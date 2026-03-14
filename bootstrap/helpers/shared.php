@@ -375,9 +375,29 @@ function base_ip(): string
 
     return 'localhost';
 }
+/**
+ * Ensure a URL string has a scheme (http:// or https://).
+ * Spatie\Url\Url::fromString treats scheme-less strings (e.g., "host:80")
+ * as having an empty scheme, which causes withPort() to produce
+ * malformed URLs like "//:80host" instead of "http://host:80".
+ */
+function ensureUrlHasScheme(string $url): string
+{
+    $url = trim($url);
+    if ($url === '') {
+        return $url;
+    }
+    if (! str_starts_with($url, 'http://') && ! str_starts_with($url, 'https://')) {
+        return 'http://'.$url;
+    }
+
+    return $url;
+}
+
 function getFqdnWithoutPort(string $fqdn)
 {
     try {
+        $fqdn = ensureUrlHasScheme($fqdn);
         $url = Url::fromString($fqdn);
         $host = $url->getHost();
         $scheme = $url->getScheme();
@@ -2153,10 +2173,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 'resourceable_id' => $resource->id,
                             ])->first();
                             if ($env) {
-                                $env_url = Url::fromString($savedService->fqdn);
+                                $env_url = Url::fromString(ensureUrlHasScheme($savedService->fqdn));
                                 $env_port = $env_url->getPort();
-                                if ($env_port !== $predefinedPort) {
-                                    $env_url = $env_url->withPort($predefinedPort);
+                                if ($env_port != $predefinedPort) {
+                                    $env_url = $env_url->withPort((int) $predefinedPort);
                                     $savedService->fqdn = $env_url->__toString();
                                     $savedService->save();
                                 }
@@ -2238,10 +2258,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 'resourceable_id' => $resource->id,
                                             ])->first();
                                             if ($env) {
-                                                $env_url = Url::fromString($env->value);
+                                                $env_url = Url::fromString(ensureUrlHasScheme($env->value));
                                                 $env_port = $env_url->getPort();
-                                                if ($env_port !== $predefinedPort) {
-                                                    $env_url = $env_url->withPort($predefinedPort);
+                                                if ($env_port != $predefinedPort) {
+                                                    $env_url = $env_url->withPort((int) $predefinedPort);
                                                     $savedService->fqdn = $env_url->__toString();
                                                     $savedService->save();
                                                 }

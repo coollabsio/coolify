@@ -478,6 +478,9 @@ class Index extends Component
             $this->fqdn = str($this->fqdn)->replaceStart(',', '')->trim()->toString();
             $domains = str($this->fqdn)->trim()->explode(',')->map(function ($domain) {
                 $domain = trim($domain);
+                if (! str_starts_with($domain, 'http://') && ! str_starts_with($domain, 'https://')) {
+                    $domain = 'http://'.$domain;
+                }
                 Url::fromString($domain, ['http', 'https']);
 
                 return str($domain)->lower();

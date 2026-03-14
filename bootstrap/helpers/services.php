@@ -327,7 +327,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         if ($resource->fqdn) {
             $resourceFqdns = str($resource->fqdn)->explode(',');
             $resourceFqdns = $resourceFqdns->first();
-            $url = Url::fromString($resourceFqdns);
+            $url = Url::fromString(ensureUrlHasScheme($resourceFqdns));
             $port = $url->getPort();
             $path = $url->getPath();
 
@@ -336,8 +336,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
             $urlValue = ($path === '/') ? $urlValue : $urlValue.$path;
 
             // Prepare FQDN value (host only, no scheme)
-            $fqdnHost = $url->getHost();
-            $fqdnValue = str($fqdnHost)->after('://');
+            $fqdnValue = $url->getHost();
             if ($path !== '/') {
                 $fqdnValue = $fqdnValue.$path;
             }

@@ -1263,12 +1263,16 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
             $fqdnsWithoutPort = $fqdns->map(function ($fqdn) {
-                return str($fqdn)->after('://')->before(':')->prepend(str($fqdn)->before('://')->append('://'));
+                $parsed = Url::fromString(ensureUrlHasScheme($fqdn));
+
+                return $parsed->getScheme().'://'.$parsed->getHost();
             });
             $coolifyEnvironments->put('COOLIFY_URL', $fqdnsWithoutPort->implode(','));
 
             $urls = $fqdns->map(function ($fqdn) {
-                return str($fqdn)->replace('http://', '')->replace('https://', '')->before(':');
+                $parsed = Url::fromString(ensureUrlHasScheme($fqdn));
+
+                return $parsed->getHost();
             });
             $coolifyEnvironments->put('COOLIFY_FQDN', $urls->implode(','));
         }
@@ -1755,8 +1759,9 @@ function serviceParser(Service $resource): Collection
                     $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
                     $url = generateUrl($server, "$fqdnFor-$uuid");
                 } elseif ($isServiceApplication) {
-                    $fqdn = str($savedService->fqdn)->after('://')->before(':')->prepend(str($savedService->fqdn)->before('://')->append('://'))->value();
-                    $url = str($savedService->fqdn)->after('://')->before(':')->prepend(str($savedService->fqdn)->before('://')->append('://'))->value();
+                    $parsedUrl = Url::fromString(ensureUrlHasScheme($savedService->fqdn));
+                    $fqdn = $parsedUrl->getScheme().'://'.$parsedUrl->getHost();
+                    $url = $fqdn;
                 } else {
                     // For ServiceDatabase, generate fqdn/url without saving to the model
                     $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
@@ -2535,11 +2540,15 @@ function serviceParser(Service $resource): Collection
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
             $fqdnsWithoutPort = $fqdns->map(function ($fqdn) {
-                return str($fqdn)->replace('http://', '')->replace('https://', '')->before(':');
+                $parsed = Url::fromString(ensureUrlHasScheme($fqdn));
+
+                return $parsed->getHost();
             });
             $coolifyEnvironments->put('COOLIFY_FQDN', $fqdnsWithoutPort->implode(','));
             $urls = $fqdns->map(function ($fqdn): Stringable {
-                return str($fqdn)->after('://')->before(':')->prepend(str($fqdn)->before('://')->append('://'));
+                $parsed = Url::fromString(ensureUrlHasScheme($fqdn));
+
+                return str($parsed->getScheme().'://'.$parsed->getHost());
             });
             $coolifyEnvironments->put('COOLIFY_URL', $urls->implode(','));
         }
