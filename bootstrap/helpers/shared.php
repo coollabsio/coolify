@@ -2155,7 +2155,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             if ($env) {
                                 $env_url = Url::fromString($savedService->fqdn);
                                 $env_port = $env_url->getPort();
-                                if ($env_port !== $predefinedPort) {
+                                if ((int) $env_port !== (int) $predefinedPort) {
                                     $env_url = $env_url->withPort($predefinedPort);
                                     $savedService->fqdn = $env_url->__toString();
                                     $savedService->save();
@@ -2240,7 +2240,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             if ($env) {
                                                 $env_url = Url::fromString($env->value);
                                                 $env_port = $env_url->getPort();
-                                                if ($env_port !== $predefinedPort) {
+                                                if ((int) $env_port !== (int) $predefinedPort) {
                                                     $env_url = $env_url->withPort($predefinedPort);
                                                     $savedService->fqdn = $env_url->__toString();
                                                     $savedService->save();

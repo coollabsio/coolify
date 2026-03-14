@@ -1263,7 +1263,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
             $fqdnsWithoutPort = $fqdns->map(function ($fqdn) {
-                return str($fqdn)->after('://')->before(':')->prepend(str($fqdn)->before('://')->append('://'));
+                return getFqdnWithoutPort($fqdn);
             });
             $coolifyEnvironments->put('COOLIFY_URL', $fqdnsWithoutPort->implode(','));
 
@@ -1755,8 +1755,8 @@ function serviceParser(Service $resource): Collection
                     $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
                     $url = generateUrl($server, "$fqdnFor-$uuid");
                 } elseif ($isServiceApplication) {
-                    $fqdn = str($savedService->fqdn)->after('://')->before(':')->prepend(str($savedService->fqdn)->before('://')->append('://'))->value();
-                    $url = str($savedService->fqdn)->after('://')->before(':')->prepend(str($savedService->fqdn)->before('://')->append('://'))->value();
+                    $fqdn = getFqdnWithoutPort($savedService->fqdn);
+                    $url = $fqdn;
                 } else {
                     // For ServiceDatabase, generate fqdn/url without saving to the model
                     $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
@@ -2538,8 +2538,8 @@ function serviceParser(Service $resource): Collection
                 return str($fqdn)->replace('http://', '')->replace('https://', '')->before(':');
             });
             $coolifyEnvironments->put('COOLIFY_FQDN', $fqdnsWithoutPort->implode(','));
-            $urls = $fqdns->map(function ($fqdn): Stringable {
-                return str($fqdn)->after('://')->before(':')->prepend(str($fqdn)->before('://')->append('://'));
+            $urls = $fqdns->map(function ($fqdn) {
+                return getFqdnWithoutPort($fqdn);
             });
             $coolifyEnvironments->put('COOLIFY_URL', $urls->implode(','));
         }
