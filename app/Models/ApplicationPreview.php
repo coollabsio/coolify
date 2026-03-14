@@ -168,4 +168,19 @@ class ApplicationPreview extends BaseModel
         $this->docker_compose_domains = json_encode($docker_compose_domains);
         $this->save();
     }
+
+    public function getComposeFqdn(): ?string
+    {
+        $domains = json_decode($this->docker_compose_domains, true);
+        if (empty($domains)) {
+            return null;
+        }
+        $firstService = collect($domains)->first();
+        $domain = data_get($firstService, 'domain');
+        if (empty($domain)) {
+            return null;
+        }
+
+        return str($domain)->before(',')->trim()->value() ?: null;
+    }
 }

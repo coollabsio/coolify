@@ -202,7 +202,7 @@ class DeploymentFailed extends CustomEmailNotification
 
         if ($this->preview) {
             $data['pull_request_id'] = $this->preview->pull_request_id;
-            $data['preview_fqdn'] = $this->preview->fqdn;
+            $data['preview_fqdn'] = $this->preview->fqdn ?? $this->preview->getComposeFqdn();
         }
 
         if ($this->fqdn) {
