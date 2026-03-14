@@ -221,6 +221,42 @@ class User extends Authenticatable implements SendsEmail
         return $this->belongsToMany(Team::class)->withPivot('role');
     }
 
+    /**
+     * Get all project memberships for this user (project-specific access).
+     */
+    public function projectMemberships(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProjectMember::class);
+    }
+
+    /**
+     * Get all projects this user has project-specific access to.
+     */
+    public function accessibleProjects(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Project::class, 'project_members')
+            ->withPivot('role', 'permissions', 'invited_by', 'accepted_at')
+            ->withTimestamps();
+    }
+
+    /**
+     * Check if this user is a project-specific member (not a full team member).
+     */
+    public function isProjectMember(): bool
+    {
+        return $this->projectMemberships()->exists();
+    }
+
+    /**
+     * Get the project member role for a specific project.
+     */
+    public function projectRole(int $projectId): ?string
+    {
+        $membership = $this->projectMemberships()->where('project_id', $projectId)->first();
+
+        return $membership?->role?->value;
+    }
+
     public function changelogReads()
     {
         return $this->hasMany(UserChangelogRead::class);

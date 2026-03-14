@@ -24,6 +24,7 @@ use App\Livewire\Project\Database\Backup\Execution as DatabaseBackupExecution;
 use App\Livewire\Project\Database\Backup\Index as DatabaseBackupIndex;
 use App\Livewire\Project\Database\Configuration as DatabaseConfiguration;
 use App\Livewire\Project\Edit as ProjectEdit;
+use App\Livewire\Project\Member\Index as ProjectMemberIndex;
 use App\Livewire\Project\EnvironmentEdit;
 use App\Livewire\Project\Index as ProjectIndex;
 use App\Livewire\Project\Resource\Create as ResourceCreate;
@@ -195,10 +196,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{uuid}/revoke', [Controller::class, 'revokeInvitation'])->name('team.invitation.revoke');
     });
 
+    Route::get('/project-invitation/{uuid}', [Controller::class, 'acceptProjectInvitation'])->name('project.invitation.accept');
+
     Route::get('/projects', ProjectIndex::class)->name('project.index');
     Route::prefix('project/{project_uuid}')->group(function () {
         Route::get('/', ProjectShow::class)->name('project.show');
         Route::get('/edit', ProjectEdit::class)->name('project.edit')->middleware('can.update.resource');
+        Route::get('/members', ProjectMemberIndex::class)->name('project.members');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}')->group(function () {
         Route::get('/', ResourceIndex::class)->name('project.resource.index');

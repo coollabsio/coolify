@@ -56,6 +56,9 @@ class AuthServiceProvider extends ServiceProvider
         // Team policy
         \App\Models\Team::class => \App\Policies\TeamPolicy::class,
 
+        // Project member policy
+        \App\Models\ProjectMember::class => \App\Policies\ProjectMemberPolicy::class,
+
         // Git source policies
         \App\Models\GithubApp::class => \App\Policies\GithubAppPolicy::class,
 

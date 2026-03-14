@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Events\TestEvent;
+use App\Models\ProjectInvitation;
+use App\Models\ProjectMember;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Providers\RouteServiceProvider;
@@ -157,5 +159,55 @@ class Controller extends BaseController
         $invitation->delete();
 
         return redirect()->route('team.index');
+    }
+
+    public function acceptProjectInvitation()
+    {
+        $invitationUuid = request()->route('uuid');
+        $invitation = ProjectInvitation::where('uuid', $invitationUuid)->firstOrFail();
+        $user = User::whereEmail($invitation->email)->firstOrFail();
+
+        if (Auth::id() !== $user->id) {
+            abort(400, 'You are not allowed to accept this invitation.');
+        }
+
+        if (! $invitation->isValid()) {
+            abort(400, 'Invitation expired.');
+        }
+
+        // Check if already a project member
+        $existingMember = ProjectMember::where('user_id', $user->id)
+            ->where('project_id', $invitation->project_id)
+            ->first();
+
+        if ($existingMember) {
+            $invitation->delete();
+
+            return redirect()->route('dashboard')->with('success', 'You are already a member of this project.');
+        }
+
+        // Add user to the team if not already a member (with 'member' role for minimal access)
+        if (! $user->teams()->where('team_id', $invitation->team_id)->exists()) {
+            $user->teams()->attach($invitation->team_id, ['role' => 'member']);
+        }
+
+        // Create project membership
+        ProjectMember::create([
+            'user_id' => $user->id,
+            'project_id' => $invitation->project_id,
+            'role' => $invitation->role,
+            'invited_by' => $invitation->invited_by,
+            'accepted_at' => now(),
+        ]);
+
+        $invitation->delete();
+
+        // Refresh session to the invitation's team
+        $team = \App\Models\Team::find($invitation->team_id);
+        if ($team) {
+            refreshSession($team);
+        }
+
+        return redirect()->route('dashboard')->with('success', 'You have joined the project successfully.');
     }
 }

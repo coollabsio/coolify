@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use OpenApi\Attributes as OA;
 use Visus\Cuid2\Cuid2;
 
@@ -45,6 +46,41 @@ class Project extends BaseModel
         });
     }
 
+    /**
+     * Get projects accessible by the current user.
+     * For team owners/admins: returns all team projects.
+     * For project-specific members: returns only their assigned projects.
+     */
+    public static function accessibleByCurrentUser()
+    {
+        $user = auth()->user();
+        $team = currentTeam();
+
+        if (! $user || ! $team) {
+            return collect();
+        }
+
+        // Team owners/admins/regular members see all projects
+        if ($user->isAdmin() || $user->isOwner()) {
+            return Project::ownedByCurrentTeam()->get();
+        }
+
+        // Check if user is a project-specific member
+        $projectMemberProjectIds = ProjectMember::where('user_id', $user->id)
+            ->whereHas('project', fn ($q) => $q->where('team_id', $team->id))
+            ->pluck('project_id');
+
+        if ($projectMemberProjectIds->isNotEmpty()) {
+            // Return only projects the user has been assigned to
+            return Project::whereIn('id', $projectMemberProjectIds)
+                ->orderByRaw('LOWER(name)')
+                ->get();
+        }
+
+        // Regular team member - see all projects
+        return Project::ownedByCurrentTeam()->get();
+    }
+
     protected static function booted()
     {
         static::created(function ($project) {
@@ -60,11 +96,76 @@ class Project extends BaseModel
         static::deleting(function ($project) {
             $project->environments()->delete();
             $project->settings()->delete();
+            $project->projectMembers()->delete();
+            $project->projectInvitations()->delete();
             $shared_variables = $project->environment_variables();
             foreach ($shared_variables as $shared_variable) {
                 $shared_variable->delete();
             }
         });
+    }
+
+    /**
+     * Get all project-specific members (via pivot).
+     */
+    public function projectMembers(): HasMany
+    {
+        return $this->hasMany(ProjectMember::class);
+    }
+
+    /**
+     * Get all users who are project-specific members.
+     */
+    public function members(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'project_members')
+            ->withPivot('role', 'permissions', 'invited_by', 'accepted_at')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get pending project invitations.
+     */
+    public function projectInvitations(): HasMany
+    {
+        return $this->hasMany(ProjectInvitation::class);
+    }
+
+    /**
+     * Check if a user is a project-specific member.
+     */
+    public function isProjectMember(User $user): bool
+    {
+        return $this->projectMembers()->where('user_id', $user->id)->exists();
+    }
+
+    /**
+     * Get the project member record for a user.
+     */
+    public function getProjectMember(User $user): ?ProjectMember
+    {
+        return $this->projectMembers()->where('user_id', $user->id)->first();
+    }
+
+    /**
+     * Check if a user can access this project.
+     * Team members (owner/admin/member) always have access.
+     * Project-specific members have access only to this project.
+     */
+    public function userCanAccess(?User $user = null): bool
+    {
+        $user = $user ?? auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        // Team owners/admins/members always have access
+        if ($user->teams->contains('id', $this->team_id)) {
+            return true;
+        }
+
+        // Check project-specific membership
+        return $this->isProjectMember($user);
     }
 
     public function environment_variables()

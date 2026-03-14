@@ -57,4 +57,55 @@
         </div>
         <livewire:team.invitations :invitations="$invitations" />
     @endcan
+
+    @if (auth()->user()->isAdmin() || auth()->user()->isOwner())
+        @if (count($projectMembers) > 0)
+            <div class="pt-6">
+                <h2>Project-Specific Members</h2>
+                <div class="subtitle">
+                    These users have access only to specific projects, not the entire team.
+                </div>
+                <div class="overflow-x-auto">
+                    <div class="inline-block min-w-full">
+                        <div class="overflow-hidden">
+                            <table class="min-w-full">
+                                <thead>
+                                    <tr>
+                                        <th class="px-5 py-3 text-xs font-medium text-left uppercase">Name</th>
+                                        <th class="px-5 py-3 text-xs font-medium text-left uppercase">Email</th>
+                                        <th class="px-5 py-3 text-xs font-medium text-left uppercase">Project</th>
+                                        <th class="px-5 py-3 text-xs font-medium text-left uppercase">Role</th>
+                                        <th class="px-5 py-3 text-xs font-medium text-left uppercase">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($projectMembers as $pm)
+                                        <tr class="dark:text-white text-black dark:bg-coolblack dark:hover:bg-coolgray-100">
+                                            <td class="px-5 py-4 text-sm whitespace-nowrap">{{ $pm->user->name }}</td>
+                                            <td class="px-5 py-4 text-sm whitespace-nowrap">{{ $pm->user->email }}</td>
+                                            <td class="px-5 py-4 text-sm whitespace-nowrap">
+                                                <a {{ wireNavigate() }}
+                                                    href="{{ route('project.members', ['project_uuid' => $pm->project->uuid]) }}"
+                                                    class="underline">
+                                                    {{ $pm->project->name }}
+                                                </a>
+                                            </td>
+                                            <td class="px-5 py-4 text-sm whitespace-nowrap">{{ $pm->role->value }}</td>
+                                            <td class="px-5 py-4 text-sm whitespace-nowrap">
+                                                <a {{ wireNavigate() }}
+                                                    href="{{ route('project.members', ['project_uuid' => $pm->project->uuid]) }}"
+                                                    class="underline">
+                                                    Manage
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+    @endif
 </div>

@@ -10,7 +10,13 @@
                     <livewire:project.delete-project :disabled="!$project->isEmpty()" :project_id="$project->id" />
                 </div>
             </div>
-            <div class="pt-2 pb-10">Edit project details here.</div>
+            <div class="pt-2 pb-4">Edit project details here.</div>
+            <nav class="flex items-center gap-4 pb-6">
+                <a class="dark:text-white font-bold">Settings</a>
+                <a {{ wireNavigate() }}
+                    href="{{ route('project.members', ['project_uuid' => $project->uuid]) }}"
+                    class="dark:text-neutral-400">Members</a>
+            </nav>
             <div class="flex gap-2">
                 <x-forms.input label="Name" id="name" />
                 <x-forms.input label="Description" id="description" />

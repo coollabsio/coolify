@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\HetznerController;
 use App\Http\Controllers\Api\OtherController;
 use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\Api\ProjectMemberController;
 use App\Http\Controllers\Api\ResourcesController;
 use App\Http\Controllers\Api\ScheduledTasksController;
 use App\Http\Controllers\Api\SecurityController;
@@ -58,6 +59,11 @@ Route::group([
     Route::post('/projects', [ProjectController::class, 'create_project'])->middleware(['api.ability:write']);
     Route::patch('/projects/{uuid}', [ProjectController::class, 'update_project'])->middleware(['api.ability:write']);
     Route::delete('/projects/{uuid}', [ProjectController::class, 'delete_project'])->middleware(['api.ability:write']);
+
+    Route::get('/projects/{uuid}/members', [ProjectMemberController::class, 'list_members'])->middleware(['api.ability:read']);
+    Route::post('/projects/{uuid}/members', [ProjectMemberController::class, 'invite_member'])->middleware(['api.ability:write']);
+    Route::patch('/projects/{uuid}/members/{member_id}', [ProjectMemberController::class, 'update_member'])->middleware(['api.ability:write']);
+    Route::delete('/projects/{uuid}/members/{member_id}', [ProjectMemberController::class, 'remove_member'])->middleware(['api.ability:write']);
 
     Route::get('/security/keys', [SecurityController::class, 'keys'])->middleware(['api.ability:read']);
     Route::post('/security/keys', [SecurityController::class, 'create_key'])->middleware(['api.ability:write']);
