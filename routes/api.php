@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\HetznerController;
 use App\Http\Controllers\Api\OtherController;
 use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\Api\ProjectMembersController;
 use App\Http\Controllers\Api\ResourcesController;
 use App\Http\Controllers\Api\ScheduledTasksController;
 use App\Http\Controllers\Api\SecurityController;
@@ -50,6 +51,10 @@ Route::group([
 
     Route::get('/projects', [ProjectController::class, 'projects'])->middleware(['api.ability:read']);
     Route::get('/projects/{uuid}', [ProjectController::class, 'project_by_uuid'])->middleware(['api.ability:read']);
+    Route::get('/projects/{uuid}/members', [ProjectMembersController::class, 'index'])->middleware(['api.ability:read']);
+    Route::post('/projects/{uuid}/members', [ProjectMembersController::class, 'store'])->middleware(['api.ability:write']);
+    Route::patch('/projects/{uuid}/members/{member_id}', [ProjectMembersController::class, 'update'])->middleware(['api.ability:write']);
+    Route::delete('/projects/{uuid}/members/{member_id}', [ProjectMembersController::class, 'destroy'])->middleware(['api.ability:write']);
     Route::get('/projects/{uuid}/environments', [ProjectController::class, 'get_environments'])->middleware(['api.ability:read']);
     Route::get('/projects/{uuid}/{environment_name_or_uuid}', [ProjectController::class, 'environment_details'])->middleware(['api.ability:read']);
     Route::post('/projects/{uuid}/environments', [ProjectController::class, 'create_environment'])->middleware(['api.ability:write']);
