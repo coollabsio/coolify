@@ -1,0 +1,70 @@
+# documentation: https://surrealdb.com/docs/surrealdb/installation/running/docker
+# slogan: SurrealDB with TiKV backend for distributed, highly-available deployments.
+# category: database
+# tags: database, nosql, sql, graph, realtime, surrealdb, tikv, distributed
+# logo: svgs/surrealdb.svg
+# port: 8000
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:v3.0.0
+    command: start --log info tikv://pd0:2379
+    environment:
+      - SERVICE_FQDN_SURREALDB_8000
+      - SURREAL_USER=${SERVICE_USER_SURREALDB}
+      - SURREAL_PASS=${SERVICE_PASSWORD_SURREALDB}
+      - SURREAL_BIND=0.0.0.0:8000
+      - SURREAL_LOG=${SURREAL_LOG:-info}
+      - SURREAL_CAPS_ALLOW_ALL=${SURREAL_CAPS_ALLOW_ALL:-true}
+    depends_on:
+      tikv0:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/surreal", "isready", "--conn", "http://127.0.0.1:8000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  pd0:
+    image: pingcap/pd:v8.5.0
+    command:
+      - --name=pd0
+      - --client-urls=http://0.0.0.0:2379
+      - --peer-urls=http://0.0.0.0:2380
+      - --advertise-client-urls=http://pd0:2379
+      - --advertise-peer-urls=http://pd0:2380
+      - --initial-cluster=pd0=http://pd0:2380
+      - --data-dir=/data/pd0
+      - --log-file=/logs/pd0.log
+    volumes:
+      - pd-data:/data
+      - pd-logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:2379/pd/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  tikv0:
+    image: pingcap/tikv:v8.5.0
+    command:
+      - --addr=0.0.0.0:20160
+      - --advertise-addr=tikv0:20160
+      - --status-addr=0.0.0.0:20180
+      - --data-dir=/data/tikv0
+      - --pd=pd0:2379
+      - --log-file=/logs/tikv0.log
+    volumes:
+      - tikv-data:/data
+      - tikv-logs:/logs
+    depends_on:
+      pd0:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:20180/status || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
