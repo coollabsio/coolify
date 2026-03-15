@@ -4,8 +4,6 @@
 # tags: analytics, product, open-source, self-hosted, ab-testing, event-tracking
 # logo: svgs/posthog.svg
 # minversion: 4.0.0-beta.222
-# port: 8000
-
 services:
   db:
     image: postgres:15.12-alpine
@@ -1243,6 +1241,7 @@ services:
       - '-c'
       - './bin/migrate && ./bin/docker-server'
     environment:
+      - SERVICE_URL_POSTHOG_8000=/
       - OTEL_SDK_DISABLED=true
       - DISABLE_SECURE_SSL_REDIRECT=true
       - IS_BEHIND_PROXY=true
@@ -1263,19 +1262,19 @@ services:
       - DEPLOYMENT=hobby
       - CDP_API_URL=http://plugins:6738
       - FLAGS_REDIS_ENABLED=false
-      - SITE_URL=${SERVICE_URL_PROXY}
+      - SITE_URL=${SERVICE_URL_POSTHOG}
       - SECRET_KEY=${SERVICE_BASE64_64_SECRETKEY}
       - ENCRYPTION_SALT_KEYS=${SERVICE_PASSWORD_ENCRYPTION}
       - OBJECT_STORAGE_ACCESS_KEY_ID=${SERVICE_USER_MINIO}
       - OBJECT_STORAGE_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
       - OBJECT_STORAGE_ENDPOINT=http://objectstorage:19000
-      - OBJECT_STORAGE_PUBLIC_ENDPOINT=${SERVICE_URL_PROXY}
+      - OBJECT_STORAGE_PUBLIC_ENDPOINT=${SERVICE_URL_POSTHOG}
       - SESSION_RECORDING_V2_S3_ENDPOINT=http://seaweedfs:8333
       - SESSION_RECORDING_V2_S3_ACCESS_KEY_ID=any
       - SESSION_RECORDING_V2_S3_SECRET_ACCESS_KEY=any
       - OBJECT_STORAGE_ENABLED=true
       - RECORDING_API_URL=http://plugins:6738
-      - LIVESTREAM_HOST=${SERVICE_URL_PROXY}/livestream
+      - LIVESTREAM_HOST=${SERVICE_URL_POSTHOG}/livestream
       - USE_GRANIAN=true
       - GRANIAN_WORKERS=2
     depends_on:
@@ -1320,13 +1319,13 @@ services:
       - DEPLOYMENT=hobby
       - CDP_API_URL=http://plugins:6738
       - FLAGS_REDIS_ENABLED=false
-      - SITE_URL=${SERVICE_URL_PROXY}
+      - SITE_URL=${SERVICE_URL_POSTHOG}
       - SECRET_KEY=${SERVICE_BASE64_64_SECRETKEY}
       - ENCRYPTION_SALT_KEYS=${SERVICE_PASSWORD_ENCRYPTION}
       - OBJECT_STORAGE_ACCESS_KEY_ID=${SERVICE_USER_MINIO}
       - OBJECT_STORAGE_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
       - OBJECT_STORAGE_ENDPOINT=http://objectstorage:19000
-      - OBJECT_STORAGE_PUBLIC_ENDPOINT=${SERVICE_URL_PROXY}
+      - OBJECT_STORAGE_PUBLIC_ENDPOINT=${SERVICE_URL_POSTHOG}
       - SESSION_RECORDING_V2_S3_ENDPOINT=http://seaweedfs:8333
       - SESSION_RECORDING_V2_S3_ACCESS_KEY_ID=any
       - SESSION_RECORDING_V2_S3_SECRET_ACCESS_KEY=any
@@ -1372,7 +1371,7 @@ services:
       - CLICKHOUSE_DATABASE=posthog
       - CLICKHOUSE_SECURE=false
       - CLICKHOUSE_VERIFY=false
-      - SITE_URL=${SERVICE_URL_PROXY}
+      - SITE_URL=${SERVICE_URL_POSTHOG}
       - SECRET_KEY=${SERVICE_BASE64_64_SECRETKEY}
       - ENCRYPTION_SALT_KEYS=${SERVICE_PASSWORD_ENCRYPTION}
       - OBJECT_STORAGE_ACCESS_KEY_ID=${SERVICE_USER_MINIO}
@@ -1381,7 +1380,7 @@ services:
       - SESSION_RECORDING_V2_S3_SECRET_ACCESS_KEY=any
       - SESSION_RECORDING_V2_S3_TIMEOUT_MS=120000
       - OBJECT_STORAGE_ENDPOINT=http://objectstorage:19000
-      - OBJECT_STORAGE_PUBLIC_ENDPOINT=${SERVICE_URL_PROXY}
+      - OBJECT_STORAGE_PUBLIC_ENDPOINT=${SERVICE_URL_POSTHOG}
       - SESSION_RECORDING_V2_S3_ENDPOINT=http://seaweedfs:8333
       - OBJECT_STORAGE_ENABLED=true
     depends_on:
@@ -1424,13 +1423,13 @@ services:
       - DEPLOYMENT=hobby
       - CDP_API_URL=http://plugins:6738
       - FLAGS_REDIS_ENABLED=false
-      - SITE_URL=${SERVICE_URL_PROXY}
+      - SITE_URL=${SERVICE_URL_POSTHOG}
       - SECRET_KEY=${SERVICE_BASE64_64_SECRETKEY}
       - ENCRYPTION_SALT_KEYS=${SERVICE_PASSWORD_ENCRYPTION}
       - OBJECT_STORAGE_ACCESS_KEY_ID=${SERVICE_USER_MINIO}
       - OBJECT_STORAGE_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
       - OBJECT_STORAGE_ENDPOINT=http://objectstorage:19000
-      - OBJECT_STORAGE_PUBLIC_ENDPOINT=${SERVICE_URL_PROXY}
+      - OBJECT_STORAGE_PUBLIC_ENDPOINT=${SERVICE_URL_POSTHOG}
       - SESSION_RECORDING_V2_S3_ENDPOINT=http://seaweedfs:8333
       - SESSION_RECORDING_V2_S3_ACCESS_KEY_ID=any
       - SESSION_RECORDING_V2_S3_SECRET_ACCESS_KEY=any
@@ -1478,13 +1477,13 @@ services:
       - DEPLOYMENT=hobby
       - CDP_API_URL=http://plugins:6738
       - FLAGS_REDIS_ENABLED=false
-      - SITE_URL=${SERVICE_URL_PROXY}
+      - SITE_URL=${SERVICE_URL_POSTHOG}
       - SECRET_KEY=${SERVICE_BASE64_64_SECRETKEY}
       - ENCRYPTION_SALT_KEYS=${SERVICE_PASSWORD_ENCRYPTION}
       - OBJECT_STORAGE_ACCESS_KEY_ID=${SERVICE_USER_MINIO}
       - OBJECT_STORAGE_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
       - OBJECT_STORAGE_ENDPOINT=http://objectstorage:19000
-      - OBJECT_STORAGE_PUBLIC_ENDPOINT=${SERVICE_URL_PROXY}
+      - OBJECT_STORAGE_PUBLIC_ENDPOINT=${SERVICE_URL_POSTHOG}
       - SESSION_RECORDING_V2_S3_ENDPOINT=http://seaweedfs:8333
       - SESSION_RECORDING_V2_S3_ACCESS_KEY_ID=any
       - SESSION_RECORDING_V2_S3_SECRET_ACCESS_KEY=any
@@ -1506,6 +1505,7 @@ services:
   capture:
     image: ghcr.io/posthog/posthog/capture:master
     environment:
+      - SERVICE_URL_POSTHOG_3000=/e
       - ADDRESS=0.0.0.0:3000
       - KAFKA_TOPIC=events_plugin_ingestion
       - KAFKA_HOSTS=kafka:9092
@@ -1521,6 +1521,7 @@ services:
   replay-capture:
     image: ghcr.io/posthog/posthog/capture:master
     environment:
+      - SERVICE_URL_POSTHOG_3000=/s
       - ADDRESS=0.0.0.0:3000
       - KAFKA_TOPIC=session_recording_snapshot_item_events
       - KAFKA_HOSTS=kafka:9092
@@ -1535,6 +1536,7 @@ services:
   livestream:
     image: ghcr.io/posthog/posthog/livestream:master
     environment:
+      - SERVICE_URL_POSTHOG_8080=/livestream
       - LIVESTREAM_JWT_SECRET=${SERVICE_BASE64_64_SECRETKEY}
       - LIVESTREAM_MMDB_PATH=/share/GeoLite2-City.mmdb
       - LIVESTREAM_KAFKA_BROKERS=kafka:9092
@@ -1575,6 +1577,7 @@ services:
       retries: 12
       start_period: 10s
     environment:
+      - SERVICE_URL_POSTHOG_3001=/flags
       - WRITE_DATABASE_URL=postgres://posthog:${SERVICE_PASSWORD_POSTGRES}@db:5432/posthog
       - READ_DATABASE_URL=postgres://posthog:${SERVICE_PASSWORD_POSTGRES}@db:5432/posthog
       - PERSONS_WRITE_DATABASE_URL=postgres://posthog:${SERVICE_PASSWORD_POSTGRES}@db:5432/posthog
@@ -1668,70 +1671,4 @@ services:
       redis:
         condition: service_healthy
 
-  proxy:
-    image: caddy:2-alpine
-    command: caddy run -c /etc/caddy/Caddyfile
-    environment:
-      - SERVICE_URL_PROXY_8000
-    depends_on:
-      - web
-      - capture
-      - livestream
-    ports:
-      - '8000'
-    volumes:
-      - type: bind
-        source: ./caddy/Caddyfile
-        target: /etc/caddy/Caddyfile
-        content: |
-          :8000 {
-              @replay-capture {
-                  path /s /s/ /s/*
-              }
-              @capture {
-                  path /e /e/ /e/*
-                  path /i/v0 /i/v0/ /i/v0/*
-                  path /batch /batch/ /batch/*
-                  path /capture /capture/ /capture/*
-              }
-              @livestream {
-                  path /livestream /livestream/ /livestream/*
-              }
-              @flags {
-                  path /flags /flags/ /flags/*
-              }
-              @webhooks {
-                  path /public/webhooks /public/webhooks/ /public/webhooks/*
-                  path /public/m/ /public/m/*
-              }
-              @objectstorage {
-                  path /posthog /posthog/ /posthog/*
-              }
-              handle @livestream {
-                  uri strip_prefix /livestream
-                  reverse_proxy livestream:8080 {
-                      flush_interval -1
-                  }
-              }
-              handle @replay-capture {
-                  reverse_proxy replay-capture:3000
-              }
-              handle @capture {
-                  reverse_proxy capture:3000
-              }
-              handle @flags {
-                  reverse_proxy feature-flags:3001
-              }
-              handle @webhooks {
-                  reverse_proxy plugins:6738
-              }
-              handle @objectstorage {
-                  reverse_proxy objectstorage:19000
-              }
-              handle {
-                  reverse_proxy web:8000
-              }
-          }
-      - posthog-caddy-data:/data
-      - posthog-caddy-config:/config
 
