@@ -347,16 +347,14 @@ async function killPtyProcess(userId) {
     if (!session?.ptyProcess) return false;
 
     return new Promise((resolve) => {
-        // Loop to ensure terminal is killed before continuing
         let killAttempts = 0;
-        const maxAttempts = 5;
+        const maxGracefulAttempts = 3;
 
         const attemptKill = () => {
             killAttempts++;
             logTerminal('log', 'Attempting to terminate PTY process.', {
                 userId,
                 killAttempts,
-                maxAttempts,
             });
 
             // session.ptyProcess.kill() wont work here because of https://github.com/moby/moby/issues/9098
@@ -373,14 +371,29 @@ async function killPtyProcess(userId) {
                     return;
                 }
 
-                if (killAttempts < maxAttempts) {
+                if (killAttempts < maxGracefulAttempts) {
                     attemptKill();
                 } else {
-                    logTerminal('warn', 'PTY process still active after maximum termination attempts.', {
+                    // Graceful attempts failed (e.g. interactive program like htop
+                    // swallowed the kill command). Force-kill the PTY process directly
+                    // to prevent orphaned processes from consuming CPU indefinitely.
+                    logTerminal('warn', 'Graceful termination failed, force-killing PTY process.', {
                         userId,
                         killAttempts,
+                        pid: session.ptyProcess.pid,
                     });
-                    resolve(false);
+
+                    try {
+                        session.ptyProcess.kill();
+                    } catch (e) {
+                        logTerminal('warn', 'Failed to kill PTY process, it may have already exited.', {
+                            userId,
+                            error: e?.message ?? e,
+                        });
+                    }
+
+                    session.isActive = false;
+                    resolve(true);
                 }
             }, 500);
         };
