@@ -1,0 +1,698 @@
+# documentation: https://docs.openreplay.com/
+# slogan: Session replay and product analytics for web apps
+# category: analytics
+# tags: analytics, session-replay, observability, debugging, user-behavior
+# logo: svgs/openreplay.svg
+# port: 80
+
+x-common-env: &common-env
+  version_number: v1.26.0
+  pg_host: postgresql
+  pg_port: "5432"
+  pg_dbname: postgres
+  pg_user: postgres
+  pg_password: $SERVICE_PASSWORD_POSTGRES
+  ch_host: clickhouse
+  ch_port: "9000"
+  ch_port_http: "8123"
+  ch_username: default
+  ch_password: ""
+  ch_db: default
+  SITE_URL: $SERVICE_URL_OPENREPLAY
+  S3_HOST: $SERVICE_URL_OPENREPLAY
+  S3_KEY: $SERVICE_USER_MINIO
+  S3_SECRET: $SERVICE_PASSWORD_MINIO
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: $SERVICE_USER_MINIO
+  AWS_SECRET_ACCESS_KEY: $SERVICE_PASSWORD_MINIO
+  AWS_ENDPOINT: http://minio:9000
+  AWS_REGION: us-east-1
+  BUCKET_NAME: mobs
+  REDIS_STRING: redis://valkey:6379
+  REDIS_URL: valkey
+  POSTGRES_STRING: postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/postgres?sslmode=disable
+  CLICKHOUSE_STRING: clickhouse:9000/default
+  CLICKHOUSE_HTTP_STRING: clickhouse:8123/default
+  CH_USERNAME: default
+  CH_PASSWORD: ""
+  JWT_SECRET: $SERVICE_PASSWORD_64_JWT
+  JWT_REFRESH_SECRET: $SERVICE_PASSWORD_64_JWTREFRESH
+  JWT_SPOT_SECRET: $SERVICE_PASSWORD_64_JWTSPOT
+  JWT_SPOT_REFRESH_SECRET: $SERVICE_PASSWORD_64_JWTSPOTREFRESH
+  ASSIST_JWT_SECRET: $SERVICE_PASSWORD_64_ASSISTJWT
+  ASSIST_KEY: $SERVICE_PASSWORD_ASSISTKEY
+  TOKEN_SECRET: $SERVICE_PASSWORD_64_TOKEN
+  ASSIST_URL: http://assist-openreplay:9001/assist/%s
+  sourcemaps_reader: http://sourcemapreader-openreplay:9000/{}/sourcemaps
+  TRACKER_HOST: $SERVICE_URL_OPENREPLAY/script
+  HTTP_PORT: "80"
+  CLUSTER_URL: svc.cluster.local
+  LOGLEVEL: INFO
+  PYTHONUNBUFFERED: "0"
+  LICENSE_KEY: ""
+  EMAIL_HOST: ${EMAIL_HOST:-}
+  EMAIL_PORT: ${EMAIL_PORT:-587}
+  EMAIL_USER: ${EMAIL_USER:-}
+  EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
+  EMAIL_USE_TLS: ${EMAIL_USE_TLS:-true}
+  EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
+  EMAIL_FROM: ${EMAIL_FROM:-OpenReplay <do-not-reply@openreplay.com>}
+  KAFKA_SERVERS: ""
+  KAFKA_USE_SSL: "false"
+
+services:
+
+  postgresql:
+    image: ghcr.io/openreplay/postgres:17
+    restart: unless-stopped
+    environment:
+      - POSTGRESQL_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    volumes:
+      - pgdata:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -h localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.11-alpine
+    restart: unless-stopped
+    environment:
+      - CLICKHOUSE_DB=default
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - clickhouse:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 -O - http://127.0.0.1:8123/ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  valkey:
+    image: ghcr.io/openreplay/valkey:8
+    restart: unless-stopped
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: ghcr.io/openreplay/minio:2025
+    restart: unless-stopped
+    environment:
+      - MINIO_ROOT_USER=$SERVICE_USER_MINIO
+      - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
+    volumes:
+      - miniodata:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+
+  minio-init:
+    image: ghcr.io/openreplay/minio:2025
+    restart: "no"
+    environment:
+      - MINIO_HOST=http://minio:9000
+      - MINIO_ACCESS_KEY=$SERVICE_USER_MINIO
+      - MINIO_SECRET_KEY=$SERVICE_PASSWORD_MINIO
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        until mc alias set myminio $$MINIO_HOST $$MINIO_ACCESS_KEY $$MINIO_SECRET_KEY 2>/dev/null; do echo 'Waiting for MinIO...'; sleep 3; done
+        for bucket in mobs sessions-assets static sourcemaps sessions-mobile-assets quickwit vault-data records spots; do
+          mc mb --ignore-existing myminio/$$bucket
+        done
+        mc anonymous set download myminio/sessions-assets
+        echo 'MinIO buckets initialized'
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  db-init:
+    image: postgres:17-alpine
+    restart: "no"
+    environment:
+      - PGPASSWORD=$SERVICE_PASSWORD_POSTGRES
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        apk add --no-cache curl > /dev/null 2>&1
+        until pg_isready -h postgresql -U postgres; do echo 'Waiting for PostgreSQL...'; sleep 3; done
+        if psql -h postgresql -U postgres -d postgres -tAc "SELECT 1 FROM information_schema.tables WHERE table_name='tenants'" | grep -q 1; then
+          echo 'Schema already exists, skipping'
+        else
+          echo 'Initializing PostgreSQL schema...'
+          curl -fsSL https://raw.githubusercontent.com/openreplay/openreplay/v1.26.0/scripts/schema/db/init_dbs/postgresql/init_schema.sql -o /tmp/init.sql
+          psql -h postgresql -U postgres -d postgres -f /tmp/init.sql
+          echo 'PostgreSQL schema initialized'
+        fi
+    depends_on:
+      postgresql:
+        condition: service_healthy
+
+  ch-init:
+    image: clickhouse/clickhouse-server:25.11-alpine
+    restart: "no"
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        until wget -q -O /dev/null http://clickhouse:8123/ping 2>/dev/null; do echo 'Waiting for ClickHouse...'; sleep 3; done
+        if clickhouse-client --host clickhouse -q "EXISTS TABLE experimental.sessions" 2>/dev/null | grep -q 1; then
+          echo 'Schema already exists, skipping'
+        else
+          echo 'Initializing ClickHouse schema...'
+          wget -q -O /tmp/init.sql https://raw.githubusercontent.com/openreplay/openreplay/v1.26.0/scripts/schema/db/init_dbs/clickhouse/create/init_schema.sql
+          clickhouse-client --host clickhouse --multiquery < /tmp/init.sql
+          echo 'ClickHouse schema initialized'
+        fi
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
+
+  openreplay:
+    image: nginx:alpine
+    restart: unless-stopped
+    environment:
+      - SERVICE_URL_OPENREPLAY
+    volumes:
+      - type: bind
+        source: /etc/nginx/conf.d/openreplay.conf
+        target: /etc/nginx/conf.d/openreplay.conf
+        content: |
+          map $arg_peerId $sessionid {
+            default "";
+            "~.*-(\d+)(?:-.*|$)" $1;
+          }
+
+          map $http_x_forwarded_for $real_ip {
+              ~^(\d+\.\d+\.\d+\.\d+) $1;
+              default $remote_addr;
+          }
+          map $http_upgrade $connection_upgrade {
+            default upgrade;
+            '' close;
+          }
+          map $http_x_forwarded_proto $origin_proto {
+            default $http_x_forwarded_proto;
+            '' $scheme;
+          }
+
+          server {
+              listen 80;
+
+              client_body_buffer_size 512k;
+              client_max_body_size 10m;
+
+              proxy_buffer_size 64k;
+              proxy_buffers 32 64k;
+              proxy_busy_buffers_size 128k;
+              proxy_max_temp_file_size 2048m;
+              proxy_buffering on;
+
+              proxy_connect_timeout 120s;
+              proxy_read_timeout 300s;
+              proxy_send_timeout 300s;
+
+              real_ip_header X-Forwarded-For;
+              set_real_ip_from 0.0.0.0/0;
+              real_ip_recursive on;
+
+              add_header X-XSS-Protection "1; mode=block" always;
+              add_header X-Content-Type-Options "nosniff" always;
+              add_header Referrer-Policy "same-origin" always;
+
+              server_tokens off;
+
+              location ~ ^/(mobs|sessions-assets|frontend|static|sourcemaps|ios-images|uxtesting-records|records|spots)/ {
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header Host $http_host;
+
+                proxy_connect_timeout 300;
+                proxy_http_version 1.1;
+                proxy_set_header Connection "";
+                chunked_transfer_encoding off;
+
+                proxy_pass http://minio:9000;
+              }
+
+              location /minio/ {
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "Upgrade";
+                proxy_set_header Host $host;
+                proxy_pass http://minio:9000;
+              }
+
+              location /ingest/ {
+                rewrite ^/ingest/(.*) /$1 break;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "Upgrade";
+                proxy_set_header X-Forwarded-For $real_ip;
+                proxy_set_header X-Forwarded-Host $host;
+                proxy_set_header X-Real-IP $real_ip;
+                proxy_set_header Host $host;
+                proxy_pass http://http-openreplay:8080;
+                proxy_read_timeout 300s;
+                proxy_connect_timeout 120s;
+                proxy_send_timeout 300s;
+
+                add_header 'Access-Control-Allow-Origin' '*' always;
+                add_header 'Access-Control-Allow-Methods' 'POST' always;
+                add_header 'Access-Control-Allow-Headers' 'Content-Type,Authorization,Content-Encoding' always;
+                add_header 'Access-Control-Expose-Headers' 'Content-Length' always;
+              }
+
+              location /integrations/ {
+                rewrite ^/integrations/(.*) /$1 break;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "Upgrade";
+                proxy_set_header X-Forwarded-For $real_ip;
+                proxy_set_header X-Forwarded-Host $host;
+                proxy_set_header X-Real-IP $real_ip;
+                proxy_set_header Host $host;
+                proxy_pass http://integrations-openreplay:8080;
+                proxy_read_timeout 300s;
+                proxy_connect_timeout 120s;
+                proxy_send_timeout 300s;
+
+                add_header 'Access-Control-Allow-Origin' '*' always;
+                add_header 'Access-Control-Allow-Methods' 'POST,PATCH,OPTIONS,DELETE' always;
+                add_header 'Access-Control-Allow-Headers' 'Content-Type,Authorization,Content-Encoding,X-Openreplay-Batch' always;
+                add_header 'Access-Control-Expose-Headers' 'Content-Length' always;
+              }
+
+              location /v2/api/ {
+                rewrite ^/v2/api/(.*) /$1 break;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "Upgrade";
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-Proto $origin_proto;
+                proxy_set_header X-Forwarded-For $real_ip;
+                proxy_set_header X-Real-IP $real_ip;
+                proxy_pass http://api-openreplay:8080;
+                proxy_read_timeout 300s;
+                proxy_connect_timeout 120s;
+                proxy_send_timeout 300s;
+
+                add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+                add_header 'Access-Control-Allow-Methods' 'POST, GET, PATCH, DELETE, OPTIONS, PUT' always;
+                add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch' always;
+                add_header 'Access-Control-Expose-Headers' 'Content-Length' always;
+                add_header 'Access-Control-Max-Age' '3600' always;
+                add_header 'Access-Control-Allow-Credentials' 'true' always;
+
+                if ($request_method = 'OPTIONS') {
+                  add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+                  add_header 'Access-Control-Allow-Methods' 'POST, GET, PATCH, DELETE, OPTIONS, PUT' always;
+                  add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch' always;
+                  add_header 'Access-Control-Max-Age' '3600' always;
+                  add_header 'Content-Length' '0';
+                  add_header 'Content-Type' 'text/plain';
+                  return 204;
+                }
+              }
+
+              location /api/ {
+                rewrite ^/api/(.*) /$1 break;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "Upgrade";
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-Proto $origin_proto;
+                proxy_set_header X-Forwarded-For $real_ip;
+                proxy_pass http://chalice-openreplay:8000;
+
+                add_header Cache-Control "no-store,no-cache" always;
+                add_header Pragma "no-cache" always;
+              }
+
+              location /spot/ {
+                rewrite ^/spot/(.*) /$1 break;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "Upgrade";
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-Proto $origin_proto;
+                proxy_set_header X-Forwarded-For $real_ip;
+                proxy_set_header X-Real-IP $real_ip;
+                proxy_pass http://spot-openreplay:8080;
+                proxy_read_timeout 300s;
+                proxy_connect_timeout 120s;
+                proxy_send_timeout 300s;
+
+                add_header 'Access-Control-Allow-Origin' '*' always;
+                add_header 'Access-Control-Allow-Methods' 'POST, PATCH, DELETE, OPTIONS' always;
+                add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch' always;
+                add_header 'Access-Control-Expose-Headers' 'Content-Length' always;
+
+                if ($request_method = 'OPTIONS') {
+                  add_header 'Access-Control-Allow-Origin' '*' always;
+                  add_header 'Access-Control-Allow-Methods' 'POST, PATCH, DELETE, OPTIONS' always;
+                  add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch' always;
+                  add_header 'Access-Control-Max-Age' '3600';
+                  add_header 'Content-Type' 'text/plain charset=UTF-8';
+                  add_header 'Content-Length' 0;
+                  return 204;
+                }
+              }
+
+              location /assist/ {
+                rewrite ^/assist/(.*) /$1 break;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $real_ip;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $origin_proto;
+
+                proxy_read_timeout 3600s;
+                proxy_send_timeout 3600s;
+                proxy_connect_timeout 75s;
+
+                proxy_buffering off;
+
+                proxy_pass http://assist-openreplay:9001;
+              }
+
+              location /ws-assist/ {
+                rewrite ^/ws-assist/(.*) /$1 break;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $real_ip;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $origin_proto;
+
+                proxy_read_timeout 3600s;
+                proxy_send_timeout 3600s;
+                proxy_connect_timeout 120s;
+
+                proxy_buffering off;
+
+                add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+                add_header 'Access-Control-Allow-Methods' 'GET, OPTIONS' always;
+                add_header 'Access-Control-Allow-Headers' 'sessionid, Content-Type, Authorization' always;
+                add_header 'Access-Control-Max-Age' '1728000' always;
+                add_header 'X-Debug-Session-ID' $sessionid always;
+
+                proxy_pass http://assist-openreplay:9001;
+              }
+
+              location /script/ {
+                rewrite ^/script/(.*)/openreplay(.*).js$ /$1/openreplay$2.js break;
+                proxy_http_version 1.1;
+                proxy_ssl_protocols TLSv1.2 TLSv1.3;
+                proxy_ssl_server_name on;
+                proxy_set_header Host static.openreplay.com;
+                proxy_pass https://static.openreplay.com;
+                proxy_read_timeout 300s;
+                proxy_connect_timeout 120s;
+                proxy_send_timeout 300s;
+
+                proxy_buffering on;
+                client_max_body_size 8m;
+              }
+
+              location / {
+                index /index.html;
+                rewrite ^((?!.(js|css|png|svg|jpg|woff|woff2)).)*$ /index.html break;
+                proxy_set_header Host $http_host;
+                proxy_set_header X-Forwarded-For $real_ip;
+                proxy_set_header X-Forwarded-Proto $origin_proto;
+                proxy_pass http://frontend-openreplay:8080;
+                proxy_intercept_errors on;
+                error_page 404 =200 /index.html;
+              }
+            }
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      frontend-openreplay:
+        condition: service_started
+      api-openreplay:
+        condition: service_started
+      chalice-openreplay:
+        condition: service_started
+      http-openreplay:
+        condition: service_started
+      integrations-openreplay:
+        condition: service_started
+      spot-openreplay:
+        condition: service_started
+      assist-openreplay:
+        condition: service_started
+      minio:
+        condition: service_healthy
+
+
+  frontend-openreplay:
+    image: public.ecr.aws/p1t3u8a3/frontend:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    depends_on:
+      - postgresql
+      - valkey
+      - minio
+
+  api-openreplay:
+    image: public.ecr.aws/p1t3u8a3/api:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+      ch-init:
+        condition: service_completed_successfully
+
+  chalice-openreplay:
+    image: public.ecr.aws/p1t3u8a3/chalice:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+      ch-init:
+        condition: service_completed_successfully
+
+  http-openreplay:
+    image: public.ecr.aws/p1t3u8a3/http:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - valkey
+
+  integrations-openreplay:
+    image: public.ecr.aws/p1t3u8a3/integrations:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - postgresql
+      - valkey
+
+  spot-openreplay:
+    image: public.ecr.aws/p1t3u8a3/spot:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  assist-openreplay:
+    image: public.ecr.aws/p1t3u8a3/assist:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - postgresql
+      - valkey
+
+  storage-openreplay:
+    image: public.ecr.aws/p1t3u8a3/storage:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - valkey
+
+  ender-openreplay:
+    image: public.ecr.aws/p1t3u8a3/ender:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    depends_on:
+      - valkey
+
+  heuristics-openreplay:
+    image: public.ecr.aws/p1t3u8a3/heuristics:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    depends_on:
+      - clickhouse
+      - valkey
+
+  alerts-openreplay:
+    image: public.ecr.aws/p1t3u8a3/alerts:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    depends_on:
+      - postgresql
+      - valkey
+
+  sourcemapreader-openreplay:
+    image: public.ecr.aws/p1t3u8a3/sourcemapreader:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    depends_on:
+      - minio
+
+  canvases-openreplay:
+    image: public.ecr.aws/p1t3u8a3/canvases:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    depends_on:
+      - postgresql
+
+  sink-openreplay:
+    image: public.ecr.aws/p1t3u8a3/sink:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    depends_on:
+      - clickhouse
+
+  db-openreplay:
+    image: public.ecr.aws/p1t3u8a3/db:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    depends_on:
+      postgresql:
+        condition: service_healthy
+
+  assets-openreplay:
+    image: public.ecr.aws/p1t3u8a3/assets:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    depends_on:
+      - minio
+
+  images-openreplay:
+    image: public.ecr.aws/p1t3u8a3/images:v1.26.0
+    restart: unless-stopped
+    environment: *common-env
+    volumes:
+      - shared-volume:/mnt/efs
+    depends_on:
+      - minio
+
+volumes:
+  pgdata:
+  clickhouse:
+  redisdata:
+  miniodata:
+  shared-volume:
