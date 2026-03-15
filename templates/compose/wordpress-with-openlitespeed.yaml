@@ -1,0 +1,69 @@
+# documentation: https://openlitespeed.org
+# slogan: High-performance WordPress powered by OpenLiteSpeed web server with HTTP/3 and LSCache support.
+# category: cms
+# tags: cms, wordpress, openlitespeed, litespeed, lscache, http3, blog
+# logo: svgs/wordpress.svg
+# port: 80
+
+services:
+  openlitespeed:
+    image: litespeedtech/openlitespeed:1.8.5-lsphp85
+    environment:
+      - SERVICE_FQDN_OPENLITESPEED_80
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_NAME=${WORDPRESS_DB_NAME:-wordpress}
+      - WORDPRESS_DB_USER=$SERVICE_USER_WORDPRESS
+      - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    volumes:
+      - ols-conf:/usr/local/lsws/conf
+      - ols-admin-conf:/usr/local/lsws/admin/conf
+      - wordpress-files:/var/www/vhosts/localhost/html
+      - type: bind
+        source: ./openlitespeed/init-wp.sh
+        target: /usr/local/bin/init-wp.sh
+        content: |
+          #!/bin/bash
+          set -e
+          DOC_ROOT="/var/www/vhosts/localhost/html"
+          if [ ! -f "$DOC_ROOT/wp-config-sample.php" ]; then
+            echo "[init-wp] Downloading WordPress..."
+            curl -sSfL https://wordpress.org/latest.tar.gz -o /tmp/wordpress.tar.gz
+            tar -xzf /tmp/wordpress.tar.gz --strip-components=1 -C "$DOC_ROOT/"
+            rm -f /tmp/wordpress.tar.gz
+            chown -R nobody:nogroup "$DOC_ROOT"
+          fi
+          if [ ! -f "$DOC_ROOT/wp-config.php" ] && [ -f "$DOC_ROOT/wp-config-sample.php" ]; then
+            cp "$DOC_ROOT/wp-config-sample.php" "$DOC_ROOT/wp-config.php"
+            sed -i "s/database_name_here/$WORDPRESS_DB_NAME/" "$DOC_ROOT/wp-config.php"
+            sed -i "s/username_here/$WORDPRESS_DB_USER/" "$DOC_ROOT/wp-config.php"
+            sed -i "s/password_here/$WORDPRESS_DB_PASSWORD/" "$DOC_ROOT/wp-config.php"
+            sed -i "s/localhost/$WORDPRESS_DB_HOST/" "$DOC_ROOT/wp-config.php"
+          fi
+          /usr/local/lsws/bin/lswsctrl start
+          tail -f /usr/local/lsws/logs/error.log
+    entrypoint: ["bash", "/usr/local/bin/init-wp.sh"]
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  mariadb:
+    image: mariadb:11.4
+    command: ["--max-allowed-packet=512M"]
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=${WORDPRESS_DB_NAME:-wordpress}
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
