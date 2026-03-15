@@ -61,9 +61,6 @@ x-common-env: &common-env
   KAFKA_USE_SSL: "false"
 
 services:
-  # ============================================================================
-  # INFRASTRUCTURE SERVICES
-  # ============================================================================
 
   postgresql:
     image: ghcr.io/openreplay/postgres:17
@@ -125,9 +122,6 @@ services:
       timeout: 20s
       retries: 3
 
-  # ============================================================================
-  # INITIALIZATION SERVICES (run once, then exit)
-  # ============================================================================
 
   minio-init:
     image: ghcr.io/openreplay/minio:2025
@@ -194,9 +188,6 @@ services:
       clickhouse:
         condition: service_healthy
 
-  # ============================================================================
-  # NGINX ROUTER (entry point)
-  # ============================================================================
 
   openreplay:
     image: nginx:alpine
@@ -208,7 +199,6 @@ services:
         source: /etc/nginx/conf.d/openreplay.conf
         target: /etc/nginx/conf.d/openreplay.conf
         content: |
-          # Extract sessionid from peerId, it'll be used for sticky sessions.
           map $arg_peerId $sessionid {
             default "";
             "~.*-(\d+)(?:-.*|$)" $1;
@@ -230,7 +220,6 @@ services:
           server {
               listen 80;
 
-              # Match ingress-nginx defaults used by OpenReplay helm chart
               client_body_buffer_size 512k;
               client_max_body_size 10m;
 
@@ -244,12 +233,10 @@ services:
               proxy_read_timeout 300s;
               proxy_send_timeout 300s;
 
-              # Trust upstream/load-balancer forwarded headers
               real_ip_header X-Forwarded-For;
               set_real_ip_from 0.0.0.0/0;
               real_ip_recursive on;
 
-              # Security headers
               add_header X-XSS-Protection "1; mode=block" always;
               add_header X-Content-Type-Options "nosniff" always;
               add_header Referrer-Policy "same-origin" always;
@@ -292,7 +279,6 @@ services:
                 proxy_connect_timeout 120s;
                 proxy_send_timeout 300s;
 
-                # CORS Headers
                 add_header 'Access-Control-Allow-Origin' '*' always;
                 add_header 'Access-Control-Allow-Methods' 'POST' always;
                 add_header 'Access-Control-Allow-Headers' 'Content-Type,Authorization,Content-Encoding' always;
@@ -313,14 +299,12 @@ services:
                 proxy_connect_timeout 120s;
                 proxy_send_timeout 300s;
 
-                # CORS Headers
                 add_header 'Access-Control-Allow-Origin' '*' always;
                 add_header 'Access-Control-Allow-Methods' 'POST,PATCH,OPTIONS,DELETE' always;
                 add_header 'Access-Control-Allow-Headers' 'Content-Type,Authorization,Content-Encoding,X-Openreplay-Batch' always;
                 add_header 'Access-Control-Expose-Headers' 'Content-Length' always;
               }
 
-              # New Go-based API (v2) - takes precedence over legacy /api
               location /v2/api/ {
                 rewrite ^/v2/api/(.*) /$1 break;
                 proxy_http_version 1.1;
@@ -335,7 +319,6 @@ services:
                 proxy_connect_timeout 120s;
                 proxy_send_timeout 300s;
 
-                # CORS Headers
                 add_header 'Access-Control-Allow-Origin' '$http_origin' always;
                 add_header 'Access-Control-Allow-Methods' 'POST, GET, PATCH, DELETE, OPTIONS, PUT' always;
                 add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch' always;
@@ -343,7 +326,6 @@ services:
                 add_header 'Access-Control-Max-Age' '3600' always;
                 add_header 'Access-Control-Allow-Credentials' 'true' always;
 
-                # Handle preflight
                 if ($request_method = 'OPTIONS') {
                   add_header 'Access-Control-Allow-Origin' '$http_origin' always;
                   add_header 'Access-Control-Allow-Methods' 'POST, GET, PATCH, DELETE, OPTIONS, PUT' always;
@@ -355,7 +337,6 @@ services:
                 }
               }
 
-              # Legacy Python API (chalice)
               location /api/ {
                 rewrite ^/api/(.*) /$1 break;
                 proxy_http_version 1.1;
@@ -366,12 +347,10 @@ services:
                 proxy_set_header X-Forwarded-For $real_ip;
                 proxy_pass http://chalice-openreplay:8000;
 
-                # Cache control headers
                 add_header Cache-Control "no-store,no-cache" always;
                 add_header Pragma "no-cache" always;
               }
 
-              # Spot service (UX testing)
               location /spot/ {
                 rewrite ^/spot/(.*) /$1 break;
                 proxy_http_version 1.1;
@@ -386,13 +365,11 @@ services:
                 proxy_connect_timeout 120s;
                 proxy_send_timeout 300s;
 
-                # CORS Headers
                 add_header 'Access-Control-Allow-Origin' '*' always;
                 add_header 'Access-Control-Allow-Methods' 'POST, PATCH, DELETE, OPTIONS' always;
                 add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch' always;
                 add_header 'Access-Control-Expose-Headers' 'Content-Length' always;
 
-                # Handle preflight
                 if ($request_method = 'OPTIONS') {
                   add_header 'Access-Control-Allow-Origin' '*' always;
                   add_header 'Access-Control-Allow-Methods' 'POST, PATCH, DELETE, OPTIONS' always;
@@ -414,12 +391,10 @@ services:
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                 proxy_set_header X-Forwarded-Proto $origin_proto;
 
-                # WebSocket specific
                 proxy_read_timeout 3600s;
                 proxy_send_timeout 3600s;
                 proxy_connect_timeout 75s;
 
-                # Disable buffering for WebSocket
                 proxy_buffering off;
 
                 proxy_pass http://assist-openreplay:9001;
@@ -435,15 +410,12 @@ services:
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                 proxy_set_header X-Forwarded-Proto $origin_proto;
 
-                # WebSocket specific
                 proxy_read_timeout 3600s;
                 proxy_send_timeout 3600s;
                 proxy_connect_timeout 120s;
 
-                # Disable buffering for WebSocket
                 proxy_buffering off;
 
-                # CORS for WebSocket
                 add_header 'Access-Control-Allow-Origin' '$http_origin' always;
                 add_header 'Access-Control-Allow-Methods' 'GET, OPTIONS' always;
                 add_header 'Access-Control-Allow-Headers' 'sessionid, Content-Type, Authorization' always;
@@ -453,7 +425,6 @@ services:
                 proxy_pass http://assist-openreplay:9001;
               }
 
-              # OpenReplay tracker script proxy
               location /script/ {
                 rewrite ^/script/(.*)/openreplay(.*).js$ /$1/openreplay$2.js break;
                 proxy_http_version 1.1;
@@ -465,12 +436,10 @@ services:
                 proxy_connect_timeout 120s;
                 proxy_send_timeout 300s;
 
-                # Enable buffering for static assets
                 proxy_buffering on;
                 client_max_body_size 8m;
               }
 
-              # Frontend SPA (catch-all)
               location / {
                 index /index.html;
                 rewrite ^((?!.(js|css|png|svg|jpg|woff|woff2)).)*$ /index.html break;
@@ -505,9 +474,6 @@ services:
       minio:
         condition: service_healthy
 
-  # ============================================================================
-  # APPLICATION MICROSERVICES
-  # ============================================================================
 
   frontend-openreplay:
     image: public.ecr.aws/p1t3u8a3/frontend:v1.26.0
