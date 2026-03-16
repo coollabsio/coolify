@@ -375,17 +375,25 @@ function base_ip(): string
 
     return 'localhost';
 }
-function getFqdnWithoutPort(string $fqdn)
+function getFqdnWithoutPort(string $fqdn): string
 {
     try {
         $url = Url::fromString($fqdn);
-        $host = $url->getHost();
-        $scheme = $url->getScheme();
-        $path = $url->getPath();
 
-        return "$scheme://$host$path";
+        return $url->withPort(null)->__toString();
     } catch (\Throwable) {
         return $fqdn;
+    }
+}
+
+function addPortToUrl(string $url, int|string $port): string
+{
+    try {
+        $parsed = Url::fromString($url);
+
+        return $parsed->withPort((int) $port)->__toString();
+    } catch (\Throwable) {
+        return "$url:$port";
     }
 }
 /**
@@ -2155,7 +2163,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             if ($env) {
                                 $env_url = Url::fromString($savedService->fqdn);
                                 $env_port = $env_url->getPort();
-                                if ($env_port !== $predefinedPort) {
+                                if ((int) $env_port !== (int) $predefinedPort) {
                                     $env_url = $env_url->withPort($predefinedPort);
                                     $savedService->fqdn = $env_url->__toString();
                                     $savedService->save();
@@ -2240,7 +2248,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             if ($env) {
                                                 $env_url = Url::fromString($env->value);
                                                 $env_port = $env_url->getPort();
-                                                if ($env_port !== $predefinedPort) {
+                                                if ((int) $env_port !== (int) $predefinedPort) {
                                                     $env_url = $env_url->withPort($predefinedPort);
                                                     $savedService->fqdn = $env_url->__toString();
                                                     $savedService->save();
