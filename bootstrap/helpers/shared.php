@@ -2560,14 +2560,14 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 $mount = $volume->after(':');
                                 if ($name->startsWith('.') || $name->startsWith('~')) {
                                     $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                                    if ($pull_request_id !== 0) {
+                                        $dir = addPreviewDeploymentSuffix($dir, $pull_request_id);
+                                    }
                                     if ($name->startsWith('.')) {
                                         $name = $name->replaceFirst('.', $dir);
                                     }
                                     if ($name->startsWith('~')) {
                                         $name = $name->replaceFirst('~', $dir);
-                                    }
-                                    if ($pull_request_id !== 0) {
-                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
                                 } else {
@@ -2623,14 +2623,14 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             if ($source && $target) {
                                 if ((str($source)->startsWith('.') || str($source)->startsWith('~'))) {
                                     $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                                    if ($pull_request_id !== 0) {
+                                        $dir = addPreviewDeploymentSuffix($dir, $pull_request_id);
+                                    }
                                     if (str($source, '.')) {
                                         $source = str($source)->replaceFirst('.', $dir);
                                     }
                                     if (str($source, '~')) {
                                         $source = str($source)->replaceFirst('~', $dir);
-                                    }
-                                    if ($pull_request_id !== 0) {
-                                        $source = addPreviewDeploymentSuffix($source, $pull_request_id);
                                     }
                                     if ($read_only) {
                                         data_set($volume, 'source', $source.':'.$target.':ro');
@@ -2684,14 +2684,14 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 $mount = $volume->after(':');
                                 if ($name->startsWith('.') || $name->startsWith('~')) {
                                     $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                                    if ($pull_request_id !== 0) {
+                                        $dir = addPreviewDeploymentSuffix($dir, $pull_request_id);
+                                    }
                                     if ($name->startsWith('.')) {
                                         $name = $name->replaceFirst('.', $dir);
                                     }
                                     if ($name->startsWith('~')) {
                                         $name = $name->replaceFirst('~', $dir);
-                                    }
-                                    if ($pull_request_id !== 0) {
-                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
                                 } else {
@@ -2752,6 +2752,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 $uuid = $resource->uuid;
                                 if ((str($source)->startsWith('.') || str($source)->startsWith('~') || str($source)->startsWith('/'))) {
                                     $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                                    if ($pull_request_id !== 0) {
+                                        $dir = addPreviewDeploymentSuffix($dir, $pull_request_id);
+                                    }
                                     if (str($source, '.')) {
                                         $source = str($source)->replaceFirst('.', $dir);
                                     }
