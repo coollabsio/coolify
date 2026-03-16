@@ -19,6 +19,7 @@ class StandaloneDragonfly extends BaseModel
 
     protected $casts = [
         'dragonfly_password' => 'encrypted',
+        'public_port_timeout' => 'integer',
         'restart_count' => 'integer',
         'last_restart_at' => 'datetime',
         'last_restart_type' => 'string',

@@ -91,6 +91,28 @@ describe('deployment job path field validation', function () {
             ->toBe('/docker/Dockerfile.prod');
     });
 
+    test('allows path with @ symbol for scoped packages', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validatePathField');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect($method->invoke($instance, '/packages/@intlayer/mcp/Dockerfile', 'dockerfile_location'))
+            ->toBe('/packages/@intlayer/mcp/Dockerfile');
+    });
+
+    test('allows path with tilde and plus characters', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validatePathField');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect($method->invoke($instance, '/build~v1/c++/Dockerfile', 'dockerfile_location'))
+            ->toBe('/build~v1/c++/Dockerfile');
+    });
+
     test('allows valid compose file path', function () {
         $job = new ReflectionClass(ApplicationDeploymentJob::class);
         $method = $job->getMethod('validatePathField');
@@ -147,6 +169,17 @@ describe('API validation rules for path fields', function () {
 
         expect($validator->fails())->toBeFalse();
     });
+
+    test('dockerfile_location validation allows paths with @ for scoped packages', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['dockerfile_location' => '/packages/@intlayer/mcp/Dockerfile'],
+            ['dockerfile_location' => $rules['dockerfile_location']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    });
 });
 
 describe('sharedDataApplications rules survive array_merge in controller', function () {
@@ -164,7 +197,7 @@ describe('sharedDataApplications rules survive array_merge in controller', funct
 
         // The merged rules for docker_compose_location should be the safe regex, not just 'string'
         expect($merged['docker_compose_location'])->toBeArray();
-        expect($merged['docker_compose_location'])->toContain('regex:/^\/[a-zA-Z0-9._\-\/]+$/');
+        expect($merged['docker_compose_location'])->toContain('regex:'.\App\Support\ValidationPatterns::FILE_PATH_PATTERN);
     });
 });
 

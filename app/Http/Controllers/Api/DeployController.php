@@ -128,7 +128,7 @@ class DeployController extends Controller
             return response()->json(['message' => 'Deployment not found.'], 404);
         }
         $application = $deployment->application;
-        if (! $application || data_get($application->team(), 'id') !== $teamId) {
+        if (! $application || data_get($application->team(), 'id') !== (int) $teamId) {
             return response()->json(['message' => 'Deployment not found.'], 404);
         }
 

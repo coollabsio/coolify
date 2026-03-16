@@ -77,15 +77,17 @@ class Show extends Component
         $this->dispatch('success', 'Storage updated successfully');
     }
 
-    public function delete($password)
+    public function delete($password, $selectedActions = [])
     {
         $this->authorize('update', $this->resource);
 
         if (! verifyPasswordConfirmation($password, $this)) {
-            return;
+            return 'The provided password is incorrect.';
         }
 
         $this->storage->delete();
         $this->dispatch('refreshStorages');
+
+        return true;
     }
 }

@@ -19,7 +19,7 @@ class Sentinel extends Component
 
     public bool $isMetricsEnabled;
 
-    #[Validate(['required'])]
+    #[Validate(['required', 'string', 'max:500', 'regex:/\A[a-zA-Z0-9._\-+=\/]+\z/'])]
     public string $sentinelToken;
 
     public ?string $sentinelUpdatedAt = null;

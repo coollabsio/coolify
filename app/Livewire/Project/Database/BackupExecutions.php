@@ -65,10 +65,10 @@ class BackupExecutions extends Component
         }
     }
 
-    public function deleteBackup($executionId, $password)
+    public function deleteBackup($executionId, $password, $selectedActions = [])
     {
         if (! verifyPasswordConfirmation($password, $this)) {
-            return;
+            return 'The provided password is incorrect.';
         }
 
         $execution = $this->backup->executions()->where('id', $executionId)->first();
@@ -96,7 +96,11 @@ class BackupExecutions extends Component
             $this->refreshBackupExecutions();
         } catch (\Exception $e) {
             $this->dispatch('error', 'Failed to delete backup: '.$e->getMessage());
+
+            return true;
         }
+
+        return true;
     }
 
     public function download_file($exeuctionId)

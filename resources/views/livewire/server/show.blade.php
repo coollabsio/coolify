@@ -289,6 +289,58 @@
                     </div>
                 </div>
             </form>
+            @if ($server->isFunctional())
+                <div class="pt-6">
+                    <div class="flex items-center gap-2 mb-3">
+                        <h3>Server Details</h3>
+                        @if ($server->server_metadata)
+                            <button wire:click="refreshServerMetadata" wire:loading.attr="disabled"
+                                wire:target="refreshServerMetadata" title="Refresh server details"
+                                class="dark:hover:fill-white fill-black dark:fill-warning">
+                                <svg wire:loading.remove wire:target="refreshServerMetadata" class="w-4 h-4"
+                                    viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path
+                                        d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
+                                </svg>
+                                <svg wire:loading wire:target="refreshServerMetadata" class="w-4 h-4 animate-spin"
+                                    viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path
+                                        d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
+                                </svg>
+                            </button>
+                        @endif
+                    </div>
+                    @if ($server->server_metadata)
+                        @php $meta = $server->server_metadata; @endphp
+                        <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm lg:grid-cols-3">
+                            <div><span class="font-medium dark:text-neutral-400">OS:</span>
+                                {{ $meta['os'] ?? 'N/A' }}</div>
+                            <div><span class="font-medium dark:text-neutral-400">Arch:</span>
+                                {{ $meta['arch'] ?? 'N/A' }}</div>
+                            <div><span class="font-medium dark:text-neutral-400">Kernel:</span>
+                                {{ $meta['kernel'] ?? 'N/A' }}</div>
+                            <div><span class="font-medium dark:text-neutral-400">CPU Cores:</span>
+                                {{ $meta['cpus'] ?? 'N/A' }}</div>
+                            <div><span class="font-medium dark:text-neutral-400">RAM:</span>
+                                {{ isset($meta['memory_bytes']) ? round($meta['memory_bytes'] / 1073741824, 1) . ' GB' : 'N/A' }}
+                            </div>
+                            <div><span class="font-medium dark:text-neutral-400">Up Since:</span>
+                                {{ $meta['uptime_since'] ?? 'N/A' }}</div>
+                        </div>
+                        @if (isset($meta['collected_at']))
+                            <p class="mt-2 text-xs dark:text-neutral-500">Last updated:
+                                {{ \Carbon\Carbon::parse($meta['collected_at'])->diffForHumans() }}</p>
+                        @endif
+                    @else
+                        <x-forms.button wire:click="refreshServerMetadata" canGate="update"
+                            :canResource="$server">
+                            <span wire:loading.remove wire:target="refreshServerMetadata">Fetch Server
+                                Details</span>
+                            <span wire:loading wire:target="refreshServerMetadata">Fetching...</span>
+                        </x-forms.button>
+                    @endif
+                </div>
+            @endif
             @if (!$server->hetzner_server_id && $availableHetznerTokens->isNotEmpty())
                 <div class="pt-6">
                     <h3>Link to Hetzner Cloud</h3>

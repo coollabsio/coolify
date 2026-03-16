@@ -53,6 +53,8 @@ class Index extends Component
 
     public ?int $publicPort = null;
 
+    public ?int $publicPortTimeout = 3600;
+
     public bool $isPublic = false;
 
     public bool $isLogDrainEnabled = false;
@@ -90,6 +92,7 @@ class Index extends Component
         'image' => 'required',
         'excludeFromStatus' => 'required|boolean',
         'publicPort' => 'nullable|integer',
+        'publicPortTimeout' => 'nullable|integer|min:1',
         'isPublic' => 'required|boolean',
         'isLogDrainEnabled' => 'required|boolean',
         // Application-specific rules
@@ -158,6 +161,7 @@ class Index extends Component
             $this->serviceDatabase->image = $this->image;
             $this->serviceDatabase->exclude_from_status = $this->excludeFromStatus;
             $this->serviceDatabase->public_port = $this->publicPort;
+            $this->serviceDatabase->public_port_timeout = $this->publicPortTimeout;
             $this->serviceDatabase->is_public = $this->isPublic;
             $this->serviceDatabase->is_log_drain_enabled = $this->isLogDrainEnabled;
         } else {
@@ -166,6 +170,7 @@ class Index extends Component
             $this->image = $this->serviceDatabase->image;
             $this->excludeFromStatus = $this->serviceDatabase->exclude_from_status ?? false;
             $this->publicPort = $this->serviceDatabase->public_port;
+            $this->publicPortTimeout = $this->serviceDatabase->public_port_timeout;
             $this->isPublic = $this->serviceDatabase->is_public ?? false;
             $this->isLogDrainEnabled = $this->serviceDatabase->is_log_drain_enabled ?? false;
         }
@@ -189,13 +194,13 @@ class Index extends Component
         }
     }
 
-    public function deleteDatabase($password)
+    public function deleteDatabase($password, $selectedActions = [])
     {
         try {
             $this->authorize('delete', $this->serviceDatabase);
 
             if (! verifyPasswordConfirmation($password, $this)) {
-                return;
+                return 'The provided password is incorrect.';
             }
 
             $this->serviceDatabase->delete();
@@ -393,13 +398,13 @@ class Index extends Component
         }
     }
 
-    public function deleteApplication($password)
+    public function deleteApplication($password, $selectedActions = [])
     {
         try {
             $this->authorize('delete', $this->serviceApplication);
 
             if (! verifyPasswordConfirmation($password, $this)) {
-                return;
+                return 'The provided password is incorrect.';
             }
 
             $this->serviceApplication->delete();

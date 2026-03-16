@@ -94,7 +94,7 @@
         }
         if (this.dispatchAction) {
             $wire.dispatch(this.submitAction);
-            return true;
+            return Promise.resolve(true);
         }
 
         const methodName = this.submitAction.split('(')[0];
