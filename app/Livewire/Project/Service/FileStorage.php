@@ -134,12 +134,12 @@ class FileStorage extends Component
         }
     }
 
-    public function delete($password)
+    public function delete($password, $selectedActions = [])
     {
         $this->authorize('update', $this->resource);
 
         if (! verifyPasswordConfirmation($password, $this)) {
-            return;
+            return 'The provided password is incorrect.';
         }
 
         try {
@@ -158,6 +158,8 @@ class FileStorage extends Component
         } finally {
             $this->dispatch('refreshStorages');
         }
+
+        return true;
     }
 
     public function submit()

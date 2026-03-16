@@ -2602,6 +2602,15 @@ class DatabasesController extends Controller
                     type: 'string',
                 )
             ),
+            new OA\Parameter(
+                name: 'docker_cleanup',
+                in: 'query',
+                description: 'Perform docker cleanup (prune networks, volumes, etc.).',
+                schema: new OA\Schema(
+                    type: 'boolean',
+                    default: true,
+                )
+            ),
         ],
         responses: [
             new OA\Response(
@@ -2653,7 +2662,9 @@ class DatabasesController extends Controller
         if (str($database->status)->contains('stopped') || str($database->status)->contains('exited')) {
             return response()->json(['message' => 'Database is already stopped.'], 400);
         }
-        StopDatabase::dispatch($database);
+
+        $dockerCleanup = $request->boolean('docker_cleanup', true);
+        StopDatabase::dispatch($database, $dockerCleanup);
 
         return response()->json(
             [

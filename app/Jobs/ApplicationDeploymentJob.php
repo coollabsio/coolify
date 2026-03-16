@@ -2166,7 +2166,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     executeInDocker($this->deployment_uuid, 'chmod 600 /root/.ssh/id_rsa'),
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$this->fullRepoUrl} {$lsRemoteRef}"),
+                    executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git ls-remote {$this->fullRepoUrl} {$lsRemoteRef}"),
                     'hidden' => true,
                     'save' => 'git_commit_sha',
                 ]
@@ -2229,7 +2229,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->create_workdir();
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "cd {$this->workdir} && git log -1 {$this->commit} --pretty=%B"),
+                executeInDocker($this->deployment_uuid, "cd {$this->workdir} && git log -1 ".escapeshellarg($this->commit).' --pretty=%B'),
                 'hidden' => true,
                 'save' => 'commit_message',
             ]
@@ -2495,7 +2495,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $coolify_envs = $this->generate_coolify_env_variables(forBuildTime: true);
         $coolify_envs->each(function ($value, $key) {
-            $this->env_args->put($key, $value);
+            if (! is_null($value) && $value !== '') {
+                $this->env_args->put($key, $value);
+            }
         });
 
         // For build process, include only environment variables where is_buildtime = true
@@ -2810,9 +2812,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         // Handle CMD type healthcheck
         if ($this->application->health_check_type === 'cmd' && ! empty($this->application->health_check_command)) {
-            $this->full_healthcheck_url = $this->application->health_check_command;
+            $command = str_replace(["\r\n", "\r", "\n"], ' ', $this->application->health_check_command);
+            $this->full_healthcheck_url = $command;
 
-            return $this->application->health_check_command;
+            return $command;
         }
 
         // HTTP type healthcheck (default)
@@ -2937,7 +2940,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function build_image()
     {
         // Add Coolify related variables to the build args/secrets
-        if (! $this->dockerBuildkitSupported) {
+        if (! $this->dockerSecretsSupported) {
             // Traditional build args approach - generate COOLIFY_ variables locally
             $coolify_envs = $this->generate_coolify_env_variables(forBuildTime: true);
             $coolify_envs->each(function ($value, $key) {
@@ -3548,8 +3551,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function add_build_env_variables_to_dockerfile()
     {
-        if ($this->dockerBuildkitSupported) {
-            // We dont need to add build secrets to dockerfile for buildkit, as we already added them with --secret flag in function generate_docker_env_flags_for_secrets
+        if ($this->dockerSecretsSupported) {
+            // We dont need to add ARG declarations when using Docker build secrets, as variables are passed with --secret flag
             return;
         }
 
@@ -3959,7 +3962,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function validatePathField(string $value, string $fieldName): string
     {
-        if (! preg_match('/^\/[a-zA-Z0-9._\-\/]+$/', $value)) {
+        if (! preg_match(\App\Support\ValidationPatterns::FILE_PATH_PATTERN, $value)) {
             throw new \RuntimeException("Invalid {$fieldName}: contains forbidden characters.");
         }
         if (str_contains($value, '..')) {

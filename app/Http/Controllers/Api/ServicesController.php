@@ -1676,6 +1676,15 @@ class ServicesController extends Controller
                     type: 'string',
                 )
             ),
+            new OA\Parameter(
+                name: 'docker_cleanup',
+                in: 'query',
+                description: 'Perform docker cleanup (prune networks, volumes, etc.).',
+                schema: new OA\Schema(
+                    type: 'boolean',
+                    default: true,
+                )
+            ),
         ],
         responses: [
             new OA\Response(
@@ -1727,7 +1736,9 @@ class ServicesController extends Controller
         if (str($service->status)->contains('stopped') || str($service->status)->contains('exited')) {
             return response()->json(['message' => 'Service is already stopped.'], 400);
         }
-        StopService::dispatch($service);
+
+        $dockerCleanup = $request->boolean('docker_cleanup', true);
+        StopService::dispatch($service, false, $dockerCleanup);
 
         return response()->json(
             [

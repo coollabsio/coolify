@@ -51,6 +51,7 @@ class Proxy extends Component
         $this->redirectEnabled = data_get($this->server, 'proxy.redirect_enabled', true);
         $this->redirectUrl = data_get($this->server, 'proxy.redirect_url');
         $this->syncData(false);
+        $this->loadProxyConfiguration();
     }
 
     private function syncData(bool $toModel = false): void

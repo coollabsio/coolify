@@ -168,7 +168,7 @@ class GithubPrivateRepository extends Component
                 'selected_repository_owner' => 'required|string|regex:/^[a-zA-Z0-9\-_]+$/',
                 'selected_repository_repo' => 'required|string|regex:/^[a-zA-Z0-9\-_\.]+$/',
                 'selected_branch_name' => ['required', 'string', new ValidGitBranch],
-                'docker_compose_location' => ['nullable', 'string', 'max:255', 'regex:/^\/[a-zA-Z0-9._\-\/]+$/'],
+                'docker_compose_location' => \App\Support\ValidationPatterns::filePathRules(),
             ]);
 
             if ($validator->fails()) {

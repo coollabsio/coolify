@@ -3339,6 +3339,15 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "docker_cleanup",
+                        "in": "query",
+                        "description": "Perform docker cleanup (prune networks, volumes, etc.).",
+                        "schema": {
+                            "type": "boolean",
+                            "default": true
+                        }
                     }
                 ],
                 "responses": {
@@ -5863,6 +5872,15 @@
                         "required": true,
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    {
+                        "name": "docker_cleanup",
+                        "in": "query",
+                        "description": "Perform docker cleanup (prune networks, volumes, etc.).",
+                        "schema": {
+                            "type": "boolean",
+                            "default": true
                         }
                     }
                 ],
@@ -10560,6 +10578,15 @@
                         "required": true,
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    {
+                        "name": "docker_cleanup",
+                        "in": "query",
+                        "description": "Perform docker cleanup (prune networks, volumes, etc.).",
+                        "schema": {
+                            "type": "boolean",
+                            "default": true
                         }
                     }
                 ],
