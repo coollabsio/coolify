@@ -142,11 +142,13 @@ class Index extends Component
             });
         }
 
-        // Load services with their tags and server
-        $this->services = $this->environment->services()->with([
-            'tags',
-            'destination.server.settings',
-        ])->get()->sortBy('name');
+        // Load services with their tags and server (exclude companion services for git-based compose)
+        $this->services = $this->environment->services()
+            ->whereNull('application_id')
+            ->with([
+                'tags',
+                'destination.server.settings',
+            ])->get()->sortBy('name');
         $this->services = $this->services->map(function ($service) use ($projectUuid, $environmentUuid) {
             $service->hrefLink = route('project.service.configuration', [
                 'project_uuid' => $projectUuid,

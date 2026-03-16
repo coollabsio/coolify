@@ -159,7 +159,9 @@ class Service extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return Service::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        return Service::whereRelation('environment.project.team', 'id', currentTeam()->id)
+            ->whereNull('application_id')
+            ->orderBy('name');
     }
 
     /**
@@ -1479,6 +1481,16 @@ class Service extends BaseModel
     public function server()
     {
         return $this->belongsTo(Server::class);
+    }
+
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
+    }
+
+    public function isCompanion(): bool
+    {
+        return $this->application_id !== null;
     }
 
     public function byUuid(string $uuid)

@@ -224,6 +224,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
         Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
         Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
+        Route::get('/database-backups', ApplicationConfiguration::class)->name('project.application.database-backups');
 
         Route::get('/deployment', DeploymentIndex::class)->name('project.application.deployment.index');
         Route::get('/deployment/{deployment_uuid}', DeploymentShow::class)->name('project.application.deployment.show');

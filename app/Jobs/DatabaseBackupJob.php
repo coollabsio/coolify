@@ -95,6 +95,20 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->database = data_get($this->backup, 'database');
                 $this->server = $this->database->service->server;
                 $this->s3 = $this->backup->s3;
+
+                // Skip backup if this is a companion service database and a deployment is in progress
+                if ($this->database->service->isCompanion()) {
+                    $linkedApplication = $this->database->service->application;
+                    if ($linkedApplication && $linkedApplication->isDeploymentInprogress()) {
+                        Log::info('DatabaseBackupJob skipped: deployment in progress for companion service', [
+                            'backup_id' => $this->backup->id,
+                            'database_id' => $this->database->id,
+                            'application_id' => $linkedApplication->id,
+                        ]);
+
+                        return;
+                    }
+                }
             } else {
                 $this->database = data_get($this->backup, 'database');
                 $this->server = $this->database->destination->server;

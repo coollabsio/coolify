@@ -1483,3 +1483,138 @@ function injectDockerComposeBuildArgs(string $command, string $buildArgsString):
 
     return $modifiedCommand ?? $command;
 }
+
+/**
+ * Synchronize companion Service and ServiceDatabase records for a git-based
+ * Docker Compose Application. This enables automated backups for database
+ * services detected in the compose file.
+ *
+ * Creates a "companion" Service record linked to the Application, with
+ * ServiceDatabase child records for each detected database image.
+ * The companion Service's UUID matches the Application UUID so that
+ * container names align with the backup system's expectations.
+ *
+ * On subsequent calls (e.g. redeployments), the function:
+ * - Creates new ServiceDatabase records for newly added databases
+ * - Updates images for existing databases that changed
+ * - Removes ServiceDatabase records (and their backups) for removed databases
+ * - Cleans up the companion Service if no databases remain
+ */
+function syncCompanionServiceDatabases(Application $application): void
+{
+    // Only applies to git-based docker compose deployments
+    if ($application->build_pack !== 'dockercompose') {
+        return;
+    }
+    if (blank($application->docker_compose_raw)) {
+        return;
+    }
+    // Only for git-based applications (not pasted compose which uses Service model directly)
+    if (blank($application->git_repository) && blank($application->git_full_url)) {
+        return;
+    }
+
+    try {
+        $yaml = \Symfony\Component\Yaml\Yaml::parse($application->docker_compose_raw);
+    } catch (\Exception) {
+        return;
+    }
+
+    $services = data_get($yaml, 'services', []);
+    if (empty($services)) {
+        return;
+    }
+
+    // Detect database services
+    $databaseServices = [];
+    foreach ($services as $serviceName => $serviceConfig) {
+        $image = data_get($serviceConfig, 'image', '');
+        if (blank($image)) {
+            continue;
+        }
+        if (isDatabaseImage($image, $serviceConfig)) {
+            $databaseServices[$serviceName] = $image;
+        }
+    }
+
+    $companion = \App\Models\Service::where('application_id', $application->id)->first();
+
+    // No databases detected
+    if (empty($databaseServices)) {
+        // Clean up existing companion if databases were removed
+        if ($companion) {
+            $companion->databases()->each(function ($db) {
+                $db->scheduledBackups()->delete();
+                $db->persistentStorages()->delete();
+                $db->fileStorages()->delete();
+                $db->delete();
+            });
+            $companion->delete();
+        }
+
+        return;
+    }
+
+    // Ensure consistent container naming is enabled (required for backup container name resolution)
+    if (! $application->settings->is_consistent_container_name_enabled) {
+        $application->settings->is_consistent_container_name_enabled = true;
+        $application->settings->save();
+    }
+
+    // Resolve server_id through the destination relationship
+    $server = data_get($application, 'destination.server');
+    $serverId = $server ? $server->id : null;
+
+    // Create or retrieve companion service
+    if (! $companion) {
+        $companion = \App\Models\Service::create([
+            'application_id' => $application->id,
+            'uuid' => $application->uuid,
+            'name' => $application->name.' (databases)',
+            'environment_id' => $application->environment_id,
+            'server_id' => $serverId,
+            'destination_type' => $application->destination_type,
+            'destination_id' => $application->destination_id,
+            'docker_compose_raw' => $application->docker_compose_raw,
+        ]);
+    } else {
+        // Keep companion in sync with application
+        $companion->update([
+            'docker_compose_raw' => $application->docker_compose_raw,
+            'server_id' => $serverId,
+            'name' => $application->name.' (databases)',
+        ]);
+    }
+
+    // Sync ServiceDatabase records
+    $existingDatabases = $companion->databases()->get()->keyBy('name');
+    $detectedNames = collect(array_keys($databaseServices));
+
+    // Remove databases no longer present in compose
+    foreach ($existingDatabases as $name => $db) {
+        if (! $detectedNames->contains($name)) {
+            $db->scheduledBackups()->delete();
+            $db->persistentStorages()->delete();
+            $db->fileStorages()->delete();
+            $db->delete();
+        }
+    }
+
+    // Create or update databases
+    foreach ($databaseServices as $serviceName => $image) {
+        $existing = $existingDatabases->get($serviceName);
+        if ($existing) {
+            // Update image if changed
+            if ($existing->image !== $image) {
+                $existing->image = $image;
+                $existing->save();
+            }
+        } else {
+            \App\Models\ServiceDatabase::create([
+                'name' => $serviceName,
+                'image' => $image,
+                'service_id' => $companion->id,
+            ]);
+        }
+    }
+}

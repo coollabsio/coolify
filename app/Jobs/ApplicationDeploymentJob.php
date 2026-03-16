@@ -623,6 +623,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_build_env_variables();
 
         $this->application->loadComposeFile(isInit: false);
+
+        // Sync companion service databases for automated backup support
+        syncCompanionServiceDatabases($this->application);
+
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             $this->application->oldRawParser();
             $yaml = $composeFile = $this->application->docker_compose_raw;

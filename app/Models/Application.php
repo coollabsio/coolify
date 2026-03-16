@@ -249,6 +249,16 @@ class Application extends BaseModel
             foreach ($application->deployment_queue as $deployment) {
                 $deployment->delete();
             }
+            // Clean up companion service and its databases/backups
+            if ($companion = $application->companionService) {
+                $companion->databases()->each(function ($db) {
+                    $db->scheduledBackups()->delete();
+                    $db->persistentStorages()->delete();
+                    $db->fileStorages()->delete();
+                    $db->forceDelete();
+                });
+                $companion->forceDelete();
+            }
         });
     }
 
@@ -925,6 +935,11 @@ class Application extends BaseModel
     public function source()
     {
         return $this->morphTo();
+    }
+
+    public function companionService()
+    {
+        return $this->hasOne(Service::class);
     }
 
     public function isDeploymentInprogress()
