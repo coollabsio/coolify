@@ -37,6 +37,8 @@ class Index extends Component
 
     public Collection $allEnvironments;
 
+    public bool $isResourceBreadcrumbEnabled;
+
     public array $parameters;
 
     public function mount()
@@ -55,31 +57,51 @@ class Index extends Component
 
         $this->project = $project;
 
-        // Load projects and environments for breadcrumb navigation (avoids inline queries in view)
+        $this->isResourceBreadcrumbEnabled = instanceSettings()->is_resource_breadcrumb_enabled ?? true;
+
+        // Load projects and environments for breadcrumb navigation
         $this->allProjects = Project::ownedByCurrentTeamCached();
-        $this->allEnvironments = $project->environments()
-            ->with([
-                'applications.additional_servers',
-                'applications.destination.server',
-                'services',
-                'services.destination.server',
-                'postgresqls',
-                'postgresqls.destination.server',
-                'redis',
-                'redis.destination.server',
-                'mongodbs',
-                'mongodbs.destination.server',
-                'mysqls',
-                'mysqls.destination.server',
-                'mariadbs',
-                'mariadbs.destination.server',
-                'keydbs',
-                'keydbs.destination.server',
-                'dragonflies',
-                'dragonflies.destination.server',
-                'clickhouses',
-                'clickhouses.destination.server',
-            ])->get();
+
+        if ($this->isResourceBreadcrumbEnabled) {
+            $this->allEnvironments = $project->environments()
+                ->with([
+                    'applications.additional_servers',
+                    'applications.destination.server',
+                    'services',
+                    'services.destination.server',
+                    'postgresqls',
+                    'postgresqls.destination.server',
+                    'redis',
+                    'redis.destination.server',
+                    'mongodbs',
+                    'mongodbs.destination.server',
+                    'mysqls',
+                    'mysqls.destination.server',
+                    'mariadbs',
+                    'mariadbs.destination.server',
+                    'keydbs',
+                    'keydbs.destination.server',
+                    'dragonflies',
+                    'dragonflies.destination.server',
+                    'clickhouses',
+                    'clickhouses.destination.server',
+                ])->get();
+        } else {
+            $this->allEnvironments = $project->environments()
+                ->select('id', 'uuid', 'name', 'project_id')
+                ->withCount([
+                    'applications',
+                    'postgresqls',
+                    'redis',
+                    'mongodbs',
+                    'mysqls',
+                    'mariadbs',
+                    'keydbs',
+                    'dragonflies',
+                    'clickhouses',
+                    'services',
+                ])->get();
+        }
 
         $this->environment = $environment->loadCount([
             'applications',

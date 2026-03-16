@@ -55,6 +55,10 @@
                         <x-forms.checkbox instantSave id="is_wire_navigate_enabled" label="SPA Navigation"
                             helper="Enable single-page application (SPA) style navigation with prefetching on hover. When enabled, page transitions are smoother without full page reloads and pages are prefetched when hovering over links. Disable if you experience navigation issues." />
                     </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_resource_breadcrumb_enabled" label="Resource Breadcrumb Navigation"
+                            helper="Show a detailed resource navigation menu in the breadcrumb on environment pages. Disable this if you have many resources and experience slow page loads or memory issues." />
+                    </div>
                     <h4 class="pt-4">Confirmation Settings</h4>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="is_sponsorship_popup_enabled" label="Show Sponsorship Popup"
