@@ -60,7 +60,6 @@
                         </div>
                     </div>
                 </li>
-                @if ($isResourceBreadcrumbEnabled)
                 <li class="inline-flex items-center" x-data="{ envOpen: false, activeEnv: null, envPositions: {}, activeRes: null, resPositions: {}, activeMenuEnv: null, menuPositions: {}, closeTimeout: null, envTimeout: null, resTimeout: null, menuTimeout: null, toggle() { this.envOpen = !this.envOpen; if (!this.envOpen) { this.activeEnv = null;
                             this.activeRes = null;
                             this.activeMenuEnv = null; } }, open() { clearTimeout(this.closeTimeout);
@@ -449,60 +448,6 @@
                         </div>
                     </div>
                 </li>
-                @else
-                <li class="inline-flex items-center" x-data="{ envOpen: false, closeTimeout: null, toggle() { this.envOpen = !this.envOpen }, open() { clearTimeout(this.closeTimeout); this.envOpen = true }, close() { this.closeTimeout = setTimeout(() => { this.envOpen = false }, 100) } }">
-                    <div class="flex items-center relative" @mouseenter="open()" @mouseleave="close()">
-                        <a class="text-xs truncate lg:text-sm hover:text-warning" {{ wireNavigate() }}
-                            href="{{ route('project.resource.index', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => $environment->uuid]) }}">
-                            {{ $environment->name }}
-                        </a>
-                        <button type="button" @click.stop="toggle()" class="px-1 text-warning">
-                            <svg class="w-3 h-3 transition-transform" :class="{ 'rotate-90': envOpen }" fill="none"
-                                stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M9 5l7 7-7 7">
-                                </path>
-                            </svg>
-                        </button>
-
-                        <div x-show="envOpen" @click.outside="close()"
-                            x-transition:enter="transition ease-out duration-200"
-                            x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-                            x-transition:leave="transition ease-in duration-75"
-                            x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-                            class="absolute z-20 top-full mt-1 left-0 sm:left-auto max-w-[calc(100vw-1rem)]">
-                            <div
-                                class="relative w-56 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
-                                @foreach ($allEnvironments as $env)
-                                    @php
-                                        $envResourceCount = ($env->applications_count ?? 0) + ($env->postgresqls_count ?? 0) + ($env->redis_count ?? 0) + ($env->mongodbs_count ?? 0) + ($env->mysqls_count ?? 0) + ($env->mariadbs_count ?? 0) + ($env->keydbs_count ?? 0) + ($env->dragonflies_count ?? 0) + ($env->clickhouses_count ?? 0) + ($env->services_count ?? 0);
-                                    @endphp
-                                    <a href="{{ route('project.resource.index', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => $env->uuid]) }}"
-                                        {{ wireNavigate() }}
-                                        class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200 {{ $env->uuid === $environment->uuid ? 'dark:text-warning font-semibold' : '' }}"
-                                        title="{{ $env->name }}">
-                                        <span class="truncate">{{ $env->name }}</span>
-                                        @if ($envResourceCount > 0)
-                                            <span class="text-xs text-neutral-400 shrink-0">{{ $envResourceCount }}</span>
-                                        @endif
-                                    </a>
-                                @endforeach
-                                <div class="border-t border-neutral-200 dark:border-coolgray-200 mt-1 pt-1">
-                                    <a href="{{ route('project.show', ['project_uuid' => data_get($parameters, 'project_uuid')]) }}"
-                                        {{ wireNavigate() }}
-                                        class="flex items-center gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
-                                            </path>
-                                        </svg>
-                                        Create / Edit
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </li>
-                @endif
             </ol>
         </nav>
     </div>
