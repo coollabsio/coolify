@@ -1,0 +1,21 @@
+# documentation: https://openlitespeed.org/kb/
+# slogan: High-performance, lightweight open-source web server.
+# category: development
+# tags: web-server, http, litespeed, php, lsphp
+# logo: svgs/openlitespeed.svg
+# port: 8088
+
+services:
+  openlitespeed:
+    image: litespeedtech/openlitespeed:latest
+    environment:
+      - SERVICE_URL_OPENLITESPEED_8088
+      - OLS_ADMIN_PASSWORD=${SERVICE_PASSWORD_64_ADMIN}
+    volumes:
+      - lsws-conf:/usr/local/lsws/conf
+      - lsws-webroot:/var/www/vhosts/localhost/html
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8088/ > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
