@@ -2513,7 +2513,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
         }
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
+        $parsedApplicationDatabaseNames = [];
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id, &$parsedApplicationDatabaseNames) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -2816,6 +2817,28 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $image = data_get_str($service, 'image');
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
+
+            if ($isDatabase && $resource instanceof Application) {
+                if ($isNew) {
+                    ServiceDatabase::create([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'application_id' => $resource->id,
+                    ]);
+                } else {
+                    $savedServiceDb = ServiceDatabase::firstOrCreate(
+                        ['name' => $serviceName, 'application_id' => $resource->id],
+                        ['image' => $image]
+                    );
+
+                    if ($savedServiceDb->image !== $image) {
+                        $savedServiceDb->image = $image;
+                        $savedServiceDb->save();
+                    }
+                }
+
+                $parsedApplicationDatabaseNames[] = $serviceName;
+            }
 
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
@@ -3198,6 +3221,26 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $services->each(function ($service, $serviceName) use ($pull_request_id, $services) {
                 $services[addPreviewDeploymentSuffix($serviceName, $pull_request_id)] = $service;
                 data_forget($services, $serviceName);
+            });
+        }
+
+        // Clean up ServiceDatabase rows that no longer appear in the compose file.
+        // $services->count() > 0 guards against running cleanup on a failed/empty parse.
+        // Two intentional sub-cases:
+        //   - DB services remain: whereNotIn removes only the rows whose names are gone.
+        //   - No DB services remain ($parsedApplicationDatabaseNames is empty): all
+        //     application-linked rows are deleted — the user removed every DB service.
+        //     Skipping cleanup here would leave orphaned backup jobs running forever.
+        if ($resource instanceof \App\Models\Application && $services->count() > 0) {
+            $staleDatabasesQuery = ServiceDatabase::where('application_id', $resource->id);
+
+            if (! empty($parsedApplicationDatabaseNames)) {
+                $staleDatabasesQuery->whereNotIn('name', $parsedApplicationDatabaseNames);
+            }
+
+            $staleDatabasesQuery->each(function (\App\Models\ServiceDatabase $staleDb) {
+                $staleDb->scheduledBackups()->delete();
+                $staleDb->delete();
             });
         }
         $finalServices = [

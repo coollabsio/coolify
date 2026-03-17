@@ -65,6 +65,24 @@
                                     </div>
                                 @endif
                             @endforeach
+
+                            <h3 class="pt-6">Databases</h3>
+                            @foreach (data_get($parsedServices, 'services') as $serviceName => $service)
+                                @if (isDatabaseImage(data_get($service, 'image')))
+                                    <div class="flex items-center justify-between gap-2">
+                                        <div>{{ $serviceName }}</div>
+                                        <a class="underline" {{ wireNavigate() }}
+                                            href="{{ route('project.application.database-backups', [
+                                                'project_uuid' => $application->project()->uuid,
+                                                'environment_uuid' => $application->environment->uuid,
+                                                'application_uuid' => $application->uuid,
+                                                'stack_service_uuid' => $serviceName,
+                                            ]) }}">
+                                            Backups
+                                        </a>
+                                    </div>
+                                @endif
+                            @endforeach
                         @endif
                     @endif
 
