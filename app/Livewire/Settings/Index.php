@@ -191,7 +191,8 @@ class Index extends Component
                 return;
             }
 
-            $buildCommand = "docker build -t ghcr.io/coollabsio/coolify-helper:{$version} -f docker/coolify-helper/Dockerfile .";
+            $registryUrl = $this->settings->docker_registry_url ?: config('constants.coolify.registry_url');
+            $buildCommand = "docker build -t {$registryUrl}/coollabsio/coolify-helper:{$version} -f docker/coolify-helper/Dockerfile .";
 
             $activity = remote_process(
                 command: [$buildCommand],

@@ -12,7 +12,7 @@ beforeEach(function () {
     $this->mockServer->id = 0;
 
     // Mock InstanceSettings
-    $this->settings = Mockery::mock(InstanceSettings::class);
+    $this->settings = Mockery::mock(InstanceSettings::class)->makePartial();
     $this->settings->is_auto_update_enabled = true;
     $this->settings->shouldReceive('save')->andReturn(true);
 });
@@ -91,6 +91,25 @@ it('uses validated cache when CDN fails and cache is newer', function () {
     $action->handle(manual_update: false);
 
     expect($action->latestVersion)->toBe('4.0.10');
+});
+
+it('passes registry URL to upgrade script', function () {
+    $action = new UpdateCoolify;
+
+    $reflection = new ReflectionMethod($action, 'update');
+
+    // Read the source code of the update method to verify it passes registry URL
+    $filename = $reflection->getFileName();
+    $startLine = $reflection->getStartLine();
+    $endLine = $reflection->getEndLine();
+    $source = implode('', array_slice(file($filename), $startLine - 1, $endLine - $startLine + 1));
+
+    // Verify the method reads registry_url from DB first, then falls back to config
+    expect($source)->toContain('instanceSettings()->docker_registry_url');
+    expect($source)->toContain("config('constants.coolify.registry_url')");
+    // Verify it passes $registryUrl as the third argument to upgrade.sh
+    expect($source)->toContain('$registryUrl');
+    expect($source)->toMatch('/upgrade\.sh.*\$registryUrl/');
 });
 
 it('prevents downgrade even with manual update', function () {

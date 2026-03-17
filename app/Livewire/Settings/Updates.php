@@ -23,6 +23,9 @@ class Updates extends Component
     #[Validate('boolean')]
     public bool $is_auto_update_enabled;
 
+    #[Validate('required|string|in:docker.io,ghcr.io')]
+    public string $docker_registry_url;
+
     public function mount()
     {
         if (! isCloud()) {
@@ -33,6 +36,7 @@ class Updates extends Component
         $this->auto_update_frequency = $this->settings->auto_update_frequency;
         $this->update_check_frequency = $this->settings->update_check_frequency;
         $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
+        $this->docker_registry_url = $this->settings->docker_registry_url ?: config('constants.coolify.registry_url');
     }
 
     public function instantSave()
@@ -46,10 +50,30 @@ class Updates extends Component
             $this->settings->auto_update_frequency = $this->auto_update_frequency;
             $this->settings->update_check_frequency = $this->update_check_frequency;
             $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
+            $this->settings->docker_registry_url = $this->docker_registry_url;
             $this->settings->save();
+            $this->syncRegistryUrlToEnv();
             $this->dispatch('success', 'Settings updated!');
         } catch (\Exception $e) {
             return handleError($e, $this);
+        }
+    }
+
+    private function syncRegistryUrlToEnv(): void
+    {
+        if (! $this->server) {
+            return;
+        }
+
+        try {
+            $registryUrl = $this->docker_registry_url;
+            instant_remote_process([
+                "sed -i 's|^REGISTRY_URL=.*|REGISTRY_URL={$registryUrl}|' /data/coolify/source/.env",
+            ], $this->server);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to sync REGISTRY_URL to .env', [
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
