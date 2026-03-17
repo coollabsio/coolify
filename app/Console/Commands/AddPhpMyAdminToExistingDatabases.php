@@ -12,7 +12,7 @@ use Illuminate\Console\Command;
 
 class AddPhpMyAdminToExistingDatabases extends Command
 {
-    protected $signature = 'database:add-phpmyadmin 
+    protected $signature = 'database:add-phpmyadmin
                             {--all : Agregar phpMyAdmin a todas las bases de datos MySQL/MariaDB}
                             {--uuid= : UUID específico de la base de datos o servicio a migrar}';
 
@@ -46,7 +46,7 @@ class AddPhpMyAdminToExistingDatabases extends Command
             $mariadbDatabases = StandaloneMariadb::all();
             $mysqlDatabases = StandaloneMysql::all();
             $databases = $mariadbDatabases->merge($mysqlDatabases);
-            
+
             // Buscar servicios con MySQL/MariaDB en su docker-compose
             $allServices = Service::all();
             foreach ($allServices as $service) {
@@ -132,7 +132,7 @@ class AddPhpMyAdminToExistingDatabases extends Command
                 // Agregar phpMyAdmin al docker-compose del servicio
                 $this->info("   🔄 Agregando phpMyAdmin al servicio...");
                 $added = EnsurePhpMyAdminForService::run($service);
-                
+
                 if (!$added) {
                     $this->warn("   ⚠️  No se pudo agregar phpMyAdmin (puede que ya exista o no tenga MySQL/MariaDB)");
                     continue;

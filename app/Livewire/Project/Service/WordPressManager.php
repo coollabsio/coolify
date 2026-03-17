@@ -140,7 +140,7 @@ class WordPressManager extends Component
                     $checkWpCli = "sudo {$checkWpCli}";
                 }
                 $wpCliCheck = trim(instant_remote_process([$checkWpCli], $server, false) ?? '');
-                
+
                 if ($wpCliCheck === 'notfound' || empty($wpCliCheck)) {
                     $this->output .= "Container: {$container['name']}\n";
                     $this->output .= "Warning: WP-CLI not found. Skipping WP-CLI commands.\n\n";
@@ -150,7 +150,7 @@ class WordPressManager extends Component
                     $wpPath = '/var/www/html';
                     $oldUrlEscaped = escapeshellarg($this->oldUrl);
                     $newUrlEscaped = escapeshellarg($this->newUrl);
-                    
+
                     $commands = [
                         ['cmd' => "cd {$wpPath} && wp search-replace {$oldUrlEscaped} {$newUrlEscaped} --all-tables --allow-root", 'name' => 'Search & Replace URLs'],
                         ['cmd' => "cd {$wpPath} && wp elementor replace-url {$oldUrlEscaped} {$newUrlEscaped} --allow-root", 'name' => 'Elementor URL Replacement'],
@@ -219,7 +219,7 @@ class WordPressManager extends Component
     public function detectWpPrefixes()
     {
         $this->wpPrefixes = [];
-        
+
         foreach ($this->wordpressContainers as $container) {
             $application = $container['application'] ?? $this->applications->find($container['id']);
             if (! $application || ! str($application->status)->contains('running')) {
@@ -230,7 +230,7 @@ class WordPressManager extends Component
                 $server = $application->service->server;
                 $containerName = $container['container_name'];
                 $prefix = $this->detectWpPrefix($server, $containerName);
-                
+
                 $this->wpPrefixes[$container['id']] = [
                     'container_name' => $container['name'],
                     'prefix' => $prefix ?? 'wp_',
@@ -248,14 +248,14 @@ class WordPressManager extends Component
     {
         try {
             $escapedContainer = escapeshellarg($containerName);
-            
+
             // Try to get prefix from wp-config.php
             $configCommand = "docker exec {$escapedContainer} sh -c 'cd /var/www/html && grep -E \"\\\$table_prefix\" wp-config.php 2>/dev/null | head -1 || echo notfound'";
             if ($server->isNonRoot()) {
                 $configCommand = "sudo {$configCommand}";
             }
             $configOutput = trim(instant_remote_process([$configCommand], $server, false) ?? '');
-            
+
             if ($configOutput !== 'notfound' && ! empty($configOutput)) {
                 // Extract prefix from line like: $table_prefix = 'wp_';
                 if (preg_match("/['\"]([^'\"]+)['\"]/", $configOutput, $matches)) {
@@ -279,7 +279,7 @@ class WordPressManager extends Component
     {
         try {
             $escapedContainer = escapeshellarg($containerName);
-            
+
             // Get environment variables to determine database type and credentials
             $envCommand = "docker exec {$escapedContainer} env";
             if ($server->isNonRoot()) {
@@ -319,7 +319,7 @@ class WordPressManager extends Component
             if ($server->isNonRoot()) {
                 $tablesCommand = "sudo {$tablesCommand}";
             }
-            
+
             $tablesOutput = instant_remote_process([$tablesCommand], $server, false);
             if (empty($tablesOutput)) {
                 return null;
@@ -328,13 +328,13 @@ class WordPressManager extends Component
             // Look for WordPress core tables (posts, users, options, etc.)
             $wpCoreTables = ['posts', 'users', 'options', 'comments', 'terms', 'postmeta'];
             $lines = explode("\n", trim($tablesOutput));
-            
+
             foreach ($lines as $line) {
                 $line = trim($line);
                 if (empty($line) || stripos($line, 'tables_in_') === 0) {
                     continue;
                 }
-                
+
                 // Check if this table matches WordPress pattern
                 foreach ($wpCoreTables as $coreTable) {
                     if (str_ends_with(strtolower($line), $coreTable)) {
@@ -414,38 +414,38 @@ PHP;
             $scriptPath = '/tmp/update_prefix_' . uniqid() . '.php';
             $escapedScriptPath = escapeshellarg($scriptPath);
             $escapedScriptContent = escapeshellarg($scriptContent);
-            
+
             // Write script
             $writeCommand = "docker exec {$escapedContainer} sh -c 'echo {$escapedScriptContent} > {$escapedScriptPath}'";
             if ($server->isNonRoot()) {
                 $writeCommand = "sudo {$writeCommand}";
             }
             instant_remote_process([$writeCommand], $server, false);
-            
+
             // Execute script
             $executeCommand = "docker exec {$escapedContainer} sh -c 'cd /var/www/html && php {$escapedScriptPath} {$escapedPrefix} 2>&1'";
             if ($server->isNonRoot()) {
                 $executeCommand = "sudo {$executeCommand}";
             }
             $output = instant_remote_process([$executeCommand], $server, false);
-            
+
             // Remove script
             $removeCommand = "docker exec {$escapedContainer} sh -c 'rm -f {$escapedScriptPath}'";
             if ($server->isNonRoot()) {
                 $removeCommand = "sudo {$removeCommand}";
             }
             instant_remote_process([$removeCommand], $server, false);
-            
+
             // Verify the change was made correctly
             $finalVerify = $this->detectWpPrefix($server, $containerName);
             if ($finalVerify !== $newPrefix) {
                 $this->dispatch('error', "No se pudo actualizar el prefijo. El prefijo actual es: ".($finalVerify ?? 'no detectado').". Output: ".($output ?? 'sin salida'));
                 return;
             }
-            
+
             // Refresh prefixes
             $this->detectWpPrefixes();
-            
+
             $this->dispatch('success', "WordPress prefix updated to {$newPrefix}.");
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to update WordPress prefix: '.$e->getMessage());
@@ -489,7 +489,7 @@ PHP;
                 $fpmInfoCommand = "sudo {$fpmInfoCommand}";
             }
             $fpmInfo = instant_remote_process([$fpmInfoCommand], $server, false) ?? '';
-            
+
             if (!empty($fpmInfo) && $fpmInfo !== 'notfound') {
                 $phpInfo = $fpmInfo;
             } else {
@@ -516,7 +516,7 @@ PHP;
             foreach ($settingsToExtract as $setting) {
                 // Try multiple methods to get the value
                 $iniValue = null;
-                
+
                 // Method 1: Check if there's a LocalFileVolume for this setting (persistent volume)
                 $confIniFileName = '99-custom-'.$setting.'.ini';
                 $confIniFileMountPath = '/usr/local/etc/php/conf.d/'.$confIniFileName;
@@ -524,14 +524,14 @@ PHP;
                     ->where('resource_id', $application->id)
                     ->where('mount_path', $confIniFileMountPath)
                     ->first();
-                
+
                 if ($fileVolume && !empty($fileVolume->content)) {
                     // Try to extract value from volume content first
                     if (preg_match('/'.$setting.'\s*=\s*([^\s\r\n]+)/', $fileVolume->content, $matches)) {
                         $iniValue = trim($matches[1]);
                     }
                 }
-                
+
                 // Method 2: Try PHP-FPM directly if available
                 if (empty($iniValue)) {
                     $fpmCommand = "docker exec {$escapedContainer} sh -c 'which php-fpm && php-fpm -i 2>/dev/null | grep \"{$setting}\" | head -1 | awk -F\"=> \" \"{print \\\$2}\" | awk \"{print \\\$1}\" || echo notfound'";
@@ -543,7 +543,7 @@ PHP;
                         $iniValue = $fpmValue;
                     }
                 }
-                
+
                 // Method 3: Try php -r (CLI, but more reliable)
                 if (empty($iniValue)) {
                     $getIniCommand = "docker exec {$escapedContainer} php -r \"echo ini_get('{$setting}');\" 2>/dev/null";
@@ -552,7 +552,7 @@ PHP;
                     }
                     $iniValue = trim(instant_remote_process([$getIniCommand], $server, false) ?? '');
                 }
-                
+
                 // Method 4: Parse from php -i output
                 if (empty($iniValue)) {
                     $pattern = "/{$setting}\s*=>\s*([^\r\n]+)/i";
@@ -563,7 +563,7 @@ PHP;
                         $iniValue = trim($value);
                     }
                 }
-                
+
                 $settings[$setting] = ! empty($iniValue) ? $iniValue : 'N/A';
             }
 
@@ -630,7 +630,7 @@ PHP;
                 $sapiCommand = "sudo {$sapiCommand}";
             }
             $sapi = strtolower(trim(instant_remote_process([$sapiCommand], $server, false) ?? 'cli'));
-            
+
             // Get PHP version
             $phpVersionCommand = "docker exec {$escapedContainer} php -r \"echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;\" 2>/dev/null";
             if ($server->isNonRoot()) {
@@ -665,7 +665,7 @@ PHP;
                 $findPhpIniCommand = "sudo {$findPhpIniCommand}";
             }
             $detectedIni = trim(instant_remote_process([$findPhpIniCommand], $server, false) ?? '');
-            
+
             if (!empty($detectedIni) && $detectedIni !== '(none)' && str_starts_with($detectedIni, '/')) {
                 $priorityPaths = array_merge([$detectedIni], $priorityPaths);
             }
@@ -688,7 +688,7 @@ PHP;
                     $checkDirCommand = "sudo {$checkDirCommand}";
                 }
                 $dirExists = trim(instant_remote_process([$checkDirCommand], $server, false) ?? '');
-                
+
                 if ($dirExists === 'found') {
                     $confDirPath = $confDir;
                     break;
@@ -737,23 +737,23 @@ PHP;
 
             // PRIORITY: conf.d files override php.ini, so we ALWAYS update conf.d first
             // This ensures the setting takes effect even if php.ini has conflicting values
-            
+
             // Debug: Show what PHP is actually using
             $debugIniCommand = "docker exec {$escapedContainer} php -r \"echo 'Loaded: ' . php_ini_loaded_file() . PHP_EOL; echo 'Scanned: ' . php_ini_scanned_files() . PHP_EOL;\" 2>/dev/null";
             if ($server->isNonRoot()) {
                 $debugIniCommand = "sudo {$debugIniCommand}";
             }
             $debugInfo = instant_remote_process([$debugIniCommand], $server, false) ?? '';
-            
+
             // CRITICAL: Store PHP config files in a persistent volume
             // Create/update LocalFileVolume to persist the configuration file
             $confIniFileName = '99-custom-'.$setting.'.ini';
             $confIniFileMountPath = $confDirPath.'/'.$confIniFileName;
             $confIniFileFsPath = './php-config/'.$confIniFileName; // Relative to workdir
-            
+
             // Prepare file content
             $confContent = "; Custom {$setting} setting - Updated by Coolify\n{$setting} = {$value}\n";
-            
+
             // Ensure php-config directory exists in workdir
             $workdir = $application->service->workdir();
             $phpConfigDir = $workdir.'/php-config';
@@ -762,14 +762,14 @@ PHP;
                 $createDirCommand = "sudo {$createDirCommand}";
             }
             instant_remote_process([$createDirCommand], $server, false);
-            
+
             try {
                 // Find or create LocalFileVolume for this PHP config file
                 $fileVolume = LocalFileVolume::where('resource_type', ServiceApplication::class)
                     ->where('resource_id', $application->id)
                     ->where('mount_path', $confIniFileMountPath)
                     ->first();
-                
+
                 if (! $fileVolume) {
                     // Create new file volume
                     $fileVolume = LocalFileVolume::create([
@@ -785,10 +785,10 @@ PHP;
                     $fileVolume->content = $confContent;
                     $fileVolume->save();
                 }
-                
+
                 // Save the file to the persistent storage on server
                 $fileVolume->saveStorageOnServer();
-                
+
                 // Verify the file was saved correctly on the server
                 $workdir = $application->service->workdir();
                 $serverFilePath = $workdir.'/php-config/'.$confIniFileName;
@@ -797,45 +797,45 @@ PHP;
                     $verifyServerFileCommand = "sudo {$verifyServerFileCommand}";
                 }
                 $serverFileContent = instant_remote_process([$verifyServerFileCommand], $server, false) ?? '';
-                
+
                 if ($serverFileContent === 'FILE_NOT_FOUND' || empty($serverFileContent)) {
                     $this->dispatch('error', "File was not saved correctly to server volume at {$serverFilePath}. Please check permissions.");
                     return;
                 }
-                
+
                 // CRITICAL: Regenerate docker-compose to include the new volume
                 // This ensures the volume is mounted when the container restarts
                 $this->service->parse();
                 $this->service->saveComposeConfigs();
-                
+
                 // Verify the volume is in docker-compose
                 $composeContent = $this->service->docker_compose ?? '';
                 $volumeInCompose = str_contains($composeContent, 'php-config') && str_contains($composeContent, $confIniFileMountPath);
-                
+
                 // Also write directly to container for immediate effect
                 $this->writeToContainerDirectly($server, $escapedContainer, $confDirPath, $confIniFileName, $confContent, $setting, $value);
-                
+
                 // Verify the file exists in the container after writing
                 $verifyContainerFileCommand = "docker exec {$escapedContainer} test -f ".escapeshellarg($confIniFileMountPath)." && docker exec {$escapedContainer} cat ".escapeshellarg($confIniFileMountPath)." || echo 'NOT_MOUNTED'";
                 if ($server->isNonRoot()) {
                     $verifyContainerFileCommand = "sudo {$verifyContainerFileCommand}";
                 }
                 $containerFileContent = instant_remote_process([$verifyContainerFileCommand], $server, false) ?? '';
-                
+
                 // Check if file is mounted from volume or written directly
                 $checkMountCommand = "docker inspect {$escapedContainer} --format '{{range .Mounts}}{{.Source}}:{{.Destination}} {{end}}' 2>/dev/null | grep -q php-config && echo 'MOUNTED' || echo 'NOT_MOUNTED'";
                 if ($server->isNonRoot()) {
                     $checkMountCommand = "sudo {$checkMountCommand}";
                 }
                 $isMounted = trim(instant_remote_process([$checkMountCommand], $server, false) ?? '');
-                
+
                 // Verify PHP is reading the new value (check both CLI and FPM)
                 $verifyPhpCliCommand = "docker exec {$escapedContainer} php -r \"echo ini_get('{$setting}');\" 2>/dev/null";
                 if ($server->isNonRoot()) {
                     $verifyPhpCliCommand = "sudo {$verifyPhpCliCommand}";
                 }
                 $phpCliValue = trim(instant_remote_process([$verifyPhpCliCommand], $server, false) ?? '');
-                
+
                 // Check PHP-FPM value (this is what WordPress uses)
                 $verifyPhpFpmCommand = "docker exec {$escapedContainer} sh -c 'php-fpm -i 2>/dev/null | grep \"{$setting}\" | head -1 | awk -F\"=> \" \"{print \\\$2}\" | awk \"{print \\\$1}\" || echo notfound'";
                 if ($server->isNonRoot()) {
@@ -845,21 +845,21 @@ PHP;
                 if ($phpFpmValue === 'notfound' || empty($phpFpmValue)) {
                     $phpFpmValue = $phpCliValue;
                 }
-                
+
                 // The file is now persisted in the volume and docker-compose has been updated
                 $volumeStatus = $volumeInCompose ? "Volume added to docker-compose." : "WARNING: Volume may not be in docker-compose.";
                 $containerStatus = str_contains($containerFileContent, $value) ? "File written to container." : "WARNING: File content not found in container.";
                 $mountStatus = ($isMounted === 'MOUNTED') ? "Volume is mounted." : "WARNING: Volume may not be mounted (file written directly to container).";
                 $phpStatus = ($phpFpmValue === $value) ? "PHP-FPM reports {$value}." : "WARNING: PHP-FPM reports {$phpFpmValue} instead of {$value}. Service restart required.";
-                
+
                 $this->dispatch('success', "PHP setting {$setting} saved. {$volumeStatus} {$containerStatus} {$mountStatus} {$phpStatus} If PHP-FPM shows old value, restart the SERVICE completely from the service page.");
-                
+
             } catch (\Throwable $e) {
                 $this->dispatch('error', "Failed to save PHP config to persistent volume: ".$e->getMessage().". Trying direct container write...");
                 // Fallback to direct container write (non-persistent)
                 $this->writeToContainerDirectly($server, $escapedContainer, $confDirPath, $confIniFileName, $confContent, $setting, $value);
             }
-            
+
             // CRITICAL: Remove or comment out duplicate settings from other conf.d files
             // Files are loaded alphabetically, so 99- prefix ensures our file loads last
             // But we should still check for conflicts
@@ -868,21 +868,21 @@ PHP;
                 $listConfFilesCommand = "sudo {$listConfFilesCommand}";
             }
             $otherConfFiles = explode("\n", trim(instant_remote_process([$listConfFilesCommand], $server, false) ?? ''));
-            
+
             $conflictingFiles = [];
             foreach ($otherConfFiles as $otherFile) {
                 $otherFile = trim($otherFile);
                 if (empty($otherFile) || !str_starts_with($otherFile, '/')) {
                     continue;
                 }
-                
+
                 // Check if this file has our setting (commented or not)
                 $checkSettingCommand = "docker exec {$escapedContainer} grep -E '^[;]*\s*{$setting}\s*=' ".escapeshellarg($otherFile)." 2>/dev/null | head -1";
                 if ($server->isNonRoot()) {
                     $checkSettingCommand = "sudo {$checkSettingCommand}";
                 }
                 $settingLine = trim(instant_remote_process([$checkSettingCommand], $server, false) ?? '');
-                
+
                 if (!empty($settingLine)) {
                     $conflictingFiles[] = $otherFile;
                     // Comment out the setting in this file (our 99- file will override it)
@@ -894,7 +894,7 @@ PHP;
                     instant_remote_process([$commentCommand], $server, false);
                 }
             }
-            
+
             // Log conflicting files for debugging
             if (!empty($conflictingFiles)) {
                 $this->dispatch('warning', "Found conflicting settings in: ".implode(', ', $conflictingFiles).". They have been commented out.");
@@ -903,19 +903,19 @@ PHP;
             // CRITICAL: Also update php.ini file directly (this persists better than conf.d)
             // Since containers are ephemeral, we need to modify the main php.ini file
             $escapedPhpIniPath = escapeshellarg($phpIniPath);
-            
+
             // Read current php.ini content
             $readCommand = "docker exec {$escapedContainer} cat {$escapedPhpIniPath}";
             if ($server->isNonRoot()) {
                 $readCommand = "sudo {$readCommand}";
             }
             $phpIniContent = instant_remote_process([$readCommand], $server, false) ?? '';
-            
+
             // Update the setting in content
             $lines = explode("\n", $phpIniContent);
             $found = false;
             $newLines = [];
-            
+
             foreach ($lines as $line) {
                 $trimmedLine = trim($line);
                 // Check if this line contains our setting (commented or not)
@@ -927,18 +927,18 @@ PHP;
                     $newLines[] = $line;
                 }
             }
-            
+
             // If setting not found, add it at the end
             if (! $found) {
                 $newLines[] = "";
                 $newLines[] = "; {$setting} - Updated by Coolify";
                 $newLines[] = "{$setting} = {$value}";
             }
-            
+
             // Write php.ini back to container using the same reliable method
             try {
                 $newContent = implode("\n", $newLines);
-                
+
                 // Save content to a temporary file locally
                 $tmpFilename = 'temp/'.uniqid('php-ini-main-').'.ini';
                 Storage::disk('local')->put($tmpFilename, $newContent);
@@ -971,7 +971,7 @@ PHP;
             // upload_max_filesize and post_max_size require a full PHP-FPM restart, not just reload
             // For these settings, we need to restart the entire container to ensure volume is mounted
             $needsContainerRestart = in_array($setting, ['upload_max_filesize', 'post_max_size', 'memory_limit']);
-            
+
             if ($needsContainerRestart) {
                 // Restart the container to ensure volume is mounted and PHP-FPM reads new config
                 $restartContainerCommand = "docker restart {$escapedContainer}";
@@ -979,7 +979,7 @@ PHP;
                     $restartContainerCommand = "sudo {$restartContainerCommand}";
                 }
                 instant_remote_process([$restartContainerCommand], $server, false);
-                
+
                 // Wait for container to be ready
                 $waitCommand = "docker exec {$escapedContainer} sh -c 'sleep 3 && php -r \"echo \\\"ready\\\";\"' 2>/dev/null || echo 'waiting'";
                 if ($server->isNonRoot()) {
@@ -1000,7 +1000,7 @@ PHP;
                     "docker exec {$escapedContainer} sh -c 'pkill -9 php-fpm 2>/dev/null || true'",
                     "docker exec {$escapedContainer} sh -c 'service php-fpm restart 2>/dev/null || service php8.3-fpm restart 2>/dev/null || service php8.2-fpm restart 2>/dev/null || service php8.1-fpm restart 2>/dev/null || service php8.0-fpm restart 2>/dev/null || true'",
                 ];
-                
+
                 foreach ($restartCommands as $restartCommand) {
                     if ($server->isNonRoot()) {
                         $restartCommand = "sudo {$restartCommand}";
@@ -1009,10 +1009,10 @@ PHP;
                     usleep(1000000); // 1 second
                 }
             }
-            
+
             // Verify the change was applied - try multiple methods
             $verifiedValue = null;
-            
+
             // Method 1: Try PHP-FPM directly
             $verifyFpmCommand = "docker exec {$escapedContainer} sh -c 'php-fpm -i 2>/dev/null | grep \"{$setting}\" | head -1 | awk -F\"=> \" \"{print \\\$2}\" | awk \"{print \\\$1}\" || echo notfound'";
             if ($server->isNonRoot()) {
@@ -1022,7 +1022,7 @@ PHP;
             if (!empty($fpmValue) && $fpmValue !== 'notfound') {
                 $verifiedValue = $fpmValue;
             }
-            
+
             // Method 2: Try CLI php
             if (empty($verifiedValue)) {
                 $verifyCommand = "docker exec {$escapedContainer} php -r \"echo ini_get('{$setting}');\" 2>/dev/null";
@@ -1031,19 +1031,19 @@ PHP;
                 }
                 $verifiedValue = trim(instant_remote_process([$verifyCommand], $server, false) ?? '');
             }
-            
+
             // Method 3: Check conf.d file content directly - multiple methods
             $confFileValue = null;
             $confIniFileForCheck = $confDirPath.'/99-custom-'.$setting.'.ini';
             $escapedConfIniForCheck = escapeshellarg($confIniFileForCheck);
-            
+
             // Try grep method
             $checkConfCommand = "docker exec {$escapedContainer} grep -E '^{$setting}\s*=' {$escapedConfIniForCheck} 2>/dev/null | head -1 | sed 's/.*=\\s*//' | xargs";
             if ($server->isNonRoot()) {
                 $checkConfCommand = "sudo {$checkConfCommand}";
             }
             $confFileValue = trim(instant_remote_process([$checkConfCommand], $server, false) ?? '');
-            
+
             // If empty, try reading entire file and parsing
             if (empty($confFileValue)) {
                 $readFileCommand = "docker exec {$escapedContainer} cat {$escapedConfIniForCheck} 2>/dev/null";
@@ -1055,10 +1055,10 @@ PHP;
                     $confFileValue = trim($matches[1]);
                 }
             }
-            
+
             // Reload settings to update UI
             $this->loadPhpIniSettings($this->selectedContainerForPhpIni);
-            
+
             // Note: Success message is already dispatched in the try block above
             // This section is only reached if there's an error or if we need additional verification
         } catch (\Throwable $e) {
@@ -1071,7 +1071,7 @@ PHP;
         // Fallback method: write directly to container (non-persistent)
         $confIniFile = $confDirPath.'/'.$confIniFileName;
         $escapedConfIni = escapeshellarg($confIniFile);
-        
+
         try {
             $tmpFilename = 'temp/'.uniqid('php-ini-').'.ini';
             Storage::disk('local')->put($tmpFilename, $confContent);

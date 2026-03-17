@@ -49,7 +49,7 @@ class EnsurePhpMyAdminForService
             foreach ($services as $serviceName => $serviceConfig) {
                 $image = str(data_get($serviceConfig, 'image', ''))->lower();
                 $serviceNameLower = str($serviceName)->lower();
-                
+
                 if ($image->contains('mysql') || $image->contains('mariadb') ||
                     $serviceNameLower->contains('mysql') || $serviceNameLower->contains('mariadb')) {
                     // Excluir phpmyadmin
@@ -78,7 +78,7 @@ class EnsurePhpMyAdminForService
             foreach ($services as $serviceName => $serviceConfig) {
                 $image = str(data_get($serviceConfig, 'image', ''))->lower();
                 $serviceNameLower = str($serviceName)->lower();
-                
+
                 if ($serviceNameLower->contains('phpmyadmin') || $image->contains('phpmyadmin')) {
                     return true;
                 }
@@ -107,14 +107,14 @@ class EnsurePhpMyAdminForService
         foreach ($services as $serviceName => $serviceConfig) {
             $image = str(data_get($serviceConfig, 'image', ''))->lower();
             $serviceNameLower = str($serviceName)->lower();
-            
+
             if (($image->contains('mysql') || $image->contains('mariadb') ||
                  $serviceNameLower->contains('mysql') || $serviceNameLower->contains('mariadb')) &&
                 ! $serviceNameLower->contains('phpmyadmin')) {
-                
+
                 $dbServiceName = $serviceName;
                 $dbServiceConfig = $serviceConfig;
-                
+
                 // Obtener la contraseña root desde las variables de entorno
                 $env = data_get($serviceConfig, 'environment', []);
                 foreach ($env as $envVar) {
@@ -144,7 +144,7 @@ class EnsurePhpMyAdminForService
         // Generar nombre y configuración para phpMyAdmin
         $phpmyadminServiceName = $dbServiceName.'-phpmyadmin';
         $phpmyadminVolumeName = $service->uuid.'-phpmyadmin-config';
-        
+
         // Obtener la red del servicio
         $networks = data_get($dbServiceConfig, 'networks', []);
         if (empty($networks)) {
@@ -204,16 +204,16 @@ class EnsurePhpMyAdminForService
         // Guardar el docker-compose modificado
         $service->docker_compose_raw = Yaml::dump($compose, 10);
         $service->save();
-        
+
         // Parsear el servicio para que se creen las variables de entorno y aplicaciones
         $service->parse();
-        
+
         // Aplicar prerrequisitos de aplicaciones (esto crea las ServiceApplications)
         applyServiceApplicationPrerequisites($service);
-        
+
         // Guardar configuración del servicio para que se generen los archivos
         $service->saveComposeConfigs();
-        
+
         // Regenerar proxy para que detecte el nuevo phpMyAdmin
         $server = $service->server;
         if ($server && $server->proxyType() !== 'NONE') {

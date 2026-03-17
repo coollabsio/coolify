@@ -15,10 +15,10 @@ class StartService
     public function handle(Service $service, bool $pullLatestImages = false, bool $stopBeforeStart = false)
     {
         $service->parse();
-        
+
         // Verificar y agregar phpMyAdmin si el servicio tiene MySQL/MariaDB
         EnsurePhpMyAdminForService::run($service);
-        
+
         if ($stopBeforeStart) {
             StopService::run(service: $service, dockerCleanup: false);
         }
@@ -52,11 +52,11 @@ class StartService
         }
 
         $activity = remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
-        
+
         // Setup WordPress automatically after service starts (delay to ensure containers are up)
         // This runs in background queue, so it won't block the HTTP response
         SetupWordPress::dispatch($service)->delay(now()->addSeconds(30));
-        
+
         return $activity;
     }
 }

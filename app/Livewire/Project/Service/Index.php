@@ -370,6 +370,7 @@ class Index extends Component
             'php8.2-apache' => 'PHP 8.2',
             'php8.1-apache' => 'PHP 8.1',
             'php8.0-apache' => 'PHP 8.0',
+            'php7.4-apache' => 'PHP 7.4',
         ];
     }
 
@@ -382,7 +383,7 @@ class Index extends Component
         if ($tag === 'latest' || $tag === 'apache' || $tag === '') {
             return 'latest';
         }
-        if (in_array($tag, ['php8.0-apache', 'php8.1-apache', 'php8.2-apache', 'php8.3-apache'], true)) {
+        if (in_array($tag, ['php8.0-apache', 'php8.1-apache', 'php8.2-apache', 'php8.3-apache', 'php7.4-apache'], true)) {
             return $tag;
         }
         if (preg_match('/php8\.\d-apache/', $tag, $m)) {

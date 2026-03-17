@@ -1039,7 +1039,7 @@ class FileExplorer extends Component
 
             // Build extraction command with automatic tool installation
             $extractionCommand = '';
-            
+
             if (str_ends_with(strtolower($filePath), '.zip')) {
                 // Try multiple methods: unzip command, Python, or PHP
                 // Para archivos grandes, ejecutar con output periódico para mantener conexión activa
@@ -1100,10 +1100,10 @@ class FileExplorer extends Component
             // Para archivos grandes, usar timeout extendido (2 horas = 7200 segundos)
             // y deshabilitar multiplexing para evitar problemas de conexión
             $extendedTimeout = 7200; // 2 horas para archivos grandes
-            
+
             // Notificar al usuario sobre archivos grandes
             $this->dispatch('info', 'Extrayendo archivo. Esto puede tardar varios minutos para archivos grandes...');
-            
+
             // Execute extraction with extended timeout and disabled multiplexing for large files
             $output = instant_remote_process([$command], $server, false, false, $extendedTimeout, true);
             $output = trim($output ?? '');
@@ -1171,7 +1171,7 @@ class FileExplorer extends Component
 
             // Try to install unzip
             $this->dispatch('info', 'Installing unzip... This may take a moment.');
-            
+
             // Try different package managers
             $installCommand = "docker exec {$escapedContainer} sh -c '";
             $installCommand .= "if command -v apk >/dev/null 2>&1; then ";
@@ -1199,7 +1199,7 @@ class FileExplorer extends Component
                     $verifyCommand = "sudo {$verifyCommand}";
                 }
                 $verifyResult = trim(instant_remote_process([$verifyCommand], $server, false) ?? '');
-                
+
                 if ($verifyResult === 'VERIFIED') {
                     $this->dispatch('success', 'unzip has been successfully installed in this container.');
                 } else {
@@ -1765,7 +1765,7 @@ class FileExplorer extends Component
                 $checkCommand = "sudo {$checkCommand}";
             }
             $checkResult = trim(instant_remote_process([$checkCommand], $server, false) ?? '');
-            
+
             if ($checkResult === 'exists') {
                 $this->dispatch('error', 'A file or folder with that name already exists.');
 
@@ -1788,7 +1788,7 @@ class FileExplorer extends Component
                     $isDirCommand = "sudo {$isDirCommand}";
                 }
                 $isDirResult = trim(instant_remote_process([$isDirCommand], $server, false) ?? '');
-                
+
                 if ($isDirResult === 'isdir') {
                     // Si es un directorio, cerrar el archivo
                     $this->selectedFile = null;
@@ -2040,14 +2040,14 @@ class FileExplorer extends Component
     public function openDatabasePanel()
     {
         // Si es una base de datos, verificar si tiene phpMyAdmin integrado
-        if ($this->type === 'database' && 
-            ($this->resource instanceof \App\Models\StandaloneMariadb || 
+        if ($this->type === 'database' &&
+            ($this->resource instanceof \App\Models\StandaloneMariadb ||
              $this->resource instanceof \App\Models\StandaloneMysql)) {
-            
+
             $database = $this->resource;
             $containerName = $database->uuid.'-phpmyadmin';
             $server = $database->destination->server;
-            
+
             // Verificar si el contenedor phpMyAdmin existe
             if ($server) {
                 $escapedContainer = escapeshellarg($containerName);
@@ -2055,14 +2055,14 @@ class FileExplorer extends Component
                 if ($server->isNonRoot()) {
                     $checkCommand = "sudo {$checkCommand}";
                 }
-                
+
                 $containerExists = instant_remote_process([$checkCommand], $server, false);
                 if (!empty(trim($containerExists))) {
                     // phpMyAdmin está integrado, obtener URL y credenciales
                     $phpMyAdminUrl = $this->getPhpMyAdminUrlForDatabase($database);
                     if ($phpMyAdminUrl) {
                         $dbCredentials = $this->getDatabaseCredentialsForIntegratedPhpMyAdmin($database);
-                        
+
                         if ($dbCredentials) {
                             // Crear URL encriptada para el autologin
                             $encryptedData = null;
@@ -2071,7 +2071,7 @@ class FileExplorer extends Component
                                     'url' => $phpMyAdminUrl,
                                     'credentials' => $dbCredentials,
                                 ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-                                
+
                                 $encryptedData = \Illuminate\Support\Facades\Crypt::encryptString($dataToEncrypt);
                                 session(['phpmyadmin_data' => $encryptedData]);
                             } catch (\Throwable $e) {
@@ -2081,20 +2081,20 @@ class FileExplorer extends Component
                                     'credentials' => $dbCredentials,
                                 ]]);
                             }
-                            
-                            $this->dispatch('openPhpMyAdmin', 
-                                url: $phpMyAdminUrl, 
-                                credentials: $dbCredentials, 
+
+                            $this->dispatch('openPhpMyAdmin',
+                                url: $phpMyAdminUrl,
+                                credentials: $dbCredentials,
                                 encryptedData: $encryptedData
                             );
-                            
+
                             return;
                         }
                     }
                 }
             }
         }
-        
+
         // Buscar servicio phpMyAdmin en el mismo entorno (funciona para todos los contenedores)
         $phpMyAdminService = $this->findPhpMyAdminService();
 
@@ -2104,12 +2104,12 @@ class FileExplorer extends Component
             if ($phpMyAdminUrl) {
                 // Obtener credenciales de la base de datos para autocompletar el formulario
                 $dbCredentials = $this->getDatabaseCredentials($phpMyAdminService->environment, $phpMyAdminService);
-                
+
                 // Intentar configurar autenticación automática en phpMyAdmin
                 $this->configurePhpMyAdminAutoLogin($phpMyAdminService, $dbCredentials);
-                
+
                 $this->phpMyAdminUrl = $phpMyAdminUrl;
-                
+
                 // Crear URL encriptada para el autologin
                 $encryptedData = null;
                 if ($dbCredentials) {
@@ -2118,10 +2118,10 @@ class FileExplorer extends Component
                             'url' => $phpMyAdminUrl,
                             'credentials' => $dbCredentials,
                         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-                        
+
                         // Intentar cifrar los datos
                         $encryptedData = \Illuminate\Support\Facades\Crypt::encryptString($dataToEncrypt);
-                        
+
                         // También guardar en sesión como respaldo
                         session(['phpmyadmin_data' => $encryptedData]);
                     } catch (\Throwable $e) {
@@ -2133,12 +2133,12 @@ class FileExplorer extends Component
                         ]]);
                     }
                 }
-                
+
                 // Disparar evento para abrir phpMyAdmin en nueva ventana con credenciales
                 // En Livewire 3, pasar los datos como parámetros nombrados
-                $this->dispatch('openPhpMyAdmin', 
-                    url: $phpMyAdminUrl, 
-                    credentials: $dbCredentials, 
+                $this->dispatch('openPhpMyAdmin',
+                    url: $phpMyAdminUrl,
+                    credentials: $dbCredentials,
                     encryptedData: $encryptedData
                 );
 
@@ -2149,16 +2149,16 @@ class FileExplorer extends Component
         // Si no se encuentra phpMyAdmin, mostrar mensaje
         $this->dispatch('error', 'phpMyAdmin service not found in this environment. Please add phpMyAdmin as a service to use it for database management.');
     }
-    
+
     private function findDatabasesInEnvironment(): \Illuminate\Support\Collection
     {
         $databases = collect();
-        
+
         try {
             // Obtener el entorno actual
             $environment = null;
-            if ($this->type === 'database' && 
-                ($this->resource instanceof \App\Models\StandaloneMariadb || 
+            if ($this->type === 'database' &&
+                ($this->resource instanceof \App\Models\StandaloneMariadb ||
                  $this->resource instanceof \App\Models\StandaloneMysql)) {
                 // Si ya es una base de datos, usarla directamente
                 $databases->push($this->resource);
@@ -2168,45 +2168,45 @@ class FileExplorer extends Component
             } elseif ($this->type === 'application' && $this->resource instanceof \App\Models\Application) {
                 $environment = $this->resource->environment;
             }
-            
+
             if ($environment) {
                 // Buscar todas las bases de datos MySQL/MariaDB en el entorno
                 $mariadbDatabases = \App\Models\StandaloneMariadb::whereHas('destination', function ($query) use ($environment) {
                     $query->where('environment_id', $environment->id);
                 })->get();
-                
+
                 $mysqlDatabases = \App\Models\StandaloneMysql::whereHas('destination', function ($query) use ($environment) {
                     $query->where('environment_id', $environment->id);
                 })->get();
-                
+
                 $databases = $mariadbDatabases->merge($mysqlDatabases);
             }
         } catch (\Throwable $e) {
             \Log::error('Error finding databases in environment: '.$e->getMessage());
         }
-        
+
         return $databases;
     }
-    
+
     private function getPhpMyAdminUrlForDatabase($database): ?string
     {
         try {
             $server = $database->destination->server;
             $containerName = $database->uuid.'-phpmyadmin';
-            
+
             // Verificar si el contenedor phpMyAdmin existe
             $escapedContainer = escapeshellarg($containerName);
             $checkCommand = "docker ps -a --filter name=^{$escapedContainer}$ --format '{{.Names}}'";
             if ($server->isNonRoot()) {
                 $checkCommand = "sudo {$checkCommand}";
             }
-            
+
             $containerExists = instant_remote_process([$checkCommand], $server, false);
             if (empty(trim($containerExists))) {
                 // El contenedor no existe aún, puede que necesite reiniciarse la base de datos
                 return null;
             }
-            
+
             // Buscar ServiceApplication para phpMyAdmin si está en un servicio
             // Primero intentar obtener desde variables de entorno del servicio
             $environment = $database->environment;
@@ -2225,7 +2225,7 @@ class FileExplorer extends Component
                                     return $fqdns[0];
                                 }
                             }
-                            
+
                             // Buscar en variables de entorno
                             $envVar = $service->environment_variables()
                                 ->where(function ($query) {
@@ -2233,7 +2233,7 @@ class FileExplorer extends Component
                                         ->orWhere('key', 'like', 'SERVICE_FQDN_%PHPMYADMIN%');
                                 })
                                 ->first();
-                            
+
                             if ($envVar && $envVar->real_value) {
                                 return $envVar->real_value;
                             }
@@ -2241,36 +2241,36 @@ class FileExplorer extends Component
                     }
                 }
             }
-            
+
             // Obtener la URL desde las variables de entorno del contenedor
             $envCommand = "docker exec {$escapedContainer} env 2>/dev/null | grep PMA_ABSOLUTE_URI | cut -d'=' -f2";
             if ($server->isNonRoot()) {
                 $envCommand = "sudo {$envCommand}";
             }
-            
+
             $url = trim(instant_remote_process([$envCommand], $server, false) ?? '');
             if (!empty($url)) {
                 return $url;
             }
-            
+
             // Si no se encuentra en las variables de entorno, generar una URL basada en el servidor
             // Usar un nombre más corto para evitar URLs muy largas
             $phpmyadminRandom = substr($database->uuid, 0, 8).'-phpmyadmin';
             $url = generateUrl($server, $phpmyadminRandom);
-            
+
             return $url;
         } catch (\Throwable $e) {
             \Log::error('Error getting phpMyAdmin URL for database: '.$e->getMessage());
             return null;
         }
     }
-    
+
     private function getDatabaseCredentialsForIntegratedPhpMyAdmin($database): ?array
     {
         try {
             $containerName = $database->uuid;
             $server = $database->destination->server;
-            
+
             // Obtener credenciales desde la base de datos
             $rootPassword = null;
             if ($database instanceof \App\Models\StandaloneMariadb) {
@@ -2278,11 +2278,11 @@ class FileExplorer extends Component
             } elseif ($database instanceof \App\Models\StandaloneMysql) {
                 $rootPassword = $database->mysql_root_password;
             }
-            
+
             if (!$rootPassword) {
                 return null;
             }
-            
+
             // phpMyAdmin está en el mismo docker-compose que la base de datos
             // En docker-compose, los servicios se comunican por nombre de servicio
             // El nombre del servicio en docker-compose es el UUID de la base de datos
@@ -2310,7 +2310,7 @@ class FileExplorer extends Component
             // La imagen de linuxserver/phpmyadmin soporta estas variables cuando PMA_ARBITRARY=1
             // Sin embargo, estas variables no funcionan directamente para autenticación automática
             // Por eso usamos JavaScript para autocompletar el formulario
-            
+
             // Nota: Las variables PMA_USER, PMA_PASSWORD y PMA_HOST no proporcionan
             // autenticación automática en la imagen de linuxserver/phpmyadmin.
             // El autocompletado se maneja mediante JavaScript en el frontend.
@@ -2333,15 +2333,15 @@ class FileExplorer extends Component
                 if (method_exists($this->resource, 'environment')) {
                     $environment = $this->resource->environment;
                 }
-                
+
                 // Si es una base de datos, verificar si tiene phpMyAdmin integrado en su docker-compose
-                if ($this->resource instanceof \App\Models\StandaloneMariadb || 
+                if ($this->resource instanceof \App\Models\StandaloneMariadb ||
                     $this->resource instanceof \App\Models\StandaloneMysql) {
                     // Verificar si la base de datos tiene phpMyAdmin en su configuración
                     // Las bases de datos ahora tienen phpMyAdmin integrado, así que crear un servicio virtual
                     // o buscar el contenedor phpMyAdmin directamente
                     $containerName = $this->resource->uuid.'-phpmyadmin';
-                    
+
                     // Verificar si el contenedor existe
                     $server = $this->resource->destination->server;
                     if ($server) {
@@ -2350,7 +2350,7 @@ class FileExplorer extends Component
                         if ($server->isNonRoot()) {
                             $checkCommand = "sudo {$checkCommand}";
                         }
-                        
+
                         $containerExists = instant_remote_process([$checkCommand], $server, false);
                         if (!empty(trim($containerExists))) {
                             // El contenedor existe, retornar un servicio virtual
@@ -2371,7 +2371,7 @@ class FileExplorer extends Component
             // Buscar por nombre de servicio, imagen o docker_compose
             foreach ($allServices as $service) {
                 $serviceName = str($service->name)->lower();
-                
+
                 // Verificar nombre del servicio
                 if ($serviceName->contains('phpmyadmin')) {
                     return $service;
@@ -2394,7 +2394,7 @@ class FileExplorer extends Component
                         foreach ($services as $serviceNameInCompose => $serviceConfig) {
                             $serviceNameLower = str($serviceNameInCompose)->lower();
                             $image = str(data_get($serviceConfig, 'image', ''))->lower();
-                            
+
                             if ($serviceNameLower->contains('phpmyadmin') || $image->contains('phpmyadmin')) {
                                 return $service;
                             }
@@ -2416,11 +2416,11 @@ class FileExplorer extends Component
         try {
             // Buscar la aplicación phpMyAdmin en el servicio
             $phpMyAdminApp = null;
-            
+
             foreach ($service->applications as $app) {
                 $appName = str($app->name)->lower();
                 $imageName = str($app->image)->lower();
-                
+
                 if ($appName->contains('phpmyadmin') || $imageName->contains('phpmyadmin')) {
                     $phpMyAdminApp = $app;
                     break;
@@ -2475,20 +2475,20 @@ class FileExplorer extends Component
             // El endpoint de autologin se encargará de hacer el POST con las credenciales
             $url = \Spatie\Url\Url::fromString($baseUrl);
             $path = $url->getPath();
-            
+
             // Remover index.php si está presente
             if (str_ends_with($path, 'index.php')) {
                 $path = dirname($path);
             }
             $path = rtrim($path, '/');
-            
+
             // Asegurar que termine con /
             if (empty($path) || $path === '/') {
                 $path = '/';
             } else {
                 $path .= '/';
             }
-            
+
             $url = $url->withPath($path)->withoutQueryParameters();
 
             return $url->__toString();
@@ -2510,13 +2510,13 @@ class FileExplorer extends Component
                 try {
                     $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($phpMyAdminService->docker_compose_raw);
                     $services = data_get($dockerCompose, 'services', []);
-                    
+
                     foreach ($services as $serviceNameInCompose => $serviceConfig) {
                         $image = str(data_get($serviceConfig, 'image', ''))->lower();
                         $serviceNameLower = str($serviceNameInCompose)->lower();
-                        
+
                         // Buscar MySQL o MariaDB (excluir phpmyadmin)
-                        if (($image->contains('mysql') || $image->contains('mariadb') || 
+                        if (($image->contains('mysql') || $image->contains('mariadb') ||
                              $serviceNameLower->contains('mysql') || $serviceNameLower->contains('mariadb')) &&
                             ! $serviceNameLower->contains('phpmyadmin')) {
                             $dbService = $phpMyAdminService;
@@ -2532,25 +2532,25 @@ class FileExplorer extends Component
             // Si no se encuentra en el mismo servicio, buscar en otros servicios del entorno
             if (! $dbService) {
                 $allServices = $environment->services()->get();
-                
+
                 foreach ($allServices as $service) {
                     // Saltar el servicio phpMyAdmin
                     if ($service->id === $phpMyAdminService->id) {
                         continue;
                     }
-                    
+
                     // Verificar en docker_compose_raw por servicios MySQL/MariaDB
                     if ($service->docker_compose_raw) {
                         try {
                             $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($service->docker_compose_raw);
                             $services = data_get($dockerCompose, 'services', []);
-                            
+
                             foreach ($services as $serviceNameInCompose => $serviceConfig) {
                                 $image = str(data_get($serviceConfig, 'image', ''))->lower();
                                 $serviceNameLower = str($serviceNameInCompose)->lower();
-                                
+
                                 // Buscar MySQL o MariaDB
-                                if ($image->contains('mysql') || $image->contains('mariadb') || 
+                                if ($image->contains('mysql') || $image->contains('mariadb') ||
                                     $serviceNameLower->contains('mysql') || $serviceNameLower->contains('mariadb')) {
                                     $dbService = $service;
                                     $dbContainer = $serviceNameInCompose;
@@ -2588,7 +2588,7 @@ class FileExplorer extends Component
                     if ($dbApp->mysql_root_password) {
                         $rootPassword = $dbApp->mysql_root_password;
                         $dbHost = $dbContainer;
-                        
+
                         return [
                             'username' => 'root',
                             'password' => $rootPassword,
@@ -2596,27 +2596,27 @@ class FileExplorer extends Component
                         ];
                     }
                 }
-                
+
                 // Si aún no se encuentra, intentar obtener desde el contenedor directamente
                 if ($dbService->server) {
                     try {
                         $containerName = "{$dbContainer}-{$dbService->uuid}";
                         $server = $dbService->server;
                         $escapedContainer = escapeshellarg($containerName);
-                        
+
                         // Intentar obtener la contraseña desde las variables de entorno del contenedor
                         $envCommand = "docker exec {$escapedContainer} env 2>/dev/null | grep -E '(MYSQL_ROOT_PASSWORD|MARIADB_ROOT_PASSWORD)' | head -1";
                         if ($server->isNonRoot()) {
                             $envCommand = "sudo {$envCommand}";
                         }
-                        
+
                         $envOutput = instant_remote_process([$envCommand], $server, false);
                         if ($envOutput && str_contains($envOutput, '=')) {
                             $parts = explode('=', trim($envOutput), 2);
                             if (count($parts) === 2) {
                                 $rootPassword = $parts[1];
                                 $dbHost = $dbContainer;
-                                
+
                                 return [
                                     'username' => 'root',
                                     'password' => $rootPassword,
@@ -2628,7 +2628,7 @@ class FileExplorer extends Component
                         // Ignorar errores
                     }
                 }
-                
+
                 // Si aún no se encuentra, retornar null
                 if (! $rootPasswordVar || ! $rootPasswordVar->real_value || str($rootPasswordVar->real_value)->startsWith('$')) {
                     \Log::warning('phpMyAdmin: Could not resolve database password', [
@@ -2641,13 +2641,13 @@ class FileExplorer extends Component
 
             // Obtener el valor real de la contraseña
             $rootPassword = $rootPasswordVar->real_value;
-            
+
             // Si la contraseña aún empieza con $, intentar obtenerla del contenedor
             if (str($rootPassword)->startsWith('$')) {
                 \Log::warning('phpMyAdmin: Password variable not resolved, trying container', [
                     'password_var' => $rootPassword,
                 ]);
-                
+
                 // Ya intentamos obtenerla del contenedor arriba, si llegamos aquí es que falló
                 return null;
             }
@@ -2655,7 +2655,7 @@ class FileExplorer extends Component
             // Obtener el nombre del host del contenedor para phpMyAdmin
             // phpMyAdmin se conecta desde dentro de su contenedor, así que necesita el nombre
             // que funcione dentro de la red Docker
-            
+
             if ($dbService->id === $phpMyAdminService->id) {
                 // Mismo servicio de Docker Compose: usar el nombre del servicio directamente
                 // Dentro de Docker Compose, los servicios se comunican por nombre de servicio
@@ -2664,20 +2664,20 @@ class FileExplorer extends Component
                 // Diferentes servicios: verificar si están conectados a la misma red Docker
                 // Si están en la misma red, pueden usar el nombre del servicio con alias
                 // Si no, necesitamos la IP interna del contenedor
-                
+
                 $dbHost = null;
-                
+
                 // Verificar si ambos servicios están en la misma red
                 $phpMyAdminNetworks = collect($phpMyAdminService->networks())->pluck('name')->toArray();
                 $dbServiceNetworks = collect($dbService->networks())->pluck('name')->toArray();
                 $commonNetworks = array_intersect($phpMyAdminNetworks, $dbServiceNetworks);
-                
+
                 if (!empty($commonNetworks)) {
                     // Están en la misma red: intentar primero con solo el nombre del servicio
                     // Si eso no funciona, se puede probar con el nombre completo del contenedor
                     // Pero primero intentemos con el nombre simple del servicio (más común)
                     $dbHost = $dbContainer;
-                    
+
                     \Log::info('phpMyAdmin: Services in same network, using service name', [
                         'dbHost' => $dbHost,
                         'commonNetworks' => $commonNetworks,
@@ -2688,16 +2688,16 @@ class FileExplorer extends Component
                     try {
                         $dbContainerName = "{$dbContainer}-{$dbService->uuid}";
                         $phpMyAdminContainerName = null;
-                        
+
                         // Buscar el contenedor de phpMyAdmin
                         foreach ($phpMyAdminService->applications as $app) {
-                            if (str($app->name)->lower()->contains('phpmyadmin') || 
+                            if (str($app->name)->lower()->contains('phpmyadmin') ||
                                 str($app->image)->lower()->contains('phpmyadmin')) {
                                 $phpMyAdminContainerName = "{$app->name}-{$phpMyAdminService->uuid}";
                                 break;
                             }
                         }
-                        
+
                         // Si no encontramos el contenedor de phpMyAdmin, usar el primer contenedor del servicio
                         if (! $phpMyAdminContainerName) {
                             $firstApp = $phpMyAdminService->applications()->first();
@@ -2705,9 +2705,9 @@ class FileExplorer extends Component
                                 $phpMyAdminContainerName = "{$firstApp->name}-{$phpMyAdminService->uuid}";
                             }
                         }
-                        
+
                         $server = $dbService->server;
-                        
+
                         if ($server && $phpMyAdminContainerName) {
                             // Obtener la red de phpMyAdmin
                             $escapedPhpMyAdmin = escapeshellarg($phpMyAdminContainerName);
@@ -2715,23 +2715,23 @@ class FileExplorer extends Component
                             if ($server->isNonRoot()) {
                                 $phpMyAdminNetworksCommand = "sudo {$phpMyAdminNetworksCommand}";
                             }
-                            
+
                             $phpMyAdminNetworksOutput = trim(instant_remote_process([$phpMyAdminNetworksCommand], $server, false) ?? '');
                             $phpMyAdminNetworks = array_filter(explode(' ', $phpMyAdminNetworksOutput));
-                            
+
                             // Obtener las redes del contenedor de la base de datos
                             $escapedDbContainer = escapeshellarg($dbContainerName);
                             $dbNetworksCommand = "docker inspect --format='{{range \$key, \$value := .NetworkSettings.Networks}}{{\$key}} {{end}}' {$escapedDbContainer} 2>/dev/null";
                             if ($server->isNonRoot()) {
                                 $dbNetworksCommand = "sudo {$dbNetworksCommand}";
                             }
-                            
+
                             $dbNetworksOutput = trim(instant_remote_process([$dbNetworksCommand], $server, false) ?? '');
                             $dbNetworks = array_filter(explode(' ', $dbNetworksOutput));
-                            
+
                             // Buscar una red común
                             $commonNetwork = array_intersect($phpMyAdminNetworks, $dbNetworks);
-                            
+
                             if (!empty($commonNetwork)) {
                                 // Están en una red común: obtener la IP en esa red
                                 $commonNetworkName = reset($commonNetwork);
@@ -2739,9 +2739,9 @@ class FileExplorer extends Component
                                 if ($server->isNonRoot()) {
                                     $ipCommand = "sudo {$ipCommand}";
                                 }
-                                
+
                                 $containerIP = trim(instant_remote_process([$ipCommand], $server, false) ?? '');
-                                
+
                                 if (!empty($containerIP) && filter_var($containerIP, FILTER_VALIDATE_IP)) {
                                     $dbHost = $containerIP;
                                     \Log::info('phpMyAdmin: Using container IP in common network', [
@@ -2756,9 +2756,9 @@ class FileExplorer extends Component
                                 if ($server->isNonRoot()) {
                                     $ipCommand = "sudo {$ipCommand}";
                                 }
-                                
+
                                 $containerIP = trim(instant_remote_process([$ipCommand], $server, false) ?? '');
-                                
+
                                 if (!empty($containerIP) && filter_var($containerIP, FILTER_VALIDATE_IP)) {
                                     $dbHost = $containerIP;
                                     \Log::info('phpMyAdmin: Using container IP (no common network)', [
@@ -2773,7 +2773,7 @@ class FileExplorer extends Component
                             'error' => $e->getMessage(),
                         ]);
                     }
-                    
+
                     // Si no se pudo obtener la IP, usar el nombre completo del contenedor como último recurso
                     if (! $dbHost) {
                         $dbHost = "{$dbContainer}-{$dbService->uuid}";
@@ -2800,7 +2800,7 @@ class FileExplorer extends Component
 
     // Métodos del panel integrado de bases de datos - ya no se usan (reemplazado por phpMyAdmin)
     // Se mantienen comentados por si se necesitan en el futuro
-    
+
     // public function closeDatabasePanel()
     // {
     //     $this->showDatabasePanel = false;
