@@ -5,6 +5,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceApplication;
+use Aws\Middleware;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
@@ -406,7 +407,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     return $labels->sort();
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?string $test_ipallowlist = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -417,12 +418,29 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
 
     $is_http_basic_auth_enabled = $is_http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;
     $http_basic_auth_label = "http-basic-auth-{$uuid}";
+    $list_string = '';
     if ($is_http_basic_auth_enabled) {
         $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
     }
 
     if ($is_http_basic_auth_enabled) {
         $labels->push("traefik.http.middlewares.{$http_basic_auth_label}.basicauth.users={$http_basic_auth_username}:{$hashedPassword}");
+    }
+
+    if ($test_ipallowlist) {
+        $ip_list = explode(',', $test_ipallowlist);
+        $sane_ip_list = [];
+        foreach ($ip_list as $_ip) {
+            $_ip = trim($_ip);
+            if (preg_match('/^(\d{1,3}\.){3}\d{1,3}(\/([0-9]|[12][0-9]|3[0-2]))?$/', $_ip)) {
+                $sane_ip_list[] = $_ip;
+            }
+        }
+
+        if (count($sane_ip_list) > 0) {
+            $list_string = implode(',', $sane_ip_list);
+            $labels->push("traefik.http.middlewares.test-ipallowlist.ipallowlist.sourcerange={$list_string}");
+        }
     }
 
     $middlewares_from_labels = collect([]);
@@ -523,6 +541,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_http_basic_auth_enabled) {
                         $middlewares->push($http_basic_auth_label);
                     }
+                    if (isListStringFilled($test_ipallowlist)) {
+                        $middlewares->push('test-ipallowlist');
+                    }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
                     });
@@ -568,7 +589,11 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
                 }
                 if ($is_force_https_enabled) {
-                    $labels->push("traefik.http.routers.{$http_label}.middlewares=redirect-to-https");
+                    $middleware_append_string = 'redirect-to-https';
+                    if (isListStringFilled($test_ipallowlist)) {
+                        $middleware_append_string .= ',test-ipallowlist';
+                    }
+                    $labels->push("traefik.http.routers.{$http_label}.middlewares={$middleware_append_string}");
                 }
             } else {
                 // Set labels for http
@@ -601,6 +626,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_http_basic_auth_enabled) {
                         $middlewares->push($http_basic_auth_label);
                     }
+                    if (isListStringFilled($test_ipallowlist)) {
+                        $middlewares->push('test-ipallowlist');
+                    }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
                     });
@@ -612,6 +640,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $middlewares = collect([]);
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
+                    }
+                    if (isListStringFilled($test_ipallowlist)) {
+                        $middlewares->push('test-ipallowlist');
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
@@ -674,6 +705,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
+                            test_ipallowlist: $application->test_ipallowlist,
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -704,6 +736,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
+                    test_ipallowlist: $application->test_ipallowlist,
                 ));
                 $labels = $labels->merge(fqdnLabelsForCaddy(
                     network: $application->destination->network,
@@ -740,6 +773,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
+                        test_ipallowlist: $application->test_ipallowlist,
                     ));
                     break;
                 case ProxyTypes::CADDY->value:
@@ -768,6 +802,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
+                test_ipallowlist: $application->test_ipallowlist,
             ));
             $labels = $labels->merge(fqdnLabelsForCaddy(
                 network: $application->destination->network,
@@ -980,6 +1015,21 @@ function isDatabaseImageWithContext(string $imageName, array $serviceConfig): bo
 
     // 6. Fallback: assume it's a database if we can't determine otherwise
     return true;
+}
+
+function isListStringFilled(string $list)
+{
+    $items = explode(',', $list);
+    if (! empty($items)) {
+        $sane_list = [];
+        foreach ($items as $item) {
+            if (strlen($item) > 0) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 function convertDockerRunToCompose(?string $custom_docker_run_options = null)

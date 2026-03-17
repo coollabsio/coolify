@@ -145,6 +145,9 @@ class General extends Component
     #[Validate(['string', 'nullable'])]
     public ?string $httpBasicAuthPassword = null;
 
+    #[Validate(['string', 'nullable'])]
+    public ?string $testIpallowlist = null;
+
     #[Validate(['nullable'])]
     public ?string $watchPaths = null;
 
@@ -413,6 +416,7 @@ class General extends Component
             $this->application->is_http_basic_auth_enabled = $this->isHttpBasicAuthEnabled;
             $this->application->http_basic_auth_username = $this->httpBasicAuthUsername;
             $this->application->http_basic_auth_password = $this->httpBasicAuthPassword;
+            $this->application->test_ipallowlist = $this->testIpallowlist;
             $this->application->watch_paths = $this->watchPaths;
             $this->application->redirect = $this->redirect;
 
@@ -463,6 +467,7 @@ class General extends Component
             $this->isHttpBasicAuthEnabled = $this->application->is_http_basic_auth_enabled;
             $this->httpBasicAuthUsername = $this->application->http_basic_auth_username;
             $this->httpBasicAuthPassword = $this->application->http_basic_auth_password;
+            $this->testIpallowlist = $this->application->test_ipallowlist;
             $this->watchPaths = $this->application->watch_paths;
             $this->redirect = $this->application->redirect;
 

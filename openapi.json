@@ -11454,6 +11454,11 @@
                         "type": "string",
                         "nullable": true,
                         "description": "Password for HTTP Basic Authentication"
+                    },
+                    "test_ipallowlist": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "List of allowed ips"
                     }
                 },
                 "type": "object"
