@@ -60,22 +60,7 @@
                         </div>
                     </div>
                 </li>
-                <li class="inline-flex items-center" x-data="{ envOpen: false, activeEnv: null, envPositions: {}, activeRes: null, resPositions: {}, activeMenuEnv: null, menuPositions: {}, closeTimeout: null, envTimeout: null, resTimeout: null, menuTimeout: null, toggle() { this.envOpen = !this.envOpen; if (!this.envOpen) { this.activeEnv = null;
-                            this.activeRes = null;
-                            this.activeMenuEnv = null; } }, open() { clearTimeout(this.closeTimeout);
-                        this.envOpen = true }, close() { this.closeTimeout = setTimeout(() => { this.envOpen = false;
-                            this.activeEnv = null;
-                            this.activeRes = null;
-                            this.activeMenuEnv = null; }, 100) }, openEnv(id) { clearTimeout(this.closeTimeout);
-                        clearTimeout(this.envTimeout);
-                        this.activeEnv = id }, closeEnv() { this.envTimeout = setTimeout(() => { this.activeEnv = null;
-                            this.activeRes = null;
-                            this.activeMenuEnv = null; }, 100) }, openRes(id) { clearTimeout(this.envTimeout);
-                        clearTimeout(this.resTimeout);
-                        this.activeRes = id }, closeRes() { this.resTimeout = setTimeout(() => { this.activeRes = null;
-                            this.activeMenuEnv = null; }, 100) }, openMenu(id) { clearTimeout(this.resTimeout);
-                        clearTimeout(this.menuTimeout);
-                        this.activeMenuEnv = id }, closeMenu() { this.menuTimeout = setTimeout(() => { this.activeMenuEnv = null; }, 100) } }">
+                <li class="inline-flex items-center" x-data="breadcrumbNav()">
                     <div class="flex items-center relative" @mouseenter="open()" @mouseleave="close()">
                         <a class="text-xs truncate lg:text-sm hover:text-warning" {{ wireNavigate() }}
                             href="{{ route('project.resource.index', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => $environment->uuid]) }}">
@@ -103,30 +88,15 @@
                                 class="relative w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
                                 @foreach ($allEnvironments as $env)
                                     @php
-                                        $envResources = collect()
-                                            ->merge(
-                                                $env->applications->map(
-                                                    fn($app) => ['type' => 'application', 'resource' => $app],
-                                                ),
-                                            )
-                                            ->merge(
-                                                $env
-                                                    ->databases()
-                                                    ->map(fn($db) => ['type' => 'database', 'resource' => $db]),
-                                            )
-                                            ->merge(
-                                                $env->services->map(
-                                                    fn($svc) => ['type' => 'service', 'resource' => $svc],
-                                                ),
-                                            );
+                                        $totalResources = $env->applications_count + $env->postgresqls_count + $env->redis_count + $env->mongodbs_count + $env->mysqls_count + $env->mariadbs_count + $env->keydbs_count + $env->dragonflies_count + $env->clickhouses_count + $env->services_count;
                                     @endphp
-                                    <div @mouseenter="openEnv('{{ $env->uuid }}'); envPositions['{{ $env->uuid }}'] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
+                                    <div @mouseenter="handleEnvHover('{{ $env->uuid }}', {{ $env->id }}, {{ $totalResources }}, $el)"
                                         @mouseleave="closeEnv()">
                                         <a href="{{ route('project.resource.index', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => $env->uuid]) }}"
                                             class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200 {{ $env->uuid === $environment->uuid ? 'dark:text-warning font-semibold' : '' }}"
                                             title="{{ $env->name }}">
                                             <span class="truncate">{{ $env->name }}</span>
-                                            @if ($envResources->count() > 0)
+                                            @if ($totalResources > 0)
                                                 <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor"
                                                     viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -150,301 +120,191 @@
                                 </div>
                             </div>
 
-                            <!-- Resources Sub-dropdown (2nd level) -->
-                            @foreach ($allEnvironments as $env)
-                                @php
-                                    // Use pre-loaded relations instead of databases() method to avoid N+1 queries
-                                    $envDatabases = collect()
-                                        ->merge($env->postgresqls ?? collect())
-                                        ->merge($env->redis ?? collect())
-                                        ->merge($env->mongodbs ?? collect())
-                                        ->merge($env->mysqls ?? collect())
-                                        ->merge($env->mariadbs ?? collect())
-                                        ->merge($env->keydbs ?? collect())
-                                        ->merge($env->dragonflies ?? collect())
-                                        ->merge($env->clickhouses ?? collect());
-                                    $envResources = collect()
-                                        ->merge(
-                                            $env->applications->map(
-                                                fn($app) => ['type' => 'application', 'resource' => $app],
-                                            ),
-                                        )
-                                        ->merge(
-                                            $envDatabases->map(fn($db) => ['type' => 'database', 'resource' => $db]),
-                                        )
-                                        ->merge(
-                                            $env->services->map(fn($svc) => ['type' => 'service', 'resource' => $svc]),
-                                        );
-                                @endphp
-                                @if ($envResources->count() > 0)
-                                    <div x-show="activeEnv === '{{ $env->uuid }}'" x-cloak
-                                        x-transition:enter="transition ease-out duration-150"
-                                        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-                                        @mouseenter="openEnv('{{ $env->uuid }}')" @mouseleave="closeEnv()"
-                                        :style="'position: absolute; left: 100%; top: ' + (envPositions[
-                                            '{{ $env->uuid }}'] || 0) + 'px; z-index: 30;'"
-                                        class="flex flex-col sm:flex-row items-start pl-1">
-                                        <div
-                                            class="relative w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
-                                            @foreach ($envResources as $envResource)
-                                                @php
-                                                    $resType = $envResource['type'];
-                                                    $res = $envResource['resource'];
-                                                    $resRoute = match ($resType) {
-                                                        'application' => route('project.application.configuration', [
-                                                            'project_uuid' => $project->uuid,
-                                                            'environment_uuid' => $env->uuid,
-                                                            'application_uuid' => $res->uuid,
-                                                        ]),
-                                                        'service' => route('project.service.configuration', [
-                                                            'project_uuid' => $project->uuid,
-                                                            'environment_uuid' => $env->uuid,
-                                                            'service_uuid' => $res->uuid,
-                                                        ]),
-                                                        'database' => route('project.database.configuration', [
-                                                            'project_uuid' => $project->uuid,
-                                                            'environment_uuid' => $env->uuid,
-                                                            'database_uuid' => $res->uuid,
-                                                        ]),
-                                                    };
-                                                    // Use loaded relation to check additional_servers (avoids N+1 query)
-                                                    $resHasMultipleServers =
-                                                        $resType === 'application' &&
-                                                        method_exists($res, 'additional_servers') &&
-                                                        ($res->relationLoaded('additional_servers') ? $res->additional_servers->count() > 0 : false);
-                                                    $resServerName = $resHasMultipleServers
-                                                        ? null
-                                                        : data_get($res, 'destination.server.name');
-                                                @endphp
-                                                <div @mouseenter="openRes('{{ $env->uuid }}-{{ $res->uuid }}'); resPositions['{{ $env->uuid }}-{{ $res->uuid }}'] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
-                                                    @mouseleave="closeRes()">
-                                                    <a href="{{ $resRoute }}"
-                                                        class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200"
-                                                        title="{{ $res->name }}{{ $resServerName ? ' (' . $resServerName . ')' : '' }}">
-                                                        <span class="truncate">{{ $res->name }}@if ($resServerName)
-                                                                <span
-                                                                    class="text-xs text-neutral-400">({{ $resServerName }})</span>
-                                                            @endif
-                                                        </span>
-                                                        <svg class="w-3 h-3 shrink-0" fill="none"
-                                                            stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                                stroke-width="4" d="M9 5l7 7-7 7"></path>
-                                                        </svg>
-                                                    </a>
-                                                </div>
-                                            @endforeach
+                            <!-- Resources Sub-dropdown (Level 2) - lazy loaded via Alpine -->
+                            <div x-show="activeEnv !== null && (loadingEnv === activeEnv || envResources[activeEnv])"
+                                x-cloak x-transition:enter="transition ease-out duration-150"
+                                x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                                @mouseenter="openEnv(activeEnv, activeEnvId)" @mouseleave="closeEnv()"
+                                :style="'position: absolute; left: 100%; top: ' + (envPositions[activeEnv] || 0) + 'px; z-index: 30;'"
+                                class="flex flex-col sm:flex-row items-start pl-1">
+                                <div class="relative w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar"
+                                    @scroll.debounce.50ms="handleScroll($event)">
+                                    <div x-show="loadingEnv === activeEnv && !envResources[activeEnv]"
+                                        class="px-4 py-2 text-sm text-neutral-400">Loading...</div>
+                                    <template x-for="res in (envResources[activeEnv]?.items || [])"
+                                        :key="res.uuid">
+                                        <div @mouseenter="openRes(activeEnv + '-' + res.uuid, res); resPositions[activeEnv + '-' + res.uuid] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
+                                            @mouseleave="closeRes()">
+                                            <a :href="resUrl(res)"
+                                                class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200"
+                                                :title="res.name + (res.serverName ? ' (' + res.serverName + ')' : '')">
+                                                <span class="truncate">
+                                                    <span x-text="res.name"></span>
+                                                    <template x-if="res.serverName">
+                                                        <span class="text-xs text-neutral-400"
+                                                            x-text="'(' + res.serverName + ')'"></span>
+                                                    </template>
+                                                </span>
+                                                <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="4" d="M9 5l7 7-7 7"></path>
+                                                </svg>
+                                            </a>
                                         </div>
-
-                                        <!-- Main Menu Sub-dropdown (3rd level) -->
-                                        @foreach ($envResources as $envResource)
-                                            @php
-                                                $resType = $envResource['type'];
-                                                $res = $envResource['resource'];
-                                                $resParams = [
-                                                    'project_uuid' => $project->uuid,
-                                                    'environment_uuid' => $env->uuid,
-                                                ];
-                                                if ($resType === 'application') {
-                                                    $resParams['application_uuid'] = $res->uuid;
-                                                } elseif ($resType === 'service') {
-                                                    $resParams['service_uuid'] = $res->uuid;
-                                                } else {
-                                                    $resParams['database_uuid'] = $res->uuid;
-                                                }
-                                                $resKey = $env->uuid . '-' . $res->uuid;
-                                            @endphp
-                                            <div x-show="activeRes === '{{ $resKey }}'" x-cloak
-                                                x-transition:enter="transition ease-out duration-150"
-                                                x-transition:enter-start="opacity-0"
-                                                x-transition:enter-end="opacity-100"
-                                                @mouseenter="openRes('{{ $resKey }}')" @mouseleave="closeRes()"
-                                                :style="'position: absolute; left: 100%; top: ' + (resPositions[
-                                                    '{{ $resKey }}'] || 0) + 'px; z-index: 40;'"
-                                                class="flex flex-col sm:flex-row items-start pl-1">
-                                                <!-- Main Menu List -->
-                                                <div
-                                                    class="relative w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200">
-                                                    @if ($resType === 'application')
-                                                        <div @mouseenter="openMenu('{{ $resKey }}-config'); menuPositions['{{ $resKey }}-config'] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
-                                                            @mouseleave="closeMenu()">
-                                                            <a href="{{ route('project.application.configuration', $resParams) }}"
-                                                                class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
-                                                                <span>Configuration</span>
-                                                                <svg class="w-3 h-3 shrink-0" fill="none"
-                                                                    stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round"
-                                                                        stroke-linejoin="round" stroke-width="4"
-                                                                        d="M9 5l7 7-7 7"></path>
-                                                                </svg>
-                                                            </a>
-                                                        </div>
-                                                        <a href="{{ route('project.application.deployment.index', $resParams) }}"
-                                                            class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Deployments</a>
-                                                        <a href="{{ route('project.application.logs', $resParams) }}"
-                                                            class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Logs</a>
-                                                        @can('canAccessTerminal')
-                                                            <a href="{{ route('project.application.command', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Terminal</a>
-                                                        @endcan
-                                                    @elseif ($resType === 'service')
-                                                        <div @mouseenter="openMenu('{{ $resKey }}-config'); menuPositions['{{ $resKey }}-config'] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
-                                                            @mouseleave="closeMenu()">
-                                                            <a href="{{ route('project.service.configuration', $resParams) }}"
-                                                                class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
-                                                                <span>Configuration</span>
-                                                                <svg class="w-3 h-3 shrink-0" fill="none"
-                                                                    stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round"
-                                                                        stroke-linejoin="round" stroke-width="4"
-                                                                        d="M9 5l7 7-7 7"></path>
-                                                                </svg>
-                                                            </a>
-                                                        </div>
-                                                        <a href="{{ route('project.service.logs', $resParams) }}"
-                                                            class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Logs</a>
-                                                        @can('canAccessTerminal')
-                                                            <a href="{{ route('project.service.command', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Terminal</a>
-                                                        @endcan
-                                                    @else
-                                                        <div @mouseenter="openMenu('{{ $resKey }}-config'); menuPositions['{{ $resKey }}-config'] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
-                                                            @mouseleave="closeMenu()">
-                                                            <a href="{{ route('project.database.configuration', $resParams) }}"
-                                                                class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
-                                                                <span>Configuration</span>
-                                                                <svg class="w-3 h-3 shrink-0" fill="none"
-                                                                    stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round"
-                                                                        stroke-linejoin="round" stroke-width="4"
-                                                                        d="M9 5l7 7-7 7"></path>
-                                                                </svg>
-                                                            </a>
-                                                        </div>
-                                                        <a href="{{ route('project.database.logs', $resParams) }}"
-                                                            class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Logs</a>
-                                                        @can('canAccessTerminal')
-                                                            <a href="{{ route('project.database.command', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Terminal</a>
-                                                        @endcan
-                                                        @if (
-                                                            $res->getMorphClass() === 'App\Models\StandalonePostgresql' ||
-                                                                $res->getMorphClass() === 'App\Models\StandaloneMongodb' ||
-                                                                $res->getMorphClass() === 'App\Models\StandaloneMysql' ||
-                                                                $res->getMorphClass() === 'App\Models\StandaloneMariadb')
-                                                            <a href="{{ route('project.database.backup.index', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Backups</a>
-                                                        @endif
-                                                    @endif
-                                                </div>
-
-                                                <!-- Configuration Sub-menu (4th level) -->
-                                                <div x-show="activeMenuEnv === '{{ $resKey }}-config'" x-cloak
-                                                    x-transition:enter="transition ease-out duration-150"
-                                                    x-transition:enter-start="opacity-0"
-                                                    x-transition:enter-end="opacity-100"
-                                                    @mouseenter="openMenu('{{ $resKey }}-config')"
-                                                    @mouseleave="closeMenu()"
-                                                    :style="'position: absolute; left: 100%; top: ' + (menuPositions[
-                                                        '{{ $resKey }}-config'] || 0) + 'px; z-index: 50;'"
-                                                    class="pl-1">
-                                                    <div
-                                                        class="w-52 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
-                                                        @if ($resType === 'application')
-                                                            <a href="{{ route('project.application.configuration', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">General</a>
-                                                            <a href="{{ route('project.application.environment-variables', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Environment
-                                                                Variables</a>
-                                                            <a href="{{ route('project.application.persistent-storage', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Persistent
-                                                                Storage</a>
-                                                            <a href="{{ route('project.application.source', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Source</a>
-                                                            <a href="{{ route('project.application.servers', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Servers</a>
-                                                            <a href="{{ route('project.application.scheduled-tasks.show', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Scheduled
-                                                                Tasks</a>
-                                                            <a href="{{ route('project.application.webhooks', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Webhooks</a>
-                                                            <a href="{{ route('project.application.preview-deployments', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Preview
-                                                                Deployments</a>
-                                                            <a href="{{ route('project.application.healthcheck', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Healthcheck</a>
-                                                            <a href="{{ route('project.application.rollback', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Rollback</a>
-                                                            <a href="{{ route('project.application.resource-limits', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
-                                                                Limits</a>
-                                                            <a href="{{ route('project.application.resource-operations', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
-                                                                Operations</a>
-                                                            <a href="{{ route('project.application.metrics', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Metrics</a>
-                                                            <a href="{{ route('project.application.tags', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Tags</a>
-                                                            <a href="{{ route('project.application.advanced', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Advanced</a>
-                                                            <a href="{{ route('project.application.danger', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">Danger
-                                                                Zone</a>
-                                                        @elseif ($resType === 'service')
-                                                            <a href="{{ route('project.service.configuration', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">General</a>
-                                                            <a href="{{ route('project.service.environment-variables', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Environment
-                                                                Variables</a>
-                                                            <a href="{{ route('project.service.storages', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Storages</a>
-                                                            <a href="{{ route('project.service.scheduled-tasks.show', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Scheduled
-                                                                Tasks</a>
-                                                            <a href="{{ route('project.service.webhooks', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Webhooks</a>
-                                                            <a href="{{ route('project.service.resource-operations', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
-                                                                Operations</a>
-                                                            <a href="{{ route('project.service.tags', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Tags</a>
-                                                            <a href="{{ route('project.service.danger', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">Danger
-                                                                Zone</a>
-                                                        @else
-                                                            <a href="{{ route('project.database.configuration', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">General</a>
-                                                            <a href="{{ route('project.database.environment-variables', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Environment
-                                                                Variables</a>
-                                                            <a href="{{ route('project.database.servers', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Servers</a>
-                                                            <a href="{{ route('project.database.persistent-storage', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Persistent
-                                                                Storage</a>
-                                                            <a href="{{ route('project.database.webhooks', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Webhooks</a>
-                                                            <a href="{{ route('project.database.resource-limits', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
-                                                                Limits</a>
-                                                            <a href="{{ route('project.database.resource-operations', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
-                                                                Operations</a>
-                                                            <a href="{{ route('project.database.metrics', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Metrics</a>
-                                                            <a href="{{ route('project.database.tags', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Tags</a>
-                                                            <a href="{{ route('project.database.danger', $resParams) }}"
-                                                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">Danger
-                                                                Zone</a>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        @endforeach
+                                    </template>
+                                    <div x-show="loadingMore"
+                                        class="px-4 py-2 text-xs text-center text-neutral-400">Loading more...
                                     </div>
-                                @endif
-                            @endforeach
+                                </div>
+
+                                <!-- Menu Sub-dropdown (Level 3) -->
+                                <div x-show="activeRes && hoveredRes" x-cloak
+                                    x-transition:enter="transition ease-out duration-150"
+                                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                                    @mouseenter="openRes(activeRes, hoveredRes)" @mouseleave="closeRes()"
+                                    :style="'position: absolute; left: 100%; top: ' + (resPositions[activeRes] || 0) + 'px; z-index: 40;'"
+                                    class="flex flex-col sm:flex-row items-start pl-1">
+                                    <div
+                                        class="relative w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200">
+                                        <div @mouseenter="openMenu(activeRes + '-config'); menuPositions[activeRes + '-config'] = $el.offsetTop"
+                                            @mouseleave="closeMenu()">
+                                            <a :href="resUrl(hoveredRes)"
+                                                class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
+                                                <span>Configuration</span>
+                                                <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="4" d="M9 5l7 7-7 7"></path>
+                                                </svg>
+                                            </a>
+                                        </div>
+                                        <template x-if="hoveredRes?.type === 'application'">
+                                            <a :href="resUrl(hoveredRes, 'deployment')"
+                                                class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Deployments</a>
+                                        </template>
+                                        <a :href="resUrl(hoveredRes, 'logs')"
+                                            class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Logs</a>
+                                        <template x-if="canAccessTerminal">
+                                            <a :href="resUrl(hoveredRes, 'terminal')"
+                                                class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Terminal</a>
+                                        </template>
+                                        <template
+                                            x-if="hoveredRes?.type === 'database' && hoveredRes?.canBackup">
+                                            <a :href="resUrl(hoveredRes, 'backups')"
+                                                class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Backups</a>
+                                        </template>
+                                    </div>
+
+                                    <!-- Configuration Sub-menu (Level 4) -->
+                                    <template x-if="activeMenuEnv === activeRes + '-config'">
+                                        <div @mouseenter="openMenu(activeRes + '-config')"
+                                            @mouseleave="closeMenu()"
+                                            :style="'position: absolute; left: 100%; top: ' + (menuPositions[activeRes + '-config'] || 0) + 'px; z-index: 50;'"
+                                            class="pl-1">
+                                            <div
+                                                class="w-52 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
+                                                <template x-if="hoveredRes?.type === 'application'">
+                                                    <div>
+                                                        <a :href="resUrl(hoveredRes)"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">General</a>
+                                                        <a :href="resUrl(hoveredRes, 'environment-variables')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Environment
+                                                            Variables</a>
+                                                        <a :href="resUrl(hoveredRes, 'persistent-storage')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Persistent
+                                                            Storage</a>
+                                                        <a :href="resUrl(hoveredRes, 'source')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Source</a>
+                                                        <a :href="resUrl(hoveredRes, 'servers')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Servers</a>
+                                                        <a :href="resUrl(hoveredRes, 'scheduled-tasks')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Scheduled
+                                                            Tasks</a>
+                                                        <a :href="resUrl(hoveredRes, 'webhooks')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Webhooks</a>
+                                                        <a :href="resUrl(hoveredRes, 'preview-deployments')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Preview
+                                                            Deployments</a>
+                                                        <a :href="resUrl(hoveredRes, 'healthcheck')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Healthcheck</a>
+                                                        <a :href="resUrl(hoveredRes, 'rollback')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Rollback</a>
+                                                        <a :href="resUrl(hoveredRes, 'resource-limits')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
+                                                            Limits</a>
+                                                        <a :href="resUrl(hoveredRes, 'resource-operations')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
+                                                            Operations</a>
+                                                        <a :href="resUrl(hoveredRes, 'metrics')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Metrics</a>
+                                                        <a :href="resUrl(hoveredRes, 'tags')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Tags</a>
+                                                        <a :href="resUrl(hoveredRes, 'advanced')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Advanced</a>
+                                                        <a :href="resUrl(hoveredRes, 'danger')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">Danger
+                                                            Zone</a>
+                                                    </div>
+                                                </template>
+                                                <template x-if="hoveredRes?.type === 'service'">
+                                                    <div>
+                                                        <a :href="resUrl(hoveredRes)"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">General</a>
+                                                        <a :href="resUrl(hoveredRes, 'environment-variables')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Environment
+                                                            Variables</a>
+                                                        <a :href="resUrl(hoveredRes, 'storages')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Storages</a>
+                                                        <a :href="resUrl(hoveredRes, 'scheduled-tasks')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Scheduled
+                                                            Tasks</a>
+                                                        <a :href="resUrl(hoveredRes, 'webhooks')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Webhooks</a>
+                                                        <a :href="resUrl(hoveredRes, 'resource-operations')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
+                                                            Operations</a>
+                                                        <a :href="resUrl(hoveredRes, 'tags')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Tags</a>
+                                                        <a :href="resUrl(hoveredRes, 'danger')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">Danger
+                                                            Zone</a>
+                                                    </div>
+                                                </template>
+                                                <template x-if="hoveredRes?.type === 'database'">
+                                                    <div>
+                                                        <a :href="resUrl(hoveredRes)"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">General</a>
+                                                        <a :href="resUrl(hoveredRes, 'environment-variables')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Environment
+                                                            Variables</a>
+                                                        <a :href="resUrl(hoveredRes, 'servers')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Servers</a>
+                                                        <a :href="resUrl(hoveredRes, 'persistent-storage')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Persistent
+                                                            Storage</a>
+                                                        <a :href="resUrl(hoveredRes, 'webhooks')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Webhooks</a>
+                                                        <a :href="resUrl(hoveredRes, 'resource-limits')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
+                                                            Limits</a>
+                                                        <a :href="resUrl(hoveredRes, 'resource-operations')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
+                                                            Operations</a>
+                                                        <a :href="resUrl(hoveredRes, 'metrics')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Metrics</a>
+                                                        <a :href="resUrl(hoveredRes, 'tags')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Tags</a>
+                                                        <a :href="resUrl(hoveredRes, 'danger')"
+                                                            class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">Danger
+                                                            Zone</a>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </li>
@@ -651,6 +511,149 @@
 <script>
     function sortFn(a, b) {
         return a.name.localeCompare(b.name)
+    }
+
+    function breadcrumbNav() {
+        return {
+            envOpen: false,
+            activeEnv: null,
+            activeEnvId: null,
+            activeRes: null,
+            activeMenuEnv: null,
+            hoveredRes: null,
+            envPositions: {},
+            resPositions: {},
+            menuPositions: {},
+            envResources: {},
+            loadingEnv: null,
+            loadingMore: false,
+            closeTimeout: null,
+            envTimeout: null,
+            resTimeout: null,
+            menuTimeout: null,
+            projectUuid: @js($project->uuid),
+            canAccessTerminal: @js($canAccessTerminal),
+            toggle() {
+                this.envOpen = !this.envOpen;
+                if (!this.envOpen) {
+                    this.activeEnv = null;
+                    this.activeEnvId = null;
+                    this.activeRes = null;
+                    this.activeMenuEnv = null;
+                    this.hoveredRes = null;
+                }
+            },
+            open() {
+                clearTimeout(this.closeTimeout);
+                this.envOpen = true;
+            },
+            close() {
+                this.closeTimeout = setTimeout(() => {
+                    this.envOpen = false;
+                    this.activeEnv = null;
+                    this.activeEnvId = null;
+                    this.activeRes = null;
+                    this.activeMenuEnv = null;
+                    this.hoveredRes = null;
+                }, 100);
+            },
+            openEnv(uuid, id) {
+                clearTimeout(this.closeTimeout);
+                clearTimeout(this.envTimeout);
+                this.activeEnv = uuid;
+                this.activeEnvId = id;
+            },
+            closeEnv() {
+                this.envTimeout = setTimeout(() => {
+                    this.activeEnv = null;
+                    this.activeEnvId = null;
+                    this.activeRes = null;
+                    this.activeMenuEnv = null;
+                    this.hoveredRes = null;
+                }, 100);
+            },
+            openRes(key, res) {
+                clearTimeout(this.envTimeout);
+                clearTimeout(this.resTimeout);
+                this.activeMenuEnv = null;
+                this.activeRes = key;
+                this.hoveredRes = res;
+            },
+            closeRes() {
+                this.resTimeout = setTimeout(() => {
+                    this.activeRes = null;
+                    this.activeMenuEnv = null;
+                    this.hoveredRes = null;
+                }, 100);
+            },
+            openMenu(key) {
+                clearTimeout(this.resTimeout);
+                clearTimeout(this.menuTimeout);
+                this.activeMenuEnv = key;
+            },
+            closeMenu() {
+                this.menuTimeout = setTimeout(() => {
+                    this.activeMenuEnv = null;
+                }, 100);
+            },
+            handleEnvHover(uuid, id, total, el) {
+                clearTimeout(this.closeTimeout);
+                clearTimeout(this.envTimeout);
+                this.envPositions[uuid] = el.offsetTop - (el.closest('.overflow-y-auto')?.scrollTop || 0);
+                this.activeRes = null;
+                this.activeMenuEnv = null;
+                this.hoveredRes = null;
+                if (total === 0) {
+                    this.activeEnv = null;
+                    this.activeEnvId = null;
+                    return;
+                }
+                this.activeEnv = uuid;
+                this.activeEnvId = id;
+                this.loadResources(id, uuid);
+            },
+            resUrl(res, suffix) {
+                if (!res) return '#';
+                const base = `/project/${this.projectUuid}/environment/${this.activeEnv}/${res.type}/${res.uuid}`;
+                return suffix ? `${base}/${suffix}` : base;
+            },
+            async loadResources(envId, envUuid) {
+                if (this.envResources[envUuid]) return;
+                if (this.loadingEnv === envUuid) return;
+                this.loadingEnv = envUuid;
+                try {
+                    const result = await this.$wire.loadBreadcrumbResources(envId, 1);
+                    this.envResources[envUuid] = {
+                        items: result.resources,
+                        hasMore: result.hasMore,
+                        page: 1,
+                    };
+                } finally {
+                    if (this.loadingEnv === envUuid) {
+                        this.loadingEnv = null;
+                    }
+                }
+            },
+            async loadMoreResources() {
+                const cache = this.envResources[this.activeEnv];
+                if (!cache || !cache.hasMore || this.loadingMore) return;
+                this.loadingMore = true;
+                try {
+                    const result = await this.$wire.loadBreadcrumbResources(this.activeEnvId, cache.page + 1);
+                    cache.items = [...cache.items, ...result.resources];
+                    cache.hasMore = result.hasMore;
+                    cache.page++;
+                } finally {
+                    this.loadingMore = false;
+                }
+            },
+            handleScroll(event) {
+                const el = event.target;
+                if (el.scrollTop + el.clientHeight >= el.scrollHeight - 20) {
+                    this.loadMoreResources();
+                }
+            },
+        };
     }
 
     function searchComponent() {
