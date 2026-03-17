@@ -1,0 +1,38 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Production-ready, full-featured mail server in a Docker container.
+# category: email
+# tags: email, smtp, imap, mail-server, postfix, dovecot
+# logo: svgs/docker-mailserver.svg
+# port: 1080
+
+services:
+  docker-mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    ports:
+      - "25:25"
+      - "143:143"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    environment:
+      - SERVICE_URL_DOCKERMAILSERVER_1080
+      - OVERRIDE_HOSTNAME=${SERVICE_FQDN_DOCKERMAILSERVER}
+      - POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS:-postmaster@example.com}
+      - TZ=${TZ:-UTC}
+      - ENABLE_SPAMASSASSIN=${ENABLE_SPAMASSASSIN:-1}
+      - ENABLE_CLAMAV=${ENABLE_CLAMAV:-1}
+      - ENABLE_FAIL2BAN=${ENABLE_FAIL2BAN:-1}
+      - ENABLE_POSTGREY=${ENABLE_POSTGREY:-0}
+      - ONE_DIR=${ONE_DIR:-1}
+      - SPOOF_PROTECTION=${SPOOF_PROTECTION:-1}
+      - SSL_TYPE=${SSL_TYPE:-}
+    volumes:
+      - mail-data:/var/mail
+      - mail-state:/var/mail-state
+      - mail-logs:/var/log/mail
+      - mail-config:/tmp/docker-mailserver
+    healthcheck:
+      test: ["CMD-SHELL", "ss -tlnp | grep -q ':25 ' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
