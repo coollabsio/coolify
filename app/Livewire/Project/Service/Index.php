@@ -82,6 +82,8 @@ class Index extends Component
 
     public bool $isStripprefixEnabled = false;
 
+    public ?string $wordpressPhpVersion = null;
+
     protected $listeners = ['generateDockerCompose', 'refreshScheduledBackups' => '$refresh', 'refreshFileStorages'];
 
     protected $rules = [
@@ -348,7 +350,55 @@ class Index extends Component
             $this->isLogDrainEnabled = data_get($this->serviceApplication, 'is_log_drain_enabled', false);
             $this->isGzipEnabled = data_get($this->serviceApplication, 'is_gzip_enabled', true);
             $this->isStripprefixEnabled = data_get($this->serviceApplication, 'is_stripprefix_enabled', true);
+            $this->wordpressPhpVersion = $this->deriveWordPressPhpVersionFromImage($this->image);
         }
+    }
+
+    public function isWordPressApplication(): bool
+    {
+        return $this->serviceApplication && str_contains(strtolower($this->image ?? ''), 'wordpress');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function getWordPressPhpVersionOptions(): array
+    {
+        return [
+            'latest' => 'Latest',
+            'php8.3-apache' => 'PHP 8.3',
+            'php8.2-apache' => 'PHP 8.2',
+            'php8.1-apache' => 'PHP 8.1',
+            'php8.0-apache' => 'PHP 8.0',
+        ];
+    }
+
+    private function deriveWordPressPhpVersionFromImage(?string $image): ?string
+    {
+        if (! $image || ! str_contains(strtolower($image), 'wordpress')) {
+            return null;
+        }
+        $tag = str($image)->after(':')->toString();
+        if ($tag === 'latest' || $tag === 'apache' || $tag === '') {
+            return 'latest';
+        }
+        if (in_array($tag, ['php8.0-apache', 'php8.1-apache', 'php8.2-apache', 'php8.3-apache'], true)) {
+            return $tag;
+        }
+        if (preg_match('/php8\.\d-apache/', $tag, $m)) {
+            return $m[0];
+        }
+
+        return 'latest';
+    }
+
+    public function updatedWordpressPhpVersion(?string $value): void
+    {
+        if ($value === null || ! $this->serviceApplication) {
+            return;
+        }
+        $tag = $value === 'latest' ? 'latest' : $value;
+        $this->image = 'wordpress:'.$tag;
     }
 
     public function instantSaveApplication()

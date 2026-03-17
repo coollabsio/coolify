@@ -73,6 +73,16 @@
                                         helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "></x-forms.input>
                                 @endif
                             @endif
+                            @if ($this->isWordPressApplication())
+                                <x-forms.select canGate="update" :canResource="$serviceApplication"
+                                    wire:model.live="wordpressPhpVersion"
+                                    label="PHP Version"
+                                    helper="PHP version used by the WordPress container. Restart the service after changing.">
+                                    @foreach ($this->getWordPressPhpVersionOptions() as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
+                                </x-forms.select>
+                            @endif
                             <x-forms.input canGate="update" :canResource="$serviceApplication"
                                 helper="You can change the image you would like to deploy.<br><br><span class='dark:text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
                                 label="Image" id="image"></x-forms.input>
