@@ -3,15 +3,15 @@
 # category: media
 # tags: podcast, media, audio, video, streaming, hosting, platform, castopod
 # logo: svgs/castopod.svg
-# port: 8000
+# port: 8080
 
 services:
   castopod:
-    image: castopod/castopod:latest
+    image: castopod/castopod:1.15.4
     volumes:
       - castopod-media:/var/www/castopod/public/media
     environment:
-      - SERVICE_URL_CASTOPOD_8000
+      - SERVICE_URL_CASTOPOD_8080
       - MYSQL_DATABASE=castopod
       - MYSQL_USER=$SERVICE_USER_MYSQL
       - MYSQL_PASSWORD=$SERVICE_PASSWORD_MYSQL
@@ -27,7 +27,7 @@ services:
           "CMD",
           "curl",
           "-f",
-          "http://localhost:8000/health"
+          "http://localhost:8080/health"
         ]
       interval: 5s
       timeout: 20s

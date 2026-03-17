@@ -2111,6 +2111,13 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Perform docker cleanup (prune networks, volumes, etc.).'
+          schema:
+            type: boolean
+            default: true
       responses:
         '200':
           description: 'Stop application.'
@@ -2160,6 +2167,108 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/storages':
+    get:
+      tags:
+        - Applications
+      summary: 'List Storages'
+      description: 'List all persistent storages and file storages by application UUID.'
+      operationId: list-storages-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'All storages by application UUID.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  persistent_storages: { type: array, items: { type: object } }
+                  file_storages: { type: array, items: { type: object } }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Applications
+      summary: 'Update Storage'
+      description: 'Update a persistent storage or file storage by application UUID.'
+      operationId: update-storage-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Storage updated. For read-only storages (from docker-compose or services), only is_preview_suffix_enabled can be updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - id
+                - type
+              properties:
+                id:
+                  type: integer
+                  description: 'The ID of the storage.'
+                type:
+                  type: string
+                  enum: [persistent, file]
+                  description: 'The type of storage: persistent or file.'
+                is_preview_suffix_enabled:
+                  type: boolean
+                  description: 'Whether to add -pr-N suffix for preview deployments.'
+                name:
+                  type: string
+                  description: 'The volume name (persistent only, not allowed for read-only storages).'
+                mount_path:
+                  type: string
+                  description: 'The container mount path (not allowed for read-only storages).'
+                host_path:
+                  type: string
+                  nullable: true
+                  description: 'The host path (persistent only, not allowed for read-only storages).'
+                content:
+                  type: string
+                  nullable: true
+                  description: 'The file content (file only, not allowed for read-only storages).'
+              type: object
+              additionalProperties: false
+      responses:
+        '200':
+          description: 'Storage updated.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -3806,6 +3915,13 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Perform docker cleanup (prune networks, volumes, etc.).'
+          schema:
+            type: boolean
+            default: true
       responses:
         '200':
           description: 'Stop database.'
@@ -6138,6 +6254,10 @@ paths:
                   type: boolean
                   default: false
                   description: 'Force domain override even if conflicts are detected.'
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'
               type: object
       responses:
         '201':
@@ -6323,6 +6443,10 @@ paths:
                   type: boolean
                   default: false
                   description: 'Force domain override even if conflicts are detected.'
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'
               type: object
       responses:
         '200':
@@ -6645,6 +6769,13 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Perform docker cleanup (prune networks, volumes, etc.).'
+          schema:
+            type: boolean
+            default: true
       responses:
         '200':
           description: 'Stop service.'

@@ -4,6 +4,7 @@ use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Server;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -215,6 +216,13 @@ function extractCustomProxyCommands(Server $server, string $existing_config): ar
 }
 function generateDefaultProxyConfiguration(Server $server, array $custom_commands = [])
 {
+    Log::info('Generating default proxy configuration', [
+        'server_id' => $server->id,
+        'server_name' => $server->name,
+        'custom_commands_count' => count($custom_commands),
+        'caller' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3)[1]['class'] ?? 'unknown',
+    ]);
+
     $proxy_path = $server->proxyPath();
     $proxy_type = $server->proxyType();
 

@@ -134,6 +134,8 @@
             </div>
             <x-forms.input placeholder="5432" disabled="{{ $isPublic }}"
                 id="publicPort" label="Public Port" canGate="update" :canResource="$database" />
+            <x-forms.input placeholder="3600" disabled="{{ $isPublic }}" id="publicPortTimeout"
+                label="Proxy Timeout (seconds)" helper="Timeout for the public TCP proxy connection in seconds. Default: 3600 (1 hour)." canGate="update" :canResource="$database" />
         </div>
         <x-forms.textarea placeholder="# maxmemory 256mb
 # maxmemory-policy allkeys-lru

@@ -442,9 +442,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $value = str($value);
             $regex = '/\$(\{?([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)\}?)/';
             preg_match_all($regex, $value, $valueMatches);
-            if (count($valueMatches[1]) > 0) {
-                foreach ($valueMatches[1] as $match) {
-                    $match = replaceVariables($match);
+            if (count($valueMatches[2]) > 0) {
+                foreach ($valueMatches[2] as $match) {
+                    $match = str($match);
                     if ($match->startsWith('SERVICE_')) {
                         if ($magicEnvironments->has($match->value())) {
                             continue;
@@ -789,7 +789,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
                         $source = replaceLocalSource($source, $mainDirectory);
-                        if ($isPullRequest) {
+                        $isPreviewSuffixEnabled = $foundConfig
+                            ? (bool) data_get($foundConfig, 'is_preview_suffix_enabled', true)
+                            : true;
+                        if ($isPullRequest && $isPreviewSuffixEnabled) {
                             $source = addPreviewDeploymentSuffix($source, $pull_request_id);
                         }
                         LocalFileVolume::updateOrCreate(
@@ -986,15 +989,17 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 continue;
             }
             if ($key->value() === $parsedValue->value()) {
-                $value = null;
-                $resource->environment_variables()->firstOrCreate([
+                // Simple variable reference (e.g. DATABASE_URL: ${DATABASE_URL})
+                // Use firstOrCreate to avoid overwriting user-saved values on redeploy
+                $envVar = $resource->environment_variables()->firstOrCreate([
                     'key' => $key,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
                 ], [
-                    'value' => $value,
                     'is_preview' => false,
                 ]);
+                // Add the variable to the environment using the saved DB value
+                $environment[$key->value()] = $envVar->value;
             } else {
                 if ($value->startsWith('$')) {
                     $isRequired = false;
@@ -1074,7 +1079,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         } else {
                             // Simple variable reference without default
                             $parsedKeyValue = replaceVariables($value);
-                            $resource->environment_variables()->firstOrCreate([
+                            $envVar = $resource->environment_variables()->firstOrCreate([
                                 'key' => $content,
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
@@ -1082,8 +1087,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                 'is_preview' => false,
                                 'is_required' => $isRequired,
                             ]);
-                            // Add the variable to the environment
-                            $environment[$content] = $value;
+                            // Add the variable to the environment using the saved DB value
+                            $environment[$content] = $envVar->value;
                         }
                     } else {
                         // Fallback to old behavior for malformed input (backward compatibility)
@@ -1109,7 +1114,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         if ($originalValue->value() === $value->value()) {
                             // This means the variable does not have a default value
                             $parsedKeyValue = replaceVariables($value);
-                            $resource->environment_variables()->firstOrCreate([
+                            $envVar = $resource->environment_variables()->firstOrCreate([
                                 'key' => $parsedKeyValue,
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
@@ -1117,7 +1122,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                 'is_preview' => false,
                                 'is_required' => $isRequired,
                             ]);
-                            $environment[$parsedKeyValue->value()] = $value;
+                            // Add the variable to the environment using the saved DB value
+                            $environment[$parsedKeyValue->value()] = $envVar->value;
 
                             continue;
                         }
@@ -1291,6 +1297,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     // Otherwise keep empty string as-is
                 }
 
+                // Resolve shared variable patterns like {{environment.VAR}}, {{project.VAR}}, {{team.VAR}}
+                // Without this, literal {{...}} strings end up in the compose environment: section,
+                // which takes precedence over the resolved values in the .env file (env_file:)
+                if (is_string($value) && str_contains($value, '{{')) {
+                    $value = resolveSharedEnvironmentVariables($value, $resource);
+                }
+
                 return $value;
             });
         }
@@ -1305,19 +1318,19 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         }
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
             $shouldGenerateLabelsExactly = $resource->destination->server->settings->generate_exact_labels;
-            $uuid = $resource->uuid;
-            $network = data_get($resource, 'destination.network');
+            $labelUuid = $resource->uuid;
+            $labelNetwork = data_get($resource, 'destination.network');
             if ($isPullRequest) {
-                $uuid = "{$resource->uuid}-{$pullRequestId}";
+                $labelUuid = "{$resource->uuid}-{$pullRequestId}";
             }
             if ($isPullRequest) {
-                $network = "{$resource->destination->network}-{$pullRequestId}";
+                $labelNetwork = "{$resource->destination->network}-{$pullRequestId}";
             }
             if ($shouldGenerateLabelsExactly) {
                 switch ($server->proxyType()) {
                     case ProxyTypes::TRAEFIK->value:
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
-                            uuid: $uuid,
+                            uuid: $labelUuid,
                             domains: $fqdns,
                             is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                             serviceLabels: $serviceLabels,
@@ -1329,8 +1342,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         break;
                     case ProxyTypes::CADDY->value:
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
-                            network: $network,
-                            uuid: $uuid,
+                            network: $labelNetwork,
+                            uuid: $labelUuid,
                             domains: $fqdns,
                             is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                             serviceLabels: $serviceLabels,
@@ -1344,7 +1357,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 }
             } else {
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
-                    uuid: $uuid,
+                    uuid: $labelUuid,
                     domains: $fqdns,
                     is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                     serviceLabels: $serviceLabels,
@@ -1354,8 +1367,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     image: $image
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
-                    network: $network,
-                    uuid: $uuid,
+                    network: $labelNetwork,
+                    uuid: $labelUuid,
                     domains: $fqdns,
                     is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                     serviceLabels: $serviceLabels,
@@ -1509,6 +1522,18 @@ function serviceParser(Service $resource): Collection
         return collect([]);
     }
     $services = data_get($yaml, 'services', collect([]));
+
+    // Clean up corrupted environment variables from previous parser bugs
+    // (keys starting with $ or ending with } should not exist as env var names)
+    $resource->environment_variables()
+        ->where('resourceable_type', get_class($resource))
+        ->where('resourceable_id', $resource->id)
+        ->where(function ($q) {
+            $q->where('key', 'LIKE', '$%')
+                ->orWhere('key', 'LIKE', '%}');
+        })
+        ->delete();
+
     $topLevel = collect([
         'volumes' => collect(data_get($yaml, 'volumes', [])),
         'networks' => collect(data_get($yaml, 'networks', [])),
@@ -1686,9 +1711,9 @@ function serviceParser(Service $resource): Collection
             $value = str($value);
             $regex = '/\$(\{?([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)\}?)/';
             preg_match_all($regex, $value, $valueMatches);
-            if (count($valueMatches[1]) > 0) {
-                foreach ($valueMatches[1] as $match) {
-                    $match = replaceVariables($match);
+            if (count($valueMatches[2]) > 0) {
+                foreach ($valueMatches[2] as $match) {
+                    $match = str($match);
                     if ($match->startsWith('SERVICE_')) {
                         if ($magicEnvironments->has($match->value())) {
                             continue;
@@ -1860,8 +1885,9 @@ function serviceParser(Service $resource): Collection
                         $serviceExists->fqdn = $url;
                         $serviceExists->save();
                     }
-                    // Create FQDN variable
-                    $resource->environment_variables()->updateOrCreate([
+                    // Create FQDN variable (use firstOrCreate to avoid overwriting values
+                    // already set by direct template declarations or updateCompose)
+                    $resource->environment_variables()->firstOrCreate([
                         'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
@@ -1873,7 +1899,7 @@ function serviceParser(Service $resource): Collection
 
                     // Also create the paired SERVICE_URL_* variable
                     $urlKey = 'SERVICE_URL_'.strtoupper($fqdnFor);
-                    $resource->environment_variables()->updateOrCreate([
+                    $resource->environment_variables()->firstOrCreate([
                         'key' => $urlKey,
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
@@ -1903,8 +1929,9 @@ function serviceParser(Service $resource): Collection
                         $serviceExists->fqdn = $url;
                         $serviceExists->save();
                     }
-                    // Create URL variable
-                    $resource->environment_variables()->updateOrCreate([
+                    // Create URL variable (use firstOrCreate to avoid overwriting values
+                    // already set by direct template declarations or updateCompose)
+                    $resource->environment_variables()->firstOrCreate([
                         'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
@@ -1916,7 +1943,7 @@ function serviceParser(Service $resource): Collection
 
                     // Also create the paired SERVICE_FQDN_* variable
                     $fqdnKey = 'SERVICE_FQDN_'.strtoupper($urlFor);
-                    $resource->environment_variables()->updateOrCreate([
+                    $resource->environment_variables()->firstOrCreate([
                         'key' => $fqdnKey,
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
@@ -1928,7 +1955,7 @@ function serviceParser(Service $resource): Collection
 
                 } else {
                     $value = generateEnvValue($command, $resource);
-                    $resource->environment_variables()->updateOrCreate([
+                    $resource->environment_variables()->firstOrCreate([
                         'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
@@ -2313,16 +2340,18 @@ function serviceParser(Service $resource): Collection
                 continue;
             }
             if ($key->value() === $parsedValue->value()) {
-                $value = null;
-                $resource->environment_variables()->updateOrCreate([
+                // Simple variable reference (e.g. DATABASE_URL: ${DATABASE_URL})
+                // Use firstOrCreate to avoid overwriting user-saved values on redeploy
+                $envVar = $resource->environment_variables()->firstOrCreate([
                     'key' => $key,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
                 ], [
-                    'value' => $value,
                     'is_preview' => false,
                     'comment' => $envComments[$originalKey] ?? null,
                 ]);
+                // Add the variable to the environment using the saved DB value
+                $environment[$key->value()] = $envVar->value;
             } else {
                 if ($value->startsWith('$')) {
                     $isRequired = false;
@@ -2409,7 +2438,8 @@ function serviceParser(Service $resource): Collection
                             }
                         } else {
                             // Simple variable reference without default
-                            $resource->environment_variables()->updateOrCreate([
+                            // Use firstOrCreate to avoid overwriting user-saved values on redeploy
+                            $envVar = $resource->environment_variables()->firstOrCreate([
                                 'key' => $content,
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
@@ -2418,6 +2448,8 @@ function serviceParser(Service $resource): Collection
                                 'is_required' => $isRequired,
                                 'comment' => $envComments[$originalKey] ?? null,
                             ]);
+                            // Add the variable to the environment using the saved DB value
+                            $environment[$content] = $envVar->value;
                         }
                     } else {
                         // Fallback to old behavior for malformed input (backward compatibility)
@@ -2443,8 +2475,9 @@ function serviceParser(Service $resource): Collection
 
                         if ($originalValue->value() === $value->value()) {
                             // This means the variable does not have a default value
+                            // Use firstOrCreate to avoid overwriting user-saved values on redeploy
                             $parsedKeyValue = replaceVariables($value);
-                            $resource->environment_variables()->updateOrCreate([
+                            $envVar = $resource->environment_variables()->firstOrCreate([
                                 'key' => $parsedKeyValue,
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
@@ -2453,12 +2486,13 @@ function serviceParser(Service $resource): Collection
                                 'is_required' => $isRequired,
                                 'comment' => $envComments[$originalKey] ?? null,
                             ]);
-                            // Add the variable to the environment so it will be shown in the deployable compose file
-                            $environment[$parsedKeyValue->value()] = $value;
+                            // Add the variable to the environment using the saved DB value
+                            $environment[$parsedKeyValue->value()] = $envVar->value;
 
                             continue;
                         }
-                        $resource->environment_variables()->updateOrCreate([
+                        // Variable with a default value from compose — use firstOrCreate to preserve user edits
+                        $resource->environment_variables()->firstOrCreate([
                             'key' => $key,
                             'resourceable_type' => get_class($resource),
                             'resourceable_id' => $resource->id,
@@ -2532,6 +2566,13 @@ function serviceParser(Service $resource): Collection
                         $value = $dbEnv->value;
                     }
                     // Otherwise keep empty string as-is
+                }
+
+                // Resolve shared variable patterns like {{environment.VAR}}, {{project.VAR}}, {{team.VAR}}
+                // Without this, literal {{...}} strings end up in the compose environment: section,
+                // which takes precedence over the resolved values in the .env file (env_file:)
+                if (is_string($value) && str_contains($value, '{{')) {
+                    $value = resolveSharedEnvironmentVariables($value, $resource);
                 }
 
                 return $value;

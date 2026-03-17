@@ -177,9 +177,10 @@ class CleanupDocker
                 ->filter(fn ($image) => ! empty($image['tag']));
 
             // Separate images into categories
-            // PR images (pr-*) and build images (*-build) are excluded from retention
-            // Build images will be cleaned up by docker image prune -af
+            // PR images (pr-*) are always deleted
+            // Build images (*-build) are cleaned up to match retained regular images
             $prImages = $images->filter(fn ($image) => str_starts_with($image['tag'], 'pr-'));
+            $buildImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && str_ends_with($image['tag'], '-build'));
             $regularImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && ! str_ends_with($image['tag'], '-build'));
 
             // Always delete all PR images
@@ -208,6 +209,26 @@ class CleanupDocker
                     'command' => $deleteCommand,
                     'output' => $deleteOutput ?? 'Image removed or was in use',
                 ];
+            }
+
+            // Clean up build images (-build suffix) that don't correspond to retained regular images
+            // Build images are intermediate artifacts (e.g. Nixpacks) not used by running containers.
+            // If a build is in progress, docker rmi will fail silently since the image is in use.
+            $keptTags = $sortedRegularImages->take($imagesToKeep)->pluck('tag');
+            if (! empty($currentTag)) {
+                $keptTags = $keptTags->push($currentTag);
+            }
+
+            foreach ($buildImages as $image) {
+                $baseTag = preg_replace('/-build$/', '', $image['tag']);
+                if (! $keptTags->contains($baseTag)) {
+                    $deleteCommand = "docker rmi {$image['image_ref']} 2>/dev/null || true";
+                    $deleteOutput = instant_remote_process([$deleteCommand], $server, false);
+                    $cleanupLog[] = [
+                        'command' => $deleteCommand,
+                        'output' => $deleteOutput ?? 'Build image removed or was in use',
+                    ];
+                }
             }
         }
 

@@ -139,7 +139,7 @@
                                     <div class="text-xs font-bold text-neutral-500 uppercase tracking-wide pb-1.5">Due now</div>
                                     <div class="flex justify-between gap-6 text-sm font-bold">
                                         <span class="dark:text-white">Prorated charge</span>
-                                        <span class="dark:text-warning" x-text="fmt(preview.due_now)"></span>
+                                        <span class="dark:text-warning" x-text="fmt(preview?.due_now)"></span>
                                     </div>
                                     <p class="text-xs text-neutral-500 pt-1">Charged immediately to your payment method.</p>
                                 </div>
@@ -147,8 +147,8 @@
                                     <div class="text-xs font-bold text-neutral-500 uppercase tracking-wide pb-1.5">Next billing cycle</div>
                                     <div class="space-y-1.5">
                                         <div class="flex justify-between gap-6 text-sm">
-                                            <span class="text-neutral-500" x-text="preview.quantity + ' servers × ' + fmt(preview.unit_price)"></span>
-                                            <span class="dark:text-white" x-text="fmt(preview.recurring_subtotal)"></span>
+                                            <span class="text-neutral-500" x-text="preview?.quantity + ' servers × ' + fmt(preview?.unit_price)"></span>
+                                            <span class="dark:text-white" x-text="fmt(preview?.recurring_subtotal)"></span>
                                         </div>
                                         <div class="flex justify-between gap-6 text-sm" x-show="preview?.tax_description" x-cloak>
                                             <span class="text-neutral-500" x-text="preview?.tax_description"></span>
@@ -156,7 +156,7 @@
                                         </div>
                                         <div class="flex justify-between gap-6 text-sm font-bold pt-1.5 border-t dark:border-coolgray-400 border-neutral-200">
                                             <span class="dark:text-white">Total / month</span>
-                                            <span class="dark:text-white" x-text="fmt(preview.recurring_total)"></span>
+                                            <span class="dark:text-white" x-text="fmt(preview?.recurring_total)"></span>
                                         </div>
                                     </div>
                                 </div>
