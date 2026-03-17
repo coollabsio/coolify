@@ -93,7 +93,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
                 $this->database = data_get($this->backup, 'database');
-                $this->server = $this->database->service->server;
+                if ($this->database->application_id) {
+                    $this->server = $this->database->application->destination->server;
+                } else {
+                    $this->server = $this->database->service->server;
+                }
                 $this->s3 = $this->backup->s3;
             } else {
                 $this->database = data_get($this->backup, 'database');
@@ -119,10 +123,30 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
                 return;
             }
+
+            if (
+                $this->database instanceof \App\Models\ServiceDatabase &&
+                $this->database->application_id &&
+                $this->database->application?->isDeploymentInprogress()
+            ) {
+                Log::info('DatabaseBackupJob deferred: application deployment in progress', [
+                    'backup_id' => $this->backup->id,
+                    'database_id' => $this->database->id,
+                    'application_id' => $this->database->application_id,
+                ]);
+                $this->release(300);
+
+                return;
+            }
             if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
                 $databaseType = $this->database->databaseType();
-                $serviceUuid = $this->database->service->uuid;
-                $serviceName = str($this->database->service->name)->slug();
+                if ($this->database->application_id) {
+                    $serviceUuid = $this->database->application->uuid;
+                    $serviceName = str($this->database->application->name)->slug();
+                } else {
+                    $serviceUuid = $this->database->service->uuid;
+                    $serviceName = str($this->database->service->name)->slug();
+                }
                 if (str($databaseType)->contains('postgres')) {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName.'-'.$this->container_name;
@@ -636,7 +660,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $endpoint = $this->s3->endpoint;
             $this->s3->testConnection(shouldSave: true);
             if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
-                $network = $this->database->service->destination->network;
+                $network = $this->database->application_id
+                    ? $this->database->application->destination->network
+                    : $this->database->service->destination->network;
             } else {
                 $network = $this->database->destination->network;
             }
