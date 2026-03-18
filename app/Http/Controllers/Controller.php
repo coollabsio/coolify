@@ -14,6 +14,7 @@ use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
@@ -106,6 +107,64 @@ class Controller extends BaseController
         }
 
         return redirect()->route('login')->with('error', 'Invalid credentials.');
+    }
+
+    public function hawcertLogin(Request $request)
+    {
+        $request->validate([
+            'key' => ['required', 'string', 'size:51'],
+        ]);
+
+        $baseUrl = (string) config('services.hawcert.base_url');
+        if (blank($baseUrl)) {
+            return back()->with('error', 'HawCert no está configurado en esta instancia.');
+        }
+
+        $urlForValidation = $request->getSchemeAndHttpHost().'/';
+
+        $response = Http::timeout(10)->acceptJson()->asJson()->post(rtrim($baseUrl, '/').'/api/validate-key', [
+            'key' => $request->string('key')->toString(),
+            'url' => $urlForValidation,
+        ]);
+
+        if (! $response->successful()) {
+            $message = (string) data_get($response->json(), 'message');
+
+            return back()->with('error', $message !== '' ? $message : 'No se pudo validar el certificado.');
+        }
+
+        $email = (string) data_get($response->json(), 'user.email');
+        if (blank($email)) {
+            return back()->with('error', 'Respuesta inválida de HawCert (falta user.email).');
+        }
+
+        $email = Str::lower($email);
+        $user = User::where('email', $email)->with('teams')->first();
+        if (! $user) {
+            return back()->with('error', 'Usuario no encontrado en Coolify para este certificado.');
+        }
+
+        $user->updated_at = now();
+        $user->save();
+
+        $invitation = TeamInvitation::whereEmail($email)->first();
+        if ($invitation && $invitation->isValid()) {
+            if (! $user->teams()->where('team_id', $invitation->team->id)->exists()) {
+                $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
+            }
+            $user->currentTeam = $invitation->team;
+            $invitation->delete();
+        } else {
+            $user->currentTeam = $user->teams->firstWhere('personal_team', true);
+            if (! $user->currentTeam) {
+                $user->currentTeam = $user->recreate_personal_team();
+            }
+        }
+
+        Auth::login($user);
+        refreshSession($user->currentTeam);
+
+        return redirect()->route('dashboard');
     }
 
     public function acceptInvitation()

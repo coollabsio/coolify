@@ -99,6 +99,7 @@ Route::get('/realtime', [Controller::class, 'realtime_test'])->middleware('auth'
 Route::get('/verify', [Controller::class, 'verify'])->middleware('auth')->name('verify.email');
 Route::get('/email/verify/{id}/{hash}', [Controller::class, 'email_verify'])->middleware(['auth'])->name('verify.verify');
 Route::middleware(['throttle:login'])->group(function () {
+    Route::post('/login/hawcert', [Controller::class, 'hawcertLogin'])->name('login.hawcert')->middleware('guest');
     Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
 });
 

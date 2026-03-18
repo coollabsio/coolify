@@ -35,6 +35,14 @@ return [
 
     'connections' => [
 
+        'sqlite' => [
+            'driver' => 'sqlite',
+            'url' => env('DATABASE_URL'),
+            'database' => env('DB_DATABASE', database_path('database.sqlite')),
+            'prefix' => '',
+            'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
+        ],
+
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DATABASE_URL'),
@@ -48,24 +56,33 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => 'prefer',
-            'options' => [
-                PDO::PGSQL_ATTR_DISABLE_PREPARES => env('DB_DISABLE_PREPARES', false),
-            ],
+            'options' => defined('PDO::PGSQL_ATTR_DISABLE_PREPARES')
+                ? [
+                    PDO::PGSQL_ATTR_DISABLE_PREPARES => env('DB_DISABLE_PREPARES', false),
+                ]
+                : [],
         ],
 
         'testing' => [
-            'driver' => 'pgsql',
-            'url' => env('DATABASE_TEST_URL'),
-            'host' => env('DB_TEST_HOST', 'postgres'),
-            'port' => env('DB_TEST_PORT', '5432'),
-            'database' => env('DB_TEST_DATABASE', 'coolify_test'),
-            'username' => env('DB_TEST_USERNAME', 'coolify'),
-            'password' => env('DB_TEST_PASSWORD', 'password'),
-            'charset' => 'utf8',
-            'prefix' => '',
-            'prefix_indexes' => true,
-            'search_path' => 'public',
-            'sslmode' => 'prefer',
+            ...(extension_loaded('pdo_pgsql') ? [
+                'driver' => 'pgsql',
+                'url' => env('DATABASE_TEST_URL'),
+                'host' => env('DB_TEST_HOST', 'postgres'),
+                'port' => env('DB_TEST_PORT', '5432'),
+                'database' => env('DB_TEST_DATABASE', 'coolify_test'),
+                'username' => env('DB_TEST_USERNAME', 'coolify'),
+                'password' => env('DB_TEST_PASSWORD', 'password'),
+                'charset' => 'utf8',
+                'prefix' => '',
+                'prefix_indexes' => true,
+                'search_path' => 'public',
+                'sslmode' => 'prefer',
+            ] : [
+                'driver' => 'sqlite',
+                'database' => ':memory:',
+                'prefix' => '',
+                'foreign_key_constraints' => true,
+            ]),
         ],
 
     ],

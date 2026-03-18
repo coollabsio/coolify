@@ -29,6 +29,28 @@
                         </div>
                     @endif
 
+                    <form action="{{ route('login.hawcert') }}" method="POST" class="flex flex-col gap-4">
+                        @csrf
+                        <x-forms.input name="key" autocomplete="one-time-code" required
+                            label="Access Key (HawCert)"
+                            helper="Introduce tu access key (formato ak_...). Se valida y se consume en HawCert." />
+
+                        <x-forms.button class="w-full justify-center py-3 box-boarding" type="submit" isHighlighted>
+                            Entrar con certificado
+                        </x-forms.button>
+                    </form>
+
+                    <div class="relative my-6">
+                        <div class="absolute inset-0 flex items-center">
+                            <div class="w-full border-t border-neutral-300 dark:border-coolgray-400"></div>
+                        </div>
+                        <div class="relative flex justify-center text-sm">
+                            <span class="px-2 bg-gray-50 dark:bg-base text-neutral-500 dark:text-neutral-400 ">
+                                o usa contraseña (opcional)
+                            </span>
+                        </div>
+                    </div>
+
                     <form action="/login" method="POST" class="flex flex-col gap-4">
                         @csrf
                         @env('local')
@@ -50,7 +72,7 @@
                             </a>
                         </div>
 
-                        <x-forms.button class="w-full justify-center py-3 box-boarding" type="submit" isHighlighted>
+                        <x-forms.button class="w-full justify-center py-3" type="submit">
                             {{ __('auth.login') }}
                         </x-forms.button>
                     </form>

@@ -67,4 +67,8 @@ return [
         'base_url' => env('ZITADEL_BASE_URL'),
     ],
 
+    'hawcert' => [
+        'base_url' => 'https://hawcert.hawkins.es',
+    ],
+
 ];
