@@ -1,0 +1,22 @@
+# documentation: https://openlitespeed.org/kb/
+# slogan: OpenLiteSpeed is a high-performance, lightweight, open-source HTTP server.
+# category: web
+# tags: web,openlitespeed,litespeed,php,http-server
+# logo: svgs/default.webp
+# port: 8088
+
+services:
+  openlitespeed:
+    image: litespeedtech/openlitespeed:latest
+    environment:
+      - SERVICE_URL_OPENLITESPEED_8088
+      - TZ=${TZ:-UTC}
+    volumes:
+      - openlitespeed-sites:/var/www/vhosts
+      - openlitespeed-config:/usr/local/lsws/conf
+      - openlitespeed-logs:/usr/local/lsws/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8088"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
