@@ -1152,6 +1152,42 @@ class Service extends BaseModel
                     }
                     $fields->put('Openclaw', $data->toArray());
                     break;
+                case $image->contains('gorse'):
+                    $data = collect([]);
+                    $username = $this->environment_variables()->where('key', 'GORSE_DASHBOARD_USER_NAME')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GORSE')->first();
+                    $apiKey = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_APIKEY')->first();
+                    if ($username) {
+                        $data = $data->merge([
+                            'Dashboard Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'Dashboard Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($apiKey) {
+                        $data = $data->merge([
+                            'API Key' => [
+                                'key' => data_get($apiKey, 'key'),
+                                'value' => data_get($apiKey, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Gorse', $data->toArray());
+                    break;
                 default:
                     $data = collect([]);
                     $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();

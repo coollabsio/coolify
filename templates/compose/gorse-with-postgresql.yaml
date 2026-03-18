@@ -1,0 +1,53 @@
+# documentation: https://gorse.io/docs
+# slogan: An open-source recommender system service written in Go.
+# category: ai
+# tags: recommendation, machine-learning, ai, recommender, personalization, postgresql
+# logo: svgs/gorse.png
+# port: 8088
+
+services:
+  gorse:
+    image: zhenghaoz/gorse-in-one:latest
+    environment:
+      - SERVICE_URL_GORSE_8088
+      - GORSE_CACHE_STORE=redis://redis:6379
+      - GORSE_DATA_STORE=postgres://${SERVICE_USER_POSTGRESQL}:${SERVICE_PASSWORD_POSTGRESQL}@postgresql:5432/${POSTGRESQL_DATABASE:-gorse}?sslmode=disable
+      - GORSE_SERVER_API_KEY=${SERVICE_PASSWORD_APIKEY}
+      - GORSE_DASHBOARD_USER_NAME=${GORSE_DASHBOARD_USER_NAME:-admin}
+      - GORSE_DASHBOARD_PASSWORD=${SERVICE_PASSWORD_GORSE}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+    volumes:
+      - gorse-data:/var/lib/gorse
+    healthcheck:
+      test: ["CMD-SHELL", "echo > /dev/tcp/127.0.0.1/8088 || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    volumes:
+      - gorse-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+  postgresql:
+    image: postgres:18-alpine
+    volumes:
+      - gorse-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-gorse}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
