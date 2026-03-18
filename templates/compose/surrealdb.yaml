@@ -1,0 +1,21 @@
+# documentation: https://surrealdb.com/docs/surrealdb/installation/running/docker
+# slogan: SurrealDB with SurrealKV — the recommended default storage backend with versioning and ACID support.
+# category: database
+# tags: surrealdb, database, multi-model, surrealkv, sql, nosql, graph, realtime, document
+# logo: svgs/surrealdb.svg
+# port: 8000
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:v2
+    command: start --user root --pass ${SERVICE_PASSWORD_SURREALDB} --bind 0.0.0.0:8000 surrealkv:///data/surreal.db
+    environment:
+      - SERVICE_FQDN_SURREALDB_8000
+      - SERVICE_URL_SURREALDB_8000
+    volumes:
+      - surrealdb-data:/data
+    healthcheck:
+      test: ["CMD", "surreal", "isready", "--endpoint", "http://127.0.0.1:8000"]
+      interval: 5s
+      timeout: 30s
+      retries: 10

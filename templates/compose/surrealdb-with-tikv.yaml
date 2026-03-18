@@ -1,0 +1,56 @@
+# documentation: https://surrealdb.com/docs/surrealdb/installation/running/docker
+# slogan: SurrealDB with TiKV — a distributed, production-ready storage cluster for horizontal scalability.
+# category: database
+# tags: surrealdb, database, multi-model, tikv, distributed, production, sql, nosql, graph, realtime
+# logo: svgs/surrealdb.svg
+# port: 8000
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:v2
+    command: start --user root --pass ${SERVICE_PASSWORD_SURREALDB} --bind 0.0.0.0:8000 tikv://pd:2379
+    environment:
+      - SERVICE_FQDN_SURREALDB_8000
+      - SERVICE_URL_SURREALDB_8000
+    depends_on:
+      tikv:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "surreal", "isready", "--endpoint", "http://127.0.0.1:8000"]
+      interval: 5s
+      timeout: 30s
+      retries: 10
+
+  pd:
+    image: pingcap/pd:v8.5.5
+    command:
+      - --name=pd
+      - --client-urls=http://0.0.0.0:2379
+      - --peer-urls=http://0.0.0.0:2380
+      - --data-dir=/data
+      - --initial-cluster=pd=http://pd:2380
+    volumes:
+      - pd-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:2379/health || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  tikv:
+    image: pingcap/tikv:v8.5.5
+    command:
+      - --addr=0.0.0.0:20160
+      - --advertise-addr=tikv:20160
+      - --data-dir=/data
+      - --pd=pd:2379
+    volumes:
+      - tikv-data:/data
+    depends_on:
+      pd:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:20180/metrics || exit 1"]
+      interval: 10s
+      timeout: 30s
+      retries: 10
