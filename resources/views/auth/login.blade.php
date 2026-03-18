@@ -29,11 +29,31 @@
                         </div>
                     @endif
 
-                    <form action="{{ route('login.hawcert') }}" method="POST" class="flex flex-col gap-4">
+                    <form action="{{ route('login.hawcert') }}" method="POST" enctype="multipart/form-data"
+                        class="flex flex-col gap-4">
                         @csrf
-                        <x-forms.input name="key" autocomplete="one-time-code" required
-                            label="Access Key (HawCert)"
-                            helper="Introduce tu access key (formato ak_...). Se valida y se consume en HawCert." />
+                        <div class="flex flex-col gap-1 w-full">
+                            <label class="flex gap-1 items-center mb-1 text-sm font-medium">
+                                Certificado (.pem)
+                                <x-highlighted text="*" />
+                            </label>
+                            <input type="file" name="certificate" accept=".pem,.crt,.cer,application/x-pem-file,text/plain"
+                                class="block w-full text-sm rounded border border-neutral-300 dark:border-coolgray-400 bg-white dark:bg-coolgray-100 file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:font-medium file:bg-coollabs file:text-white dark:file:bg-warning cursor-pointer" />
+                            <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                                Sube el archivo del certificado (p. ej. <code class="text-xs">Nico_2026-03-11.pem</code>).
+                            </p>
+                        </div>
+
+                        <details class="text-sm">
+                            <summary class="cursor-pointer text-neutral-500 dark:text-neutral-400 hover:underline">
+                                O entrar con access key (texto)
+                            </summary>
+                            <div class="pt-3">
+                                <x-forms.input name="key" autocomplete="one-time-code" :required="false"
+                                    label="Access Key (HawCert)"
+                                    helper="Solo si no usas archivo .pem. Formato ak_... (un solo uso)." />
+                            </div>
+                        </details>
 
                         <x-forms.button class="w-full justify-center py-3 box-boarding" type="submit" isHighlighted>
                             Entrar con certificado

@@ -9,6 +9,7 @@ use App\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Foundation\Validation\ValidatesRequests;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Auth;
@@ -111,26 +112,79 @@ class Controller extends BaseController
 
     public function hawcertLogin(Request $request)
     {
-        $request->validate([
-            'key' => ['required', 'string', 'size:51'],
-        ]);
-
-        $baseUrl = (string) config('services.hawcert.base_url');
-        if (blank($baseUrl)) {
+        $baseUrl = rtrim((string) config('services.hawcert.base_url'), '/');
+        if ($baseUrl === '') {
             return back()->with('error', 'HawCert no está configurado en esta instancia.');
         }
 
         $urlForValidation = $request->getSchemeAndHttpHost().'/';
 
-        $response = Http::timeout(10)->acceptJson()->asJson()->post(rtrim($baseUrl, '/').'/api/validate-key', [
-            'key' => $request->string('key')->toString(),
-            'url' => $urlForValidation,
-        ]);
+        if ($request->hasFile('certificate')) {
+            $request->validate([
+                'certificate' => [
+                    'required',
+                    'file',
+                    'max:512',
+                    function (string $attribute, mixed $value, \Closure $fail): void {
+                        if (! $value instanceof \Illuminate\Http\UploadedFile || ! $value->isValid()) {
+                            $fail('El archivo de certificado no es válido.');
+
+                            return;
+                        }
+                        $ext = strtolower($value->getClientOriginalExtension() ?? '');
+                        if (! in_array($ext, ['pem', 'crt', 'cer', 'txt'], true)) {
+                            $fail('El archivo debe ser .pem (o .crt/.cer).');
+                        }
+                    },
+                ],
+            ], [], [
+                'certificate' => 'certificado',
+            ]);
+
+            $pem = (string) file_get_contents($request->file('certificate')->getRealPath());
+            if (! str_contains($pem, 'BEGIN')) {
+                return back()->with('error', 'El archivo no parece un certificado PEM válido.');
+            }
+
+            $accessResponse = Http::timeout(20)->acceptJson()->asJson()->post($baseUrl.'/api/validate-access', [
+                'certificate' => $pem,
+                'url' => $urlForValidation,
+            ]);
+
+            if (! $accessResponse->successful()) {
+                $message = (string) data_get($accessResponse->json(), 'message');
+
+                return back()->with('error', $message !== '' ? $message : 'HawCert no pudo validar el certificado.');
+            }
+
+            $accessKey = (string) data_get($accessResponse->json(), 'access_key');
+            if (strlen($accessKey) !== 51 || ! str_starts_with($accessKey, 'ak_')) {
+                return back()->with('error', 'Respuesta inválida de HawCert (access_key).');
+            }
+
+            $response = Http::timeout(10)->acceptJson()->asJson()->post($baseUrl.'/api/validate-key', [
+                'key' => $accessKey,
+                'url' => $urlForValidation,
+            ]);
+        } elseif ($request->filled('key')) {
+            $request->validate([
+                'key' => ['required', 'string', 'size:51'],
+            ]);
+
+            $response = Http::timeout(10)->acceptJson()->asJson()->post($baseUrl.'/api/validate-key', [
+                'key' => $request->string('key')->toString(),
+                'url' => $urlForValidation,
+            ]);
+        } else {
+            return back()->withErrors([
+                'certificate' => 'Sube tu certificado (.pem) o introduce una access key.',
+            ]);
+        }
 
         if (! $response->successful()) {
             $message = (string) data_get($response->json(), 'message');
 
-            return back()->with('error', $message !== '' ? $message : 'No se pudo validar el certificado.');
+            return back()->with('error', $message !== '' ? $message : 'No se pudo validar el acceso.');
         }
 
         $email = (string) data_get($response->json(), 'user.email');
@@ -138,7 +192,11 @@ class Controller extends BaseController
             return back()->with('error', 'Respuesta inválida de HawCert (falta user.email).');
         }
 
-        $email = Str::lower($email);
+        return $this->finalizeHawcertLogin(Str::lower($email));
+    }
+
+    private function finalizeHawcertLogin(string $email): RedirectResponse
+    {
         $user = User::where('email', $email)->with('teams')->first();
         if (! $user) {
             return back()->with('error', 'Usuario no encontrado en Coolify para este certificado.');
