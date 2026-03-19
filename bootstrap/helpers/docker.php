@@ -406,7 +406,82 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     return $labels->sort();
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null)
+function normalizeProxyTargetPort(mixed $port): ?string
+{
+    if (is_null($port) || $port === '') {
+        return null;
+    }
+
+    $port = str((string) $port)->trim()->before('/')->value();
+    if ($port === '') {
+        return null;
+    }
+
+    if (preg_match('/(\d+(?:-\d+)?)$/', $port, $matches) !== 1) {
+        return null;
+    }
+
+    $port = str($matches[1])->before('-')->value();
+
+    if (! is_numeric($port)) {
+        return null;
+    }
+
+    $port = (int) $port;
+    if ($port < 1 || $port > 65535) {
+        return null;
+    }
+
+    return (string) $port;
+}
+
+function getServiceProxyTargetPort(array $service, mixed $fallbackPort = null): ?string
+{
+    $ports = collect([]);
+
+    $pushPort = function (mixed $candidate) use ($ports) {
+        $normalizedPort = normalizeProxyTargetPort($candidate);
+        if (! is_null($normalizedPort)) {
+            $ports->push($normalizedPort);
+        }
+    };
+
+    $normalizedFallbackPort = normalizeProxyTargetPort($fallbackPort);
+
+    collect(data_get($service, 'expose', []))->each(function ($exposedPort) use ($pushPort) {
+        if (is_array($exposedPort)) {
+            $pushPort(data_get($exposedPort, 'target') ?? data_get($exposedPort, 'published') ?? data_get($exposedPort, 'port'));
+
+            return;
+        }
+
+        $pushPort($exposedPort);
+    });
+
+    collect(data_get($service, 'ports', []))->each(function ($portMapping) use ($pushPort) {
+        if (is_array($portMapping)) {
+            $pushPort(data_get($portMapping, 'target'));
+
+            return;
+        }
+
+        $pushPort($portMapping);
+    });
+
+    $ports = $ports->unique()->values();
+
+    if ($ports->count() === 1) {
+        return $ports->first();
+    }
+
+    if (! is_null($normalizedFallbackPort) && $ports->contains($normalizedFallbackPort)) {
+        return $normalizedFallbackPort;
+    }
+
+    return $normalizedFallbackPort;
+}
+
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?string $predefinedPort = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -464,6 +539,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             $port = $url->getPort();
             if (is_null($port) && ! is_null($onlyPort)) {
                 $port = $onlyPort;
+            }
+            if (is_null($port) && ! is_null($predefinedPort)) {
+                $port = $predefinedPort;
             }
             $http_label = "http-{$loop}-{$uuid}";
             $https_label = "https-{$loop}-{$uuid}";

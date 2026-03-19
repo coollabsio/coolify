@@ -688,7 +688,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             pull_request_id: $pullRequestId
         );
         $containerName = "$serviceName-$baseName";
-        $predefinedPort = null;
+        $predefinedPort = getServiceProxyTargetPort($service);
 
         $originalResource = $resource;
 
@@ -1337,7 +1337,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
-                            image: $image
+                            image: $image,
+                            predefinedPort: $predefinedPort
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -1364,7 +1365,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
-                    image: $image
+                    image: $image,
+                    predefinedPort: $predefinedPort
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $labelNetwork,
