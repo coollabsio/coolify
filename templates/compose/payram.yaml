@@ -1,0 +1,54 @@
+# documentation: https://docs.payram.com
+name: PayRam
+description: PayRam server setup with a dedicated PostgreSQL database.
+logo: https://raw.githubusercontent.com/payramapp/payram/main/logo.png
+services:
+  payram:
+    image: payramapp/payram:latest
+    environment:
+      - SERVER=PRODUCTION
+      - BLOCKCHAIN_NETWORK_TYPE=mainnet
+      - AES_KEY=${SERVICE_PASSWORD_AES_KEY}
+      - SSL_CERT_PATH=""
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DATABASE=${POSTGRES_DB}
+      - POSTGRES_USERNAME=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - payram-data:/root/payram
+      - payram-logs:/var/log
+    depends_on:
+      - db
+    labels:
+      - coolify.managed=true
+      - coolify.connectionId=${CONNECTION_ID}
+      - coolify.proxyId=${PROXY_ID}
+      - traefik.enable=true
+      - traefik.http.routers.payram-${SERVICE_ID}.rule=Host(`${SERVICE_FQDN_PAYRAM}`)
+      - traefik.http.services.payram-${SERVICE_ID}.loadbalancer.server.port=8080
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${SERVICE_USER_POSTGRES}
+    volumes:
+      - payram-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SERVICE_USER_POSTGRES}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+variables:
+  - SERVICE_PASSWORD_AES_KEY
+  - SERVICE_USER_POSTGRES
+  - SERVICE_PASSWORD_POSTGRES
+  - SERVICE_FQDN_PAYRAM
+
+volumes:
+  payram-data:
+  payram-logs:
+  payram-db-data:
