@@ -47,6 +47,7 @@ use App\Livewire\Server\CloudflareTunnel;
 use App\Livewire\Server\CloudProviderToken\Show as CloudProviderTokenShow;
 use App\Livewire\Server\Delete as DeleteServer;
 use App\Livewire\Server\Destinations as ServerDestinations;
+use App\Livewire\Server\EnvironmentVariable as ServerEnvironmentVariable;
 use App\Livewire\Server\DockerCleanup;
 use App\Livewire\Server\Index as ServerIndex;
 use App\Livewire\Server\LogDrains;
@@ -279,6 +280,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/ca-certificate', CaCertificateShow::class)->name('server.ca-certificate');
         Route::get('/resources', ResourcesShow::class)->name('server.resources');
         Route::get('/cloudflare-tunnel', CloudflareTunnel::class)->name('server.cloudflare-tunnel');
+        Route::get('/environment-variables', ServerEnvironmentVariable::class)->name('server.environment-variables');
         Route::get('/destinations', ServerDestinations::class)->name('server.destinations');
         Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
         Route::get('/metrics', ServerCharts::class)->name('server.charts');
