@@ -5,21 +5,28 @@ logo: https://raw.githubusercontent.com/payramapp/payram/main/logo.png
 services:
   payram:
     image: payramapp/payram:latest
+    platform: linux/amd64
     environment:
       - SERVER=PRODUCTION
       - BLOCKCHAIN_NETWORK_TYPE=mainnet
       - AES_KEY=${SERVICE_PASSWORD_AES_KEY}
-      - SSL_CERT_PATH=""
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
-      - POSTGRES_DATABASE=${POSTGRES_DB}
-      - POSTGRES_USERNAME=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE=${SERVICE_USER_POSTGRES}
+      - POSTGRES_USERNAME=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
     volumes:
       - payram-data:/root/payram
       - payram-logs:/var/log
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     labels:
       - coolify.managed=true
       - coolify.connectionId=${CONNECTION_ID}
