@@ -102,6 +102,7 @@ class HealthChecks extends Component
             $this->resource->health_check_timeout = $this->healthCheckTimeout;
             $this->resource->health_check_retries = $this->healthCheckRetries;
             $this->resource->health_check_start_period = $this->healthCheckStartPeriod;
+            $this->resource->health_check_start_period = $this->healthCheckStartPeriod;
             $this->resource->custom_healthcheck_found = $this->customHealthcheckFound;
 
             $this->resource->save();
