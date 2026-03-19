@@ -16,7 +16,7 @@ it('wraps https clone commands with an HTTP/1.1 retry after cleanup', function (
     expect($result)
         ->toContain("(git clone --depth=1 -b 'main' 'https://github.com/coollabsio/coolify' '/artifacts/test-uuid')")
         ->toContain("rm -rf '/artifacts/test-uuid'")
-        ->toContain("Primary git clone failed, retrying with HTTP/1.1")
+        ->toContain('Primary git clone failed, retrying with HTTP/1.1')
         ->toContain("git -c http.version=HTTP/1.1 clone --depth=1 -b 'main' 'https://github.com/coollabsio/coolify' '/artifacts/test-uuid'");
 });
 
