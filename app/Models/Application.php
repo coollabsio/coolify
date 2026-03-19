@@ -1359,6 +1359,7 @@ class Application extends BaseModel
                     $fullRepoUrl = "{$this->source->html_url}/{$customRepository}";
                     $escapedRepoUrl = escapeshellarg("{$this->source->html_url}/{$customRepository}");
                     $git_clone_command = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
+                    $git_clone_command = wrapGitCloneCommandWithHttpTransportFallback($git_clone_command, $baseDir, $fullRepoUrl);
                     if (! $only_checkout) {
                         $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit);
                     }
@@ -1381,6 +1382,7 @@ class Application extends BaseModel
                         $git_clone_command = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
                         $fullRepoUrl = $repoUrl;
                     }
+                    $git_clone_command = wrapGitCloneCommandWithHttpTransportFallback($git_clone_command, $baseDir, $repoUrl);
                     if (! $only_checkout) {
                         $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false, commit: $commit);
                     }
@@ -1466,6 +1468,7 @@ class Application extends BaseModel
                 $fullRepoUrl = $customRepository;
                 $escapedCustomRepository = escapeshellarg($customRepository);
                 $git_clone_command = "{$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
+                $git_clone_command = wrapGitCloneCommandWithHttpTransportFallback($git_clone_command, $baseDir, $fullRepoUrl);
                 $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit);
 
                 if ($exec_in_docker) {
@@ -1552,6 +1555,7 @@ class Application extends BaseModel
             $fullRepoUrl = $customRepository;
             $escapedCustomRepository = escapeshellarg($customRepository);
             $git_clone_command = "{$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
+            $git_clone_command = wrapGitCloneCommandWithHttpTransportFallback($git_clone_command, $baseDir, $fullRepoUrl);
             $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit);
 
             if ($pull_request_id !== 0) {

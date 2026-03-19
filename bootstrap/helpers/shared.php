@@ -3416,6 +3416,32 @@ function loadConfigFromGit(string $repository, string $branch, string $base_dire
     }
 }
 
+function wrapGitCloneCommandWithHttpTransportFallback(string $gitCloneCommand, string $baseDir, ?string $repositoryUrl = null): string
+{
+    if (blank($repositoryUrl)) {
+        return $gitCloneCommand;
+    }
+
+    $normalizedBaseDir = trim($baseDir);
+    if ($normalizedBaseDir === '' || $normalizedBaseDir === '.' || $normalizedBaseDir === './' || $normalizedBaseDir === '/') {
+        return $gitCloneCommand;
+    }
+
+    $normalizedRepositoryUrl = strtolower(trim($repositoryUrl));
+    if (! str_starts_with($normalizedRepositoryUrl, 'http://') && ! str_starts_with($normalizedRepositoryUrl, 'https://')) {
+        return $gitCloneCommand;
+    }
+
+    $fallbackCommand = preg_replace('/\bgit clone\b/', 'git -c http.version=HTTP/1.1 clone', $gitCloneCommand, 1);
+    if ($fallbackCommand === null || $fallbackCommand === $gitCloneCommand) {
+        return $gitCloneCommand;
+    }
+
+    $escapedBaseDir = escapeshellarg($baseDir);
+
+    return "({$gitCloneCommand}) || (rm -rf {$escapedBaseDir} && echo 'Primary git clone failed, retrying with HTTP/1.1' >&2 && {$fallbackCommand})";
+}
+
 function loggy($message = null, array $context = [])
 {
     if (! isDev()) {
