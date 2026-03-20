@@ -339,13 +339,13 @@
                         @endif
                     @endif
                     <div class="flex-1"></div>
-                    @if (isInstanceAdmin() && !isCloud())
+                    {{-- @if (isInstanceAdmin() && !isCloud())
                         @persist('upgrade')
                             <li>
                                 <livewire:upgrade />
                             </li>
                         @endpersist
-                    @endif
+                    @endif --}}
                     {{-- <li>
                         <a title="Onboarding"
                             class="{{ request()->is('onboarding*') ? 'menu-item-active menu-item' : 'menu-item' }}"
