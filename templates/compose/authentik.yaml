@@ -27,7 +27,7 @@ services:
       - AUTHENTIK_EMAIL__TIMEOUT=${AUTHENTIK_EMAIL__TIMEOUT}
       - AUTHENTIK_EMAIL__FROM=${AUTHENTIK_EMAIL__FROM}
     volumes:
-      - ./media:/media
+      - ./data:/data
       - ./custom-templates:/templates
     depends_on:
       postgresql:
@@ -60,7 +60,7 @@ services:
     user: root
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./media:/media
+      - ./data:/data
       - ./certs:/certs
       - ./custom-templates:/templates
     depends_on:
