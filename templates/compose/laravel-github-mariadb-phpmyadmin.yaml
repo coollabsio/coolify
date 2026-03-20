@@ -1,0 +1,281 @@
+# documentation: https://laravel.com/docs
+# slogan: Despliega Laravel desde un Repositorio GitHub con MariaDB y PhpMyAdmin
+# category: framework
+# tags: laravel, php, framework, web, application, mariadb, phpmyadmin, github
+# logo: svgs/laravel.svg
+
+services:
+  laravel:
+    image: php:8.4-fpm-alpine
+    volumes:
+      - laravel-files:/var/www/html
+      - type: bind
+        source: ./supervisord.conf
+        target: /etc/supervisord.conf
+        content: |
+          [supervisord]
+          nodaemon=true
+          pidfile=/tmp/supervisord.pid
+          logfile=/dev/null
+          logfile_maxbytes=0
+          loglevel=info
+
+          [program:php-fpm]
+          command=php-fpm
+          redirect_stderr=true
+          stdout_logfile=/dev/stdout
+          stdout_logfile_maxbytes=0
+          stderr_logfile=/dev/stderr
+          stderr_logfile_maxbytes=0
+          autostart=true
+          autorestart=true
+
+          [program:scheduler]
+          command=sh -c "while true; do if [ -f /var/www/html/artisan ]; then php /var/www/html/artisan schedule:run --verbose --no-interaction 2>&1; else echo 'Waiting for Laravel installation...'; fi; sleep 60; done"
+          redirect_stderr=true
+          stdout_logfile=/dev/stdout
+          stdout_logfile_maxbytes=0
+          stderr_logfile=/dev/stderr
+          stderr_logfile_maxbytes=0
+          autostart=true
+          autorestart=true
+
+          [program:queue-worker]
+          process_name=%(program_name)s_%(process_num)02d
+          command=sh -c "while [ ! -f /var/www/html/artisan ]; do echo 'Waiting for Laravel installation...'; sleep 10; done; php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600"
+          redirect_stderr=true
+          stdout_logfile=/dev/stdout
+          stdout_logfile_maxbytes=0
+          stderr_logfile=/dev/stderr
+          stderr_logfile_maxbytes=0
+          autostart=true
+          autorestart=true
+          numprocs=2
+          stopwaitsecs=3600
+
+          [eventlistener:shutdown]
+          command=shutdown.sh
+          events=PROCESS_STATE_STOPPED, PROCESS_STATE_EXITED, PROCESS_STATE_FATAL
+          stdout_logfile=/dev/stdout
+          stdout_logfile_maxbytes=0
+          stderr_logfile=/dev/stderr
+          stderr_logfile_maxbytes=0
+      - type: bind
+        source: ./entrypoint.sh
+        target: /entrypoint.sh
+        mode: "0755"
+        content: |
+          #!/bin/sh
+          set -e
+
+          echo "Starting Laravel deployment from GitHub..."
+
+          chmod +x /entrypoint.sh 2>/dev/null || true
+
+          if ! command -v supervisord >/dev/null 2>&1; then
+            echo "Installing supervisor and required packages..."
+            apk add --no-cache supervisor curl git unzip
+          fi
+
+          if php -m | grep -q "pdo_mysql" && php -m | grep -q "mbstring"; then
+            echo "PHP extensions already installed..."
+          else
+            echo "Installing PHP extensions..."
+            apk add --no-cache oniguruma-dev libzip-dev postgresql-dev mysql-client mariadb-client freetype-dev libjpeg-turbo-dev libpng-dev icu-dev libxml2-dev
+            docker-php-ext-install -j$(nproc) pdo_mysql pdo_pgsql mbstring zip exif pcntl bcmath gd intl opcache 2>&1 | grep -vE "(mkdir: can't create directory|File exists)" || true
+          fi
+
+          if ! grep -q "listen = 0.0.0.0:9000" /usr/local/etc/php-fpm.d/www.conf 2>/dev/null; then
+            sed -i 's/listen = 127.0.0.1:9000/listen = 0.0.0.0:9000/' /usr/local/etc/php-fpm.d/www.conf
+            sed -i 's/;clear_env = no/clear_env = no/' /usr/local/etc/php-fpm.d/www.conf
+          fi
+
+          if ! command -v composer >/dev/null 2>&1; then
+            echo "Installing Composer..."
+            curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+            chmod +x /usr/local/bin/composer
+          fi
+
+          mkdir -p /var/www/html
+          cd /var/www/html
+
+          if [ ! -d .git ]; then
+            echo "Cloning repository \${SERVICE_GITHUB_REPO_URL}..."
+            rm -rf * .[!.]* 2>/dev/null || true
+            git clone \${SERVICE_GITHUB_REPO_URL} .
+          else
+            echo "Repository already exists..."
+          fi
+
+          if [ -f composer.json ]; then
+            echo "Installing Composer dependencies..."
+            composer install --no-interaction --prefer-dist --optimize-autoloader
+          fi
+
+          if [ ! -f .env ]; then
+             if [ -f .env.example ]; then
+               cp .env.example .env
+             else
+               touch .env
+             fi
+             echo "" >> .env
+             echo "DB_CONNECTION=mysql" >> .env
+             echo "DB_HOST=mariadb" >> .env
+             echo "DB_PORT=3306" >> .env
+             echo "DB_DATABASE=\${SERVICE_DATABASE_LARAVEL}" >> .env
+             echo "DB_USERNAME=\${SERVICE_USER_LARAVEL}" >> .env
+             echo "DB_PASSWORD=\${SERVICE_PASSWORD_LARAVEL}" >> .env
+             echo "APP_URL=\${SERVICE_URL_LARAVEL}" >> .env
+          fi
+
+          if [ -f artisan ]; then
+            echo "Running Laravel setup tasks..."
+            php artisan key:generate --force || true
+            php artisan optimize:clear || true
+            php artisan migrate --force || true
+          fi
+
+          mkdir -p /var/www/html/storage/logs
+          mkdir -p /var/www/html/storage/framework/cache
+          mkdir -p /var/www/html/storage/framework/sessions
+          mkdir -p /var/www/html/storage/framework/views
+          mkdir -p /var/www/html/bootstrap/cache
+
+          chown -R www-data:www-data /var/www/html
+          chmod -R 775 /var/www/html/storage
+          chmod -R 775 /var/www/html/bootstrap/cache
+
+          max_wait=300
+          waited=0
+          while [ ! -f /var/www/html/artisan ]; do
+            if [ $waited -ge $max_wait ]; then
+              echo "ERROR: Laravel not found after ${max_wait}s (maybe the repo doesn't have an artisan file?)"
+              exit 1
+            fi
+            sleep 2
+            waited=$((waited + 2))
+          done
+          echo "Laravel is ready!"
+
+          if [ ! -f /usr/local/bin/shutdown.sh ]; then
+            cat > /usr/local/bin/shutdown.sh << 'EOF'
+          #!/bin/sh
+          if [ -f /tmp/supervisord.pid ]; then
+            kill -TERM $(cat /tmp/supervisord.pid) 2>/dev/null || true
+          fi
+          EOF
+            chmod +x /usr/local/bin/shutdown.sh
+          fi
+
+          echo "Starting supervisor..."
+          exec /usr/bin/supervisord -c /etc/supervisord.conf
+    environment:
+      - SERVICE_URL_LARAVEL
+      - SERVICE_GITHUB_REPO_URL=${SERVICE_GITHUB_REPO_URL:-https://github.com/coollabsio/coolify.git}
+      - APP_NAME=Laravel
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=$SERVICE_URL_LARAVEL
+      - LOG_CHANNEL=stack
+      - LOG_LEVEL=debug
+      - DB_CONNECTION=mysql
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - DB_DATABASE=$SERVICE_DATABASE_LARAVEL
+      - DB_USERNAME=$SERVICE_USER_LARAVEL
+      - DB_PASSWORD=$SERVICE_PASSWORD_LARAVEL
+      - QUEUE_CONNECTION=database
+      - CACHE_DRIVER=file
+      - SESSION_DRIVER=file
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "php-fpm -t >/dev/null 2>&1 && test -f /var/www/html/artisan && php /var/www/html/artisan --version >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - laravel-files:/var/www/html:ro
+      - type: bind
+        source: ./nginx.conf
+        target: /etc/nginx/conf.d/default.conf
+        content: |
+          server {
+              listen 80;
+              server_name _;
+              root /var/www/html/public;
+              index index.php index.html;
+
+              client_max_body_size 100M;
+
+              access_log /dev/stdout;
+              error_log /dev/stderr;
+
+              location = / {
+                if (!-f $document_root/index.php) {
+                  return 503 "Deployment from GitHub is in progress... wait 1 min and refresh!";
+                }
+                try_files $uri $uri/ /index.php?$query_string;
+              }
+
+              location / {
+                  try_files $uri $uri/ /index.php?$query_string;
+              }
+
+              location ~ \.php$ {
+                  fastcgi_pass laravel:9000;
+                  fastcgi_index index.php;
+                  fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                  include fastcgi_params;
+                  fastcgi_read_timeout 300;
+              }
+
+              location ~ /\.(?!well-known).* {
+                  deny all;
+              }
+          }
+    depends_on:
+      laravel:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t && pgrep nginx >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=$SERVICE_DATABASE_LARAVEL
+      - MYSQL_USER=$SERVICE_USER_LARAVEL
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_LARAVEL
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    environment:
+      - PMA_HOST=mariadb
+      - PMA_USER=root
+      - PMA_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - UPLOAD_LIMIT=300M
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+volumes:
+  laravel-files:
+  mariadb-data:
