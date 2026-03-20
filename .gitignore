@@ -15,13 +15,22 @@ node_modules
 
 *.log
 
-.ai
+AGENTS.md
+/.agents
+/.ai
 CLAUDE.md
+/.claude
+/.codex
 /.cursor
 /.fleet
+GEMINI.md
 /.idea
+jean.json
 /.junie
+.mcp.json
 /.nova
+.opencode
+opencode.json
 /.vscode
 /.windsurfrules
 /.zed
