@@ -153,12 +153,19 @@ class UpdateSubscriptionQuantity
                 \Log::warning("Subscription {$subscription->stripe_subscription_id} quantity updated but invoice not paid (status: {$latestInvoice->status}) for team {$team->name}. Reverting to {$previousQuantity}.");
 
                 // Revert subscription quantity on Stripe
-                $this->stripe->subscriptions->update($subscription->stripe_subscription_id, [
-                    'items' => [
-                        ['id' => $item->id, 'quantity' => $previousQuantity],
-                    ],
-                    'proration_behavior' => 'none',
-                ]);
+                try {
+                    $this->stripe->subscriptions->update($subscription->stripe_subscription_id, [
+                        'items' => [
+                            ['id' => $item->id, 'quantity' => $previousQuantity],
+                        ],
+                        'proration_behavior' => 'none',
+                    ]);
+                } catch (\Exception $revertException) {
+                    \Log::critical("Failed to revert Stripe quantity for subscription {$subscription->stripe_subscription_id}, team {$team->id}. Stripe may have quantity {$quantity} but local is {$previousQuantity}. Error: ".$revertException->getMessage());
+                    send_internal_notification(
+                        "CRITICAL: Stripe quantity revert failed for subscription {$subscription->stripe_subscription_id}, team {$team->id}. Manual reconciliation required."
+                    );
+                }
 
                 // Void the unpaid invoice
                 if ($latestInvoice->id) {

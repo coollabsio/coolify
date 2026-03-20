@@ -194,6 +194,55 @@ it('falls back to isDue when no dedup key is provided', function () {
     expect($result2)->toBeFalse();
 });
 
+it('catches delayed docker cleanup when job runs past the cron minute', function () {
+    // Simulate a previous dispatch at :10
+    Cache::put('docker-cleanup:42', Carbon::create(2026, 2, 28, 10, 10, 0, 'UTC')->toIso8601String(), 86400);
+
+    // Freeze time at :22 — job was delayed 2 minutes past the :20 cron window
+    Carbon::setTestNow(Carbon::create(2026, 2, 28, 10, 22, 0, 'UTC'));
+
+    $job = new ScheduledJobManager;
+    $reflection = new ReflectionClass($job);
+
+    $executionTimeProp = $reflection->getProperty('executionTime');
+    $executionTimeProp->setAccessible(true);
+    $executionTimeProp->setValue($job, Carbon::now());
+
+    $method = $reflection->getMethod('shouldRunNow');
+    $method->setAccessible(true);
+
+    // isDue() would return false at :22, but getPreviousRunDate() = :20
+    // lastDispatched = :10 → :20 > :10 → fires
+    $result = $method->invoke($job, '*/10 * * * *', 'UTC', 'docker-cleanup:42');
+
+    expect($result)->toBeTrue();
+});
+
+it('does not double-dispatch docker cleanup within same cron window', function () {
+    // First dispatch at :10
+    Carbon::setTestNow(Carbon::create(2026, 2, 28, 10, 10, 0, 'UTC'));
+
+    $job = new ScheduledJobManager;
+    $reflection = new ReflectionClass($job);
+
+    $executionTimeProp = $reflection->getProperty('executionTime');
+    $executionTimeProp->setAccessible(true);
+    $executionTimeProp->setValue($job, Carbon::now());
+
+    $method = $reflection->getMethod('shouldRunNow');
+    $method->setAccessible(true);
+
+    $first = $method->invoke($job, '*/10 * * * *', 'UTC', 'docker-cleanup:99');
+    expect($first)->toBeTrue();
+
+    // Second run at :11 — should NOT dispatch (previousDue=:10, lastDispatched=:10)
+    Carbon::setTestNow(Carbon::create(2026, 2, 28, 10, 11, 0, 'UTC'));
+    $executionTimeProp->setValue($job, Carbon::now());
+
+    $second = $method->invoke($job, '*/10 * * * *', 'UTC', 'docker-cleanup:99');
+    expect($second)->toBeFalse();
+});
+
 it('respects server timezone for cron evaluation', function () {
     // UTC time is 22:00 Feb 28, which is 06:00 Mar 1 in Asia/Singapore (+8)
     Carbon::setTestNow(Carbon::create(2026, 2, 28, 22, 0, 0, 'UTC'));

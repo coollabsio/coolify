@@ -10,6 +10,10 @@ class LocalPersistentVolume extends Model
 {
     protected $guarded = [];
 
+    protected $casts = [
+        'is_preview_suffix_enabled' => 'boolean',
+    ];
+
     public function resource()
     {
         return $this->morphTo('resource');

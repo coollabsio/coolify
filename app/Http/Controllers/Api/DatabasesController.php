@@ -11,6 +11,7 @@ use App\Enums\NewDatabaseTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DeleteResourceJob;
+use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
@@ -2749,5 +2750,552 @@ class DatabasesController extends Controller
             ],
             200
         );
+    }
+
+    private function removeSensitiveEnvData($env)
+    {
+        $env->makeHidden([
+            'id',
+            'resourceable',
+            'resourceable_id',
+            'resourceable_type',
+        ]);
+        if (request()->attributes->get('can_read_sensitive', false) === false) {
+            $env->makeHidden([
+                'value',
+                'real_value',
+            ]);
+        }
+
+        return serializeApiResponse($env);
+    }
+
+    #[OA\Get(
+        summary: 'List Envs',
+        description: 'List all envs by database UUID.',
+        path: '/databases/{uuid}/envs',
+        operationId: 'list-envs-by-database-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Environment variables.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/EnvironmentVariable')
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function envs(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('view', $database);
+
+        $envs = $database->environment_variables->map(function ($env) {
+            return $this->removeSensitiveEnvData($env);
+        });
+
+        return response()->json($envs);
+    }
+
+    #[OA\Patch(
+        summary: 'Update Env',
+        description: 'Update env by database UUID.',
+        path: '/databases/{uuid}/envs',
+        operationId: 'update-env-by-database-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Env updated.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['key', 'value'],
+                        properties: [
+                            'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
+                            'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
+                            'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
+                            'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
+                            'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                        ],
+                    ),
+                ),
+            ],
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Environment variable updated.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            ref: '#/components/schemas/EnvironmentVariable'
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function update_env_by_uuid(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->route('uuid'), $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('manageEnvironment', $database);
+
+        $validator = customApiValidator($request->all(), [
+            'key' => 'string|required',
+            'value' => 'string|nullable',
+            'is_literal' => 'boolean',
+            'is_multiline' => 'boolean',
+            'is_shown_once' => 'boolean',
+            'comment' => 'string|nullable|max:256',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $key = str($request->key)->trim()->replace(' ', '_')->value;
+        $env = $database->environment_variables()->where('key', $key)->first();
+        if (! $env) {
+            return response()->json(['message' => 'Environment variable not found.'], 404);
+        }
+
+        $env->value = $request->value;
+        if ($request->has('is_literal')) {
+            $env->is_literal = $request->is_literal;
+        }
+        if ($request->has('is_multiline')) {
+            $env->is_multiline = $request->is_multiline;
+        }
+        if ($request->has('is_shown_once')) {
+            $env->is_shown_once = $request->is_shown_once;
+        }
+        if ($request->has('comment')) {
+            $env->comment = $request->comment;
+        }
+        $env->save();
+
+        return response()->json($this->removeSensitiveEnvData($env))->setStatusCode(201);
+    }
+
+    #[OA\Patch(
+        summary: 'Update Envs (Bulk)',
+        description: 'Update multiple envs by database UUID.',
+        path: '/databases/{uuid}/envs/bulk',
+        operationId: 'update-envs-by-database-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Bulk envs updated.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['data'],
+                        properties: [
+                            'data' => [
+                                'type' => 'array',
+                                'items' => new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
+                                        'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
+                                        'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
+                                        'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
+                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                                    ],
+                                ),
+                            ],
+                        ],
+                    ),
+                ),
+            ],
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Environment variables updated.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/EnvironmentVariable')
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function create_bulk_envs(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->route('uuid'), $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('manageEnvironment', $database);
+
+        $bulk_data = $request->get('data');
+        if (! $bulk_data) {
+            return response()->json(['message' => 'Bulk data is required.'], 400);
+        }
+
+        $updatedEnvs = collect();
+        foreach ($bulk_data as $item) {
+            $validator = customApiValidator($item, [
+                'key' => 'string|required',
+                'value' => 'string|nullable',
+                'is_literal' => 'boolean',
+                'is_multiline' => 'boolean',
+                'is_shown_once' => 'boolean',
+                'comment' => 'string|nullable|max:256',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+            $key = str($item['key'])->trim()->replace(' ', '_')->value;
+            $env = $database->environment_variables()->updateOrCreate(
+                ['key' => $key],
+                $item
+            );
+
+            $updatedEnvs->push($this->removeSensitiveEnvData($env));
+        }
+
+        return response()->json($updatedEnvs)->setStatusCode(201);
+    }
+
+    #[OA\Post(
+        summary: 'Create Env',
+        description: 'Create env by database UUID.',
+        path: '/databases/{uuid}/envs',
+        operationId: 'create-env-by-database-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            description: 'Env created.',
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
+                        'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
+                        'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
+                        'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
+                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                    ],
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Environment variable created.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'uuid' => ['type' => 'string', 'example' => 'nc0k04gk8g0cgsk440g0koko'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function create_env(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->route('uuid'), $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('manageEnvironment', $database);
+
+        $validator = customApiValidator($request->all(), [
+            'key' => 'string|required',
+            'value' => 'string|nullable',
+            'is_literal' => 'boolean',
+            'is_multiline' => 'boolean',
+            'is_shown_once' => 'boolean',
+            'comment' => 'string|nullable|max:256',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $key = str($request->key)->trim()->replace(' ', '_')->value;
+        $existingEnv = $database->environment_variables()->where('key', $key)->first();
+        if ($existingEnv) {
+            return response()->json([
+                'message' => 'Environment variable already exists. Use PATCH request to update it.',
+            ], 409);
+        }
+
+        $env = $database->environment_variables()->create([
+            'key' => $key,
+            'value' => $request->value,
+            'is_literal' => $request->is_literal ?? false,
+            'is_multiline' => $request->is_multiline ?? false,
+            'is_shown_once' => $request->is_shown_once ?? false,
+            'comment' => $request->comment ?? null,
+        ]);
+
+        return response()->json($this->removeSensitiveEnvData($env))->setStatusCode(201);
+    }
+
+    #[OA\Delete(
+        summary: 'Delete Env',
+        description: 'Delete env by UUID.',
+        path: '/databases/{uuid}/envs/{env_uuid}',
+        operationId: 'delete-env-by-database-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+            new OA\Parameter(
+                name: 'env_uuid',
+                in: 'path',
+                description: 'UUID of the environment variable.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Environment variable deleted.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Environment variable deleted.'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function delete_env_by_uuid(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->route('uuid'), $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('manageEnvironment', $database);
+
+        $env = EnvironmentVariable::where('uuid', $request->route('env_uuid'))
+            ->where('resourceable_type', get_class($database))
+            ->where('resourceable_id', $database->id)
+            ->first();
+
+        if (! $env) {
+            return response()->json(['message' => 'Environment variable not found.'], 404);
+        }
+
+        $env->forceDelete();
+
+        return response()->json(['message' => 'Environment variable deleted.']);
     }
 }

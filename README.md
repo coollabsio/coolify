@@ -59,6 +59,7 @@ Thank you so much!
 
 * [MVPS](https://www.mvps.net?ref=coolify.io) - Cheap VPS servers at the highest possible quality
 * [SerpAPI](https://serpapi.com?ref=coolify.io) - Google Search API — Scrape Google and other search engines from our fast, easy, and complete API
+* [ScreenshotOne](https://screenshotone.com?ref=coolify.io) - Screenshot API for devs
 *
 
 ### Big Sponsors
@@ -77,6 +78,7 @@ Thank you so much!
 * [Convex](https://convex.link/coolify.io) - Open-source reactive database for web app developers
 * [CubePath](https://cubepath.com/?ref=coolify.io) - Dedicated Servers & Instant Deploy
 * [Darweb](https://darweb.nl/?ref=coolify.io) - 3D CPQ solutions for ecommerce design
+* [Dataforest Cloud](https://cloud.dataforest.net/en?ref=coolify.io) - Deploy cloud servers as seeds independently in seconds. Enterprise hardware, premium network, 100% made in Germany.
 * [Formbricks](https://formbricks.com?ref=coolify.io) - The open source feedback platform
 * [GoldenVM](https://billing.goldenvm.com?ref=coolify.io) - Premium virtual machine hosting solutions
 * [Greptile](https://www.greptile.com?ref=coolify.io) - The AI Code Reviewer

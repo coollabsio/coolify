@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Stripe\UpdateSubscriptionQuantity;
 use App\Models\Subscription;
 use App\Models\Team;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -238,6 +239,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                             'stripe_invoice_paid' => false,
                         ]);
                     }
+                    break;
                 case 'customer.subscription.updated':
                     $teamId = data_get($data, 'metadata.team_id');
                     $userId = data_get($data, 'metadata.user_id');
@@ -272,14 +274,14 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                     $comment = data_get($data, 'cancellation_details.comment');
                     $lookup_key = data_get($data, 'items.data.0.price.lookup_key');
                     if (str($lookup_key)->contains('dynamic')) {
-                        $quantity = data_get($data, 'items.data.0.quantity', 2);
+                        $quantity = min((int) data_get($data, 'items.data.0.quantity', 2), UpdateSubscriptionQuantity::MAX_SERVER_LIMIT);
                         $team = data_get($subscription, 'team');
                         if ($team) {
                             $team->update([
                                 'custom_server_limit' => $quantity,
                             ]);
+                            ServerLimitCheckJob::dispatch($team);
                         }
-                        ServerLimitCheckJob::dispatch($team);
                     }
                     $subscription->update([
                         'stripe_feedback' => $feedback,

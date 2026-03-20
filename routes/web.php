@@ -140,6 +140,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('storages')->group(function () {
         Route::get('/', StorageIndex::class)->name('storage.index');
         Route::get('/{storage_uuid}', StorageShow::class)->name('storage.show');
+        Route::get('/{storage_uuid}/resources', StorageShow::class)->name('storage.resources');
     });
     Route::prefix('shared-variables')->group(function () {
         Route::get('/', SharedVariablesIndex::class)->name('shared-variables.index');

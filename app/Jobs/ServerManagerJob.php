@@ -14,6 +14,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
@@ -80,7 +81,7 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
     private function dispatchConnectionChecks(Collection $servers): void
     {
 
-        if ($this->shouldRunNow($this->checkFrequency)) {
+        if ($this->shouldRunNow($this->checkFrequency, dedupKey: 'server-connection-checks')) {
             $servers->each(function (Server $server) {
                 try {
                     // Skip SSH connection check if Sentinel is healthy — its heartbeat already proves connectivity
@@ -129,13 +130,13 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
 
         if ($sentinelOutOfSync) {
             // Dispatch ServerCheckJob if Sentinel is out of sync
-            if ($this->shouldRunNow($this->checkFrequency, $serverTimezone)) {
+            if ($this->shouldRunNow($this->checkFrequency, $serverTimezone, "server-check:{$server->id}")) {
                 ServerCheckJob::dispatch($server);
             }
         }
 
         $isSentinelEnabled = $server->isSentinelEnabled();
-        $shouldRestartSentinel = $isSentinelEnabled && $this->shouldRunNow('0 0 * * *', $serverTimezone);
+        $shouldRestartSentinel = $isSentinelEnabled && $this->shouldRunNow('0 0 * * *', $serverTimezone, "sentinel-restart:{$server->id}");
         // Dispatch Sentinel restart if due (daily for Sentinel-enabled servers)
 
         if ($shouldRestartSentinel) {
@@ -149,7 +150,7 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             if (isset(VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency])) {
                 $serverDiskUsageCheckFrequency = VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency];
             }
-            $shouldRunStorageCheck = $this->shouldRunNow($serverDiskUsageCheckFrequency, $serverTimezone);
+            $shouldRunStorageCheck = $this->shouldRunNow($serverDiskUsageCheckFrequency, $serverTimezone, "server-storage-check:{$server->id}");
 
             if ($shouldRunStorageCheck) {
                 ServerStorageCheckJob::dispatch($server);
@@ -157,7 +158,7 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         // Dispatch ServerPatchCheckJob if due (weekly)
-        $shouldRunPatchCheck = $this->shouldRunNow('0 0 * * 0', $serverTimezone);
+        $shouldRunPatchCheck = $this->shouldRunNow('0 0 * * 0', $serverTimezone, "server-patch-check:{$server->id}");
 
         if ($shouldRunPatchCheck) { // Weekly on Sunday at midnight
             ServerPatchCheckJob::dispatch($server);
@@ -167,7 +168,14 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         // Crash recovery is handled by sentinelOutOfSync → ServerCheckJob → CheckAndStartSentinelJob.
     }
 
-    private function shouldRunNow(string $frequency, ?string $timezone = null): bool
+    /**
+     * Determine if a cron schedule should run now.
+     *
+     * When a dedupKey is provided, uses getPreviousRunDate() + last-dispatch tracking
+     * instead of isDue(). This is resilient to queue delays — even if the job is delayed
+     * by minutes, it still catches the missed cron window.
+     */
+    private function shouldRunNow(string $frequency, ?string $timezone = null, ?string $dedupKey = null): bool
     {
         $cron = new CronExpression($frequency);
 
@@ -175,6 +183,29 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         $baseTime = $this->executionTime ?? Carbon::now();
         $executionTime = $baseTime->copy()->setTimezone($timezone ?? config('app.timezone'));
 
-        return $cron->isDue($executionTime);
+        if ($dedupKey === null) {
+            return $cron->isDue($executionTime);
+        }
+
+        $previousDue = Carbon::instance($cron->getPreviousRunDate($executionTime, allowCurrentDate: true));
+
+        $lastDispatched = Cache::get($dedupKey);
+
+        if ($lastDispatched === null) {
+            $isDue = $cron->isDue($executionTime);
+            if ($isDue) {
+                Cache::put($dedupKey, $executionTime->toIso8601String(), 86400);
+            }
+
+            return $isDue;
+        }
+
+        if ($previousDue->gt(Carbon::parse($lastDispatched))) {
+            Cache::put($dedupKey, $executionTime->toIso8601String(), 86400);
+
+            return true;
+        }
+
+        return false;
     }
 }

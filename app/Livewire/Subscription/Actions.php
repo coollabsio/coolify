@@ -7,6 +7,7 @@ use App\Actions\Stripe\RefundSubscription;
 use App\Actions\Stripe\ResumeSubscription;
 use App\Actions\Stripe\UpdateSubscriptionQuantity;
 use App\Models\Team;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 use Stripe\StripeClient;
@@ -31,10 +32,15 @@ class Actions extends Component
 
     public bool $refundAlreadyUsed = false;
 
+    public string $billingInterval = 'monthly';
+
+    public ?string $nextBillingDate = null;
+
     public function mount(): void
     {
         $this->server_limits = Team::serverLimit();
         $this->quantity = (int) $this->server_limits;
+        $this->billingInterval = currentTeam()->subscription?->billingInterval() ?? 'monthly';
     }
 
     public function loadPricePreview(int $quantity): void
@@ -198,6 +204,10 @@ class Actions extends Component
             $result = (new RefundSubscription)->checkEligibility(currentTeam());
             $this->isRefundEligible = $result['eligible'];
             $this->refundDaysRemaining = $result['days_remaining'];
+
+            if ($result['current_period_end']) {
+                $this->nextBillingDate = Carbon::createFromTimestamp($result['current_period_end'])->format('M j, Y');
+            }
         } catch (\Exception $e) {
             \Log::warning('Refund eligibility check failed: '.$e->getMessage());
         }
