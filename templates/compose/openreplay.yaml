@@ -1,0 +1,59 @@
+# documentation: https://docs.openreplay.com/en/deployment/deploy-docker/
+# slogan: Session replay and analytics tool for developers. Self-hosted alternative to LogRocket.
+# category: analytics
+# tags: analytics, session-replay, monitoring, self-hosted
+# logo: svgs/openreplay.svg
+
+services:
+  openreplay-db:
+    image: 'postgres:16-alpine'
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_OPENREPLAY}
+      - POSTGRES_DB=openreplay
+    volumes:
+      - openreplay-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  openreplay-redis:
+    image: 'redis:7-alpine'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  openreplay:
+    image: 'ghcr.io/openreplay/openreplay:latest'
+    environment:
+      - SERVICE_URL_OPENREPLAY
+      - POSTGRES_HOST=openreplay-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_OPENREPLAY}
+      - POSTGRES_DB=openreplay
+      - REDIS_HOST=openreplay-redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${SERVICE_PASSWORD_OPENREPLAY_JWT}
+      - LICENSE_KEY=${OPENREPLAY_LICENSE_KEY:-}
+      - S3_BUCKET=${OPENREPLAY_S3_BUCKET:-mobs}
+      - S3_HOST=${OPENREPLAY_S3_HOST:-}
+      - AWS_ACCESS_KEY_ID=${OPENREPLAY_AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${OPENREPLAY_AWS_SECRET_ACCESS_KEY:-}
+    volumes:
+      - openreplay-data:/srv
+    depends_on:
+      openreplay-db:
+        condition: service_healthy
+      openreplay-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --timeout=5 http://localhost/healthz -O /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

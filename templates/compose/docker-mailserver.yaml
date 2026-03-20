@@ -1,0 +1,39 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Fullstack but simple email server. Production-ready, battle-tested mail server solution.
+# category: email
+# tags: email, mail, smtp, imap, self-hosted
+# logo: svgs/docker-mailserver.svg
+# port: 25
+
+services:
+  mailserver:
+    image: 'docker.io/mailserver/docker-mailserver:latest'
+    hostname: ${SERVICE_FQDN_MAILSERVER}
+    environment:
+      - SSL_TYPE=letsencrypt
+      - ENABLE_SPAMASSASSIN=1
+      - ENABLE_CLAMAV=0
+      - ENABLE_FAIL2BAN=1
+      - ENABLE_POSTGREY=1
+      - ONE_DIR=1
+      - PERMIT_DOCKER=none
+      - POSTMASTER_ADDRESS=${MAILSERVER_POSTMASTER:-postmaster@example.com}
+      - OVERRIDE_HOSTNAME=${SERVICE_FQDN_MAILSERVER}
+    volumes:
+      - mailserver-data:/var/mail
+      - mailserver-state:/var/mail-state
+      - mailserver-logs:/var/log/mail
+      - mailserver-config:/tmp/docker-mailserver
+    ports:
+      - '25:25'
+      - '143:143'
+      - '587:587'
+      - '993:993'
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD-SHELL", "ss -ltn | grep -q ':25 ' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

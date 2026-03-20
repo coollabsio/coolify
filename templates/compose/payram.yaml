@@ -1,0 +1,39 @@
+# documentation: https://payram.com
+# slogan: Self-hosted cryptocurrency payment gateway. Accept crypto payments directly with no middleman.
+# category: payments
+# tags: crypto, payments, bitcoin, ethereum, self-hosted, gateway
+# logo: svgs/payram.svg
+# port: 3000
+
+services:
+  payram-db:
+    image: 'postgres:16-alpine'
+    environment:
+      - POSTGRES_USER=payram
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_PAYRAM_DB}
+      - POSTGRES_DB=payram
+    volumes:
+      - payram-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payram"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  payram:
+    image: 'payramapp/payram:latest'
+    environment:
+      - SERVICE_URL_PAYRAM
+      - DATABASE_URL=postgresql://payram:${SERVICE_PASSWORD_PAYRAM_DB}@payram-db:5432/payram
+      - JWT_SECRET=${SERVICE_PASSWORD_PAYRAM_JWT}
+      - PAYRAM_ENCRYPTION_KEY=${SERVICE_PASSWORD_PAYRAM_ENCRYPTION}
+      - NODE_ENV=production
+    depends_on:
+      payram-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --timeout=5 http://localhost:3000/health -O /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

@@ -1,0 +1,47 @@
+# documentation: https://docs.openlitespeed.org/
+# slogan: WordPress with OpenLiteSpeed - high performance web server with built-in caching.
+# category: cms
+# tags: wordpress, openlitespeed, cms, blog, php
+# logo: svgs/wordpress.svg
+# port: 8080
+
+services:
+  wordpress-db:
+    image: 'mariadb:11'
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_WORDPRESS_ROOT}
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=wordpress
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_WORDPRESS_DB}
+    volumes:
+      - wordpress-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p${SERVICE_PASSWORD_WORDPRESS_ROOT} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  wordpress:
+    image: 'litespeedtech/openlitespeed:latest'
+    environment:
+      - SERVICE_URL_WORDPRESS_8080
+      - MYSQL_HOST=wordpress-db
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=wordpress
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_WORDPRESS_DB}
+      - DOMAIN=${SERVICE_FQDN_WORDPRESS}
+      - ADMIN_EMAIL=${WORDPRESS_ADMIN_EMAIL:-admin@example.com}
+      - ADMIN_USER=${WORDPRESS_ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${SERVICE_PASSWORD_WORDPRESS_ADMIN}
+    volumes:
+      - wordpress-data:/var/www/html
+    depends_on:
+      wordpress-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
