@@ -38,6 +38,7 @@
 		"driftingly/rector-laravel": "^2.2.0",
 		"fakerphp/faker": "^1.24.1",
 		"larastan/larastan": "^3.9.3",
+		"laravel/boost": "^2.4.1",
 		"laravel/pail": "^1.2.6",
 		"laravel/pint": "^1.29.0",
 		"mockery/mockery": "^1.6.12",
