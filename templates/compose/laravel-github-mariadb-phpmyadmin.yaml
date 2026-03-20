@@ -100,9 +100,9 @@ services:
           cd /var/www/html
 
           if [ ! -d .git ]; then
-            echo "Cloning repository \${SERVICE_GITHUB_REPO_URL}..."
+            echo "Cloning repository ${SERVICE_GITHUB_REPO_URL}..."
             rm -rf * .[!.]* 2>/dev/null || true
-            git clone \${SERVICE_GITHUB_REPO_URL} .
+            git clone ${SERVICE_GITHUB_REPO_URL} .
           else
             echo "Repository already exists..."
           fi
@@ -122,10 +122,10 @@ services:
              echo "DB_CONNECTION=mysql" >> .env
              echo "DB_HOST=mariadb" >> .env
              echo "DB_PORT=3306" >> .env
-             echo "DB_DATABASE=\${SERVICE_DATABASE_LARAVEL}" >> .env
-             echo "DB_USERNAME=\${SERVICE_USER_LARAVEL}" >> .env
-             echo "DB_PASSWORD=\${SERVICE_PASSWORD_LARAVEL}" >> .env
-             echo "APP_URL=\${SERVICE_URL_LARAVEL}" >> .env
+             echo "DB_DATABASE=${SERVICE_DATABASE_LARAVEL}" >> .env
+             echo "DB_USERNAME=${SERVICE_USER_LARAVEL}" >> .env
+             echo "DB_PASSWORD=${SERVICE_PASSWORD_LARAVEL}" >> .env
+             echo "APP_URL=${SERVICE_URL_LARAVEL}" >> .env
           fi
 
           if [ -f artisan ]; then
