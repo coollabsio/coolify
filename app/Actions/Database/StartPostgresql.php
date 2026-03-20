@@ -225,13 +225,36 @@ class StartPostgresql
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker stop -t 10 $container_name 2>/dev/null || true";
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
-        $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         if ($this->database->enable_ssl) {
-            $this->commands[] = executeInDocker($this->database->uuid, "chown {$this->database->postgres_user}:{$this->database->postgres_user} /var/lib/postgresql/certs/server.key /var/lib/postgresql/certs/server.crt");
+            $this->prepareSslCertificatePermissions();
         }
+        $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+    }
+
+    /**
+     * Prepend host-level ownership and permission commands for the SSL certificate files.
+     *
+     * The SSL directory is bind-mounted into the container, and the files on the host are
+     * initially owned by root. The postgres process inside official PostgreSQL Docker images
+     * runs as the `postgres` OS user (UID/GID 999). PostgreSQL requires the private key to
+     * be readable only by its owner, so ownership must be corrected on the host BEFORE the
+     * container starts — otherwise PostgreSQL fails immediately with "Permission denied" and
+     * enters a restart loop before any in-container fix can run.
+     *
+     * UID/GID 999 is the `postgres` user in all official PostgreSQL Docker images.
+     */
+    private function prepareSslCertificatePermissions(): void
+    {
+        $sslDir = $this->configuration_dir.'/ssl';
+        $keyPath = escapeshellarg($sslDir.'/server.key');
+        $crtPath = escapeshellarg($sslDir.'/server.crt');
+
+        $this->commands[] = "chown 999:999 {$keyPath} {$crtPath}";
+        $this->commands[] = "chmod 600 {$keyPath}";
+        $this->commands[] = "chmod 644 {$crtPath}";
     }
 
     private function generate_local_persistent_volumes()

@@ -180,7 +180,6 @@ class LocalFileVolume extends BaseModel
             } else {
                 $commands->push("touch {$escapedPath}");
             }
-            $commands->push("chmod +x {$escapedPath}");
             if ($chown) {
                 $commands->push("chown $chown {$escapedPath}");
             }
