@@ -77,12 +77,12 @@ services:
             apk add --no-cache supervisor curl git unzip
           fi
 
-          if php -m | grep -q "pdo_mysql" && php -m | grep -q "mbstring"; then
+          if php -m | grep -q "pdo_mysql" && php -m | grep -q "zip"; then
             echo "PHP extensions already installed..."
           else
             echo "Installing PHP extensions..."
-            apk add --no-cache oniguruma-dev libzip-dev postgresql-dev mysql-client mariadb-client freetype-dev libjpeg-turbo-dev libpng-dev icu-dev libxml2-dev
-            docker-php-ext-install -j$(nproc) pdo_mysql pdo_pgsql mbstring zip exif pcntl bcmath gd intl opcache 2>&1 | grep -vE "(mkdir: can't create directory|File exists)" || true
+            apk add --no-cache libzip-dev mysql-client mariadb-client
+            docker-php-ext-install pdo_mysql zip bcmath || true
           fi
 
           if ! grep -q "listen = 0.0.0.0:9000" /usr/local/etc/php-fpm.d/www.conf 2>/dev/null; then
