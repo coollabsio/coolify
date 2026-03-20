@@ -49,7 +49,7 @@ services:
       retries: 10
       timeout: 2s
   redis:
-    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD} --maxmemory ${REDIS_MAXMEMORY:-2gb} --maxmemory-policy allkeys-lru
     environment:
       REDIS_PASSWORD: "${REDIS_PASSWORD}"
     volumes:
