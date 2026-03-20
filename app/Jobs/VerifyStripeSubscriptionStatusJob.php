@@ -82,12 +82,9 @@ class VerifyStripeSubscriptionStatusJob implements ShouldBeEncrypted, ShouldQueu
                         'stripe_past_due' => false,
                     ]);
 
-                    // Trigger subscription ended logic if canceled
-                    if ($stripeSubscription->status === 'canceled') {
-                        $team = $this->subscription->team;
-                        if ($team) {
-                            $team->subscriptionEnded();
-                        }
+                    $team = $this->subscription->team;
+                    if ($team) {
+                        $team->subscriptionEnded();
                     }
                     break;
 

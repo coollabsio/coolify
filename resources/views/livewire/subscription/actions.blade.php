@@ -35,44 +35,44 @@
         }" @success.window="preview = null; showModal = false; qty = $wire.server_limits"
             @keydown.escape.window="if (showModal) { closeAdjust(); }" class="-mt-2">
             <h3 class="pb-2">Plan Overview</h3>
-            <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
-                {{-- Current Plan Card --}}
-                <div class="p-5 rounded border dark:bg-coolgray-100 bg-white border-neutral-200 dark:border-coolgray-400">
-                    <div class="text-xs font-bold text-neutral-500 uppercase tracking-wide pb-1">Current Plan</div>
-                    <div class="text-xl font-bold dark:text-warning">
+            <div class="space-y-2">
+                <div class="text-sm">
+                    <span class="text-neutral-500">Plan:</span>
+                    <span class="dark:text-warning font-medium">
                         @if (data_get(currentTeam(), 'subscription')->type() == 'dynamic')
                             Pay-as-you-go
                         @else
                             {{ data_get(currentTeam(), 'subscription')->type() }}
                         @endif
-                    </div>
-                    <div class="pt-2 text-sm">
+                    </span>
+                    <span class="text-neutral-500">&middot; {{ $billingInterval === 'yearly' ? 'Yearly' : 'Monthly' }}</span>
+                    <span class="text-neutral-500">&middot;</span>
+                    @if (currentTeam()->subscription->stripe_cancel_at_period_end)
+                        <span class="text-red-500 font-medium">Cancelling at end of period</span>
+                    @else
+                        <span class="text-green-500 font-medium">Active</span>
+                    @endif
+                </div>
+                <div class="text-sm flex items-center gap-2 flex-wrap">
+                    <span>
+                        <span class="text-neutral-500">Active servers:</span>
+                        <span class="font-medium {{ currentTeam()->serverOverflow() ? 'text-red-500' : 'dark:text-white' }}">{{ currentTeam()->servers->count() }}</span>
+                        <span class="text-neutral-500">/</span>
+                        <span class="font-medium dark:text-white" x-text="current"></span>
+                        <span class="text-neutral-500">paid</span>
+                    </span>
+                    <x-forms.button isHighlighted @click="openAdjust()">Adjust</x-forms.button>
+                </div>
+                <div class="text-sm text-neutral-500">
+                    @if ($refundCheckLoading)
+                        <x-loading text="Loading..." />
+                    @elseif ($nextBillingDate)
                         @if (currentTeam()->subscription->stripe_cancel_at_period_end)
-                            <span class="text-red-500 font-medium">Cancelling at end of period</span>
+                            Cancels on <span class="dark:text-white font-medium">{{ $nextBillingDate }}</span>
                         @else
-                            <span class="text-green-500 font-medium">Active</span>
-                            <span class="text-neutral-500"> &middot; Invoice
-                                {{ currentTeam()->subscription->stripe_invoice_paid ? 'paid' : 'not paid' }}</span>
+                            Next billing <span class="dark:text-white font-medium">{{ $nextBillingDate }}</span>
                         @endif
-                    </div>
-                </div>
-
-                {{-- Paid Servers Card --}}
-                <div class="p-5 rounded border dark:bg-coolgray-100 bg-white border-neutral-200 dark:border-coolgray-400 cursor-pointer hover:border-warning/50 transition-colors"
-                    @click="openAdjust()">
-                    <div class="text-xs font-bold text-neutral-500 uppercase tracking-wide pb-1">Paid Servers</div>
-                    <div class="text-xl font-bold dark:text-white" x-text="current"></div>
-                    <div class="pt-2 text-sm text-neutral-500">Click to adjust</div>
-                </div>
-
-                {{-- Active Servers Card --}}
-                <div
-                    class="p-5 rounded border dark:bg-coolgray-100 bg-white border-neutral-200 dark:border-coolgray-400 {{ currentTeam()->serverOverflow() ? 'border-red-500 dark:border-red-500' : '' }}">
-                    <div class="text-xs font-bold text-neutral-500 uppercase tracking-wide pb-1">Active Servers</div>
-                    <div class="text-xl font-bold {{ currentTeam()->serverOverflow() ? 'text-red-500' : 'dark:text-white' }}">
-                        {{ currentTeam()->servers->count() }}
-                    </div>
-                    <div class="pt-2 text-sm text-neutral-500">Currently running</div>
+                    @endif
                 </div>
             </div>
 
@@ -99,9 +99,9 @@
                         x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
                         class="relative w-full border rounded-sm min-w-full lg:min-w-[36rem] max-w-[48rem] max-h-[calc(100vh-2rem)] bg-neutral-100 border-neutral-400 dark:bg-base dark:border-coolgray-300 flex flex-col">
                         <div class="flex justify-between items-center py-6 px-7 shrink-0">
-                            <h3 class="pr-8 text-2xl font-bold">Adjust Server Limit</h3>
+                            <h3 class="text-2xl font-bold">Adjust Server Limit</h3>
                             <button @click="closeAdjust()"
-                                class="flex absolute top-2 right-2 justify-center items-center w-8 h-8 rounded-full dark:text-white hover:bg-coolgray-300">
+                                class="flex justify-center items-center w-8 h-8 rounded-full dark:text-white hover:bg-coolgray-300">
                                 <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none"
                                     viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -144,7 +144,12 @@
                                     <p class="text-xs text-neutral-500 pt-1">Charged immediately to your payment method.</p>
                                 </div>
                                 <div>
-                                    <div class="text-xs font-bold text-neutral-500 uppercase tracking-wide pb-1.5">Next billing cycle</div>
+                                    <div class="text-xs font-bold text-neutral-500 uppercase tracking-wide pb-1.5">
+                                        Next billing cycle
+                                        @if ($nextBillingDate)
+                                            <span class="normal-case font-normal">&middot; {{ $nextBillingDate }}</span>
+                                        @endif
+                                    </div>
                                     <div class="space-y-1.5">
                                         <div class="flex justify-between gap-6 text-sm">
                                             <span class="text-neutral-500" x-text="preview?.quantity + ' servers × ' + fmt(preview?.unit_price)"></span>
@@ -155,7 +160,7 @@
                                             <span class="dark:text-white" x-text="fmt(preview?.recurring_tax)"></span>
                                         </div>
                                         <div class="flex justify-between gap-6 text-sm font-bold pt-1.5 border-t dark:border-coolgray-400 border-neutral-200">
-                                            <span class="dark:text-white">Total / month</span>
+                                            <span class="dark:text-white">Total / {{ $billingInterval === 'yearly' ? 'year' : 'month' }}</span>
                                             <span class="dark:text-white" x-text="fmt(preview?.recurring_total)"></span>
                                         </div>
                                     </div>
@@ -175,7 +180,7 @@
                                     warningMessage="This will update your subscription and charge the prorated amount to your payment method."
                                     step2ButtonText="Confirm & Pay">
                                     <x-slot:content>
-                                        <x-forms.button @click="$wire.set('quantity', qty)">
+                                        <x-forms.button class="w-full" @click="$wire.set('quantity', qty)">
                                             Update Server Limit
                                         </x-forms.button>
                                     </x-slot:content>
@@ -194,11 +199,10 @@
             </template>
         </section>
 
-        {{-- Billing, Refund & Cancellation --}}
+        {{-- Manage Subscription --}}
         <section>
             <h3 class="pb-2">Manage Subscription</h3>
             <div class="flex flex-wrap items-center gap-2">
-                {{-- Billing --}}
                 <x-forms.button class="gap-2" wire:click='stripeCustomerPortal'>
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
                         stroke-width="1.5" stroke="currentColor">
@@ -207,8 +211,13 @@
                     </svg>
                     Manage Billing on Stripe
                 </x-forms.button>
+            </div>
+        </section>
 
-                {{-- Resume or Cancel --}}
+        {{-- Cancel Subscription --}}
+        <section>
+            <h3 class="pb-2">Cancel Subscription</h3>
+            <div class="flex flex-wrap items-center gap-2">
                 @if (currentTeam()->subscription->stripe_cancel_at_period_end)
                     <x-forms.button wire:click="resumeSubscription">Resume Subscription</x-forms.button>
                 @else
@@ -231,10 +240,18 @@
                         confirmationLabel="Enter your team name to confirm"
                         shortConfirmationLabel="Team Name" step2ButtonText="Permanently Cancel" />
                 @endif
+            </div>
+            @if (currentTeam()->subscription->stripe_cancel_at_period_end)
+                <p class="mt-2 text-sm text-neutral-500">Your subscription is set to cancel at the end of the billing period.</p>
+            @endif
+        </section>
 
-                {{-- Refund --}}
+        {{-- Refund --}}
+        <section>
+            <h3 class="pb-2">Refund</h3>
+            <div class="flex flex-wrap items-center gap-2">
                 @if ($refundCheckLoading)
-                    <x-loading text="Checking refund..." />
+                    <x-forms.button disabled>Request Full Refund</x-forms.button>
                 @elseif ($isRefundEligible && !currentTeam()->subscription->stripe_cancel_at_period_end)
                     <x-modal-confirmation title="Request Full Refund?" buttonTitle="Request Full Refund"
                         isErrorButton submitAction="refundSubscription"
@@ -245,18 +262,21 @@
                         ]" confirmationText="{{ currentTeam()->name }}"
                         confirmationLabel="Enter your team name to confirm" shortConfirmationLabel="Team Name"
                         step2ButtonText="Confirm Refund & Cancel" />
+                @else
+                    <x-forms.button disabled>Request Full Refund</x-forms.button>
                 @endif
             </div>
-
-            {{-- Contextual notes --}}
-            @if ($isRefundEligible && !currentTeam()->subscription->stripe_cancel_at_period_end)
-                <p class="mt-2 text-sm text-neutral-500">Eligible for a full refund &mdash; <strong class="dark:text-warning">{{ $refundDaysRemaining }}</strong> days remaining.</p>
-            @elseif ($refundAlreadyUsed)
-                <p class="mt-2 text-sm text-neutral-500">Refund already processed. Each team is eligible for one refund only.</p>
-            @endif
-            @if (currentTeam()->subscription->stripe_cancel_at_period_end)
-                <p class="mt-2 text-sm text-neutral-500">Your subscription is set to cancel at the end of the billing period.</p>
-            @endif
+            <p class="mt-2 text-sm text-neutral-500">
+                @if ($refundCheckLoading)
+                    Checking refund eligibility...
+                @elseif ($isRefundEligible && !currentTeam()->subscription->stripe_cancel_at_period_end)
+                    Eligible for a full refund &mdash; <strong class="dark:text-warning">{{ $refundDaysRemaining }}</strong> days remaining.
+                @elseif ($refundAlreadyUsed)
+                    Refund already processed. Each team is eligible for one refund only.
+                @else
+                    Not eligible for a refund.
+                @endif
+            </p>
         </section>
 
         <div class="text-sm text-neutral-500">
