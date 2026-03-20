@@ -1,0 +1,40 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: A fullstack, simple mail server with SMTP, IMAP, DKIM, DMARC, and anti-spam.
+# category: email
+# tags: email,mail,smtp,imap,dkim,dmarc,postfix,dovecot
+# logo: svgs/docker-mailserver.png
+# port: 443
+
+services:
+  mailserver:
+    image: mailserver/docker-mailserver:latest
+    hostname: ${MAIL_HOSTNAME:-mail.example.com}
+    ports:
+      - "25:25"
+      - "143:143"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    environment:
+      - SERVICE_URL_MAILSERVER_443
+      - OVERRIDE_HOSTNAME=${MAIL_HOSTNAME:-mail.example.com}
+      - ENABLE_CLAMAV=${ENABLE_CLAMAV:-0}
+      - ENABLE_FAIL2BAN=${ENABLE_FAIL2BAN:-0}
+      - ENABLE_SPAMASSASSIN=${ENABLE_SPAMASSASSIN:-1}
+      - SPOOF_PROTECTION=${SPOOF_PROTECTION:-1}
+      - SSL_TYPE=${SSL_TYPE:-}
+      - PERMIT_DOCKER=${PERMIT_DOCKER:-none}
+      - ONE_DIR=${ONE_DIR:-1}
+      - POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS:-postmaster@example.com}
+    volumes:
+      - mailserver-mail-data:/var/mail
+      - mailserver-mail-state:/var/mail-state
+      - mailserver-mail-logs:/var/log/mail
+      - mailserver-config:/tmp/docker-mailserver
+    stop_grace_period: 1m
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "ss --listening --tcp | grep -P 'LISTEN.+:smtp' || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
