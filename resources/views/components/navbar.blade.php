@@ -357,7 +357,7 @@
                             Onboarding
                         </a>
                     </li> --}}
-                    <li>
+                    {{-- <li>
                         <a title="Sponsor us" class="menu-item" href="https://coolify.io/sponsorships"
                             target="_blank">
                             <svg class="text-pink-500 menu-item-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -370,7 +370,7 @@
                             </svg>
                             <span class="menu-item-label">Sponsor us</span>
                         </a>
-                    </li>
+                    </li> --}}
                 @endif
                 @if (!isSubscribed() && isCloud() && auth()->user()->teams()->get()->count() > 1)
                     <livewire:navbar-delete-team />
