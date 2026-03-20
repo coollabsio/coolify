@@ -1,0 +1,45 @@
+# documentation: https://docs.payram.com
+# slogan: Payram is a self-hosted, open-source crypto payment gateway.
+# category: payments
+# tags: payram,crypto,payments,blockchain,gateway
+# logo: svgs/payram.png
+# port: 80
+
+services:
+  payram:
+    image: payramapp/payram:latest
+    environment:
+      - SERVICE_URL_PAYRAM_80
+      - SSL_CERT_PATH=
+      - BLOCKCHAIN_NETWORK_TYPE=${BLOCKCHAIN_NETWORK_TYPE:-mainnet}
+      - SERVER=${SERVER:-PRODUCTION}
+      - AES_KEY=${SERVICE_PASSWORD_64_AES}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DATABASE=${POSTGRES_DB:-payram}
+      - POSTGRES_USERNAME=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    volumes:
+      - payram-data:/home/payram
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  postgres:
+    image: postgres:16-alpine
+    volumes:
+      - payram-postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-payram}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
