@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Models\ApplicationDeploymentQueue;
-use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -36,19 +35,7 @@ class ProcessStaleDeploymentsJob implements ShouldQueue
             ->get();
 
         foreach ($staleDeployments as $deployment) {
-            $serverId = $deployment->server_id;
-            $server = Server::find($serverId);
-
-            if (! $server) {
-                continue;
-            }
-
-            $concurrentLimit = $server->settings->concurrent_builds ?? 1;
-            $inProgressCount = ApplicationDeploymentQueue::where('server_id', $serverId)
-                ->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)
-                ->count();
-
-            if ($inProgressCount < $concurrentLimit) {
+            if (next_queuable($deployment->server_id, $deployment->application_id, $deployment->commit, $deployment->pull_request_id)) {
                 $deployment->update([
                     'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
                 ]);
@@ -58,7 +45,7 @@ class ProcessStaleDeploymentsJob implements ShouldQueue
                 );
 
                 \Log::info("ProcessStaleDeployments: Started stale deployment {$deployment->deployment_uuid} (queued for ".
-                    Carbon::parse($deployment->created_at)->diffForHumans().")");
+                    Carbon::parse($deployment->created_at)->diffForHumans().')');
             }
         }
     }

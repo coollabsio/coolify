@@ -43,6 +43,7 @@
                 'border-white border-dashed' =>
                     data_get($deployment, 'status') === 'cancelled-by-user',
                 'border-error' => data_get($deployment, 'status') === 'failed',
+                'border-orange-500' => data_get($deployment, 'status') === 'failed-rolled-back',
                 'border-success' => data_get($deployment, 'status') === 'finished',
             ])>
                 <a href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}" {{ wireNavigate() }} class="block">
@@ -56,6 +57,8 @@
                                     data_get($deployment, 'status') === 'queued',
                                 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200' =>
                                     data_get($deployment, 'status') === 'failed',
+                                'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200' =>
+                                    data_get($deployment, 'status') === 'failed-rolled-back',
                                 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' =>
                                     data_get($deployment, 'status') === 'finished',
                                 'bg-gray-100 text-gray-700 dark:bg-gray-600/30 dark:text-gray-300' =>
@@ -67,6 +70,7 @@
                                         'in_progress' => 'In Progress',
                                         'cancelled-by-user' => 'Cancelled',
                                         'queued' => 'Queued',
+                                        'failed-rolled-back' => 'Rolled Back',
                                         default => ucfirst(data_get($deployment, 'status')),
                                     };
                                 @endphp

@@ -349,10 +349,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             // Auto-retry logic: if retries remain, re-queue instead of failing
+            // Skip retry for rollback — the old version is still serving, retrying won't help
             $retryCount = $this->application_deployment_queue->retry_count ?? 0;
             $maxRetries = $this->application_deployment_queue->max_retries ?? 0;
+            $wasRolledBack = $this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED_WITH_ROLLBACK->value;
 
-            if ($retryCount < $maxRetries) {
+            if (! $wasRolledBack && $retryCount < $maxRetries) {
                 $nextRetry = $retryCount + 1;
                 $backoffSeconds = (int) (30 * pow(2, $retryCount)); // 30s, 60s, 120s...
 
@@ -361,12 +363,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     'stderr'
                 );
 
-                $retryDeployment = $this->application_deployment_queue->replicate();
+                $retryDeployment = new ApplicationDeploymentQueue($this->application_deployment_queue->only([
+                    'application_id', 'application_name', 'server_id', 'server_name',
+                    'destination_id', 'deployment_url', 'pull_request_id', 'commit',
+                    'force_rebuild', 'is_webhook', 'is_api', 'restart_only',
+                    'git_type', 'only_this_server', 'rollback', 'max_retries',
+                ]));
                 $retryDeployment->deployment_uuid = (string) new \Visus\Cuid2\Cuid2;
                 $retryDeployment->status = ApplicationDeploymentStatus::QUEUED->value;
                 $retryDeployment->retry_count = $nextRetry;
-                $retryDeployment->started_at = null;
-                $retryDeployment->finished_at = null;
                 $retryDeployment->save();
 
                 \Log::info("Deployment {$this->deployment_uuid} failed. Scheduled retry {$nextRetry}/{$maxRetries} in {$backoffSeconds}s.");
@@ -1860,12 +1865,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                             // Previous container is still running — it was never stopped
                             $this->application_deployment_queue->addLogEntry('Rollback complete. Previous container is still serving traffic.');
-                            $this->application_deployment_queue->update([
-                                'status' => ApplicationDeploymentStatus::FAILED_WITH_ROLLBACK->value,
-                            ]);
+                            $this->transitionToStatus(ApplicationDeploymentStatus::FAILED_WITH_ROLLBACK);
 
-                            // Don't throw — the rollback succeeded, app is still up
-                            return;
+                            throw new DeploymentException('Health check failed. Rollback to the previous version was successful.');
                         }
 
                         throw new DeploymentException('Health check failed and auto-rollback is disabled: '.$healthException->getMessage(), $healthException->getCode(), $healthException);
@@ -4167,6 +4169,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             return true;
         }
 
+        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED_WITH_ROLLBACK->value) {
+            return true;
+        }
+
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
             $this->application_deployment_queue->addLogEntry('Deployment cancelled by user, stopping execution.');
             throw new DeploymentException('Deployment cancelled by user', 69420);
@@ -4192,7 +4198,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         match ($status) {
             ApplicationDeploymentStatus::FINISHED => $this->handleSuccessfulDeployment(),
-            ApplicationDeploymentStatus::FAILED => $this->handleFailedDeployment(),
+            ApplicationDeploymentStatus::FAILED, ApplicationDeploymentStatus::FAILED_WITH_ROLLBACK => $this->handleFailedDeployment(),
             default => null,
         };
     }

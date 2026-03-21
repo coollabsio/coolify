@@ -34,6 +34,8 @@ use OpenApi\Attributes as OA;
         'destination_id' => ['type' => 'string'],
         'only_this_server' => ['type' => 'boolean'],
         'rollback' => ['type' => 'boolean'],
+        'retry_count' => ['type' => 'integer'],
+        'max_retries' => ['type' => 'integer'],
         'commit_message' => ['type' => 'string'],
     ],
 )]

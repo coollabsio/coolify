@@ -9,13 +9,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('application_deployment_queues', function (Blueprint $table) {
-            $table->integer('retry_count')->default(0)->after('rollback');
-            $table->integer('max_retries')->default(0)->after('retry_count');
+            $table->integer('retry_count')->default(0);
+            $table->integer('max_retries')->default(0);
         });
 
         Schema::table('application_settings', function (Blueprint $table) {
-            $table->integer('max_deployment_retries')->default(2)->after('is_raw_compose_deployment_enabled');
-            $table->boolean('auto_rollback_on_failure')->default(true)->after('max_deployment_retries');
+            $table->integer('max_deployment_retries')->default(2);
+            $table->boolean('auto_rollback_on_failure')->default(true);
         });
     }
 
