@@ -1447,3 +1447,97 @@ it('returns warning for unsupported application domain protocol while preserving
         ->and($payload)->toContain('http://10.8.0.37:9074')
         ->and($payload)->not->toContain('minecraft.example.com');
 });
+
+it('deletes service edge route files from all team traefik servers', function () {
+    $firstEdgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $firstEdgeProxyServer->id = 201;
+    $firstEdgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/edge-201');
+
+    $secondEdgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $secondEdgeProxyServer->id = 202;
+    $secondEdgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/edge-202');
+
+    $manager = new class($firstEdgeProxyServer, $secondEdgeProxyServer) extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        public function __construct(private Server $firstEdgeProxyServer, private Server $secondEdgeProxyServer) {}
+
+        protected function resolveEdgeProxyServersByTeamId(?int $teamId): \Illuminate\Support\Collection
+        {
+            return collect([$this->firstEdgeProxyServer, $this->secondEdgeProxyServer]);
+        }
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'server_id' => $server->id,
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $service = new Service;
+    $service->uuid = 'service-delete-all-edge-servers';
+    $service->setRelation('environment', (object) [
+        'project' => (object) ['team_id' => 42],
+    ]);
+
+    $manager->deleteService($service);
+
+    expect($manager->calls)->toHaveCount(2)
+        ->and($manager->calls[0]['server_id'])->toBe(201)
+        ->and($manager->calls[0]['commands'][0])->toContain('/tmp/edge-201/dynamic/service-remote-service-delete-all-edge-servers.yaml')
+        ->and($manager->calls[1]['server_id'])->toBe(202)
+        ->and($manager->calls[1]['commands'][0])->toContain('/tmp/edge-202/dynamic/service-remote-service-delete-all-edge-servers.yaml');
+});
+
+it('deletes application edge route files from all team traefik servers', function () {
+    $firstEdgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $firstEdgeProxyServer->id = 211;
+    $firstEdgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/edge-211');
+
+    $secondEdgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $secondEdgeProxyServer->id = 212;
+    $secondEdgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/edge-212');
+
+    $manager = new class($firstEdgeProxyServer, $secondEdgeProxyServer) extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        public function __construct(private Server $firstEdgeProxyServer, private Server $secondEdgeProxyServer) {}
+
+        protected function resolveEdgeProxyServersByTeamId(?int $teamId): \Illuminate\Support\Collection
+        {
+            return collect([$this->firstEdgeProxyServer, $this->secondEdgeProxyServer]);
+        }
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'server_id' => $server->id,
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $application = new Application;
+    $application->uuid = 'application-delete-all-edge-servers';
+    $application->setRelation('environment', (object) [
+        'project' => (object) ['team_id' => 52],
+    ]);
+
+    $manager->deleteApplication($application);
+
+    expect($manager->calls)->toHaveCount(2)
+        ->and($manager->calls[0]['server_id'])->toBe(211)
+        ->and($manager->calls[0]['commands'][0])->toContain('/tmp/edge-211/dynamic/application-remote-application-delete-all-edge-servers.yaml')
+        ->and($manager->calls[1]['server_id'])->toBe(212)
+        ->and($manager->calls[1]['commands'][0])->toContain('/tmp/edge-212/dynamic/application-remote-application-delete-all-edge-servers.yaml');
+});

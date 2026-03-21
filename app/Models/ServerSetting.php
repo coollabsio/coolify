@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
@@ -103,19 +104,31 @@ class ServerSetting extends Model
             return;
         }
 
-        $teamId = Server::query()
-            ->whereKey($this->server_id)
-            ->value('team_id');
+        DB::transaction(function () {
+            $teamId = Server::query()
+                ->whereKey($this->server_id)
+                ->lockForUpdate()
+                ->value('team_id');
 
-        if (is_null($teamId)) {
-            return;
-        }
+            if (is_null($teamId)) {
+                return;
+            }
 
-        static::query()
-            ->where('server_id', '!=', $this->server_id)
-            ->where('is_master_domain_router_enabled', true)
-            ->whereHas('server', fn ($query) => $query->where('team_id', $teamId))
-            ->update(['is_master_domain_router_enabled' => false]);
+            static::query()
+                ->whereHas('server', fn ($query) => $query->where('team_id', $teamId))
+                ->lockForUpdate()
+                ->get();
+
+            if (! $this->is_master_domain_router_enabled || is_null($this->server_id)) {
+                return;
+            }
+
+            static::query()
+                ->where('server_id', '!=', $this->server_id)
+                ->where('is_master_domain_router_enabled', true)
+                ->whereHas('server', fn ($query) => $query->where('team_id', $teamId))
+                ->update(['is_master_domain_router_enabled' => false]);
+        });
     }
 
     /**

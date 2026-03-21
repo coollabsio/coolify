@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Traits\ResolvesEdgeProxyServer;
 use Illuminate\Container\Container;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -15,6 +16,8 @@ use Symfony\Component\Yaml\Yaml;
 
 class EdgeProxyRemoteRouteService
 {
+    use ResolvesEdgeProxyServer;
+
     private const string SERVICE_ROUTE_FILE_PREFIX = 'service-remote-';
 
     private const string APPLICATION_ROUTE_FILE_PREFIX = 'application-remote-';
@@ -402,12 +405,8 @@ class EdgeProxyRemoteRouteService
 
     public function deleteService(Service $service): void
     {
-        $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($this->extractServiceTeamId($service));
-        if (! $edgeProxyServer instanceof Server || $edgeProxyServer->proxyType() !== ProxyTypes::TRAEFIK->value) {
-            return;
-        }
-
-        $this->deleteServiceWithServer($service, $edgeProxyServer);
+        $this->resolveEdgeProxyServersByTeamId($this->extractServiceTeamId($service))
+            ->each(fn (Server $edgeProxyServer) => $this->deleteServiceWithServer($service, $edgeProxyServer));
     }
 
     public function deleteServiceWithServer(Service $service, Server $edgeProxyServer): void
@@ -417,12 +416,8 @@ class EdgeProxyRemoteRouteService
 
     public function deleteApplication(Application $application): void
     {
-        $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($this->extractApplicationTeamId($application));
-        if (! $edgeProxyServer instanceof Server || $edgeProxyServer->proxyType() !== ProxyTypes::TRAEFIK->value) {
-            return;
-        }
-
-        $this->deleteApplicationWithServer($application, $edgeProxyServer);
+        $this->resolveEdgeProxyServersByTeamId($this->extractApplicationTeamId($application))
+            ->each(fn (Server $edgeProxyServer) => $this->deleteApplicationWithServer($application, $edgeProxyServer));
     }
 
     public function deleteApplicationWithServer(Application $application, Server $edgeProxyServer): void
@@ -580,19 +575,6 @@ class EdgeProxyRemoteRouteService
         return $rule;
     }
 
-    protected function resolveEdgeProxyServerByTeamId(?int $teamId): ?Server
-    {
-        if (is_null($teamId)) {
-            return null;
-        }
-
-        return Server::query()
-            ->where('team_id', $teamId)
-            ->whereRelation('settings', 'is_master_domain_router_enabled', true)
-            ->orderBy('id')
-            ->first();
-    }
-
     private function missingMasterDomainRouterWarning(string $resourceType, string $resourceUuid, ?int $teamId): ?string
     {
         if (is_null($teamId)) {
@@ -741,27 +723,6 @@ class EdgeProxyRemoteRouteService
                 'domain' => $domain,
             ])
             ->values();
-    }
-
-    private function resolveTunnelHost(Server $deploymentServer): ?string
-    {
-        $candidates = [
-            data_get($deploymentServer, 'proxy.wireguard_ip'),
-            data_get($deploymentServer, 'proxy.wg_ip'),
-            data_get($deploymentServer, 'proxy.tunnel_ip'),
-            data_get($deploymentServer, 'proxy.tunnel_host'),
-            data_get($deploymentServer, 'proxy.tunnel_domain'),
-            data_get($deploymentServer, 'ip'),
-        ];
-
-        foreach ($candidates as $candidate) {
-            $normalizedHost = $this->normalizeRemoteHost((string) $candidate);
-            if (! is_null($normalizedHost)) {
-                return $normalizedHost;
-            }
-        }
-
-        return null;
     }
 
     private function parseServiceCompose(Service $service): array
@@ -1522,41 +1483,4 @@ class EdgeProxyRemoteRouteService
         return str_contains($value, '`') || preg_match('/[\r\n]/', $value) === 1;
     }
 
-    private function normalizeRemoteHost(string $rawHost): ?string
-    {
-        $host = trim($rawHost);
-        if ($host === '') {
-            return null;
-        }
-
-        // Allow values like https://10.8.0.15:8080/path and extract only host.
-        if (Str::startsWith($host, ['http://', 'https://'])) {
-            $parsedHost = parse_url($host, PHP_URL_HOST);
-            $host = is_string($parsedHost) ? $parsedHost : '';
-        } elseif (str_contains($host, '/')) {
-            $parsedHost = parse_url('http://'.$host, PHP_URL_HOST);
-            $host = is_string($parsedHost) ? $parsedHost : '';
-        }
-
-        $host = trim($host, '[]');
-        if ($host === '') {
-            return null;
-        }
-
-        // Drop accidental host:port values so published compose port remains authoritative.
-        if (str_contains($host, ':') && ! filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-            $parsedHost = parse_url('http://'.$host, PHP_URL_HOST);
-            $host = is_string($parsedHost) ? $parsedHost : '';
-        }
-
-        if ($host === '') {
-            return null;
-        }
-
-        if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-            return '['.$host.']';
-        }
-
-        return $host;
-    }
 }

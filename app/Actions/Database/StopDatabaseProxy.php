@@ -13,11 +13,15 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Traits\ResolvesDatabaseTeamId;
+use App\Traits\ResolvesEdgeProxyServer;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StopDatabaseProxy
 {
     use AsAction;
+    use ResolvesDatabaseTeamId;
+    use ResolvesEdgeProxyServer;
 
     public string $jobQueue = 'high';
 
@@ -40,7 +44,7 @@ class StopDatabaseProxy
 
         $database->save();
 
-        $this->dispatchDatabaseProxyStoppedEvent();
+        $this->dispatchDatabaseProxyStoppedEvent($database);
 
     }
 
@@ -49,43 +53,16 @@ class StopDatabaseProxy
         return instant_remote_process($commands, $server, $throwError);
     }
 
-    protected function dispatchDatabaseProxyStoppedEvent(): void
-    {
-        DatabaseProxyStopped::dispatch();
+    protected function dispatchDatabaseProxyStoppedEvent(
+        StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|ServiceDatabase|StandaloneDragonfly|StandaloneClickhouse $database
+    ): void {
+        $teamId = $this->resolveDatabaseTeamId($database);
+
+        DatabaseProxyStopped::dispatch($teamId);
     }
 
     protected function resolveEdgeProxyServerForTeamId(?int $teamId): ?Server
     {
-        if (is_null($teamId)) {
-            return null;
-        }
-
-        return Server::query()
-            ->where('team_id', $teamId)
-            ->whereRelation('settings', 'is_master_domain_router_enabled', true)
-            ->orderBy('id')
-            ->first();
-    }
-
-    private function resolveDatabaseTeamId(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|ServiceDatabase|StandaloneDragonfly|StandaloneClickhouse $database): ?int
-    {
-        if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-            $teamId = data_get($database, 'service.environment.project.team_id');
-            if (! is_null($teamId)) {
-                return (int) $teamId;
-            }
-        }
-
-        $teamId = data_get($database, 'environment.project.team_id');
-        if (! is_null($teamId)) {
-            return (int) $teamId;
-        }
-
-        $teamId = data_get($database, 'team.id');
-        if (! is_null($teamId)) {
-            return (int) $teamId;
-        }
-
-        return null;
+        return $this->resolveEdgeProxyServerByTeamId($teamId);
     }
 }

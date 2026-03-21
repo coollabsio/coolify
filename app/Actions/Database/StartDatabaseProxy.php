@@ -12,12 +12,16 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Traits\ResolvesDatabaseTeamId;
+use App\Traits\ResolvesEdgeProxyServer;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
 class StartDatabaseProxy
 {
     use AsAction;
+    use ResolvesDatabaseTeamId;
+    use ResolvesEdgeProxyServer;
 
     public string $jobQueue = 'high';
 
@@ -209,98 +213,6 @@ class StartDatabaseProxy
         $appEnv = $_ENV['APP_ENV'] ?? $_SERVER['APP_ENV'] ?? getenv('APP_ENV');
 
         return $appEnv === 'local';
-    }
-
-    protected function resolveEdgeProxyServerForTeamId(?int $teamId): ?Server
-    {
-        if (is_null($teamId)) {
-            return null;
-        }
-
-        return Server::query()
-            ->where('team_id', $teamId)
-            ->whereRelation('settings', 'is_master_domain_router_enabled', true)
-            ->orderBy('id')
-            ->first();
-    }
-
-    private function resolveDatabaseTeamId(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase $database): ?int
-    {
-        if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-            $teamId = data_get($database, 'service.environment.project.team_id');
-            if (! is_null($teamId)) {
-                return (int) $teamId;
-            }
-        }
-
-        $teamId = data_get($database, 'environment.project.team_id');
-        if (! is_null($teamId)) {
-            return (int) $teamId;
-        }
-
-        $teamId = data_get($database, 'team.id');
-        if (! is_null($teamId)) {
-            return (int) $teamId;
-        }
-
-        return null;
-    }
-
-    private function resolveRemoteHost(Server $deploymentServer): ?string
-    {
-        $candidates = [
-            data_get($deploymentServer, 'proxy.wireguard_ip'),
-            data_get($deploymentServer, 'proxy.wg_ip'),
-            data_get($deploymentServer, 'proxy.tunnel_ip'),
-            data_get($deploymentServer, 'proxy.tunnel_host'),
-            data_get($deploymentServer, 'proxy.tunnel_domain'),
-            data_get($deploymentServer, 'ip'),
-        ];
-
-        foreach ($candidates as $candidate) {
-            $normalizedHost = $this->normalizeRemoteHost((string) $candidate);
-            if (! is_null($normalizedHost)) {
-                return $normalizedHost;
-            }
-        }
-
-        return null;
-    }
-
-    private function normalizeRemoteHost(string $rawHost): ?string
-    {
-        $host = trim($rawHost);
-        if ($host === '') {
-            return null;
-        }
-
-        if (str_starts_with($host, 'http://') || str_starts_with($host, 'https://')) {
-            $parsedHost = parse_url($host, PHP_URL_HOST);
-            $host = is_string($parsedHost) ? $parsedHost : '';
-        } elseif (str_contains($host, '/')) {
-            $parsedHost = parse_url('http://'.$host, PHP_URL_HOST);
-            $host = is_string($parsedHost) ? $parsedHost : '';
-        }
-
-        $host = trim($host, '[]');
-        if ($host === '') {
-            return null;
-        }
-
-        if (str_contains($host, ':') && ! filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-            $parsedHost = parse_url('http://'.$host, PHP_URL_HOST);
-            $host = is_string($parsedHost) ? $parsedHost : '';
-        }
-
-        if ($host === '') {
-            return null;
-        }
-
-        if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-            return '['.$host.']';
-        }
-
-        return $host;
     }
 
     protected function logWarning(string $message): void

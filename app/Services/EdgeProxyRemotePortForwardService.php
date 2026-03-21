@@ -5,11 +5,14 @@ namespace App\Services;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
+use App\Traits\ResolvesEdgeProxyServer;
 use Illuminate\Support\Collection;
 use Symfony\Component\Yaml\Yaml;
 
 class EdgeProxyRemotePortForwardService
 {
+    use ResolvesEdgeProxyServer;
+
     private const array RESERVED_EDGE_PORTS = [80, 443];
 
     public function syncService(Service $service): array
@@ -73,12 +76,8 @@ class EdgeProxyRemotePortForwardService
 
     public function deleteService(Service $service): void
     {
-        $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($this->extractServiceTeamId($service));
-        if (! $edgeProxyServer instanceof Server) {
-            return;
-        }
-
-        $this->deleteServiceWithServer($service, $edgeProxyServer);
+        $this->resolveEdgeProxyServersByTeamId($this->extractServiceTeamId($service))
+            ->each(fn (Server $edgeProxyServer) => $this->deleteServiceWithServer($service, $edgeProxyServer));
     }
 
     public function deleteServiceWithServer(Service $service, Server $edgeProxyServer): void
@@ -88,12 +87,8 @@ class EdgeProxyRemotePortForwardService
 
     public function deleteApplication(Application $application): void
     {
-        $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($this->extractApplicationTeamId($application));
-        if (! $edgeProxyServer instanceof Server) {
-            return;
-        }
-
-        $this->deleteApplicationWithServer($application, $edgeProxyServer);
+        $this->resolveEdgeProxyServersByTeamId($this->extractApplicationTeamId($application))
+            ->each(fn (Server $edgeProxyServer) => $this->deleteApplicationWithServer($application, $edgeProxyServer));
     }
 
     public function deleteApplicationWithServer(Application $application, Server $edgeProxyServer): void
@@ -104,19 +99,6 @@ class EdgeProxyRemotePortForwardService
     protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
     {
         return instant_remote_process($commands, $server, $throwError);
-    }
-
-    protected function resolveEdgeProxyServerByTeamId(?int $teamId): ?Server
-    {
-        if (is_null($teamId)) {
-            return null;
-        }
-
-        return Server::query()
-            ->where('team_id', $teamId)
-            ->whereRelation('settings', 'is_master_domain_router_enabled', true)
-            ->orderBy('id')
-            ->first();
     }
 
     protected function logWarning(string $message): void
@@ -533,27 +515,6 @@ EOF;
         return null;
     }
 
-    private function resolveRemoteHost(Server $deploymentServer): ?string
-    {
-        $candidates = [
-            data_get($deploymentServer, 'proxy.wireguard_ip'),
-            data_get($deploymentServer, 'proxy.wg_ip'),
-            data_get($deploymentServer, 'proxy.tunnel_ip'),
-            data_get($deploymentServer, 'proxy.tunnel_host'),
-            data_get($deploymentServer, 'proxy.tunnel_domain'),
-            data_get($deploymentServer, 'ip'),
-        ];
-
-        foreach ($candidates as $candidate) {
-            $normalizedHost = $this->normalizeRemoteHost((string) $candidate);
-            if (! is_null($normalizedHost)) {
-                return $normalizedHost;
-            }
-        }
-
-        return null;
-    }
-
     private function parseServiceCompose(Service $service): array
     {
         if (blank($service->docker_compose_raw)) {
@@ -830,39 +791,4 @@ EOF;
         return null;
     }
 
-    private function normalizeRemoteHost(string $rawHost): ?string
-    {
-        $host = trim($rawHost);
-        if ($host === '') {
-            return null;
-        }
-
-        if (str_starts_with($host, 'http://') || str_starts_with($host, 'https://')) {
-            $parsedHost = parse_url($host, PHP_URL_HOST);
-            $host = is_string($parsedHost) ? $parsedHost : '';
-        } elseif (str_contains($host, '/')) {
-            $parsedHost = parse_url('http://'.$host, PHP_URL_HOST);
-            $host = is_string($parsedHost) ? $parsedHost : '';
-        }
-
-        $host = trim($host, '[]');
-        if ($host === '') {
-            return null;
-        }
-
-        if (str_contains($host, ':') && ! filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-            $parsedHost = parse_url('http://'.$host, PHP_URL_HOST);
-            $host = is_string($parsedHost) ? $parsedHost : '';
-        }
-
-        if ($host === '') {
-            return null;
-        }
-
-        if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-            return '['.$host.']';
-        }
-
-        return $host;
-    }
 }

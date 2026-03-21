@@ -44,88 +44,119 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle()
     {
-        try {
-            // Handle ApplicationPreview instances separately
-            if ($this->resource instanceof ApplicationPreview) {
-                $this->deleteApplicationPreview();
+        // Handle ApplicationPreview instances separately
+        if ($this->resource instanceof ApplicationPreview) {
+            $this->deleteApplicationPreview();
 
-                return;
-            }
-
-            switch ($this->resource->type()) {
-                case 'application':
-                    StopApplication::run($this->resource, previewDeployments: true, dockerCleanup: $this->dockerCleanup);
-                    break;
-                case 'standalone-postgresql':
-                case 'standalone-redis':
-                case 'standalone-mongodb':
-                case 'standalone-mysql':
-                case 'standalone-mariadb':
-                case 'standalone-keydb':
-                case 'standalone-dragonfly':
-                case 'standalone-clickhouse':
-                    StopDatabase::run($this->resource, dockerCleanup: $this->dockerCleanup);
-                    break;
-                case 'service':
-                    StopService::run($this->resource, $this->deleteConnectedNetworks, $this->dockerCleanup);
-                    DeleteService::run($this->resource, $this->deleteVolumes, $this->deleteConnectedNetworks, $this->deleteConfigurations, $this->dockerCleanup);
-
-                    return;
-            }
-
-            if ($this->deleteConfigurations) {
-                $this->resource->deleteConfigurations();
-            }
-            if ($this->deleteVolumes) {
-                $this->resource->deleteVolumes();
-                $this->resource->persistentStorages()->delete();
-            }
-            $this->resource->fileStorages()->delete(); // these are file mounts which should probably have their own flag
-
-            $isDatabase = $this->resource instanceof StandalonePostgresql
-            || $this->resource instanceof StandaloneRedis
-            || $this->resource instanceof StandaloneMongodb
-            || $this->resource instanceof StandaloneMysql
-            || $this->resource instanceof StandaloneMariadb
-            || $this->resource instanceof StandaloneKeydb
-            || $this->resource instanceof StandaloneDragonfly
-            || $this->resource instanceof StandaloneClickhouse;
-
-            if ($isDatabase) {
-                $this->resource->sslCertificates()->delete();
-                $this->resource->scheduledBackups()->delete();
-                $this->resource->tags()->detach();
-            }
-            $this->resource->environment_variables()->delete();
-
-            if ($this->deleteConnectedNetworks && $this->resource->type() === 'application') {
-                $this->resource->deleteConnectedNetworks();
-            }
-        } catch (\Throwable $e) {
-            throw $e;
-        } finally {
-            if ($this->resource instanceof Application) {
-                try {
-                    app(EdgeProxyRemoteRouteService::class)->deleteApplication($this->resource);
-                } catch (\Throwable $e) {
-                    \Log::warning('Failed to delete edge proxy route file for application '.$this->resource->uuid.': '.$e->getMessage());
-                }
-                try {
-                    app(EdgeProxyRemotePortForwardService::class)->deleteApplication($this->resource);
-                } catch (\Throwable $e) {
-                    \Log::warning('Failed to delete edge port proxy for application '.$this->resource->uuid.': '.$e->getMessage());
-                }
-            }
-
-            $this->resource->forceDelete();
-            if ($this->dockerCleanup) {
-                $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
-                if ($server) {
-                    CleanupDocker::dispatch($server, false, false);
-                }
-            }
-            Artisan::queue('cleanup:stucked-resources');
+            return;
         }
+
+        if ($this->resource instanceof Service) {
+            $this->stopAndDeleteServiceResource();
+            $this->queueStuckedResourcesCleanup();
+
+            return;
+        }
+
+        $this->prepareResourceForDeletion();
+
+        if ($this->resource instanceof Application) {
+            $this->cleanupApplicationEdgeProxyState($this->resource);
+        }
+
+        $this->resource->forceDelete();
+        $this->dispatchDockerCleanupIfNeeded();
+        $this->queueStuckedResourcesCleanup();
+    }
+
+    protected function stopAndDeleteServiceResource(): void
+    {
+        StopService::run($this->resource, $this->deleteConnectedNetworks, $this->dockerCleanup);
+        DeleteService::run($this->resource, $this->deleteVolumes, $this->deleteConnectedNetworks, $this->deleteConfigurations, $this->dockerCleanup);
+    }
+
+    protected function prepareResourceForDeletion(): void
+    {
+        switch ($this->resource->type()) {
+            case 'application':
+                StopApplication::run($this->resource, previewDeployments: true, dockerCleanup: $this->dockerCleanup);
+                break;
+            case 'standalone-postgresql':
+            case 'standalone-redis':
+            case 'standalone-mongodb':
+            case 'standalone-mysql':
+            case 'standalone-mariadb':
+            case 'standalone-keydb':
+            case 'standalone-dragonfly':
+            case 'standalone-clickhouse':
+                StopDatabase::run($this->resource, dockerCleanup: $this->dockerCleanup);
+                break;
+        }
+
+        if ($this->deleteConfigurations) {
+            $this->resource->deleteConfigurations();
+        }
+        if ($this->deleteVolumes) {
+            $this->resource->deleteVolumes();
+            $this->resource->persistentStorages()->delete();
+        }
+        $this->resource->fileStorages()->delete();
+
+        $isDatabase = $this->resource instanceof StandalonePostgresql
+        || $this->resource instanceof StandaloneRedis
+        || $this->resource instanceof StandaloneMongodb
+        || $this->resource instanceof StandaloneMysql
+        || $this->resource instanceof StandaloneMariadb
+        || $this->resource instanceof StandaloneKeydb
+        || $this->resource instanceof StandaloneDragonfly
+        || $this->resource instanceof StandaloneClickhouse;
+
+        if ($isDatabase) {
+            $this->resource->sslCertificates()->delete();
+            $this->resource->scheduledBackups()->delete();
+            $this->resource->tags()->detach();
+        }
+        $this->resource->environment_variables()->delete();
+
+        if ($this->deleteConnectedNetworks && $this->resource->type() === 'application') {
+            $this->resource->deleteConnectedNetworks();
+        }
+    }
+
+    protected function cleanupApplicationEdgeProxyState(Application $application): void
+    {
+        try {
+            app(EdgeProxyRemoteRouteService::class)->deleteApplication($application);
+        } catch (\Throwable $exception) {
+            \Log::warning('Failed to delete edge proxy route file for application '.$application->uuid.': '.$exception->getMessage());
+
+            throw $exception;
+        }
+
+        try {
+            app(EdgeProxyRemotePortForwardService::class)->deleteApplication($application);
+        } catch (\Throwable $exception) {
+            \Log::warning('Failed to delete edge port proxy for application '.$application->uuid.': '.$exception->getMessage());
+
+            throw $exception;
+        }
+    }
+
+    protected function dispatchDockerCleanupIfNeeded(): void
+    {
+        if (! $this->dockerCleanup) {
+            return;
+        }
+
+        $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
+        if ($server) {
+            CleanupDocker::dispatch($server, false, false);
+        }
+    }
+
+    protected function queueStuckedResourcesCleanup(): void
+    {
+        Artisan::queue('cleanup:stucked-resources');
     }
 
     private function deleteApplicationPreview()

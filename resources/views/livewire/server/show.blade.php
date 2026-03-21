@@ -289,7 +289,8 @@
                         @if ($server->proxyType() === \App\Enums\ProxyTypes::TRAEFIK->value)
                             <div class="w-96">
                                 @if ($isMasterDomainRouterLocked)
-                                    <x-forms.checkbox disabled instantSave id="isMasterDomainRouterEnabled"
+                                    <x-forms.checkbox canGate="update" :canResource="$server" disabled instantSave
+                                        id="isMasterDomainRouterEnabled"
                                         label="Enable master domain routing?"
                                         helper="{{ $masterDomainRouterLockMessage }}" />
                                 @else

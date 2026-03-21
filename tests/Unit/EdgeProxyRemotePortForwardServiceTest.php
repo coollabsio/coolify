@@ -325,3 +325,93 @@ it('deletes application edge port proxy containers', function () {
         ->and($manager->calls[0]['server_id'])->toBe(51)
         ->and($manager->calls[0]['commands'][0])->toContain('application-application-delete-port-proxy-edge-port-proxy');
 });
+
+it('deletes service edge port proxy containers from all team traefik servers', function () {
+    $firstEdgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $firstEdgeProxyServer->id = 61;
+
+    $secondEdgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $secondEdgeProxyServer->id = 62;
+
+    $service = new Service;
+    $service->uuid = 'service-delete-port-proxy-all-servers';
+    $service->setRelation('environment', (object) [
+        'project' => (object) ['team_id' => 61],
+    ]);
+
+    $manager = new class($firstEdgeProxyServer, $secondEdgeProxyServer) extends EdgeProxyRemotePortForwardService
+    {
+        public array $calls = [];
+
+        public function __construct(private Server $firstEdgeProxyServer, private Server $secondEdgeProxyServer) {}
+
+        protected function resolveEdgeProxyServersByTeamId(?int $teamId): \Illuminate\Support\Collection
+        {
+            return collect([$this->firstEdgeProxyServer, $this->secondEdgeProxyServer]);
+        }
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'server_id' => $server->id,
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $manager->deleteService($service);
+
+    expect($manager->calls)->toHaveCount(2)
+        ->and($manager->calls[0]['server_id'])->toBe(61)
+        ->and($manager->calls[0]['commands'][0])->toContain('service-service-delete-port-proxy-all-servers-edge-port-proxy')
+        ->and($manager->calls[1]['server_id'])->toBe(62)
+        ->and($manager->calls[1]['commands'][0])->toContain('service-service-delete-port-proxy-all-servers-edge-port-proxy');
+});
+
+it('deletes application edge port proxy containers from all team traefik servers', function () {
+    $firstEdgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $firstEdgeProxyServer->id = 71;
+
+    $secondEdgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $secondEdgeProxyServer->id = 72;
+
+    $application = new Application;
+    $application->uuid = 'application-delete-port-proxy-all-servers';
+    $application->setRelation('environment', (object) [
+        'project' => (object) ['team_id' => 71],
+    ]);
+
+    $manager = new class($firstEdgeProxyServer, $secondEdgeProxyServer) extends EdgeProxyRemotePortForwardService
+    {
+        public array $calls = [];
+
+        public function __construct(private Server $firstEdgeProxyServer, private Server $secondEdgeProxyServer) {}
+
+        protected function resolveEdgeProxyServersByTeamId(?int $teamId): \Illuminate\Support\Collection
+        {
+            return collect([$this->firstEdgeProxyServer, $this->secondEdgeProxyServer]);
+        }
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'server_id' => $server->id,
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $manager->deleteApplication($application);
+
+    expect($manager->calls)->toHaveCount(2)
+        ->and($manager->calls[0]['server_id'])->toBe(71)
+        ->and($manager->calls[0]['commands'][0])->toContain('application-application-delete-port-proxy-all-servers-edge-port-proxy')
+        ->and($manager->calls[1]['server_id'])->toBe(72)
+        ->and($manager->calls[1]['commands'][0])->toContain('application-application-delete-port-proxy-all-servers-edge-port-proxy');
+});

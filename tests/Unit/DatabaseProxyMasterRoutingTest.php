@@ -2,9 +2,11 @@
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Events\DatabaseProxyStopped;
 use App\Models\ServiceDatabase;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
+use Illuminate\Support\Facades\Event;
 
 it('runs standalone database proxy on the master domain router server for remote deployments', function () {
     $edgeServer = \Mockery::mock(Server::class)->makePartial();
@@ -294,7 +296,7 @@ it('stops database proxy containers on deployment and master domain router serve
             return $this->edgeServer;
         }
 
-        protected function dispatchDatabaseProxyStoppedEvent(): void
+        protected function dispatchDatabaseProxyStoppedEvent($database): void
         {
             // No-op in isolated unit test environment.
         }
@@ -639,7 +641,7 @@ it('does not try to stop database proxy when deployment server is missing', func
             return null;
         }
 
-        protected function dispatchDatabaseProxyStoppedEvent(): void
+        protected function dispatchDatabaseProxyStoppedEvent($database): void
         {
             // No-op in isolated unit test environment.
         }
@@ -686,7 +688,7 @@ it('stops proxy only once when edge and deployment server are the same', functio
             return $this->edgeServer;
         }
 
-        protected function dispatchDatabaseProxyStoppedEvent(): void
+        protected function dispatchDatabaseProxyStoppedEvent($database): void
         {
             // No-op in isolated unit test environment.
         }
@@ -786,4 +788,71 @@ it('normalizes remote host with scheme and path before building database upstrea
 
     expect($nginxConf)->toContain('proxy_pass 10.8.0.112:5432;')
         ->and($nginxConf)->not->toContain('8443');
+});
+
+it('dispatches database proxy stopped event with standalone database team id', function () {
+    Event::fake([DatabaseProxyStopped::class]);
+
+    $deploymentServer = \Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 301;
+
+    $database = \Mockery::mock(StandalonePostgresql::class)->makePartial();
+    $database->uuid = 'stopped-db-event-uuid';
+    $database->shouldReceive('save')->once()->andReturnTrue();
+    $database->setRelation('destination', (object) [
+        'server' => $deploymentServer,
+    ]);
+    $database->setRelation('environment', (object) [
+        'project' => (object) ['team_id' => 777],
+    ]);
+
+    $action = new class extends StopDatabaseProxy
+    {
+        protected function runRemoteCommands(array $commands, Server $server, bool $throwError = true): ?string
+        {
+            return null;
+        }
+
+        protected function resolveEdgeProxyServerForTeamId(?int $teamId): ?Server
+        {
+            return null;
+        }
+    };
+
+    $action->handle($database);
+
+    Event::assertDispatched(DatabaseProxyStopped::class, fn (DatabaseProxyStopped $event) => $event->teamId === 777);
+});
+
+it('dispatches database proxy stopped event with service database team id', function () {
+    Event::fake([DatabaseProxyStopped::class]);
+
+    $deploymentServer = \Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 302;
+
+    $database = \Mockery::mock(ServiceDatabase::class)->makePartial();
+    $database->uuid = 'service-db-event-uuid';
+    $database->shouldReceive('getMorphClass')->andReturn(ServiceDatabase::class);
+    $database->shouldReceive('save')->once()->andReturnTrue();
+    $database->setRelation('service', (object) [
+        'destination' => (object) ['server' => $deploymentServer],
+        'environment' => (object) ['project' => (object) ['team_id' => 778]],
+    ]);
+
+    $action = new class extends StopDatabaseProxy
+    {
+        protected function runRemoteCommands(array $commands, Server $server, bool $throwError = true): ?string
+        {
+            return null;
+        }
+
+        protected function resolveEdgeProxyServerForTeamId(?int $teamId): ?Server
+        {
+            return null;
+        }
+    };
+
+    $action->handle($database);
+
+    Event::assertDispatched(DatabaseProxyStopped::class, fn (DatabaseProxyStopped $event) => $event->teamId === 778);
 });

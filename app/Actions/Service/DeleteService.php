@@ -15,8 +15,9 @@ class DeleteService
 
     public function handle(Service $service, bool $deleteVolumes, bool $deleteConnectedNetworks, bool $deleteConfigurations, bool $dockerCleanup)
     {
+        $server = data_get($service, 'server');
+
         try {
-            $server = data_get($service, 'server');
             if ($deleteVolumes && $server->isFunctional()) {
                 $storagesToDelete = collect([]);
 
@@ -41,7 +42,7 @@ class DeleteService
                 // Execute volume deletion first, this must be done first otherwise volumes will not be deleted.
                 if (! empty($commands)) {
                     foreach ($commands as $command) {
-                        $result = instant_remote_process([$command], $server, false);
+                        $result = $this->runRemoteCommands([$command], $server, false);
                         if ($result !== null && $result !== 0) {
                             Log::error('Error deleting volumes: '.$result);
                         }
@@ -53,45 +54,60 @@ class DeleteService
                 $service->deleteConnectedNetworks();
             }
 
-            instant_remote_process(["docker rm -f $service->uuid"], $server, throwError: false);
-        } catch (\Exception $e) {
-            throw new \RuntimeException($e->getMessage());
-        } finally {
-            try {
-                app(EdgeProxyRemoteRouteService::class)->deleteService($service);
-            } catch (\Throwable $exception) {
-                Log::warning('Failed to delete edge proxy route file for service.', [
-                    'service_uuid' => $service->uuid,
-                    'error' => $exception->getMessage(),
-                ]);
-            }
-            try {
-                app(EdgeProxyRemotePortForwardService::class)->deleteService($service);
-            } catch (\Throwable $exception) {
-                Log::warning('Failed to delete edge port proxy for service.', [
-                    'service_uuid' => $service->uuid,
-                    'error' => $exception->getMessage(),
-                ]);
-            }
+            $this->runRemoteCommands(["docker rm -f $service->uuid"], $server, throwError: false);
+        } catch (\Throwable $exception) {
+            throw new \RuntimeException($exception->getMessage(), previous: $exception);
+        }
 
-            if ($deleteConfigurations) {
-                $service->deleteConfigurations();
-            }
-            foreach ($service->applications()->get() as $application) {
-                $application->forceDelete();
-            }
-            foreach ($service->databases()->get() as $database) {
-                $database->forceDelete();
-            }
-            foreach ($service->scheduled_tasks as $task) {
-                $task->delete();
-            }
-            $service->tags()->detach();
-            $service->forceDelete();
+        $this->cleanupEdgeProxyState($service);
 
-            if ($dockerCleanup) {
-                CleanupDocker::dispatch($server, false, false);
-            }
+        if ($deleteConfigurations) {
+            $service->deleteConfigurations();
+        }
+        foreach ($service->applications()->get() as $application) {
+            $application->forceDelete();
+        }
+        foreach ($service->databases()->get() as $database) {
+            $database->forceDelete();
+        }
+        foreach ($service->scheduled_tasks as $task) {
+            $task->delete();
+        }
+        $service->tags()->detach();
+        $service->forceDelete();
+
+        if ($dockerCleanup) {
+            CleanupDocker::dispatch($server, false, false);
+        }
+    }
+
+    protected function runRemoteCommands(array $commands, $server, bool $throwError = true): ?string
+    {
+        return instant_remote_process($commands, $server, $throwError);
+    }
+
+    protected function cleanupEdgeProxyState(Service $service): void
+    {
+        try {
+            app(EdgeProxyRemoteRouteService::class)->deleteService($service);
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to delete edge proxy route file for service.', [
+                'service_uuid' => $service->uuid,
+                'error' => $exception->getMessage(),
+            ]);
+
+            throw $exception;
+        }
+
+        try {
+            app(EdgeProxyRemotePortForwardService::class)->deleteService($service);
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to delete edge port proxy for service.', [
+                'service_uuid' => $service->uuid,
+                'error' => $exception->getMessage(),
+            ]);
+
+            throw $exception;
         }
     }
 }
