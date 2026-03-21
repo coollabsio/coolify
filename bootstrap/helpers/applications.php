@@ -79,6 +79,8 @@ function queue_application_deployment(Application $application, string $deployme
         'rollback' => $rollback,
         'git_type' => $git_type,
         'only_this_server' => $only_this_server,
+        'retry_count' => 0,
+        'max_retries' => $application->settings->max_deployment_retries ?? 2,
     ]);
 
     if ($no_questions_asked) {

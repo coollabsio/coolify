@@ -347,6 +347,35 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->pull_request_id !== 0 && $this->application->is_github_based()) {
                 ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::ERROR);
             }
+
+            // Auto-retry logic: if retries remain, re-queue instead of failing
+            $retryCount = $this->application_deployment_queue->retry_count ?? 0;
+            $maxRetries = $this->application_deployment_queue->max_retries ?? 0;
+
+            if ($retryCount < $maxRetries) {
+                $nextRetry = $retryCount + 1;
+                $backoffSeconds = (int) (30 * pow(2, $retryCount)); // 30s, 60s, 120s...
+
+                $this->application_deployment_queue->addLogEntry(
+                    "Deployment failed. Retrying in {$backoffSeconds}s (attempt {$nextRetry}/{$maxRetries})...",
+                    'stderr'
+                );
+
+                $retryDeployment = $this->application_deployment_queue->replicate();
+                $retryDeployment->deployment_uuid = (string) new \Visus\Cuid2\Cuid2;
+                $retryDeployment->status = ApplicationDeploymentStatus::QUEUED->value;
+                $retryDeployment->retry_count = $nextRetry;
+                $retryDeployment->started_at = null;
+                $retryDeployment->finished_at = null;
+                $retryDeployment->save();
+
+                \Log::info("Deployment {$this->deployment_uuid} failed. Scheduled retry {$nextRetry}/{$maxRetries} in {$backoffSeconds}s.");
+
+                ApplicationDeploymentJob::dispatch(
+                    application_deployment_queue_id: $retryDeployment->id,
+                )->delay(now()->addSeconds($backoffSeconds));
+            }
+
             $this->fail($e);
             throw $e;
         } finally {
@@ -1810,9 +1839,37 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->application_deployment_queue->addLogEntry('----------------------------------------');
                     $this->application_deployment_queue->addLogEntry('Rolling update started.');
                     $this->start_by_compose_file();
-                    $this->health_check();
-                    $this->stop_running_container();
-                    $this->application_deployment_queue->addLogEntry('Rolling update completed.');
+
+                    try {
+                        $this->health_check();
+                        $this->stop_running_container();
+                        $this->application_deployment_queue->addLogEntry('Rolling update completed.');
+                    } catch (Exception $healthException) {
+                        // Auto-rollback: health check failed on new container
+                        $autoRollback = $this->application->settings->auto_rollback_on_failure ?? true;
+
+                        if ($autoRollback) {
+                            $this->application_deployment_queue->addLogEntry('Health check failed on new container. Rolling back to previous version.', 'stderr');
+
+                            // Stop the new (unhealthy) container
+                            try {
+                                $this->graceful_shutdown_container($this->container_name);
+                            } catch (Exception $cleanupError) {
+                                \Log::warning("Failed to stop unhealthy container: {$cleanupError->getMessage()}");
+                            }
+
+                            // Previous container is still running — it was never stopped
+                            $this->application_deployment_queue->addLogEntry('Rollback complete. Previous container is still serving traffic.');
+                            $this->application_deployment_queue->update([
+                                'status' => ApplicationDeploymentStatus::FAILED_WITH_ROLLBACK->value,
+                            ]);
+
+                            // Don't throw — the rollback succeeded, app is still up
+                            return;
+                        }
+
+                        throw new DeploymentException('Health check failed and auto-rollback is disabled: '.$healthException->getMessage(), $healthException->getCode(), $healthException);
+                    }
                 }
             }
         } catch (Exception $e) {

@@ -8,5 +8,6 @@ enum ApplicationDeploymentStatus: string
     case IN_PROGRESS = 'in_progress';
     case FINISHED = 'finished';
     case FAILED = 'failed';
+    case FAILED_WITH_ROLLBACK = 'failed-rolled-back';
     case CANCELLED_BY_USER = 'cancelled-by-user';
 }
