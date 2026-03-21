@@ -14,6 +14,7 @@ class LocalFileVolume extends BaseModel
         // 'mount_path' => 'encrypted',
         'content' => 'encrypted',
         'is_directory' => 'boolean',
+        'is_preview_suffix_enabled' => 'boolean',
     ];
 
     use HasFactory;

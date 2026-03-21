@@ -3,6 +3,7 @@
 namespace App\Traits;
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Exceptions\DeploymentException;
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
 use Carbon\Carbon;
@@ -103,7 +104,7 @@ trait ExecuteRemoteCommand
                 try {
                     $this->executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors);
                     $commandExecuted = true;
-                } catch (\RuntimeException $e) {
+                } catch (\RuntimeException|DeploymentException $e) {
                     $lastError = $e;
                     $errorMessage = $e->getMessage();
                     // Only retry if it's an SSH connection error and we haven't exhausted retries
@@ -233,7 +234,7 @@ trait ExecuteRemoteCommand
                     $error = $process_result->output() ?: 'Command failed with no error output';
                 }
                 $redactedCommand = $this->redact_sensitive_info($command);
-                throw new \RuntimeException("Command execution failed (exit code {$process_result->exitCode()}): {$redactedCommand}\nError: {$error}");
+                throw new DeploymentException("Command execution failed (exit code {$process_result->exitCode()}): {$redactedCommand}\nError: {$error}");
             }
         }
     }

@@ -350,7 +350,7 @@ class ScheduledJobManager implements ShouldQueue
         $baseTime = $this->executionTime ?? Carbon::now();
         $executionTime = $baseTime->copy()->setTimezone($timezone);
 
-        // No dedup key → simple isDue check (used by docker cleanups)
+        // No dedup key → simple isDue check
         if ($dedupKey === null) {
             return $cron->isDue($executionTime);
         }
@@ -411,7 +411,7 @@ class ScheduledJobManager implements ShouldQueue
                 }
 
                 // Use the frozen execution time for consistent evaluation
-                if ($this->shouldRunNow($frequency, $serverTimezone)) {
+                if ($this->shouldRunNow($frequency, $serverTimezone, "docker-cleanup:{$server->id}")) {
                     DockerCleanupJob::dispatch(
                         $server,
                         false,

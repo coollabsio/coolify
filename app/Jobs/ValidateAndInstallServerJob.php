@@ -179,6 +179,9 @@ class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
             // Mark validation as complete
             $this->server->update(['is_validating' => false]);
 
+            // Auto-fetch server details now that validation passed
+            $this->server->gatherServerMetadata();
+
             // Refresh server to get latest state
             $this->server->refresh();
 

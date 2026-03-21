@@ -6,6 +6,7 @@ use App\Models\S3Storage;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Form extends Component
@@ -131,19 +132,7 @@ class Form extends Component
         }
     }
 
-    public function delete()
-    {
-        try {
-            $this->authorize('delete', $this->storage);
-
-            $this->storage->delete();
-
-            return redirect()->route('storage.index');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
+    #[On('submitStorage')]
     public function submit()
     {
         try {

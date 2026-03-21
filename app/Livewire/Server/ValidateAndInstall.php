@@ -198,6 +198,9 @@ class ValidateAndInstall extends Component
                 // Mark validation as complete
                 $this->server->update(['is_validating' => false]);
 
+                // Auto-fetch server details now that validation passed
+                $this->server->gatherServerMetadata();
+
                 $this->dispatch('refreshServerShow');
                 $this->dispatch('refreshBoardingIndex');
                 ServerValidated::dispatch($this->server->team_id, $this->server->uuid);

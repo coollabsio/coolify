@@ -314,8 +314,8 @@
                             </div>
                         @else
                             <div x-data="{
-                                baseDir: '{{ $application->base_directory }}',
-                                dockerfileLocation: '{{ $application->dockerfile_location }}',
+                                baseDir: @entangle('baseDirectory'),
+                                dockerfileLocation: @entangle('dockerfileLocation'),
                                 normalizePath(path) {
                                     if (!path || path.trim() === '') return '/';
                                     path = path.trim();
@@ -332,11 +332,11 @@
                                     this.dockerfileLocation = this.normalizePath(this.dockerfileLocation);
                                 }
                             }" class="flex flex-col gap-2 xl:flex-row">
-                                <x-forms.input placeholder="/" wire:model.defer="baseDirectory"
+                                <x-forms.input placeholder="/"
                                     label="Base Directory" helper="Directory to use as root. Useful for monorepos."
                                     x-bind:disabled="!canUpdate" x-model="baseDir" @blur="normalizeBaseDir()" />
                                 @if ($buildPack === 'dockerfile' && !$application->dockerfile)
-                                    <x-forms.input placeholder="/Dockerfile" wire:model.defer="dockerfileLocation"
+                                    <x-forms.input placeholder="/Dockerfile"
                                         label="Dockerfile Location"
                                         helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->dockerfile_location, '/') }}</span>"
                                         x-bind:disabled="!canUpdate" x-model="dockerfileLocation"

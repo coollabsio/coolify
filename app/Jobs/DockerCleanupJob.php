@@ -39,7 +39,9 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
         public bool $manualCleanup = false,
         public bool $deleteUnusedVolumes = false,
         public bool $deleteUnusedNetworks = false
-    ) {}
+    ) {
+        $this->onQueue('high');
+    }
 
     public function handle(): void
     {
