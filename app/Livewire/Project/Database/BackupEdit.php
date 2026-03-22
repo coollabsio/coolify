@@ -78,6 +78,12 @@ class BackupEdit extends Component
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int $timeout = 3600;
 
+    #[Validate(['required', 'string'])]
+    public string $engine = 'dump';
+
+    #[Validate(['required', 'string'])]
+    public string $backupType = 'full';
+
     public function mount()
     {
         try {
@@ -125,6 +131,14 @@ class BackupEdit extends Component
             $this->backup->databases_to_backup = $this->databasesToBackup;
             $this->backup->dump_all = $this->dumpAll;
             $this->backup->timeout = $this->timeout;
+            $this->backup->engine = $this->engine;
+            $this->backup->backup_type = $this->backupType;
+
+            // Update pgbackrest_enabled on the database if needed
+            if ($this->engine === 'pgbackrest' && $this->backup->database_type === 'App\Models\StandalonePostgresql') {
+                $this->backup->database->update(['pgbackrest_enabled' => true]);
+            }
+
             $this->customValidate();
             $this->backup->save();
         } else {
@@ -143,6 +157,8 @@ class BackupEdit extends Component
             $this->databasesToBackup = $this->backup->databases_to_backup;
             $this->dumpAll = $this->backup->dump_all;
             $this->timeout = $this->backup->timeout;
+            $this->engine = $this->backup->engine ?? 'dump';
+            $this->backupType = $this->backup->backup_type ?? 'full';
         }
     }
 

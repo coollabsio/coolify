@@ -46,8 +46,29 @@
     @endif
     <div class="flex flex-col gap-2">
         <h3>Settings</h3>
-        <div class="flex gap-2 flex-col ">
+        <div class="flex gap-2 flex-col">
             @if ($backup->database_type === 'App\Models\StandalonePostgresql' && $backup->database_id !== 0)
+                <div class="flex gap-2">
+                    <x-forms.select id="engine" label="Backup Engine" wire:model.live="engine">
+                        <option value="dump">pg_dump (Standard)</option>
+                        <option value="pgbackrest">pgBackRest (Incremental)</option>
+                    </x-forms.select>
+                    @if ($engine === 'pgbackrest')
+                        <x-forms.select id="backupType" label="Backup Type">
+                            <option value="full">Full</option>
+                            <option value="incr">Incremental</option>
+                            <option value="diff">Differential</option>
+                        </x-forms.select>
+                    @endif
+                </div>
+                @if ($engine === 'pgbackrest')
+                    <div class="text-sm text-neutral-400">
+                        pgBackRest enables incremental backups, reducing storage costs and backup time for large databases (100GB+).
+                        S3 storage is handled natively by pgBackRest when configured.
+                    </div>
+                @endif
+            @endif
+            @if ($backup->database_type === 'App\Models\StandalonePostgresql' && $backup->database_id !== 0 && ($engine ?? 'dump') === 'dump')
                 <div class="w-48">
                     <x-forms.checkbox label="Backup All Databases" id="dumpAll" instantSave />
                 </div>
