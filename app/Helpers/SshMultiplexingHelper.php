@@ -115,7 +115,7 @@ class SshMultiplexingHelper
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
         $muxSocket = $sshConfig['muxFilename'];
 
-        $timeout = config('constants.ssh.command_timeout');
+        $timeout = $timeout ?? config('constants.ssh.command_timeout');
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
         $scp_command = "timeout $timeout scp ";
@@ -150,7 +150,7 @@ class SshMultiplexingHelper
         return $scp_command;
     }
 
-    public static function generateSshCommand(Server $server, string $command, bool $disableMultiplexing = false)
+    public static function generateSshCommand(Server $server, string $command, bool $disableMultiplexing = false, ?int $timeout = null)
     {
         if ($server->settings->force_disabled) {
             throw new \RuntimeException('Server is disabled.');
@@ -163,7 +163,7 @@ class SshMultiplexingHelper
 
         $muxSocket = $sshConfig['muxFilename'];
 
-        $timeout = config('constants.ssh.command_timeout');
+        $timeout = $timeout ?? config('constants.ssh.command_timeout');
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
         $ssh_command = "timeout $timeout ssh ";
