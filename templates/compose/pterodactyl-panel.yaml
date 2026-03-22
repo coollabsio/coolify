@@ -46,6 +46,9 @@ services:
           #!/bin/sh
           set -e
 
+           echo "Installing mysql-client..."
+           apk add --no-cache mysql-client
+
            echo "Setting logs permissions..."
            chown -R nginx: /app/storage/logs/
 
