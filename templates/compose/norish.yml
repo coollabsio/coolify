@@ -1,0 +1,70 @@
+services:
+  norish:
+    image: 'norishapp/norish:latest'
+    environment:
+      - SERVICE_URL_NORISH_3000
+      - 'AUTH_URL=${SERVICE_URL_NORISH}'
+      - 'DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-norish}'
+      - 'MASTER_KEY=${SERVICE_PASSWORD_64_MASTERKEY}'
+      - CHROME_WS_ENDPOINT=ws://chrome-headless:3000
+      - REDIS_URL=redis://redis:6379
+      - UPLOADS_DIR=/app/uploads
+      - 'TRUSTED_ORIGINS=${SERVICE_URL_NORISH}'
+    volumes:
+      - 'norish_uploads:/app/uploads'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      chrome-headless:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'node -e "require(''http'').get(''http://127.0.0.1:3000/api/health'', r => process.exit(r.statusCode===200?0:1))"'
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 45s
+
+  postgres:
+    image: 'postgres:17-alpine'
+    environment:
+      - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - 'POSTGRES_DB=${POSTGRES_DB:-norish}'
+    volumes:
+      - 'norish_postgres_data:/var/lib/postgresql/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}'
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  chrome-headless:
+    image: 'zenika/alpine-chrome:latest'
+    command:
+      - '--no-sandbox'
+      - '--disable-gpu'
+      - '--disable-dev-shm-usage'
+      - '--disable-features=dbus'
+      - '--remote-debugging-address=0.0.0.0'
+      - '--remote-debugging-port=3000'
+      - '--headless'
+    shm_size: '256m'
+
+  redis:
+    image: 'redis:8-alpine'
+    volumes:
+      - 'norish_redis_data:/data'
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 20s
+      retries: 10
