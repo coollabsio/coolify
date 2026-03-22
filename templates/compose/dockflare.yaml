@@ -1,0 +1,56 @@
+# documentation: https://dockflare.app
+# slogan: Manages Cloudflare Tunnel routes, DNS records, and Access policies automatically from Docker container labels.
+# category: networking
+# tags: cloudflare,tunnel,docker,proxy,networking,homelab,dns,access,ingress
+# logo: svgs/dockflare.webp
+# port: 5000
+
+services:
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.1
+    environment:
+      - CONTAINERS=1
+      - INFO=1
+      - NETWORKS=1
+      - POST=1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  dockflare-init:
+    image: alpine:3.20
+    command: ["sh", "-c", "chown -R 65532:65532 /app/data && chmod -R 750 /app/data"]
+    volumes:
+      - dockflare_data:/app/data
+
+  dockflare:
+    image: alplat/dockflare:stable
+    depends_on:
+      docker-socket-proxy:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      dockflare-init:
+        condition: service_completed_successfully
+    environment:
+      - SERVICE_FQDN_DOCKFLARE_5000
+      - REDIS_URL=redis://redis:6379/0
+      - DOCKER_HOST=tcp://docker-socket-proxy:2375
+      - LOG_LEVEL=${LOG_LEVEL:-WARNING}
+    volumes:
+      - dockflare_data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5000/ || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - dockflare_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
