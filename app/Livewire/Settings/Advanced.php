@@ -66,7 +66,7 @@ class Advanced extends Component
         $this->allowed_ips = $this->settings->allowed_ips;
         $this->do_not_track = $this->settings->do_not_track;
         $this->is_registration_enabled = $this->settings->is_registration_enabled;
-        $this->is_oauth_registration_enabled = $this->settings->is_oauth_registration_enabled;
+        $this->is_oauth_registration_enabled = $this->settings->is_oauth_registration_enabled ?? false;
         $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
         $this->is_api_enabled = $this->settings->is_api_enabled;
         $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
