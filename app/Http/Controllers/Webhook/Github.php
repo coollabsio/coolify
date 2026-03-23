@@ -33,6 +33,8 @@ class Github extends Controller
             if ($content_type !== 'application/json') {
                 $payload = json_decode(data_get($payload, 'payload'), true);
             }
+            $branch = null;
+            $full_name = null;
             if ($x_github_event === 'push') {
                 $branch = data_get($payload, 'ref');
                 $full_name = data_get($payload, 'repository.full_name');
@@ -194,7 +196,6 @@ class Github extends Controller
     {
         try {
             $return_payloads = collect([]);
-            $id = null;
             $x_github_delivery = $request->header('X-GitHub-Delivery');
             $x_github_event = Str::lower($request->header('X-GitHub-Event'));
             $x_github_hook_installation_target_id = $request->header('X-GitHub-Hook-Installation-Target-Id');
@@ -224,6 +225,8 @@ class Github extends Controller
 
                 return response('cool');
             }
+            $id = null;
+            $branch = null;
             if ($x_github_event === 'push') {
                 $id = data_get($payload, 'repository.id');
                 $branch = data_get($payload, 'ref');
