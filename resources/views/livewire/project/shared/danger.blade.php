@@ -21,6 +21,22 @@
                         Recheck
                     </x-forms.button>
                 </div>
+                <details class="mt-3 rounded border border-warning/40 bg-black/20 p-3 text-xs">
+                    <summary class="cursor-pointer font-semibold text-warning">Manual setup (step-by-step)</summary>
+                    <div class="mt-3 space-y-2 text-white/90">
+                        <div>1) Go to the Coolify server terminal and open the app directory.</div>
+                        <pre class="overflow-x-auto rounded bg-black/40 p-2">cd /data/coolify/source</pre>
+                        <div>2) Start the worker service (if using Docker Compose):</div>
+                        <pre class="overflow-x-auto rounded bg-black/40 p-2">docker compose up -d coolify-realtime coolify-worker</pre>
+                        <div>3) Or start Horizon manually from the app container:</div>
+                        <pre class="overflow-x-auto rounded bg-black/40 p-2">docker exec -it coolify php artisan start:horizon</pre>
+                        <div>4) Check workers are running:</div>
+                        <pre class="overflow-x-auto rounded bg-black/40 p-2">docker exec -it coolify php artisan horizon:status</pre>
+                        <div>5) If still failing, inspect logs:</div>
+                        <pre class="overflow-x-auto rounded bg-black/40 p-2">docker exec -it coolify php artisan horizon:list
+tail -n 100 /data/coolify/source/storage/logs/laravel.log</pre>
+                    </div>
+                </details>
             </x-callout>
         @endif
         <x-modal-confirmation title="Confirm Resource Deletion?" buttonTitle="Delete" isErrorButton submitAction="delete"
