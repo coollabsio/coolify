@@ -25,7 +25,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Frontend framework from Livewire 3 and Alpine.js to Svelte 5 and Inertia v3
-- Upgrade PHP from 8.2 to 8.5, TailwindCSS from v3 to v4, Vite from v7 to v8, Laravel from v10 to v12 and all other Composer and Node dependencies to their latest versions and syntax
+- Upgrade PHP from 8.2 to 8.5, TailwindCSS from v3 to v4, Vite from v7 to v8, Laravel from v10 to v13 and all other Composer and Node dependencies to their latest versions and syntax
 - **Docker**
   - Upgrade Postgres from v15 to v18, Redis from v7 to v8 and all other Docker dependencies to latest
   -

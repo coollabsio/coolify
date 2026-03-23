@@ -30,25 +30,26 @@
 	"require": {
 		"php": "^8.5",
 		"inertiajs/inertia-laravel": "^3.0.0-beta.3",
-		"laravel/framework": "^12.53.0",
-		"laravel/horizon": "^5.45",
-		"laravel/tinker": "^2.11.1"
+		"laravel/framework": "^13.1.1",
+		"laravel/horizon": "^5.45.4",
+		"laravel/tinker": "^3.0.0"
 	},
 	"require-dev": {
-		"driftingly/rector-laravel": "^2.1.9",
+		"driftingly/rector-laravel": "^2.2.0",
 		"fakerphp/faker": "^1.24.1",
-		"larastan/larastan": "^3.9.2",
+		"larastan/larastan": "^3.9.3",
 		"laravel/pail": "^1.2.6",
-		"laravel/pint": "^1.27.1",
+		"laravel/pint": "^1.29.0",
 		"mockery/mockery": "^1.6.12",
+		"mrpunyapal/peststan": "^0.1.0",
 		"nunomaduro/collision": "^8.9.1",
-		"pestphp/pest": "^4.4.1",
+		"pestphp/pest": "^4.4.3",
 		"pestphp/pest-plugin-laravel": "^4.1.0",
 		"pestphp/pest-plugin-type-coverage": "^4.0.3",
 		"phpstan/phpstan-deprecation-rules": "^2.0.4",
 		"phpstan/phpstan-strict-rules": "^2.0.10",
-		"rector/rector": "^2.3.8",
-		"spatie/laravel-ray": "^1.43.6"
+		"rector/rector": "^2.3.9",
+		"spatie/laravel-ray": "^1.43.7"
 	},
 	"autoload": {
 		"psr-4": {

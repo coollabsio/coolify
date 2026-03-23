@@ -44,6 +44,12 @@ return [
             'key' => env('SESSION_CACHE_KEY', '_cache'),
         ],
 
+        'file' => [
+            'driver' => 'file',
+            'path' => storage_path('framework/cache/data'),
+            'lock_path' => storage_path('framework/cache/data'),
+        ],
+
         'redis' => [
             'driver' => 'redis',
             'connection' => env('REDIS_CACHE_CONNECTION', 'cache'),
@@ -63,4 +69,17 @@ return [
     */
 
     'prefix' => env('CACHE_PREFIX', Str::slug((string) env('APP_NAME', 'coolify')).'-cache-'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Serializable Classes
+    |--------------------------------------------------------------------------
+    |
+    | This value determines the classes that can be unserialized from cache
+    | storage. By default, no PHP classes will be unserialized from your
+    | cache to prevent gadget chain attacks if your APP_KEY is leaked.
+    |
+    */
+
+    'serializable_classes' => false,
 ];

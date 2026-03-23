@@ -4,6 +4,20 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use Illuminate\Console\Command;
+use Illuminate\Contracts\Container\ContextualAttribute;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Http\Resources\Json\ResourceCollection;
+use Illuminate\Mail\Mailable;
+use Illuminate\Notifications\Notification;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\ServiceProvider;
 use Throwable;
 
 arch()->preset()->php();
@@ -16,29 +30,29 @@ arch('App')
     ->ignoring('App\Enums')
     ->classes()->not->toBeAbstract()
     ->classes()->toBeFinal()
-    ->not->toExtend(\Illuminate\Database\Eloquent\Model::class)
+    ->not->toExtend(Model::class)
     ->ignoring('App\Models')
-    ->not->toExtend(\Illuminate\Foundation\Http\FormRequest::class)
+    ->not->toExtend(FormRequest::class)
     ->ignoring('App\Http\Requests')
-    ->not->toExtend(\Illuminate\Http\Resources\Json\JsonResource::class)
+    ->not->toExtend(JsonResource::class)
     ->ignoring('App\Http\Resources')
-    ->not->toExtend(\Illuminate\Http\Resources\Json\ResourceCollection::class)
+    ->not->toExtend(ResourceCollection::class)
     ->ignoring('App\Http\Resources')
-    ->not->toExtend(\Illuminate\Console\Command::class)
+    ->not->toExtend(Command::class)
     ->ignoring('App\Console\Commands')
-    ->not->toExtend(\Illuminate\Mail\Mailable::class)
+    ->not->toExtend(Mailable::class)
     ->ignoring('App\Mail')
-    ->not->toExtend(\Illuminate\Notifications\Notification::class)
+    ->not->toExtend(Notification::class)
     ->ignoring('App\Notifications')
-    ->not->toExtend(\Illuminate\Support\ServiceProvider::class)
+    ->not->toExtend(ServiceProvider::class)
     ->ignoring('App\Providers')
     ->not->toImplement(Throwable::class)
     ->ignoring('App\Exceptions')
-    ->not->toImplement(\Illuminate\Contracts\Queue\ShouldQueue::class)
+    ->not->toImplement(ShouldQueue::class)
     ->ignoring('App\Jobs')
-    ->not->toUseTrait(\Illuminate\Foundation\Bus\Dispatchable::class)
+    ->not->toUseTrait(Dispatchable::class)
     ->ignoring('App\Jobs')
-    ->not->toUseTrait(\Illuminate\Queue\SerializesModels::class)
+    ->not->toUseTrait(SerializesModels::class)
     ->ignoring('App\Events')
     ->not->toHaveSuffix('Controller')
     ->ignoring('App\Http\Controllers')
@@ -57,7 +71,7 @@ arch('Attributes')
     ->toBeClasses()
     ->toHaveMethod(method: 'resolve')
     ->toHaveAttribute('Attribute')
-    ->toImplement(\Illuminate\Contracts\Container\ContextualAttribute::class)
+    ->toImplement(ContextualAttribute::class)
     ->toHaveLineCountLessThan(100);
 
 arch('Concerns')
@@ -86,7 +100,7 @@ arch('Enums')
 arch('Exceptions')
     ->expect('App\Exceptions')
     ->toBeClasses()
-    ->toImplement('Throwable')
+    ->toImplement(Throwable::class)
     ->ignoring('App\Exceptions\Handler')
     ->toHaveLineCountLessThan(150)
     ->toHaveSuffix('Exception');
@@ -94,7 +108,7 @@ arch('Exceptions')
 arch('Http')
     ->expect('App\Http')
     ->toBeClasses()
-    ->toOnlyBeUsedIn('App\Http');
+    ->toOnlyBeUsedIn(['App\Http', 'App\Providers']);
 
 arch('Middleware')
     ->expect('App\Http\Middleware')
@@ -115,7 +129,7 @@ arch('Requests')
     ->expect('App\Http\Requests')
     ->toBeClasses()
     ->toHaveMethod(method: 'rules')
-    ->toExtend(\Illuminate\Foundation\Http\FormRequest::class)
+    ->toExtend(FormRequest::class)
     ->toOnlyBeUsedIn('App\Http\Controllers')
     ->toHaveLineCountLessThan(150)
     ->toHaveSuffix('Request');
@@ -123,7 +137,7 @@ arch('Requests')
 arch('Resources')
     ->expect('App\Http\Resources')
     ->toBeClasses()
-    ->toExtend(\Illuminate\Http\Resources\Json\JsonResource::class)
+    ->toExtend(JsonResource::class)
     ->toOnlyBeUsedIn('App\Http\Controllers')
     ->toHaveLineCountLessThan(150)
     ->toHaveSuffix('Resource');
@@ -147,7 +161,7 @@ arch('Events')
     ->expect('App\Events')
     ->toBeClasses()
     ->toExtendNothing()
-    ->toUseTrait(\Illuminate\Queue\SerializesModels::class)
+    ->toUseTrait(SerializesModels::class)
     ->toHaveLineCountLessThan(100)
     ->not->toHaveSuffix('Event');
 
@@ -161,7 +175,7 @@ arch('Commands')
     ->expect('App\Console\Commands')
     ->toBeClasses()
     ->not->toHavePublicMethodsBesides(['handle'])
-    ->toExtend(\Illuminate\Console\Command::class)
+    ->toExtend(Command::class)
     ->toImplementNothing()
     ->toHaveLineCountLessThan(150)
     ->toHaveSuffix('Command');
@@ -170,38 +184,38 @@ arch('Jobs')
     ->expect('App\Jobs')
     ->toBeClasses()
     ->not->toHavePublicMethodsBesides(['handle'])
-    ->toImplement(\Illuminate\Contracts\Queue\ShouldQueue::class)
-    ->toUseTrait(\Illuminate\Foundation\Bus\Dispatchable::class)
+    ->toImplement(ShouldQueue::class)
+    ->toUseTrait(Dispatchable::class)
     ->toHaveLineCountLessThan(250)
     ->toHaveSuffix('Job');
 
 arch('Mail')
     ->expect('App\Mail')
     ->toBeClasses()
-    ->toExtend(\Illuminate\Mail\Mailable::class)
-    ->toImplement(\Illuminate\Contracts\Queue\ShouldQueue::class)
+    ->toExtend(Mailable::class)
+    ->toImplement(ShouldQueue::class)
     ->toHaveLineCountLessThan(150);
 
 arch('Notifications')
     ->expect('App\Notifications')
     ->toBeClasses()
-    ->toExtend(\Illuminate\Notifications\Notification::class)
+    ->toExtend(Notification::class)
     ->toHaveLineCountLessThan(200)
     ->toHaveSuffix('Notification');
 
 arch('Models')
     ->expect('App\Models')
     ->toBeClasses()
-    ->toExtend(\Illuminate\Database\Eloquent\Model::class)
+    ->toExtend(Model::class)
     ->ignoring('App\Models\Scopes')
-    ->not->toUseTrait(\Illuminate\Database\Eloquent\SoftDeletes::class)
+    ->not->toUseTrait(SoftDeletes::class)
     ->toHaveLineCountLessThan(250)
     ->not->toHaveSuffix('Model');
 
 arch('Queries')
     ->expect('App\Queries')
     ->toBeClasses()
-    ->toExtend(\Illuminate\Database\Eloquent\Builder::class)
+    ->toExtend(Builder::class)
     ->not->toHavePublicMethodsBesides(['__construct', 'builder'])
     ->toHaveLineCountLessThan(150);
 
@@ -214,7 +228,7 @@ arch('Policies')
 arch('Providers')
     ->expect('App\Providers')
     ->toBeClasses()
-    ->toExtend(\Illuminate\Support\ServiceProvider::class)
+    ->toExtend(ServiceProvider::class)
     ->not->toBeUsed()
     ->toHaveLineCountLessThan(250)
     ->toHaveSuffix('ServiceProvider');

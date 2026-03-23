@@ -9,5 +9,8 @@ declare module "@inertiajs/core" {
 		//     toast?: { type: "success" | "error"; message: string };
 		// };
 		errorValueType: string[];
+		layoutProps: {
+			title: string;
+		};
 	}
 }
