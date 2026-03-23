@@ -19,13 +19,28 @@ const server = http.createServer((req, res) => {
 
 const getSessionCookie = (req) => {
     const cookies = cookie.parse(req.headers.cookie || '');
-    const xsrfToken = cookies['XSRF-TOKEN'];
+    const decodeCookieValue = (value) => {
+        if (!value) {
+            return value;
+        }
+        try {
+            return decodeURIComponent(value);
+        } catch {
+            return value;
+        }
+    };
+
+    const xsrfToken = decodeCookieValue(cookies['XSRF-TOKEN']);
     const appName = process.env.APP_NAME || 'laravel';
-    const sessionCookieName = `${appName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_session`;
+    const configuredSessionCookie = process.env.SESSION_COOKIE;
+    const fallbackSessionCookieName = `${appName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_session`;
+    const discoveredSessionCookie = Object.keys(cookies).find((key) => key.endsWith('_session'));
+    const sessionCookieName = configuredSessionCookie || fallbackSessionCookieName || discoveredSessionCookie;
+    const laravelSession = decodeCookieValue(cookies[sessionCookieName]) || decodeCookieValue(cookies[discoveredSessionCookie]);
     return {
         sessionCookieName,
         xsrfToken: xsrfToken,
-        laravelSession: cookies[sessionCookieName]
+        laravelSession: laravelSession
     }
 }
 

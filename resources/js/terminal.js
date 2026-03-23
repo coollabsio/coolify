@@ -38,6 +38,7 @@ export function initializeTerminalComponent() {
             wasConnectedBeforeHidden: false,
             websocketUrls: [],
             websocketUrlIndex: 0,
+            queuedTerminalCommand: null,
 
             init() {
                 this.setupTerminal();
@@ -288,6 +289,12 @@ export function initializeTerminalComponent() {
 
                 // Notify that WebSocket is ready for auto-connection
                 this.dispatchEvent('terminal-websocket-ready');
+
+                // Flush queued command if user clicked connect before socket was ready.
+                if (this.queuedTerminalCommand) {
+                    this.sendMessage(this.queuedTerminalCommand);
+                    this.queuedTerminalCommand = null;
+                }
             },
 
             handleSocketError(error) {
@@ -413,6 +420,13 @@ export function initializeTerminalComponent() {
             sendCommandWhenReady(message) {
                 if (this.isWebSocketReady()) {
                     this.sendMessage(message);
+                    return;
+                }
+
+                // Queue latest command and ensure connection attempts continue.
+                this.queuedTerminalCommand = message;
+                if (!this.socket || this.socket.readyState === WebSocket.CLOSED || this.connectionState === 'disconnected') {
+                    this.initializeWebSocket();
                 }
             },
 
