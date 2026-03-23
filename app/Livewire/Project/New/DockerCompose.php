@@ -31,11 +31,21 @@ class DockerCompose extends Component
 
     public function submit()
     {
-        $server_id = $this->query['server_id'];
         try {
             $this->validate([
                 'dockerComposeRaw' => 'required',
             ]);
+
+            $server_id = data_get($this->query, 'server_id');
+            $destination_uuid = data_get($this->query, 'destination');
+
+            if (! is_numeric($server_id)) {
+                throw new \InvalidArgumentException('Invalid server id.');
+            }
+
+            if (! is_string($destination_uuid) || trim($destination_uuid) === '') {
+                throw new \InvalidArgumentException('Invalid destination.');
+            }
             $this->dockerComposeRaw = Yaml::dump(Yaml::parse($this->dockerComposeRaw), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
 
             // Validate for command injection BEFORE saving to database
@@ -44,7 +54,6 @@ class DockerCompose extends Component
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
 
-            $destination_uuid = $this->query['destination'];
             $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
             if (! $destination) {
                 $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
@@ -52,6 +61,11 @@ class DockerCompose extends Component
             if (! $destination) {
                 throw new \Exception('Destination not found. What?!');
             }
+
+            if ((int) $destination->server_id !== (int) $server_id) {
+                throw new \InvalidArgumentException('Destination/server mismatch.');
+            }
+
             $destination_class = $destination->getMorphClass();
 
             $service = Service::create([
