@@ -935,6 +935,12 @@ class FileExplorer extends Component
     {
         try {
             $normalizedEncodedPath = trim($encodedPath);
+            if (
+                (str_starts_with($normalizedEncodedPath, "'") && str_ends_with($normalizedEncodedPath, "'")) ||
+                (str_starts_with($normalizedEncodedPath, '"') && str_ends_with($normalizedEncodedPath, '"'))
+            ) {
+                $normalizedEncodedPath = substr($normalizedEncodedPath, 1, -1);
+            }
             $padded = str_pad(
                 strtr($normalizedEncodedPath, '-_', '+/'),
                 strlen($normalizedEncodedPath) % 4 === 0 ? strlen($normalizedEncodedPath) : strlen($normalizedEncodedPath) + (4 - (strlen($normalizedEncodedPath) % 4)),
@@ -1051,6 +1057,11 @@ class FileExplorer extends Component
         } else {
             $this->selectedFiles[] = $path;
         }
+        $this->syncSelectedFilesWithCurrentDirectory();
+    }
+
+    public function updatedSelectedFiles(): void
+    {
         $this->syncSelectedFilesWithCurrentDirectory();
     }
 
