@@ -7,6 +7,9 @@ function get_socialite_provider(string $provider)
 {
     $oauth_setting = OauthSetting::firstWhere('provider', $provider);
 
+    abort_if(! $oauth_setting, 404, 'OAuth provider not found.');
+    abort_if(! $oauth_setting->enabled, 403, 'OAuth provider is disabled.');
+
     if (! filled($oauth_setting->redirect_uri)) {
         $oauth_setting->update(['redirect_uri' => route('auth.callback', $provider)]);
     }
@@ -69,6 +72,8 @@ function get_socialite_provider(string $provider)
         'gitlab' => \Laravel\Socialite\Two\GitlabProvider::class,
         'infomaniak' => \SocialiteProviders\Infomaniak\Provider::class,
     ];
+
+    abort_unless(array_key_exists($provider, $provider_class_map), 404, 'OAuth provider not found.');
 
     $socialite = Socialite::buildProvider(
         $provider_class_map[$provider],
