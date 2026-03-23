@@ -55,6 +55,15 @@ class Github extends Controller
                 $after_sha = data_get($payload, 'after', data_get($payload, 'pull_request.head.sha'));
                 $author_association = data_get($payload, 'pull_request.author_association');
             }
+            if ($x_github_event === 'release') {
+                $action = data_get($payload, 'action');
+                if ($action !== 'published') {
+                    return response("Nothing to do. Release action is '$action', not 'published'.");
+                }
+                $full_name = data_get($payload, 'repository.full_name');
+                $branch = data_get($payload, 'release.target_commitish');
+                $release_tag = data_get($payload, 'release.tag_name');
+            }
             if (! $branch) {
                 return response('Nothing to do. No branch found in the request.');
             }
@@ -69,6 +78,13 @@ class Github extends Controller
                 $applications = $applications->where('git_branch', $base_branch)->get();
                 if ($applications->isEmpty()) {
                     return response("Nothing to do. No applications found for repo $full_name and branch '$base_branch'.");
+                }
+            }
+            if ($x_github_event === 'release') {
+                $applications = $applications->where('git_branch', $branch)->get()
+                    ->filter(fn ($app) => $app->settings->is_deploy_on_release_enabled);
+                if ($applications->isEmpty()) {
+                    return response("Nothing to do. No applications with deploy-on-release enabled for repo $full_name and branch '$branch'.");
                 }
             }
             $applicationsByServer = $applications->groupBy(function ($app) {
@@ -181,6 +197,24 @@ class Github extends Controller
                             'message' => 'PR webhook received, processing queued.',
                         ]);
                     }
+                    if ($x_github_event === 'release') {
+                        $deployment_uuid = new Cuid2;
+                        $result = queue_application_deployment(
+                            application: $application,
+                            deployment_uuid: $deployment_uuid,
+                            commit: $release_tag ?? 'HEAD',
+                            force_rebuild: false,
+                            is_webhook: true,
+                        );
+                        if ($result['status'] === 'queue_full') {
+                            return response($result['message'], 429)->header('Retry-After', 60);
+                        }
+                        $return_payloads->push([
+                            'application' => $application->name,
+                            'status' => $result['status'],
+                            'message' => "Release '{$release_tag}' deployment queued.",
+                        ]);
+                    }
                 }
             }
 
@@ -246,6 +280,15 @@ class Github extends Controller
                 $after_sha = data_get($payload, 'after', data_get($payload, 'pull_request.head.sha'));
                 $author_association = data_get($payload, 'pull_request.author_association');
             }
+            if ($x_github_event === 'release') {
+                $action = data_get($payload, 'action');
+                if ($action !== 'published') {
+                    return response("Nothing to do. Release action is '$action', not 'published'.");
+                }
+                $id = data_get($payload, 'repository.id');
+                $branch = data_get($payload, 'release.target_commitish');
+                $release_tag = data_get($payload, 'release.tag_name');
+            }
             if (! $id || ! $branch) {
                 return response('Nothing to do. No id or branch found.');
             }
@@ -262,6 +305,13 @@ class Github extends Controller
                 $applications = $applications->where('git_branch', $base_branch)->get();
                 if ($applications->isEmpty()) {
                     return response("Nothing to do. No applications found with branch '$base_branch'.");
+                }
+            }
+            if ($x_github_event === 'release') {
+                $applications = $applications->where('git_branch', $branch)->get()
+                    ->filter(fn ($app) => $app->settings->is_deploy_on_release_enabled);
+                if ($applications->isEmpty()) {
+                    return response("Nothing to do. No applications with deploy-on-release enabled for branch '$branch'.");
                 }
             }
             $applicationsByServer = $applications->groupBy(function ($app) {
@@ -356,6 +406,26 @@ class Github extends Controller
                             'application' => $application->name,
                             'status' => 'queued',
                             'message' => 'PR webhook received, processing queued.',
+                        ]);
+                    }
+                    if ($x_github_event === 'release') {
+                        $deployment_uuid = new Cuid2;
+                        $result = queue_application_deployment(
+                            application: $application,
+                            deployment_uuid: $deployment_uuid,
+                            commit: $release_tag ?? 'HEAD',
+                            force_rebuild: false,
+                            is_webhook: true,
+                        );
+                        if ($result['status'] === 'queue_full') {
+                            return response($result['message'], 429)->header('Retry-After', 60);
+                        }
+                        $return_payloads->push([
+                            'status' => $result['status'],
+                            'message' => "Release '{$release_tag}' deployment queued.",
+                            'application_uuid' => $application->uuid,
+                            'application_name' => $application->name,
+                            'deployment_uuid' => $result['deployment_uuid'] ?? null,
                         ]);
                     }
                 }

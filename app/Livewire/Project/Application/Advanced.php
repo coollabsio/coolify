@@ -34,6 +34,8 @@ class Advanced extends Component
     #[Validate(['boolean'])]
     public bool $isAutoDeployEnabled = true;
 
+    public bool $isDeployOnReleaseEnabled = false;
+
     #[Validate(['boolean'])]
     public bool $disableBuildCache = false;
 
@@ -102,6 +104,7 @@ class Advanced extends Component
             $this->application->settings->is_preview_deployments_enabled = $this->isPreviewDeploymentsEnabled;
             $this->application->settings->is_pr_deployments_public_enabled = $this->isPrDeploymentsPublicEnabled;
             $this->application->settings->is_auto_deploy_enabled = $this->isAutoDeployEnabled;
+            $this->application->settings->is_deploy_on_release_enabled = $this->isDeployOnReleaseEnabled;
             $this->application->settings->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->application->settings->is_gpu_enabled = $this->isGpuEnabled;
             $this->application->settings->gpu_driver = $this->gpuDriver;
@@ -131,6 +134,7 @@ class Advanced extends Component
             $this->isPreviewDeploymentsEnabled = $this->application->settings->is_preview_deployments_enabled;
             $this->isPrDeploymentsPublicEnabled = $this->application->settings->is_pr_deployments_public_enabled ?? false;
             $this->isAutoDeployEnabled = $this->application->settings->is_auto_deploy_enabled;
+            $this->isDeployOnReleaseEnabled = $this->application->settings->is_deploy_on_release_enabled ?? false;
             $this->isGpuEnabled = $this->application->settings->is_gpu_enabled;
             $this->gpuDriver = $this->application->settings->gpu_driver;
             $this->gpuCount = $this->application->settings->gpu_count;

@@ -18,6 +18,7 @@ class ApplicationSetting extends Model
         'inject_build_args_to_dockerfile' => 'boolean',
         'include_source_commit_in_build' => 'boolean',
         'is_auto_deploy_enabled' => 'boolean',
+        'is_deploy_on_release_enabled' => 'boolean',
         'is_force_https_enabled' => 'boolean',
         'is_debug_enabled' => 'boolean',
         'is_preview_deployments_enabled' => 'boolean',
