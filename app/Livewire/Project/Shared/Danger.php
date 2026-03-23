@@ -110,7 +110,6 @@ class Danger extends Component
             }
 
             $this->authorize('delete', $this->resource);
-            $this->resource->delete();
             DeleteResourceJob::dispatch(
                 $this->resource,
                 $this->delete_volumes,

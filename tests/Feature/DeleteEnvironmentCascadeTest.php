@@ -81,6 +81,37 @@ it('danger delete method accepts checkbox selection payload', function () {
     expect($reflection->getParameters()[1]->isOptional())->toBeTrue();
 });
 
+it('danger delete dispatches resource cleanup job for services', function () {
+    Queue::fake();
+
+    $project = Project::query()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'project-danger-delete',
+        'team_id' => $this->team->id,
+    ]);
+
+    $environment = Environment::query()->create([
+        'name' => 'production',
+        'project_id' => $project->id,
+    ]);
+
+    $service = Service::query()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'service-to-delete',
+        'destination_type' => 'App\\Models\\StandaloneDocker',
+        'destination_id' => 1,
+        'environment_id' => $environment->id,
+    ]);
+
+    Livewire::test(Danger::class, ['resource' => $service])
+        ->set('projectUuid', $project->uuid)
+        ->set('environmentUuid', $environment->uuid)
+        ->call('delete', 'password', ['delete_volumes', 'delete_connected_networks', 'delete_configurations', 'docker_cleanup']);
+
+    Queue::assertPushed(DeleteResourceJob::class, 1);
+    expect(Service::query()->find($service->id))->not->toBeNull();
+});
+
 it('deletes project with all resources inside it', function () {
     Queue::fake();
 
