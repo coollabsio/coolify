@@ -897,6 +897,15 @@ class Application extends BaseModel
         return $this->hasMany(ScheduledTask::class)->orderBy('name', 'asc');
     }
 
+    /**
+     * Database services detected in Docker Compose deployments via GitHub App.
+     * These ServiceDatabase records enable automated backup scheduling.
+     */
+    public function databases(): HasMany
+    {
+        return $this->hasMany(ServiceDatabase::class);
+    }
+
     public function private_key()
     {
         return $this->belongsTo(PrivateKey::class);

@@ -2817,6 +2817,26 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
 
+            // Create ServiceDatabase record for detected databases in Application deployments
+            // This enables automated backup support for databases in GitHub App Docker Compose deployments
+            if ($isDatabase) {
+                $existingDb = ServiceDatabase::where([
+                    'name' => $serviceName,
+                    'application_id' => $resource->id,
+                ])->first();
+
+                if (is_null($existingDb)) {
+                    ServiceDatabase::create([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'application_id' => $resource->id,
+                    ]);
+                } elseif ($existingDb->image !== $image) {
+                    $existingDb->image = $image;
+                    $existingDb->save();
+                }
+            }
+
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
