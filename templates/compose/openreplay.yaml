@@ -1,0 +1,167 @@
+# documentation: https://docs.openreplay.com/
+# slogan: "Open-source session replay and product analytics you can self-host."
+# category: analytics
+# tags: analytics, session-replay, product-analytics, debugging, open-source, privacy
+# logo: svgs/openreplay.svg
+# port: 80
+
+services:
+  openreplay:
+    image: "ghcr.io/openreplay/http:v1.23.0"
+    environment:
+      - SERVICE_URL_OPENREPLAY
+      - COMMON_DOMAIN_NAME=${SERVICE_FQDN_OPENREPLAY}
+      - COMMON_PROTOCOL=${COMMON_PROTOCOL:-https}
+      - COMMON_JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
+      - COMMON_JWT_SPOT_SECRET=${SERVICE_PASSWORD_64_JWTSPOT}
+      - COMMON_JWT_REFRESH_SECRET=${SERVICE_PASSWORD_64_JWTREFRESH}
+      - COMMON_JWT_SPOT_REFRESH_SECRET=${SERVICE_PASSWORD_64_JWTSPOTREFRESH}
+      - COMMON_ASSIST_JWT_SECRET=${SERVICE_PASSWORD_64_ASSISTJWT}
+      - COMMON_ASSIST_KEY=${SERVICE_PASSWORD_64_ASSISTKEY}
+      - COMMON_PG_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - COMMON_S3_KEY=${SERVICE_PASSWORD_S3KEY}
+      - COMMON_S3_SECRET=${SERVICE_PASSWORD_S3SECRET}
+      - REDIS_STRING=redis://redis:6379
+      - POSTGRES_STRING=postgres://openreplay:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/openreplay
+      - S3_HOST=http://minio:9000
+      - S3_KEY=${SERVICE_PASSWORD_S3KEY}
+      - S3_SECRET=${SERVICE_PASSWORD_S3SECRET}
+      - CLICKHOUSE_STRING=http://clickhouse:8123
+      - SITE_URL=${SERVICE_URL_OPENREPLAY}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  openreplay-chalice:
+    image: "ghcr.io/openreplay/chalice:v1.23.0"
+    environment:
+      - COMMON_DOMAIN_NAME=${SERVICE_FQDN_OPENREPLAY}
+      - COMMON_PROTOCOL=${COMMON_PROTOCOL:-https}
+      - COMMON_JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
+      - COMMON_JWT_SPOT_SECRET=${SERVICE_PASSWORD_64_JWTSPOT}
+      - COMMON_JWT_REFRESH_SECRET=${SERVICE_PASSWORD_64_JWTREFRESH}
+      - COMMON_JWT_SPOT_REFRESH_SECRET=${SERVICE_PASSWORD_64_JWTSPOTREFRESH}
+      - COMMON_ASSIST_JWT_SECRET=${SERVICE_PASSWORD_64_ASSISTJWT}
+      - COMMON_ASSIST_KEY=${SERVICE_PASSWORD_64_ASSISTKEY}
+      - COMMON_PG_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - REDIS_STRING=redis://redis:6379
+      - POSTGRES_STRING=postgres://openreplay:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/openreplay
+      - S3_HOST=http://minio:9000
+      - S3_KEY=${SERVICE_PASSWORD_S3KEY}
+      - S3_SECRET=${SERVICE_PASSWORD_S3SECRET}
+      - CLICKHOUSE_STRING=http://clickhouse:8123
+      - SITE_URL=${SERVICE_URL_OPENREPLAY}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  openreplay-assist:
+    image: "ghcr.io/openreplay/assist:v1.23.0"
+    environment:
+      - COMMON_DOMAIN_NAME=${SERVICE_FQDN_OPENREPLAY}
+      - COMMON_PROTOCOL=${COMMON_PROTOCOL:-https}
+      - COMMON_ASSIST_JWT_SECRET=${SERVICE_PASSWORD_64_ASSISTJWT}
+      - COMMON_ASSIST_KEY=${SERVICE_PASSWORD_64_ASSISTKEY}
+      - REDIS_STRING=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  openreplay-sink:
+    image: "ghcr.io/openreplay/sink:v1.23.0"
+    environment:
+      - COMMON_PG_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - REDIS_STRING=redis://redis:6379
+      - POSTGRES_STRING=postgres://openreplay:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/openreplay
+      - S3_HOST=http://minio:9000
+      - S3_KEY=${SERVICE_PASSWORD_S3KEY}
+      - S3_SECRET=${SERVICE_PASSWORD_S3SECRET}
+      - CLICKHOUSE_STRING=http://clickhouse:8123
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+
+  openreplay-worker:
+    image: "ghcr.io/openreplay/worker:v1.23.0"
+    environment:
+      - COMMON_PG_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - REDIS_STRING=redis://redis:6379
+      - POSTGRES_STRING=postgres://openreplay:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/openreplay
+      - S3_HOST=http://minio:9000
+      - S3_KEY=${SERVICE_PASSWORD_S3KEY}
+      - S3_SECRET=${SERVICE_PASSWORD_S3SECRET}
+      - CLICKHOUSE_STRING=http://clickhouse:8123
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgresql:
+    image: "postgres:17-alpine"
+    volumes:
+      - openreplay-postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=openreplay
+      - POSTGRES_USER=openreplay
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openreplay -d openreplay"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: "valkey/valkey:8-alpine"
+    volumes:
+      - openreplay-redis-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  clickhouse:
+    image: "clickhouse/clickhouse-server:25.11-alpine"
+    volumes:
+      - openreplay-clickhouse-data:/var/lib/clickhouse
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8123/ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  minio:
+    image: "bitnami/minio:2025"
+    volumes:
+      - openreplay-minio-data:/bitnami/minio/data
+    environment:
+      - MINIO_ROOT_USER=${SERVICE_PASSWORD_S3KEY}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_S3SECRET}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
