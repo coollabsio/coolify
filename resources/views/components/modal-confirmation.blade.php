@@ -133,7 +133,7 @@
         const params = paramsMatch && paramsMatch[1] 
             ? paramsMatch[1].split(',').map(param => {
                 let p = param.trim();
-                if ((p.startsWith("'") && p.endsWith("'")) || (p.startsWith('"') && p.endsWith('"'))) {
+                if ((p.startsWith("'") && p.endsWith("'")) || (p.startsWith('\x22') && p.endsWith('\x22'))) {
                     p = p.slice(1, -1);
                 }
                 return p === 'true' ? true : p === 'false' ? false : p;
@@ -145,7 +145,7 @@
         params.push(this.confirmWithPassword ? this.password : '');
 
         // Only pass selectedActions if there are checkboxes with selections
-        if (this.selectedActions.length > 0) {
+        if (this.selectedActions.length !== 0) {
             params.push(this.selectedActions);
         }
 
@@ -171,7 +171,7 @@
     },
     toggleAction(id) {
         const index = this.selectedActions.indexOf(id);
-        if (index > -1) {
+        if (index !== -1) {
             this.selectedActions.splice(index, 1);
         } else {
             this.selectedActions.push(id);
