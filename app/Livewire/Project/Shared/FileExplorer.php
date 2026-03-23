@@ -478,9 +478,11 @@ class FileExplorer extends Component
             $output = instant_remote_process([$command], $server, false);
 
             $this->files = $this->parseFileList($output ?? '');
+            $this->syncSelectedFilesWithCurrentDirectory();
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to load files: '.$e->getMessage());
             $this->files = [];
+            $this->selectedFiles = [];
             $this->isLoading = false;
         } finally {
             $this->isLoading = false;
@@ -916,39 +918,10 @@ class FileExplorer extends Component
     public function deleteFile(string $path, string $password = '')
     {
         try {
-            // modal-confirmation can pass string params wrapped in quotes.
-            // Normalize here so rm targets the real filesystem path.
-            $normalizedPath = trim($path);
-            if (
-                (str_starts_with($normalizedPath, "'") && str_ends_with($normalizedPath, "'")) ||
-                (str_starts_with($normalizedPath, '"') && str_ends_with($normalizedPath, '"'))
-            ) {
-                $normalizedPath = substr($normalizedPath, 1, -1);
-            }
-
-            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
-            if (is_null($container)) {
-                $this->dispatch('error', 'Container not found.');
+            if (! $this->deleteFileInternal($path)) {
+                $this->dispatch('error', 'Failed to delete file or folder.');
 
                 return;
-            }
-
-            $server = data_get($container, 'server');
-            $containerName = data_get($container, 'container.Names');
-            $escapedContainer = escapeshellarg($containerName);
-            $escapedPath = escapeshellarg($normalizedPath);
-
-            $command = "docker exec {$escapedContainer} rm -rf {$escapedPath}";
-            if ($server->isNonRoot()) {
-                $command = "sudo {$command}";
-            }
-
-            instant_remote_process([$command], $server);
-
-            if ($this->selectedFile === $normalizedPath || $this->selectedFile === $path) {
-                $this->selectedFile = null;
-                $this->fileContent = null;
-                $this->isEditing = false;
             }
 
             $this->dispatch('success', 'File deleted successfully.');
@@ -958,28 +931,184 @@ class FileExplorer extends Component
         }
     }
 
+    public function deleteFileByEncodedPath(string $encodedPath, string $password = '')
+    {
+        try {
+            $normalizedEncodedPath = trim($encodedPath);
+            $padded = str_pad(
+                strtr($normalizedEncodedPath, '-_', '+/'),
+                strlen($normalizedEncodedPath) % 4 === 0 ? strlen($normalizedEncodedPath) : strlen($normalizedEncodedPath) + (4 - (strlen($normalizedEncodedPath) % 4)),
+                '=',
+                STR_PAD_RIGHT
+            );
+
+            $decodedPath = base64_decode($padded, true);
+            if ($decodedPath === false || $decodedPath === '') {
+                $this->dispatch('error', 'Invalid file path.');
+
+                return;
+            }
+
+            $this->deleteFile($decodedPath, $password);
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to decode file path: '.$e->getMessage());
+        }
+    }
+
+    private function deleteFileInternal(string $path): bool
+    {
+        // modal-confirmation can pass string params wrapped in quotes.
+        // Normalize here so rm targets the real filesystem path.
+        $normalizedPath = trim($path);
+        if (
+            (str_starts_with($normalizedPath, "'") && str_ends_with($normalizedPath, "'")) ||
+            (str_starts_with($normalizedPath, '"') && str_ends_with($normalizedPath, '"'))
+        ) {
+            $normalizedPath = substr($normalizedPath, 1, -1);
+        }
+
+        if ($normalizedPath === '') {
+            return false;
+        }
+
+        $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+        if (is_null($container)) {
+            return false;
+        }
+
+        $server = data_get($container, 'server');
+        $containerName = data_get($container, 'container.Names');
+        if (! $server || ! $server instanceof Server) {
+            return false;
+        }
+
+        if (! $this->pathExistsInContainer($containerName, $server, $normalizedPath)) {
+            return false;
+        }
+
+        $escapedContainer = escapeshellarg($containerName);
+        $escapedPath = escapeshellarg($normalizedPath);
+
+        $command = "docker exec {$escapedContainer} rm -rf {$escapedPath}";
+        if ($server->isNonRoot()) {
+            $command = "sudo {$command}";
+        }
+
+        instant_remote_process([$command], $server);
+
+        if ($this->pathExistsInContainer($containerName, $server, $normalizedPath)) {
+            return false;
+        }
+
+        if ($this->selectedFile === $normalizedPath || $this->selectedFile === $path) {
+            $this->selectedFile = null;
+            $this->fileContent = null;
+            $this->isEditing = false;
+        }
+
+        return true;
+    }
+
+    private function pathExistsInContainer(string $containerName, Server $server, string $path): bool
+    {
+        $escapedContainer = escapeshellarg($containerName);
+        $escapedPath = escapeshellarg($path);
+        $checkCommand = "docker exec {$escapedContainer} sh -c 'test -e {$escapedPath} && echo exists || echo missing'";
+
+        if ($server->isNonRoot()) {
+            $checkCommand = "sudo {$checkCommand}";
+        }
+
+        $result = trim((string) (instant_remote_process([$checkCommand], $server, false) ?? ''));
+
+        return $result === 'exists';
+    }
+
+    private function syncSelectedFilesWithCurrentDirectory(): void
+    {
+        $validPaths = collect($this->files)
+            ->pluck('path')
+            ->filter(fn ($path) => is_string($path) && $path !== '')
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $validPathsSet = array_flip($validPaths);
+        $normalizedSelected = [];
+        foreach ($this->selectedFiles as $path) {
+            if (is_string($path) && isset($validPathsSet[$path])) {
+                $normalizedSelected[$path] = $path;
+            }
+        }
+
+        $this->selectedFiles = array_values($normalizedSelected);
+    }
+
     public function toggleFileSelection(string $path)
     {
-        if (in_array($path, $this->selectedFiles)) {
+        if (in_array($path, $this->selectedFiles, true)) {
             $this->selectedFiles = array_values(array_diff($this->selectedFiles, [$path]));
         } else {
             $this->selectedFiles[] = $path;
         }
+        $this->syncSelectedFilesWithCurrentDirectory();
     }
 
     public function selectAll()
     {
+        $this->syncSelectedFilesWithCurrentDirectory();
         $allSelected = count($this->selectedFiles) === count($this->files);
         if ($allSelected) {
             $this->selectedFiles = [];
         } else {
-            $this->selectedFiles = collect($this->files)->pluck('path')->toArray();
+            $this->selectedFiles = collect($this->files)
+                ->pluck('path')
+                ->filter(fn ($path) => is_string($path) && $path !== '')
+                ->unique()
+                ->values()
+                ->toArray();
         }
     }
 
     public function deselectAll()
     {
         $this->selectedFiles = [];
+    }
+
+    public function deleteSelectedFiles(string $password = ''): void
+    {
+        $this->syncSelectedFilesWithCurrentDirectory();
+
+        if (empty($this->selectedFiles)) {
+            $this->dispatch('error', 'Please select at least one file or folder.');
+
+            return;
+        }
+
+        try {
+            $deletedCount = 0;
+            $failedCount = 0;
+            foreach ($this->selectedFiles as $path) {
+                if ($this->deleteFileInternal($path)) {
+                    $deletedCount++;
+                } else {
+                    $failedCount++;
+                }
+            }
+
+            $this->selectedFiles = [];
+            $this->loadFiles();
+
+            if ($deletedCount > 0 && $failedCount === 0) {
+                $this->dispatch('success', $deletedCount.' item(s) deleted successfully.');
+            } elseif ($deletedCount > 0) {
+                $this->dispatch('error', "Deleted {$deletedCount} item(s), but {$failedCount} could not be deleted.");
+            } else {
+                $this->dispatch('error', 'No selected items could be deleted.');
+            }
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to delete selected items: '.$e->getMessage());
+        }
     }
 
     public function extractSelectedFiles()

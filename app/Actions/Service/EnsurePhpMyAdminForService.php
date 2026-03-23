@@ -175,6 +175,9 @@ class EnsurePhpMyAdminForService
                 'PMA_HOST='.$dbServiceName,
                 'PMA_USER=root',
                 'PMA_PASSWORD='.($rootPassword ?? '${SERVICE_PASSWORD_MYSQLROOT}'),
+                'UPLOAD_LIMIT=32M',
+                'PHP_UPLOAD_MAX_FILESIZE=32M',
+                'PHP_POST_MAX_SIZE=32M',
             ],
             'networks' => [
                 $network => null,

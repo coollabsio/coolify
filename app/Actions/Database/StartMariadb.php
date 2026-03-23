@@ -225,6 +225,9 @@ class StartMariadb
                 'PMA_HOST='.$container_name,
                 'PMA_USER=root',
                 'PMA_PASSWORD='.$this->database->mariadb_root_password,
+                'UPLOAD_LIMIT=32M',
+                'PHP_UPLOAD_MAX_FILESIZE=32M',
+                'PHP_POST_MAX_SIZE=32M',
                 // Configurar servidor por defecto para login automático
                 'PMA_CONTROLUSER=root',
                 'PMA_CONTROLPASS='.$this->database->mariadb_root_password,
