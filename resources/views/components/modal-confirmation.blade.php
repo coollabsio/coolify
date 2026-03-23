@@ -109,6 +109,7 @@
             let inSingleQuote = false;
             let inDoubleQuote = false;
             const doubleQuote = String.fromCharCode(34);
+            const singleQuote = String.fromCharCode(39);
             let escaped = false;
 
             for (const char of rawParams) {
@@ -156,7 +157,8 @@
                 ) {
                     const unquoted = param.slice(1, -1);
                     return unquoted
-                        .replace(/\\'/g, "'")
+                        // Replace escaped single-quotes (\' -> ')
+                        .replace(/\\'/g, singleQuote)
                         .replace(new RegExp('\\\\' + doubleQuote, 'g'), doubleQuote)
                         .replace(/\\\\/g, '\\');
                 }
