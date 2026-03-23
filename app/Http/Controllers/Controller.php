@@ -86,11 +86,15 @@ class Controller extends BaseController
                 return redirect()->route('login');
             }
             if (Hash::check($password, $user->password)) {
-                $invitation = TeamInvitation::whereEmail($email);
-                if ($invitation->exists()) {
-                    $team = $invitation->first()->team;
-                    $user->teams()->attach($team->id, ['role' => $invitation->first()->role]);
-                    $invitation->delete();
+                $invitation = TeamInvitation::whereEmail($email)
+                    ->latest('id')
+                    ->first();
+                if ($invitation) {
+                    $team = $invitation->team;
+                    if (! $user->teams()->where('team_id', $team->id)->exists()) {
+                        $user->teams()->attach($team->id, ['role' => $invitation->role]);
+                    }
+                    TeamInvitation::where('id', $invitation->id)->delete();
                 } else {
                     $team = $user->teams()->first();
                 }
