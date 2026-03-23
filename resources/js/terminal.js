@@ -36,6 +36,8 @@ export function initializeTerminalComponent() {
             // Visibility handling - prevent disconnects when tab loses focus
             isDocumentVisible: true,
             wasConnectedBeforeHidden: false,
+            websocketUrls: [],
+            websocketUrlIndex: 0,
 
             init() {
                 this.setupTerminal();
@@ -201,28 +203,13 @@ export function initializeTerminalComponent() {
                     window.terminalConfig = {};
                 }
 
-                const predefined = window.terminalConfig
-                const connectionString = {
-                    protocol: window.location.protocol === 'https:' ? 'wss' : 'ws',
-                    host: window.location.hostname,
-                    port: ":6002",
-                    path: '/terminal/ws'
+                this.websocketUrls = this.buildWebSocketUrlCandidates();
+                this.websocketUrlIndex = 0;
+                const url = this.websocketUrls[this.websocketUrlIndex];
+                if (!url) {
+                    this.handleConnectionError('No valid terminal websocket URL found');
+                    return;
                 }
-
-                if (!window.location.port) {
-                    connectionString.port = ''
-                }
-                if (predefined.host) {
-                    connectionString.host = predefined.host
-                }
-                if (predefined.port) {
-                    connectionString.port = `:${predefined.port}`
-                }
-                if (predefined.protocol) {
-                    connectionString.protocol = predefined.protocol
-                }
-
-                const url = `${connectionString.protocol}://${connectionString.host}${connectionString.port}${connectionString.path}`
                 console.log(`[Terminal] Attempting connection to: ${url}`);
 
                 try {
@@ -247,6 +234,40 @@ export function initializeTerminalComponent() {
                     console.error('[Terminal] Failed to create WebSocket:', error);
                     this.handleConnectionError(`Failed to create WebSocket connection: ${error.message}`);
                 }
+            },
+            buildWebSocketUrlCandidates() {
+                const predefined = window.terminalConfig || {};
+                const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+                const host = window.location.hostname;
+                const appPort = window.location.port ? `:${window.location.port}` : '';
+                const path = '/terminal/ws';
+
+                const candidates = [];
+                const addCandidate = (candidateProtocol, candidateHost, candidatePort) => {
+                    if (!candidateHost) {
+                        return;
+                    }
+                    const normalizedPort = candidatePort ? `${candidatePort}` : '';
+                    const url = `${candidateProtocol}://${candidateHost}${normalizedPort}${path}`;
+                    if (!candidates.includes(url)) {
+                        candidates.push(url);
+                    }
+                };
+
+                if (predefined.host || predefined.port || predefined.protocol) {
+                    const configuredProtocol = predefined.protocol || protocol;
+                    const configuredHost = predefined.host || host;
+                    const configuredPort = predefined.port ? `:${predefined.port}` : '';
+                    addCandidate(configuredProtocol, configuredHost, configuredPort);
+                }
+
+                // Try same origin first (works when websocket is reverse-proxied through app endpoint).
+                addCandidate(protocol, host, appPort);
+
+                // Fallback to the legacy terminal websocket port.
+                addCandidate(protocol, host, ':6002');
+
+                return candidates;
             },
 
             handleSocketOpen() {
@@ -273,6 +294,9 @@ export function initializeTerminalComponent() {
                 console.error('[Terminal] WebSocket error:', error);
                 console.error('[Terminal] WebSocket state:', this.socket ? this.socket.readyState : 'No socket');
                 console.error('[Terminal] Connection attempt:', this.reconnectAttempts + 1);
+                if (this.connectionState === 'connecting' && this.tryNextWebSocketUrl()) {
+                    return;
+                }
                 this.handleConnectionError('WebSocket error occurred');
             },
 
@@ -286,6 +310,9 @@ export function initializeTerminalComponent() {
 
                 // Only reset terminal and reconnect if it wasn't a clean close
                 if (event.code !== 1000) {
+                    if (this.connectionState === 'connecting' && this.tryNextWebSocketUrl()) {
+                        return;
+                    }
                     // Don't show terminal reset message on first connection attempt
                     if (this.reconnectAttempts > 0) {
                         this.resetTerminal();
@@ -293,6 +320,50 @@ export function initializeTerminalComponent() {
                         this.terminalActive = false;
                     }
                     this.scheduleReconnect();
+                }
+            },
+            tryNextWebSocketUrl() {
+                if (!this.websocketUrls || this.websocketUrls.length === 0) {
+                    return false;
+                }
+                if (this.websocketUrlIndex >= this.websocketUrls.length - 1) {
+                    return false;
+                }
+
+                this.websocketUrlIndex++;
+                const nextUrl = this.websocketUrls[this.websocketUrlIndex];
+                if (!nextUrl) {
+                    return false;
+                }
+
+                console.warn(`[Terminal] Trying fallback websocket URL: ${nextUrl}`);
+                if (this.connectionTimeoutId) {
+                    clearTimeout(this.connectionTimeoutId);
+                    this.connectionTimeoutId = null;
+                }
+                try {
+                    if (this.socket) {
+                        this.socket.onopen = null;
+                        this.socket.onmessage = null;
+                        this.socket.onerror = null;
+                        this.socket.onclose = null;
+                    }
+                    this.socket = new WebSocket(nextUrl);
+                    const timeoutMs = this.connectionTimeout;
+                    this.connectionTimeoutId = setTimeout(() => {
+                        if (this.connectionState === 'connecting') {
+                            this.socket.close();
+                            this.handleConnectionError('Connection timeout');
+                        }
+                    }, timeoutMs);
+                    this.socket.onopen = this.handleSocketOpen.bind(this);
+                    this.socket.onmessage = this.handleSocketMessage.bind(this);
+                    this.socket.onerror = this.handleSocketError.bind(this);
+                    this.socket.onclose = this.handleSocketClose.bind(this);
+                    return true;
+                } catch (error) {
+                    console.error('[Terminal] Fallback websocket creation failed:', error);
+                    return this.tryNextWebSocketUrl();
                 }
             },
 
