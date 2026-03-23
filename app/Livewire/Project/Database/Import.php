@@ -660,49 +660,58 @@ EOD;
             // Prepare all commands in sequence
             $commands = [];
 
+            // Escape shell arguments for command safety
+            $escapedContainerName = escapeshellarg($containerName);
+            $escapedServerTmpPath = escapeshellarg($serverTmpPath);
+            $escapedTargetContainer = escapeshellarg($this->container);
+            $escapedContainerTmpPath = escapeshellarg($containerTmpPath);
+            $escapedScriptPath = escapeshellarg($scriptPath);
+            $escapedDestinationNetwork = escapeshellarg($destinationNetwork);
+            $escapedFullImageName = escapeshellarg($fullImageName);
+
             // 1. Clean up any existing helper container and temp files from previous runs
-            $commands[] = "docker rm -f {$containerName} 2>/dev/null || true";
-            $commands[] = "rm -f {$serverTmpPath} 2>/dev/null || true";
-            $commands[] = "docker exec {$this->container} rm -f {$containerTmpPath} {$scriptPath} 2>/dev/null || true";
+            $commands[] = "docker rm -f {$escapedContainerName} 2>/dev/null || true";
+            $commands[] = "rm -f {$escapedServerTmpPath} 2>/dev/null || true";
+            $commands[] = "docker exec {$escapedTargetContainer} rm -f {$escapedContainerTmpPath} {$escapedScriptPath} 2>/dev/null || true";
 
             // 2. Start helper container on the database network
-            $commands[] = "docker run -d --network {$destinationNetwork} --name {$containerName} {$fullImageName} sleep 3600";
+            $commands[] = "docker run -d --network {$escapedDestinationNetwork} --name {$escapedContainerName} {$escapedFullImageName} sleep 3600";
 
             // 3. Configure S3 access in helper container
             $escapedEndpoint = escapeshellarg($endpoint);
             $escapedKey = escapeshellarg($key);
             $escapedSecret = escapeshellarg($secret);
-            $commands[] = "docker exec {$containerName} mc alias set s3temp {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
+            $commands[] = "docker exec {$escapedContainerName} mc alias set s3temp {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
 
             // 4. Check file exists in S3 (bucket and path already validated above)
             $escapedBucket = escapeshellarg($bucket);
             $escapedCleanPath = escapeshellarg($cleanPath);
             $escapedS3Source = escapeshellarg("s3temp/{$bucket}/{$cleanPath}");
-            $commands[] = "docker exec {$containerName} mc stat {$escapedS3Source}";
+            $commands[] = "docker exec {$escapedContainerName} mc stat {$escapedS3Source}";
 
             // 5. Download from S3 to helper container (progress shown by default)
             $escapedHelperTmpPath = escapeshellarg($helperTmpPath);
-            $commands[] = "docker exec {$containerName} mc cp {$escapedS3Source} {$escapedHelperTmpPath}";
+            $commands[] = "docker exec {$escapedContainerName} mc cp {$escapedS3Source} {$escapedHelperTmpPath}";
 
             // 6. Copy from helper to server, then immediately to database container
-            $commands[] = "docker cp {$containerName}:{$helperTmpPath} {$serverTmpPath}";
-            $commands[] = "docker cp {$serverTmpPath} {$this->container}:{$containerTmpPath}";
+            $commands[] = "docker cp {$escapedContainerName}:{$helperTmpPath} {$escapedServerTmpPath}";
+            $commands[] = "docker cp {$escapedServerTmpPath} {$escapedTargetContainer}:{$containerTmpPath}";
 
             // 7. Cleanup helper container and server temp file immediately (no longer needed)
-            $commands[] = "docker rm -f {$containerName} 2>/dev/null || true";
-            $commands[] = "rm -f {$serverTmpPath} 2>/dev/null || true";
+            $commands[] = "docker rm -f {$escapedContainerName} 2>/dev/null || true";
+            $commands[] = "rm -f {$escapedServerTmpPath} 2>/dev/null || true";
 
             // 8. Build and execute restore command inside database container
             $restoreCommand = $this->buildRestoreCommand($containerTmpPath);
 
             $restoreCommandBase64 = base64_encode($restoreCommand);
-            $commands[] = "echo \"{$restoreCommandBase64}\" | base64 -d > {$scriptPath}";
-            $commands[] = "chmod +x {$scriptPath}";
-            $commands[] = "docker cp {$scriptPath} {$this->container}:{$scriptPath}";
+            $commands[] = "echo \"{$restoreCommandBase64}\" | base64 -d > {$escapedScriptPath}";
+            $commands[] = "chmod +x {$escapedScriptPath}";
+            $commands[] = "docker cp {$escapedScriptPath} {$escapedTargetContainer}:{$scriptPath}";
 
             // 9. Execute restore and cleanup temp files immediately after completion
-            $commands[] = "docker exec {$this->container} sh -c '{$scriptPath} && rm -f {$containerTmpPath} {$scriptPath}'";
-            $commands[] = "docker exec {$this->container} sh -c 'echo \"Import finished with exit code $?\"'";
+            $commands[] = "docker exec {$escapedTargetContainer} sh -c '{$scriptPath} && rm -f {$containerTmpPath} {$scriptPath}'";
+            $commands[] = "docker exec {$escapedTargetContainer} sh -c 'echo \"Import finished with exit code $?\"'";
 
             // Execute all commands with cleanup event (as safety net for edge cases)
             $activity = remote_process($commands, $this->server, ignore_errors: true, callEventOnFinish: 'S3RestoreJobFinished', callEventData: [
