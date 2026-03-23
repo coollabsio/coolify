@@ -42,19 +42,19 @@ class BackupEdit extends Component
     #[Validate(['string'])]
     public string $timezone = '';
 
-    #[Validate(['required', 'integer'])]
+    #[Validate(['required', 'integer', 'min:0'])]
     public int $databaseBackupRetentionAmountLocally = 0;
 
-    #[Validate(['required', 'integer'])]
+    #[Validate(['required', 'integer', 'min:0'])]
     public ?int $databaseBackupRetentionDaysLocally = 0;
 
     #[Validate(['required', 'numeric', 'min:0'])]
     public ?float $databaseBackupRetentionMaxStorageLocally = 0;
 
-    #[Validate(['required', 'integer'])]
+    #[Validate(['required', 'integer', 'min:0'])]
     public ?int $databaseBackupRetentionAmountS3 = 0;
 
-    #[Validate(['required', 'integer'])]
+    #[Validate(['required', 'integer', 'min:0'])]
     public ?int $databaseBackupRetentionDaysS3 = 0;
 
     #[Validate(['required', 'numeric', 'min:0'])]
@@ -107,10 +107,17 @@ class BackupEdit extends Component
             // Validate databases_to_backup to prevent command injection
             if (filled($this->databasesToBackup)) {
                 $databases = str($this->databasesToBackup)->explode(',');
+                $normalized = [];
+
                 foreach ($databases as $index => $db) {
                     $dbName = trim($db);
+                    if ($dbName === '') {
+                        continue;
+                    }
+
                     try {
                         validateShellSafePath($dbName, 'database name');
+                        $normalized[] = $dbName;
                     } catch (\Exception $e) {
                         // Provide specific error message indicating which database failed validation
                         $position = $index + 1;
@@ -120,6 +127,8 @@ class BackupEdit extends Component
                         );
                     }
                 }
+
+                $this->databasesToBackup = implode(',', array_unique($normalized));
             }
 
             $this->backup->databases_to_backup = $this->databasesToBackup;
