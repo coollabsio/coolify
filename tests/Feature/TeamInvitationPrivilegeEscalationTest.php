@@ -173,4 +173,36 @@ describe('privilege escalation prevention', function () {
             ->call('viaEmail')
             ->assertDispatched('error');
     });
+
+    test('pending invitation in another team does not block current team invite', function () {
+        $otherTeam = Team::factory()->create();
+        $otherOwner = User::factory()->create();
+        $otherTeam->members()->attach($otherOwner->id, ['role' => 'owner']);
+
+        // Existing pending invite for same email in another team
+        \App\Models\TeamInvitation::create([
+            'team_id' => $otherTeam->id,
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'email' => 'shared@example.com',
+            'role' => 'member',
+            'link' => 'https://example.test/invite/other-team',
+            'via' => 'link',
+        ]);
+
+        // Owner of current team should still be able to invite same email
+        $this->actingAs($this->owner);
+        session(['currentTeam' => $this->team]);
+
+        Livewire::test(InviteLink::class)
+            ->set('email', 'shared@example.com')
+            ->set('role', 'member')
+            ->call('viaLink')
+            ->assertDispatched('success');
+
+        $this->assertDatabaseHas('team_invitations', [
+            'team_id' => $this->team->id,
+            'email' => 'shared@example.com',
+            'role' => 'member',
+        ]);
+    });
 });

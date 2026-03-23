@@ -76,7 +76,9 @@ class InviteLink extends Component
                 $token = Crypt::encryptString("{$user->email}@@@$password");
                 $link = route('auth.link', ['token' => $token]);
             }
-            $invitation = TeamInvitation::whereEmail($this->email)->first();
+            $invitation = TeamInvitation::where('team_id', currentTeam()->id)
+                ->whereEmail($this->email)
+                ->first();
             if (! is_null($invitation)) {
                 $invitationValid = $invitation->isValid();
                 if ($invitationValid) {
