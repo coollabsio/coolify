@@ -645,10 +645,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit);
-            // Always add .env file to services
+            // Add per-service .env files so each container only sees its own variables + Coolify globals
             $services = collect(data_get($composeFile, 'services', []));
             $services = $services->map(function ($service, $name) {
-                $service['env_file'] = ['.env'];
+                $service['env_file'] = [".env.{$name}"];
 
                 return $service;
             });
@@ -1351,27 +1351,31 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function save_runtime_environment_variables()
     {
-        // This method saves the .env file with ALL runtime variables
-        // For builds, it should be called AFTER the build to include runtime-only variables
+        // This method saves runtime environment variables.
+        // For dockercompose: creates per-service .env files so each container only sees its own variables.
+        // For other build packs: creates a single .env file (unchanged behavior).
 
         // Generate runtime environment variables locally
         $environment_variables = $this->generate_runtime_environment_variables();
 
-        // Handle empty environment variables
+        // For dockercompose, create per-service .env files instead of a single shared one
+        if ($this->build_pack === 'dockercompose') {
+            $this->save_per_service_environment_variables($environment_variables);
+
+            return;
+        }
+
+        // Handle empty environment variables (non-dockercompose)
         if ($environment_variables->isEmpty()) {
-            // For Docker Compose and Docker Image, we need to create an empty .env file
-            // because we always reference it in the compose file
-            if ($this->build_pack === 'dockercompose' || $this->build_pack === 'dockerimage') {
+            if ($this->build_pack === 'dockerimage') {
                 $this->application_deployment_queue->addLogEntry('Creating empty .env file (no environment variables defined).');
 
-                // Create empty .env file
                 $this->execute_remote_command(
                     [
                         executeInDocker($this->deployment_uuid, "touch $this->workdir/.env"),
                     ]
                 );
 
-                // Also create in configuration directory
                 if ($this->use_build_server) {
                     $this->server = $this->mainServer;
                     $this->execute_remote_command(
@@ -1388,7 +1392,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     );
                 }
             } else {
-                // For non-Docker Compose deployments, clean up any existing .env files
                 if ($this->use_build_server) {
                     $this->server = $this->mainServer;
                     $this->execute_remote_command(
@@ -1420,10 +1423,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        // Write the environment variables to file
+        // Write the environment variables to file (non-dockercompose)
         $envs_base64 = base64_encode($environment_variables->implode("\n"));
 
-        // Write .env file to workdir (for container runtime)
         $this->application_deployment_queue->addLogEntry('Creating .env file with runtime variables for container.', hidden: true);
         $this->execute_remote_command(
             [
@@ -1440,7 +1442,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             );
         }
 
-        // Write .env file to configuration directory
         if ($this->use_build_server) {
             $this->server = $this->mainServer;
             $this->execute_remote_command(
@@ -1456,6 +1457,110 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ]
             );
         }
+    }
+
+    /**
+     * For Docker Compose deployments, create per-service .env files.
+     * Each service gets only: (1) variables from its own environment: section,
+     * (2) Coolify metadata variables (COOLIFY_*, SERVICE_FQDN_*, SERVICE_URL_*, SERVICE_NAME_*).
+     * This prevents one container from accessing another container's secrets.
+     */
+    private function save_per_service_environment_variables(Collection $allEnvVars)
+    {
+        // Parse the compose file to discover service names and their environment keys
+        if ($this->application->settings->is_raw_compose_deployment_enabled) {
+            $dockerCompose = Yaml::parse($this->application->docker_compose_raw);
+        } else {
+            $dockerCompose = Yaml::parse($this->application->docker_compose);
+        }
+        $services = collect(data_get($dockerCompose, 'services', []));
+
+        // Identify Coolify global variables (safe to share with all services)
+        $coolifyPrefixes = ['COOLIFY_', 'SERVICE_FQDN_', 'SERVICE_URL_', 'SERVICE_NAME_', 'HOST='];
+        $globalVars = $allEnvVars->filter(function ($envLine) use ($coolifyPrefixes) {
+            foreach ($coolifyPrefixes as $prefix) {
+                if (str_starts_with($envLine, $prefix)) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
+
+        // Build a map of env var keys per service from the original compose
+        $serviceEnvKeys = [];
+        foreach ($services as $serviceName => $service) {
+            $envSection = collect(data_get($service, 'environment', []));
+            $keys = collect([]);
+            foreach ($envSection as $key => $value) {
+                if (is_int($key) && is_string($value)) {
+                    // Format: "KEY=value"
+                    $keys->push(explode('=', $value, 2)[0]);
+                } else {
+                    // Format: KEY: value
+                    $keys->push($key);
+                }
+            }
+            $serviceEnvKeys[$serviceName] = $keys;
+        }
+
+        // Non-global variables (user-defined)
+        $userVars = $allEnvVars->diff($globalVars);
+
+        foreach ($services as $serviceName => $service) {
+            $serviceKeys = $serviceEnvKeys[$serviceName] ?? collect([]);
+
+            // Filter user vars to only those whose key matches this service's environment: section
+            $serviceVars = $userVars->filter(function ($envLine) use ($serviceKeys) {
+                $key = explode('=', $envLine, 2)[0];
+
+                return $serviceKeys->contains($key);
+            });
+
+            // Combine: this service's own vars + global Coolify vars
+            $envContent = $globalVars->merge($serviceVars);
+
+            $envFileName = ".env.{$serviceName}";
+            if ($envContent->isEmpty()) {
+                // Create empty per-service env file
+                $this->execute_remote_command(
+                    [
+                        executeInDocker($this->deployment_uuid, "touch $this->workdir/{$envFileName}"),
+                    ]
+                );
+                if ($this->use_build_server) {
+                    $this->server = $this->mainServer;
+                    $this->execute_remote_command([
+                        "touch $this->configuration_dir/{$envFileName}",
+                    ]);
+                    $this->server = $this->build_server;
+                } else {
+                    $this->execute_remote_command([
+                        "touch $this->configuration_dir/{$envFileName}",
+                    ]);
+                }
+            } else {
+                $envs_base64 = base64_encode($envContent->implode("\n"));
+                $this->execute_remote_command(
+                    [
+                        executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/{$envFileName} > /dev/null"),
+                    ]
+                );
+                if ($this->use_build_server) {
+                    $this->server = $this->mainServer;
+                    $this->execute_remote_command([
+                        "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$envFileName} > /dev/null",
+                    ]);
+                    $this->server = $this->build_server;
+                } else {
+                    $this->execute_remote_command([
+                        "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$envFileName} > /dev/null",
+                    ]);
+                }
+            }
+        }
+
+        $this->application_deployment_queue->addLogEntry('Created per-service .env files (environment variables are isolated per container).', hidden: true);
     }
 
     private function generate_buildtime_environment_variables()
