@@ -902,6 +902,26 @@
         "minversion": "0.0.0",
         "port": "5000"
     },
+    "docling": {
+        "documentation": "https://github.com/DS4SD/docling-serve?utm_source=coolify.io",
+        "slogan": "Convert documents (PDF, DOCX, PPTX, images, HTML) to Markdown, JSON, and more using AI-powered document processing.",
+        "compose": "c2VydmljZXM6CiAgZG9jbGluZy1zZXJ2ZToKICAgIGltYWdlOiBnaGNyLmlvL2RvY2xpbmctcHJvamVjdC9kb2NsaW5nLXNlcnZlLWNwdTpsYXRlc3QKICAgIGVudmlyb25tZW50OgogICAgLSBTRVJWSUNFX1VSTF9ET0NMSU5HXzUwMDEKICAgIC0gRE9DTElOR19TRVJWRV9FTkFCTEVfVUk9JHtET0NMSU5HX1NFUlZFX0VOQUJMRV9VSTotdHJ1ZX0KICAgIC0gRE9DTElOR19TRVJWRV9MT0dfTEVWRUw9JHtET0NMSU5HX1NFUlZFX0xPR19MRVZFTDotV0FSTklOR30KICAgIC0gRE9DTElOR19OVU1fVEhSRUFEUz0ke0RPQ0xJTkdfTlVNX1RIUkVBRFM6LTR9CiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgLSBDTUQKICAgICAgLSB3Z2V0CiAgICAgIC0gLXFPLQogICAgICAtIGh0dHA6Ly8xMjcuMC4wLjE6NTAwMS9oZWFsdGgKICAgICAgaW50ZXJ2YWw6IDMwcwogICAgICB0aW1lb3V0OiAzMHMKICAgICAgcmV0cmllczogMTAKICAgICAgc3RhcnRfcGVyaW9kOiAxMjBzCg==",
+        "tags": [
+            "ai",
+            "document",
+            "pdf",
+            "ocr",
+            "markdown",
+            "extraction",
+            "ibm",
+            "rag",
+            "nlp"
+        ],
+        "category": "ai",
+        "logo": "svgs/docling.png",
+        "minversion": "0.0.0",
+        "port": "5001"
+    },
     "docmost": {
         "documentation": "https://docmost.com/docs/?utm_source=coolify.io",
         "slogan": "Open-source collaborative wiki and documentation software",
