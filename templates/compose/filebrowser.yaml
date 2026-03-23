@@ -7,7 +7,7 @@
 
 services:
   filebrowser:
-    image: filebrowser/filebrowser:latest
+    image: filebrowser/filebrowser:s6
     environment:
       - SERVICE_URL_FILEBROWSER_80
     volumes:
