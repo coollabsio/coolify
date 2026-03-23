@@ -125,12 +125,20 @@
         }
         if (this.dispatchAction) {
             $wire.dispatch(this.submitAction);
-            return true;
+            return Promise.resolve(true);
         }
 
         const methodName = this.submitAction.split('(')[0];
         const paramsMatch = this.submitAction.match(/\((.*?)\)/);
-        const params = paramsMatch ? paramsMatch[1].split(',').map(param => param.trim()) : [];
+        const params = paramsMatch && paramsMatch[1] 
+            ? paramsMatch[1].split(',').map(param => {
+                let p = param.trim();
+                if ((p.startsWith("'") && p.endsWith("'")) || (p.startsWith('"') && p.endsWith('"'))) {
+                    p = p.slice(1, -1);
+                }
+                return p === 'true' ? true : p === 'false' ? false : p;
+            }) 
+            : [];
 
         // Always pass password parameter (empty string if password confirmation is skipped)
         // This ensures consistent method signature for backend Livewire methods
@@ -140,14 +148,26 @@
         if (this.selectedActions.length > 0) {
             params.push(this.selectedActions);
         }
-        return $wire[methodName](...params)
-            .then(result => {
-                if (result === true) {
-                    return true;
-                } else if (typeof result === 'string') {
-                    return result;
-                }
-            });
+
+        try {
+            const resultPromise = $wire[methodName](...params);
+            if (resultPromise && typeof resultPromise.then === 'function') {
+                return resultPromise.then(result => {
+                    if (typeof result === 'string') {
+                        return result; // return error message
+                    } else if (result === false) {
+                        return 'Action failed.';
+                    }
+                    return true; // undefined/null or true means success
+                }).catch(err => {
+                    return err.message || 'An error occurred';
+                });
+            } else {
+                return Promise.resolve(true);
+            }
+        } catch (err) {
+            return Promise.resolve(err.message || 'An error occurred');
+        }
     },
     toggleAction(id) {
         const index = this.selectedActions.indexOf(id);

@@ -1817,6 +1817,50 @@ class FileExplorer extends Component
         }
     }
 
+    public function deleteFile(string $path)
+    {
+        if (empty($path)) {
+            $this->dispatch('error', 'Path is required to delete.');
+            return;
+        }
+
+        try {
+            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            if (is_null($container)) {
+                $this->dispatch('error', 'Container not found.');
+                return;
+            }
+
+            $server = data_get($container, 'server');
+            $containerName = data_get($container, 'container.Names');
+            $escapedContainer = escapeshellarg($containerName);
+            $escapedPath = escapeshellarg($path);
+
+            $command = "docker exec {$escapedContainer} sh -c 'rm -rf {$escapedPath}'";
+            if ($server->isNonRoot()) {
+                $command = "sudo {$command}";
+            }
+
+            instant_remote_process([$command], $server);
+
+            if ($this->selectedFile === $path) {
+                $this->selectedFile = null;
+                $this->fileContent = null;
+                $this->isEditing = false;
+            }
+
+            // Remove from selectedFiles if present
+            if (in_array($path, $this->selectedFiles)) {
+                $this->selectedFiles = array_diff($this->selectedFiles, [$path]);
+            }
+
+            $this->dispatch('success', 'File deleted successfully.');
+            $this->loadFiles();
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to delete file: ' . $e->getMessage());
+        }
+    }
+
     public function cancelEditing()
     {
         $this->isEditing = false;
