@@ -645,14 +645,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit);
-            // Always add .env file to services
-            $services = collect(data_get($composeFile, 'services', []));
-            $services = $services->map(function ($service, $name) {
-                $service['env_file'] = ['.env'];
-
-                return $service;
-            });
-            $composeFile['services'] = $services->toArray();
+            // Don't inject shared env_file — each service's environment: section
+            // already contains only its own variables (set by the parser).
+            // Injecting a shared .env would leak all variables to all containers (#7655).
             if (empty($composeFile)) {
                 $this->application_deployment_queue->addLogEntry('Failed to parse docker-compose file.');
                 $this->fail('Failed to parse docker-compose file.');
@@ -1359,9 +1354,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Handle empty environment variables
         if ($environment_variables->isEmpty()) {
-            // For Docker Compose and Docker Image, we need to create an empty .env file
-            // because we always reference it in the compose file
-            if ($this->build_pack === 'dockercompose' || $this->build_pack === 'dockerimage') {
+            // For Docker Image, we need to create an empty .env file
+            // because we reference it via env_file in the compose file.
+            // Docker Compose no longer needs this — env vars are in the environment: section (#7655).
+            if ($this->build_pack === 'dockerimage') {
                 $this->application_deployment_queue->addLogEntry('Creating empty .env file (no environment variables defined).');
 
                 // Create empty .env file
