@@ -69,31 +69,31 @@
     finalStep: {{ $confirmWithPassword && !$skipPasswordConfirmation ? 3 : 2 }},
     deleteText: '',
     password: '',
-    actions: @js($actions),
+    actions: {{ json_encode($actions) }},
     confirmationText: (function() {
         const textarea = document.createElement('textarea');
-        textarea.innerHTML = @js($confirmationText);
+        textarea.innerHTML = {{ json_encode($confirmationText) }};
         return textarea.value;
     })(),
     userConfirmationText: '',
-    confirmWithText: @js($confirmWithText && !$disableTwoStepConfirmation),
-    confirmWithPassword: @js($confirmWithPassword && !$skipPasswordConfirmation),
-    submitAction: @js($submitAction),
-    dispatchAction: @js($dispatchAction),
+    confirmWithText: {{ json_encode($confirmWithText && !$disableTwoStepConfirmation) }},
+    confirmWithPassword: {{ json_encode($confirmWithPassword && !$skipPasswordConfirmation) }},
+    submitAction: {{ json_encode($submitAction) }},
+    dispatchAction: {{ json_encode($dispatchAction) }},
     passwordError: '',
-    selectedActions: @js($selectedActions),
-    dispatchEvent: @js($dispatchEvent),
-    dispatchEventType: @js($dispatchEventType),
-    dispatchEventMessage: @js($dispatchEventMessage),
-    disableTwoStepConfirmation: @js($disableTwoStepConfirmation),
-    skipPasswordConfirmation: @js($skipPasswordConfirmation),
+    selectedActions: {{ json_encode($selectedActions) }},
+    dispatchEvent: {{ json_encode($dispatchEvent) }},
+    dispatchEventType: {{ json_encode($dispatchEventType) }},
+    dispatchEventMessage: {{ json_encode($dispatchEventMessage) }},
+    disableTwoStepConfirmation: {{ json_encode($disableTwoStepConfirmation) }},
+    skipPasswordConfirmation: {{ json_encode($skipPasswordConfirmation) }},
     resetModal() {
         this.step = this.initialStep;
         this.deleteText = '';
         this.password = '';
         this.userConfirmationText = '';
         // Recalculate selectedActions from current Livewire component state
-        const checkboxes = @js($checkboxes);
+        const checkboxes = {{ json_encode($checkboxes) }};
         if (checkboxes && checkboxes.length !== 0) {
             this.selectedActions = checkboxes.filter(function(checkbox) {
                 try {
@@ -107,9 +107,9 @@
         }
         $wire.$refresh();
     },
-    step1ButtonText: @js($step1ButtonText),
-    step2ButtonText: @js($effectiveStep2ButtonText),
-    step3ButtonText: @js($step3ButtonText),
+    step1ButtonText: {{ json_encode($step1ButtonText) }},
+    step2ButtonText: {{ json_encode($effectiveStep2ButtonText) }},
+    step3ButtonText: {{ json_encode($step3ButtonText) }},
     validatePassword() {
         if (this.confirmWithPassword && !this.password) {
             return 'Password is required.';
