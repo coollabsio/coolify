@@ -70,7 +70,7 @@
     deleteText: '',
     password: '',
     actions: @js($actions),
-    confirmationText: (() => {
+    confirmationText: (function() {
         const textarea = document.createElement('textarea');
         textarea.innerHTML = @js($confirmationText);
         return textarea.value;
@@ -94,14 +94,14 @@
         this.userConfirmationText = '';
         // Recalculate selectedActions from current Livewire component state
         const checkboxes = @js($checkboxes);
-        if (checkboxes && checkboxes.length > 0) {
-            this.selectedActions = checkboxes.filter(checkbox => {
+        if (checkboxes && checkboxes.length !== 0) {
+            this.selectedActions = checkboxes.filter(function(checkbox) {
                 try {
                     return $wire.get(checkbox.id) === true;
                 } catch (e) {
                     return false;
                 }
-            }).map(checkbox => checkbox.id);
+            }).map(function(checkbox) { return checkbox.id; });
         } else {
             this.selectedActions = [];
         }
@@ -131,7 +131,7 @@
         const methodName = this.submitAction.split('(')[0];
         const paramsMatch = this.submitAction.match(/\((.*?)\)/);
         const params = paramsMatch && paramsMatch[1] 
-            ? paramsMatch[1].split(',').map(param => {
+            ? paramsMatch[1].split(',').map(function(param) {
                 let p = param.trim();
                 if ((p.startsWith("'") && p.endsWith("'")) || (p.startsWith('\x22') && p.endsWith('\x22'))) {
                     p = p.slice(1, -1);
@@ -152,14 +152,14 @@
         try {
             const resultPromise = $wire[methodName](...params);
             if (resultPromise && typeof resultPromise.then === 'function') {
-                return resultPromise.then(result => {
+                return resultPromise.then(function(result) {
                     if (typeof result === 'string') {
                         return result; // return error message
                     } else if (result === false) {
                         return 'Action failed.';
                     }
                     return true; // undefined/null or true means success
-                }).catch(err => {
+                }).catch(function(err) {
                     return err.message || 'An error occurred';
                 });
             } else {
