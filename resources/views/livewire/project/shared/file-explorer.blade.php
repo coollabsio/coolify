@@ -198,7 +198,7 @@
                             @endif
                         </div>
                         @if (isset($selectedFiles) && is_array($selectedFiles) && count($selectedFiles) > 0)
-                            <x-modal-confirmation title="Delete selected items?" buttonTitle="Delete Selected" submitAction="deleteSelectedFiles()" :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Delete" step2ButtonText="Confirm">
+                            <x-modal-confirmation title="Delete selected items?" buttonTitle="Delete Selected" submitAction="deleteSelectedFiles()" :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Delete" step2ButtonText="Confirm" :ignoreWire="false">
                                 <x-slot:content>
                                     <x-forms.button @click.prevent="modalOpen=true" class="bg-red-600">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
