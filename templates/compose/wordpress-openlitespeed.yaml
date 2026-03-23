@@ -1,0 +1,47 @@
+# documentation: https://docs.litespeedtech.com/cloud/images/wordpress/
+# slogan: Production-ready WordPress with OpenLiteSpeed for high-performance hosting.
+# category: cms
+# tags: cms, wordpress, openlitespeed, performance, blog
+# logo: svgs/wordpress.svg
+# port: 8080
+
+services:
+  wordpress-ols:
+    image: litespeedtech/openlitespeed:1.8.4-lsphp83
+    volumes:
+      - wordpress-data:/var/www/vhosts/localhost/html
+      - ols-config:/usr/local/lsws/conf
+    environment:
+      - SERVICE_FQDN_WORDPRESS_8080
+      - MYSQL_HOST=wordpress-mariadb
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-wordpress}
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+      - DOMAIN=${SERVICE_FQDN_WORDPRESS}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      - WP_TITLE=${WP_TITLE:-My WordPress Site}
+      - WP_ADMIN_USER=${WP_ADMIN_USER:-admin}
+      - WP_ADMIN_PASSWORD=${SERVICE_PASSWORD_64_WPADMIN}
+    depends_on:
+      wordpress-mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 20s
+      retries: 10
+  wordpress-mariadb:
+    image: mariadb:11
+    volumes:
+      - wordpress-mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-wordpress}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
