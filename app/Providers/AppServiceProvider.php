@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Models\EmailNotificationSettings;
+use App\Models\Environment;
+use App\Models\HostedEmailSettings;
+use App\Models\Project;
+use App\Models\Server;
+use App\Models\User;
+use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -11,12 +18,10 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Sleep;
 use Illuminate\Validation\Rules\Password;
 
 final class AppServiceProvider extends ServiceProvider
@@ -57,14 +62,14 @@ final class AppServiceProvider extends ServiceProvider
      */
     private function configurePasswordValidation(): void
     {
-        if (App::isProduction()) {
-            Password::defaults(fn () => Password::min(12)
+        Password::defaults(fn () => App::isProduction()
+            ? Password::min(12)
                 ->letters()
                 ->mixedCase()
                 ->numbers()
                 ->symbols()
-                ->uncompromised());
-        }
+                ->uncompromised()
+            : null);
     }
 
     /**
@@ -72,9 +77,7 @@ final class AppServiceProvider extends ServiceProvider
      */
     private function configureCommands(): void
     {
-        if (App::isProduction()) {
-            DB::prohibitDestructiveCommands();
-        }
+        DB::prohibitDestructiveCommands(App::isProduction());
     }
 
     /**
@@ -83,11 +86,7 @@ final class AppServiceProvider extends ServiceProvider
     private function configureModels(): void
     {
         Model::automaticallyEagerLoadRelationships();
-
-        if (! App::isProduction()) {
-            Model::preventLazyLoading();
-        }
-
+        Model::preventLazyLoading(! App::isProduction());
         Model::preventSilentlyDiscardingAttributes();
         Model::preventAccessingMissingAttributes();
 
