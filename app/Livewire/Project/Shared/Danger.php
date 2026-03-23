@@ -92,13 +92,13 @@ class Danger extends Component
     public function delete(string $password, array $selectedActions = [])
     {
         if (! verifyPasswordConfirmation($password, $this)) {
-            return;
+            return 'The provided password is incorrect.';
         }
 
         if (! $this->resource) {
             $this->addError('resource', 'Resource not found.');
 
-            return;
+            return 'Resource not found.';
         }
 
         try {

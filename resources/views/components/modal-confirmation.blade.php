@@ -113,9 +113,18 @@
             .then(result => {
                 if (result === true) {
                     return true;
-                } else if (typeof result === 'string') {
+                }
+                if (typeof result === 'string') {
                     return result;
                 }
+                if (result && typeof result === 'object') {
+                    return true;
+                }
+                if (result === undefined || result === null) {
+                    return true;
+                }
+
+                return result;
             });
     },
     toggleAction(id) {
@@ -393,7 +402,9 @@
                                             modalOpen = false;
                                             resetModal();
                                         } else {
-                                            passwordError = result;
+                                            passwordError = typeof result === 'string' && result.length > 0
+                                                ? result
+                                                : 'Action could not be completed. Check your password and try again.';
                                             password = '';
                                         }
                                     }).catch(() => {
