@@ -99,7 +99,85 @@
 
         const methodName = this.submitAction.split('(')[0];
         const paramsMatch = this.submitAction.match(/\((.*?)\)/);
-        const params = paramsMatch ? paramsMatch[1].split(',').map(param => param.trim()) : [];
+        const parseParams = (rawParams) => {
+            if (!rawParams || !rawParams.trim()) {
+                return [];
+            }
+
+            const parts = [];
+            let current = '';
+            let inSingleQuote = false;
+            let inDoubleQuote = false;
+            const doubleQuote = String.fromCharCode(34);
+            let escaped = false;
+
+            for (const char of rawParams) {
+                if (escaped) {
+                    current += char;
+                    escaped = false;
+                    continue;
+                }
+
+                if (char === '\\') {
+                    current += char;
+                    escaped = true;
+                    continue;
+                }
+
+                if (char === "'" && !inDoubleQuote) {
+                    inSingleQuote = !inSingleQuote;
+                    current += char;
+                    continue;
+                }
+
+                if (char === doubleQuote && !inSingleQuote) {
+                    inDoubleQuote = !inDoubleQuote;
+                    current += char;
+                    continue;
+                }
+
+                if (char === ',' && !inSingleQuote && !inDoubleQuote) {
+                    parts.push(current.trim());
+                    current = '';
+                    continue;
+                }
+
+                current += char;
+            }
+
+            if (current.trim() !== '') {
+                parts.push(current.trim());
+            }
+
+            return parts.map((param) => {
+                if (
+                    (param.startsWith("'") && param.endsWith("'")) ||
+                    (param.startsWith(doubleQuote) && param.endsWith(doubleQuote))
+                ) {
+                    const unquoted = param.slice(1, -1);
+                    return unquoted
+                        .replace(/\\'/g, "'")
+                        .replace(new RegExp('\\\\' + doubleQuote, 'g'), doubleQuote)
+                        .replace(/\\\\/g, '\\');
+                }
+
+                if (param === 'true') {
+                    return true;
+                }
+                if (param === 'false') {
+                    return false;
+                }
+                if (param === 'null') {
+                    return null;
+                }
+                if (/^-?\d+(\.\d+)?$/.test(param)) {
+                    return Number(param);
+                }
+
+                return param;
+            });
+        };
+        const params = paramsMatch ? parseParams(paramsMatch[1]) : [];
 
         // Always pass password parameter (empty string if password confirmation is skipped)
         // This ensures consistent method signature for backend Livewire methods

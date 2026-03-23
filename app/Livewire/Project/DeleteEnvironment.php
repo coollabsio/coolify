@@ -76,6 +76,41 @@ class DeleteEnvironment extends Component
         return redirectRoute($this, 'project.show', ['project_uuid' => $this->parameters['project_uuid']]);
     }
 
+    public function startQueueWorkers(): void
+    {
+        if (! config('constants.horizon.is_horizon_enabled')) {
+            $this->queueWorkersAvailable = true;
+            $this->dispatch('success', 'Horizon is disabled in this instance. Queue worker check is not required.');
+
+            return;
+        }
+
+        try {
+            $command = 'cd '.escapeshellarg(base_path()).' && nohup '.escapeshellarg(PHP_BINARY).' artisan start:horizon > /tmp/coolify-horizon.log 2>&1 &';
+            @exec($command);
+            usleep(800000);
+
+            $this->queueWorkersAvailable = $this->hasActiveQueueWorkers();
+            if ($this->queueWorkersAvailable) {
+                $this->dispatch('success', 'Queue workers started successfully.');
+            } else {
+                $this->dispatch('error', 'Could not confirm workers are running yet. Please wait a few seconds and click Recheck.');
+            }
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to start queue workers: '.$e->getMessage());
+        }
+    }
+
+    public function refreshQueueWorkersStatus(): void
+    {
+        $this->queueWorkersAvailable = $this->hasActiveQueueWorkers();
+        if ($this->queueWorkersAvailable) {
+            $this->dispatch('success', 'Queue workers are running.');
+        } else {
+            $this->dispatch('error', 'Queue workers are still not running.');
+        }
+    }
+
     private function hasActiveQueueWorkers(): bool
     {
         if (! config('constants.horizon.is_horizon_enabled')) {
