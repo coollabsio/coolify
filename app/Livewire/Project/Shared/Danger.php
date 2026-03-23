@@ -163,16 +163,37 @@ class Danger extends Component
         }
 
         try {
-            $command = 'cd '.escapeshellarg(base_path()).' && nohup '.escapeshellarg(PHP_BINARY).' artisan start:horizon > /tmp/coolify-horizon.log 2>&1 &';
-            @exec($command);
-            usleep(800000);
+            if (! function_exists('exec') || str_contains((string) ini_get('disable_functions'), 'exec')) {
+                $this->dispatch('error', 'PHP exec() is disabled. Please start workers manually from terminal.');
 
-            $this->queueWorkersAvailable = $this->hasActiveQueueWorkers();
-            if ($this->queueWorkersAvailable) {
-                $this->dispatch('success', 'Queue workers started successfully.');
-            } else {
-                $this->dispatch('error', 'Could not confirm workers are running yet. Please wait a few seconds and click Recheck.');
+                return;
             }
+
+            $logFile = storage_path('logs/horizon-ui.log');
+            $artisanPath = base_path('artisan');
+            $phpBinary = PHP_BINARY;
+            $command = 'nohup '.escapeshellarg($phpBinary).' '.escapeshellarg($artisanPath).' start:horizon > '.escapeshellarg($logFile).' 2>&1 &';
+
+            $output = [];
+            $exitCode = 1;
+            exec($command, $output, $exitCode);
+            if ($exitCode !== 0) {
+                $this->dispatch('error', 'Failed to launch Horizon process. Please start workers manually.');
+
+                return;
+            }
+
+            for ($i = 0; $i < 6; $i++) {
+                usleep(1000000);
+                $this->queueWorkersAvailable = $this->hasActiveQueueWorkers();
+                if ($this->queueWorkersAvailable) {
+                    $this->dispatch('success', 'Queue workers started successfully.');
+
+                    return;
+                }
+            }
+
+            $this->dispatch('error', 'Could not confirm workers are running yet. Click Recheck in a few seconds or start them manually.');
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to start queue workers: '.$e->getMessage());
         }
