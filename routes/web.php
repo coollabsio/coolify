@@ -420,7 +420,7 @@ Route::middleware(['auth'])->group(function () {
             $hasAccess = false;
             if ($resourceType === 'application') {
                 $resource = \App\Models\Application::where('uuid', $resourceUuid)->first();
-                if ($resource && $resource->team_id === $team->id) {
+                if ($resource && optional($resource->team())->id === $team->id) {
                     $hasAccess = true;
                 }
             } elseif ($resourceType === 'database') {
@@ -430,7 +430,7 @@ Route::middleware(['auth'])->group(function () {
                 }
             } elseif ($resourceType === 'service') {
                 $resource = \App\Models\Service::where('uuid', $resourceUuid)->first();
-                if ($resource && $resource->team_id === $team->id) {
+                if ($resource && optional($resource->team())->id === $team->id) {
                     $hasAccess = true;
                 }
             }
