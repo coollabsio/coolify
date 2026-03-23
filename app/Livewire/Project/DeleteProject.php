@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project;
 
+use App\Jobs\DeleteResourceJob;
 use App\Models\Project;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -32,12 +33,25 @@ class DeleteProject extends Component
         $project = Project::findOrFail($this->project_id);
         $this->authorize('delete', $project);
 
-        if ($project->isEmpty()) {
-            $project->delete();
-
-            return redirectRoute($this, 'project.index');
+        $resources = collect();
+        foreach ($project->environments()->get() as $environment) {
+            $resources = $resources
+                ->concat($environment->applications()->get())
+                ->concat($environment->databases())
+                ->concat($environment->services()->get());
         }
 
-        return $this->dispatch('error', "<strong>Project {$project->name}</strong> has resources defined, please delete them first.");
+        foreach ($resources as $resource) {
+            if (! $resource) {
+                continue;
+            }
+            $this->authorize('delete', $resource);
+            $resource->delete();
+            DeleteResourceJob::dispatch($resource, true, true, true, true);
+        }
+
+        $project->delete();
+
+        return redirectRoute($this, 'project.index');
     }
 }

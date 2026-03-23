@@ -2,6 +2,7 @@
 
 use App\Jobs\DeleteResourceJob;
 use App\Livewire\Project\DeleteEnvironment;
+use App\Livewire\Project\DeleteProject;
 use App\Livewire\Project\Shared\Danger;
 use App\Models\Environment;
 use App\Models\Project;
@@ -78,5 +79,37 @@ it('danger delete method accepts checkbox selection payload', function () {
     expect($reflection->getNumberOfParameters())->toBe(2);
     expect($reflection->getParameters()[1]->getName())->toBe('selectedActions');
     expect($reflection->getParameters()[1]->isOptional())->toBeTrue();
+});
+
+it('deletes project with all resources inside it', function () {
+    Queue::fake();
+
+    $project = Project::query()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'project-to-delete',
+        'team_id' => $this->team->id,
+    ]);
+
+    $environment = Environment::query()->create([
+        'name' => 'production',
+        'project_id' => $project->id,
+    ]);
+
+    $service = Service::query()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'service-in-project',
+        'destination_type' => 'App\\Models\\StandaloneDocker',
+        'destination_id' => 1,
+        'environment_id' => $environment->id,
+    ]);
+
+    Livewire::test(DeleteProject::class, ['project_id' => $project->id])
+        ->call('delete');
+
+    expect(Project::query()->find($project->id))->toBeNull();
+    expect(Environment::query()->find($environment->id))->toBeNull();
+    expect(Service::withTrashed()->find($service->id)?->trashed())->toBeTrue();
+
+    Queue::assertPushed(DeleteResourceJob::class, 1);
 });
 
