@@ -108,6 +108,7 @@
             let current = '';
             let inSingleQuote = false;
             let inDoubleQuote = false;
+            const doubleQuote = String.fromCharCode(34);
             let escaped = false;
 
             for (const char of rawParams) {
@@ -129,7 +130,7 @@
                     continue;
                 }
 
-                if (char === '"' && !inSingleQuote) {
+                if (char === doubleQuote && !inSingleQuote) {
                     inDoubleQuote = !inDoubleQuote;
                     current += char;
                     continue;
@@ -151,12 +152,12 @@
             return parts.map((param) => {
                 if (
                     (param.startsWith("'") && param.endsWith("'")) ||
-                    (param.startsWith('"') && param.endsWith('"'))
+                    (param.startsWith(doubleQuote) && param.endsWith(doubleQuote))
                 ) {
                     const unquoted = param.slice(1, -1);
                     return unquoted
                         .replace(/\\'/g, "'")
-                        .replace(/\\"/g, '"')
+                        .replace(/\\"/g, doubleQuote)
                         .replace(/\\\\/g, '\\');
                 }
 
