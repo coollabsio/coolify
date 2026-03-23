@@ -12,6 +12,7 @@ use App\Models\Server;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Console\DumpCommand;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Client\RequestException;
@@ -78,6 +79,7 @@ final class AppServiceProvider extends ServiceProvider
     private function configureCommands(): void
     {
         DB::prohibitDestructiveCommands(App::isProduction());
+        DumpCommand::prohibit(App::isProduction());
     }
 
     /**
