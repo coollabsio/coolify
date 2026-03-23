@@ -916,6 +916,16 @@ class FileExplorer extends Component
     public function deleteFile(string $path, string $password = '')
     {
         try {
+            // modal-confirmation can pass string params wrapped in quotes.
+            // Normalize here so rm targets the real filesystem path.
+            $normalizedPath = trim($path);
+            if (
+                (str_starts_with($normalizedPath, "'") && str_ends_with($normalizedPath, "'")) ||
+                (str_starts_with($normalizedPath, '"') && str_ends_with($normalizedPath, '"'))
+            ) {
+                $normalizedPath = substr($normalizedPath, 1, -1);
+            }
+
             $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
             if (is_null($container)) {
                 $this->dispatch('error', 'Container not found.');
@@ -926,7 +936,7 @@ class FileExplorer extends Component
             $server = data_get($container, 'server');
             $containerName = data_get($container, 'container.Names');
             $escapedContainer = escapeshellarg($containerName);
-            $escapedPath = escapeshellarg($path);
+            $escapedPath = escapeshellarg($normalizedPath);
 
             $command = "docker exec {$escapedContainer} rm -rf {$escapedPath}";
             if ($server->isNonRoot()) {
@@ -935,7 +945,7 @@ class FileExplorer extends Component
 
             instant_remote_process([$command], $server);
 
-            if ($this->selectedFile === $path) {
+            if ($this->selectedFile === $normalizedPath || $this->selectedFile === $path) {
                 $this->selectedFile = null;
                 $this->fileContent = null;
                 $this->isEditing = false;
