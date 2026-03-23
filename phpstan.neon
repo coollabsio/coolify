@@ -3,6 +3,7 @@ includes:
     - vendor/phpstan/phpstan-strict-rules/rules.neon
     - vendor/phpstan/phpstan-deprecation-rules/rules.neon
     - vendor/larastan/larastan/extension.neon
+    - vendor/mrpunyapal/peststan/extension.neon
     - vendor/nesbot/carbon/extension.neon
 
 parameters:
