@@ -108,7 +108,7 @@ arch('Exceptions')
 arch('Http')
     ->expect('App\Http')
     ->toBeClasses()
-    ->toOnlyBeUsedIn('App\Http');
+    ->toOnlyBeUsedIn(['App\Http', 'App\Providers']);
 
 arch('Middleware')
     ->expect('App\Http\Middleware')
