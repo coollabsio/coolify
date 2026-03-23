@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Project\Shared;
 
-use App\Contracts\CustomJobRepositoryInterface;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -36,8 +35,6 @@ class Danger extends Component
     public string $resourceDomain = '';
 
     public bool $canDelete = false;
-
-    public bool $queueWorkersAvailable = true;
 
     public function mount()
     {
@@ -90,17 +87,10 @@ class Danger extends Component
             $this->canDelete = false;
         }
 
-        $this->queueWorkersAvailable = $this->hasActiveQueueWorkers();
     }
 
     public function delete(string $password, array $selectedActions = [])
     {
-        if (! $this->queueWorkersAvailable) {
-            $this->dispatch('error', 'Queue workers are not running. Start Horizon/queue workers and try again.');
-
-            return;
-        }
-
         if (! verifyPasswordConfirmation($password, $this)) {
             return;
         }
@@ -151,74 +141,5 @@ class Danger extends Component
                 // ['id' => 'delete_associated_backups_sftp', 'label' => 'All backups associated with this Ressource will be permanently deleted from the selected SFTP Storage.']
             ],
         ]);
-    }
-
-    public function startQueueWorkers(): void
-    {
-        if (! config('constants.horizon.is_horizon_enabled')) {
-            $this->queueWorkersAvailable = true;
-            $this->dispatch('success', 'Horizon is disabled in this instance. Queue worker check is not required.');
-
-            return;
-        }
-
-        try {
-            if (! function_exists('exec') || str_contains((string) ini_get('disable_functions'), 'exec')) {
-                $this->dispatch('error', 'PHP exec() is disabled. Please start workers manually from terminal.');
-
-                return;
-            }
-
-            $logFile = storage_path('logs/horizon-ui.log');
-            $artisanPath = base_path('artisan');
-            $phpBinary = PHP_BINARY;
-            $command = 'nohup '.escapeshellarg($phpBinary).' '.escapeshellarg($artisanPath).' start:horizon > '.escapeshellarg($logFile).' 2>&1 &';
-
-            $output = [];
-            $exitCode = 1;
-            exec($command, $output, $exitCode);
-            if ($exitCode !== 0) {
-                $this->dispatch('error', 'Failed to launch Horizon process. Please start workers manually.');
-
-                return;
-            }
-
-            for ($i = 0; $i < 6; $i++) {
-                usleep(1000000);
-                $this->queueWorkersAvailable = $this->hasActiveQueueWorkers();
-                if ($this->queueWorkersAvailable) {
-                    $this->dispatch('success', 'Queue workers started successfully.');
-
-                    return;
-                }
-            }
-
-            $this->dispatch('error', 'Could not confirm workers are running yet. Click Recheck in a few seconds or start them manually.');
-        } catch (\Throwable $e) {
-            $this->dispatch('error', 'Failed to start queue workers: '.$e->getMessage());
-        }
-    }
-
-    public function refreshQueueWorkersStatus(): void
-    {
-        $this->queueWorkersAvailable = $this->hasActiveQueueWorkers();
-        if ($this->queueWorkersAvailable) {
-            $this->dispatch('success', 'Queue workers are running.');
-        } else {
-            $this->dispatch('error', 'Queue workers are still not running.');
-        }
-    }
-
-    private function hasActiveQueueWorkers(): bool
-    {
-        if (! config('constants.horizon.is_horizon_enabled')) {
-            return true;
-        }
-
-        try {
-            return app(CustomJobRepositoryInterface::class)->getHorizonWorkers()->count() > 0;
-        } catch (\Throwable) {
-            return false;
-        }
     }
 }
