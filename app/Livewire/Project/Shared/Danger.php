@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Contracts\CustomJobRepositoryInterface;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -35,6 +36,8 @@ class Danger extends Component
     public string $resourceDomain = '';
 
     public bool $canDelete = false;
+
+    public bool $queueWorkersAvailable = true;
 
     public function mount()
     {
@@ -86,10 +89,18 @@ class Danger extends Component
         } catch (\Exception $e) {
             $this->canDelete = false;
         }
+
+        $this->queueWorkersAvailable = $this->hasActiveQueueWorkers();
     }
 
-    public function delete($password)
+    public function delete(string $password, array $selectedActions = [])
     {
+        if (! $this->queueWorkersAvailable) {
+            $this->dispatch('error', 'Queue workers are not running. Start Horizon/queue workers and try again.');
+
+            return;
+        }
+
         if (! verifyPasswordConfirmation($password, $this)) {
             return;
         }
@@ -101,6 +112,13 @@ class Danger extends Component
         }
 
         try {
+            if (! empty($selectedActions)) {
+                $this->delete_volumes = in_array('delete_volumes', $selectedActions, true);
+                $this->delete_connected_networks = in_array('delete_connected_networks', $selectedActions, true);
+                $this->delete_configurations = in_array('delete_configurations', $selectedActions, true);
+                $this->docker_cleanup = in_array('docker_cleanup', $selectedActions, true);
+            }
+
             $this->authorize('delete', $this->resource);
             $this->resource->delete();
             DeleteResourceJob::dispatch(
@@ -133,5 +151,18 @@ class Danger extends Component
                 // ['id' => 'delete_associated_backups_sftp', 'label' => 'All backups associated with this Ressource will be permanently deleted from the selected SFTP Storage.']
             ],
         ]);
+    }
+
+    private function hasActiveQueueWorkers(): bool
+    {
+        if (! config('constants.horizon.is_horizon_enabled')) {
+            return true;
+        }
+
+        try {
+            return app(CustomJobRepositoryInterface::class)->getHorizonWorkers()->count() > 0;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 }
