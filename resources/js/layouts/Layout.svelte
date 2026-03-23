@@ -1,15 +1,13 @@
 <script lang="ts">
-	import { page, useLayoutProps } from "@inertiajs/svelte";
+	import type { LayoutProps } from "@inertiajs/core";
+	import type { Snippet } from "svelte";
+	import { page } from "@inertiajs/svelte";
 
-	const layout = useLayoutProps({
-		title: "",
-	});
-
-	let { children } = $props();
+	let { title, children }: LayoutProps & { children: Snippet } = $props();
 </script>
 
 <svelte:head>
-	<title>{layout.title ? `${layout.title} - ` : ""}{page.props.appName}</title>
+	<title>{title ? `${title} - ` : ""}{page.props.appName}</title>
 </svelte:head>
 
 <main>
