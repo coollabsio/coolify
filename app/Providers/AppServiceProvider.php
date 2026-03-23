@@ -43,7 +43,6 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureModels();
         $this->configureDates();
         $this->configureQueues();
-        $this->configureTests();
         $this->configureRequestExceptions();
         $this->configureVite();
     }
@@ -114,17 +113,6 @@ final class AppServiceProvider extends ServiceProvider
     private function configureQueues(): void
     {
         Queue::withoutInterruptionPolling();
-    }
-
-    /**
-     * Configure tests.
-     */
-    private function configureTests(): void
-    {
-        if (App::runningUnitTests()) {
-            Sleep::fake();
-            Http::preventStrayRequests();
-        }
     }
 
     /**
