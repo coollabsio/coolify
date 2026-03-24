@@ -1,0 +1,42 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: A fullstack, production-ready mail server in a Docker container.
+# category: email
+# tags: email, mail, smtp, imap, postfix, dovecot, self-hosted
+# logo: svgs/docker-mailserver.svg
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: ${MAIL_HOSTNAME:-mail.example.com}
+    ports:
+      - "25:25"
+      - "143:143"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    volumes:
+      - mail-data:/var/mail
+      - mail-state:/var/mail-state
+      - mail-logs:/var/log/mail
+      - mail-config:/tmp/docker-mailserver
+    environment:
+      - OVERRIDE_HOSTNAME=${MAIL_HOSTNAME:-mail.example.com}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - ENABLE_CLAMAV=${ENABLE_CLAMAV:-0}
+      - ENABLE_FAIL2BAN=${ENABLE_FAIL2BAN:-0}
+      - ENABLE_SPAMASSASSIN=${ENABLE_SPAMASSASSIN:-1}
+      - SPAMASSASSIN_SPAM_TO_INBOX=${SPAMASSASSIN_SPAM_TO_INBOX:-1}
+      - ENABLE_FETCHMAIL=${ENABLE_FETCHMAIL:-0}
+      - ENABLE_POSTGREY=${ENABLE_POSTGREY:-0}
+      - SSL_TYPE=${SSL_TYPE:-}
+      - PERMIT_DOCKER=${PERMIT_DOCKER:-none}
+      - ONE_DIR=1
+      - POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS:-}
+      - ENABLE_UPDATE_CHECK=${ENABLE_UPDATE_CHECK:-1}
+    restart: always
+    stop_grace_period: 1m
+    healthcheck:
+      test: ["CMD-SHELL", "ss --listening --ipv4 --tcp | grep --silent ':smtp' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
