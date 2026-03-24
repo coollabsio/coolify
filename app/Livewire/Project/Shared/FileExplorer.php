@@ -485,8 +485,8 @@ class FileExplorer extends Component
             }
 
             $output = instant_remote_process([$command], $server, false);
-
-            $this->files = $this->parseFileList($output ?? '');
+            $parsedFiles = $this->parseFileList($output ?? '');
+            $this->files = $this->populateDirectorySizes($parsedFiles, $server, $escapedContainer);
             $this->syncSelectedFilesWithCurrentDirectory();
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to load files: '.$e->getMessage());
@@ -563,6 +563,55 @@ class FileExplorer extends Component
 
             return strcmp($a['name'], $b['name']);
         });
+
+        return $files;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $files
+     * @return array<int, array<string, mixed>>
+     */
+    private function populateDirectorySizes(array $files, Server $server, string $escapedContainer): array
+    {
+        $directoryIndexes = [];
+        foreach ($files as $index => $file) {
+            if (($file['is_directory'] ?? false) === true) {
+                $directoryIndexes[] = $index;
+            }
+        }
+
+        if (empty($directoryIndexes)) {
+            return $files;
+        }
+
+        // Safety limit to avoid very slow rendering on huge directories.
+        $directoryIndexes = array_slice($directoryIndexes, 0, 25);
+
+        foreach ($directoryIndexes as $index) {
+            $path = (string) ($files[$index]['path'] ?? '');
+            if ($path === '') {
+                continue;
+            }
+
+            $escapedPath = escapeshellarg($path);
+            $sizeCommand = "docker exec {$escapedContainer} sh -c 'du -sb {$escapedPath} 2>/dev/null | cut -f1 || du -sk {$escapedPath} 2>/dev/null | cut -f1'";
+            if ($server->isNonRoot()) {
+                $sizeCommand = "sudo {$sizeCommand}";
+            }
+
+            $sizeOutput = trim((string) (instant_remote_process([$sizeCommand], $server, false) ?? ''));
+            if ($sizeOutput === '' || ! preg_match('/^\d+$/', $sizeOutput)) {
+                continue;
+            }
+
+            $sizeBytes = (int) $sizeOutput;
+            // If fallback came from du -sk, convert KB to bytes.
+            if ($sizeBytes > 0 && $sizeBytes < 1024) {
+                $sizeBytes *= 1024;
+            }
+
+            $files[$index]['size'] = $this->formatSize($sizeBytes);
+        }
 
         return $files;
     }
@@ -1604,54 +1653,19 @@ class FileExplorer extends Component
                 return;
             }
 
-            $wrappedCommand = $innerCommand.'; __coolify_exit=$?; echo "__COMPRESS_EXIT:${__coolify_exit}__"';
-            $command = "docker exec {$escapedContainer} sh -c " . escapeshellarg($wrappedCommand);
+            $logFile = '/tmp/coolify-compress-'.date('Ymd-His').'-'.substr(md5((string) $archivePath), 0, 8).'.log';
+            $escapedLogFile = escapeshellarg($logFile);
+            $backgroundCommand = "({$innerCommand}) > {$escapedLogFile} 2>&1 & echo __COMPRESS_STARTED__";
+            $command = "docker exec {$escapedContainer} sh -c " . escapeshellarg($backgroundCommand);
 
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
             }
 
             $output = (string) (instant_remote_process([$command], $server, false) ?? '');
-            if (str_contains($output ?? '', 'not available')) {
+            if (! str_contains($output, '__COMPRESS_STARTED__')) {
                 $this->dispatch('error', $this->formatCompressErrorMessage(
-                    'Required compression tool is not available in this container.',
-                    $dirPath,
-                    $archivePath,
-                    $this->selectedFiles,
-                    $output
-                ));
-                $this->showCompressDialog = false;
-
-                return;
-            }
-
-            if (preg_match('/__COMPRESS_EXIT:(\d+)__/', $output, $matches) === 1) {
-                $exitCode = (int) ($matches[1] ?? 1);
-                if ($exitCode !== 0) {
-                    $preview = trim(str_replace($matches[0], '', $output));
-                    $preview = mb_substr($preview, 0, 400);
-                    $this->dispatch('error', $this->formatCompressErrorMessage(
-                        $preview !== '' ? "Compression failed (exit code {$exitCode}). {$preview}" : "Compression failed with exit code {$exitCode}.",
-                        $dirPath,
-                        $archivePath,
-                        $this->selectedFiles,
-                        $output
-                    ));
-                    $this->showCompressDialog = false;
-
-                    return;
-                }
-            }
-
-            $verifyArchiveCommand = "docker exec {$escapedContainer} sh -c 'test -f {$escapedArchive} && echo CREATED || echo MISSING'";
-            if ($server->isNonRoot()) {
-                $verifyArchiveCommand = "sudo {$verifyArchiveCommand}";
-            }
-            $verifyArchiveResult = trim((string) (instant_remote_process([$verifyArchiveCommand], $server, false) ?? ''));
-            if ($verifyArchiveResult !== 'CREATED') {
-                $preview = mb_substr(trim((string) $output), 0, 400);
-                $this->dispatch('error', $this->formatCompressErrorMessage(
-                    $preview !== '' ? "Compression failed. {$preview}" : 'Compression failed. Archive file was not created.',
+                    'Compression could not be started.',
                     $dirPath,
                     $archivePath,
                     $this->selectedFiles,
@@ -1664,9 +1678,9 @@ class FileExplorer extends Component
 
             $this->selectedFiles = [];
             $this->compressArchiveName = null;
-            $this->overwriteExisting = false;
+            $this->overwriteExisting = true;
             $this->showCompressDialog = false;
-            $this->dispatch('success', 'Files compressed successfully.');
+            $this->dispatch('success', "Compression started in background. Archive will be created in current folder. Log: {$logFile}");
             $this->loadFiles();
         } catch (\Throwable $e) {
             $this->dispatch('error', $this->formatCompressErrorMessage(
