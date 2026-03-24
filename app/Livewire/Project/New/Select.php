@@ -413,6 +413,7 @@ class Select extends Component
 
         // Merge strategy keeps local templates while refreshing known ones from source.
         $mergedServices = $localServices->merge($sourceServices);
+        $mergedServices = $this->normalizeDuplicateLaravelTemplates($mergedServices);
         $mergedServices = $this->ensureProtectedTemplatesExist($mergedServices);
         $this->persistServiceTemplates($mergedServices);
 
@@ -451,6 +452,17 @@ class Select extends Component
                 'logo' => 'svgs/laravel.svg',
                 'minversion' => '0.0.0',
             ]);
+        }
+
+        return $services;
+    }
+
+    private function normalizeDuplicateLaravelTemplates(Collection $services): Collection
+    {
+        // Keep only one Laravel+MariaDB+phpMyAdmin template in the catalog.
+        // We keep `laravel-with-mariadb` as the canonical key and drop the duplicate.
+        if ($services->has('laravel-github-mariadb-phpmyadmin')) {
+            $services->forget('laravel-github-mariadb-phpmyadmin');
         }
 
         return $services;
