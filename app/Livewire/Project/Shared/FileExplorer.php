@@ -1543,15 +1543,22 @@ class FileExplorer extends Component
 
     public function decompressFile(string $path)
     {
-        $this->selectedFiles = [$path];
+        $normalizedPath = $this->normalizePathArgument($path);
+        if ($normalizedPath === '') {
+            $this->dispatch('error', 'Invalid file path.');
+
+            return;
+        }
+
+        $this->selectedFiles = [$normalizedPath];
         $this->extractSelectedFiles();
     }
 
     public function moveFile()
     {
         // Get values from component properties
-        $sourcePath = $this->moveSource;
-        $destinationPath = $this->moveDestination;
+        $sourcePath = $this->normalizePathArgument((string) $this->moveSource);
+        $destinationPath = $this->normalizePathArgument((string) $this->moveDestination);
 
         if (empty($sourcePath) || empty($destinationPath)) {
             $this->dispatch('error', 'Source and destination paths are required.');
@@ -1844,7 +1851,14 @@ class FileExplorer extends Component
 
     public function openMoveDialog(string $path)
     {
-        $this->moveSource = $path;
+        $normalizedPath = $this->normalizePathArgument($path);
+        if ($normalizedPath === '') {
+            $this->dispatch('error', 'Invalid file path.');
+
+            return;
+        }
+
+        $this->moveSource = $normalizedPath;
         $this->showMoveDialog = true;
     }
 
@@ -1857,8 +1871,15 @@ class FileExplorer extends Component
 
     public function openRenameDialog(string $path)
     {
-        $this->renameSource = $path;
-        $this->renameNewName = basename($path);
+        $normalizedPath = $this->normalizePathArgument($path);
+        if ($normalizedPath === '') {
+            $this->dispatch('error', 'Invalid file path.');
+
+            return;
+        }
+
+        $this->renameSource = $normalizedPath;
+        $this->renameNewName = basename($normalizedPath);
         $this->showRenameDialog = true;
     }
 
@@ -1871,7 +1892,7 @@ class FileExplorer extends Component
 
     public function renameFile()
     {
-        $sourcePath = $this->renameSource;
+        $sourcePath = $this->normalizePathArgument((string) $this->renameSource);
         $newName = trim($this->renameNewName ?? '');
 
         if (empty($sourcePath) || empty($newName)) {
@@ -3330,5 +3351,19 @@ class FileExplorer extends Component
     public function render()
     {
         return view('livewire.project.shared.file-explorer');
+    }
+
+    private function normalizePathArgument(string $path): string
+    {
+        $normalizedPath = trim($path);
+
+        if (
+            (str_starts_with($normalizedPath, "'") && str_ends_with($normalizedPath, "'")) ||
+            (str_starts_with($normalizedPath, '"') && str_ends_with($normalizedPath, '"'))
+        ) {
+            $normalizedPath = substr($normalizedPath, 1, -1);
+        }
+
+        return trim($normalizedPath);
     }
 }

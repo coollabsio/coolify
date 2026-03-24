@@ -48,17 +48,21 @@ const verifyClient = async (info, callback) => {
     const { xsrfToken, laravelSession, sessionCookieName } = getSessionCookie(info.req);
 
     // Verify presence of required tokens
-    if (!laravelSession || !xsrfToken) {
-        return callback(false, 401, 'Unauthorized: Missing required tokens');
+    if (!laravelSession) {
+        return callback(false, 401, 'Unauthorized: Missing session token');
     }
 
     try {
+        const authHeaders = {
+            'Cookie': `${sessionCookieName}=${laravelSession}`
+        };
+        if (xsrfToken) {
+            authHeaders['X-XSRF-TOKEN'] = xsrfToken;
+        }
+
         // Authenticate with Laravel backend
         const response = await axios.post(`http://coolify:8080/terminal/auth`, null, {
-            headers: {
-                'Cookie': `${sessionCookieName}=${laravelSession}`,
-                'X-XSRF-TOKEN': xsrfToken
-            },
+            headers: authHeaders,
         });
 
         if (response.status === 200) {
@@ -82,15 +86,18 @@ wss.on('connection', async (ws, req) => {
     const { xsrfToken, laravelSession, sessionCookieName } = getSessionCookie(req);
 
     // Verify presence of required tokens
-    if (!laravelSession || !xsrfToken) {
-        ws.close(401, 'Unauthorized: Missing required tokens');
+    if (!laravelSession) {
+        ws.close(401, 'Unauthorized: Missing session token');
         return;
     }
+    const ipsHeaders = {
+        'Cookie': `${sessionCookieName}=${laravelSession}`
+    };
+    if (xsrfToken) {
+        ipsHeaders['X-XSRF-TOKEN'] = xsrfToken;
+    }
     const response = await axios.post(`http://coolify:8080/terminal/auth/ips`, null, {
-        headers: {
-            'Cookie': `${sessionCookieName}=${laravelSession}`,
-            'X-XSRF-TOKEN': xsrfToken
-        },
+        headers: ipsHeaders,
     });
     userSession.authorizedIPs = response.data.ipAddresses || [];
     userSessions.set(userId, userSession);
