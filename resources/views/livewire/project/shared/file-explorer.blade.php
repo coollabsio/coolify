@@ -37,9 +37,18 @@
                         <x-loading wire:loading wire:target="loadFiles" />
                         Refresh
                     </x-forms.button>
-                    <x-forms.button wire:click="checkAndInstallUnzip" wire:loading.attr="disabled" class="bg-green-600">
-                        <x-loading wire:loading wire:target="checkAndInstallUnzip" />
-                        Verificar/Instalar unzip
+                    <div class="flex items-center gap-2">
+                        <x-forms.button wire:click="checkUnzip" wire:loading.attr="disabled" class="bg-green-600">
+                            <x-loading wire:loading wire:target="checkUnzip" />
+                            Verificar unzip
+                        </x-forms.button>
+                        <span
+                            class="inline-flex h-3 w-3 rounded-full {{ $isUnzipInstalled === true ? 'bg-green-500' : ($isUnzipInstalled === false ? 'bg-red-500' : 'bg-gray-500') }}"
+                            title="{{ $isUnzipInstalled === true ? 'unzip instalado' : ($isUnzipInstalled === false ? 'unzip no instalado' : 'estado sin verificar') }}"></span>
+                    </div>
+                    <x-forms.button wire:click="installUnzip" wire:loading.attr="disabled" class="bg-yellow-600">
+                        <x-loading wire:loading wire:target="installUnzip" />
+                        Instalar unzip
                     </x-forms.button>
                 </div>
 

@@ -71,6 +71,8 @@ describe('File Explorer Component', function () {
         expect(method_exists($component, 'deleteFileByEncodedPath'))->toBeTrue();
         expect(method_exists($component, 'deleteSelectedFiles'))->toBeTrue();
         expect(method_exists($component, 'compressFileByEncodedPath'))->toBeTrue();
+        expect(method_exists($component, 'checkUnzip'))->toBeTrue();
+        expect(method_exists($component, 'installUnzip'))->toBeTrue();
         expect(method_exists($component, 'getDownloadUrl'))->toBeTrue();
     });
 

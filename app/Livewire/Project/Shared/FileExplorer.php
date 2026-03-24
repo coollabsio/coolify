@@ -83,6 +83,8 @@ class FileExplorer extends Component
 
     public bool $showDatabasePanel = false;
 
+    public ?bool $isUnzipInstalled = null;
+
     public array $databases = [];
 
     public ?string $selectedDatabase = null;
@@ -249,9 +251,11 @@ class FileExplorer extends Component
             $this->checkDatabaseType();
             $this->checkForDatabaseContainers();
             $this->loadFiles();
+            $this->isUnzipInstalled = null;
         } else {
             $this->isMySQLOrMariaDB = false;
             $this->hasMySQLOrMariaDBContainer = false;
+            $this->isUnzipInstalled = null;
         }
     }
 
@@ -1311,43 +1315,53 @@ class FileExplorer extends Component
         }
     }
 
-    public function checkAndInstallUnzip()
+    public function checkUnzip(): void
     {
         try {
-            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
-            if (is_null($container)) {
+            $context = $this->getSelectedContainerContext();
+            if ($context === null) {
                 $this->dispatch('error', 'Container not found.');
 
                 return;
             }
 
-            $server = data_get($container, 'server');
-            if (is_null($server)) {
-                $this->dispatch('error', 'Server not found.');
+            $server = $context['server'];
+            $escapedContainer = $context['escapedContainer'];
 
-                return;
-            }
-
-            $containerName = data_get($container, 'container.Names');
-            $escapedContainer = escapeshellarg($containerName);
-
-            // Check if unzip is installed
             $checkCommand = "docker exec {$escapedContainer} sh -c 'command -v unzip >/dev/null 2>&1 && echo INSTALLED || echo NOT_INSTALLED'";
             if ($server->isNonRoot()) {
                 $checkCommand = "sudo {$checkCommand}";
             }
 
             $checkResult = trim(instant_remote_process([$checkCommand], $server, false) ?? '');
-
             if ($checkResult === 'INSTALLED') {
+                $this->isUnzipInstalled = true;
                 $this->dispatch('success', 'unzip is already installed in this container.');
+            } else {
+                $this->isUnzipInstalled = false;
+                $this->dispatch('error', 'unzip is not installed in this container.');
+            }
+        } catch (\Throwable $e) {
+            $this->isUnzipInstalled = null;
+            $this->dispatch('error', 'Failed to check unzip: '.$e->getMessage());
+        }
+    }
+
+    public function installUnzip(): void
+    {
+        try {
+            $context = $this->getSelectedContainerContext();
+            if ($context === null) {
+                $this->dispatch('error', 'Container not found.');
+
                 return;
             }
 
-            // Try to install unzip
+            $server = $context['server'];
+            $escapedContainer = $context['escapedContainer'];
+
             $this->dispatch('info', 'Installing unzip... This may take a moment.');
 
-            // Try different package managers
             $installCommand = "docker exec {$escapedContainer} sh -c '";
             $installCommand .= "if command -v apk >/dev/null 2>&1; then ";
             $installCommand .= "apk add --no-cache unzip 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
@@ -1364,29 +1378,24 @@ class FileExplorer extends Component
                 $installCommand = "sudo {$installCommand}";
             }
 
-            $installResult = instant_remote_process([$installCommand], $server, false);
-            $installResult = trim($installResult ?? '');
-
+            $installResult = trim((string) (instant_remote_process([$installCommand], $server, false) ?? ''));
             if (str_contains($installResult, 'INSTALL_SUCCESS')) {
-                // Verify installation
-                $verifyCommand = "docker exec {$escapedContainer} sh -c 'command -v unzip >/dev/null 2>&1 && echo VERIFIED || echo NOT_VERIFIED'";
-                if ($server->isNonRoot()) {
-                    $verifyCommand = "sudo {$verifyCommand}";
-                }
-                $verifyResult = trim(instant_remote_process([$verifyCommand], $server, false) ?? '');
-
-                if ($verifyResult === 'VERIFIED') {
+                $this->checkUnzip();
+                if ($this->isUnzipInstalled === true) {
                     $this->dispatch('success', 'unzip has been successfully installed in this container.');
                 } else {
                     $this->dispatch('error', 'unzip installation completed but verification failed. Please try restarting the container.');
                 }
             } elseif (str_contains($installResult, 'NO_PACKAGE_MANAGER')) {
+                $this->isUnzipInstalled = false;
                 $this->dispatch('error', 'Could not find a supported package manager (apk, apt-get, yum, dnf) in this container. Please install unzip manually.');
             } else {
+                $this->isUnzipInstalled = false;
                 $this->dispatch('error', 'Failed to install unzip. Error: '.$installResult);
             }
         } catch (\Throwable $e) {
-            $this->dispatch('error', 'Failed to check/install unzip: '.$e->getMessage());
+            $this->isUnzipInstalled = null;
+            $this->dispatch('error', 'Failed to install unzip: '.$e->getMessage());
         }
     }
 
@@ -1544,6 +1553,19 @@ class FileExplorer extends Component
             $output = instant_remote_process([$command], $server, false);
             if (str_contains($output ?? '', 'not available')) {
                 $this->dispatch('error', 'Required compression tool not available in container.');
+                $this->showCompressDialog = false;
+
+                return;
+            }
+
+            $verifyArchiveCommand = "docker exec {$escapedContainer} sh -c 'test -f {$escapedArchive} && echo CREATED || echo MISSING'";
+            if ($server->isNonRoot()) {
+                $verifyArchiveCommand = "sudo {$verifyArchiveCommand}";
+            }
+            $verifyArchiveResult = trim((string) (instant_remote_process([$verifyArchiveCommand], $server, false) ?? ''));
+            if ($verifyArchiveResult !== 'CREATED') {
+                $preview = mb_substr(trim((string) $output), 0, 400);
+                $this->dispatch('error', $preview !== '' ? 'Compression failed. '.$preview : 'Compression failed. Archive file was not created.');
                 $this->showCompressDialog = false;
 
                 return;
@@ -3440,5 +3462,28 @@ class FileExplorer extends Component
         }
 
         return $decodedPath;
+    }
+
+    private function getSelectedContainerContext(): ?array
+    {
+        if ($this->selected_container === 'default') {
+            return null;
+        }
+
+        $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+        if ($container === null) {
+            return null;
+        }
+
+        $server = data_get($container, 'server');
+        $containerName = data_get($container, 'container.Names');
+        if (! $server instanceof Server || ! is_string($containerName) || $containerName === '') {
+            return null;
+        }
+
+        return [
+            'server' => $server,
+            'escapedContainer' => escapeshellarg($containerName),
+        ];
     }
 }
