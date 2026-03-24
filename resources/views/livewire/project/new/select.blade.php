@@ -144,9 +144,9 @@
                         <x-modal-confirmation title="Regenerate Missing Services?" buttonTitle="Regenerate Services"
                             submitAction="regenerateServicesInCurrentEnvironment" :confirmWithText="false"
                             :confirmWithPassword="false" :actions="[
-                                'This will only regenerate services in the current project and environment.',
+                                'This will regenerate the Services catalog shown in this page.',
                                 'No resources will be deleted.',
-                                'Missing or soft-deleted service records will be restored and re-parsed.',
+                                'It will restore missing templates like Laravel + Nginx + MariaDB + phpMyAdmin if absent.',
                             ]"
                             step2ButtonText="Regenerate" />
                     </div>

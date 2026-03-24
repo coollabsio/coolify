@@ -2,11 +2,10 @@
 
 namespace App\Livewire\Project\New;
 
-use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
-use App\Models\Service;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\File;
 use Livewire\Component;
 
 class Select extends Component
@@ -394,74 +393,54 @@ class Select extends Component
     public function regenerateServicesInCurrentEnvironment(): void
     {
         try {
-            $projectUuid = data_get($this->parameters, 'project_uuid');
-            $environmentUuid = data_get($this->parameters, 'environment_uuid');
-
-            $project = currentTeam()
-                ->projects()
-                ->where('uuid', $projectUuid)
-                ->firstOrFail();
-            $environment = Environment::query()
-                ->where('project_id', $project->id)
-                ->where('uuid', $environmentUuid)
-                ->firstOrFail();
-
-            $result = $this->regenerateEnvironmentServices($environment);
-
-            if ($result['services'] === 0) {
-                $this->dispatch('error', 'No services found in this environment to regenerate.');
-
-                return;
+            $services = get_service_templates(force: true);
+            if ($services->isEmpty()) {
+                $services = get_service_templates();
             }
+            $services = $this->ensureLaravelTemplateExists($services);
 
-            if ($result['failed'] > 0) {
-                $this->dispatch(
-                    'error',
-                    "Regeneration finished with warnings. Parsed {$result['parsed']} service(s), {$result['failed']} failed."
-                );
-            } else {
-                $this->dispatch(
-                    'success',
-                    "Services regenerated successfully. Parsed {$result['parsed']} service(s)."
-                );
-            }
+            $targetFile = base_path('templates/'.config('constants.services.file_name'));
+            File::put(
+                $targetFile,
+                json_encode($services->sortKeys()->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+            );
+
+            $this->dispatch('success', 'Service catalog regenerated. Click "Reload List" to refresh the Services list.');
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
     }
 
-    /**
-     * @return array{services:int,restored:int,parsed:int,failed:int}
-     */
-    private function regenerateEnvironmentServices(Environment $environment): array
+    private function ensureLaravelTemplateExists(Collection $services): Collection
     {
-        $services = Service::withTrashed()
-            ->where('environment_id', $environment->id)
-            ->get();
+        if ($services->has('laravel-with-mariadb')) {
+            return $services;
+        }
 
-        $restored = 0;
-        $parsed = 0;
-        $failed = 0;
+        $latestTemplatesFile = base_path('templates/service-templates-latest.json');
+        if (File::exists($latestTemplatesFile)) {
+            $latestTemplates = collect(json_decode((string) File::get($latestTemplatesFile), true) ?? []);
+            if ($latestTemplates->has('laravel-with-mariadb')) {
+                $services->put('laravel-with-mariadb', $latestTemplates->get('laravel-with-mariadb'));
 
-        foreach ($services as $service) {
-            try {
-                if ($service->trashed()) {
-                    $service->restore();
-                    $restored++;
-                }
-
-                $service->parse();
-                $parsed++;
-            } catch (\Throwable) {
-                $failed++;
+                return $services;
             }
         }
 
-        return [
-            'services' => $services->count(),
-            'restored' => $restored,
-            'parsed' => $parsed,
-            'failed' => $failed,
-        ];
+        $composePath = base_path('templates/compose/laravel-github-mariadb-phpmyadmin.yaml');
+        if (File::exists($composePath)) {
+            $services->put('laravel-with-mariadb', [
+                'name' => 'laravel-with-mariadb',
+                'documentation' => 'https://laravel.com/docs?utm_source=coolify.io',
+                'slogan' => 'Laravel with Nginx, MariaDB and phpMyAdmin.',
+                'compose' => base64_encode((string) File::get($composePath)),
+                'tags' => ['laravel', 'php', 'nginx', 'mariadb', 'phpmyadmin'],
+                'category' => 'framework',
+                'logo' => 'svgs/laravel.svg',
+                'minversion' => '0.0.0',
+            ]);
+        }
+
+        return $services;
     }
 }
