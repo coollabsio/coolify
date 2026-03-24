@@ -355,14 +355,14 @@
                                                             <svg class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
                                                             </svg>
-                                                            <button wire:click="navigateTo(@js($filePath))" class="text-coollabs hover:underline font-medium">
+                                                            <button wire:click="navigateTo('{{ $filePathEscaped }}')" class="text-coollabs hover:underline font-medium">
                                                                 {{ $file['name'] }}
                                                             </button>
                                                         @else
                                                             <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                                             </svg>
-                                                            <button wire:click="openFile(@js($filePath))" class="text-coollabs hover:underline">
+                                                            <button wire:click="openFile('{{ $filePathEscaped }}')" class="text-coollabs hover:underline">
                                                                 {{ $file['name'] }}
                                                             </button>
                                                         @endif
@@ -379,7 +379,7 @@
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                                                                 </svg>
                                                             </a>
-                                                            <x-forms.button wire:click="compressFile(@js($filePath))" class="!text-xs !px-2 !py-1" title="Compress">
+                                                            <x-forms.button wire:click="compressFile('{{ $filePathEscaped }}')" class="!text-xs !px-2 !py-1" title="Compress">
                                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
                                                                 </svg>
@@ -401,18 +401,18 @@
                                                                         str_ends_with($fileName, '.xz');
                                                         @endphp
                                                         @if ($isArchive)
-                                                            <x-forms.button wire:click="decompressFile(@js($filePath))" class="!text-xs !px-2 !py-1" title="Decompress">
+                                                            <x-forms.button wire:click="decompressFileByEncodedPath('{{ $filePathEncoded }}')" class="!text-xs !px-2 !py-1" title="Decompress">
                                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                                                                 </svg>
                                                             </x-forms.button>
                                                         @endif
-                                                        <x-forms.button wire:click="openRenameDialog(@js($filePath))" class="!text-xs !px-2 !py-1" title="Rename">
+                                                        <x-forms.button wire:click="openRenameDialogByEncodedPath('{{ $filePathEncoded }}')" class="!text-xs !px-2 !py-1" title="Rename">
                                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                                             </svg>
                                                         </x-forms.button>
-                                                        <x-forms.button wire:click="openMoveDialog(@js($filePath))" class="!text-xs !px-2 !py-1" title="Move">
+                                                        <x-forms.button wire:click="openMoveDialogByEncodedPath('{{ $filePathEncoded }}')" class="!text-xs !px-2 !py-1" title="Move">
                                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
                                                             </svg>

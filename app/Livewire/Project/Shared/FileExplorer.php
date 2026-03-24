@@ -934,22 +934,8 @@ class FileExplorer extends Component
     public function deleteFileByEncodedPath(string $encodedPath, string $password = '')
     {
         try {
-            $normalizedEncodedPath = trim($encodedPath);
-            if (
-                (str_starts_with($normalizedEncodedPath, "'") && str_ends_with($normalizedEncodedPath, "'")) ||
-                (str_starts_with($normalizedEncodedPath, '"') && str_ends_with($normalizedEncodedPath, '"'))
-            ) {
-                $normalizedEncodedPath = substr($normalizedEncodedPath, 1, -1);
-            }
-            $padded = str_pad(
-                strtr($normalizedEncodedPath, '-_', '+/'),
-                strlen($normalizedEncodedPath) % 4 === 0 ? strlen($normalizedEncodedPath) : strlen($normalizedEncodedPath) + (4 - (strlen($normalizedEncodedPath) % 4)),
-                '=',
-                STR_PAD_RIGHT
-            );
-
-            $decodedPath = base64_decode($padded, true);
-            if ($decodedPath === false || $decodedPath === '') {
+            $decodedPath = $this->decodePathFromEncoded($encodedPath);
+            if ($decodedPath === null || $decodedPath === '') {
                 $this->dispatch('error', 'Invalid file path.');
 
                 return;
@@ -959,6 +945,42 @@ class FileExplorer extends Component
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to decode file path: '.$e->getMessage());
         }
+    }
+
+    public function decompressFileByEncodedPath(string $encodedPath): void
+    {
+        $decodedPath = $this->decodePathFromEncoded($encodedPath);
+        if ($decodedPath === null || $decodedPath === '') {
+            $this->dispatch('error', 'Invalid file path.');
+
+            return;
+        }
+
+        $this->decompressFile($decodedPath);
+    }
+
+    public function openRenameDialogByEncodedPath(string $encodedPath): void
+    {
+        $decodedPath = $this->decodePathFromEncoded($encodedPath);
+        if ($decodedPath === null || $decodedPath === '') {
+            $this->dispatch('error', 'Invalid file path.');
+
+            return;
+        }
+
+        $this->openRenameDialog($decodedPath);
+    }
+
+    public function openMoveDialogByEncodedPath(string $encodedPath): void
+    {
+        $decodedPath = $this->decodePathFromEncoded($encodedPath);
+        if ($decodedPath === null || $decodedPath === '') {
+            $this->dispatch('error', 'Invalid file path.');
+
+            return;
+        }
+
+        $this->openMoveDialog($decodedPath);
     }
 
     private function deleteFileInternal(string $path): bool
@@ -3365,5 +3387,35 @@ class FileExplorer extends Component
         }
 
         return trim($normalizedPath);
+    }
+
+    private function decodePathFromEncoded(string $encodedPath): ?string
+    {
+        $normalizedEncodedPath = trim($encodedPath);
+        if (
+            (str_starts_with($normalizedEncodedPath, "'") && str_ends_with($normalizedEncodedPath, "'")) ||
+            (str_starts_with($normalizedEncodedPath, '"') && str_ends_with($normalizedEncodedPath, '"'))
+        ) {
+            $normalizedEncodedPath = substr($normalizedEncodedPath, 1, -1);
+        }
+
+        $normalizedEncodedPath = trim($normalizedEncodedPath);
+        if ($normalizedEncodedPath === '') {
+            return null;
+        }
+
+        $padded = str_pad(
+            strtr($normalizedEncodedPath, '-_', '+/'),
+            strlen($normalizedEncodedPath) % 4 === 0 ? strlen($normalizedEncodedPath) : strlen($normalizedEncodedPath) + (4 - (strlen($normalizedEncodedPath) % 4)),
+            '=',
+            STR_PAD_RIGHT
+        );
+
+        $decodedPath = base64_decode($padded, true);
+        if ($decodedPath === false || $decodedPath === '') {
+            return null;
+        }
+
+        return $decodedPath;
     }
 }
