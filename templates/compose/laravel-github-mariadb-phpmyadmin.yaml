@@ -99,10 +99,12 @@ services:
           mkdir -p /var/www/html
           cd /var/www/html
 
+          REPO_URL="${SERVICE_GITHUB_REPO_URL:-https://github.com/coollabsio/coolify.git}"
+
           if [ ! -d .git ]; then
-            echo "Cloning repository ${SERVICE_GITHUB_REPO_URL}..."
+            echo "Cloning repository ${REPO_URL}..."
             rm -rf * .[!.]* 2>/dev/null || true
-            git clone ${SERVICE_GITHUB_REPO_URL} .
+            git clone ${REPO_URL} .
           else
             echo "Repository already exists..."
           fi
@@ -171,7 +173,7 @@ services:
           exec /usr/bin/supervisord -c /etc/supervisord.conf
     environment:
       - SERVICE_URL_LARAVEL
-      - SERVICE_GITHUB_REPO_URL=${SERVICE_GITHUB_REPO_URL:-https://github.com/coollabsio/coolify.git}
+      - SERVICE_GITHUB_REPO_URL
       - APP_NAME=Laravel
       - APP_ENV=production
       - APP_DEBUG=false
@@ -268,13 +270,22 @@ services:
   phpmyadmin:
     image: phpmyadmin:latest
     environment:
+      - SERVICE_URL_PHPMYADMIN
       - PMA_HOST=mariadb
       - PMA_USER=root
       - PMA_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - PMA_PORT=3306
+      - PMA_ARBITRARY=0
+      - PMA_ABSOLUTE_URI=$SERVICE_URL_PHPMYADMIN
       - UPLOAD_LIMIT=300M
     depends_on:
       mariadb:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit((int)!@fsockopen(\"127.0.0.1\",80));'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
 volumes:
   laravel-files:

@@ -439,28 +439,14 @@ class Select extends Component
 
     private function ensureProtectedTemplatesExist(Collection $services): Collection
     {
-        if ($services->has('laravel-with-mariadb')) {
-            return $services;
-        }
-
-        $latestTemplatesFile = base_path('templates/service-templates-latest.json');
-        if (File::exists($latestTemplatesFile)) {
-            $latestTemplates = collect(json_decode((string) File::get($latestTemplatesFile), true) ?? []);
-            if ($latestTemplates->has('laravel-with-mariadb')) {
-                $services->put('laravel-with-mariadb', $latestTemplates->get('laravel-with-mariadb'));
-
-                return $services;
-            }
-        }
-
         $composePath = base_path('templates/compose/laravel-github-mariadb-phpmyadmin.yaml');
         if (File::exists($composePath)) {
             $services->put('laravel-with-mariadb', [
                 'name' => 'laravel-with-mariadb',
                 'documentation' => 'https://laravel.com/docs?utm_source=coolify.io',
-                'slogan' => 'Laravel with Nginx, MariaDB and phpMyAdmin.',
+                'slogan' => 'Laravel with GitHub deploy, Nginx, MariaDB and phpMyAdmin.',
                 'compose' => base64_encode((string) File::get($composePath)),
-                'tags' => ['laravel', 'php', 'nginx', 'mariadb', 'phpmyadmin'],
+                'tags' => ['laravel', 'php', 'nginx', 'mariadb', 'phpmyadmin', 'github'],
                 'category' => 'framework',
                 'logo' => 'svgs/laravel.svg',
                 'minversion' => '0.0.0',
