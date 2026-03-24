@@ -314,6 +314,18 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 // Step 1: Create local backup
                 try {
                     if (str($databaseType)->contains('postgres')) {
+                        if ($this->backup->engine === 'pgbackrest' && $this->database instanceof StandalonePostgresql) {
+                            $this->backup_file = "/pgbackrest-$database-".Carbon::now()->timestamp.'.info';
+                            $this->backup_location = $this->backup_dir.$this->backup_file;
+                            $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                                'uuid' => $this->backup_log_uuid,
+                                'database_name' => $database,
+                                'filename' => $this->backup_location,
+                                'scheduled_database_backup_id' => $this->backup->id,
+                                'local_storage_deleted' => false,
+                            ]);
+                            $this->backupWithPgbackrest($database);
+                        } else {
                         $this->backup_file = "/pg-dump-$database-".Carbon::now()->timestamp.'.dmp';
                         if ($this->backup->dump_all) {
                             $this->backup_file = '/pg-dump-all-'.Carbon::now()->timestamp.'.gz';
@@ -327,6 +339,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'local_storage_deleted' => false,
                         ]);
                         $this->backup_standalone_postgresql($database);
+                        }
                     } elseif (str($databaseType)->contains('mongo')) {
                         if ($database === '*') {
                             $database = 'all';
@@ -518,6 +531,41 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
+            }
+        } catch (\Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
+        }
+    }
+
+    private function backupWithPgbackrest(string $database): void
+    {
+        try {
+            $pgbackrestService = new \App\Services\Backup\PgBackrestService($this->database, $this->server);
+            $backupType = $this->backup->backup_type ?? 'incr';
+
+            $setupCommands = $pgbackrestService->buildSetupCommands($this->s3);
+            instant_remote_process($setupCommands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+
+            $backupCommands = $pgbackrestService->buildContainerBackupCommands($backupType);
+            $this->backup_output = instant_remote_process($backupCommands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+
+            $infoCommands = $pgbackrestService->buildContainerInfoCommands();
+            $infoOutput = instant_remote_process($infoCommands, $this->server, true, false, 60, disableMultiplexing: true);
+
+            $commands = [
+                'mkdir -p '.$this->backup_dir,
+                "echo ".escapeshellarg($infoOutput)." > {$this->backup_location}",
+            ];
+            instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
+
+            $this->backup_output = "pgBackRest {$backupType} backup completed successfully.\n" . trim($this->backup_output ?? '');
+            if ($this->backup_output === '') {
+                $this->backup_output = null;
+            }
+
+            if ($this->s3) {
+                $this->s3_uploaded = true;
             }
         } catch (\Throwable $e) {
             $this->add_to_error_output($e->getMessage());

@@ -27,6 +27,14 @@ class CreateScheduledBackup extends Component
     #[Validate(['nullable', 'integer'])]
     public ?int $s3StorageId = null;
 
+    #[Validate(['required', 'string'])]
+    public string $engine = 'dump';
+
+    #[Validate(['required', 'string'])]
+    public string $backupType = 'full';
+
+    public bool $showPgbackrestOptions = false;
+
     public Collection $definedS3s;
 
     public function mount()
@@ -63,7 +71,13 @@ class CreateScheduledBackup extends Component
                 'database_id' => $this->database->id,
                 'database_type' => $this->database->getMorphClass(),
                 'team_id' => currentTeam()->id,
+                'engine' => $this->engine,
+                'backup_type' => $this->backupType,
             ];
+
+            if ($this->engine === 'pgbackrest' && $this->database->type() === 'standalone-postgresql') {
+                $this->database->update(['pgbackrest_enabled' => true]);
+            }
 
             if ($this->database->type() === 'standalone-postgresql') {
                 $payload['databases_to_backup'] = $this->database->postgres_db;

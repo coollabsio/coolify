@@ -345,4 +345,9 @@ class StandalonePostgresql extends BaseModel
     {
         return true;
     }
+
+    public function isPgbackrestEnabled(): bool
+    {
+        return (bool) $this->pgbackrest_enabled;
+    }
 }

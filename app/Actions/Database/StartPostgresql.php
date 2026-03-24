@@ -187,6 +187,40 @@ class StartPostgresql
 
         $command = ['postgres'];
 
+        if ($this->database->pgbackrest_enabled) {
+            $pgbackrestService = new \App\Services\Backup\PgBackrestService($this->database, $this->database->destination->server);
+            $walParams = $pgbackrestService->getWalArchiveParams();
+            $command = array_merge($command, $walParams);
+
+            $pgbackrestConfigDir = $this->configuration_dir . '/pgbackrest';
+            $this->commands[] = "mkdir -p {$pgbackrestConfigDir}";
+
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'],
+                [
+                    [
+                        'type' => 'bind',
+                        'source' => $pgbackrestConfigDir . '/pgbackrest.conf',
+                        'target' => '/etc/pgbackrest/pgbackrest.conf',
+                        'read_only' => true,
+                    ],
+                ]
+            );
+
+            $pgbackrestVolumeName = 'pgbackrest-data-' . $container_name;
+            $docker_compose['services'][$container_name]['volumes'][] = $pgbackrestVolumeName . ':/var/lib/pgbackrest';
+            $docker_compose['services'][$container_name]['volumes'][] = 'pgbackrest-log-' . $container_name . ':/var/log/pgbackrest';
+
+            $docker_compose['volumes'][$pgbackrestVolumeName] = [
+                'name' => $pgbackrestVolumeName,
+                'external' => false,
+            ];
+            $docker_compose['volumes']['pgbackrest-log-' . $container_name] = [
+                'name' => 'pgbackrest-log-' . $container_name,
+                'external' => false,
+            ];
+        }
+
         if (filled($this->database->postgres_conf)) {
             $docker_compose['services'][$container_name]['volumes'] = array_merge(
                 $docker_compose['services'][$container_name]['volumes'],

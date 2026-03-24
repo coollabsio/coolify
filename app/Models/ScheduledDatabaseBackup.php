@@ -46,6 +46,11 @@ class ScheduledDatabaseBackup extends BaseModel
         return $this->belongsTo(S3Storage::class, 's3_storage_id');
     }
 
+    public function isPgbackrest(): bool
+    {
+        return $this->engine === 'pgbackrest';
+    }
+
     public function get_last_days_backup_status($days = 7)
     {
         return $this->hasMany(ScheduledDatabaseBackupExecution::class)->where('created_at', '>=', now()->subDays($days))->get();
