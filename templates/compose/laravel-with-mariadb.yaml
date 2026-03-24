@@ -225,8 +225,8 @@ services:
 
   nginx:
     image: nginx:alpine
-    environment:
-      - NGINX_ENTRYPOINT_WORKER_PROCESSES_AUTOTUNE=0
+    entrypoint: ["nginx"]
+    command: ["-g", "daemon off;"]
     volumes:
       - laravel-files:/var/www/html:ro
       - type: bind
@@ -234,19 +234,20 @@ services:
         target: /etc/nginx/nginx.conf
         content: |
           user nginx;
-          worker_processes 2;
+          worker_processes 1;
           error_log /var/log/nginx/error.log warn;
           pid /var/run/nginx.pid;
 
           events {
-              worker_connections 1024;
+              worker_connections 512;
               multi_accept off;
           }
 
           http {
               include /etc/nginx/mime.types;
               default_type application/octet-stream;
-              sendfile on;
+              aio off;
+              sendfile off;
               keepalive_timeout 65;
               client_max_body_size 100M;
               include /etc/nginx/conf.d/*.conf;

@@ -236,29 +236,31 @@ services:
 
   nginx:
     image: nginx:alpine
-    environment:
-      - NGINX_ENTRYPOINT_WORKER_PROCESSES_AUTOTUNE=0
+    # Skip /docker-entrypoint.d/ scripts: they try to PATCH nginx.conf (read-only bind) and still trigger io_setup issues.
+    entrypoint: ["nginx"]
+    command: ["-g", "daemon off;"]
     volumes:
       - laravel-files:/var/www/html:ro
       - type: bind
         source: ./nginx-main.conf
         target: /etc/nginx/nginx.conf
         content: |
-          # Low worker count avoids io_setup() failures on hosts with strict aio limits (502 Bad Gateway).
+          # Minimal workers + no async AIO: avoids io_setup() failures on constrained hosts (502 from Traefik).
           user nginx;
-          worker_processes 2;
+          worker_processes 1;
           error_log /var/log/nginx/error.log warn;
           pid /var/run/nginx.pid;
 
           events {
-              worker_connections 1024;
+              worker_connections 512;
               multi_accept off;
           }
 
           http {
               include /etc/nginx/mime.types;
               default_type application/octet-stream;
-              sendfile on;
+              aio off;
+              sendfile off;
               keepalive_timeout 65;
               client_max_body_size 100M;
               include /etc/nginx/conf.d/*.conf;
