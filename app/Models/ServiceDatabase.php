@@ -53,10 +53,24 @@ class ServiceDatabase extends BaseModel
         });
     }
 
+    /**
+     * Whether this ServiceDatabase belongs to an Application (dockercompose buildpack)
+     * rather than a Service (empty compose / one-click).
+     */
+    public function isApplicationOwned(): bool
+    {
+        return ! is_null($this->application_id);
+    }
+
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        if ($this->isApplicationOwned()) {
+            $container_id = $this->name.'-'.$this->application->uuid;
+            remote_process(["docker restart {$container_id}"], $this->getServer());
+        } else {
+            $container_id = $this->name.'-'.$this->service->uuid;
+            remote_process(["docker restart {$container_id}"], $this->getServer());
+        }
     }
 
     public function isRunning()
@@ -118,8 +132,9 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = $this->getServer();
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -128,17 +143,67 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
+        if ($this->isApplicationOwned()) {
+            return data_get($this, 'application.environment.project.team');
+        }
+
         return data_get($this, 'service.environment.project.team');
     }
 
     public function workdir()
     {
+        if ($this->isApplicationOwned()) {
+            return application_configuration_dir()."/{$this->application->uuid}";
+        }
+
         return service_configuration_dir()."/{$this->service->uuid}";
+    }
+
+    /**
+     * Get the server for this database, regardless of whether it is owned
+     * by a Service or an Application.
+     */
+    public function getServer(): \App\Models\Server
+    {
+        if ($this->isApplicationOwned()) {
+            return $this->application->destination->server;
+        }
+
+        return $this->service->destination->server;
+    }
+
+    /**
+     * Get the network for this database.
+     */
+    public function getNetwork(): string
+    {
+        if ($this->isApplicationOwned()) {
+            return $this->application->destination->network;
+        }
+
+        return $this->service->destination->network;
+    }
+
+    /**
+     * Get the UUID of the owning resource (Service or Application).
+     */
+    public function getOwnerUuid(): string
+    {
+        if ($this->isApplicationOwned()) {
+            return $this->application->uuid;
+        }
+
+        return $this->service->uuid;
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function persistentStorages()
