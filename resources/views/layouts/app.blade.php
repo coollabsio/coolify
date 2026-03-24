@@ -8,68 +8,44 @@
     <livewire:global-search />
     @auth
         <livewire:deployments-indicator />
-        <div
-            x-data="{
-                open: false,
-                tasks: [],
-                loading: false,
-                async fetchTasks() {
-                    this.loading = true;
-                    try {
-                        const response = await fetch('{{ route('compression.tasks') }}', {
-                            method: 'GET',
-                            headers: { 'Accept': 'application/json' }
-                        });
-                        if (!response.ok) {
-                            return;
-                        }
-                        const payload = await response.json();
-                        this.tasks = Array.isArray(payload.tasks) ? payload.tasks : [];
-                    } catch (e) {
-                    } finally {
-                        this.loading = false;
-                    }
-                }
-            }"
-            x-init="fetchTasks(); setInterval(() => fetchTasks(), 10000)"
-            class="fixed top-4 right-4 z-[10000]">
-            <div class="relative" @click.outside="open = false">
-                <button type="button" @click="open = !open; if (open) fetchTasks()"
-                    class="rounded bg-coollabs px-3 py-2 text-xs font-semibold text-white shadow-lg hover:opacity-90">
-                    Compression Tasks (<span x-text="tasks.length"></span>)
-                </button>
-                <div x-show="open" x-cloak
-                    class="absolute right-0 mt-2 w-[30rem] max-h-[28rem] overflow-auto rounded border border-coolgray-300 dark:border-coolgray-600 bg-white dark:bg-coolgray-100 p-3 shadow-2xl">
+        @php
+            $teamId = (string) data_get(auth()->user()?->currentTeam(), 'id', '0');
+            $globalCompressionTasks = \Illuminate\Support\Facades\Cache::get("file-explorer-compression-tasks:{$teamId}", []);
+            $globalCompressionTasks = is_array($globalCompressionTasks) ? $globalCompressionTasks : [];
+        @endphp
+        <div class="fixed top-4 right-4 z-[10000]">
+            <details class="relative group">
+                <summary class="list-none cursor-pointer rounded bg-coollabs px-3 py-2 text-xs font-semibold text-white shadow-lg hover:opacity-90">
+                    Compression Tasks ({{ count($globalCompressionTasks) }})
+                </summary>
+                <div class="absolute right-0 mt-2 w-[30rem] max-h-[28rem] overflow-auto rounded border border-coolgray-300 dark:border-coolgray-600 bg-white dark:bg-coolgray-100 p-3 shadow-2xl">
                     <div class="mb-2 flex items-center justify-between">
                         <h4 class="text-sm font-semibold dark:text-white">Background Compression Tasks</h4>
-                        <button type="button" @click="fetchTasks()"
-                            class="rounded bg-gray-700 px-2 py-1 text-[11px] text-white hover:opacity-90">Refresh</button>
+                        <a href="{{ url()->current() }}" class="rounded bg-gray-700 px-2 py-1 text-[11px] text-white hover:opacity-90">Refresh</a>
                     </div>
-                    <template x-if="loading">
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Loading...</p>
-                    </template>
-                    <template x-if="!loading && tasks.length === 0">
+                    @if (empty($globalCompressionTasks))
                         <p class="text-xs text-gray-500 dark:text-gray-400">No compression tasks.</p>
-                    </template>
-                    <div class="space-y-2" x-show="!loading && tasks.length > 0">
-                        <template x-for="task in tasks" :key="task.id">
-                            <div class="rounded border border-coolgray-300 dark:border-coolgray-600 p-2">
-                                <div class="flex items-center justify-between gap-2">
-                                    <p class="truncate text-xs font-semibold dark:text-white" x-text="task.archive_name || 'archive.zip'"></p>
-                                    <span class="text-[11px]"
-                                        :class="task.status === 'completed' ? 'text-green-500' : (task.status === 'failed' ? 'text-red-500' : 'text-yellow-500')"
-                                        x-text="(task.status || 'running').toUpperCase()"></span>
+                    @else
+                        <div class="space-y-2">
+                            @foreach ($globalCompressionTasks as $task)
+                                <div class="rounded border border-coolgray-300 dark:border-coolgray-600 p-2">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <p class="truncate text-xs font-semibold dark:text-white">{{ data_get($task, 'archive_name', 'archive.zip') }}</p>
+                                        <span class="text-[11px] {{ data_get($task, 'status') === 'completed' ? 'text-green-500' : (data_get($task, 'status') === 'failed' ? 'text-red-500' : 'text-yellow-500') }}">
+                                            {{ strtoupper((string) data_get($task, 'status', 'running')) }}
+                                        </span>
+                                    </div>
+                                    <p class="truncate text-[11px] text-gray-500 dark:text-gray-400">Dir: {{ data_get($task, 'directory', '/') }}</p>
+                                    <p class="break-words text-[11px] text-gray-500 dark:text-gray-400">{{ data_get($task, 'last_message', '') }}</p>
+                                    <div class="mt-2">
+                                        <a href="{{ data_get($task, 'open_url', '#') }}" class="rounded bg-blue-600 px-2 py-1 text-[11px] text-white hover:opacity-90">Open Location</a>
+                                    </div>
                                 </div>
-                                <p class="truncate text-[11px] text-gray-500 dark:text-gray-400" x-text="'Dir: ' + (task.directory || '/')"></p>
-                                <p class="break-words text-[11px] text-gray-500 dark:text-gray-400" x-text="task.last_message || ''"></p>
-                                <div class="mt-2">
-                                    <a :href="task.open_url || '#'" class="rounded bg-blue-600 px-2 py-1 text-[11px] text-white hover:opacity-90">Open Location</a>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
-            </div>
+            </details>
         </div>
         <div x-data="{
             open: false,

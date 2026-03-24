@@ -277,6 +277,10 @@
                             </svg>
                             .env
                         </x-forms.button>
+                        <x-forms.button wire:click="loadFiles" wire:loading.attr="disabled" wire:target="loadFiles" class="bg-gray-600" title="Refresh current folder">
+                            <x-loading wire:loading wire:target="loadFiles" />
+                            Refresh Files
+                        </x-forms.button>
                         @endif
                     </div>
                 @endif
