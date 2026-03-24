@@ -502,7 +502,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('project.file.download')->middleware('can.access.terminal');
 
     Route::get('/compression-tasks', function () {
-        $teamId = (string) data_get(auth()->user(), 'currentTeam.id', '0');
+        $teamId = (string) data_get(auth()->user()?->currentTeam(), 'id', '0');
         $cacheKey = "file-explorer-compression-tasks:{$teamId}";
         $tasks = \Illuminate\Support\Facades\Cache::get($cacheKey, []);
 

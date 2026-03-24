@@ -3694,7 +3694,7 @@ class FileExplorer extends Component
 
     private function compressionTasksCacheKey(): string
     {
-        $teamId = (string) data_get(auth()->user(), 'currentTeam.id', '0');
+        $teamId = (string) data_get(auth()->user()?->currentTeam(), 'id', '0');
 
         return "file-explorer-compression-tasks:{$teamId}";
     }
