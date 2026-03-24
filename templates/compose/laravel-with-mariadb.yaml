@@ -233,9 +233,10 @@ services:
         source: ./nginx-main.conf
         target: /etc/nginx/nginx.conf
         content: |
+          # Main error_log must be stderr so Docker/Coolify log UI shows nginx + FastCGI upstream errors.
           user nginx;
           worker_processes 1;
-          error_log /var/log/nginx/error.log warn;
+          error_log /dev/stderr warn;
           pid /var/run/nginx.pid;
 
           events {
@@ -301,6 +302,8 @@ services:
       laravel:
         condition: service_started
     restart: unless-stopped
+    expose:
+      - "80"
     healthcheck:
       test: ["CMD-SHELL", "nginx -t && pgrep nginx >/dev/null || exit 1"]
       interval: 10s
