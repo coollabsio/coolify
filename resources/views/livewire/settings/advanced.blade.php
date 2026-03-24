@@ -18,7 +18,7 @@
                 <div class="flex flex-col gap-1">
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="is_registration_enabled"
-                            helper="Allow users to self-register. If disabled, only administrators can create accounts."
+                            helper="Allow users to self-register. If disabled, only administrators can create accounts. Note: OAuth users can always self-register regardless of this setting."
                             label="Registration Allowed" />
                     </div>
                     <div class="md:w-96">
