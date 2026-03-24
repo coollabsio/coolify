@@ -236,6 +236,8 @@ services:
 
   nginx:
     image: nginx:alpine
+    environment:
+      - NGINX_ENTRYPOINT_WORKER_PROCESSES_AUTOTUNE=0
     volumes:
       - laravel-files:/var/www/html:ro
       - type: bind
