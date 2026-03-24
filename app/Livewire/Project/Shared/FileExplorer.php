@@ -1392,6 +1392,8 @@ class FileExplorer extends Component
 
     public function openCompressDialog()
     {
+        $this->syncSelectedFilesWithCurrentDirectory();
+
         if (empty($this->selectedFiles)) {
             $this->dispatch('error', 'Please select at least one file or folder to compress.');
 
@@ -1404,6 +1406,8 @@ class FileExplorer extends Component
 
     public function compressSelectedFiles()
     {
+        $this->syncSelectedFilesWithCurrentDirectory();
+
         if (empty($this->selectedFiles)) {
             $this->dispatch('error', 'Please select at least one file or folder to compress.');
             $this->showCompressDialog = false;
@@ -1461,13 +1465,13 @@ class FileExplorer extends Component
             }
 
             // Prepare file list for compression
-            $fileNames = [];
-            foreach ($this->selectedFiles as $selectedPath) {
-                $file = collect($this->files)->firstWhere('path', $selectedPath);
-                if ($file) {
-                    $fileNames[] = escapeshellarg(basename($selectedPath));
-                }
-            }
+            $fileNames = collect($this->selectedFiles)
+                ->map(fn ($selectedPath) => $this->normalizePathArgument((string) $selectedPath))
+                ->filter(fn ($selectedPath) => $selectedPath !== '')
+                ->map(fn ($selectedPath) => escapeshellarg(basename($selectedPath)))
+                ->unique()
+                ->values()
+                ->toArray();
 
             if (empty($fileNames)) {
                 $this->dispatch('error', 'No valid files selected.');
@@ -1559,8 +1563,27 @@ class FileExplorer extends Component
 
     public function compressFile(string $path)
     {
-        $this->selectedFiles = [$path];
+        $normalizedPath = $this->normalizePathArgument($path);
+        if ($normalizedPath === '') {
+            $this->dispatch('error', 'Invalid file path.');
+
+            return;
+        }
+
+        $this->selectedFiles = [$normalizedPath];
         $this->openCompressDialog();
+    }
+
+    public function compressFileByEncodedPath(string $encodedPath): void
+    {
+        $decodedPath = $this->decodePathFromEncoded($encodedPath);
+        if ($decodedPath === null || $decodedPath === '') {
+            $this->dispatch('error', 'Invalid file path.');
+
+            return;
+        }
+
+        $this->compressFile($decodedPath);
     }
 
     public function decompressFile(string $path)

@@ -70,6 +70,7 @@ describe('File Explorer Component', function () {
         expect(method_exists($component, 'deleteFile'))->toBeTrue();
         expect(method_exists($component, 'deleteFileByEncodedPath'))->toBeTrue();
         expect(method_exists($component, 'deleteSelectedFiles'))->toBeTrue();
+        expect(method_exists($component, 'compressFileByEncodedPath'))->toBeTrue();
         expect(method_exists($component, 'getDownloadUrl'))->toBeTrue();
     });
 
