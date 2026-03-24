@@ -185,6 +185,7 @@ class StackForm extends Component
     {
         try {
             $this->validate();
+            $this->syncLaravelDatabaseVariable();
             $this->syncData(true);
 
             // Validate for command injection BEFORE any database operations
@@ -216,6 +217,31 @@ class StackForm extends Component
                 $this->dispatch('configurationChanged');
             }
         }
+    }
+
+    private function syncLaravelDatabaseVariable(): void
+    {
+        if ($this->fields->has('SERVICE_DATABASE_LARAVEL')) {
+            return;
+        }
+
+        $databaseField = $this->fields->get('MYSQL_DATABASE')
+            ?? $this->fields->get('SERVICE_DATABASE_MARIADB');
+
+        $databaseName = (string) data_get($databaseField, 'value', '');
+        if ($databaseName === '') {
+            return;
+        }
+
+        $this->fields->put('SERVICE_DATABASE_LARAVEL', [
+            'serviceName' => 'SERVICE_DATABASE_LARAVEL',
+            'key' => 'SERVICE_DATABASE_LARAVEL',
+            'name' => 'Laravel Database Name',
+            'value' => $databaseName,
+            'isPassword' => false,
+            'rules' => 'nullable|string',
+            'customHelper' => 'Auto-synced from MariaDB Database Name.',
+        ]);
     }
 
     public function render()

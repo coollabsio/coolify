@@ -126,6 +126,10 @@ services:
             composer install --no-interaction --prefer-dist --optimize-autoloader
           fi
 
+          DB_NAME="${SERVICE_DATABASE_LARAVEL:-${MYSQL_DATABASE:-laravel}}"
+          DB_USER="${SERVICE_USER_LARAVEL:-${MYSQL_USER:-laravel}}"
+          DB_PASSWORD="${SERVICE_PASSWORD_LARAVEL:-${MYSQL_PASSWORD:-password}}"
+
           if [ ! -f .env ]; then
              if [ -f .env.example ]; then
                cp .env.example .env
@@ -136,9 +140,9 @@ services:
              echo "DB_CONNECTION=mysql" >> .env
              echo "DB_HOST=mariadb" >> .env
              echo "DB_PORT=3306" >> .env
-             echo "DB_DATABASE=${SERVICE_DATABASE_LARAVEL}" >> .env
-             echo "DB_USERNAME=${SERVICE_USER_LARAVEL}" >> .env
-             echo "DB_PASSWORD=${SERVICE_PASSWORD_LARAVEL}" >> .env
+             echo "DB_DATABASE=${DB_NAME}" >> .env
+             echo "DB_USERNAME=${DB_USER}" >> .env
+             echo "DB_PASSWORD=${DB_PASSWORD}" >> .env
              echo "APP_URL=${SERVICE_URL_LARAVEL}" >> .env
           fi
 
@@ -159,9 +163,9 @@ services:
           upsert_env "DB_CONNECTION" "mysql"
           upsert_env "DB_HOST" "mariadb"
           upsert_env "DB_PORT" "3306"
-          upsert_env "DB_DATABASE" "${SERVICE_DATABASE_LARAVEL}"
-          upsert_env "DB_USERNAME" "${SERVICE_USER_LARAVEL}"
-          upsert_env "DB_PASSWORD" "${SERVICE_PASSWORD_LARAVEL}"
+          upsert_env "DB_DATABASE" "${DB_NAME}"
+          upsert_env "DB_USERNAME" "${DB_USER}"
+          upsert_env "DB_PASSWORD" "${DB_PASSWORD}"
 
           if [ -f artisan ]; then
             echo "Running Laravel setup tasks..."
@@ -170,9 +174,9 @@ services:
             DB_CONNECTION=mysql \
               DB_HOST=mariadb \
               DB_PORT=3306 \
-              DB_DATABASE="${SERVICE_DATABASE_LARAVEL}" \
-              DB_USERNAME="${SERVICE_USER_LARAVEL}" \
-              DB_PASSWORD="${SERVICE_PASSWORD_LARAVEL}" \
+              DB_DATABASE="${DB_NAME}" \
+              DB_USERNAME="${DB_USER}" \
+              DB_PASSWORD="${DB_PASSWORD}" \
               php artisan migrate --force || true
           fi
 
@@ -213,9 +217,9 @@ services:
       - DB_CONNECTION=mysql
       - DB_HOST=mariadb
       - DB_PORT=3306
-      - DB_DATABASE=$SERVICE_DATABASE_LARAVEL
-      - DB_USERNAME=$SERVICE_USER_LARAVEL
-      - DB_PASSWORD=$SERVICE_PASSWORD_LARAVEL
+      - DB_DATABASE=${SERVICE_DATABASE_LARAVEL:-laravel}
+      - DB_USERNAME=${SERVICE_USER_LARAVEL:-laravel}
+      - DB_PASSWORD=${SERVICE_PASSWORD_LARAVEL:-password}
       - QUEUE_CONNECTION=database
       - CACHE_DRIVER=file
       - SESSION_DRIVER=file
@@ -288,9 +292,9 @@ services:
       - mariadb-data:/var/lib/mysql
     environment:
       - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
-      - MYSQL_DATABASE=$SERVICE_DATABASE_LARAVEL
-      - MYSQL_USER=$SERVICE_USER_LARAVEL
-      - MYSQL_PASSWORD=$SERVICE_PASSWORD_LARAVEL
+      - MYSQL_DATABASE=${SERVICE_DATABASE_LARAVEL:-laravel}
+      - MYSQL_USER=${SERVICE_USER_LARAVEL:-laravel}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_LARAVEL:-password}
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
