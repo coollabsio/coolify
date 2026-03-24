@@ -90,6 +90,7 @@ Thank you so much!
 * [Logto](https://logto.io?ref=coolify.io) - The better identity infrastructure for developers
 * [Macarne](https://macarne.com?ref=coolify.io) - Best IP Transit & Carrier Ethernet Solutions for Simplified Network Connectivity
 * [Mobb](https://vibe.mobb.ai/?ref=coolify.io) - Secure Your AI-Generated Code to Unlock Dev Productivity
+* [PetroSky Cloud](https://petrosky.io?ref=coolify.io) - Open source cloud deployment solutions
 * [PFGLabs](https://pfglabs.com?ref=coolify.io) - Build Real Projects with Golang
 * [Ramnode](https://ramnode.com/?ref=coolify.io) - High Performance Cloud VPS Hosting
 * [SaasyKit](https://saasykit.com?ref=coolify.io) - Complete SaaS starter kit for developers

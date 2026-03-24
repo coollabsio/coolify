@@ -11,11 +11,8 @@ class InstallDocker
 {
     use AsAction;
 
-    private string $dockerVersion;
-
     public function handle(Server $server)
     {
-        $this->dockerVersion = config('constants.docker.minimum_required_version');
         $supported_os_type = $server->validateOS();
         if (! $supported_os_type) {
             throw new \Exception('Server OS type is not supported for automated installation. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://coolify.io/docs/installation#manually">documentation</a>.');
@@ -118,7 +115,7 @@ class InstallDocker
 
     private function getDebianDockerInstallCommand(): string
     {
-        return "curl --max-time 300 --retry 3 https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl --max-time 300 --retry 3 https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
+        return 'curl -fsSL https://get.docker.com | sh || ('.
             '. /etc/os-release && '.
             'install -m 0755 -d /etc/apt/keyrings && '.
             'curl -fsSL https://download.docker.com/linux/${ID}/gpg -o /etc/apt/keyrings/docker.asc && '.
@@ -131,7 +128,7 @@ class InstallDocker
 
     private function getRhelDockerInstallCommand(): string
     {
-        return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
+        return 'curl -fsSL https://get.docker.com | sh || ('.
             'dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && '.
             'dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && '.
             'systemctl start docker && '.
@@ -141,7 +138,7 @@ class InstallDocker
 
     private function getSuseDockerInstallCommand(): string
     {
-        return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
+        return 'curl -fsSL https://get.docker.com | sh || ('.
             'zypper addrepo https://download.docker.com/linux/sles/docker-ce.repo && '.
             'zypper refresh && '.
             'zypper install -y --no-confirm docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && '.
@@ -152,10 +149,6 @@ class InstallDocker
 
     private function getArchDockerInstallCommand(): string
     {
-        // Use -Syu to perform full system upgrade before installing Docker
-        // Partial upgrades (-Sy without -u) are discouraged on Arch Linux
-        // as they can lead to broken dependencies and system instability
-        // Use --needed to skip reinstalling packages that are already up-to-date (idempotent)
         return 'pacman -Syu --noconfirm --needed docker docker-compose && '.
             'systemctl enable docker.service && '.
             'systemctl start docker.service';
@@ -163,6 +156,6 @@ class InstallDocker
 
     private function getGenericDockerInstallCommand(): string
     {
-        return "curl --max-time 300 --retry 3 https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl --max-time 300 --retry 3 https://get.docker.com | sh -s -- --version {$this->dockerVersion}";
+        return 'curl -fsSL https://get.docker.com | sh';
     }
 }
