@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\Service;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -86,6 +87,8 @@ class FileExplorer extends Component
     public ?bool $isUnzipInstalled = null;
 
     public ?bool $isZipInstalled = null;
+
+    public array $compressionTasks = [];
 
     public array $databases = [];
 
@@ -176,7 +179,31 @@ class FileExplorer extends Component
         // Check if any container in the service is MySQL/MariaDB
         $this->checkForDatabaseContainers();
 
-        if ($this->containers->count() === 1) {
+        $requestedPath = request()->query('path');
+        if (is_string($requestedPath) && $requestedPath !== '') {
+            $normalizedRequestedPath = $this->normalizePathArgument($requestedPath);
+            if ($normalizedRequestedPath !== '' && str_starts_with($normalizedRequestedPath, '/')) {
+                $this->currentPath = $normalizedRequestedPath;
+            }
+        }
+
+        $requestedContainer = request()->query('container');
+        if (is_string($requestedContainer) && $requestedContainer !== '') {
+            $containerExists = $this->containers
+                ->pluck('container.Names')
+                ->contains($requestedContainer);
+            if ($containerExists) {
+                $this->selected_container = $requestedContainer;
+                try {
+                    $this->checkDatabaseType();
+                    $this->loadFiles();
+                } catch (\Throwable) {
+                    // Fallback to default behavior if requested container is invalid at runtime.
+                }
+            }
+        }
+
+        if ($this->selected_container === 'default' && $this->containers->count() === 1) {
             try {
                 $this->selected_container = data_get($this->containers->first(), 'container.Names');
                 $this->checkDatabaseType();
@@ -185,6 +212,8 @@ class FileExplorer extends Component
                 // Silently fail on mount, user can manually select container
             }
         }
+
+        $this->loadCompressionTasksFromCache();
     }
 
     public function loadContainers()
@@ -485,8 +514,7 @@ class FileExplorer extends Component
             }
 
             $output = instant_remote_process([$command], $server, false);
-            $parsedFiles = $this->parseFileList($output ?? '');
-            $this->files = $this->populateDirectorySizes($parsedFiles, $server, $escapedContainer);
+            $this->files = $this->parseFileList($output ?? '');
             $this->syncSelectedFilesWithCurrentDirectory();
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to load files: '.$e->getMessage());
@@ -563,55 +591,6 @@ class FileExplorer extends Component
 
             return strcmp($a['name'], $b['name']);
         });
-
-        return $files;
-    }
-
-    /**
-     * @param  array<int, array<string, mixed>>  $files
-     * @return array<int, array<string, mixed>>
-     */
-    private function populateDirectorySizes(array $files, Server $server, string $escapedContainer): array
-    {
-        $directoryIndexes = [];
-        foreach ($files as $index => $file) {
-            if (($file['is_directory'] ?? false) === true) {
-                $directoryIndexes[] = $index;
-            }
-        }
-
-        if (empty($directoryIndexes)) {
-            return $files;
-        }
-
-        // Safety limit to avoid very slow rendering on huge directories.
-        $directoryIndexes = array_slice($directoryIndexes, 0, 25);
-
-        foreach ($directoryIndexes as $index) {
-            $path = (string) ($files[$index]['path'] ?? '');
-            if ($path === '') {
-                continue;
-            }
-
-            $escapedPath = escapeshellarg($path);
-            $sizeCommand = "docker exec {$escapedContainer} sh -c 'du -sb {$escapedPath} 2>/dev/null | cut -f1 || du -sk {$escapedPath} 2>/dev/null | cut -f1'";
-            if ($server->isNonRoot()) {
-                $sizeCommand = "sudo {$sizeCommand}";
-            }
-
-            $sizeOutput = trim((string) (instant_remote_process([$sizeCommand], $server, false) ?? ''));
-            if ($sizeOutput === '' || ! preg_match('/^\d+$/', $sizeOutput)) {
-                continue;
-            }
-
-            $sizeBytes = (int) $sizeOutput;
-            // If fallback came from du -sk, convert KB to bytes.
-            if ($sizeBytes > 0 && $sizeBytes < 1024) {
-                $sizeBytes *= 1024;
-            }
-
-            $files[$index]['size'] = $this->formatSize($sizeBytes);
-        }
 
         return $files;
     }
@@ -1655,7 +1634,7 @@ class FileExplorer extends Component
 
             $logFile = '/tmp/coolify-compress-'.date('Ymd-His').'-'.substr(md5((string) $archivePath), 0, 8).'.log';
             $escapedLogFile = escapeshellarg($logFile);
-            $backgroundCommand = "({$innerCommand}) > {$escapedLogFile} 2>&1 & echo __COMPRESS_STARTED__";
+            $backgroundCommand = "({$innerCommand}) > {$escapedLogFile} 2>&1 & echo __COMPRESS_STARTED__ $!";
             $command = "docker exec {$escapedContainer} sh -c " . escapeshellarg($backgroundCommand);
 
             if ($server->isNonRoot()) {
@@ -1675,6 +1654,29 @@ class FileExplorer extends Component
 
                 return;
             }
+
+            $pid = null;
+            if (preg_match('/__COMPRESS_STARTED__\s*(\d+)?/', $output, $matches) === 1 && isset($matches[1]) && $matches[1] !== '') {
+                $pid = (int) $matches[1];
+            }
+
+            $this->addCompressionTask([
+                'id' => (string) str()->uuid(),
+                'server_id' => data_get($server, 'id'),
+                'container' => $containerName,
+                'directory' => $dirPath,
+                'archive_path' => $archivePath,
+                'archive_name' => basename($archivePath),
+                'selected_items' => array_values($this->selectedFiles),
+                'resource_type' => $this->type,
+                'resource_uuid' => (string) data_get($this->resource, 'uuid', ''),
+                'open_url' => $this->buildTaskOpenUrl($dirPath, $containerName),
+                'log_file' => $logFile,
+                'pid' => $pid,
+                'status' => 'running',
+                'created_at' => now()->toDateTimeString(),
+                'last_message' => 'Compression started.',
+            ]);
 
             $this->selectedFiles = [];
             $this->compressArchiveName = null;
@@ -3595,6 +3597,159 @@ class FileExplorer extends Component
             'server' => $server,
             'escapedContainer' => escapeshellarg($containerName),
         ];
+    }
+
+    public function refreshCompressionTasks(): void
+    {
+        $this->loadCompressionTasksFromCache();
+
+        $updatedTasks = collect($this->compressionTasks)->map(function ($task) {
+            if (! is_array($task)) {
+                return $task;
+            }
+            if (($task['status'] ?? '') !== 'running') {
+                return $task;
+            }
+
+            $containerName = (string) data_get($task, 'container', '');
+            $serverId = data_get($task, 'server_id');
+            $server = is_numeric($serverId) ? Server::find((int) $serverId) : null;
+            if (! $server instanceof Server || $containerName === '') {
+                $task['status'] = 'failed';
+                $task['last_message'] = 'Server or container context no longer available.';
+
+                return $task;
+            }
+
+            $escapedContainer = escapeshellarg($containerName);
+            $pid = data_get($task, 'pid');
+            if (is_int($pid) && $pid > 0) {
+                $runningCheck = "docker exec {$escapedContainer} sh -c 'kill -0 {$pid} >/dev/null 2>&1 && echo RUNNING || echo DONE'";
+                if ($server->isNonRoot()) {
+                    $runningCheck = "sudo {$runningCheck}";
+                }
+                $runningResult = trim((string) (instant_remote_process([$runningCheck], $server, false) ?? ''));
+                if ($runningResult === 'RUNNING') {
+                    $task['last_message'] = 'Running...';
+
+                    return $task;
+                }
+            }
+
+            $archivePath = (string) data_get($task, 'archive_path', '');
+            if ($archivePath !== '') {
+                $escapedArchive = escapeshellarg($archivePath);
+                $existsCheck = "docker exec {$escapedContainer} sh -c 'test -f {$escapedArchive} && echo EXISTS || echo MISSING'";
+                if ($server->isNonRoot()) {
+                    $existsCheck = "sudo {$existsCheck}";
+                }
+                $existsResult = trim((string) (instant_remote_process([$existsCheck], $server, false) ?? ''));
+                if ($existsResult === 'EXISTS') {
+                    $task['status'] = 'completed';
+                    $task['last_message'] = 'Archive created successfully.';
+
+                    return $task;
+                }
+            }
+
+            $logFile = (string) data_get($task, 'log_file', '');
+            if ($logFile !== '') {
+                $escapedLog = escapeshellarg($logFile);
+                $tailCommand = "docker exec {$escapedContainer} sh -c 'tail -n 20 {$escapedLog} 2>/dev/null'";
+                if ($server->isNonRoot()) {
+                    $tailCommand = "sudo {$tailCommand}";
+                }
+                $tailOutput = trim((string) (instant_remote_process([$tailCommand], $server, false) ?? ''));
+                $task['status'] = 'failed';
+                $task['last_message'] = $tailOutput !== '' ? mb_substr($tailOutput, 0, 300) : 'Compression finished without creating archive.';
+
+                return $task;
+            }
+
+            $task['status'] = 'failed';
+            $task['last_message'] = 'Compression finished without creating archive.';
+
+            return $task;
+        })->values()->toArray();
+
+        $this->compressionTasks = $updatedTasks;
+        $this->saveCompressionTasksToCache();
+    }
+
+    public function openCompressionTaskLocation(string $taskId): void
+    {
+        $this->loadCompressionTasksFromCache();
+        $task = collect($this->compressionTasks)->first(fn ($item) => is_array($item) && data_get($item, 'id') === $taskId);
+        if (! is_array($task)) {
+            $this->dispatch('error', 'Compression task not found.');
+
+            return;
+        }
+
+        $directory = (string) data_get($task, 'directory', '/');
+        $this->currentPath = $directory !== '' ? $directory : '/';
+        $this->loadFiles();
+        $this->dispatch('success', "Opened compression folder: {$this->currentPath}");
+    }
+
+    private function compressionTasksCacheKey(): string
+    {
+        $teamId = (string) data_get(auth()->user(), 'currentTeam.id', '0');
+
+        return "file-explorer-compression-tasks:{$teamId}";
+    }
+
+    private function loadCompressionTasksFromCache(): void
+    {
+        $cached = Cache::get($this->compressionTasksCacheKey(), []);
+        $this->compressionTasks = is_array($cached) ? $cached : [];
+    }
+
+    private function saveCompressionTasksToCache(): void
+    {
+        Cache::put($this->compressionTasksCacheKey(), $this->compressionTasks, now()->addDay());
+    }
+
+    /**
+     * @param array<string, mixed> $task
+     */
+    private function addCompressionTask(array $task): void
+    {
+        $this->loadCompressionTasksFromCache();
+        array_unshift($this->compressionTasks, $task);
+        $this->compressionTasks = array_slice($this->compressionTasks, 0, 30);
+        $this->saveCompressionTasksToCache();
+    }
+
+    private function buildTaskOpenUrl(string $directory, string $containerName): string
+    {
+        $routeName = match ($this->type) {
+            'application' => 'project.application.files',
+            'database' => 'project.database.files',
+            'service' => 'project.service.files',
+            default => null,
+        };
+
+        if ($routeName === null) {
+            return '#';
+        }
+
+        $routeParameters = [
+            'project_uuid' => data_get($this->parameters, 'project_uuid'),
+            'environment_uuid' => data_get($this->parameters, 'environment_uuid'),
+            'path' => $directory,
+            'container' => $containerName,
+        ];
+
+        if ($this->type === 'application') {
+            $routeParameters['application_uuid'] = data_get($this->parameters, 'application_uuid');
+        } elseif ($this->type === 'database') {
+            $routeParameters['database_uuid'] = data_get($this->parameters, 'database_uuid');
+        } elseif ($this->type === 'service') {
+            $routeParameters['service_uuid'] = data_get($this->parameters, 'service_uuid');
+        }
+
+        return route($routeName, $routeParameters);
     }
 
     private function ensureCommandAvailableInContainer(Server $server, string $escapedContainer, string $commandName): bool

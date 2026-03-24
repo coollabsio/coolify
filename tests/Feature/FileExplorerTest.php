@@ -75,6 +75,8 @@ describe('File Explorer Component', function () {
         expect(method_exists($component, 'installUnzip'))->toBeTrue();
         expect(method_exists($component, 'checkZip'))->toBeTrue();
         expect(method_exists($component, 'installZip'))->toBeTrue();
+        expect(method_exists($component, 'refreshCompressionTasks'))->toBeTrue();
+        expect(method_exists($component, 'openCompressionTaskLocation'))->toBeTrue();
         expect(method_exists($component, 'getDownloadUrl'))->toBeTrue();
     });
 

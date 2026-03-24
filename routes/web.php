@@ -449,7 +449,7 @@ Route::middleware(['auth'])->group(function () {
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
             }
-            instant_remote_process([$command], $server);
+            instant_remote_process([$command], $server, true, false, 7200);
 
             // Download file from server using SFTP
             $privateKeyLocation = $server->privateKey->getKeyLocation();
@@ -470,6 +470,8 @@ Route::middleware(['auth'])->group(function () {
             $filename = basename($path);
 
             return new StreamedResponse(function () use ($disk, $serverTmpPath, $server) {
+                set_time_limit(0);
+                ignore_user_abort(true);
                 if (ob_get_level()) {
                     ob_end_clean();
                 }
@@ -478,7 +480,7 @@ Route::middleware(['auth'])->group(function () {
                     abort(500, 'Failed to open stream for the requested file.');
                 }
                 while (! feof($stream)) {
-                    echo fread($stream, 2048);
+                    echo fread($stream, 1024 * 1024);
                     flush();
                 }
                 fclose($stream);
@@ -492,11 +494,22 @@ Route::middleware(['auth'])->group(function () {
             }, 200, [
                 'Content-Type' => $mimeType,
                 'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+                'X-Accel-Buffering' => 'no',
             ]);
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 500);
         }
     })->name('project.file.download')->middleware('can.access.terminal');
+
+    Route::get('/compression-tasks', function () {
+        $teamId = (string) data_get(auth()->user(), 'currentTeam.id', '0');
+        $cacheKey = "file-explorer-compression-tasks:{$teamId}";
+        $tasks = \Illuminate\Support\Facades\Cache::get($cacheKey, []);
+
+        return response()->json([
+            'tasks' => is_array($tasks) ? $tasks : [],
+        ]);
+    })->name('compression.tasks');
 
 });
 

@@ -22,7 +22,7 @@
         @else
             <div class="flex flex-col gap-4">
                 <!-- Container Selection -->
-                <div class="flex gap-2 items-end">
+                <div class="flex gap-2 items-end flex-wrap">
                     <div class="w-96 min-w-fit">
                         <x-forms.select id="selected_container" wire:model.live="selected_container">
                             <option value="default">Select a container</option>
