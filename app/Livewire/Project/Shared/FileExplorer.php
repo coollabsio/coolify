@@ -1453,12 +1453,14 @@ class FileExplorer extends Component
             $dirPath = $this->currentPath;
             $escapedDir = escapeshellarg($dirPath);
 
-            // Check if archive already exists
-            $archivePath = rtrim($dirPath, '/').'/'.$this->compressArchiveName;
+            // Keep archive creation inside current directory.
+            $archiveFileName = $this->compressArchiveName;
+            $archivePath = rtrim($dirPath, '/').'/'.$archiveFileName;
             if ($dirPath === '/') {
-                $archivePath = '/'.$this->compressArchiveName;
+                $archivePath = '/'.$archiveFileName;
             }
             $escapedArchive = escapeshellarg($archivePath);
+            $escapedArchiveFileName = escapeshellarg($archiveFileName);
 
             // Check if file exists
             $checkCommand = "docker exec {$escapedContainer} sh -c 'test -f {$escapedArchive} && echo exists || echo not_exists'";
@@ -1500,41 +1502,41 @@ class FileExplorer extends Component
             if ($extension === 'zip') {
                 $innerCommand .= 'if command -v zip >/dev/null 2>&1; then ';
                 if ($this->overwriteExisting && $exists) {
-                    $innerCommand .= "rm -f {$escapedArchive} && ";
+                    $innerCommand .= "rm -f {$escapedArchiveFileName} && ";
                 }
-                $innerCommand .= "zip -r {$escapedArchive} {$filesList} 2>&1; ";
+                $innerCommand .= "zip -r {$escapedArchiveFileName} {$filesList} 2>&1; ";
                 $innerCommand .= 'else echo "zip not available" && exit 1; ';
                 $innerCommand .= 'fi';
             } elseif (in_array($extension, ['gz', 'tgz']) || ($extension === 'gz' && str_ends_with($baseExtension, '.tar'))) {
                 $innerCommand .= 'if command -v tar >/dev/null 2>&1 && command -v gzip >/dev/null 2>&1; then ';
                 if ($this->overwriteExisting && $exists) {
-                    $innerCommand .= "rm -f {$escapedArchive} && ";
+                    $innerCommand .= "rm -f {$escapedArchiveFileName} && ";
                 }
-                $innerCommand .= "tar -czf {$escapedArchive} {$filesList} 2>&1; ";
+                $innerCommand .= "tar -czf {$escapedArchiveFileName} {$filesList} 2>&1; ";
                 $innerCommand .= 'else echo "tar/gzip not available" && exit 1; ';
                 $innerCommand .= 'fi';
             } elseif (in_array($extension, ['bz2', 'tbz2', 'tbz']) || ($extension === 'bz2' && str_ends_with($baseExtension, '.tar'))) {
                 $innerCommand .= 'if command -v tar >/dev/null 2>&1 && command -v bzip2 >/dev/null 2>&1; then ';
                 if ($this->overwriteExisting && $exists) {
-                    $innerCommand .= "rm -f {$escapedArchive} && ";
+                    $innerCommand .= "rm -f {$escapedArchiveFileName} && ";
                 }
-                $innerCommand .= "tar -cjf {$escapedArchive} {$filesList} 2>&1; ";
+                $innerCommand .= "tar -cjf {$escapedArchiveFileName} {$filesList} 2>&1; ";
                 $innerCommand .= 'else echo "tar/bzip2 not available" && exit 1; ';
                 $innerCommand .= 'fi';
             } elseif (in_array($extension, ['xz', 'txz']) || ($extension === 'xz' && str_ends_with($baseExtension, '.tar'))) {
                 $innerCommand .= 'if command -v tar >/dev/null 2>&1 && command -v xz >/dev/null 2>&1; then ';
                 if ($this->overwriteExisting && $exists) {
-                    $innerCommand .= "rm -f {$escapedArchive} && ";
+                    $innerCommand .= "rm -f {$escapedArchiveFileName} && ";
                 }
-                $innerCommand .= "tar -cJf {$escapedArchive} {$filesList} 2>&1; ";
+                $innerCommand .= "tar -cJf {$escapedArchiveFileName} {$filesList} 2>&1; ";
                 $innerCommand .= 'else echo "tar/xz not available" && exit 1; ';
                 $innerCommand .= 'fi';
             } elseif ($extension === 'tar') {
                 $innerCommand .= 'if command -v tar >/dev/null 2>&1; then ';
                 if ($this->overwriteExisting && $exists) {
-                    $innerCommand .= "rm -f {$escapedArchive} && ";
+                    $innerCommand .= "rm -f {$escapedArchiveFileName} && ";
                 }
-                $innerCommand .= "tar -cf {$escapedArchive} {$filesList} 2>&1; ";
+                $innerCommand .= "tar -cf {$escapedArchiveFileName} {$filesList} 2>&1; ";
                 $innerCommand .= 'else echo "tar not available" && exit 1; ';
                 $innerCommand .= 'fi';
             } else {
@@ -1544,18 +1546,31 @@ class FileExplorer extends Component
                 return;
             }
 
-            $command = "docker exec {$escapedContainer} sh -c " . escapeshellarg($innerCommand);
+            $wrappedCommand = $innerCommand.'; __coolify_exit=$?; echo "__COMPRESS_EXIT:${__coolify_exit}__"';
+            $command = "docker exec {$escapedContainer} sh -c " . escapeshellarg($wrappedCommand);
 
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
             }
 
-            $output = instant_remote_process([$command], $server, false);
+            $output = (string) (instant_remote_process([$command], $server, false) ?? '');
             if (str_contains($output ?? '', 'not available')) {
                 $this->dispatch('error', 'Required compression tool not available in container.');
                 $this->showCompressDialog = false;
 
                 return;
+            }
+
+            if (preg_match('/__COMPRESS_EXIT:(\d+)__/', $output, $matches) === 1) {
+                $exitCode = (int) ($matches[1] ?? 1);
+                if ($exitCode !== 0) {
+                    $preview = trim(str_replace($matches[0], '', $output));
+                    $preview = mb_substr($preview, 0, 400);
+                    $this->dispatch('error', $preview !== '' ? 'Compression failed. '.$preview : "Compression failed with exit code {$exitCode}.");
+                    $this->showCompressDialog = false;
+
+                    return;
+                }
             }
 
             $verifyArchiveCommand = "docker exec {$escapedContainer} sh -c 'test -f {$escapedArchive} && echo CREATED || echo MISSING'";
