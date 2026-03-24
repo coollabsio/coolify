@@ -141,6 +141,14 @@
                     <div class="flex items-center gap-4" x-init="loadResources">
                         <h2>Services</h2>
                         <x-forms.button x-on:click="loadResources">Reload List</x-forms.button>
+                        <x-modal-confirmation title="Regenerate Missing Services?" buttonTitle="Regenerate Services"
+                            submitAction="regenerateServicesInCurrentEnvironment" :confirmWithText="false"
+                            :confirmWithPassword="false" :actions="[
+                                'This will only regenerate services in the current project and environment.',
+                                'No resources will be deleted.',
+                                'Missing or soft-deleted service records will be restored and re-parsed.',
+                            ]"
+                            step2ButtonText="Regenerate" />
                     </div>
                     <x-callout type="info" title="Trademarks Policy" class="mt-4 mb-6">
                         The respective trademarks mentioned here are owned by the respective companies, and use of them

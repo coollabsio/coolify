@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Project\New;
 
+use App\Actions\Service\RegenerateEnvironmentServices;
+use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use Illuminate\Support\Collection;
@@ -386,6 +388,45 @@ class Select extends Component
             $this->onlyBuildServerAvailable = $this->allServers->every(function ($server) {
                 return $server->isBuildServer();
             });
+        }
+    }
+
+    public function regenerateServicesInCurrentEnvironment(RegenerateEnvironmentServices $regenerator): void
+    {
+        try {
+            $projectUuid = data_get($this->parameters, 'project_uuid');
+            $environmentUuid = data_get($this->parameters, 'environment_uuid');
+
+            $project = currentTeam()
+                ->projects()
+                ->where('uuid', $projectUuid)
+                ->firstOrFail();
+            $environment = Environment::query()
+                ->where('project_id', $project->id)
+                ->where('uuid', $environmentUuid)
+                ->firstOrFail();
+
+            $result = $regenerator->handle($environment);
+
+            if ($result['services'] === 0) {
+                $this->dispatch('error', 'No services found in this environment to regenerate.');
+
+                return;
+            }
+
+            if ($result['failed'] > 0) {
+                $this->dispatch(
+                    'error',
+                    "Regeneration finished with warnings. Parsed {$result['parsed']} service(s), {$result['failed']} failed."
+                );
+            } else {
+                $this->dispatch(
+                    'success',
+                    "Services regenerated successfully. Parsed {$result['parsed']} service(s)."
+                );
+            }
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 }
