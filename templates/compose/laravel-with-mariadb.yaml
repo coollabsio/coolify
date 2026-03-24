@@ -230,6 +230,28 @@ services:
     volumes:
       - laravel-files:/var/www/html:ro
       - type: bind
+        source: ./nginx-main.conf
+        target: /etc/nginx/nginx.conf
+        content: |
+          user nginx;
+          worker_processes 2;
+          error_log /var/log/nginx/error.log warn;
+          pid /var/run/nginx.pid;
+
+          events {
+              worker_connections 1024;
+              multi_accept off;
+          }
+
+          http {
+              include /etc/nginx/mime.types;
+              default_type application/octet-stream;
+              sendfile on;
+              keepalive_timeout 65;
+              client_max_body_size 100M;
+              include /etc/nginx/conf.d/*.conf;
+          }
+      - type: bind
         source: ./nginx.conf
         target: /etc/nginx/conf.d/default.conf
         content: |
