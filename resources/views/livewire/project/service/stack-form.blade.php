@@ -25,12 +25,22 @@
             label="Connect To Predefined Network"
             helper="By default, you do not reach the Coolify defined networks.<br>Starting a docker compose based resource will have an internal network. <br>If you connect to a Coolify defined network, you maybe need to use different internal DNS names to connect to a resource.<br><br>For more information, check <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/knowledge-base/docker/compose#connect-to-predefined-networks'>this</a>." />
     </div>
+    @if ($fields->has('SERVICE_GITHUB_REPO_URL'))
+        <div class="w-full">
+            <x-forms.input canGate="update" :canResource="$service" id="fields.SERVICE_GITHUB_REPO_URL.value"
+                label="GitHub Repository URL" placeholder="https://github.com/owner/repository.git"
+                helper="Public repository URL used to clone your Laravel project." wire:change="saveGithubRepoUrl" />
+        </div>
+    @endif
     @if ($fields->count() > 0)
         <div>
             <h3>Service Specific Configuration</h3>
         </div>
         <div class="grid grid-cols-2 gap-2">
             @foreach ($fields as $serviceName => $field)
+                @if ($serviceName === 'SERVICE_GITHUB_REPO_URL')
+                    @continue
+                @endif
                 <div class="flex items-center gap-2"><span
                         class="font-bold">{{ data_get($field, 'serviceName') }}</span>{{ data_get($field, 'name') }}
                     @if (data_get($field, 'customHelper'))

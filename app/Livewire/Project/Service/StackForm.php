@@ -126,6 +126,12 @@ class StackForm extends Component
         $this->submit(notify: true);
     }
 
+    public function saveGithubRepoUrl(): void
+    {
+        $this->submit(notify: false);
+        $this->dispatch('success', 'GitHub repository URL saved.');
+    }
+
     public function instantSave()
     {
         $this->syncData(true);
