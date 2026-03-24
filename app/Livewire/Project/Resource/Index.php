@@ -2,13 +2,17 @@
 
 namespace App\Livewire\Project\Resource;
 
+use App\Actions\Service\RegenerateEnvironmentServices;
 use App\Models\Environment;
 use App\Models\Project;
 use Illuminate\Support\Collection;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Index extends Component
 {
+    use AuthorizesRequests;
+
     public Project $project;
 
     public Environment $environment;
@@ -161,5 +165,48 @@ class Index extends Component
     public function render()
     {
         return view('livewire.project.resource.index');
+    }
+
+    public function regenerateEnvironmentResources(RegenerateEnvironmentServices $regenerator): mixed
+    {
+        try {
+            if (! auth()->user()?->can('createAnyResource')) {
+                $this->dispatch('error', 'You do not have permission to regenerate resources.');
+
+                return null;
+            }
+
+            $environment = Environment::query()
+                ->where('id', $this->environment->id)
+                ->where('project_id', $this->project->id)
+                ->firstOrFail();
+
+            $result = $regenerator->handle($environment);
+
+            if ($result['services'] === 0) {
+                $this->dispatch('error', 'No services found in this environment to regenerate.');
+
+                return null;
+            }
+
+            if ($result['failed'] > 0) {
+                $this->dispatch(
+                    'error',
+                    "Resources regenerated partially. Parsed {$result['parsed']} service(s), {$result['failed']} failed."
+                );
+            } else {
+                $this->dispatch(
+                    'success',
+                    "Resources regenerated successfully. Parsed {$result['parsed']} service(s)."
+                );
+            }
+
+            return redirectRoute($this, 'project.resource.index', [
+                'project_uuid' => $this->project->uuid,
+                'environment_uuid' => $this->environment->uuid,
+            ]);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 }

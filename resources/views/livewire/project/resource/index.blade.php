@@ -28,6 +28,16 @@
             @can('delete', $environment)
                 <livewire:project.delete-environment :disabled="!$environment->isEmpty()" :environment_id="$environment->id" />
             @endcan
+            @can('createAnyResource')
+                <x-modal-confirmation title="Regenerate Environment Resources?" buttonTitle="Regenerate Resources"
+                    submitAction="regenerateEnvironmentResources" :confirmWithText="false" :confirmWithPassword="false"
+                    :actions="[
+                        'This will re-parse service stacks in the current environment.',
+                        'Soft-deleted services in this environment will be restored.',
+                        'Only this project and environment are affected.',
+                    ]"
+                    step2ButtonText="Regenerate" />
+            @endcan
         </div>
         <nav class="flex pt-2 pb-6">
             <ol class="flex items-center">
