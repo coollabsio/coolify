@@ -1,4 +1,4 @@
-<div x-data x-init="$wire.loadServers">
+<div x-data x-init="$wire.loadServers" x-on:services-catalog-regenerated.window="window.location.reload()">
     <div x-data="searchResources()">
         @if ($current_step === 'type')
             <div x-init="window.addEventListener('scroll', () => isSticky = window.pageYOffset > 100)"

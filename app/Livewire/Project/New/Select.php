@@ -105,7 +105,7 @@ class Select extends Component
 
     public function loadServices()
     {
-        $services = get_service_templates();
+        $services = $this->loadAndRepairServiceTemplates();
         $services = collect($services)->map(function ($service, $key) {
             $default_logo = 'images/default.webp';
             $logo = data_get($service, 'logo', $default_logo);
@@ -393,25 +393,51 @@ class Select extends Component
     public function regenerateServicesInCurrentEnvironment(): void
     {
         try {
-            $services = get_service_templates(force: true);
-            if ($services->isEmpty()) {
-                $services = get_service_templates();
-            }
-            $services = $this->ensureLaravelTemplateExists($services);
+            $this->loadAndRepairServiceTemplates(force: true);
 
-            $targetFile = base_path('templates/'.config('constants.services.file_name'));
-            File::put(
-                $targetFile,
-                json_encode($services->sortKeys()->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
-            );
-
-            $this->dispatch('success', 'Service catalog regenerated. Click "Reload List" to refresh the Services list.');
+            $this->dispatch('success', 'Service catalog regenerated successfully.');
+            $this->dispatch('services-catalog-regenerated');
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
     }
 
-    private function ensureLaravelTemplateExists(Collection $services): Collection
+    private function loadAndRepairServiceTemplates(bool $force = false): Collection
+    {
+        $localServices = collect(get_service_templates());
+        $sourceServices = $force ? collect(get_service_templates(force: true)) : $localServices;
+
+        if ($sourceServices->isEmpty()) {
+            $sourceServices = $localServices;
+        }
+
+        // Merge strategy keeps local templates while refreshing known ones from source.
+        $mergedServices = $localServices->merge($sourceServices);
+        $mergedServices = $this->ensureProtectedTemplatesExist($mergedServices);
+        $this->persistServiceTemplates($mergedServices);
+
+        return $mergedServices;
+    }
+
+    private function persistServiceTemplates(Collection $services): void
+    {
+        $targetFile = base_path('templates/'.config('constants.services.file_name'));
+        $normalized = $services->sortKeys()->toArray();
+        $newJson = json_encode($normalized, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+        if ($newJson === false) {
+            return;
+        }
+
+        $currentJson = File::exists($targetFile) ? (string) File::get($targetFile) : '';
+        if (trim($currentJson) === trim($newJson)) {
+            return;
+        }
+
+        File::put($targetFile, $newJson);
+    }
+
+    private function ensureProtectedTemplatesExist(Collection $services): Collection
     {
         if ($services->has('laravel-with-mariadb')) {
             return $services;
