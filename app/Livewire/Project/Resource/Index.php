@@ -2,9 +2,9 @@
 
 namespace App\Livewire\Project\Resource;
 
-use App\Actions\Service\RegenerateEnvironmentServices;
 use App\Models\Environment;
 use App\Models\Project;
+use App\Models\Service;
 use Illuminate\Support\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -167,7 +167,7 @@ class Index extends Component
         return view('livewire.project.resource.index');
     }
 
-    public function regenerateEnvironmentResources(RegenerateEnvironmentServices $regenerator): mixed
+    public function regenerateEnvironmentResources(): mixed
     {
         try {
             if (! auth()->user()?->can('createAnyResource')) {
@@ -181,7 +181,7 @@ class Index extends Component
                 ->where('project_id', $this->project->id)
                 ->firstOrFail();
 
-            $result = $regenerator->handle($environment);
+            $result = $this->regenerateEnvironmentServices($environment);
 
             if ($result['services'] === 0) {
                 $this->dispatch('error', 'No services found in this environment to regenerate.');
@@ -208,5 +208,40 @@ class Index extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * @return array{services:int,restored:int,parsed:int,failed:int}
+     */
+    private function regenerateEnvironmentServices(Environment $environment): array
+    {
+        $services = Service::withTrashed()
+            ->where('environment_id', $environment->id)
+            ->get();
+
+        $restored = 0;
+        $parsed = 0;
+        $failed = 0;
+
+        foreach ($services as $service) {
+            try {
+                if ($service->trashed()) {
+                    $service->restore();
+                    $restored++;
+                }
+
+                $service->parse();
+                $parsed++;
+            } catch (\Throwable) {
+                $failed++;
+            }
+        }
+
+        return [
+            'services' => $services->count(),
+            'restored' => $restored,
+            'parsed' => $parsed,
+            'failed' => $failed,
+        ];
     }
 }

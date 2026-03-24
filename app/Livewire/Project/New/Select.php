@@ -2,10 +2,10 @@
 
 namespace App\Livewire\Project\New;
 
-use App\Actions\Service\RegenerateEnvironmentServices;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -391,7 +391,7 @@ class Select extends Component
         }
     }
 
-    public function regenerateServicesInCurrentEnvironment(RegenerateEnvironmentServices $regenerator): void
+    public function regenerateServicesInCurrentEnvironment(): void
     {
         try {
             $projectUuid = data_get($this->parameters, 'project_uuid');
@@ -406,7 +406,7 @@ class Select extends Component
                 ->where('uuid', $environmentUuid)
                 ->firstOrFail();
 
-            $result = $regenerator->handle($environment);
+            $result = $this->regenerateEnvironmentServices($environment);
 
             if ($result['services'] === 0) {
                 $this->dispatch('error', 'No services found in this environment to regenerate.');
@@ -428,5 +428,40 @@ class Select extends Component
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
+    }
+
+    /**
+     * @return array{services:int,restored:int,parsed:int,failed:int}
+     */
+    private function regenerateEnvironmentServices(Environment $environment): array
+    {
+        $services = Service::withTrashed()
+            ->where('environment_id', $environment->id)
+            ->get();
+
+        $restored = 0;
+        $parsed = 0;
+        $failed = 0;
+
+        foreach ($services as $service) {
+            try {
+                if ($service->trashed()) {
+                    $service->restore();
+                    $restored++;
+                }
+
+                $service->parse();
+                $parsed++;
+            } catch (\Throwable) {
+                $failed++;
+            }
+        }
+
+        return [
+            'services' => $services->count(),
+            'restored' => $restored,
+            'parsed' => $parsed,
+            'failed' => $failed,
+        ];
     }
 }
