@@ -173,7 +173,7 @@ services:
           exec /usr/bin/supervisord -c /etc/supervisord.conf
     environment:
       - SERVICE_URL_LARAVEL
-      - SERVICE_GITHUB_REPO_URL
+      - SERVICE_GITHUB_REPO_URL=$SERVICE_GITHUB_REPO_URL
       - APP_NAME=Laravel
       - APP_ENV=production
       - APP_DEBUG=false
