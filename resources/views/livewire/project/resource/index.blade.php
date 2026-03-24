@@ -28,7 +28,9 @@
             @can('delete', $environment)
                 <livewire:project.delete-environment :disabled="!$environment->isEmpty()" :environment_id="$environment->id" />
             @endcan
-            @can('createAnyResource')
+        </div>
+        @can('createAnyResource')
+            <div class="pt-2">
                 <x-modal-confirmation title="Regenerate Environment Resources?" buttonTitle="Regenerate Resources"
                     submitAction="regenerateEnvironmentResources" :confirmWithText="false" :confirmWithPassword="false"
                     :actions="[
@@ -37,8 +39,8 @@
                         'Only this project and environment are affected.',
                     ]"
                     step2ButtonText="Regenerate" />
-            @endcan
-        </div>
+            </div>
+        @endcan
         <nav class="flex pt-2 pb-6">
             <ol class="flex items-center">
                 <li class="inline-flex items-center" x-data="{ projectOpen: false, toggle() { this.projectOpen = !this.projectOpen }, open() { this.projectOpen = true }, close() { this.projectOpen = false } }">
