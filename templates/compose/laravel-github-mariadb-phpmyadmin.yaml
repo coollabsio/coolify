@@ -252,15 +252,20 @@ services:
           pid /var/run/nginx.pid;
 
           events {
-              worker_connections 512;
+              worker_connections 256;
               multi_accept off;
+              use epoll;
+              # Cap AIO queue depth if any context still enables file AIO (host fs.aio-max-nr exhaustion → io_setup 11).
+              worker_aio_requests 1;
           }
 
           http {
               include /etc/nginx/mime.types;
               default_type application/octet-stream;
               aio off;
+              aio_write off;
               sendfile off;
+              directio off;
               keepalive_timeout 65;
               client_max_body_size 100M;
               include /etc/nginx/conf.d/*.conf;
@@ -274,6 +279,8 @@ services:
               server_name _;
               root /var/www/html/public;
               index index.php index.html;
+              aio off;
+              aio_write off;
 
               client_max_body_size 100M;
 
