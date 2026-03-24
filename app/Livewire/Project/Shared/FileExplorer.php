@@ -934,22 +934,8 @@ class FileExplorer extends Component
     public function deleteFileByEncodedPath(string $encodedPath, string $password = '')
     {
         try {
-            $normalizedEncodedPath = trim($encodedPath);
-            if (
-                (str_starts_with($normalizedEncodedPath, "'") && str_ends_with($normalizedEncodedPath, "'")) ||
-                (str_starts_with($normalizedEncodedPath, '"') && str_ends_with($normalizedEncodedPath, '"'))
-            ) {
-                $normalizedEncodedPath = substr($normalizedEncodedPath, 1, -1);
-            }
-            $padded = str_pad(
-                strtr($normalizedEncodedPath, '-_', '+/'),
-                strlen($normalizedEncodedPath) % 4 === 0 ? strlen($normalizedEncodedPath) : strlen($normalizedEncodedPath) + (4 - (strlen($normalizedEncodedPath) % 4)),
-                '=',
-                STR_PAD_RIGHT
-            );
-
-            $decodedPath = base64_decode($padded, true);
-            if ($decodedPath === false || $decodedPath === '') {
+            $decodedPath = $this->decodePathFromEncoded($encodedPath);
+            if ($decodedPath === null || $decodedPath === '') {
                 $this->dispatch('error', 'Invalid file path.');
 
                 return;
@@ -959,6 +945,42 @@ class FileExplorer extends Component
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to decode file path: '.$e->getMessage());
         }
+    }
+
+    public function decompressFileByEncodedPath(string $encodedPath): void
+    {
+        $decodedPath = $this->decodePathFromEncoded($encodedPath);
+        if ($decodedPath === null || $decodedPath === '') {
+            $this->dispatch('error', 'Invalid file path.');
+
+            return;
+        }
+
+        $this->decompressFile($decodedPath);
+    }
+
+    public function openRenameDialogByEncodedPath(string $encodedPath): void
+    {
+        $decodedPath = $this->decodePathFromEncoded($encodedPath);
+        if ($decodedPath === null || $decodedPath === '') {
+            $this->dispatch('error', 'Invalid file path.');
+
+            return;
+        }
+
+        $this->openRenameDialog($decodedPath);
+    }
+
+    public function openMoveDialogByEncodedPath(string $encodedPath): void
+    {
+        $decodedPath = $this->decodePathFromEncoded($encodedPath);
+        if ($decodedPath === null || $decodedPath === '') {
+            $this->dispatch('error', 'Invalid file path.');
+
+            return;
+        }
+
+        $this->openMoveDialog($decodedPath);
     }
 
     private function deleteFileInternal(string $path): bool
@@ -1183,7 +1205,10 @@ class FileExplorer extends Component
 
             $containerName = data_get($container, 'container.Names');
             $escapedContainer = escapeshellarg($containerName);
-            $fileNameEscaped = escapeshellarg(basename($filePath));
+            $archiveFileName = basename($filePath);
+            $fileNameEscaped = escapeshellarg($archiveFileName);
+            $archiveFileNameForPython = str_replace(['\\', "'"], ['\\\\', "\\'"], $archiveFileName);
+            $archiveFileNameForPhp = str_replace(['\\', "'"], ['\\\\', "\\'"], $archiveFileName);
             $fileDir = dirname($filePath);
             $fileDirEscaped = escapeshellarg($fileDir);
 
@@ -1200,11 +1225,11 @@ class FileExplorer extends Component
                 $extractionCommand .= "(unzip -o {$fileNameEscaped} -d . 2>&1 | while IFS= read -r line; do echo \"PROGRESS: \\\$line\"; done; echo 'EXTRACTION_SUCCESS') || echo 'EXTRACTION_FAILED'; ";
                 $extractionCommand .= "elif command -v python3 >/dev/null 2>&1; then ";
                 // Python con output periódico cada 100 archivos
-                $extractionCommand .= "python3 -c \"import zipfile, os, sys; z=zipfile.ZipFile('{$fileNameEscaped}'); files=z.namelist(); total=len(files); [z.extract(f, '.') or (print(f'PROGRESS: Extracted {i+1}/{total}') if (i+1)%100==0 else None) for i, f in enumerate(files)]; z.close(); print('EXTRACTION_SUCCESS')\" 2>&1 || echo 'EXTRACTION_FAILED'; ";
+                $extractionCommand .= "python3 -c \"import zipfile, os, sys; z=zipfile.ZipFile('{$archiveFileNameForPython}'); files=z.namelist(); total=len(files); [z.extract(f, '.') or (print(f'PROGRESS: Extracted {i+1}/{total}') if (i+1)%100==0 else None) for i, f in enumerate(files)]; z.close(); print('EXTRACTION_SUCCESS')\" 2>&1 || echo 'EXTRACTION_FAILED'; ";
                 $extractionCommand .= "elif command -v python >/dev/null 2>&1; then ";
-                $extractionCommand .= "python -c \"import zipfile, os, sys; z=zipfile.ZipFile('{$fileNameEscaped}'); files=z.namelist(); total=len(files); [z.extract(f, '.') or (print(f'PROGRESS: Extracted {i+1}/{total}') if (i+1)%100==0 else None) for i, f in enumerate(files)]; z.close(); print('EXTRACTION_SUCCESS')\" 2>&1 || echo 'EXTRACTION_FAILED'; ";
+                $extractionCommand .= "python -c \"import zipfile, os, sys; z=zipfile.ZipFile('{$archiveFileNameForPython}'); files=z.namelist(); total=len(files); [z.extract(f, '.') or (print(f'PROGRESS: Extracted {i+1}/{total}') if (i+1)%100==0 else None) for i, f in enumerate(files)]; z.close(); print('EXTRACTION_SUCCESS')\" 2>&1 || echo 'EXTRACTION_FAILED'; ";
                 $extractionCommand .= "elif command -v php >/dev/null 2>&1; then ";
-                $extractionCommand .= "php -r \"\\\$zip = new ZipArchive(); if (\\\$zip->open('{$fileNameEscaped}') === TRUE) { \\\$total = \\\$zip->numFiles; for (\\\$i = 0; \\\$i < \\\$total; \\\$i++) { \\\$zip->extractTo('.', [\\\$zip->getNameIndex(\\\$i)]); if ((\\\$i+1) % 100 == 0) echo 'PROGRESS: Extracted ' . (\\\$i+1) . '/' . \\\$total . ' files...' . PHP_EOL; } \\\$zip->close(); echo 'EXTRACTION_SUCCESS'; } else { echo 'EXTRACTION_FAILED'; }\" 2>&1; ";
+                $extractionCommand .= "php -r \"\\\$zip = new ZipArchive(); if (\\\$zip->open('{$archiveFileNameForPhp}') === TRUE) { \\\$total = \\\$zip->numFiles; for (\\\$i = 0; \\\$i < \\\$total; \\\$i++) { \\\$zip->extractTo('.', [\\\$zip->getNameIndex(\\\$i)]); if ((\\\$i+1) % 100 == 0) echo 'PROGRESS: Extracted ' . (\\\$i+1) . '/' . \\\$total . ' files...' . PHP_EOL; } \\\$zip->close(); echo 'EXTRACTION_SUCCESS'; } else { echo 'EXTRACTION_FAILED'; }\" 2>&1; ";
                 $extractionCommand .= "else ";
                 $extractionCommand .= "echo 'TOOL_NOT_FOUND:unzip'; ";
                 $extractionCommand .= "fi";
@@ -1540,15 +1565,22 @@ class FileExplorer extends Component
 
     public function decompressFile(string $path)
     {
-        $this->selectedFiles = [$path];
+        $normalizedPath = $this->normalizePathArgument($path);
+        if ($normalizedPath === '') {
+            $this->dispatch('error', 'Invalid file path.');
+
+            return;
+        }
+
+        $this->selectedFiles = [$normalizedPath];
         $this->extractSelectedFiles();
     }
 
     public function moveFile()
     {
         // Get values from component properties
-        $sourcePath = $this->moveSource;
-        $destinationPath = $this->moveDestination;
+        $sourcePath = $this->normalizePathArgument((string) $this->moveSource);
+        $destinationPath = $this->normalizePathArgument((string) $this->moveDestination);
 
         if (empty($sourcePath) || empty($destinationPath)) {
             $this->dispatch('error', 'Source and destination paths are required.');
@@ -1841,7 +1873,14 @@ class FileExplorer extends Component
 
     public function openMoveDialog(string $path)
     {
-        $this->moveSource = $path;
+        $normalizedPath = $this->normalizePathArgument($path);
+        if ($normalizedPath === '') {
+            $this->dispatch('error', 'Invalid file path.');
+
+            return;
+        }
+
+        $this->moveSource = $normalizedPath;
         $this->showMoveDialog = true;
     }
 
@@ -1854,8 +1893,15 @@ class FileExplorer extends Component
 
     public function openRenameDialog(string $path)
     {
-        $this->renameSource = $path;
-        $this->renameNewName = basename($path);
+        $normalizedPath = $this->normalizePathArgument($path);
+        if ($normalizedPath === '') {
+            $this->dispatch('error', 'Invalid file path.');
+
+            return;
+        }
+
+        $this->renameSource = $normalizedPath;
+        $this->renameNewName = basename($normalizedPath);
         $this->showRenameDialog = true;
     }
 
@@ -1868,7 +1914,7 @@ class FileExplorer extends Component
 
     public function renameFile()
     {
-        $sourcePath = $this->renameSource;
+        $sourcePath = $this->normalizePathArgument((string) $this->renameSource);
         $newName = trim($this->renameNewName ?? '');
 
         if (empty($sourcePath) || empty($newName)) {
@@ -3327,5 +3373,49 @@ class FileExplorer extends Component
     public function render()
     {
         return view('livewire.project.shared.file-explorer');
+    }
+
+    private function normalizePathArgument(string $path): string
+    {
+        $normalizedPath = trim($path);
+
+        if (
+            (str_starts_with($normalizedPath, "'") && str_ends_with($normalizedPath, "'")) ||
+            (str_starts_with($normalizedPath, '"') && str_ends_with($normalizedPath, '"'))
+        ) {
+            $normalizedPath = substr($normalizedPath, 1, -1);
+        }
+
+        return trim($normalizedPath);
+    }
+
+    private function decodePathFromEncoded(string $encodedPath): ?string
+    {
+        $normalizedEncodedPath = trim($encodedPath);
+        if (
+            (str_starts_with($normalizedEncodedPath, "'") && str_ends_with($normalizedEncodedPath, "'")) ||
+            (str_starts_with($normalizedEncodedPath, '"') && str_ends_with($normalizedEncodedPath, '"'))
+        ) {
+            $normalizedEncodedPath = substr($normalizedEncodedPath, 1, -1);
+        }
+
+        $normalizedEncodedPath = trim($normalizedEncodedPath);
+        if ($normalizedEncodedPath === '') {
+            return null;
+        }
+
+        $padded = str_pad(
+            strtr($normalizedEncodedPath, '-_', '+/'),
+            strlen($normalizedEncodedPath) % 4 === 0 ? strlen($normalizedEncodedPath) : strlen($normalizedEncodedPath) + (4 - (strlen($normalizedEncodedPath) % 4)),
+            '=',
+            STR_PAD_RIGHT
+        );
+
+        $decodedPath = base64_decode($padded, true);
+        if ($decodedPath === false || $decodedPath === '') {
+            return null;
+        }
+
+        return $decodedPath;
     }
 }

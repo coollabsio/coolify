@@ -312,12 +312,13 @@ export function initializeTerminalComponent() {
                 console.log('[Terminal] Was clean close:', event.code === 1000);
                 console.log('[Terminal] Connection attempt:', this.reconnectAttempts + 1);
 
+                const previousConnectionState = this.connectionState;
                 this.connectionState = 'disconnected';
                 this.clearAllTimers();
 
                 // Only reset terminal and reconnect if it wasn't a clean close
                 if (event.code !== 1000) {
-                    if (this.connectionState === 'connecting' && this.tryNextWebSocketUrl()) {
+                    if (previousConnectionState === 'connecting' && this.tryNextWebSocketUrl()) {
                         return;
                     }
                     // Don't show terminal reset message on first connection attempt
