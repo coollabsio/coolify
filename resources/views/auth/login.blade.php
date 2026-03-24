@@ -94,6 +94,11 @@
                                 </x-forms.button>
                             @endforeach
                         </div>
+                        @if (!$is_registration_enabled && isset($allow_oauth_registration) && $allow_oauth_registration)
+                            <div class="mt-4 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                                {{ __('auth.oauth_registration_hint') }}
+                            </div>
+                        @endif
                     @endif
                 </div>
             </div>
