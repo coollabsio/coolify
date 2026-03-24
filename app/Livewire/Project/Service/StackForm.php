@@ -118,6 +118,25 @@ class StackForm extends Component
         })->flatMap(function ($group) {
             return $group;
         });
+
+        // Ensure GitHub repository URL is always available as a configurable field
+        // for Laravel GitHub-based templates.
+        if (! $this->fields->has('SERVICE_GITHUB_REPO_URL')) {
+            $githubRepoUrl = $this->service->environment_variables()
+                ->where('key', 'SERVICE_GITHUB_REPO_URL')
+                ->first();
+
+            $this->fields->put('SERVICE_GITHUB_REPO_URL', [
+                'serviceName' => 'SERVICE_GITHUB_REPO_URL',
+                'key' => 'SERVICE_GITHUB_REPO_URL',
+                'name' => 'GitHub Repo URL',
+                'value' => data_get($githubRepoUrl, 'value', ''),
+                'isPassword' => false,
+                'rules' => 'required|url',
+                'customHelper' => 'Public repository URL used to clone your Laravel project.',
+            ]);
+            $this->validationAttributes['fields.SERVICE_GITHUB_REPO_URL.value'] = 'GitHub Repo URL';
+        }
     }
 
     public function saveCompose($raw)
