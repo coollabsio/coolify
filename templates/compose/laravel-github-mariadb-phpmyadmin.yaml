@@ -278,9 +278,13 @@ services:
                   deny all;
               }
           }
+    # Start nginx as soon as laravel container exists (not after Laravel healthcheck).
+    # Otherwise nginx container does not exist for many minutes and tools/UI show "No such container".
+    # Users may see 502/503 until PHP-FPM is ready; nginx.conf already returns 503 while deploying.
     depends_on:
       laravel:
-        condition: service_healthy
+        condition: service_started
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "nginx -t && pgrep nginx >/dev/null || exit 1"]
       interval: 10s

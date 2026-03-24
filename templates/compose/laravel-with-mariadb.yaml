@@ -270,7 +270,8 @@ services:
           }
     depends_on:
       laravel:
-        condition: service_healthy
+        condition: service_started
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "nginx -t && pgrep nginx >/dev/null || exit 1"]
       interval: 10s
