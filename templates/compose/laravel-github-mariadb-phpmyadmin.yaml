@@ -53,13 +53,6 @@ services:
           numprocs=2
           stopwaitsecs=3600
 
-          [eventlistener:shutdown]
-          command=shutdown.sh
-          events=PROCESS_STATE_STOPPED, PROCESS_STATE_EXITED, PROCESS_STATE_FATAL
-          stdout_logfile=/dev/stdout
-          stdout_logfile_maxbytes=0
-          stderr_logfile=/dev/stderr
-          stderr_logfile_maxbytes=0
       - type: bind
         source: ./entrypoint.sh
         target: /entrypoint.sh
@@ -77,7 +70,13 @@ services:
             apk add --no-cache supervisor curl git unzip
           fi
 
-          if php -m | grep -q "pdo_mysql" && php -m | grep -q "zip" && php -m | grep -q "gd"; then
+          if php -m | grep -q "^pdo_mysql$" \
+            && php -m | grep -q "^zip$" \
+            && php -m | grep -q "^gd$" \
+            && php -m | grep -q "^intl$" \
+            && php -m | grep -q "^mbstring$" \
+            && php -m | grep -q "^bcmath$" \
+            && php -m | grep -q "^opcache$"; then
             echo "PHP extensions already installed..."
           else
             echo "Installing PHP extensions..."
@@ -91,7 +90,8 @@ services:
               oniguruma-dev \
               icu-dev \
               libxml2-dev
-            docker-php-ext-install pdo_mysql zip bcmath gd intl mbstring opcache || true
+            docker-php-ext-configure gd --with-freetype --with-jpeg
+            docker-php-ext-install -j"$(nproc)" pdo_mysql zip bcmath gd intl mbstring opcache
           fi
 
           if ! grep -q "listen = 0.0.0.0:9000" /usr/local/etc/php-fpm.d/www.conf 2>/dev/null; then
@@ -113,7 +113,7 @@ services:
           if [ ! -d .git ]; then
             echo "Cloning repository ${REPO_URL}..."
             rm -rf * .[!.]* 2>/dev/null || true
-            git clone ${REPO_URL} .
+            git clone "${REPO_URL}" .
           else
             echo "Repository already exists..."
           fi
@@ -142,11 +142,38 @@ services:
              echo "APP_URL=${SERVICE_URL_LARAVEL}" >> .env
           fi
 
+          upsert_env() {
+            key="$1"
+            value="$2"
+            escaped_value=$(printf '%s\n' "$value" | sed 's/[\/&]/\\&/g')
+            if grep -Eq "^${key}=" .env; then
+              sed -i "s/^${key}=.*/${key}=${escaped_value}/" .env
+            else
+              echo "${key}=${value}" >> .env
+            fi
+          }
+
+          # Force critical runtime values even when .env already exists with empty/wrong values.
+          upsert_env "APP_KEY" ""
+          upsert_env "APP_URL" "${SERVICE_URL_LARAVEL}"
+          upsert_env "DB_CONNECTION" "mysql"
+          upsert_env "DB_HOST" "mariadb"
+          upsert_env "DB_PORT" "3306"
+          upsert_env "DB_DATABASE" "${SERVICE_DATABASE_LARAVEL}"
+          upsert_env "DB_USERNAME" "${SERVICE_USER_LARAVEL}"
+          upsert_env "DB_PASSWORD" "${SERVICE_PASSWORD_LARAVEL}"
+
           if [ -f artisan ]; then
             echo "Running Laravel setup tasks..."
             php artisan key:generate --force || true
             php artisan optimize:clear || true
-            php artisan migrate --force || true
+            DB_CONNECTION=mysql \
+              DB_HOST=mariadb \
+              DB_PORT=3306 \
+              DB_DATABASE="${SERVICE_DATABASE_LARAVEL}" \
+              DB_USERNAME="${SERVICE_USER_LARAVEL}" \
+              DB_PASSWORD="${SERVICE_PASSWORD_LARAVEL}" \
+              php artisan migrate --force || true
           fi
 
           mkdir -p /var/www/html/storage/logs
@@ -170,16 +197,6 @@ services:
             waited=$((waited + 2))
           done
           echo "Laravel is ready!"
-
-          if [ ! -f /usr/local/bin/shutdown.sh ]; then
-            cat > /usr/local/bin/shutdown.sh << 'EOF'
-          #!/bin/sh
-          if [ -f /tmp/supervisord.pid ]; then
-            kill -TERM $(cat /tmp/supervisord.pid) 2>/dev/null || true
-          fi
-          EOF
-            chmod +x /usr/local/bin/shutdown.sh
-          fi
 
           echo "Starting supervisor..."
           exec /usr/bin/supervisord -c /etc/supervisord.conf
@@ -206,11 +223,11 @@ services:
       mariadb:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "php-fpm -t >/dev/null 2>&1 && test -f /var/www/html/artisan && php /var/www/html/artisan --version >/dev/null 2>&1 || exit 1"]
-      interval: 30s
+      test: ["CMD-SHELL", "php-fpm -t >/dev/null 2>&1 && pgrep php-fpm >/dev/null && test -f /var/www/html/artisan || exit 1"]
+      interval: 15s
       timeout: 10s
-      retries: 3
-      start_period: 120s
+      retries: 20
+      start_period: 900s
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
 
   nginx:

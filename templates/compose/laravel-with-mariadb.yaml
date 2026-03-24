@@ -7,7 +7,7 @@
 
 services:
   laravel:
-    image: php:8.4-fpm-alpine
+    image: php:8.3-fpm-alpine
     volumes:
       - laravel-files:/var/www/html
       - type: bind
@@ -54,13 +54,6 @@ services:
           numprocs=2
           stopwaitsecs=3600
 
-          [eventlistener:shutdown]
-          command=shutdown.sh
-          events=PROCESS_STATE_STOPPED, PROCESS_STATE_EXITED, PROCESS_STATE_FATAL
-          stdout_logfile=/dev/stdout
-          stdout_logfile_maxbytes=0
-          stderr_logfile=/dev/stderr
-          stderr_logfile_maxbytes=0
       - type: bind
         source: ./entrypoint.sh
         target: /entrypoint.sh
@@ -194,17 +187,6 @@ services:
           done
           echo "Laravel is ready!"
 
-          # Create shutdown.sh script for supervisor (only if not exists)
-          if [ ! -f /usr/local/bin/shutdown.sh ]; then
-            cat > /usr/local/bin/shutdown.sh << 'EOF'
-          #!/bin/sh
-          if [ -f /tmp/supervisord.pid ]; then
-            kill -TERM $(cat /tmp/supervisord.pid) 2>/dev/null || true
-          fi
-          EOF
-            chmod +x /usr/local/bin/shutdown.sh
-          fi
-
           echo "Starting supervisor..."
           exec /usr/bin/supervisord -c /etc/supervisord.conf
     environment:
@@ -234,11 +216,11 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "php-fpm -t >/dev/null 2>&1 && test -f /var/www/html/artisan && php /var/www/html/artisan --version >/dev/null 2>&1 || exit 1"]
-      interval: 30s
+      test: ["CMD-SHELL", "php-fpm -t >/dev/null 2>&1 && pgrep php-fpm >/dev/null && test -f /var/www/html/artisan || exit 1"]
+      interval: 15s
       timeout: 10s
-      retries: 3
-      start_period: 120s
+      retries: 20
+      start_period: 900s
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
 
   nginx:
