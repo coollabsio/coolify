@@ -6,7 +6,7 @@
 
 services:
   laravel:
-    image: php:8.4-fpm-alpine
+    image: php:${SERVICE_PHP_VERSION:-8.3}-fpm-alpine
     volumes:
       - laravel-files:/var/www/html
       - type: bind
@@ -77,12 +77,21 @@ services:
             apk add --no-cache supervisor curl git unzip
           fi
 
-          if php -m | grep -q "pdo_mysql" && php -m | grep -q "zip"; then
+          if php -m | grep -q "pdo_mysql" && php -m | grep -q "zip" && php -m | grep -q "gd"; then
             echo "PHP extensions already installed..."
           else
             echo "Installing PHP extensions..."
-            apk add --no-cache libzip-dev mysql-client mariadb-client
-            docker-php-ext-install pdo_mysql zip bcmath || true
+            apk add --no-cache \
+              libzip-dev \
+              mysql-client \
+              mariadb-client \
+              freetype-dev \
+              libjpeg-turbo-dev \
+              libpng-dev \
+              oniguruma-dev \
+              icu-dev \
+              libxml2-dev
+            docker-php-ext-install pdo_mysql zip bcmath gd intl mbstring opcache || true
           fi
 
           if ! grep -q "listen = 0.0.0.0:9000" /usr/local/etc/php-fpm.d/www.conf 2>/dev/null; then
@@ -108,6 +117,9 @@ services:
           else
             echo "Repository already exists..."
           fi
+
+          # Avoid git ownership safety errors on mounted volume
+          git config --global --add safe.directory /var/www/html || true
 
           if [ -f composer.json ]; then
             echo "Installing Composer dependencies..."
@@ -174,6 +186,7 @@ services:
     environment:
       - SERVICE_URL_LARAVEL
       - SERVICE_GITHUB_REPO_URL=$SERVICE_GITHUB_REPO_URL
+      - SERVICE_PHP_VERSION=$SERVICE_PHP_VERSION
       - APP_NAME=Laravel
       - APP_ENV=production
       - APP_DEBUG=false

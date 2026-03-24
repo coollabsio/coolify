@@ -32,13 +32,24 @@
                 helper="Public repository URL used to clone your Laravel project." wire:change="saveGithubRepoUrl" />
         </div>
     @endif
+    @if ($fields->has('SERVICE_PHP_VERSION'))
+        <div class="w-full max-w-xs">
+            <x-forms.select canGate="update" :canResource="$service" id="fields.SERVICE_PHP_VERSION.value"
+                label="PHP Version" wire:change="savePhpVersion" helper="Runtime version for Laravel container.">
+                <option value="8.1">8.1</option>
+                <option value="8.2">8.2</option>
+                <option value="8.3">8.3</option>
+                <option value="8.4">8.4</option>
+            </x-forms.select>
+        </div>
+    @endif
     @if ($fields->count() > 0)
         <div>
             <h3>Service Specific Configuration</h3>
         </div>
         <div class="grid grid-cols-2 gap-2">
             @foreach ($fields as $serviceName => $field)
-                @if ($serviceName === 'SERVICE_GITHUB_REPO_URL')
+                @if ($serviceName === 'SERVICE_GITHUB_REPO_URL' || $serviceName === 'SERVICE_PHP_VERSION')
                     @continue
                 @endif
                 <div class="flex items-center gap-2"><span

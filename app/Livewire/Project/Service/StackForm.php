@@ -137,6 +137,23 @@ class StackForm extends Component
             ]);
             $this->validationAttributes['fields.SERVICE_GITHUB_REPO_URL.value'] = 'GitHub Repo URL';
         }
+
+        if (! $this->fields->has('SERVICE_PHP_VERSION')) {
+            $phpVersion = $this->service->environment_variables()
+                ->where('key', 'SERVICE_PHP_VERSION')
+                ->first();
+
+            $this->fields->put('SERVICE_PHP_VERSION', [
+                'serviceName' => 'SERVICE_PHP_VERSION',
+                'key' => 'SERVICE_PHP_VERSION',
+                'name' => 'PHP Version',
+                'value' => data_get($phpVersion, 'value', '8.3'),
+                'isPassword' => false,
+                'rules' => 'required|in:8.1,8.2,8.3,8.4',
+                'customHelper' => 'PHP runtime version used by the Laravel container.',
+            ]);
+            $this->validationAttributes['fields.SERVICE_PHP_VERSION.value'] = 'PHP Version';
+        }
     }
 
     public function saveCompose($raw)
@@ -149,6 +166,12 @@ class StackForm extends Component
     {
         $this->submit(notify: false);
         $this->dispatch('success', 'GitHub repository URL saved.');
+    }
+
+    public function savePhpVersion(): void
+    {
+        $this->submit(notify: false);
+        $this->dispatch('success', 'PHP version saved.');
     }
 
     public function instantSave()
