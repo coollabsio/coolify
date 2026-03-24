@@ -16,16 +16,15 @@ jobs:
       - uses: peakoss/anti-slop@v0
         with:
           # General Settings
-          max-failures: 4
+          max-failures: 6
 
           # PR Branch Checks
-          allowed-target-branches: "next"
+          allowed-target-branches: ""
           blocked-target-branches: ""
           allowed-source-branches: ""
           blocked-source-branches: |
             main
             master
-            v4.x
 
           # PR Quality Checks
           max-negative-reactions: 0
@@ -106,6 +105,6 @@ jobs:
           failure-remove-pr-labels: ""
           failure-remove-all-pr-labels: true
           failure-add-pr-labels: "quality/rejected"
-          failure-pr-message: "This PR did not pass quality checks so it will be closed. If you believe this is a mistake please let us know."
-          close-pr: true
+          failure-pr-message: "This PR did not pass quality checks. Please address the failures listed above and update your PR. If you believe this is a mistake please let us know."
+          close-pr: false
           lock-pr: false
