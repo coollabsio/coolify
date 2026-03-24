@@ -237,8 +237,9 @@ services:
   nginx:
     image: nginx:alpine
     # Skip /docker-entrypoint.d/ scripts: they try to PATCH nginx.conf (read-only bind) and still trigger io_setup issues.
-    entrypoint: ["nginx"]
-    command: ["-g", "daemon off;"]
+    # Shell wrapper: prints one line to stdout so Docker/Coolify log UI is not empty before the first HTTP request.
+    entrypoint: ["/bin/sh", "-c"]
+    command: "echo '[nginx] starting'; exec nginx -g 'daemon off;'"
     volumes:
       - laravel-files:/var/www/html:ro
       - type: bind
