@@ -124,6 +124,7 @@ class FileExplorer extends Component
         $this->tableStructure = [];
         $this->tableData = [];
         $this->currentPage = 1;
+        $this->overwriteExisting = true;
         $this->showDatabasePanel = false;
         $this->databases = [];
         $this->selectedDatabase = null;
@@ -1410,6 +1411,7 @@ class FileExplorer extends Component
         }
 
         $this->compressArchiveName = 'archive_'.date('Y-m-d_His').'.zip';
+        $this->overwriteExisting = true;
         $this->showCompressDialog = true;
     }
 
@@ -1462,19 +1464,6 @@ class FileExplorer extends Component
             $escapedArchive = escapeshellarg($archivePath);
             $escapedArchiveFileName = escapeshellarg($archiveFileName);
 
-            // Check if file exists
-            $checkCommand = "docker exec {$escapedContainer} sh -c 'test -f {$escapedArchive} && echo exists || echo not_exists'";
-            if ($server->isNonRoot()) {
-                $checkCommand = "sudo {$checkCommand}";
-            }
-            $exists = trim(instant_remote_process([$checkCommand], $server, false) ?? '') === 'exists';
-
-            if ($exists && ! $this->overwriteExisting) {
-                $this->dispatch('error', 'Archive already exists. Enable "Overwrite existing" to replace it.');
-
-                return;
-            }
-
             // Prepare file list for compression
             $fileNames = collect($this->selectedFiles)
                 ->map(fn ($selectedPath) => $this->normalizePathArgument((string) $selectedPath))
@@ -1501,43 +1490,33 @@ class FileExplorer extends Component
 
             if ($extension === 'zip') {
                 $innerCommand .= 'if command -v zip >/dev/null 2>&1; then ';
-                if ($this->overwriteExisting && $exists) {
-                    $innerCommand .= "rm -f {$escapedArchiveFileName} && ";
-                }
+                $innerCommand .= "rm -f {$escapedArchiveFileName}; ";
                 $innerCommand .= "zip -r {$escapedArchiveFileName} {$filesList} 2>&1; ";
-                $innerCommand .= 'else echo "zip not available" && exit 1; ';
+                $innerCommand .= 'else echo "zip not available"; ';
                 $innerCommand .= 'fi';
             } elseif (in_array($extension, ['gz', 'tgz']) || ($extension === 'gz' && str_ends_with($baseExtension, '.tar'))) {
                 $innerCommand .= 'if command -v tar >/dev/null 2>&1 && command -v gzip >/dev/null 2>&1; then ';
-                if ($this->overwriteExisting && $exists) {
-                    $innerCommand .= "rm -f {$escapedArchiveFileName} && ";
-                }
+                $innerCommand .= "rm -f {$escapedArchiveFileName}; ";
                 $innerCommand .= "tar -czf {$escapedArchiveFileName} {$filesList} 2>&1; ";
-                $innerCommand .= 'else echo "tar/gzip not available" && exit 1; ';
+                $innerCommand .= 'else echo "tar/gzip not available"; ';
                 $innerCommand .= 'fi';
             } elseif (in_array($extension, ['bz2', 'tbz2', 'tbz']) || ($extension === 'bz2' && str_ends_with($baseExtension, '.tar'))) {
                 $innerCommand .= 'if command -v tar >/dev/null 2>&1 && command -v bzip2 >/dev/null 2>&1; then ';
-                if ($this->overwriteExisting && $exists) {
-                    $innerCommand .= "rm -f {$escapedArchiveFileName} && ";
-                }
+                $innerCommand .= "rm -f {$escapedArchiveFileName}; ";
                 $innerCommand .= "tar -cjf {$escapedArchiveFileName} {$filesList} 2>&1; ";
-                $innerCommand .= 'else echo "tar/bzip2 not available" && exit 1; ';
+                $innerCommand .= 'else echo "tar/bzip2 not available"; ';
                 $innerCommand .= 'fi';
             } elseif (in_array($extension, ['xz', 'txz']) || ($extension === 'xz' && str_ends_with($baseExtension, '.tar'))) {
                 $innerCommand .= 'if command -v tar >/dev/null 2>&1 && command -v xz >/dev/null 2>&1; then ';
-                if ($this->overwriteExisting && $exists) {
-                    $innerCommand .= "rm -f {$escapedArchiveFileName} && ";
-                }
+                $innerCommand .= "rm -f {$escapedArchiveFileName}; ";
                 $innerCommand .= "tar -cJf {$escapedArchiveFileName} {$filesList} 2>&1; ";
-                $innerCommand .= 'else echo "tar/xz not available" && exit 1; ';
+                $innerCommand .= 'else echo "tar/xz not available"; ';
                 $innerCommand .= 'fi';
             } elseif ($extension === 'tar') {
                 $innerCommand .= 'if command -v tar >/dev/null 2>&1; then ';
-                if ($this->overwriteExisting && $exists) {
-                    $innerCommand .= "rm -f {$escapedArchiveFileName} && ";
-                }
+                $innerCommand .= "rm -f {$escapedArchiveFileName}; ";
                 $innerCommand .= "tar -cf {$escapedArchiveFileName} {$filesList} 2>&1; ";
-                $innerCommand .= 'else echo "tar not available" && exit 1; ';
+                $innerCommand .= 'else echo "tar not available"; ';
                 $innerCommand .= 'fi';
             } else {
                 $this->dispatch('error', 'Unsupported archive format. Use .zip, .tar, .tar.gz, .tar.bz2, or .tar.xz');
@@ -1555,7 +1534,13 @@ class FileExplorer extends Component
 
             $output = (string) (instant_remote_process([$command], $server, false) ?? '');
             if (str_contains($output ?? '', 'not available')) {
-                $this->dispatch('error', 'Required compression tool not available in container.');
+                $this->dispatch('error', $this->formatCompressErrorMessage(
+                    'Required compression tool is not available in this container.',
+                    $dirPath,
+                    $archivePath,
+                    $this->selectedFiles,
+                    $output
+                ));
                 $this->showCompressDialog = false;
 
                 return;
@@ -1566,7 +1551,13 @@ class FileExplorer extends Component
                 if ($exitCode !== 0) {
                     $preview = trim(str_replace($matches[0], '', $output));
                     $preview = mb_substr($preview, 0, 400);
-                    $this->dispatch('error', $preview !== '' ? 'Compression failed. '.$preview : "Compression failed with exit code {$exitCode}.");
+                    $this->dispatch('error', $this->formatCompressErrorMessage(
+                        $preview !== '' ? "Compression failed (exit code {$exitCode}). {$preview}" : "Compression failed with exit code {$exitCode}.",
+                        $dirPath,
+                        $archivePath,
+                        $this->selectedFiles,
+                        $output
+                    ));
                     $this->showCompressDialog = false;
 
                     return;
@@ -1580,7 +1571,13 @@ class FileExplorer extends Component
             $verifyArchiveResult = trim((string) (instant_remote_process([$verifyArchiveCommand], $server, false) ?? ''));
             if ($verifyArchiveResult !== 'CREATED') {
                 $preview = mb_substr(trim((string) $output), 0, 400);
-                $this->dispatch('error', $preview !== '' ? 'Compression failed. '.$preview : 'Compression failed. Archive file was not created.');
+                $this->dispatch('error', $this->formatCompressErrorMessage(
+                    $preview !== '' ? "Compression failed. {$preview}" : 'Compression failed. Archive file was not created.',
+                    $dirPath,
+                    $archivePath,
+                    $this->selectedFiles,
+                    $output
+                ));
                 $this->showCompressDialog = false;
 
                 return;
@@ -1593,7 +1590,12 @@ class FileExplorer extends Component
             $this->dispatch('success', 'Files compressed successfully.');
             $this->loadFiles();
         } catch (\Throwable $e) {
-            $this->dispatch('error', 'Failed to compress files: '.$e->getMessage());
+            $this->dispatch('error', $this->formatCompressErrorMessage(
+                'Failed to compress files: '.$e->getMessage(),
+                $this->currentPath,
+                rtrim($this->currentPath, '/').'/'.$this->compressArchiveName,
+                $this->selectedFiles
+            ));
             $this->showCompressDialog = false;
         }
     }
@@ -3500,5 +3502,44 @@ class FileExplorer extends Component
             'server' => $server,
             'escapedContainer' => escapeshellarg($containerName),
         ];
+    }
+
+    /**
+     * @param  array<int, string>  $selectedItems
+     */
+    private function formatCompressErrorMessage(
+        string $reason,
+        string $directory,
+        string $archivePath,
+        array $selectedItems,
+        ?string $rawOutput = null
+    ): string {
+        $items = collect($selectedItems)
+            ->filter(fn ($item) => is_string($item) && trim($item) !== '')
+            ->map(fn ($item) => basename((string) $item))
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $itemsText = empty($items) ? '(none)' : implode(', ', array_slice($items, 0, 8));
+        if (count($items) > 8) {
+            $itemsText .= ', ...';
+        }
+
+        $details = [];
+        $details[] = $reason;
+        $details[] = "Directory: {$directory}";
+        $details[] = "Archive: {$archivePath}";
+        $details[] = "Items: {$itemsText}";
+
+        if (is_string($rawOutput) && trim($rawOutput) !== '') {
+            $cleanOutput = trim(preg_replace('/__COMPRESS_EXIT:\d+__/', '', $rawOutput) ?? $rawOutput);
+            $cleanOutput = preg_replace('/\s+/', ' ', $cleanOutput) ?? $cleanOutput;
+            if ($cleanOutput !== '') {
+                $details[] = 'Output: '.mb_substr($cleanOutput, 0, 500);
+            }
+        }
+
+        return implode(' | ', $details);
     }
 }

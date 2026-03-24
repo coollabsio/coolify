@@ -776,10 +776,9 @@
                     <p class="text-xs text-gray-500 dark:text-gray-400">
                         Supported formats: .zip, .tar, .tar.gz, .tar.bz2, .tar.xz, .tgz, .tbz2, .tbz, .txz
                     </p>
-                    <div class="flex items-center gap-2">
-                        <input type="checkbox" id="overwriteExisting" wire:model="overwriteExisting" class="cursor-pointer">
-                        <label for="overwriteExisting" class="text-sm cursor-pointer dark:text-gray-300">Overwrite existing archive if it exists</label>
-                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        Existing archive with the same name will be overwritten automatically.
+                    </p>
                 </div>
             </div>
             <div class="flex items-center justify-end gap-2 p-4 border-t border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">

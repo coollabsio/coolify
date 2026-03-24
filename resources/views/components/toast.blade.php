@@ -327,12 +327,41 @@
                     toastHovered: false,
                     copyNotification: false,
                     copyToClipboard() {
-                        navigator.clipboard.writeText(toast.description);
-                        this.copyNotification = true;
-                        let that = this;
-                        setTimeout(function() {
-                            that.copyNotification = false;
-                        }, 1000);
+                        const textToCopy = toast.description || toast.message || '';
+                        if (textToCopy === '') {
+                            return;
+                        }
+
+                        if (navigator?.clipboard?.writeText) {
+                            navigator.clipboard.writeText(textToCopy).then(() => {
+                                this.copyNotification = true;
+                                let that = this;
+                                setTimeout(function() {
+                                    that.copyNotification = false;
+                                }, 1000);
+                            }).catch(() => {});
+                            return;
+                        }
+
+                        // Fallback for insecure contexts / unsupported clipboard API.
+                        const fallbackInput = document.createElement('textarea');
+                        fallbackInput.value = textToCopy;
+                        fallbackInput.setAttribute('readonly', '');
+                        fallbackInput.style.position = 'absolute';
+                        fallbackInput.style.left = '-9999px';
+                        document.body.appendChild(fallbackInput);
+                        fallbackInput.select();
+                        try {
+                            document.execCommand('copy');
+                            this.copyNotification = true;
+                            let that = this;
+                            setTimeout(function() {
+                                that.copyNotification = false;
+                            }, 1000);
+                        } catch (_) {
+                        } finally {
+                            document.body.removeChild(fallbackInput);
+                        }
                     }
                 }" x-init="if (position.includes('bottom')) {
                     $el.firstElementChild.classList.add('toast-bottom');
