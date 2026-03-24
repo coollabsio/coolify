@@ -73,6 +73,8 @@ describe('File Explorer Component', function () {
         expect(method_exists($component, 'compressFileByEncodedPath'))->toBeTrue();
         expect(method_exists($component, 'checkUnzip'))->toBeTrue();
         expect(method_exists($component, 'installUnzip'))->toBeTrue();
+        expect(method_exists($component, 'checkZip'))->toBeTrue();
+        expect(method_exists($component, 'installZip'))->toBeTrue();
         expect(method_exists($component, 'getDownloadUrl'))->toBeTrue();
     });
 

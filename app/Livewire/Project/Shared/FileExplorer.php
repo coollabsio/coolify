@@ -85,6 +85,8 @@ class FileExplorer extends Component
 
     public ?bool $isUnzipInstalled = null;
 
+    public ?bool $isZipInstalled = null;
+
     public array $databases = [];
 
     public ?string $selectedDatabase = null;
@@ -253,10 +255,12 @@ class FileExplorer extends Component
             $this->checkForDatabaseContainers();
             $this->loadFiles();
             $this->isUnzipInstalled = null;
+            $this->isZipInstalled = null;
         } else {
             $this->isMySQLOrMariaDB = false;
             $this->hasMySQLOrMariaDBContainer = false;
             $this->isUnzipInstalled = null;
+            $this->isZipInstalled = null;
         }
     }
 
@@ -1400,6 +1404,65 @@ class FileExplorer extends Component
         }
     }
 
+    public function checkZip(): void
+    {
+        try {
+            $context = $this->getSelectedContainerContext();
+            if ($context === null) {
+                $this->dispatch('error', 'Container not found.');
+
+                return;
+            }
+
+            $server = $context['server'];
+            $escapedContainer = $context['escapedContainer'];
+            $checkCommand = "docker exec {$escapedContainer} sh -c 'command -v zip >/dev/null 2>&1 && echo INSTALLED || echo NOT_INSTALLED'";
+            if ($server->isNonRoot()) {
+                $checkCommand = "sudo {$checkCommand}";
+            }
+
+            $checkResult = trim((string) (instant_remote_process([$checkCommand], $server, false) ?? ''));
+            if ($checkResult === 'INSTALLED') {
+                $this->isZipInstalled = true;
+                $this->dispatch('success', 'zip is installed in this container.');
+            } else {
+                $this->isZipInstalled = false;
+                $this->dispatch('error', 'zip is not installed in this container.');
+            }
+        } catch (\Throwable $e) {
+            $this->isZipInstalled = null;
+            $this->dispatch('error', 'Failed to check zip: '.$e->getMessage());
+        }
+    }
+
+    public function installZip(): void
+    {
+        try {
+            $context = $this->getSelectedContainerContext();
+            if ($context === null) {
+                $this->dispatch('error', 'Container not found.');
+
+                return;
+            }
+
+            $server = $context['server'];
+            $escapedContainer = $context['escapedContainer'];
+            $this->dispatch('info', 'Installing zip... This may take a moment.');
+
+            $installed = $this->ensureCommandAvailableInContainer($server, $escapedContainer, 'zip');
+            if ($installed) {
+                $this->isZipInstalled = true;
+                $this->dispatch('success', 'zip has been successfully installed in this container.');
+            } else {
+                $this->isZipInstalled = false;
+                $this->dispatch('error', 'Failed to install zip. Please install it manually in the container.');
+            }
+        } catch (\Throwable $e) {
+            $this->isZipInstalled = null;
+            $this->dispatch('error', 'Failed to install zip: '.$e->getMessage());
+        }
+    }
+
     public function openCompressDialog()
     {
         $this->syncSelectedFilesWithCurrentDirectory();
@@ -1485,6 +1548,22 @@ class FileExplorer extends Component
             // Determine compression format
             $extension = strtolower(pathinfo($this->compressArchiveName, PATHINFO_EXTENSION));
             $baseExtension = strtolower(pathinfo(pathinfo($this->compressArchiveName, PATHINFO_FILENAME), PATHINFO_EXTENSION));
+
+            if ($extension === 'zip') {
+                $zipReady = $this->ensureCommandAvailableInContainer($server, $escapedContainer, 'zip');
+                if (! $zipReady) {
+                    $this->dispatch('error', $this->formatCompressErrorMessage(
+                        'Required compression tool is not available in this container.',
+                        $dirPath,
+                        $archivePath,
+                        $this->selectedFiles,
+                        'zip not available (auto-install failed)'
+                    ));
+                    $this->showCompressDialog = false;
+
+                    return;
+                }
+            }
 
             $innerCommand = "cd {$escapedDir} && ";
 
@@ -3502,6 +3581,54 @@ class FileExplorer extends Component
             'server' => $server,
             'escapedContainer' => escapeshellarg($containerName),
         ];
+    }
+
+    private function ensureCommandAvailableInContainer(Server $server, string $escapedContainer, string $commandName): bool
+    {
+        $safeCommand = preg_replace('/[^a-zA-Z0-9._+-]/', '', $commandName);
+        if ($safeCommand === null || $safeCommand === '') {
+            return false;
+        }
+
+        $checkCommand = "docker exec {$escapedContainer} sh -c 'command -v {$safeCommand} >/dev/null 2>&1 && echo INSTALLED || echo NOT_INSTALLED'";
+        if ($server->isNonRoot()) {
+            $checkCommand = "sudo {$checkCommand}";
+        }
+
+        $checkResult = trim((string) (instant_remote_process([$checkCommand], $server, false) ?? ''));
+        if ($checkResult === 'INSTALLED') {
+            return true;
+        }
+
+        $installCommand = "docker exec {$escapedContainer} sh -c '";
+        $installCommand .= "if command -v apk >/dev/null 2>&1; then ";
+        $installCommand .= "apk add --no-cache {$safeCommand} 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
+        $installCommand .= "elif command -v apt-get >/dev/null 2>&1; then ";
+        $installCommand .= "apt-get update -qq && apt-get install -y -qq {$safeCommand} 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
+        $installCommand .= "elif command -v yum >/dev/null 2>&1; then ";
+        $installCommand .= "yum install -y -q {$safeCommand} 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
+        $installCommand .= "elif command -v dnf >/dev/null 2>&1; then ";
+        $installCommand .= "dnf install -y -q {$safeCommand} 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
+        $installCommand .= "else echo NO_PACKAGE_MANAGER; ";
+        $installCommand .= "fi'";
+
+        if ($server->isNonRoot()) {
+            $installCommand = "sudo {$installCommand}";
+        }
+
+        $installResult = trim((string) (instant_remote_process([$installCommand], $server, false) ?? ''));
+        if (! str_contains($installResult, 'INSTALL_SUCCESS')) {
+            return false;
+        }
+
+        $verifyCommand = "docker exec {$escapedContainer} sh -c 'command -v {$safeCommand} >/dev/null 2>&1 && echo VERIFIED || echo NOT_VERIFIED'";
+        if ($server->isNonRoot()) {
+            $verifyCommand = "sudo {$verifyCommand}";
+        }
+
+        $verifyResult = trim((string) (instant_remote_process([$verifyCommand], $server, false) ?? ''));
+
+        return $verifyResult === 'VERIFIED';
     }
 
     /**

@@ -50,6 +50,19 @@
                         <x-loading wire:loading wire:target="installUnzip" />
                         Instalar unzip
                     </x-forms.button>
+                    <div class="flex items-center gap-2">
+                        <x-forms.button wire:click="checkZip" wire:loading.attr="disabled" class="bg-green-600">
+                            <x-loading wire:loading wire:target="checkZip" />
+                            Verificar zip
+                        </x-forms.button>
+                        <span class="text-xs {{ $isZipInstalled === true ? 'text-green-500' : ($isZipInstalled === false ? 'text-red-500' : 'text-gray-500') }}">
+                            ({{ $isZipInstalled === true ? 'instalado' : ($isZipInstalled === false ? 'no instalado' : 'sin verificar') }})
+                        </span>
+                    </div>
+                    <x-forms.button wire:click="installZip" wire:loading.attr="disabled" class="bg-yellow-600">
+                        <x-loading wire:loading wire:target="installZip" />
+                        Instalar zip
+                    </x-forms.button>
                 </div>
 
                 @if ($selected_container !== 'default')
