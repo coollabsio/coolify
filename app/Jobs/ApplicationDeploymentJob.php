@@ -645,10 +645,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit);
-            // Always add .env file to services
+            // Add per-service .env files to isolate environment variables between containers
             $services = collect(data_get($composeFile, 'services', []));
             $services = $services->map(function ($service, $name) {
-                $service['env_file'] = ['.env'];
+                $safeName = str($name)->replace('/', '_')->value();
+                $service['env_file'] = [".env.{$safeName}"];
 
                 return $service;
             });
@@ -1455,6 +1456,99 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
                 ]
             );
+        }
+
+        // Create per-service .env files for Docker Compose deployments
+        // to isolate environment variables between containers
+        if ($this->build_pack === 'dockercompose') {
+            $this->create_per_service_env_files($environment_variables);
+        }
+    }
+
+    /**
+     * Create per-service .env files for Docker Compose deployments.
+     * Each service gets only its own environment variables, preventing
+     * cross-container secret leakage.
+     */
+    private function create_per_service_env_files($all_environment_variables)
+    {
+        if ($this->application->settings->is_raw_compose_deployment_enabled) {
+            return;
+        }
+
+        // Parse the compose file to determine per-service environment keys
+        $dockerCompose = Yaml::parse($this->application->docker_compose);
+        $services = data_get($dockerCompose, 'services', []);
+
+        // Build a lookup dict from all environment variables
+        $envDict = [];
+        foreach ($all_environment_variables as $line) {
+            $pos = strpos($line, '=');
+            if ($pos !== false) {
+                $envDict[substr($line, 0, $pos)] = substr($line, $pos + 1);
+            }
+        }
+
+        // Classify variables as shared (Coolify metadata) or service-specific
+        $sharedPrefixes = ['COOLIFY_', 'SERVICE_FQDN_', 'SERVICE_URL_', 'SERVICE_NAME_'];
+
+        foreach ($services as $serviceName => $serviceConfig) {
+            $serviceEnvKeys = [];
+            $environment = data_get($serviceConfig, 'environment', []);
+
+            // Collect keys from the service's environment section
+            if (is_array($environment) || $environment instanceof \Illuminate\Support\Collection) {
+                foreach ($environment as $key => $value) {
+                    if (is_string($key)) {
+                        $serviceEnvKeys[] = $key;
+                    } elseif (is_string($value) && str_contains($value, '=')) {
+                        $serviceEnvKeys[] = explode('=', $value, 2)[0];
+                    }
+                }
+            }
+
+            // Build the per-service env file content:
+            // shared Coolify vars + only this service's specific vars
+            $serviceLines = [];
+            foreach ($all_environment_variables as $line) {
+                $pos = strpos($line, '=');
+                if ($pos === false) {
+                    continue;
+                }
+                $key = substr($line, 0, $pos);
+                $isShared = false;
+                foreach ($sharedPrefixes as $prefix) {
+                    if (str_starts_with($key, $prefix)) {
+                        $isShared = true;
+                        break;
+                    }
+                }
+                if ($isShared || in_array($key, $serviceEnvKeys, true)) {
+                    $serviceLines[] = $line;
+                }
+            }
+
+            $safeName = str($serviceName)->replace('/', '_')->value();
+            $envContent = implode("\n", $serviceLines);
+            $envsBase64 = base64_encode($envContent);
+
+            // Write per-service env file to workdir
+            $this->execute_remote_command(
+                [
+                    executeInDocker($this->deployment_uuid, "echo '{$envsBase64}' | base64 -d | tee {$this->workdir}/.env.{$safeName} > /dev/null"),
+                    'hidden' => true,
+                ]
+            );
+
+            // Write per-service env file to configuration directory
+            $this->execute_remote_command(
+                [
+                    "echo '{$envsBase64}' | base64 -d | tee {$this->configuration_dir}/.env.{$safeName} > /dev/null",
+                    'hidden' => true,
+                ]
+            );
+
+            $this->application_deployment_queue->addLogEntry("Created isolated .env.{$safeName} with ".count($serviceLines).' variables.', hidden: true);
         }
     }
 

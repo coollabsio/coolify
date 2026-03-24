@@ -1583,6 +1583,70 @@ class Service extends BaseModel
             $commands[] = "echo '$envs_base64' | base64 -d | tee .env > /dev/null";
         }
 
+        // Create per-service .env files to isolate environment variables between containers
+        if ($this->docker_compose) {
+            try {
+                $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($this->docker_compose);
+                $composeServices = data_get($dockerCompose, 'services', []);
+
+                // Build lookup dict from all env vars
+                $allEnvDict = [];
+                foreach ($envs as $line) {
+                    $pos = strpos($line, '=');
+                    if ($pos !== false) {
+                        $allEnvDict[substr($line, 0, $pos)] = true;
+                    }
+                }
+
+                // Classify shared (Coolify metadata) vs service-specific
+                $sharedPrefixes = ['COOLIFY_', 'SERVICE_FQDN_', 'SERVICE_URL_', 'SERVICE_NAME_'];
+
+                foreach ($composeServices as $serviceName => $serviceConfig) {
+                    $serviceEnvKeys = [];
+                    $environment = data_get($serviceConfig, 'environment', []);
+
+                    if (is_array($environment) || $environment instanceof \Illuminate\Support\Collection) {
+                        foreach ($environment as $key => $value) {
+                            if (is_string($key)) {
+                                $serviceEnvKeys[] = $key;
+                            } elseif (is_string($value) && str_contains($value, '=')) {
+                                $serviceEnvKeys[] = explode('=', $value, 2)[0];
+                            }
+                        }
+                    }
+
+                    $serviceLines = [];
+                    foreach ($envs as $line) {
+                        $pos = strpos($line, '=');
+                        if ($pos === false) {
+                            continue;
+                        }
+                        $key = substr($line, 0, $pos);
+                        $isShared = false;
+                        foreach ($sharedPrefixes as $prefix) {
+                            if (str_starts_with($key, $prefix)) {
+                                $isShared = true;
+                                break;
+                            }
+                        }
+                        if ($isShared || in_array($key, $serviceEnvKeys, true)) {
+                            $serviceLines[] = $line;
+                        }
+                    }
+
+                    $safeName = str($serviceName)->replace('/', '_')->value();
+                    if (count($serviceLines) > 0) {
+                        $serviceEnvBase64 = base64_encode(implode("\n", $serviceLines));
+                        $commands[] = "echo '$serviceEnvBase64' | base64 -d | tee .env.{$safeName} > /dev/null";
+                    } else {
+                        $commands[] = "touch .env.{$safeName}";
+                    }
+                }
+            } catch (\Exception $e) {
+                ray($e->getMessage());
+            }
+        }
+
         instant_remote_process($commands, $this->server);
     }
 
