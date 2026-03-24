@@ -1183,7 +1183,10 @@ class FileExplorer extends Component
 
             $containerName = data_get($container, 'container.Names');
             $escapedContainer = escapeshellarg($containerName);
-            $fileNameEscaped = escapeshellarg(basename($filePath));
+            $archiveFileName = basename($filePath);
+            $fileNameEscaped = escapeshellarg($archiveFileName);
+            $archiveFileNameForPython = str_replace(['\\', "'"], ['\\\\', "\\'"], $archiveFileName);
+            $archiveFileNameForPhp = str_replace(['\\', "'"], ['\\\\', "\\'"], $archiveFileName);
             $fileDir = dirname($filePath);
             $fileDirEscaped = escapeshellarg($fileDir);
 
@@ -1200,11 +1203,11 @@ class FileExplorer extends Component
                 $extractionCommand .= "(unzip -o {$fileNameEscaped} -d . 2>&1 | while IFS= read -r line; do echo \"PROGRESS: \\\$line\"; done; echo 'EXTRACTION_SUCCESS') || echo 'EXTRACTION_FAILED'; ";
                 $extractionCommand .= "elif command -v python3 >/dev/null 2>&1; then ";
                 // Python con output periódico cada 100 archivos
-                $extractionCommand .= "python3 -c \"import zipfile, os, sys; z=zipfile.ZipFile('{$fileNameEscaped}'); files=z.namelist(); total=len(files); [z.extract(f, '.') or (print(f'PROGRESS: Extracted {i+1}/{total}') if (i+1)%100==0 else None) for i, f in enumerate(files)]; z.close(); print('EXTRACTION_SUCCESS')\" 2>&1 || echo 'EXTRACTION_FAILED'; ";
+                $extractionCommand .= "python3 -c \"import zipfile, os, sys; z=zipfile.ZipFile('{$archiveFileNameForPython}'); files=z.namelist(); total=len(files); [z.extract(f, '.') or (print(f'PROGRESS: Extracted {i+1}/{total}') if (i+1)%100==0 else None) for i, f in enumerate(files)]; z.close(); print('EXTRACTION_SUCCESS')\" 2>&1 || echo 'EXTRACTION_FAILED'; ";
                 $extractionCommand .= "elif command -v python >/dev/null 2>&1; then ";
-                $extractionCommand .= "python -c \"import zipfile, os, sys; z=zipfile.ZipFile('{$fileNameEscaped}'); files=z.namelist(); total=len(files); [z.extract(f, '.') or (print(f'PROGRESS: Extracted {i+1}/{total}') if (i+1)%100==0 else None) for i, f in enumerate(files)]; z.close(); print('EXTRACTION_SUCCESS')\" 2>&1 || echo 'EXTRACTION_FAILED'; ";
+                $extractionCommand .= "python -c \"import zipfile, os, sys; z=zipfile.ZipFile('{$archiveFileNameForPython}'); files=z.namelist(); total=len(files); [z.extract(f, '.') or (print(f'PROGRESS: Extracted {i+1}/{total}') if (i+1)%100==0 else None) for i, f in enumerate(files)]; z.close(); print('EXTRACTION_SUCCESS')\" 2>&1 || echo 'EXTRACTION_FAILED'; ";
                 $extractionCommand .= "elif command -v php >/dev/null 2>&1; then ";
-                $extractionCommand .= "php -r \"\\\$zip = new ZipArchive(); if (\\\$zip->open('{$fileNameEscaped}') === TRUE) { \\\$total = \\\$zip->numFiles; for (\\\$i = 0; \\\$i < \\\$total; \\\$i++) { \\\$zip->extractTo('.', [\\\$zip->getNameIndex(\\\$i)]); if ((\\\$i+1) % 100 == 0) echo 'PROGRESS: Extracted ' . (\\\$i+1) . '/' . \\\$total . ' files...' . PHP_EOL; } \\\$zip->close(); echo 'EXTRACTION_SUCCESS'; } else { echo 'EXTRACTION_FAILED'; }\" 2>&1; ";
+                $extractionCommand .= "php -r \"\\\$zip = new ZipArchive(); if (\\\$zip->open('{$archiveFileNameForPhp}') === TRUE) { \\\$total = \\\$zip->numFiles; for (\\\$i = 0; \\\$i < \\\$total; \\\$i++) { \\\$zip->extractTo('.', [\\\$zip->getNameIndex(\\\$i)]); if ((\\\$i+1) % 100 == 0) echo 'PROGRESS: Extracted ' . (\\\$i+1) . '/' . \\\$total . ' files...' . PHP_EOL; } \\\$zip->close(); echo 'EXTRACTION_SUCCESS'; } else { echo 'EXTRACTION_FAILED'; }\" 2>&1; ";
                 $extractionCommand .= "else ";
                 $extractionCommand .= "echo 'TOOL_NOT_FOUND:unzip'; ";
                 $extractionCommand .= "fi";

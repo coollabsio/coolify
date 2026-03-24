@@ -35,7 +35,7 @@ const getSessionCookie = (req) => {
     const configuredSessionCookie = process.env.SESSION_COOKIE;
     const fallbackSessionCookieName = `${appName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_session`;
     const discoveredSessionCookie = Object.keys(cookies).find((key) => key.endsWith('_session'));
-    const sessionCookieName = configuredSessionCookie || fallbackSessionCookieName || discoveredSessionCookie;
+    const sessionCookieName = configuredSessionCookie || discoveredSessionCookie || fallbackSessionCookieName;
     const laravelSession = decodeCookieValue(cookies[sessionCookieName]) || decodeCookieValue(cookies[discoveredSessionCookie]);
     return {
         sessionCookieName,
