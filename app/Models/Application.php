@@ -978,6 +978,15 @@ class Application extends BaseModel
         return false;
     }
 
+    public function isReleaseDeployable(): bool
+    {
+        if ($this->settings->is_deploy_on_release_enabled) {
+            return true;
+        }
+
+        return false;
+    }
+
     public function isPRDeployable(): bool
     {
         if ($this->settings->is_preview_deployments_enabled) {

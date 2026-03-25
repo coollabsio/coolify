@@ -313,7 +313,7 @@
                         emails: 'read',
                         administration: 'read'
                     };
-                    const default_events = ['push'];
+                    const default_events = ['push', 'release'];
                     if (preview_deployment_permissions) {
                         default_permissions.pull_requests = 'write';
                         default_events.push('pull_request');
