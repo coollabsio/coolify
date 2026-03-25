@@ -29,6 +29,9 @@ class LaravelArtisan extends Component
 
     public string $selectedCommandDescription = '';
 
+    /** @var array<int, array{name: string, description: string}> */
+    public array $filteredArtisanCommands = [];
+
     public bool $isLoadingHelp = false;
 
     public string $selectedCommandHelp = '';
@@ -37,6 +40,31 @@ class LaravelArtisan extends Component
 
     public bool $isRunning = false;
 
+    // Prevent the dropdown from reopening right after selecting an item.
+    public bool $suppressCommandDropdown = false;
+
+    /**
+     * Returns the artisan sub-command token (the token after `artisan` if present).
+     */
+    private function getArtisanSubcommandToken(string $value): string
+    {
+        $tokens = preg_split('/\s+/', trim($value)) ?: [];
+        $tokens = array_values(array_filter($tokens, fn ($t) => $t !== ''));
+        if ($tokens === []) {
+            return '';
+        }
+
+        foreach ($tokens as $index => $token) {
+            if (strtolower((string) $token) !== 'artisan') {
+                continue;
+            }
+
+            return (string) ($tokens[$index + 1] ?? '');
+        }
+
+        return (string) ($tokens[0] ?? '');
+    }
+
     public function mount(): void
     {
         $this->parameters = get_route_parameters();
@@ -44,6 +72,15 @@ class LaravelArtisan extends Component
         $this->authorize('view', $this->service);
         $this->applications = $this->service->applications->sort();
         $this->detectLaravelContainers();
+
+        // Auto-pick the first running Laravel container; UI no longer allows manual selection.
+        if ($this->selectedContainer === null && ! empty($this->laravelContainers)) {
+            $this->selectedContainer = (int) ($this->laravelContainers[0]['id'] ?? null);
+        }
+
+        if ($this->selectedContainer) {
+            $this->loadArtisanCommands();
+        }
     }
 
     public function detectLaravelContainers(): void
@@ -132,9 +169,10 @@ class LaravelArtisan extends Component
     {
         $this->isLoadingCommands = true;
         $this->artisanCommands = [];
-        $this->selectedCommand = null;
+        $this->selectedCommand = '';
         $this->selectedCommandDescription = '';
         $this->selectedCommandHelp = '';
+        $this->filteredArtisanCommands = [];
 
         try {
             $context = $this->getSelectedContainerContext();
@@ -160,14 +198,45 @@ class LaravelArtisan extends Component
             $this->artisanCommands = $commands;
 
             if ($this->artisanCommands !== []) {
-                $this->selectedCommand = $this->artisanCommands[0]['name'];
-                $this->selectedCommandDescription = $this->artisanCommands[0]['description'];
+                // Leave the input empty; dropdown will populate when the user types.
             }
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Error loading artisan commands: '.$e->getMessage());
         } finally {
             $this->isLoadingCommands = false;
         }
+    }
+
+    private function refreshCommandDropdown(): void
+    {
+        $value = trim((string) $this->selectedCommand);
+        if ($value === '') {
+            $this->filteredArtisanCommands = [];
+
+            return;
+        }
+
+        $subcommand = $this->getArtisanSubcommandToken($value);
+        if ($subcommand === '') {
+            $this->filteredArtisanCommands = [];
+
+            return;
+        }
+
+        $q = strtolower($subcommand);
+        $startsWith = array_values(array_filter(
+            $this->artisanCommands,
+            fn (array $cmd) => str_starts_with(strtolower((string) ($cmd['name'] ?? '')), $q)
+        ));
+
+        $containsElsewhere = array_values(array_filter(
+            $this->artisanCommands,
+            fn (array $cmd) => ! str_starts_with(strtolower((string) ($cmd['name'] ?? '')), $q)
+                && str_contains(strtolower((string) ($cmd['name'] ?? '')), $q)
+        ));
+
+        // Order: exact prefix matches first, then "contains" matches.
+        $this->filteredArtisanCommands = array_merge($startsWith, $containsElsewhere);
     }
 
     /**
@@ -256,24 +325,36 @@ class LaravelArtisan extends Component
 
     public function selectCommand(string $command): void
     {
+        $this->suppressCommandDropdown = true;
         $this->selectedCommand = $command;
         $name = trim((string) ($command ? preg_split('/\s+/', $command)[0] : ''));
         $selected = collect($this->artisanCommands)->firstWhere('name', $name);
         $this->selectedCommandDescription = (string) (data_get($selected, 'description', ''));
+        $this->filteredArtisanCommands = [];
     }
 
     public function updatedSelectedCommand(?string $value): void
     {
-        if (! $value) {
-            $this->selectedCommandDescription = '';
-            $this->selectedCommandHelp = '';
+        if ($this->suppressCommandDropdown) {
+            $this->suppressCommandDropdown = false;
+            $this->filteredArtisanCommands = [];
+
             return;
         }
 
-        $name = trim((string) (preg_split('/\s+/', $value)[0] ?? ''));
-        $selected = collect($this->artisanCommands)->firstWhere('name', $name);
+        if (! $value) {
+            $this->selectedCommandDescription = '';
+            $this->selectedCommandHelp = '';
+            $this->filteredArtisanCommands = [];
+            return;
+        }
+
+        $subcommand = $this->getArtisanSubcommandToken((string) $value);
+        $selected = collect($this->artisanCommands)->firstWhere('name', $subcommand);
         $this->selectedCommandDescription = (string) (data_get($selected, 'description', ''));
         $this->selectedCommandHelp = '';
+
+        $this->refreshCommandDropdown();
     }
 
     public function run(): void
@@ -293,11 +374,31 @@ class LaravelArtisan extends Component
         $server = $context['server'];
         $escapedContainer = $context['escapedContainer'];
 
-        $tokens = preg_split('/\s+/', trim((string) $this->selectedCommand)) ?: [];
+        $rawTokens = preg_split('/\s+/', trim((string) $this->selectedCommand)) ?: [];
+        $rawTokens = array_values(array_filter($rawTokens, fn ($t) => $t !== ''));
+        if ($rawTokens === []) {
+            $this->dispatch('error', 'Command is empty.');
+
+            return;
+        }
+
+        // Allow users to type either:
+        // - "migrate --force"
+        // - "php artisan migrate --force"
+        // Strip leading "php artisan" when present.
+        $artisanIndex = null;
+        foreach ($rawTokens as $index => $token) {
+            if (strtolower((string) $token) === 'artisan') {
+                $artisanIndex = $index;
+                break;
+            }
+        }
+
+        $tokens = $artisanIndex !== null ? array_slice($rawTokens, $artisanIndex + 1) : $rawTokens;
         $tokens = array_values(array_filter($tokens, fn ($t) => $t !== ''));
 
         if ($tokens === []) {
-            $this->dispatch('error', 'Command is empty.');
+            $this->dispatch('error', 'Command is empty (no artisan sub-command found).');
 
             return;
         }

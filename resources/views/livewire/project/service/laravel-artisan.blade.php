@@ -29,58 +29,56 @@
                     </div>
                 @else
                     <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6">
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium dark:text-white mb-2">Seleccionar Contenedor:</label>
-                            <select wire:model.live="selectedContainer" wire:change="loadArtisanCommands" class="input w-full">
-                                <option value="">-- Selecciona un contenedor --</option>
-                                @foreach ($laravelContainers as $container)
-                                    <option value="{{ $container['id'] }}" @if (!str($container['status'])->contains('running')) disabled @endif>
-                                        {{ $container['name'] }}
-                                        @if (!str($container['status'])->contains('running'))
-                                            (No está en ejecución)
-                                        @endif
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
+                        <div class="relative">
+                            <label class="block text-sm font-medium dark:text-white mb-2">Comando:</label>
 
-                        <div class="flex flex-col gap-3 lg:flex-row lg:items-start">
-                            <div class="flex-1">
-                                <label class="block text-sm font-medium dark:text-white mb-2">Comando:</label>
-                                <input
-                                    type="text"
-                                    wire:model.live="selectedCommand"
-                                    list="artisan-command-list"
-                                    class="input w-full"
-                                    placeholder="Ej: migrate --force"
-                                />
+                            <div class="flex gap-2 items-start">
+                                <div class="relative flex-1">
+                                    <input
+                                        type="text"
+                                        wire:model.live="selectedCommand"
+                                        class="input w-full"
+                                        placeholder="Ej: migrate --force"
+                                    />
 
-                                <datalist id="artisan-command-list">
-                                    @foreach ($artisanCommands as $cmd)
-                                        <option value="{{ $cmd['name'] }}"></option>
-                                    @endforeach
-                                </datalist>
+                                    @if (! $isLoadingCommands && ! empty($filteredArtisanCommands))
+                                        <div class="absolute z-20 left-0 right-0 mt-1 bg-white dark:bg-coolgray-800 border border-coolgray-300 dark:border-coolgray-600 rounded shadow-lg max-h-64 overflow-auto">
+                                            @foreach ($filteredArtisanCommands as $cmd)
+                                                <button
+                                                    type="button"
+                                                    class="w-full px-3 py-2 hover:bg-neutral-100 dark:hover:bg-coolgray-700 flex items-center gap-2 text-left"
+                                                    wire:click="selectCommand(@js($cmd['name']))"
+                                                >
+                                                    <span class="font-mono text-sm whitespace-nowrap">{{ $cmd['name'] }}</span>
+                                                    @if (! empty($cmd['description']))
+                                                        <span
+                                                            class="text-xs text-gray-500 dark:text-gray-400 truncate max-w-96"
+                                                            title="{{ $cmd['description'] }}"
+                                                        >
+                                                            - {{ $cmd['description'] }}
+                                                        </span>
+                                                    @endif
+                                                </button>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
 
-                                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    Se ejecuta como:
-                                    <span class="font-mono">{{ 'php /var/www/html/artisan '.$selectedCommand }}</span>
+                                <div class="shrink-0">
+                                    <x-forms.button
+                                        wire:click="run"
+                                        wire:loading.attr="disabled"
+                                        wire:target="run"
+                                        class="bg-coollabs h-10 px-4"
+                                    >
+                                        Ejecutar
+                                    </x-forms.button>
                                 </div>
                             </div>
 
-                            <div class="w-full lg:w-80">
-                                <label class="block text-sm font-medium dark:text-white mb-2">Descripción:</label>
-                                <div class="p-3 border border-coolgray-300 dark:border-coolgray-600 rounded bg-white dark:bg-coolgray-800 text-sm text-gray-700 dark:text-gray-200 min-h-12">
-                                    {{ $selectedCommandDescription ?: '—' }}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mt-4 flex gap-2">
-                            <x-forms.button wire:click="run" wire:loading.attr="disabled" wire:target="run" class="bg-coollabs">
-                                Ejecutar
-                            </x-forms.button>
-                            <div wire:loading wire:target="run" class="text-sm text-gray-600 dark:text-gray-400 self-center">
-                                Ejecutando...
+                            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Se ejecuta como:
+                                <span class="font-mono">{{ 'php /var/www/html/artisan '.trim((string) $selectedCommand) }}</span>
                             </div>
                         </div>
 

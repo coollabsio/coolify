@@ -139,7 +139,6 @@ class LaravelCron extends Component
 
     public function loadCronData(): void
     {
-        $this->checkSchedulerStatus();
         $this->loadScheduleList();
     }
 

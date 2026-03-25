@@ -29,94 +29,74 @@
                     </div>
                 @else
                     <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6">
-                        @if ($selectedContainerForCron)
-                            @if ($isLoadingCron)
-                                <div class="flex items-center justify-center p-8">
-                                    <span class="text-gray-600 dark:text-gray-400">Verificando estado...</span>
+                        <div class="p-4 border border-coolgray-300 dark:border-coolgray-600 rounded bg-white dark:bg-coolgray-800">
+                            <div class="mt-2 flex items-center justify-between mb-3">
+                                <h3 class="font-semibold dark:text-white">Tareas programadas</h3>
+                                <x-forms.button
+                                    wire:click="loadScheduleList"
+                                    wire:loading.attr="disabled"
+                                    wire:target="loadScheduleList"
+                                    class="bg-gray-500 hover:bg-gray-600">
+                                    Recargar
+                                </x-forms.button>
+                            </div>
+
+                            @if ($isLoadingScheduleList)
+                                <div class="p-4 text-sm text-gray-600 dark:text-gray-300">
+                                    Cargando schedule list...
+                                </div>
+                            @elseif (empty($scheduledTasks))
+                                <div class="p-4 text-sm text-gray-600 dark:text-gray-300">
+                                    No hay tareas programadas detectadas.
                                 </div>
                             @else
-                                <div class="p-4 border border-coolgray-300 dark:border-coolgray-600 rounded bg-white dark:bg-coolgray-800">
-                                    <div class="flex items-center justify-between mb-4">
-                                        <div>
-                                            <div class="font-medium dark:text-white">Estado: <span class="font-mono">{{ $schedulerStatus }}</span></div>
-                                        </div>
-                                        <div class="flex gap-2">
-                                            <x-forms.button wire:click="toggleScheduler" class="bg-coollabs">
-                                                {{ $isSchedulerEnabled ? 'Detener' : 'Iniciar' }}
-                                            </x-forms.button>
-                                            <x-forms.button wire:click="runScheduler" class="bg-gray-500 hover:bg-gray-600">
-                                                Ejecutar ahora
-                                            </x-forms.button>
-                                        </div>
-                                    </div>
-
-                                    <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">Salida:</div>
-                                    <pre class="w-full whitespace-pre-wrap break-words bg-white dark:bg-coolgray-900 text-gray-900 dark:text-gray-100 border border-coolgray-300 dark:border-coolgray-600 px-4 py-3 rounded text-sm font-mono min-h-32">{{ $schedulerOutput }}</pre>
-
-                                    <div class="mt-6 flex items-center justify-between mb-3">
-                                        <h3 class="font-semibold dark:text-white">Tareas programadas</h3>
-                                        <x-forms.button
-                                            wire:click="loadScheduleList"
-                                            wire:loading.attr="disabled"
-                                            wire:target="loadScheduleList"
-                                            class="bg-gray-500 hover:bg-gray-600">
-                                            Recargar
-                                        </x-forms.button>
-                                    </div>
-
-                                    @if ($isLoadingScheduleList)
-                                        <div class="p-4 text-sm text-gray-600 dark:text-gray-300">
-                                            Cargando schedule list...
-                                        </div>
-                                    @elseif (empty($scheduledTasks))
-                                        <div class="p-4 text-sm text-gray-600 dark:text-gray-300">
-                                            No hay tareas programadas detectadas.
-                                        </div>
-                                    @else
-                                        <div class="overflow-x-auto">
-                                            <table class="w-full text-sm">
-                                                <thead>
-                                                <tr class="text-left text-xs text-gray-500 dark:text-gray-400">
-                                                    <th class="px-2 py-2">Command</th>
-                                                    <th class="px-2 py-2">Intervalo</th>
-                                                    <th class="px-2 py-2">Próxima</th>
-                                                    <th class="px-2 py-2">Última</th>
-                                                    <th class="px-2 py-2">Acción</th>
-                                                </tr>
-                                                </thead>
-                                                <tbody>
-                                                @foreach ($scheduledTasks as $taskIndex => $task)
-                                                    <tr class="border-t border-coolgray-200 dark:border-coolgray-700">
-                                                        <td class="px-2 py-2">
-                                                            <span class="font-mono">{{ $task['command'] }}</span>
-                                                        </td>
-                                                        <td class="px-2 py-2">
-                                                            <span class="font-mono">{{ $task['expression'] }}</span>
-                                                        </td>
-                                                        <td class="px-2 py-2">
-                                                            {{ $task['next_due'] }}
-                                                        </td>
-                                                        <td class="px-2 py-2">
-                                                            {{ $task['last_run'] }}
-                                                        </td>
-                                                        <td class="px-2 py-2">
-                                                            <x-forms.button
-                                                                wire:click="executeTaskNow({{ $taskIndex }})"
-                                                                wire:loading.attr="disabled"
-                                                                wire:target="executeTaskNow"
-                                                                class="bg-coollabs">
-                                                                Ejecutar ahora
-                                                            </x-forms.button>
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    @endif
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead>
+                                        <tr class="text-left text-xs text-gray-500 dark:text-gray-400">
+                                            <th class="px-2 py-2">Command</th>
+                                            <th class="px-2 py-2">Intervalo</th>
+                                            <th class="px-2 py-2">Próxima</th>
+                                            <th class="px-2 py-2">Última</th>
+                                            <th class="px-2 py-2">Acción</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        @foreach ($scheduledTasks as $taskIndex => $task)
+                                            <tr class="border-t border-coolgray-200 dark:border-coolgray-700">
+                                                <td class="px-2 py-2">
+                                                    <span class="font-mono">{{ $task['command'] }}</span>
+                                                </td>
+                                                <td class="px-2 py-2">
+                                                    <span class="font-mono">{{ $task['expression'] }}</span>
+                                                </td>
+                                                <td class="px-2 py-2">
+                                                    {{ $task['next_due'] }}
+                                                </td>
+                                                <td class="px-2 py-2">
+                                                    {{ $task['last_run'] }}
+                                                </td>
+                                                <td class="px-2 py-2">
+                                                    <x-forms.button
+                                                        wire:click="executeTaskNow({{ $taskIndex }})"
+                                                        wire:loading.attr="disabled"
+                                                        wire:target="executeTaskNow"
+                                                        class="bg-coollabs">
+                                                        Ejecutar ahora
+                                                    </x-forms.button>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                        </tbody>
+                                    </table>
                                 </div>
                             @endif
-                        @endif
+
+                            <div class="mt-6">
+                                <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">Salida:</div>
+                                <pre class="w-full whitespace-pre-wrap break-words bg-white dark:bg-coolgray-900 text-gray-900 dark:text-gray-100 border border-coolgray-300 dark:border-coolgray-600 px-4 py-3 rounded text-sm font-mono min-h-32">{{ $schedulerOutput }}</pre>
+                            </div>
+                        </div>
                     </div>
                 @endif
             </div>
