@@ -1,0 +1,61 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Production-ready fullstack but simple mail server (smtp, imap, antispam, antivirus, ssl).
+# tags: email, mailserver, smtp, imap, postfix, dovecot, docker-mailserver
+# logo: svgs/email-server.svg
+# port: 25
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    container_name: mailserver
+    # To build from source, uncomment the following lines and comment out the image above
+    # build:
+    #   context: https://github.com/docker-mailserver/docker-mailserver.git
+    #   dockerfile: Dockerfile
+    domainname: ${SERVICE_FQDN_MAILSERVER}
+    hostname: ${SERVICE_FQDN_MAILSERVER}
+    env_file:
+      - ./.docker/mailserver.env
+    # More information about the mail server settings can be found in the documentation.
+    # https://docker-mailserver.github.io/docker-mailserver/latest/config/environment/
+    environment:
+      - ENABLE_SPAMASSASSIN=1
+      - ENABLE_CLAMAV=1
+      - ENABLE_FAIL2BAN=1
+      - ENABLE_POSTGREY=0
+      - ONE_DIR=1
+      - DMS_DEBUG=0
+      - SSL_TYPE=${SSL_TYPE:-self-signed}
+      - SSL_DOMAIN=${SERVICE_FQDN_MAILSERVER}
+      - POSTMASTER_ADDRESS=postmaster@${SERVICE_FQDN_MAILSERVER}
+      - REPORT_RECIPIENT=${REPORT_RECIPIENT:-false}
+      - REPORT_SENDER=${REPORT_SENDER:-postmaster@${SERVICE_FQDN_MAILSERVER}}
+      - REPORT_INTERVAL=${REPORT_INTERVAL:-daily}
+    ports:
+      - "25:25"    # SMTP - mostly processing incoming mails
+      - "465:465"  # SMTPS - alternative port for smtp-over-ssl (legacy / thunderbird)
+      - "587:587"  # submission - commonly used port for smtp authentication
+      - "143:143"  # IMAP - standard protocol for accessing email
+      - "993:993"  # IMAPS - IMAP over SSL/TLS
+    volumes:
+      - maildata:/var/mail
+      - mailstate:/var/mail-state
+      - maillogs:/var/log/mail
+      - ./config/:/tmp/docker-mailserver/
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "25"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    restart: always
+
+volumes:
+  maildata:
+    driver: local
+  mailstate:
+    driver: local
+  maillogs:
+    driver: local
