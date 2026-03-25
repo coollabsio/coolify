@@ -4,7 +4,6 @@ namespace App\Livewire\Project\Resource;
 
 use App\Models\Environment;
 use App\Models\Project;
-use App\Models\Service;
 use Illuminate\Support\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -165,83 +164,5 @@ class Index extends Component
     public function render()
     {
         return view('livewire.project.resource.index');
-    }
-
-    public function regenerateEnvironmentResources(): mixed
-    {
-        try {
-            if (! auth()->user()?->can('createAnyResource')) {
-                $this->dispatch('error', 'You do not have permission to regenerate resources.');
-
-                return null;
-            }
-
-            $environment = Environment::query()
-                ->where('id', $this->environment->id)
-                ->where('project_id', $this->project->id)
-                ->firstOrFail();
-
-            $result = $this->regenerateEnvironmentServices($environment);
-
-            if ($result['services'] === 0) {
-                $this->dispatch('error', 'No services found in this environment to regenerate.');
-
-                return null;
-            }
-
-            if ($result['failed'] > 0) {
-                $this->dispatch(
-                    'error',
-                    "Resources regenerated partially. Parsed {$result['parsed']} service(s), {$result['failed']} failed."
-                );
-            } else {
-                $this->dispatch(
-                    'success',
-                    "Resources regenerated successfully. Parsed {$result['parsed']} service(s)."
-                );
-            }
-
-            return redirectRoute($this, 'project.resource.index', [
-                'project_uuid' => $this->project->uuid,
-                'environment_uuid' => $this->environment->uuid,
-            ]);
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    /**
-     * @return array{services:int,restored:int,parsed:int,failed:int}
-     */
-    private function regenerateEnvironmentServices(Environment $environment): array
-    {
-        $services = Service::withTrashed()
-            ->where('environment_id', $environment->id)
-            ->get();
-
-        $restored = 0;
-        $parsed = 0;
-        $failed = 0;
-
-        foreach ($services as $service) {
-            try {
-                if ($service->trashed()) {
-                    $service->restore();
-                    $restored++;
-                }
-
-                $service->parse();
-                $parsed++;
-            } catch (\Throwable) {
-                $failed++;
-            }
-        }
-
-        return [
-            'services' => $services->count(),
-            'restored' => $restored,
-            'parsed' => $parsed,
-            'failed' => $failed,
-        ];
     }
 }
