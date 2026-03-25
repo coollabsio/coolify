@@ -217,7 +217,7 @@ services:
       - DB_CONNECTION=mysql
       - DB_HOST=mariadb
       - DB_PORT=3306
-      - DB_DATABASE=${SERVICE_DATABASE_LARAVEL:-laravel}
+      - DB_DATABASE=${SERVICE_DATABASE_LARAVEL}
       - DB_USERNAME=${SERVICE_USER_LARAVEL:-laravel}
       - DB_PASSWORD=${SERVICE_PASSWORD_LARAVEL:-password}
       - QUEUE_CONNECTION=database
@@ -339,7 +339,7 @@ services:
       - mariadb-data:/var/lib/mysql
     environment:
       - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
-      - MYSQL_DATABASE=${SERVICE_DATABASE_LARAVEL:-laravel}
+      - MYSQL_DATABASE=${SERVICE_DATABASE_LARAVEL}
       - MYSQL_USER=${SERVICE_USER_LARAVEL:-laravel}
       - MYSQL_PASSWORD=${SERVICE_PASSWORD_LARAVEL:-password}
     healthcheck:

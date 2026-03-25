@@ -1334,7 +1334,9 @@ class Service extends BaseModel
                             'Database Name' => [
                                 'key' => data_get($mariadb_db_name, 'key'),
                                 'value' => data_get($mariadb_db_name, 'value'),
-                                'rules' => 'required',
+                                // Force users to enter a literal DB name (not an unresolved ${SERVICE_*} placeholder)
+                                'rules' => 'required|not_regex:/^\s*\$\{?SERVICE_/i',
+                                'customHelper' => 'Introduce un nombre',
                             ],
                         ]);
                     }
