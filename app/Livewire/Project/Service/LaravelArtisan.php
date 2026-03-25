@@ -120,7 +120,7 @@ class LaravelArtisan extends Component
             }
         }
 
-        $this->filteredArtisanCommands = array_values($result);
+        $this->filteredArtisanCommands = array_values(array_slice($result, 0, 10));
     }
 
     public function mount(): void
@@ -294,7 +294,8 @@ class LaravelArtisan extends Component
         ));
 
         // Order: exact prefix matches first, then "contains" matches.
-        $this->filteredArtisanCommands = array_merge($startsWith, $containsElsewhere);
+        $merged = array_merge($startsWith, $containsElsewhere);
+        $this->filteredArtisanCommands = array_values(array_slice($merged, 0, 10));
     }
 
     /**

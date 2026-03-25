@@ -32,28 +32,28 @@
                         <div class="relative w-full max-w-none">
                             <label class="block text-sm font-medium dark:text-white mb-2">Comando:</label>
 
-                            <div class="flex gap-2 items-start w-full max-w-none">
+                            <div class="flex items-start w-full max-w-none gap-0">
                                 <div class="relative flex-1 min-w-0">
                                     <input
                                         type="text"
                                         wire:model.live="selectedCommand"
                                         wire:focus="showPopularCommands"
-                                        class="input w-full min-w-[28rem] lg:min-w-[44rem]"
+                                        class="input w-full min-w-0"
                                         placeholder="Ej: migrate --force"
                                     />
 
                                     @if (! $isLoadingCommands && ! empty($filteredArtisanCommands))
-                                        <div class="absolute z-20 left-0 right-0 mt-1 bg-white dark:bg-coolgray-800 border border-coolgray-300 dark:border-coolgray-600 rounded shadow-lg max-h-64 overflow-auto">
+                                        <div class="absolute z-20 left-0 right-0 mt-1 bg-white dark:bg-coolgray-800 border border-coolgray-300 dark:border-coolgray-600 rounded shadow-lg max-h-[420px] overflow-hidden text-gray-900 dark:text-gray-100">
                                             @foreach ($filteredArtisanCommands as $cmd)
                                                 <button
                                                     type="button"
-                                                    class="w-full px-3 py-2 hover:bg-neutral-100 dark:hover:bg-coolgray-700 flex items-center gap-2 text-left text-gray-900 dark:text-gray-100"
+                                                    class="w-full px-3 py-2 hover:bg-neutral-100 dark:hover:bg-coolgray-700 flex items-center gap-2 text-left text-gray-900 dark:text-gray-100 hover:text-gray-900 dark:hover:text-gray-100"
                                                     wire:click="selectCommand(@js($cmd['name']))"
                                                 >
-                                                    <span class="font-mono text-sm whitespace-nowrap text-gray-900 dark:text-gray-100">{{ $cmd['name'] }}</span>
+                                                    <span class="font-mono text-sm whitespace-nowrap text-black dark:text-gray-100">{{ $cmd['name'] }}</span>
                                                     @if (! empty($cmd['description']))
                                                         <span
-                                                            class="text-xs text-gray-700 dark:text-gray-300 truncate max-w-96"
+                                                            class="text-xs text-gray-900 dark:text-gray-300 truncate max-w-96"
                                                             title="{{ $cmd['description'] }}"
                                                         >
                                                             - {{ $cmd['description'] }}
