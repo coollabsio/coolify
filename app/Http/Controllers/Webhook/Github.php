@@ -205,7 +205,7 @@ class Github extends Controller
                             $result = queue_application_deployment(
                                 application: $application,
                                 deployment_uuid: $deployment_uuid,
-                                commit: $tag_name ?? 'HEAD',
+                                commit: $tag_name ? "refs/tags/{$tag_name}" : 'HEAD',
                                 force_rebuild: false,
                                 is_webhook: true,
                             );
