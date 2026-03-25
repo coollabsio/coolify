@@ -139,20 +139,25 @@ class Configuration extends Component
 
     public function hasLaravel(): bool
     {
-        foreach ($this->applications as $application) {
-            $image = strtolower($application->image ?? '');
-            if (str_contains($image, 'laravel') || str_contains($image, 'php')) {
-                return true;
-            }
-            $envVars = $application->environment_variables()->get();
-            foreach ($envVars as $envVar) {
-                $key = strtoupper($envVar->key ?? '');
-                if (str_contains($key, 'LARAVEL') || str_contains($key, 'APP_KEY') || str_contains($key, 'APP_ENV')) {
-                    return true;
-                }
-            }
+        // We only want to show Laravel-specific menus when the service stack
+        // is actually our Laravel GitHub template (the one that defines these keys).
+        if (! $this->service) {
+            return false;
         }
 
-        return false;
+        $composeRaw = (string) data_get($this->service, 'docker_compose_raw', '');
+        if (str_contains($composeRaw, 'SERVICE_GITHUB_REPO_URL') || str_contains($composeRaw, 'SERVICE_PHP_VERSION')) {
+            return true;
+        }
+
+        // Fallback: check service-level environment variables already stored in DB.
+        $keys = ['SERVICE_GITHUB_REPO_URL', 'SERVICE_PHP_VERSION'];
+        try {
+            return (bool) $this->service->environment_variables()
+                ->whereIn('key', $keys)
+                ->exists();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 }

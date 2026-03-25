@@ -36,6 +36,7 @@
         <div class="w-full max-w-xs">
             <x-forms.select canGate="update" :canResource="$service" id="fields.SERVICE_PHP_VERSION.value"
                 label="PHP Version" wire:change="savePhpVersion" helper="Runtime version for Laravel container.">
+                <option value="7.4">7.4</option>
                 <option value="8.1">8.1</option>
                 <option value="8.2">8.2</option>
                 <option value="8.3">8.3</option>

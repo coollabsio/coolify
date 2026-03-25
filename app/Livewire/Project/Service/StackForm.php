@@ -119,6 +119,10 @@ class StackForm extends Component
             return $group;
         });
 
+        if (! $this->isLaravelGitHubStack()) {
+            return;
+        }
+
         // Ensure GitHub repository URL is always available as a configurable field
         // for Laravel GitHub-based templates.
         if (! $this->fields->has('SERVICE_GITHUB_REPO_URL')) {
@@ -149,11 +153,18 @@ class StackForm extends Component
                 'name' => 'PHP Version',
                 'value' => data_get($phpVersion, 'value', '8.3'),
                 'isPassword' => false,
-                'rules' => 'required|in:8.1,8.2,8.3,8.4',
+                'rules' => 'required|in:7.4,8.1,8.2,8.3,8.4',
                 'customHelper' => 'PHP runtime version used by the Laravel container.',
             ]);
             $this->validationAttributes['fields.SERVICE_PHP_VERSION.value'] = 'PHP Version';
         }
+    }
+
+    public function isLaravelGitHubStack(): bool
+    {
+        $raw = (string) ($this->dockerComposeRaw ?? $this->service->docker_compose_raw ?? '');
+
+        return str_contains($raw, 'SERVICE_GITHUB_REPO_URL') || str_contains($raw, 'SERVICE_PHP_VERSION');
     }
 
     public function saveCompose($raw)

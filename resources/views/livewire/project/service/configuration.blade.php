@@ -23,6 +23,10 @@
             @if ($this->hasLaravel())
                 <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
                     href="{{ route('project.service.laravel-manager', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Laravel Manager</span></a>
+                <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
+                    href="{{ route('project.service.laravel-artisan', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Artisan Commands</span></a>
+                <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
+                    href="{{ route('project.service.laravel-cron', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Laravel Cron</span></a>
             @endif
             <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
                 href="{{ route('project.service.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Webhooks</span></a>
