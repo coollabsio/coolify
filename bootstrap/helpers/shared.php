@@ -943,6 +943,24 @@ function parseEnvVariable(Str|string $value)
 function generateEnvValue(string $command, Service|Application|null $service = null)
 {
     switch ($command) {
+        case 'DATABASE':
+            $base = 'app';
+            if ($service instanceof Service || $service instanceof Application) {
+                $name = (string) data_get($service, 'name', '');
+                if ($name !== '') {
+                    $base = (string) str($name)->lower()->slug('_')->replace('-', '_')->limit(24, '')->trim('_');
+                }
+            }
+            $suffix = Str::lower(Str::random(8));
+            $generatedValue = (string) str("{$base}_{$suffix}")
+                ->replaceMatches('/[^a-z0-9_]/', '_')
+                ->replaceMatches('/_{2,}/', '_')
+                ->trim('_')
+                ->limit(63, '');
+            if ($generatedValue === '' || ! ctype_alpha($generatedValue[0])) {
+                $generatedValue = (string) str("db_{$generatedValue}")->limit(63, '')->trim('_');
+            }
+            break;
         case 'PASSWORD':
             $generatedValue = Str::password(symbols: false);
             break;

@@ -289,6 +289,11 @@ services:
               access_log /dev/stdout;
               error_log /dev/stderr;
 
+              # Resolve upstreams via Docker embedded DNS to avoid startup crashes
+              # when the `laravel` container is not yet resolvable.
+              resolver 127.0.0.11 ipv6=off valid=10s;
+              set $php_upstream "laravel:9000";
+
               location = / {
                 if (!-f $document_root/index.php) {
                   return 503 "Deployment from GitHub is in progress... wait 1 min and refresh!";
@@ -301,7 +306,7 @@ services:
               }
 
               location ~ \.php$ {
-                  fastcgi_pass laravel:9000;
+                  fastcgi_pass $php_upstream;
                   fastcgi_index index.php;
                   fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
                   include fastcgi_params;
