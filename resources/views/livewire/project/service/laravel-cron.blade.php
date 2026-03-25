@@ -29,25 +29,6 @@
                     </div>
                 @else
                     <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6">
-                        <div class="mb-6">
-                            <label class="block text-sm font-medium dark:text-white mb-2">Seleccionar Contenedor:</label>
-                            <select
-                                wire:model.live="selectedContainerForCron"
-                                wire:change="loadCronData"
-                                class="input w-full"
-                            >
-                                <option value="">-- Selecciona un contenedor --</option>
-                                @foreach ($laravelContainers as $container)
-                                    <option value="{{ $container['id'] }}" @if (!str($container['status'])->contains('running')) disabled @endif>
-                                        {{ $container['name'] }}
-                                        @if (!str($container['status'])->contains('running'))
-                                            (No está en ejecución)
-                                        @endif
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
                         @if ($selectedContainerForCron)
                             @if ($isLoadingCron)
                                 <div class="flex items-center justify-center p-8">

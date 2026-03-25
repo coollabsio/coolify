@@ -68,20 +68,40 @@ class LaravelArtisan extends Component
 
     public function isLaravelContainer($application): bool
     {
+        // Primary heuristic (cheap): image/env suggests Laravel.
         $image = strtolower($application->image ?? '');
-        if (str_contains($image, 'laravel') || str_contains($image, 'php')) {
-            return true;
-        }
+        $looksLikeLaravel = str_contains($image, 'laravel') || str_contains($image, 'php');
 
         $envVars = $application->environment_variables()->get();
         foreach ($envVars as $envVar) {
             $key = strtoupper($envVar->key ?? '');
             if (str_contains($key, 'LARAVEL') || str_contains($key, 'APP_KEY') || str_contains($key, 'APP_ENV')) {
-                return true;
+                $looksLikeLaravel = true;
+                break;
             }
         }
 
-        return false;
+        if (! $looksLikeLaravel) {
+            return false;
+        }
+
+        // Strong check: artisan must exist in the container.
+        if (! str($application->status)->contains('running')) {
+            return false;
+        }
+
+        $server = $application->service->server;
+        $containerName = $application->name.'-'.$this->service->uuid;
+        $escapedContainer = escapeshellarg($containerName);
+
+        $command = "docker exec {$escapedContainer} sh -c 'test -f /var/www/html/artisan && echo found || echo notfound'";
+        if ($server->isNonRoot()) {
+            $command = "sudo {$command}";
+        }
+
+        $output = trim(instant_remote_process([$command], $server, false) ?? '');
+
+        return $output === 'found';
     }
 
     private function getSelectedContainerContext(): ?array
@@ -142,7 +162,6 @@ class LaravelArtisan extends Component
             if ($this->artisanCommands !== []) {
                 $this->selectedCommand = $this->artisanCommands[0]['name'];
                 $this->selectedCommandDescription = $this->artisanCommands[0]['description'];
-                $this->loadHelp();
             }
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Error loading artisan commands: '.$e->getMessage());
@@ -238,9 +257,9 @@ class LaravelArtisan extends Component
     public function selectCommand(string $command): void
     {
         $this->selectedCommand = $command;
-        $selected = collect($this->artisanCommands)->firstWhere('name', $command);
+        $name = trim((string) ($command ? preg_split('/\s+/', $command)[0] : ''));
+        $selected = collect($this->artisanCommands)->firstWhere('name', $name);
         $this->selectedCommandDescription = (string) (data_get($selected, 'description', ''));
-        $this->loadHelp();
     }
 
     public function updatedSelectedCommand(?string $value): void
@@ -251,9 +270,10 @@ class LaravelArtisan extends Component
             return;
         }
 
-        $selected = collect($this->artisanCommands)->firstWhere('name', $value);
+        $name = trim((string) (preg_split('/\s+/', $value)[0] ?? ''));
+        $selected = collect($this->artisanCommands)->firstWhere('name', $name);
         $this->selectedCommandDescription = (string) (data_get($selected, 'description', ''));
-        $this->loadHelp();
+        $this->selectedCommandHelp = '';
     }
 
     public function run(): void

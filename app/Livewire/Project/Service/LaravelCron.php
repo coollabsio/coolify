@@ -40,6 +40,16 @@ class LaravelCron extends Component
         $this->authorize('view', $this->service);
         $this->applications = $this->service->applications->sort();
         $this->detectLaravelContainers();
+
+        // Cron UI should focus only on Laravel containers (no phpMyAdmin).
+        // Default to the first running Laravel container if available.
+        if ($this->selectedContainerForCron === null && ! empty($this->laravelContainers)) {
+            $this->selectedContainerForCron = (int) ($this->laravelContainers[0]['id'] ?? null);
+        }
+
+        if ($this->selectedContainerForCron) {
+            $this->loadCronData();
+        }
     }
 
     public function detectLaravelContainers(): void
@@ -64,20 +74,40 @@ class LaravelCron extends Component
 
     public function isLaravelContainer($application): bool
     {
+        // Primary heuristic (cheap): image/env suggests Laravel.
         $image = strtolower($application->image ?? '');
-        if (str_contains($image, 'laravel') || str_contains($image, 'php')) {
-            return true;
-        }
+        $looksLikeLaravel = str_contains($image, 'laravel') || str_contains($image, 'php');
 
         $envVars = $application->environment_variables()->get();
         foreach ($envVars as $envVar) {
             $key = strtoupper($envVar->key ?? '');
             if (str_contains($key, 'LARAVEL') || str_contains($key, 'APP_KEY') || str_contains($key, 'APP_ENV')) {
-                return true;
+                $looksLikeLaravel = true;
+                break;
             }
         }
 
-        return false;
+        if (! $looksLikeLaravel) {
+            return false;
+        }
+
+        // Strong check: artisan must exist in the container.
+        if (! str($application->status)->contains('running')) {
+            return false;
+        }
+
+        $server = $application->service->server;
+        $containerName = $application->name.'-'.$this->service->uuid;
+        $escapedContainer = escapeshellarg($containerName);
+
+        $command = "docker exec {$escapedContainer} sh -c 'test -f /var/www/html/artisan && echo found || echo notfound'";
+        if ($server->isNonRoot()) {
+            $command = "sudo {$command}";
+        }
+
+        $output = trim(instant_remote_process([$command], $server, false) ?? '');
+
+        return $output === 'found';
     }
 
     private function getSelectedContainerApplicationContext(): ?array
@@ -191,13 +221,24 @@ class LaravelCron extends Component
 
             // Prefer json if supported; fallback to plain table.
             $jsonCommand = "docker exec {$escapedContainer} php /var/www/html/artisan schedule:list --format=json";
+            $rawJson = '';
             if ($server->isNonRoot()) {
                 $jsonCommand = "sudo {$jsonCommand}";
             }
-
             $rawJson = (string) (instant_remote_process([$jsonCommand], $server, false) ?? '');
             $rawJson = trim($rawJson);
             $parsed = $this->parseScheduleListOutput($rawJson);
+
+            if ($parsed === []) {
+                // Some Laravel versions use --json instead.
+                $jsonCommand = "docker exec {$escapedContainer} php /var/www/html/artisan schedule:list --json";
+                if ($server->isNonRoot()) {
+                    $jsonCommand = "sudo {$jsonCommand}";
+                }
+                $rawJson = (string) (instant_remote_process([$jsonCommand], $server, false) ?? '');
+                $rawJson = trim($rawJson);
+                $parsed = $this->parseScheduleListOutput($rawJson);
+            }
 
             if ($parsed !== []) {
                 $this->scheduledTasks = $parsed;
