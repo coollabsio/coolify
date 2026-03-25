@@ -33,6 +33,7 @@
                             <label class="block text-sm font-medium dark:text-white mb-2">Seleccionar Contenedor:</label>
                             <select
                                 wire:model.live="selectedContainer"
+                                wire:change="loadArtisanCommands"
                                 class="input w-full"
                             >
                                 <option value="">-- Selecciona un contenedor --</option>
@@ -47,24 +48,68 @@
                             </select>
                         </div>
 
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium dark:text-white mb-2">Comando:</label>
-                            <x-forms.input
-                                id="command"
-                                label=""
-                                placeholder="Ej: migrate --force"
-                            />
-                            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                Se ejecuta como: <span class="font-mono">php /var/www/html/artisan &lt;tu comando&gt;</span>
-                            </div>
-                        </div>
+                        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                            <div class="p-4 border border-coolgray-300 dark:border-coolgray-600 rounded bg-white dark:bg-coolgray-800">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h3 class="font-semibold dark:text-white">Comandos</h3>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ count($artisanCommands) }} encontrados
+                                    </div>
+                                </div>
 
-                        <div class="flex gap-2">
-                            <x-forms.button wire:click="run" wire:loading.attr="disabled" wire:target="run" class="bg-coollabs">
-                                Ejecutar
-                            </x-forms.button>
-                            <div wire:loading wire:target="run" class="text-sm text-gray-600 dark:text-gray-400 self-center">
-                                Ejecutando...
+                                @if ($isLoadingCommands)
+                                    <div class="p-4 text-sm text-gray-600 dark:text-gray-300">Cargando comandos...</div>
+                                @elseif (empty($artisanCommands))
+                                    <div class="p-4 text-sm text-gray-600 dark:text-gray-300">No se encontraron comandos.</div>
+                                @else
+                                    <select
+                                        wire:model.live="selectedCommand"
+                                        class="input w-full"
+                                    >
+                                        @foreach ($artisanCommands as $cmd)
+                                            <option value="{{ $cmd['name'] }}">
+                                                {{ $cmd['name'] }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                @endif
+
+                                @if (!empty($selectedCommand))
+                                    <div class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                                        Se ejecuta como:
+                                        <span class="font-mono">{{ 'php /var/www/html/artisan '.$selectedCommand }}</span>
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div class="p-4 border border-coolgray-300 dark:border-coolgray-600 rounded bg-white dark:bg-coolgray-800">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h3 class="font-semibold dark:text-white">Guía</h3>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ $selectedCommand ? $selectedCommand : '—' }}
+                                    </div>
+                                </div>
+
+                                @if ($selectedCommandDescription)
+                                    <div class="mb-4 text-sm text-gray-700 dark:text-gray-200">
+                                        <span class="font-medium">Descripción:</span> {{ $selectedCommandDescription }}
+                                    </div>
+                                @endif
+
+                                @if ($isLoadingHelp)
+                                    <div class="p-4 text-sm text-gray-600 dark:text-gray-300">Cargando ayuda...</div>
+                                @else
+                                    <pre class="w-full whitespace-pre-wrap break-words bg-white dark:bg-coolgray-900 text-gray-900 dark:text-gray-100 border border-coolgray-300 dark:border-coolgray-600 px-4 py-3 rounded text-sm font-mono min-h-32">{{ $selectedCommandHelp }}</pre>
+                                @endif
+
+                                <div class="flex gap-2 mt-4">
+                                    <x-forms.button wire:click="run" wire:loading.attr="disabled" wire:target="run" class="bg-coollabs">
+                                        Ejecutar
+                                    </x-forms.button>
+                                    <div wire:loading wire:target="run" class="text-sm text-gray-600 dark:text-gray-400 self-center">
+                                        Ejecutando...
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

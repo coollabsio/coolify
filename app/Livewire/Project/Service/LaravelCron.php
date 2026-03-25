@@ -28,6 +28,11 @@ class LaravelCron extends Component
 
     public string $schedulerOutput = '';
 
+    public bool $isLoadingScheduleList = false;
+
+    /** @var array<int, array{command: string, expression: string, next_due: string, last_run: string, description: string}> */
+    public array $scheduledTasks = [];
+
     public function mount(): void
     {
         $this->parameters = get_route_parameters();
@@ -73,6 +78,39 @@ class LaravelCron extends Component
         }
 
         return false;
+    }
+
+    private function getSelectedContainerApplicationContext(): ?array
+    {
+        if (! $this->selectedContainerForCron) {
+            return null;
+        }
+
+        $container = collect($this->laravelContainers)->firstWhere('id', $this->selectedContainerForCron);
+        if (! $container) {
+            return null;
+        }
+
+        $application = $container['application'] ?? $this->applications->find($container['id']);
+        if (! $application || ! str($application->status)->contains('running')) {
+            return null;
+        }
+
+        $server = $application->service->server;
+        $escapedContainer = escapeshellarg($container['container_name']);
+
+        return [
+            'container' => $container,
+            'application' => $application,
+            'server' => $server,
+            'escapedContainer' => $escapedContainer,
+        ];
+    }
+
+    public function loadCronData(): void
+    {
+        $this->checkSchedulerStatus();
+        $this->loadScheduleList();
     }
 
     public function checkSchedulerStatus(): void
@@ -128,6 +166,224 @@ class LaravelCron extends Component
             $this->dispatch('error', 'Error checking scheduler status: '.$e->getMessage());
         } finally {
             $this->isLoadingCron = false;
+        }
+    }
+
+    public function loadScheduleList(): void
+    {
+        if (! $this->selectedContainerForCron) {
+            return;
+        }
+
+        $this->isLoadingScheduleList = true;
+        $this->scheduledTasks = [];
+
+        try {
+            $context = $this->getSelectedContainerApplicationContext();
+            if (! $context) {
+                $this->dispatch('error', 'Container not found or not running.');
+
+                return;
+            }
+
+            $server = $context['server'];
+            $escapedContainer = $context['escapedContainer'];
+
+            // Prefer json if supported; fallback to plain table.
+            $jsonCommand = "docker exec {$escapedContainer} php /var/www/html/artisan schedule:list --format=json";
+            if ($server->isNonRoot()) {
+                $jsonCommand = "sudo {$jsonCommand}";
+            }
+
+            $rawJson = (string) (instant_remote_process([$jsonCommand], $server, false) ?? '');
+            $rawJson = trim($rawJson);
+            $parsed = $this->parseScheduleListOutput($rawJson);
+
+            if ($parsed !== []) {
+                $this->scheduledTasks = $parsed;
+
+                return;
+            }
+
+            $plainCommand = "docker exec {$escapedContainer} php /var/www/html/artisan schedule:list";
+            if ($server->isNonRoot()) {
+                $plainCommand = "sudo {$plainCommand}";
+            }
+
+            $rawPlain = (string) (instant_remote_process([$plainCommand], $server, false) ?? '');
+            $rawPlain = trim($rawPlain);
+
+            $this->scheduledTasks = $this->parseScheduleListOutput($rawPlain);
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Error loading schedule list: '.$e->getMessage());
+        } finally {
+            $this->isLoadingScheduleList = false;
+        }
+    }
+
+    /**
+     * @return array<int, array{command: string, expression: string, next_due: string, last_run: string, description: string}>
+     */
+    private function parseScheduleListOutput(string $raw): array
+    {
+        if ($raw === '') {
+            return [];
+        }
+
+        // If json is available, prefer it. Laravel supports `--format=json` in some versions.
+        $decoded = null;
+        if (str_starts_with($raw, '{') || str_starts_with($raw, '[')) {
+            $decoded = json_decode($raw, true);
+        }
+
+        if (is_array($decoded)) {
+            $list = $decoded['tasks'] ?? $decoded['data'] ?? $decoded;
+            if (is_array($list)) {
+                $result = [];
+                foreach ($list as $item) {
+                    if (! is_array($item)) {
+                        continue;
+                    }
+                    $result[] = [
+                        'command' => (string) ($item['command'] ?? ''),
+                        'expression' => (string) ($item['expression'] ?? ''),
+                        'next_due' => (string) ($item['next_due'] ?? $item['nextDue'] ?? ''),
+                        'last_run' => (string) ($item['last_run'] ?? $item['lastRun'] ?? ''),
+                        'description' => (string) ($item['description'] ?? ''),
+                    ];
+                }
+
+                return $result;
+            }
+        }
+
+        // Plain output fallback: Symfony table usually contains `|` separators.
+        $lines = preg_split('/\r?\n/', $raw);
+        $header = null;
+        $headerIndex = [];
+        $rows = [];
+        $columnCount = null;
+
+        foreach ($lines as $line) {
+            if (strpos($line, '|') === false) {
+                continue;
+            }
+
+            $trim = trim($line);
+            if ($trim === '' || preg_match('/^\+[-+]+\+$/', $trim) === 1) {
+                continue;
+            }
+
+            // Tokenize `| col | col |`
+            $parts = array_map('trim', explode('|', trim($trim, "| ")));
+            $parts = array_values(array_filter($parts, fn ($p) => $p !== ''));
+
+            if ($columnCount === null) {
+                $columnCount = count($parts);
+            }
+
+            if ($header === null) {
+                $candidate = strtolower(implode(' ', $parts));
+                if (str_contains($candidate, 'command') && str_contains($candidate, 'expression')) {
+                    $header = $parts;
+                    foreach ($header as $i => $name) {
+                        $headerIndex[strtolower($name)] = $i;
+                    }
+                    continue;
+                }
+            } else {
+                if ($columnCount !== count($parts)) {
+                    continue;
+                }
+
+                if (count($parts) < 2) {
+                    continue;
+                }
+
+                $rows[] = $parts;
+            }
+        }
+
+        if ($header === null || $rows === []) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($rows as $cols) {
+            $command = '';
+            foreach (['command', 'action'] as $name) {
+                if (array_key_exists(strtolower($name), $headerIndex)) {
+                    $command = (string) ($cols[$headerIndex[strtolower($name)]] ?? '');
+                }
+            }
+
+            $expression = (string) ($cols[$headerIndex['expression'] ?? -1] ?? '');
+            $nextDue = (string) ($cols[$headerIndex['next due'] ?? $headerIndex['next_due'] ?? -1] ?? '');
+            $lastRun = (string) ($cols[$headerIndex['last run'] ?? $headerIndex['last_run'] ?? -1] ?? '');
+            $description = (string) ($cols[$headerIndex['description'] ?? $headerIndex['desc'] ?? -1] ?? '');
+
+            if ($command !== '') {
+                $result[] = [
+                    'command' => $command,
+                    'expression' => $expression,
+                    'next_due' => $nextDue,
+                    'last_run' => $lastRun,
+                    'description' => $description,
+                ];
+            }
+        }
+
+        return $result;
+    }
+
+    public function executeTaskNow(int $index): void
+    {
+        if (! isset($this->scheduledTasks[$index])) {
+            $this->dispatch('error', 'Task not found.');
+
+            return;
+        }
+
+        $taskCommand = (string) data_get($this->scheduledTasks[$index], 'command', '');
+        $taskCommand = trim($taskCommand);
+        if ($taskCommand === '') {
+            $this->dispatch('error', 'Task command is empty.');
+
+            return;
+        }
+
+        try {
+            $context = $this->getSelectedContainerApplicationContext();
+            if (! $context) {
+                $this->dispatch('error', 'Container not found or not running.');
+
+                return;
+            }
+
+            $server = $context['server'];
+            $escapedContainer = $context['escapedContainer'];
+
+            $tokens = preg_split('/\s+/', $taskCommand) ?: [];
+            $tokens = array_values(array_filter($tokens, fn ($t) => $t !== ''));
+            foreach ($tokens as $token) {
+                if (preg_match('/[;&|`$<>\\\\]/', (string) $token)) {
+                    $this->dispatch('error', 'Invalid task command.');
+
+                    return;
+                }
+            }
+
+            $artisanArgs = implode(' ', array_map('escapeshellarg', $tokens));
+            $command = "docker exec {$escapedContainer} php /var/www/html/artisan {$artisanArgs}";
+            if ($server->isNonRoot()) {
+                $command = "sudo {$command}";
+            }
+
+            $this->schedulerOutput = (string) (instant_remote_process([$command], $server, false) ?? '');
+            $this->dispatch('success', 'Task executed successfully.');
+        } catch (\Throwable $e) {
+            $this->schedulerOutput = $e->getMessage();
+            $this->dispatch('error', 'Error executing task: '.$e->getMessage());
         }
     }
 

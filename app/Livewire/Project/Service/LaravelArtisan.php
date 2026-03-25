@@ -20,7 +20,18 @@ class LaravelArtisan extends Component
 
     public ?int $selectedContainer = null;
 
-    public string $command = '';
+    public bool $isLoadingCommands = false;
+
+    /** @var array<int, array{name: string, description: string}> */
+    public array $artisanCommands = [];
+
+    public ?string $selectedCommand = null;
+
+    public string $selectedCommandDescription = '';
+
+    public bool $isLoadingHelp = false;
+
+    public string $selectedCommandHelp = '';
 
     public string $output = '';
 
@@ -73,28 +84,196 @@ class LaravelArtisan extends Component
         return false;
     }
 
-    public function run(): void
+    private function getSelectedContainerContext(): ?array
     {
-        $this->validate([
-            'selectedContainer' => 'required|integer',
-            'command' => ['required', 'string', 'max:2000'],
-        ]);
+        if (! $this->selectedContainer) {
+            return null;
+        }
 
         $container = collect($this->laravelContainers)->firstWhere('id', $this->selectedContainer);
         if (! $container) {
-            $this->dispatch('error', 'Container not found.');
-
-            return;
+            return null;
         }
 
         $application = $container['application'] ?? $this->applications->find($container['id']);
         if (! $application || ! str($application->status)->contains('running')) {
-            $this->dispatch('error', 'Container is not running.');
+            return null;
+        }
+
+        return [
+            'container' => $container,
+            'application' => $application,
+            'server' => $application->service->server,
+            'escapedContainer' => escapeshellarg($container['container_name']),
+        ];
+    }
+
+    public function loadArtisanCommands(): void
+    {
+        $this->isLoadingCommands = true;
+        $this->artisanCommands = [];
+        $this->selectedCommand = null;
+        $this->selectedCommandDescription = '';
+        $this->selectedCommandHelp = '';
+
+        try {
+            $context = $this->getSelectedContainerContext();
+            if (! $context) {
+                $this->dispatch('error', 'Container not found or not running.');
+
+                return;
+            }
+
+            $server = $context['server'];
+            $escapedContainer = $context['escapedContainer'];
+
+            // Prefer json output (easier to parse); fallback to plain output if unsupported.
+            $command = "docker exec {$escapedContainer} php /var/www/html/artisan list --format=json";
+            if ($server->isNonRoot()) {
+                $command = "sudo {$command}";
+            }
+
+            $raw = (string) (instant_remote_process([$command], $server, false) ?? '');
+            $raw = trim($raw);
+
+            $commands = $this->parseArtisanListOutput($raw);
+            $this->artisanCommands = $commands;
+
+            if ($this->artisanCommands !== []) {
+                $this->selectedCommand = $this->artisanCommands[0]['name'];
+                $this->selectedCommandDescription = $this->artisanCommands[0]['description'];
+                $this->loadHelp();
+            }
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Error loading artisan commands: '.$e->getMessage());
+        } finally {
+            $this->isLoadingCommands = false;
+        }
+    }
+
+    /**
+     * @return array<int, array{name: string, description: string}>
+     */
+    private function parseArtisanListOutput(string $raw): array
+    {
+        if ($raw === '') {
+            return [];
+        }
+
+        $decoded = null;
+        if (str_starts_with($raw, '{') || str_starts_with($raw, '[')) {
+            $decoded = json_decode($raw, true);
+        }
+
+        if (is_array($decoded)) {
+            $list = $decoded['commands'] ?? $decoded['data'] ?? $decoded;
+            if (is_array($list)) {
+                $result = [];
+                foreach ($list as $item) {
+                    if (! is_array($item)) {
+                        continue;
+                    }
+                    $name = (string) ($item['name'] ?? $item['command'] ?? '');
+                    $description = (string) ($item['description'] ?? $item['help'] ?? '');
+                    if ($name !== '') {
+                        $result[] = ['name' => $name, 'description' => $description];
+                    }
+                }
+
+                return $result;
+            }
+        }
+
+        // Plain output fallback: lines like "about  Display basic information about your application."
+        $result = [];
+        foreach (preg_split('/\r?\n/', $raw) as $line) {
+            $line = trim($line);
+            if ($line === '' || ! preg_match('/^([a-zA-Z0-9:\-]+)\s{2,}(.+)$/', $line, $m)) {
+                continue;
+            }
+
+            $result[] = [
+                'name' => (string) $m[1],
+                'description' => trim((string) $m[2]),
+            ];
+        }
+
+        return $result;
+    }
+
+    public function loadHelp(): void
+    {
+        if (! $this->selectedCommand) {
+            $this->selectedCommandHelp = '';
+            return;
+        }
+
+        $this->isLoadingHelp = true;
+        $this->selectedCommandHelp = '';
+
+        try {
+            $context = $this->getSelectedContainerContext();
+            if (! $context) {
+                $this->dispatch('error', 'Container not found or not running.');
+
+                return;
+            }
+
+            $server = $context['server'];
+            $escapedContainer = $context['escapedContainer'];
+
+            $helpCommand = "docker exec {$escapedContainer} php /var/www/html/artisan help ".escapeshellarg($this->selectedCommand);
+            if ($server->isNonRoot()) {
+                $helpCommand = "sudo {$helpCommand}";
+            }
+
+            $this->selectedCommandHelp = (string) (instant_remote_process([$helpCommand], $server, false) ?? '');
+        } catch (\Throwable $e) {
+            $this->selectedCommandHelp = 'Error loading help: '.$e->getMessage();
+        } finally {
+            $this->isLoadingHelp = false;
+        }
+    }
+
+    public function selectCommand(string $command): void
+    {
+        $this->selectedCommand = $command;
+        $selected = collect($this->artisanCommands)->firstWhere('name', $command);
+        $this->selectedCommandDescription = (string) (data_get($selected, 'description', ''));
+        $this->loadHelp();
+    }
+
+    public function updatedSelectedCommand(?string $value): void
+    {
+        if (! $value) {
+            $this->selectedCommandDescription = '';
+            $this->selectedCommandHelp = '';
+            return;
+        }
+
+        $selected = collect($this->artisanCommands)->firstWhere('name', $value);
+        $this->selectedCommandDescription = (string) (data_get($selected, 'description', ''));
+        $this->loadHelp();
+    }
+
+    public function run(): void
+    {
+        $this->validate([
+            'selectedContainer' => 'required|integer',
+            'selectedCommand' => ['required', 'string', 'max:300'],
+        ]);
+
+        $context = $this->getSelectedContainerContext();
+        if (! $context) {
+            $this->dispatch('error', 'Container not found or not running.');
 
             return;
         }
 
-        $tokens = preg_split('/\s+/', trim($this->command)) ?: [];
+        $server = $context['server'];
+        $escapedContainer = $context['escapedContainer'];
+
+        $tokens = preg_split('/\s+/', trim((string) $this->selectedCommand)) ?: [];
         $tokens = array_values(array_filter($tokens, fn ($t) => $t !== ''));
 
         if ($tokens === []) {
@@ -112,9 +291,6 @@ class LaravelArtisan extends Component
                 return;
             }
         }
-
-        $server = $application->service->server;
-        $escapedContainer = escapeshellarg($container['container_name']);
 
         $artisanArgs = implode(' ', array_map('escapeshellarg', $tokens));
         $command = "docker exec {$escapedContainer} php /var/www/html/artisan {$artisanArgs}";
