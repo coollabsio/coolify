@@ -229,6 +229,9 @@ class SshMultiplexingHelper
 
         if ($needsRewrite) {
             $privateKey->storeInFileSystem();
+            // Close existing mux connections using the old key to prevent permission denied errors
+            // when the key file is rewritten while an active mux connection exists
+            refresh_server_connection($privateKey);
         }
 
         // Ensure correct permissions (SSH requires 0600)
