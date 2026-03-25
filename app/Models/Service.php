@@ -1347,11 +1347,28 @@ class Service extends BaseModel
         $fields = collect($fields)->map(function ($extraFields) {
             if (is_array($extraFields)) {
                 $extraFields = collect($extraFields)->map(function ($field) {
-                    if (filled($field['value']) && str($field['value'])->startsWith('$SERVICE_')) {
-                        $searchValue = str($field['value'])->after('$')->value;
+                    if (! filled(data_get($field, 'value'))) {
+                        return $field;
+                    }
+
+                    $raw = (string) data_get($field, 'value');
+
+                    // ${SERVICE_KEY} or ${SERVICE_KEY:-default} — show empty until user saves a value
+                    if (preg_match('/^\$\{(SERVICE_[A-Z0-9_]+)(?::-[^}]*)?\}$/', $raw, $matches)) {
+                        $envKey = $matches[1];
+                        $newValue = $this->environment_variables()->where('key', $envKey)->first();
+                        $field['value'] = $newValue ? (string) $newValue->value : '';
+
+                        return $field;
+                    }
+
+                    if (str($raw)->startsWith('$SERVICE_')) {
+                        $searchValue = str($raw)->after('$')->value;
                         $newValue = $this->environment_variables()->where('key', $searchValue)->first();
                         if ($newValue) {
                             $field['value'] = $newValue->value;
+                        } else {
+                            $field['value'] = '';
                         }
                     }
 
