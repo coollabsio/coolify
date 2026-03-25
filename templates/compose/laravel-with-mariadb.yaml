@@ -226,9 +226,9 @@ services:
   nginx:
     image: nginx:alpine
     # Skip /docker-entrypoint.d/ scripts: they try to PATCH nginx.conf (read-only bind) and can hit io_setup on constrained hosts.
-    # Shell wrapper: prints one line to stdout so Docker/Coolify log UI is not empty before the first HTTP request.
+    # Shell wrapper: log to stderr so Coolify log UI shows startup before the first HTTP request.
     entrypoint: ["/bin/sh", "-c"]
-    command: "echo '[nginx] starting'; exec nginx -g 'daemon off;'"
+    command: "echo '[nginx] starting' >&2; exec nginx -g 'daemon off;'"
     volumes:
       - laravel-files:/var/www/html:ro
       - type: bind
@@ -311,8 +311,9 @@ services:
     restart: unless-stopped
     expose:
       - "80"
+    # Do not rely on `pgrep` (often missing in nginx:alpine); verify config + master PID instead.
     healthcheck:
-      test: ["CMD-SHELL", "nginx -t && pgrep nginx >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "nginx -t >/dev/null 2>&1 && test -f /var/run/nginx.pid && kill -0 $(cat /var/run/nginx.pid)"]
       interval: 10s
       timeout: 5s
       retries: 5
