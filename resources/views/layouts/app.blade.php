@@ -69,41 +69,43 @@
 
             <main class="lg:pl-56">
                 <div class="p-4 sm:px-6 lg:px-8 lg:py-6">
-                    <div class="sticky top-4 z-40 mb-4 flex justify-end">
-                        <details class="relative group">
-                            <summary class="list-none cursor-pointer rounded bg-coollabs px-3 py-2 text-xs font-semibold text-white shadow-lg hover:opacity-90">
-                                Compression Tasks ({{ count($globalCompressionTasks) }})
-                            </summary>
-                            <div class="absolute right-0 mt-2 w-[30rem] max-h-[28rem] overflow-auto rounded border border-coolgray-300 dark:border-coolgray-600 bg-white dark:bg-coolgray-100 p-3 shadow-2xl">
-                                <div class="mb-2 flex items-center justify-between">
-                                    <h4 class="text-sm font-semibold dark:text-white">Background Compression Tasks</h4>
-                                    <a href="{{ url()->current() }}" class="rounded bg-gray-700 px-2 py-1 text-[11px] text-white hover:opacity-90">Refresh</a>
-                                </div>
-                                @if (empty($globalCompressionTasks))
-                                    <p class="text-xs text-gray-500 dark:text-gray-400">No compression tasks.</p>
-                                @else
-                                    <div class="space-y-2">
-                                        @foreach ($globalCompressionTasks as $task)
-                                            <div class="rounded border border-coolgray-300 dark:border-coolgray-600 p-2">
-                                                <div class="flex items-center justify-between gap-2">
-                                                    <p class="truncate text-xs font-semibold dark:text-white">{{ data_get($task, 'archive_name', 'archive.zip') }}</p>
-                                                    <span class="text-[11px] {{ data_get($task, 'status') === 'completed' ? 'text-green-500' : (data_get($task, 'status') === 'failed' ? 'text-red-500' : 'text-yellow-500') }}">
-                                                        {{ strtoupper((string) data_get($task, 'status', 'running')) }}
-                                                    </span>
-                                                </div>
-                                                <p class="truncate text-[11px] text-gray-500 dark:text-gray-400">Dir: {{ data_get($task, 'directory', '/') }}</p>
-                                                <p class="break-words text-[11px] text-gray-500 dark:text-gray-400">{{ data_get($task, 'last_message', '') }}</p>
-                                                <div class="mt-2">
-                                                    <a href="{{ data_get($task, 'open_url', '#') }}" class="rounded bg-blue-600 px-2 py-1 text-[11px] text-white hover:opacity-90">Open Location</a>
-                                                </div>
-                                            </div>
-                                        @endforeach
+                    <div class="relative">
+                        <div class="absolute right-0 top-0 z-40">
+                            <details class="relative group">
+                                <summary class="list-none cursor-pointer rounded bg-coollabs px-3 py-2 text-xs font-semibold text-white shadow-lg hover:opacity-90">
+                                    Compression Tasks ({{ count($globalCompressionTasks) }})
+                                </summary>
+                                <div class="absolute right-0 mt-2 w-[30rem] max-h-[28rem] overflow-auto rounded border border-coolgray-300 dark:border-coolgray-600 bg-white dark:bg-coolgray-100 p-3 shadow-2xl">
+                                    <div class="mb-2 flex items-center justify-between">
+                                        <h4 class="text-sm font-semibold dark:text-white">Background Compression Tasks</h4>
+                                        <a href="{{ url()->current() }}" class="rounded bg-gray-700 px-2 py-1 text-[11px] text-white hover:opacity-90">Refresh</a>
                                     </div>
-                                @endif
-                            </div>
-                        </details>
+                                    @if (empty($globalCompressionTasks))
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">No compression tasks.</p>
+                                    @else
+                                        <div class="space-y-2">
+                                            @foreach ($globalCompressionTasks as $task)
+                                                <div class="rounded border border-coolgray-300 dark:border-coolgray-600 p-2">
+                                                    <div class="flex items-center justify-between gap-2">
+                                                        <p class="truncate text-xs font-semibold dark:text-white">{{ data_get($task, 'archive_name', 'archive.zip') }}</p>
+                                                        <span class="text-[11px] {{ data_get($task, 'status') === 'completed' ? 'text-green-500' : (data_get($task, 'status') === 'failed' ? 'text-red-500' : 'text-yellow-500') }}">
+                                                            {{ strtoupper((string) data_get($task, 'status', 'running')) }}
+                                                        </span>
+                                                    </div>
+                                                    <p class="truncate text-[11px] text-gray-500 dark:text-gray-400">Dir: {{ data_get($task, 'directory', '/') }}</p>
+                                                    <p class="break-words text-[11px] text-gray-500 dark:text-gray-400">{{ data_get($task, 'last_message', '') }}</p>
+                                                    <div class="mt-2">
+                                                        <a href="{{ data_get($task, 'open_url', '#') }}" class="rounded bg-blue-600 px-2 py-1 text-[11px] text-white hover:opacity-90">Open Location</a>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                            </details>
+                        </div>
+                        {{ $slot }}
                     </div>
-                    {{ $slot }}
                 </div>
             </main>
         </div>
