@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class OauthController extends Controller
 {
@@ -23,7 +22,7 @@ class OauthController extends Controller
             if (! $user) {
                 $settings = instanceSettings();
                 if (! $settings->is_registration_enabled && ! $settings->is_oauth_registration_enabled) {
-                    abort(403, 'Registration is disabled');
+                    return redirect()->route('login')->withErrors([__('auth.registration_disabled')]);
                 }
 
                 $user = User::create([
@@ -35,9 +34,7 @@ class OauthController extends Controller
 
             return redirect('/');
         } catch (\Exception $e) {
-            $errorCode = $e instanceof HttpException ? 'auth.failed' : 'auth.failed.callback';
-
-            return redirect()->route('login')->withErrors([__($errorCode)]);
+            return redirect()->route('login')->withErrors([__('auth.failed.callback')]);
         }
     }
 }
