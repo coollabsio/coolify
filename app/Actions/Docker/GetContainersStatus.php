@@ -295,8 +295,14 @@ class GetContainersStatus
                 // Mark service as found
                 if ($subType === 'application') {
                     $service = $parentService->applications()->where('id', $subId)->first();
+                    if (!$service) {
+                        $service = $parentService->databases()->where('id', $subId)->first();
+                    }
                 } else {
                     $service = $parentService->databases()->where('id', $subId)->first();
+                    if (!$service) {
+                        $service = $parentService->applications()->where('id', $subId)->first();
+                    }
                 }
                 if ($service) {
                     $foundServices[] = "$service->id-$service->name";
@@ -550,8 +556,14 @@ class GetContainersStatus
             $subResource = null;
             if ($subType === 'application') {
                 $subResource = $service->applications()->where('id', $subId)->first();
-            } elseif ($subType === 'database') {
+                if (!$subResource) {
+                    $subResource = $service->databases()->where('id', $subId)->first();
+                }
+            } else {
                 $subResource = $service->databases()->where('id', $subId)->first();
+                if (!$subResource) {
+                    $subResource = $service->applications()->where('id', $subId)->first();
+                }
             }
 
             if (! $subResource) {
