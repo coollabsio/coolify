@@ -339,7 +339,18 @@ function generate_application_name(string $git_repository, string $git_branch, ?
         $cuid = new Cuid2;
     }
 
-    return Str::kebab("$git_repository:$git_branch-$cuid");
+    $repo_name = str_contains($git_repository, '/') ? last(explode('/', $git_repository)) : $git_repository;
+
+    $name = Str::kebab("$repo_name:$git_branch-$cuid");
+
+    // Strip characters not allowed by NAME_PATTERN
+    $name = preg_replace('/[^\p{L}\p{M}\p{N}\s\-_.@\/&()#,:+]+/u', '', $name);
+
+    if (empty($name) || mb_strlen($name) < 3) {
+        return generate_random_name($cuid);
+    }
+
+    return $name;
 }
 
 /**
@@ -464,6 +475,36 @@ function validate_cron_expression($expression_to_validate): bool
     }
 
     return $isValid;
+}
+
+/**
+ * Determine if a cron schedule should run now, with deduplication.
+ *
+ * Uses getPreviousRunDate() + last-dispatch tracking to be resilient to queue delays.
+ * Even if the job runs minutes late, it still catches the missed cron window.
+ * Without a dedupKey, falls back to a simple isDue() check.
+ */
+function shouldRunCronNow(string $frequency, string $timezone, ?string $dedupKey = null, ?\Illuminate\Support\Carbon $executionTime = null): bool
+{
+    $cron = new \Cron\CronExpression($frequency);
+    $executionTime = ($executionTime ?? \Illuminate\Support\Carbon::now())->copy()->setTimezone($timezone);
+
+    if ($dedupKey === null) {
+        return $cron->isDue($executionTime);
+    }
+
+    $previousDue = \Illuminate\Support\Carbon::instance($cron->getPreviousRunDate($executionTime, allowCurrentDate: true));
+    $lastDispatched = Cache::get($dedupKey);
+
+    $shouldFire = $lastDispatched === null
+        ? $cron->isDue($executionTime)
+        : $previousDue->gt(\Illuminate\Support\Carbon::parse($lastDispatched));
+
+    // Always write: seeds on first miss, refreshes on dispatch.
+    // 30-day static TTL covers all intervals; orphan keys self-clean.
+    Cache::put($dedupKey, ($shouldFire ? $executionTime : $previousDue)->toIso8601String(), 2592000);
+
+    return $shouldFire;
 }
 
 function validate_timezone(string $timezone): bool

@@ -135,7 +135,7 @@ class Server extends BaseModel
             $server->forceFill($payload);
         });
         static::saved(function ($server) {
-            if ($server->privateKey?->isDirty()) {
+            if ($server->wasChanged('private_key_id') || $server->privateKey?->isDirty()) {
                 refresh_server_connection($server->privateKey);
             }
         });
@@ -1471,6 +1471,9 @@ $schema://$host {
         if ($validProxyTypes->contains(str($proxyType)->lower())) {
             $this->proxy->set('type', str($proxyType)->upper());
             $this->proxy->set('status', 'exited');
+            $this->proxy->set('last_saved_proxy_configuration', null);
+            $this->proxy->set('last_saved_settings', null);
+            $this->proxy->set('last_applied_settings', null);
             $this->save();
             if ($this->proxySet()) {
                 if ($async) {

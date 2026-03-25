@@ -59,6 +59,7 @@ Thank you so much!
 
 * [MVPS](https://www.mvps.net?ref=coolify.io) - Cheap VPS servers at the highest possible quality
 * [SerpAPI](https://serpapi.com?ref=coolify.io) - Google Search API — Scrape Google and other search engines from our fast, easy, and complete API
+* [ScreenshotOne](https://screenshotone.com?ref=coolify.io) - Screenshot API for devs
 *
 
 ### Big Sponsors
@@ -69,7 +70,7 @@ Thank you so much!
 * [Arcjet](https://arcjet.com?ref=coolify.io) - Advanced web security and performance solutions
 * [BC Direct](https://bc.direct?ref=coolify.io) - Your trusted technology consulting partner
 * [Blacksmith](https://blacksmith.sh?ref=coolify.io) - Infrastructure automation platform
-* [Brand.dev](https://brand.dev?ref=coolify.io) - API to personalize your product with logos, colors, and company info from any domain
+* [Context.dev](https://context.dev?ref=coolify.io) - API to personalize your product with logos, colors, and company info from any domain
 * [ByteBase](https://www.bytebase.com?ref=coolify.io) - Database CI/CD and Security at Scale
 * [CodeRabbit](https://coderabbit.ai?ref=coolify.io) - Cut Code Review Time & Bugs in Half
 * [COMIT](https://comit.international?ref=coolify.io) - New York Times award–winning contractor
@@ -89,6 +90,7 @@ Thank you so much!
 * [Logto](https://logto.io?ref=coolify.io) - The better identity infrastructure for developers
 * [Macarne](https://macarne.com?ref=coolify.io) - Best IP Transit & Carrier Ethernet Solutions for Simplified Network Connectivity
 * [Mobb](https://vibe.mobb.ai/?ref=coolify.io) - Secure Your AI-Generated Code to Unlock Dev Productivity
+* [PetroSky Cloud](https://petrosky.io?ref=coolify.io) - Open source cloud deployment solutions
 * [PFGLabs](https://pfglabs.com?ref=coolify.io) - Build Real Projects with Golang
 * [Ramnode](https://ramnode.com/?ref=coolify.io) - High Performance Cloud VPS Hosting
 * [SaasyKit](https://saasykit.com?ref=coolify.io) - Complete SaaS starter kit for developers

@@ -625,10 +625,16 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private function upload_to_s3(): void
     {
+        if (is_null($this->s3)) {
+            $this->backup->update([
+                'save_s3' => false,
+                's3_storage_id' => null,
+            ]);
+
+            throw new \Exception('S3 storage configuration is missing or has been deleted (S3 storage ID: '.($this->backup->s3_storage_id ?? 'null').'). S3 backup has been disabled for this schedule.');
+        }
+
         try {
-            if (is_null($this->s3)) {
-                return;
-            }
             $key = $this->s3->key;
             $secret = $this->s3->secret;
             // $region = $this->s3->region;

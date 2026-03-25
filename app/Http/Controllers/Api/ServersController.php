@@ -7,6 +7,7 @@ use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Http\Controllers\Controller;
+use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -758,12 +759,22 @@ class ServersController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
-        if ($server->definedResources()->count() > 0) {
-            return response()->json(['message' => 'Server has resources, so you need to delete them before.'], 400);
+
+        $force = filter_var($request->query('force', false), FILTER_VALIDATE_BOOLEAN);
+
+        if ($server->definedResources()->count() > 0 && ! $force) {
+            return response()->json(['message' => 'Server has resources. Use ?force=true to delete all resources and the server, or delete resources manually first.'], 400);
         }
         if ($server->isLocalhost()) {
             return response()->json(['message' => 'Local server cannot be deleted.'], 400);
         }
+
+        if ($force) {
+            foreach ($server->definedResources() as $resource) {
+                DeleteResourceJob::dispatch($resource);
+            }
+        }
+
         $server->delete();
         DeleteServer::dispatch(
             $server->id,

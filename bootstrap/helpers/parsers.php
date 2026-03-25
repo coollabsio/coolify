@@ -789,7 +789,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
                         $source = replaceLocalSource($source, $mainDirectory);
-                        if ($isPullRequest) {
+                        $isPreviewSuffixEnabled = $foundConfig
+                            ? (bool) data_get($foundConfig, 'is_preview_suffix_enabled', true)
+                            : true;
+                        if ($isPullRequest && $isPreviewSuffixEnabled) {
                             $source = addPreviewDeploymentSuffix($source, $pull_request_id);
                         }
                         LocalFileVolume::updateOrCreate(
@@ -987,16 +990,17 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             }
             if ($key->value() === $parsedValue->value()) {
                 // Simple variable reference (e.g. DATABASE_URL: ${DATABASE_URL})
-                // Use firstOrCreate to avoid overwriting user-saved values on redeploy
-                $envVar = $resource->environment_variables()->firstOrCreate([
+                // Ensure the variable exists in DB for .env generation and UI display
+                $resource->environment_variables()->firstOrCreate([
                     'key' => $key,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
                 ], [
                     'is_preview' => false,
                 ]);
-                // Add the variable to the environment using the saved DB value
-                $environment[$key->value()] = $envVar->value;
+                // Keep the ${VAR} reference in compose — Docker Compose resolves from .env at deploy time.
+                // Do NOT replace with DB value: if user updates env var without re-parsing compose,
+                // a stale resolved value in environment: would override the correct .env value.
             } else {
                 if ($value->startsWith('$')) {
                     $isRequired = false;
@@ -1315,19 +1319,19 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         }
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
             $shouldGenerateLabelsExactly = $resource->destination->server->settings->generate_exact_labels;
-            $uuid = $resource->uuid;
-            $network = data_get($resource, 'destination.network');
+            $labelUuid = $resource->uuid;
+            $labelNetwork = data_get($resource, 'destination.network');
             if ($isPullRequest) {
-                $uuid = "{$resource->uuid}-{$pullRequestId}";
+                $labelUuid = "{$resource->uuid}-{$pullRequestId}";
             }
             if ($isPullRequest) {
-                $network = "{$resource->destination->network}-{$pullRequestId}";
+                $labelNetwork = "{$resource->destination->network}-{$pullRequestId}";
             }
             if ($shouldGenerateLabelsExactly) {
                 switch ($server->proxyType()) {
                     case ProxyTypes::TRAEFIK->value:
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
-                            uuid: $uuid,
+                            uuid: $labelUuid,
                             domains: $fqdns,
                             is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                             serviceLabels: $serviceLabels,
@@ -1339,8 +1343,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         break;
                     case ProxyTypes::CADDY->value:
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
-                            network: $network,
-                            uuid: $uuid,
+                            network: $labelNetwork,
+                            uuid: $labelUuid,
                             domains: $fqdns,
                             is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                             serviceLabels: $serviceLabels,
@@ -1354,7 +1358,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 }
             } else {
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
-                    uuid: $uuid,
+                    uuid: $labelUuid,
                     domains: $fqdns,
                     is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                     serviceLabels: $serviceLabels,
@@ -1364,8 +1368,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     image: $image
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
-                    network: $network,
-                    uuid: $uuid,
+                    network: $labelNetwork,
+                    uuid: $labelUuid,
                     domains: $fqdns,
                     is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                     serviceLabels: $serviceLabels,
@@ -2338,8 +2342,8 @@ function serviceParser(Service $resource): Collection
             }
             if ($key->value() === $parsedValue->value()) {
                 // Simple variable reference (e.g. DATABASE_URL: ${DATABASE_URL})
-                // Use firstOrCreate to avoid overwriting user-saved values on redeploy
-                $envVar = $resource->environment_variables()->firstOrCreate([
+                // Ensure the variable exists in DB for .env generation and UI display
+                $resource->environment_variables()->firstOrCreate([
                     'key' => $key,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
@@ -2347,8 +2351,9 @@ function serviceParser(Service $resource): Collection
                     'is_preview' => false,
                     'comment' => $envComments[$originalKey] ?? null,
                 ]);
-                // Add the variable to the environment using the saved DB value
-                $environment[$key->value()] = $envVar->value;
+                // Keep the ${VAR} reference in compose — Docker Compose resolves from .env at deploy time.
+                // Do NOT replace with DB value: if user updates env var without re-parsing compose,
+                // a stale resolved value in environment: would override the correct .env value.
             } else {
                 if ($value->startsWith('$')) {
                     $isRequired = false;

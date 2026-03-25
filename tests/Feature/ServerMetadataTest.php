@@ -1,9 +1,11 @@
 <?php
 
+use App\Livewire\Server\ValidateAndInstall;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -93,4 +95,25 @@ it('can overwrite server_metadata with new values', function () {
 
     expect($this->server->server_metadata['os'])->toBe('Ubuntu 22.04')
         ->and($this->server->server_metadata['cpus'])->toBe(4);
+});
+
+it('calls gatherServerMetadata during ValidateAndInstall when docker version is valid', function () {
+    $serverMock = Mockery::mock($this->server)->makePartial();
+    $serverMock->shouldReceive('isSwarm')->andReturn(false);
+    $serverMock->shouldReceive('validateDockerEngineVersion')->once()->andReturn('24.0.0');
+    $serverMock->shouldReceive('gatherServerMetadata')->once();
+    $serverMock->shouldReceive('isBuildServer')->andReturn(false);
+
+    Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])
+        ->call('validateDockerVersion');
+});
+
+it('does not call gatherServerMetadata when docker version validation fails', function () {
+    $serverMock = Mockery::mock($this->server)->makePartial();
+    $serverMock->shouldReceive('isSwarm')->andReturn(false);
+    $serverMock->shouldReceive('validateDockerEngineVersion')->once()->andReturn(false);
+    $serverMock->shouldNotReceive('gatherServerMetadata');
+
+    Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])
+        ->call('validateDockerVersion');
 });

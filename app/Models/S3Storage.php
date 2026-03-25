@@ -40,6 +40,13 @@ class S3Storage extends BaseModel
                 $storage->secret = trim($storage->secret);
             }
         });
+
+        static::deleting(function (S3Storage $storage) {
+            ScheduledDatabaseBackup::where('s3_storage_id', $storage->id)->update([
+                'save_s3' => false,
+                's3_storage_id' => null,
+            ]);
+        });
     }
 
     public static function ownedByCurrentTeam(array $select = ['*'])
@@ -57,6 +64,11 @@ class S3Storage extends BaseModel
     public function team()
     {
         return $this->belongsTo(Team::class);
+    }
+
+    public function scheduledBackups()
+    {
+        return $this->hasMany(ScheduledDatabaseBackup::class, 's3_storage_id');
     }
 
     public function awsUrl()

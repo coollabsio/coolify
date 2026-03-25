@@ -5,7 +5,6 @@ namespace App\Jobs;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
-use Cron\CronExpression;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -80,7 +79,7 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
     private function dispatchConnectionChecks(Collection $servers): void
     {
 
-        if ($this->shouldRunNow($this->checkFrequency)) {
+        if (shouldRunCronNow($this->checkFrequency, $this->instanceTimezone, 'server-connection-checks', $this->executionTime)) {
             $servers->each(function (Server $server) {
                 try {
                     // Skip SSH connection check if Sentinel is healthy — its heartbeat already proves connectivity
@@ -129,13 +128,13 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
 
         if ($sentinelOutOfSync) {
             // Dispatch ServerCheckJob if Sentinel is out of sync
-            if ($this->shouldRunNow($this->checkFrequency, $serverTimezone)) {
+            if (shouldRunCronNow($this->checkFrequency, $serverTimezone, "server-check:{$server->id}", $this->executionTime)) {
                 ServerCheckJob::dispatch($server);
             }
         }
 
         $isSentinelEnabled = $server->isSentinelEnabled();
-        $shouldRestartSentinel = $isSentinelEnabled && $this->shouldRunNow('0 0 * * *', $serverTimezone);
+        $shouldRestartSentinel = $isSentinelEnabled && shouldRunCronNow('0 0 * * *', $serverTimezone, "sentinel-restart:{$server->id}", $this->executionTime);
         // Dispatch Sentinel restart if due (daily for Sentinel-enabled servers)
 
         if ($shouldRestartSentinel) {
@@ -149,7 +148,7 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             if (isset(VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency])) {
                 $serverDiskUsageCheckFrequency = VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency];
             }
-            $shouldRunStorageCheck = $this->shouldRunNow($serverDiskUsageCheckFrequency, $serverTimezone);
+            $shouldRunStorageCheck = shouldRunCronNow($serverDiskUsageCheckFrequency, $serverTimezone, "server-storage-check:{$server->id}", $this->executionTime);
 
             if ($shouldRunStorageCheck) {
                 ServerStorageCheckJob::dispatch($server);
@@ -157,7 +156,7 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         // Dispatch ServerPatchCheckJob if due (weekly)
-        $shouldRunPatchCheck = $this->shouldRunNow('0 0 * * 0', $serverTimezone);
+        $shouldRunPatchCheck = shouldRunCronNow('0 0 * * 0', $serverTimezone, "server-patch-check:{$server->id}", $this->executionTime);
 
         if ($shouldRunPatchCheck) { // Weekly on Sunday at midnight
             ServerPatchCheckJob::dispatch($server);
@@ -165,16 +164,5 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
 
         // Note: CheckAndStartSentinelJob is only dispatched daily (line above) for version updates.
         // Crash recovery is handled by sentinelOutOfSync → ServerCheckJob → CheckAndStartSentinelJob.
-    }
-
-    private function shouldRunNow(string $frequency, ?string $timezone = null): bool
-    {
-        $cron = new CronExpression($frequency);
-
-        // Use the frozen execution time, not the current time
-        $baseTime = $this->executionTime ?? Carbon::now();
-        $executionTime = $baseTime->copy()->setTimezone($timezone ?? config('app.timezone'));
-
-        return $cron->isDue($executionTime);
     }
 }
