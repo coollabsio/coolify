@@ -28,16 +28,17 @@
                         No Laravel containers detected in this service.
                     </div>
                 @else
-                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6">
-                        <div class="relative">
+                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6 w-full max-w-none">
+                        <div class="relative w-full max-w-none">
                             <label class="block text-sm font-medium dark:text-white mb-2">Comando:</label>
 
-                            <div class="flex gap-2 items-start">
-                                <div class="relative flex-1">
+                            <div class="flex gap-2 items-start w-full max-w-none">
+                                <div class="relative flex-1 min-w-0">
                                     <input
                                         type="text"
                                         wire:model.live="selectedCommand"
-                                        class="input w-full"
+                                        wire:focus="showPopularCommands"
+                                        class="input w-full min-w-[28rem] lg:min-w-[44rem]"
                                         placeholder="Ej: migrate --force"
                                     />
 
@@ -46,13 +47,13 @@
                                             @foreach ($filteredArtisanCommands as $cmd)
                                                 <button
                                                     type="button"
-                                                    class="w-full px-3 py-2 hover:bg-neutral-100 dark:hover:bg-coolgray-700 flex items-center gap-2 text-left"
+                                                    class="w-full px-3 py-2 hover:bg-neutral-100 dark:hover:bg-coolgray-700 flex items-center gap-2 text-left text-gray-900 dark:text-gray-100"
                                                     wire:click="selectCommand(@js($cmd['name']))"
                                                 >
-                                                    <span class="font-mono text-sm whitespace-nowrap">{{ $cmd['name'] }}</span>
+                                                    <span class="font-mono text-sm whitespace-nowrap text-gray-900 dark:text-gray-100">{{ $cmd['name'] }}</span>
                                                     @if (! empty($cmd['description']))
                                                         <span
-                                                            class="text-xs text-gray-500 dark:text-gray-400 truncate max-w-96"
+                                                            class="text-xs text-gray-700 dark:text-gray-300 truncate max-w-96"
                                                             title="{{ $cmd['description'] }}"
                                                         >
                                                             - {{ $cmd['description'] }}
@@ -84,7 +85,7 @@
 
                         <div class="mt-6">
                             <label class="block text-sm font-medium dark:text-white mb-2">Salida:</label>
-                            <pre class="w-full whitespace-pre-wrap break-words bg-white dark:bg-coolgray-900 text-gray-900 dark:text-gray-100 border border-coolgray-300 dark:border-coolgray-600 px-4 py-3 rounded text-sm font-mono min-h-40">{{ $output }}</pre>
+                            <pre class="w-full max-w-none whitespace-pre-wrap break-words bg-white dark:bg-coolgray-900 text-gray-900 dark:text-gray-100 border border-coolgray-300 dark:border-coolgray-600 px-4 py-3 rounded text-sm font-mono min-h-80 max-h-[60vh] overflow-auto">{{ $output }}</pre>
                         </div>
                     </div>
                 @endif

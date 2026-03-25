@@ -65,6 +65,64 @@ class LaravelArtisan extends Component
         return (string) ($tokens[0] ?? '');
     }
 
+    public function showPopularCommands(): void
+    {
+        if ($this->isLoadingCommands) {
+            return;
+        }
+
+        if (trim((string) $this->selectedCommand) !== '') {
+            $this->refreshCommandDropdown();
+
+            return;
+        }
+
+        if ($this->artisanCommands === []) {
+            return;
+        }
+
+        $popular = [
+            'env',
+            'about',
+            'migrate',
+            'db:seed',
+            'optimize',
+            'optimize:clear',
+            'config:cache',
+            'config:clear',
+            'cache:clear',
+            'route:list',
+            'queue:work',
+            'schedule:run',
+            'view:clear',
+            'storage:link',
+        ];
+
+        $byName = collect($this->artisanCommands)->keyBy('name');
+        $result = [];
+
+        foreach ($popular as $name) {
+            $cmd = $byName->get($name);
+            if (is_array($cmd)) {
+                $result[] = $cmd;
+            }
+        }
+
+        if (count($result) < 10) {
+            foreach ($this->artisanCommands as $cmd) {
+                if (count($result) >= 10) {
+                    break;
+                }
+                if (in_array($cmd['name'] ?? '', $popular, true)) {
+                    continue;
+                }
+                $result[] = $cmd;
+            }
+        }
+
+        $this->filteredArtisanCommands = array_values($result);
+    }
+
     public function mount(): void
     {
         $this->parameters = get_route_parameters();
