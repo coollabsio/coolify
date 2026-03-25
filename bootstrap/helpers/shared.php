@@ -3579,6 +3579,19 @@ function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|
     // Let's try and parse the string to detect if it's a valid SSH string or not
     preg_match('/((.*?)\:\/\/)?(.*@.*:.*)/', $gitRepository, $sshMatches);
 
+    // Extract custom port from source for GitLab/GitHub apps with custom ports
+    // This handles SCP-style URLs like git@host:repo.git where host uses non-standard port
+    if ($deploymentType === 'deploy_key' && $source && ! empty($sshMatches)) {
+        switch ($source->getMorphClass()) {
+            case \App\Models\GithubApp::class:
+            case \App\Models\GitlabApp::class:
+                if ($source->custom_port !== null && (int) $source->custom_port !== 22) {
+                    $providerInfo['port'] = (int) $source->custom_port;
+                }
+                break;
+        }
+    }
+
     if ($deploymentType === 'deploy_key' && empty($sshMatches) && $source) {
         // If this happens, the user may have provided an HTTP URL when they needed an SSH one
         // Let's try and fix that for known Git providers
@@ -3586,7 +3599,7 @@ function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|
             case \App\Models\GithubApp::class:
             case \App\Models\GitlabApp::class:
                 $providerInfo['host'] = Url::fromString($source->html_url)->getHost();
-                $providerInfo['port'] = $source->custom_port;
+                $providerInfo['port'] = ($source->custom_port !== null && $source->custom_port !== '' && (int) $source->custom_port !== 22) ? (int) $source->custom_port : 22;
                 $providerInfo['user'] = $source->custom_user;
                 break;
         }
