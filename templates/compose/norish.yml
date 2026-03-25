@@ -1,3 +1,10 @@
+# documentation: https://github.com/norish-recipes/norish
+# slogan: A modern, realtime recipe manager for families & friends with web scraping support.
+# category: productivity
+# tags: recipe, recipes, cooking, meal planning, recipe manager, meal planner, food
+# logo: svgs/norish.svg
+# port: 3000
+
 services:
   norish:
     image: 'norishapp/norish:latest'
