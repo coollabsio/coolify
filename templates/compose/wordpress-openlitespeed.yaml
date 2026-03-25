@@ -1,0 +1,38 @@
+# documentation: https://docs.litespeedtech.com/
+# slogan: WordPress with OpenLiteSpeed for high-performance hosting.
+# category: cms
+# tags: cms, blog, content, management, openlitespeed, mariadb
+# logo: svgs/wordpress.svg
+
+services:
+  wordpress:
+    image: litespeedtech/openlitespeed-wordpress:latest
+    volumes:
+      - wordpress-data:/var/www/html
+    environment:
+      - SERVICE_URL_WORDPRESS
+      - MYSQL_HOST=mariadb
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+      - MYSQL_DATABASE=wordpress
+    depends_on:
+      - mariadb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 2s
+      timeout: 10s
+      retries: 10
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
