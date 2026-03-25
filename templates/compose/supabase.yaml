@@ -22,7 +22,7 @@ services:
       - KONG_DECLARATIVE_CONFIG=/home/kong/kong.yml
       # https://github.com/supabase/cli/issues/14
       - KONG_DNS_ORDER=LAST,A,CNAME
-      - KONG_PLUGINS=request-transformer,cors,key-auth,acl,basic-auth
+      - KONG_PLUGINS=request-transformer,cors,key-auth,acl,basic-auth,ip-restriction
       - KONG_NGINX_PROXY_PROXY_BUFFER_SIZE=160k
       - KONG_NGINX_PROXY_PROXY_BUFFERS=64 160k
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
@@ -274,6 +274,27 @@ services:
                     hide_groups_header: true
                     allow:
                       - admin
+
+            ## MCP endpoint - local access only via SSH tunnel or VPN
+            ## Do NOT expose to the Internet. Add your Docker bridge gateway IP below.
+            ## Run: docker inspect supabase-kong --format '{{ "{{" }}range .NetworkSettings.Networks{{ "}}" }}{{ "{{" }}println .Gateway{{ "}}" }}{{ "{{" }}end{{ "}}" }}'
+            - name: mcp
+              _comment: 'MCP: /mcp -> http://supabase-studio:3000/api/mcp'
+              url: http://supabase-studio:3000/api/mcp
+              routes:
+                - name: mcp-all
+                  strip_path: true
+                  paths:
+                    - /mcp
+              plugins:
+                - name: cors
+                - name: ip-restriction
+                  config:
+                    allow:
+                      - 127.0.0.1
+                      - ::1
+                      # Add your Docker bridge gateway IP here for SSH tunnel access
+                    deny: []
 
             ## Protected Dashboard - catch all remaining routes
             - name: dashboard
