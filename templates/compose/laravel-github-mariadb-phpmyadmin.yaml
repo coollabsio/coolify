@@ -226,8 +226,9 @@ services:
     depends_on:
       mariadb:
         condition: service_healthy
+    # Avoid `pgrep` (often missing on php-fpm-alpine). Verify config + artisan + TCP :9000 with bundled `php`.
     healthcheck:
-      test: ["CMD-SHELL", "php-fpm -t >/dev/null 2>&1 && pgrep php-fpm >/dev/null && test -f /var/www/html/artisan || exit 1"]
+      test: ["CMD-SHELL", "php-fpm -t >/dev/null 2>&1 && test -f /var/www/html/artisan && php -r \"exit(@fsockopen('127.0.0.1',9000)?0:1);\""]
       interval: 15s
       timeout: 10s
       retries: 20
@@ -247,7 +248,7 @@ services:
         source: ./nginx-main.conf
         target: /etc/nginx/nginx.conf
         content: |
-          # Minimal workers + no async AIO: avoids io_setup() failures on constrained hosts (502 from Traefik).
+          # Minimal + aio off: avoids io_setup() issues on constrained hosts. Keep events simple (no epoll tuning).
           # Main error_log must be stderr so Docker/Coolify log UI shows startup + upstream (FastCGI) errors.
           user nginx;
           worker_processes 1;
@@ -255,11 +256,7 @@ services:
           pid /var/run/nginx.pid;
 
           events {
-              worker_connections 256;
-              multi_accept off;
-              use epoll;
-              # Cap AIO queue depth if any context still enables file AIO (host fs.aio-max-nr exhaustion → io_setup 11).
-              worker_aio_requests 1;
+              worker_connections 1024;
           }
 
           http {
@@ -295,13 +292,7 @@ services:
               resolver 127.0.0.11 ipv6=off valid=10s;
               set $php_upstream "laravel:9000";
 
-              location = / {
-                if (!-f $document_root/index.php) {
-                  return 503 "Deployment from GitHub is in progress... wait 1 min and refresh!";
-                }
-                try_files $uri $uri/ /index.php?$query_string;
-              }
-
+              # Standard Laravel front controller (avoid `if` in location — fragile and can surprise health/debug tools).
               location / {
                   try_files $uri $uri/ /index.php?$query_string;
               }
@@ -312,6 +303,8 @@ services:
                   fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
                   include fastcgi_params;
                   fastcgi_read_timeout 300;
+                  fastcgi_buffers 16 16k;
+                  fastcgi_buffer_size 32k;
               }
 
               location ~ /\.(?!well-known).* {
@@ -320,20 +313,20 @@ services:
           }
     # Start nginx as soon as laravel container exists (not after Laravel healthcheck).
     # Otherwise nginx container does not exist for many minutes and tools/UI show "No such container".
-    # Users may see 502/503 until PHP-FPM is ready; nginx.conf already returns 503 while deploying.
+    # Users may see 502 until PHP-FPM is ready; healthcheck is config-only so PHP slowness won't mark nginx unhealthy.
     depends_on:
       laravel:
         condition: service_started
     restart: unless-stopped
     expose:
       - "80"
-    # Do not rely on `pgrep` (often missing in nginx:alpine); verify config + master PID instead.
+    # Config-only: does not depend on PHP-FPM (502s during boot would fail HTTP probes). Traefik needs Docker healthy.
     healthcheck:
-      test: ["CMD-SHELL", "nginx -t >/dev/null 2>&1 && test -f /var/run/nginx.pid && kill -0 $(cat /var/run/nginx.pid)"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      test: ["CMD-SHELL", "nginx -t >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   mariadb:
     image: mariadb:11

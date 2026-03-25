@@ -215,8 +215,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Avoid `pgrep` (often missing on php-fpm-alpine). Verify config + artisan + TCP :9000 with bundled `php`.
     healthcheck:
-      test: ["CMD-SHELL", "php-fpm -t >/dev/null 2>&1 && pgrep php-fpm >/dev/null && test -f /var/www/html/artisan || exit 1"]
+      test: ["CMD-SHELL", "php-fpm -t >/dev/null 2>&1 && test -f /var/www/html/artisan && php -r \"exit(@fsockopen('127.0.0.1',9000)?0:1);\""]
       interval: 15s
       timeout: 10s
       retries: 20
@@ -235,17 +236,14 @@ services:
         source: ./nginx-main.conf
         target: /etc/nginx/nginx.conf
         content: |
-          # Main error_log must be stderr so Docker/Coolify log UI shows nginx + FastCGI upstream errors.
+          # Minimal + aio off; keep events simple for broad compatibility.
           user nginx;
           worker_processes 1;
           error_log /dev/stderr warn;
           pid /var/run/nginx.pid;
 
           events {
-              worker_connections 256;
-              multi_accept off;
-              use epoll;
-              worker_aio_requests 1;
+              worker_connections 1024;
           }
 
           http {
@@ -281,14 +279,6 @@ services:
               resolver 127.0.0.11 ipv6=off valid=10s;
               set $php_upstream "laravel:9000";
 
-              # Return 503 if Laravel is not installed yet
-              location = / {
-                if (!-f $document_root/index.php) {
-                  return 503 "Laravel is installing, please wait...";
-                }
-                try_files $uri $uri/ /index.php?$query_string;
-              }
-
               location / {
                   try_files $uri $uri/ /index.php?$query_string;
               }
@@ -299,6 +289,8 @@ services:
                   fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
                   include fastcgi_params;
                   fastcgi_read_timeout 300;
+                  fastcgi_buffers 16 16k;
+                  fastcgi_buffer_size 32k;
               }
 
               location ~ /\.(?!well-known).* {
@@ -311,13 +303,12 @@ services:
     restart: unless-stopped
     expose:
       - "80"
-    # Do not rely on `pgrep` (often missing in nginx:alpine); verify config + master PID instead.
     healthcheck:
-      test: ["CMD-SHELL", "nginx -t >/dev/null 2>&1 && test -f /var/run/nginx.pid && kill -0 $(cat /var/run/nginx.pid)"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      test: ["CMD-SHELL", "nginx -t >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   mariadb:
     image: mariadb:11
