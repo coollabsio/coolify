@@ -293,7 +293,13 @@ class StackForm extends Component
             $value = 'https://'.$value;
         }
 
-        data_set($this->fields, "{$serviceUrlFieldKey}.value", $value);
+        $serviceUrlField = $this->fields->get($serviceUrlFieldKey, []);
+        if (! is_array($serviceUrlField)) {
+            return;
+        }
+
+        $serviceUrlField['value'] = $value;
+        $this->fields->put($serviceUrlFieldKey, $serviceUrlField);
     }
 
     public function render()
