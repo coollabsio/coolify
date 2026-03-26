@@ -185,6 +185,13 @@ class StackForm extends Component
         $this->dispatch('success', 'PHP version saved.');
     }
 
+    public function saveServiceUrl(): void
+    {
+        $this->normalizeServiceUrlField();
+        $this->submit(notify: false);
+        $this->dispatch('success', 'Service URL saved.');
+    }
+
     public function instantSave()
     {
         $this->syncData(true);
@@ -195,6 +202,7 @@ class StackForm extends Component
     public function submit($notify = true)
     {
         try {
+            $this->normalizeServiceUrlField();
             $this->validate();
             $this->syncLaravelDatabaseVariable();
             $this->syncData(true);
@@ -232,10 +240,6 @@ class StackForm extends Component
 
     private function syncLaravelDatabaseVariable(): void
     {
-        if ($this->fields->has('SERVICE_DATABASE_LARAVEL')) {
-            return;
-        }
-
         $databaseField = $this->fields->get('MYSQL_DATABASE')
             ?? $this->fields->get('SERVICE_DATABASE_MARIADB');
 
@@ -253,6 +257,24 @@ class StackForm extends Component
             'rules' => 'nullable|string',
             'customHelper' => 'Auto-synced from MariaDB Database Name.',
         ]);
+    }
+
+    private function normalizeServiceUrlField(): void
+    {
+        if (! $this->fields->has('SERVICE_URL_LARAVEL')) {
+            return;
+        }
+
+        $value = trim((string) data_get($this->fields, 'SERVICE_URL_LARAVEL.value', ''));
+        if ($value === '') {
+            return;
+        }
+
+        if (! str_starts_with($value, 'http://') && ! str_starts_with($value, 'https://')) {
+            $value = 'https://'.$value;
+        }
+
+        data_set($this->fields, 'SERVICE_URL_LARAVEL.value', $value);
     }
 
     public function render()
