@@ -440,21 +440,47 @@ class Select extends Component
 
     private function ensureProtectedTemplatesExist(Collection $services): Collection
     {
-        $composePath = base_path('templates/compose/laravel-github-mariadb-phpmyadmin.yaml');
-        if (File::exists($composePath)) {
-            $services->put('laravel-with-mariadb', [
-                'name' => 'laravel-with-mariadb',
-                'documentation' => 'https://laravel.com/docs?utm_source=coolify.io',
-                'slogan' => 'Laravel with GitHub deploy, Nginx, MariaDB and phpMyAdmin.',
-                'compose' => base64_encode((string) File::get($composePath)),
-                'tags' => ['laravel', 'php', 'nginx', 'mariadb', 'phpmyadmin', 'github'],
-                'category' => 'framework',
-                'logo' => 'svgs/laravel.svg',
-                'minversion' => '0.0.0',
-            ]);
-        }
+        $this->upsertServiceTemplateFromCompose(
+            services: $services,
+            key: 'laravel-with-mariadb',
+            composeFile: 'laravel-github-mariadb-phpmyadmin.yaml',
+            slogan: 'Laravel with GitHub deploy, Nginx, MariaDB and phpMyAdmin.',
+            tags: ['laravel', 'php', 'nginx', 'mariadb', 'phpmyadmin', 'github']
+        );
+
+        $this->upsertServiceTemplateFromCompose(
+            services: $services,
+            key: 'laravel-rootkit',
+            composeFile: 'laravel-rootkit.yaml',
+            slogan: 'Laravel RootKit with GitHub deploy, Nginx, MariaDB and phpMyAdmin.',
+            tags: ['laravel', 'php', 'framework', 'web', 'application', 'mariadb', 'phpmyadmin', 'github', 'rootkit']
+        );
 
         return $services;
+    }
+
+    private function upsertServiceTemplateFromCompose(
+        Collection $services,
+        string $key,
+        string $composeFile,
+        string $slogan,
+        array $tags
+    ): void {
+        $composePath = base_path("templates/compose/{$composeFile}");
+        if (! File::exists($composePath)) {
+            return;
+        }
+
+        $services->put($key, [
+            'name' => $key,
+            'documentation' => 'https://laravel.com/docs?utm_source=coolify.io',
+            'slogan' => $slogan,
+            'compose' => base64_encode((string) File::get($composePath)),
+            'tags' => $tags,
+            'category' => 'framework',
+            'logo' => 'svgs/laravel.svg',
+            'minversion' => '0.0.0',
+        ]);
     }
 
     private function normalizeDuplicateLaravelTemplates(Collection $services): Collection
