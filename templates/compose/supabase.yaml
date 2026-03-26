@@ -275,6 +275,27 @@ services:
                     allow:
                       - admin
 
+            ## MCP (Model Context Protocol) routes
+            ## Note: MCP should NOT be exposed to the internet. Use VPN or SSH tunnel only.
+            - name: mcp-v1
+              _comment: 'MCP: /mcp/v1/* -> http://supabase-mcp:3000/*'
+              url: http://supabase-mcp:3000/
+              routes:
+                - name: mcp-v1-all
+                  strip_path: true
+                  paths:
+                    - /mcp/v1/
+              plugins:
+                - name: cors
+                - name: key-auth
+                  config:
+                    hide_credentials: false
+                - name: acl
+                  config:
+                    hide_groups_header: true
+                    allow:
+                      - admin
+
             ## Protected Dashboard - catch all remaining routes
             - name: dashboard
               _comment: 'Studio: /* -> http://studio:3000/*'
@@ -1443,3 +1464,30 @@ services:
           else
             {:ok, _} = Supavisor.Tenants.create_tenant(params)
           end
+
+  #############################################################################
+  # MCP (Model Context Protocol) Service
+  # Provides AI assistant integration with Supabase database
+  # WARNING: Do NOT expose MCP to the internet. Use VPN or SSH tunnel only.
+  #############################################################################
+  supabase-mcp:
+    image: supabase/postgres-mcp:latest
+    container_name: supabase-mcp-${SERVICE_ID:-default}
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_MCP=${SERVICE_FQDN_MCP}
+      - POSTGRES_HOST=${POSTGRES_HOSTNAME:-supabase-db}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - POSTGRES_USER=postgres
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - DATABASE_URL=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h ${POSTGRES_HOSTNAME:-supabase-db} -p ${POSTGRES_PORT:-5432} -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - supabase-network-internal
