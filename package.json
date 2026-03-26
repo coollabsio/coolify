@@ -5,8 +5,8 @@
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
 		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
-		"@inertiajs/svelte": "^3.0.0-beta.5",
-		"@inertiajs/vite": "^3.0.0-beta.5",
+		"@inertiajs/svelte": "^3.0.0",
+		"@inertiajs/vite": "^3.0.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@tailwindcss/vite": "^4.2.2",
 		"concurrently": "^9.2.1",
@@ -25,7 +25,7 @@
 		"tailwindcss": "^4.2.2",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.57.2",
-		"vite": "^8.0.2"
+		"vite": "^8.0.3"
 	},
 	"scripts": {
 		"dev": "vite",
