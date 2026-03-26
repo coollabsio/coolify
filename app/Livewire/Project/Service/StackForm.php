@@ -339,21 +339,21 @@ class StackForm extends Component
 
     private function resolveWebsiteUrlFieldKey(): string
     {
-        if (str_contains($this->dockerComposeRaw, 'SERVICE_FQDN_NGINX_80')) {
-            return 'SERVICE_FQDN_NGINX_80';
-        }
         if (str_contains($this->dockerComposeRaw, 'SERVICE_FQDN_NGINX')) {
             return 'SERVICE_FQDN_NGINX';
+        }
+        if (str_contains($this->dockerComposeRaw, 'SERVICE_FQDN_NGINX_80')) {
+            return 'SERVICE_FQDN_NGINX_80';
         }
         if (str_contains($this->dockerComposeRaw, 'SERVICE_URL_NGINX_80')) {
             return 'SERVICE_URL_NGINX_80';
         }
 
-        if ($this->fields->has('SERVICE_FQDN_NGINX_80')) {
-            return 'SERVICE_FQDN_NGINX_80';
-        }
         if ($this->fields->has('SERVICE_FQDN_NGINX')) {
             return 'SERVICE_FQDN_NGINX';
+        }
+        if ($this->fields->has('SERVICE_FQDN_NGINX_80')) {
+            return 'SERVICE_FQDN_NGINX_80';
         }
         if ($this->fields->has('SERVICE_URL_NGINX_80')) {
             return 'SERVICE_URL_NGINX_80';

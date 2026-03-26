@@ -275,7 +275,6 @@ services:
           echo "Starting supervisor..."
           exec /usr/bin/supervisord -c /etc/supervisord.conf
     environment:
-      - SERVICE_PUBLIC_URL=$SERVICE_URL_NGINX
       - SERVICE_GITHUB_REPO_URL=$SERVICE_GITHUB_REPO_URL
       - SERVICE_PHP_VERSION=$SERVICE_PHP_VERSION
       - SERVICE_URL_NGINX
@@ -285,7 +284,6 @@ services:
       - APP_NAME=Laravel RootKit
       - APP_ENV=production
       - APP_DEBUG=false
-      - APP_URL=$SERVICE_URL_NGINX
       - LOG_CHANNEL=stack
       - LOG_LEVEL=debug
       - DB_CONNECTION=mysql
