@@ -33,7 +33,11 @@
         </div>
     @endif
     @php
-        $websiteUrlFieldKey = $fields->has('SERVICE_URL_NGINX_80') ? 'SERVICE_URL_NGINX_80' : 'SERVICE_URL_LARAVEL';
+        $websiteUrlFieldKey = $fields->has('SERVICE_FQDN_NGINX_80')
+            ? 'SERVICE_FQDN_NGINX_80'
+            : ($fields->has('SERVICE_FQDN_NGINX')
+                ? 'SERVICE_FQDN_NGINX'
+                : ($fields->has('SERVICE_URL_NGINX_80') ? 'SERVICE_URL_NGINX_80' : 'SERVICE_URL_LARAVEL'));
     @endphp
     @if ($fields->has($websiteUrlFieldKey))
         <div class="w-full">
@@ -61,7 +65,7 @@
         </div>
         <div class="grid grid-cols-2 gap-2">
             @foreach ($fields as $serviceName => $field)
-                @if ($serviceName === 'SERVICE_GITHUB_REPO_URL' || $serviceName === 'SERVICE_PHP_VERSION' || $serviceName === 'SERVICE_URL_LARAVEL' || $serviceName === 'SERVICE_URL_NGINX_80')
+                @if ($serviceName === 'SERVICE_GITHUB_REPO_URL' || $serviceName === 'SERVICE_PHP_VERSION' || $serviceName === 'SERVICE_URL_LARAVEL' || $serviceName === 'SERVICE_URL_NGINX_80' || $serviceName === 'SERVICE_FQDN_NGINX' || $serviceName === 'SERVICE_FQDN_NGINX_80')
                     @continue
                 @endif
                 <div class="flex items-center gap-2"><span

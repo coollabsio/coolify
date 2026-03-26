@@ -164,10 +164,10 @@ class StackForm extends Component
             $serviceUrl = $this->service->environment_variables()
                 ->where('key', $websiteUrlFieldKey)
                 ->first();
-            if (! $serviceUrl && $websiteUrlFieldKey === 'SERVICE_URL_NGINX_80') {
-                // Backward compatibility for services created before nginx URL became canonical.
+            if (! $serviceUrl && in_array($websiteUrlFieldKey, ['SERVICE_FQDN_NGINX_80', 'SERVICE_FQDN_NGINX'], true)) {
+                // Backward compatibility for services created before nginx FQDN became canonical.
                 $serviceUrl = $this->service->environment_variables()
-                    ->where('key', 'SERVICE_URL_LARAVEL')
+                    ->whereIn('key', ['SERVICE_FQDN_NGINX_80', 'SERVICE_FQDN_NGINX', 'SERVICE_URL_NGINX_80', 'SERVICE_URL_NGINX', 'SERVICE_URL_LARAVEL'])
                     ->first();
             }
 
@@ -296,8 +296,14 @@ class StackForm extends Component
             return;
         }
 
-        if (! str_starts_with($value, 'http://') && ! str_starts_with($value, 'https://')) {
-            $value = 'https://'.$value;
+        if (str_starts_with($value, 'http://')) {
+            $value = substr($value, 7);
+        } elseif (str_starts_with($value, 'https://')) {
+            $value = substr($value, 8);
+        }
+        $value = rtrim($value, '/');
+        if ($serviceUrlFieldKey === 'SERVICE_FQDN_NGINX_80' && ! str_contains($value, ':')) {
+            $value .= ':80';
         }
 
         $serviceUrlField = $this->fields->get($serviceUrlFieldKey, []);
@@ -317,22 +323,54 @@ class StackForm extends Component
             return;
         }
 
-        if ($canonicalFieldKey === 'SERVICE_URL_NGINX_80') {
-            $laravelField = $this->fields->get('SERVICE_URL_LARAVEL', []);
-            if (is_array($laravelField) && $laravelField !== []) {
-                $laravelField['value'] = $canonicalUrl;
-                $this->fields->put('SERVICE_URL_LARAVEL', $laravelField);
-            }
-        }
+        $fqdnWithoutScheme = $canonicalUrl;
+        $fqdnWithoutPort = preg_replace('/:\d+$/', '', $fqdnWithoutScheme) ?? $fqdnWithoutScheme;
+        $fqdnWithPort = str_contains($fqdnWithoutScheme, ':') ? $fqdnWithoutScheme : $fqdnWithoutScheme.':80';
+        $httpUrl = str_starts_with($fqdnWithoutPort, 'http://') || str_starts_with($fqdnWithoutPort, 'https://')
+            ? $fqdnWithoutPort
+            : 'http://'.$fqdnWithoutPort;
+
+        $this->setFieldValueIfPresent('SERVICE_FQDN_NGINX_80', $fqdnWithPort);
+        $this->setFieldValueIfPresent('SERVICE_FQDN_NGINX', $fqdnWithoutPort);
+        $this->setFieldValueIfPresent('SERVICE_URL_NGINX_80', $httpUrl);
+        $this->setFieldValueIfPresent('SERVICE_URL_NGINX', $httpUrl);
+        $this->setFieldValueIfPresent('SERVICE_URL_LARAVEL', $httpUrl);
     }
 
     private function resolveWebsiteUrlFieldKey(): string
     {
+        if (str_contains($this->dockerComposeRaw, 'SERVICE_FQDN_NGINX_80')) {
+            return 'SERVICE_FQDN_NGINX_80';
+        }
+        if (str_contains($this->dockerComposeRaw, 'SERVICE_FQDN_NGINX')) {
+            return 'SERVICE_FQDN_NGINX';
+        }
         if (str_contains($this->dockerComposeRaw, 'SERVICE_URL_NGINX_80')) {
             return 'SERVICE_URL_NGINX_80';
         }
 
-        return $this->fields->has('SERVICE_URL_NGINX_80') ? 'SERVICE_URL_NGINX_80' : 'SERVICE_URL_LARAVEL';
+        if ($this->fields->has('SERVICE_FQDN_NGINX_80')) {
+            return 'SERVICE_FQDN_NGINX_80';
+        }
+        if ($this->fields->has('SERVICE_FQDN_NGINX')) {
+            return 'SERVICE_FQDN_NGINX';
+        }
+        if ($this->fields->has('SERVICE_URL_NGINX_80')) {
+            return 'SERVICE_URL_NGINX_80';
+        }
+
+        return 'SERVICE_URL_LARAVEL';
+    }
+
+    private function setFieldValueIfPresent(string $key, string $value): void
+    {
+        $field = $this->fields->get($key, []);
+        if (! is_array($field) || $field === []) {
+            return;
+        }
+
+        $field['value'] = $value;
+        $this->fields->put($key, $field);
     }
 
     public function render()

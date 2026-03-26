@@ -125,6 +125,16 @@ services:
           fi
 
           REPO_URL="${SERVICE_GITHUB_REPO_URL:-https://github.com/crmhawkins/copiservi.git}"
+          SERVICE_PUBLIC_URL_RUNTIME="${SERVICE_URL_NGINX_80:-${SERVICE_URL_NGINX:-}}"
+          if [ -z "${SERVICE_PUBLIC_URL_RUNTIME}" ]; then
+            SERVICE_PUBLIC_URL_RUNTIME="${SERVICE_PUBLIC_URL:-}"
+          fi
+          if [ -z "${SERVICE_PUBLIC_URL_RUNTIME}" ] && [ -n "${SERVICE_FQDN_NGINX_80:-}" ]; then
+            SERVICE_PUBLIC_URL_RUNTIME="http://${SERVICE_FQDN_NGINX_80%:80}"
+          fi
+          if [ -z "${SERVICE_PUBLIC_URL_RUNTIME}" ] && [ -n "${SERVICE_FQDN_NGINX:-}" ]; then
+            SERVICE_PUBLIC_URL_RUNTIME="http://${SERVICE_FQDN_NGINX}"
+          fi
 
           if [ ! -d .git ]; then
             echo "Cloning repository ${REPO_URL}..."
@@ -186,7 +196,7 @@ services:
              echo "DB_DATABASE=${DB_NAME}" >> .env
              echo "DB_USERNAME=${DB_USER}" >> .env
              echo "DB_PASSWORD=${DB_PASSWORD}" >> .env
-             echo "APP_URL=${SERVICE_PUBLIC_URL}" >> .env
+             echo "APP_URL=${SERVICE_PUBLIC_URL_RUNTIME}" >> .env
           fi
 
           upsert_env() {
@@ -201,7 +211,7 @@ services:
           }
 
           upsert_env "APP_KEY" ""
-          upsert_env "APP_URL" "${SERVICE_PUBLIC_URL}"
+          upsert_env "APP_URL" "${SERVICE_PUBLIC_URL_RUNTIME}"
           upsert_env "DB_CONNECTION" "mysql"
           upsert_env "DB_HOST" "mariadb"
           upsert_env "DB_PORT" "3306"
@@ -265,13 +275,17 @@ services:
           echo "Starting supervisor..."
           exec /usr/bin/supervisord -c /etc/supervisord.conf
     environment:
-      - SERVICE_PUBLIC_URL=${SERVICE_URL_NGINX_80}
+      - SERVICE_PUBLIC_URL=$SERVICE_URL_NGINX
       - SERVICE_GITHUB_REPO_URL=$SERVICE_GITHUB_REPO_URL
       - SERVICE_PHP_VERSION=$SERVICE_PHP_VERSION
+      - SERVICE_URL_NGINX
+      - SERVICE_URL_NGINX_80
+      - SERVICE_FQDN_NGINX
+      - SERVICE_FQDN_NGINX_80
       - APP_NAME=Laravel RootKit
       - APP_ENV=production
       - APP_DEBUG=false
-      - APP_URL=${SERVICE_URL_NGINX_80}
+      - APP_URL=$SERVICE_URL_NGINX
       - LOG_CHANNEL=stack
       - LOG_LEVEL=debug
       - DB_CONNECTION=mysql
