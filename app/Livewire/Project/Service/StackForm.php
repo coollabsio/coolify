@@ -158,6 +158,23 @@ class StackForm extends Component
             ]);
             $this->validationAttributes['fields.SERVICE_PHP_VERSION.value'] = 'PHP Version';
         }
+
+        if (! $this->fields->has('SERVICE_URL_LARAVEL')) {
+            $serviceUrl = $this->service->environment_variables()
+                ->where('key', 'SERVICE_URL_LARAVEL')
+                ->first();
+
+            $this->fields->put('SERVICE_URL_LARAVEL', [
+                'serviceName' => 'SERVICE_URL_LARAVEL',
+                'key' => 'SERVICE_URL_LARAVEL',
+                'name' => 'Website URL',
+                'value' => data_get($serviceUrl, 'value', ''),
+                'isPassword' => false,
+                'rules' => 'required|string',
+                'customHelper' => 'Public URL routed by Coolify for your Laravel app.',
+            ]);
+            $this->validationAttributes['fields.SERVICE_URL_LARAVEL.value'] = 'Website URL';
+        }
     }
 
     public function isLaravelGitHubStack(): bool
