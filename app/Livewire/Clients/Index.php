@@ -15,6 +15,8 @@ class Index extends Component
 {
     public Collection $clients;
 
+    public bool $missingMigration = false;
+
     public string $name = '';
 
     public string $email = '';
@@ -51,6 +53,7 @@ class Index extends Component
         }
 
         if (! Schema::hasColumn('teams', 'is_client')) {
+            $this->missingMigration = true;
             $this->dispatch('error', 'No puedo crear clientes hasta ejecutar la migración (falta teams.is_client). Ejecuta: php artisan migrate');
 
             return;
@@ -89,12 +92,14 @@ class Index extends Component
     private function refreshClients(): void
     {
         if (! Schema::hasColumn('teams', 'is_client')) {
+            $this->missingMigration = true;
             $this->clients = collect();
             $this->dispatch('error', 'Falta ejecutar la migración para Clientes (columna teams.is_client). Ejecuta: php artisan migrate');
 
             return;
         }
 
+        $this->missingMigration = false;
         $this->clients = Team::query()
             ->where('is_client', true)
             ->orderByRaw('LOWER(name)')

@@ -6,7 +6,12 @@
     <div class="flex items-center gap-2">
         <h1>Clientes</h1>
         <x-modal-input buttonTitle="+ Añadir" title="Nuevo cliente" :closeOutside="false">
-            <form class="flex flex-col gap-4" wire:submit="create">
+            <form class="flex flex-col gap-4" wire:submit.prevent="create">
+                @if ($missingMigration)
+                    <div class="p-3 text-sm border rounded-sm border-red-500 text-red-500">
+                        Falta ejecutar la migración de Clientes. Ejecuta <span class="font-mono">php artisan migrate</span> y recarga esta página.
+                    </div>
+                @endif
                 <div class="grid gap-3">
                     <x-forms.input id="name" label="Nombre" required />
                     <x-forms.input id="email" label="Email" required />
@@ -19,6 +24,12 @@
         </x-modal-input>
     </div>
     <div class="subtitle">Crea clientes y asígnales servidores/proyectos.</div>
+
+    @if ($missingMigration)
+        <div class="p-3 mt-3 text-sm border rounded-sm border-red-500 text-red-500">
+            La función de Clientes está desactivada hasta ejecutar <span class="font-mono">php artisan migrate</span>.
+        </div>
+    @endif
 
     <div class="grid gap-4 lg:grid-cols-2 -mt-1">
         @forelse ($clients as $client)
