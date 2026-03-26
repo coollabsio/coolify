@@ -25,6 +25,24 @@ class StartService
         $service->saveComposeConfigs();
         $service->isConfigurationChanged(save: true);
         $workdir = $service->workdir();
+        /**
+         * Ensure file-based bind mounts exist before `docker compose up`.
+         *
+         * Coolify stores bind-mounted file definitions (e.g. nginx.conf, entrypoint.sh)
+         * in LocalFileVolume records and normally materializes them on the server via
+         * queued jobs. If the queue worker is down/slow, Docker will create directories
+         * for missing bind-mount sources which can crash containers like nginx and lead
+         * to restart loops.
+         *
+         * Create these files synchronously during service start to make the deployment
+         * deterministic.
+         */
+        foreach ($service->applications()->get() as $application) {
+            $application->getFilesFromServer(isInit: true);
+        }
+        foreach ($service->databases()->get() as $database) {
+            $database->getFilesFromServer(isInit: true);
+        }
         // $commands[] = "cd {$workdir}";
         $commands[] = "echo 'Saved configuration files to {$workdir}.'";
         // Ensure .env exists in the correct directory before docker compose tries to load it
