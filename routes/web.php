@@ -6,6 +6,7 @@ use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
+use App\Livewire\Deployments\Index as DeploymentsIndex;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\ForcePasswordReset;
@@ -123,6 +124,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/scheduled-jobs', SettingsScheduledJobs::class)->name('settings.scheduled-jobs');
 
     Route::get('/profile', ProfileIndex::class)->name('profile');
+    Route::get('/deployments', DeploymentsIndex::class)->name('deployments.index');
 
     Route::prefix('tags')->group(function () {
         Route::get('/{tagName?}', TagsShow::class)->name('tags.show');
