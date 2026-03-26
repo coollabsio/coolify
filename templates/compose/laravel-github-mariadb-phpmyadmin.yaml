@@ -225,34 +225,18 @@ services:
               echo "WARNING: Laravel not ready after ${max_wait}s. Starting anyway so nginx can show an error page."
               mkdir -p /var/www/html/public
               if [ ! -f /var/www/html/public/_coolify_error.html ]; then
-                cat > /var/www/html/public/_coolify_error.html <<'EOF'
-                <!doctype html>
-                <html lang="en">
-                <head>
-                  <meta charset="utf-8" />
-                  <meta name="viewport" content="width=device-width, initial-scale=1" />
-                  <title>Coolify: Laravel not ready</title>
-                  <style>
-                    :root { color-scheme: dark; }
-                    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#0b0f19; color:#e5e7eb; }
-                    .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px; }
-                    .card { background:#111827; border:1px solid #1f2937; border-radius: 12px; padding: 20px; }
-                    h1 { font-size: 18px; margin: 0 0 12px; }
-                    p { margin: 0 0 12px; color:#cbd5e1; }
-                    .muted { color:#94a3b8; font-size: 13px; }
-                  </style>
-                </head>
-                <body>
-                  <div class="wrap">
-                    <div class="card">
-                      <h1>Laravel is not ready yet</h1>
-                      <p>The application did not finish installing (no <code>artisan</code> file found).</p>
-                      <p class="muted">Check the Laravel container logs in Coolify for the installation error and redeploy.</p>
-                    </div>
-                  </div>
-                </body>
-                </html>
-EOF
+                {
+                  printf '%s\n' '<!doctype html>'
+                  printf '%s\n' '<html lang="en"><head><meta charset="utf-8" />'
+                  printf '%s\n' '<meta name="viewport" content="width=device-width, initial-scale=1" />'
+                  printf '%s\n' '<title>Coolify: Laravel not ready</title>'
+                  printf '%s\n' '<style>:root{color-scheme:dark}body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#0b0f19;color:#e5e7eb}.wrap{max-width:960px;margin:0 auto;padding:32px 20px}.card{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:20px}h1{font-size:18px;margin:0 0 12px}p{margin:0 0 12px;color:#cbd5e1}.muted{color:#94a3b8;font-size:13px}</style></head><body>'
+                  printf '%s\n' '<div class="wrap"><div class="card">'
+                  printf '%s\n' '<h1>Laravel is not ready yet</h1>'
+                  printf '%s\n' '<p>The application did not finish installing (no <code>artisan</code> file found).</p>'
+                  printf '%s\n' '<p class="muted">Check the Laravel container logs in Coolify for the installation error and redeploy.</p>'
+                  printf '%s\n' '</div></div></body></html>'
+                } > /var/www/html/public/_coolify_error.html
               fi
               break
             fi

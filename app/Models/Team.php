@@ -44,6 +44,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     protected $casts = [
         'personal_team' => 'boolean',
+        'is_client' => 'boolean',
     ];
 
     protected static function booted()

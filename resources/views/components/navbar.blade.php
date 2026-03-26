@@ -291,6 +291,23 @@
                             <span class="menu-item-label">Teams</span>
                         </a>
                     </li>
+                    @if (isInstanceAdmin())
+                        <li>
+                            <a title="Cliente" {{ wireNavigate() }}
+                                class="{{ request()->is('clients*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                                href="{{ route('clients.index') }}">
+                                <svg class="menu-item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
+                                    <path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855" />
+                                    <path d="M8 8a4 4 0 1 1 8 0" />
+                                </svg>
+                                <span class="menu-item-label">Cliente</span>
+                            </a>
+                        </li>
+                    @endif
                     @if (isCloud() && auth()->user()->isAdmin())
                         <li>
                             <a title="Subscription" {{ wireNavigate() }}
