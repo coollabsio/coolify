@@ -60,7 +60,6 @@
 		"heredoc_indentation": {
 			"indentation": "same_as_start"
 		},
-		"indentation_type": false,
 		"logical_operators": true,
 		"long_to_shorthand_operator": true,
 		"mb_str_functions": true,
