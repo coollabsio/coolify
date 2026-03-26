@@ -114,7 +114,7 @@ class StandalonePostgresql extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
-            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+            instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
         }
     }
 

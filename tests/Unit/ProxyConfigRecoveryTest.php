@@ -10,20 +10,26 @@ beforeEach(function () {
     Cache::spy();
 });
 
-function mockServerWithDbConfig(?string $savedConfig): object
+function mockServerWithDbConfig(?string $savedConfig, string $proxyType = 'TRAEFIK'): object
 {
     $proxyAttributes = Mockery::mock(SchemalessAttributes::class);
     $proxyAttributes->shouldReceive('get')
         ->with('last_saved_proxy_configuration')
         ->andReturn($savedConfig);
 
+    $proxyPath = match ($proxyType) {
+        'CADDY' => '/data/coolify/proxy/caddy',
+        'NGINX' => '/data/coolify/proxy/nginx',
+        default => '/data/coolify/proxy/',
+    };
+
     $server = Mockery::mock('App\Models\Server');
     $server->shouldIgnoreMissing();
     $server->shouldReceive('getAttribute')->with('proxy')->andReturn($proxyAttributes);
     $server->shouldReceive('getAttribute')->with('id')->andReturn(1);
     $server->shouldReceive('getAttribute')->with('name')->andReturn('Test Server');
-    $server->shouldReceive('proxyType')->andReturn('TRAEFIK');
-    $server->shouldReceive('proxyPath')->andReturn('/data/coolify/proxy');
+    $server->shouldReceive('proxyType')->andReturn($proxyType);
+    $server->shouldReceive('proxyPath')->andReturn($proxyPath);
 
     return $server;
 }
@@ -106,4 +112,62 @@ it('does not read from disk when DB config exists', function () {
     $result = GetProxyConfiguration::run($server);
 
     expect($result)->toBe($savedConfig);
+});
+
+it('rejects stored Traefik config when proxy type is CADDY', function () {
+    Log::swap(new \Illuminate\Log\LogManager(app()));
+    Log::spy();
+
+    $traefikConfig = "services:\n  traefik:\n    image: traefik:v3.6\n";
+    $server = mockServerWithDbConfig($traefikConfig, 'CADDY');
+
+    // Config type mismatch should trigger regeneration, which will try
+    // backfillFromDisk (instant_remote_process) then generateDefault.
+    // Both will fail in test env, but the warning log proves mismatch was detected.
+    try {
+        GetProxyConfiguration::run($server);
+    } catch (\Throwable $e) {
+        // Expected — regeneration requires SSH/full server setup
+    }
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn ($message) => str_contains($message, 'does not match current proxy type'))
+        ->once();
+});
+
+it('rejects stored Caddy config when proxy type is TRAEFIK', function () {
+    Log::swap(new \Illuminate\Log\LogManager(app()));
+    Log::spy();
+
+    $caddyConfig = "services:\n  caddy:\n    image: lucaslorentz/caddy-docker-proxy:2.8-alpine\n";
+    $server = mockServerWithDbConfig($caddyConfig, 'TRAEFIK');
+
+    try {
+        GetProxyConfiguration::run($server);
+    } catch (\Throwable $e) {
+        // Expected — regeneration requires SSH/full server setup
+    }
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn ($message) => str_contains($message, 'does not match current proxy type'))
+        ->once();
+});
+
+it('accepts stored Caddy config when proxy type is CADDY', function () {
+    $caddyConfig = "services:\n  caddy:\n    image: lucaslorentz/caddy-docker-proxy:2.8-alpine\n";
+    $server = mockServerWithDbConfig($caddyConfig, 'CADDY');
+
+    $result = GetProxyConfiguration::run($server);
+
+    expect($result)->toBe($caddyConfig);
+});
+
+it('accepts stored config when YAML parsing fails', function () {
+    $invalidYaml = "this: is: not: [valid yaml: {{{}}}";
+    $server = mockServerWithDbConfig($invalidYaml, 'TRAEFIK');
+
+    // Invalid YAML should not block — configMatchesProxyType returns true on parse failure
+    $result = GetProxyConfiguration::run($server);
+
+    expect($result)->toBe($invalidYaml);
 });

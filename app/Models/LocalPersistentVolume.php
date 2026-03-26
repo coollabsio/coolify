@@ -3,10 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
-use Illuminate\Database\Eloquent\Model;
 use Symfony\Component\Yaml\Yaml;
 
-class LocalPersistentVolume extends Model
+class LocalPersistentVolume extends BaseModel
 {
     protected $guarded = [];
 

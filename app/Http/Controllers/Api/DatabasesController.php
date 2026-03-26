@@ -12,11 +12,15 @@ use App\Http\Controllers\Controller;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DeleteResourceJob;
 use App\Models\EnvironmentVariable;
+use App\Models\LocalFileVolume;
+use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
+use App\Support\ValidationPatterns;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
@@ -331,7 +335,7 @@ class DatabasesController extends Controller
 
         // this check if the request is a valid json
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = customApiValidator($request->all(), [
@@ -682,7 +686,7 @@ class DatabasesController extends Controller
 
         // Validate incoming request is valid JSON
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
 
@@ -786,6 +790,18 @@ class DatabasesController extends Controller
                 $backupData['databases_to_backup'] = $database->mysql_database;
             } elseif ($database->type() === 'standalone-mariadb') {
                 $backupData['databases_to_backup'] = $database->mariadb_database;
+            }
+        }
+
+        // Validate databases_to_backup input
+        if (! empty($backupData['databases_to_backup'])) {
+            try {
+                validateDatabasesBackupInput($backupData['databases_to_backup']);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['databases_to_backup' => [$e->getMessage()]],
+                ], 422);
             }
         }
 
@@ -899,7 +915,7 @@ class DatabasesController extends Controller
         }
         // this check if the request is a valid json
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = customApiValidator($request->all(), [
@@ -992,6 +1008,18 @@ class DatabasesController extends Controller
                 ], 422);
             }
             unset($backupData['s3_storage_uuid']);
+        }
+
+        // Validate databases_to_backup input
+        if (! empty($backupData['databases_to_backup'])) {
+            try {
+                validateDatabasesBackupInput($backupData['databases_to_backup']);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['databases_to_backup' => [$e->getMessage()]],
+                ], 422);
+            }
         }
 
         $backupConfig->update($backupData);
@@ -1563,7 +1591,7 @@ class DatabasesController extends Controller
         $this->authorize('create', StandalonePostgresql::class);
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
 
@@ -3297,5 +3325,524 @@ class DatabasesController extends Controller
         $env->forceDelete();
 
         return response()->json(['message' => 'Environment variable deleted.']);
+    }
+
+    #[OA\Get(
+        summary: 'List Storages',
+        description: 'List all persistent storages and file storages by database UUID.',
+        path: '/databases/{uuid}/storages',
+        operationId: 'list-storages-by-database-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'All storages by database UUID.',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'persistent_storages', type: 'array', items: new OA\Items(type: 'object')),
+                        new OA\Property(property: 'file_storages', type: 'array', items: new OA\Items(type: 'object')),
+                    ],
+                ),
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function storages(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('view', $database);
+
+        $persistentStorages = $database->persistentStorages->sortBy('id')->values();
+        $fileStorages = $database->fileStorages->sortBy('id')->values();
+
+        return response()->json([
+            'persistent_storages' => $persistentStorages,
+            'file_storages' => $fileStorages,
+        ]);
+    }
+
+    #[OA\Post(
+        summary: 'Create Storage',
+        description: 'Create a persistent storage or file storage for a database.',
+        path: '/databases/{uuid}/storages',
+        operationId: 'create-storage-by-database-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['type', 'mount_path'],
+                        properties: [
+                            'type' => ['type' => 'string', 'enum' => ['persistent', 'file'], 'description' => 'The type of storage.'],
+                            'name' => ['type' => 'string', 'description' => 'Volume name (persistent only, required for persistent).'],
+                            'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
+                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, optional).'],
+                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
+                            'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
+                            'fs_path' => ['type' => 'string', 'description' => 'Host directory path (required when is_directory is true).'],
+                        ],
+                        additionalProperties: false,
+                    ),
+                ),
+            ],
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Storage created.',
+                content: new OA\JsonContent(type: 'object'),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function create_storage(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('update', $database);
+
+        $validator = customApiValidator($request->all(), [
+            'type' => 'required|string|in:persistent,file',
+            'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
+            'mount_path' => 'required|string',
+            'host_path' => 'string|nullable',
+            'content' => 'string|nullable',
+            'is_directory' => 'boolean',
+            'fs_path' => 'string',
+        ]);
+
+        $allAllowedFields = ['type', 'name', 'mount_path', 'host_path', 'content', 'is_directory', 'fs_path'];
+        $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        if ($request->type === 'persistent') {
+            if (! $request->name) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['name' => 'The name field is required for persistent storages.'],
+                ], 422);
+            }
+
+            $typeSpecificInvalidFields = array_intersect(['content', 'is_directory', 'fs_path'], array_keys($request->all()));
+            if (! empty($typeSpecificInvalidFields)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => collect($typeSpecificInvalidFields)
+                        ->mapWithKeys(fn ($field) => [$field => "Field '{$field}' is not valid for type 'persistent'."]),
+                ], 422);
+            }
+
+            $storage = LocalPersistentVolume::create([
+                'name' => $database->uuid.'-'.$request->name,
+                'mount_path' => $request->mount_path,
+                'host_path' => $request->host_path,
+                'resource_id' => $database->id,
+                'resource_type' => $database->getMorphClass(),
+            ]);
+
+            return response()->json($storage, 201);
+        }
+
+        // File storage
+        $typeSpecificInvalidFields = array_intersect(['name', 'host_path'], array_keys($request->all()));
+        if (! empty($typeSpecificInvalidFields)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => collect($typeSpecificInvalidFields)
+                    ->mapWithKeys(fn ($field) => [$field => "Field '{$field}' is not valid for type 'file'."]),
+            ], 422);
+        }
+
+        $isDirectory = $request->boolean('is_directory', false);
+
+        if ($isDirectory) {
+            if (! $request->fs_path) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['fs_path' => 'The fs_path field is required for directory mounts.'],
+                ], 422);
+            }
+
+            $fsPath = str($request->fs_path)->trim()->start('/')->value();
+            $mountPath = str($request->mount_path)->trim()->start('/')->value();
+
+            validateShellSafePath($fsPath, 'storage source path');
+            validateShellSafePath($mountPath, 'storage destination path');
+
+            $storage = LocalFileVolume::create([
+                'fs_path' => $fsPath,
+                'mount_path' => $mountPath,
+                'is_directory' => true,
+                'resource_id' => $database->id,
+                'resource_type' => get_class($database),
+            ]);
+        } else {
+            $mountPath = str($request->mount_path)->trim()->start('/')->value();
+
+            validateShellSafePath($mountPath, 'file storage path');
+
+            $fsPath = database_configuration_dir().'/'.$database->uuid.$mountPath;
+
+            $storage = LocalFileVolume::create([
+                'fs_path' => $fsPath,
+                'mount_path' => $mountPath,
+                'content' => $request->content,
+                'is_directory' => false,
+                'resource_id' => $database->id,
+                'resource_type' => get_class($database),
+            ]);
+        }
+
+        return response()->json($storage, 201);
+    }
+
+    #[OA\Patch(
+        summary: 'Update Storage',
+        description: 'Update a persistent storage or file storage by database UUID.',
+        path: '/databases/{uuid}/storages',
+        operationId: 'update-storage-by-database-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Storage updated. For read-only storages (from docker-compose or services), only is_preview_suffix_enabled can be updated.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['type'],
+                        properties: [
+                            'uuid' => ['type' => 'string', 'description' => 'The UUID of the storage (preferred).'],
+                            'id' => ['type' => 'integer', 'description' => 'The ID of the storage (deprecated, use uuid instead).'],
+                            'type' => ['type' => 'string', 'enum' => ['persistent', 'file'], 'description' => 'The type of storage: persistent or file.'],
+                            'is_preview_suffix_enabled' => ['type' => 'boolean', 'description' => 'Whether to add -pr-N suffix for preview deployments.'],
+                            'name' => ['type' => 'string', 'description' => 'The volume name (persistent only, not allowed for read-only storages).'],
+                            'mount_path' => ['type' => 'string', 'description' => 'The container mount path (not allowed for read-only storages).'],
+                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, not allowed for read-only storages).'],
+                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages).'],
+                        ],
+                        additionalProperties: false,
+                    ),
+                ),
+            ],
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Storage updated.',
+                content: new OA\JsonContent(type: 'object'),
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function update_storage(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->route('uuid'), $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('update', $database);
+
+        $validator = customApiValidator($request->all(), [
+            'uuid' => 'string',
+            'id' => 'integer',
+            'type' => 'required|string|in:persistent,file',
+            'is_preview_suffix_enabled' => 'boolean',
+            'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
+            'mount_path' => 'string',
+            'host_path' => 'string|nullable',
+            'content' => 'string|nullable',
+        ]);
+
+        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'host_path', 'content'];
+        $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $storageUuid = $request->input('uuid');
+        $storageId = $request->input('id');
+
+        if (! $storageUuid && ! $storageId) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['uuid' => 'Either uuid or id is required.'],
+            ], 422);
+        }
+
+        $lookupField = $storageUuid ? 'uuid' : 'id';
+        $lookupValue = $storageUuid ?? $storageId;
+
+        if ($request->type === 'persistent') {
+            $storage = $database->persistentStorages->where($lookupField, $lookupValue)->first();
+        } else {
+            $storage = $database->fileStorages->where($lookupField, $lookupValue)->first();
+        }
+
+        if (! $storage) {
+            return response()->json([
+                'message' => 'Storage not found.',
+            ], 404);
+        }
+
+        $isReadOnly = $storage->shouldBeReadOnlyInUI();
+        $editableOnlyFields = ['name', 'mount_path', 'host_path', 'content'];
+        $requestedEditableFields = array_intersect($editableOnlyFields, array_keys($request->all()));
+
+        if ($isReadOnly && ! empty($requestedEditableFields)) {
+            return response()->json([
+                'message' => 'This storage is read-only (managed by docker-compose or service definition). Only is_preview_suffix_enabled can be updated.',
+                'read_only_fields' => array_values($requestedEditableFields),
+            ], 422);
+        }
+
+        // Reject fields that don't apply to the given storage type
+        if (! $isReadOnly) {
+            $typeSpecificInvalidFields = $request->type === 'persistent'
+                ? array_intersect(['content'], array_keys($request->all()))
+                : array_intersect(['name', 'host_path'], array_keys($request->all()));
+
+            if (! empty($typeSpecificInvalidFields)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => collect($typeSpecificInvalidFields)
+                        ->mapWithKeys(fn ($field) => [$field => "Field '{$field}' is not valid for type '{$request->type}'."]),
+                ], 422);
+            }
+        }
+
+        // Always allowed
+        if ($request->has('is_preview_suffix_enabled')) {
+            $storage->is_preview_suffix_enabled = $request->is_preview_suffix_enabled;
+        }
+
+        // Only for editable storages
+        if (! $isReadOnly) {
+            if ($request->type === 'persistent') {
+                if ($request->has('name')) {
+                    $storage->name = $request->name;
+                }
+                if ($request->has('mount_path')) {
+                    $storage->mount_path = $request->mount_path;
+                }
+                if ($request->has('host_path')) {
+                    $storage->host_path = $request->host_path;
+                }
+            } else {
+                if ($request->has('mount_path')) {
+                    $storage->mount_path = $request->mount_path;
+                }
+                if ($request->has('content')) {
+                    $storage->content = $request->content;
+                }
+            }
+        }
+
+        $storage->save();
+
+        return response()->json($storage);
+    }
+
+    #[OA\Delete(
+        summary: 'Delete Storage',
+        description: 'Delete a persistent storage or file storage by database UUID.',
+        path: '/databases/{uuid}/storages/{storage_uuid}',
+        operationId: 'delete-storage-by-database-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+            new OA\Parameter(
+                name: 'storage_uuid',
+                in: 'path',
+                description: 'UUID of the storage.',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Storage deleted.', content: new OA\JsonContent(
+                properties: [new OA\Property(property: 'message', type: 'string')],
+            )),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function delete_storage(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('update', $database);
+
+        $storageUuid = $request->route('storage_uuid');
+
+        $storage = $database->persistentStorages->where('uuid', $storageUuid)->first();
+        if (! $storage) {
+            $storage = $database->fileStorages->where('uuid', $storageUuid)->first();
+        }
+
+        if (! $storage) {
+            return response()->json(['message' => 'Storage not found.'], 404);
+        }
+
+        if ($storage->shouldBeReadOnlyInUI()) {
+            return response()->json([
+                'message' => 'This storage is read-only (managed by docker-compose or service definition) and cannot be deleted.',
+            ], 422);
+        }
+
+        if ($storage instanceof LocalFileVolume) {
+            $storage->deleteStorageOnServer();
+        }
+
+        $storage->delete();
+
+        return response()->json(['message' => 'Storage deleted.']);
     }
 }

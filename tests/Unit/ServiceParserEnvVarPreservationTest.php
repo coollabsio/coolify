@@ -4,7 +4,7 @@
  * Unit tests to verify that Docker Compose environment variables
  * do not overwrite user-saved values on redeploy.
  *
- * Regression test for GitHub issue #8885.
+ * Regression test for GitHub issues #8885 and #9136.
  */
 it('uses firstOrCreate for simple variable references in serviceParser to preserve user values', function () {
     $parsersFile = file_get_contents(__DIR__.'/../../bootstrap/helpers/parsers.php');
@@ -14,8 +14,8 @@ it('uses firstOrCreate for simple variable references in serviceParser to preser
     // This is the key === parsedValue branch
     expect($parsersFile)->toContain(
         "// Simple variable reference (e.g. DATABASE_URL: \${DATABASE_URL})\n".
-        "                // Use firstOrCreate to avoid overwriting user-saved values on redeploy\n".
-        '                $envVar = $resource->environment_variables()->firstOrCreate('
+        "                // Ensure the variable exists in DB for .env generation and UI display\n".
+        '                $resource->environment_variables()->firstOrCreate('
     );
 });
 
@@ -46,15 +46,15 @@ it('uses firstOrCreate for simple variable refs without default in serviceParser
     expect($count)->toBe(1, 'serviceParser should use firstOrCreate for simple variable refs without default');
 });
 
-it('populates environment array with saved DB value instead of raw compose variable', function () {
+it('does not replace self-referencing variable values in the environment array', function () {
     $parsersFile = file_get_contents(__DIR__.'/../../bootstrap/helpers/parsers.php');
 
-    // After firstOrCreate, the environment should be populated with the DB value ($envVar->value)
-    // not the raw compose variable reference (e.g., ${DATABASE_URL})
-    // This pattern should appear in both parsers for all variable reference types
-    expect($parsersFile)->toContain('// Add the variable to the environment using the saved DB value');
-    expect($parsersFile)->toContain('$environment[$key->value()] = $envVar->value;');
-    expect($parsersFile)->toContain('$environment[$content] = $envVar->value;');
+    // Fix for #9136: self-referencing variables (KEY=${KEY}) must NOT have their ${VAR}
+    // reference replaced with the DB value in the compose environment section.
+    // Instead, the reference should stay intact so Docker Compose resolves from .env at deploy time.
+    // This prevents stale values when users update env vars without re-parsing compose.
+    expect($parsersFile)->toContain('Keep the ${VAR} reference in compose');
+    expect($parsersFile)->not->toContain('$environment[$key->value()] = $envVar->value;');
 });
 
 it('does not use updateOrCreate with value null for user-editable environment variables', function () {

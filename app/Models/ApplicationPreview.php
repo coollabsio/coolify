@@ -37,7 +37,7 @@ class ApplicationPreview extends BaseModel
                 $persistentStorages = $preview->persistentStorages()->get() ?? collect();
                 if ($persistentStorages->count() > 0) {
                     foreach ($persistentStorages as $storage) {
-                        instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+                        instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
                     }
                 }
             }

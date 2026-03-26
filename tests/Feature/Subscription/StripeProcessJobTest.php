@@ -50,6 +50,93 @@ describe('customer.subscription.created does not fall through to updated', funct
         // Critical: stripe_invoice_paid must remain false — payment not yet confirmed
         expect($subscription->stripe_invoice_paid)->toBeFalsy();
     });
+
+    test('created event updates existing subscription instead of duplicating', function () {
+        Queue::fake();
+
+        Subscription::create([
+            'team_id' => $this->team->id,
+            'stripe_subscription_id' => 'sub_old',
+            'stripe_customer_id' => 'cus_old',
+            'stripe_invoice_paid' => true,
+        ]);
+
+        $event = [
+            'type' => 'customer.subscription.created',
+            'data' => [
+                'object' => [
+                    'customer' => 'cus_new_123',
+                    'id' => 'sub_new_123',
+                    'metadata' => [
+                        'team_id' => $this->team->id,
+                        'user_id' => $this->user->id,
+                    ],
+                ],
+            ],
+        ];
+
+        $job = new StripeProcessJob($event);
+        $job->handle();
+
+        expect(Subscription::where('team_id', $this->team->id)->count())->toBe(1);
+        $subscription = Subscription::where('team_id', $this->team->id)->first();
+        expect($subscription->stripe_subscription_id)->toBe('sub_new_123');
+        expect($subscription->stripe_customer_id)->toBe('cus_new_123');
+    });
+});
+
+describe('checkout.session.completed', function () {
+    test('creates subscription for new team', function () {
+        Queue::fake();
+
+        $event = [
+            'type' => 'checkout.session.completed',
+            'data' => [
+                'object' => [
+                    'client_reference_id' => $this->user->id.':'.$this->team->id,
+                    'subscription' => 'sub_checkout_123',
+                    'customer' => 'cus_checkout_123',
+                ],
+            ],
+        ];
+
+        $job = new StripeProcessJob($event);
+        $job->handle();
+
+        $subscription = Subscription::where('team_id', $this->team->id)->first();
+        expect($subscription)->not->toBeNull();
+        expect($subscription->stripe_invoice_paid)->toBeTruthy();
+    });
+
+    test('updates existing subscription instead of duplicating', function () {
+        Queue::fake();
+
+        Subscription::create([
+            'team_id' => $this->team->id,
+            'stripe_subscription_id' => 'sub_old',
+            'stripe_customer_id' => 'cus_old',
+            'stripe_invoice_paid' => false,
+        ]);
+
+        $event = [
+            'type' => 'checkout.session.completed',
+            'data' => [
+                'object' => [
+                    'client_reference_id' => $this->user->id.':'.$this->team->id,
+                    'subscription' => 'sub_checkout_new',
+                    'customer' => 'cus_checkout_new',
+                ],
+            ],
+        ];
+
+        $job = new StripeProcessJob($event);
+        $job->handle();
+
+        expect(Subscription::where('team_id', $this->team->id)->count())->toBe(1);
+        $subscription = Subscription::where('team_id', $this->team->id)->first();
+        expect($subscription->stripe_subscription_id)->toBe('sub_checkout_new');
+        expect($subscription->stripe_invoice_paid)->toBeTruthy();
+    });
 });
 
 describe('customer.subscription.updated clamps quantity to MAX_SERVER_LIMIT', function () {

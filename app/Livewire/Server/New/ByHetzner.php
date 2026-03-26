@@ -8,6 +8,7 @@ use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
+use App\Rules\ValidCloudInitYaml;
 use App\Rules\ValidHostname;
 use App\Services\HetznerService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -161,7 +162,7 @@ class ByHetzner extends Component
                 'selectedHetznerSshKeyIds.*' => 'integer',
                 'enable_ipv4' => 'required|boolean',
                 'enable_ipv6' => 'required|boolean',
-                'cloud_init_script' => ['nullable', 'string', new \App\Rules\ValidCloudInitYaml],
+                'cloud_init_script' => ['nullable', 'string', new ValidCloudInitYaml],
                 'save_cloud_init_script' => 'boolean',
                 'cloud_init_script_name' => 'nullable|string|max:255',
                 'selected_cloud_init_script_id' => 'nullable|integer|exists:cloud_init_scripts,id',
@@ -295,11 +296,6 @@ class ByHetzner extends Component
 
     public function getAvailableServerTypesProperty()
     {
-        ray('Getting available server types', [
-            'selected_location' => $this->selected_location,
-            'total_server_types' => count($this->serverTypes),
-        ]);
-
         if (! $this->selected_location) {
             return $this->serverTypes;
         }
@@ -322,21 +318,11 @@ class ByHetzner extends Component
             ->values()
             ->toArray();
 
-        ray('Filtered server types', [
-            'selected_location' => $this->selected_location,
-            'filtered_count' => count($filtered),
-        ]);
-
         return $filtered;
     }
 
     public function getAvailableImagesProperty()
     {
-        ray('Getting available images', [
-            'selected_server_type' => $this->selected_server_type,
-            'total_images' => count($this->images),
-            'images' => $this->images,
-        ]);
 
         if (! $this->selected_server_type) {
             return $this->images;
@@ -344,10 +330,7 @@ class ByHetzner extends Component
 
         $serverType = collect($this->serverTypes)->firstWhere('name', $this->selected_server_type);
 
-        ray('Server type data', $serverType);
-
         if (! $serverType || ! isset($serverType['architecture'])) {
-            ray('No architecture in server type, returning all');
 
             return $this->images;
         }
@@ -358,11 +341,6 @@ class ByHetzner extends Component
             ->filter(fn ($image) => ($image['architecture'] ?? null) === $architecture)
             ->values()
             ->toArray();
-
-        ray('Filtered images', [
-            'architecture' => $architecture,
-            'filtered_count' => count($filtered),
-        ]);
 
         return $filtered;
     }
@@ -386,8 +364,6 @@ class ByHetzner extends Component
 
     public function updatedSelectedLocation($value)
     {
-        ray('Location selected', $value);
-
         // Reset server type and image when location changes
         $this->selected_server_type = null;
         $this->selected_image = null;
@@ -395,15 +371,13 @@ class ByHetzner extends Component
 
     public function updatedSelectedServerType($value)
     {
-        ray('Server type selected', $value);
-
         // Reset image when server type changes
         $this->selected_image = null;
     }
 
     public function updatedSelectedImage($value)
     {
-        ray('Image selected', $value);
+        //
     }
 
     public function updatedSelectedCloudInitScriptId($value)
@@ -433,17 +407,9 @@ class ByHetzner extends Component
         $publicKey = $privateKey->getPublicKey();
         $md5Fingerprint = PrivateKey::generateMd5Fingerprint($privateKey->private_key);
 
-        ray('Private Key Info', [
-            'private_key_id' => $this->private_key_id,
-            'sha256_fingerprint' => $privateKey->fingerprint,
-            'md5_fingerprint' => $md5Fingerprint,
-        ]);
-
         // Check if SSH key already exists on Hetzner by comparing MD5 fingerprints
         $existingSshKeys = $hetznerService->getSshKeys();
         $existingKey = null;
-
-        ray('Existing SSH Keys on Hetzner', $existingSshKeys);
 
         foreach ($existingSshKeys as $key) {
             if ($key['fingerprint'] === $md5Fingerprint) {
@@ -455,12 +421,10 @@ class ByHetzner extends Component
         // Upload SSH key if it doesn't exist
         if ($existingKey) {
             $sshKeyId = $existingKey['id'];
-            ray('Using existing SSH key', ['ssh_key_id' => $sshKeyId]);
         } else {
             $sshKeyName = $privateKey->name;
             $uploadedKey = $hetznerService->uploadSshKey($sshKeyName, $publicKey);
             $sshKeyId = $uploadedKey['id'];
-            ray('Uploaded new SSH key', ['ssh_key_id' => $sshKeyId, 'name' => $sshKeyName]);
         }
 
         // Normalize server name to lowercase for RFC 1123 compliance
@@ -495,12 +459,8 @@ class ByHetzner extends Component
             $params['user_data'] = $this->cloud_init_script;
         }
 
-        ray('Server creation parameters', $params);
-
         // Create server on Hetzner
         $hetznerServer = $hetznerService->createServer($params);
-
-        ray('Hetzner server created', $hetznerServer);
 
         return $hetznerServer;
     }

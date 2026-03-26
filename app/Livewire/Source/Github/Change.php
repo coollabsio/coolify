@@ -5,6 +5,7 @@ namespace App\Livewire\Source\Github;
 use App\Jobs\GithubAppPermissionJob;
 use App\Models\GithubApp;
 use App\Models\PrivateKey;
+use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Http;
 use Lcobucci\JWT\Configuration;
@@ -71,24 +72,27 @@ class Change extends Component
 
     public $privateKeys;
 
-    protected $rules = [
-        'name' => 'required|string',
-        'organization' => 'nullable|string',
-        'apiUrl' => 'required|string',
-        'htmlUrl' => 'required|string',
-        'customUser' => 'required|string',
-        'customPort' => 'required|int',
-        'appId' => 'nullable|int',
-        'installationId' => 'nullable|int',
-        'clientId' => 'nullable|string',
-        'clientSecret' => 'nullable|string',
-        'webhookSecret' => 'nullable|string',
-        'isSystemWide' => 'required|bool',
-        'contents' => 'nullable|string',
-        'metadata' => 'nullable|string',
-        'pullRequests' => 'nullable|string',
-        'privateKeyId' => 'nullable|int',
-    ];
+    protected function rules(): array
+    {
+        return [
+            'name' => 'required|string',
+            'organization' => 'nullable|string',
+            'apiUrl' => ['required', 'string', 'url', new SafeExternalUrl],
+            'htmlUrl' => ['required', 'string', 'url', new SafeExternalUrl],
+            'customUser' => 'required|string',
+            'customPort' => 'required|int',
+            'appId' => 'nullable|int',
+            'installationId' => 'nullable|int',
+            'clientId' => 'nullable|string',
+            'clientSecret' => 'nullable|string',
+            'webhookSecret' => 'nullable|string',
+            'isSystemWide' => 'required|bool',
+            'contents' => 'nullable|string',
+            'metadata' => 'nullable|string',
+            'pullRequests' => 'nullable|string',
+            'privateKeyId' => 'nullable|int',
+        ];
+    }
 
     public function boot()
     {

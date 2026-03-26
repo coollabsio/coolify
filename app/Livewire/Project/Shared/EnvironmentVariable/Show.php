@@ -98,6 +98,9 @@ class Show extends Component
 
     public function refresh()
     {
+        if (! $this->env->exists || ! $this->env->fresh()) {
+            return;
+        }
         $this->syncData();
         $this->checkEnvs();
     }

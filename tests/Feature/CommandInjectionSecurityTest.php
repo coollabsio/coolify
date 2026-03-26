@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\ApplicationDeploymentJob;
+use App\Support\ValidationPatterns;
 
 describe('deployment job path field validation', function () {
     test('rejects shell metacharacters in dockerfile_location', function () {
@@ -197,7 +198,7 @@ describe('sharedDataApplications rules survive array_merge in controller', funct
 
         // The merged rules for docker_compose_location should be the safe regex, not just 'string'
         expect($merged['docker_compose_location'])->toBeArray();
-        expect($merged['docker_compose_location'])->toContain('regex:'.\App\Support\ValidationPatterns::FILE_PATH_PATTERN);
+        expect($merged['docker_compose_location'])->toContain('regex:'.ValidationPatterns::FILE_PATH_PATTERN);
     });
 });
 
@@ -285,7 +286,7 @@ describe('dockerfile_target_build validation', function () {
         $job = new ReflectionClass(ApplicationDeploymentJob::class);
 
         // Test that validateShellSafeCommand is also available as a pattern
-        $pattern = \App\Support\ValidationPatterns::DOCKER_TARGET_PATTERN;
+        $pattern = ValidationPatterns::DOCKER_TARGET_PATTERN;
         expect(preg_match($pattern, 'production'))->toBe(1);
         expect(preg_match($pattern, 'build; env'))->toBe(0);
         expect(preg_match($pattern, 'target`whoami`'))->toBe(0);
@@ -364,15 +365,15 @@ describe('docker_compose_custom_command validation', function () {
         expect($validator->fails())->toBeTrue();
     });
 
-    test('rejects ampersand chaining in docker_compose_custom_start_command', function () {
+    test('allows ampersand chaining in docker_compose_custom_start_command', function () {
         $rules = sharedDataApplications();
 
         $validator = validator(
-            ['docker_compose_custom_start_command' => 'docker compose up && rm -rf /'],
+            ['docker_compose_custom_start_command' => 'docker compose up && docker compose logs'],
             ['docker_compose_custom_start_command' => $rules['docker_compose_custom_start_command']]
         );
 
-        expect($validator->fails())->toBeTrue();
+        expect($validator->fails())->toBeFalse();
     });
 
     test('rejects command substitution in docker_compose_custom_build_command', function () {
@@ -399,6 +400,7 @@ describe('docker_compose_custom_command validation', function () {
         'docker compose build',
         'docker compose up -d --build',
         'docker compose -f custom.yml build --no-cache',
+        'docker compose build && docker tag registry.example.com/app:beta localhost:5000/app:beta && docker push localhost:5000/app:beta',
     ]);
 
     test('rejects backslash in docker_compose_custom_start_command', function () {
@@ -423,15 +425,15 @@ describe('docker_compose_custom_command validation', function () {
         expect($validator->fails())->toBeTrue();
     });
 
-    test('rejects double quotes in docker_compose_custom_start_command', function () {
+    test('allows double quotes in docker_compose_custom_start_command', function () {
         $rules = sharedDataApplications();
 
         $validator = validator(
-            ['docker_compose_custom_start_command' => 'docker compose up -d --build "malicious"'],
+            ['docker_compose_custom_start_command' => 'docker compose up -d --build --build-arg VERSION="1.0.0"'],
             ['docker_compose_custom_start_command' => $rules['docker_compose_custom_start_command']]
         );
 
-        expect($validator->fails())->toBeTrue();
+        expect($validator->fails())->toBeFalse();
     });
 
     test('rejects newline injection in docker_compose_custom_start_command', function () {
@@ -564,7 +566,7 @@ describe('dockerfile_target_build rules survive array_merge in controller', func
 
         expect($merged)->toHaveKey('dockerfile_target_build');
         expect($merged['dockerfile_target_build'])->toBeArray();
-        expect($merged['dockerfile_target_build'])->toContain('regex:'.\App\Support\ValidationPatterns::DOCKER_TARGET_PATTERN);
+        expect($merged['dockerfile_target_build'])->toContain('regex:'.ValidationPatterns::DOCKER_TARGET_PATTERN);
     });
 });
 
@@ -582,7 +584,7 @@ describe('docker_compose_custom_command rules survive array_merge in controller'
         $merged = array_merge($sharedRules, $localRules);
 
         expect($merged['docker_compose_custom_start_command'])->toBeArray();
-        expect($merged['docker_compose_custom_start_command'])->toContain('regex:'.\App\Support\ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
+        expect($merged['docker_compose_custom_start_command'])->toContain('regex:'.ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
     });
 
     test('docker_compose_custom_build_command safe regex is not overridden by local rules', function () {
@@ -595,7 +597,7 @@ describe('docker_compose_custom_command rules survive array_merge in controller'
         $merged = array_merge($sharedRules, $localRules);
 
         expect($merged['docker_compose_custom_build_command'])->toBeArray();
-        expect($merged['docker_compose_custom_build_command'])->toContain('regex:'.\App\Support\ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
+        expect($merged['docker_compose_custom_build_command'])->toContain('regex:'.ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
     });
 });
 

@@ -149,6 +149,59 @@ function validateShellSafePath(string $input, string $context = 'path'): string
 }
 
 /**
+ * Validate that a databases_to_backup input string is safe from command injection.
+ *
+ * Supports all database formats:
+ * - PostgreSQL/MySQL/MariaDB: "db1,db2,db3"
+ * - MongoDB: "db1:col1,col2|db2:col3,col4"
+ *
+ * Validates each database name AND collection name individually against shell metacharacters.
+ *
+ * @param  string  $input  The databases_to_backup string
+ * @return string The validated input
+ *
+ * @throws \Exception If any component contains dangerous characters
+ */
+function validateDatabasesBackupInput(string $input): string
+{
+    // Split by pipe (MongoDB multi-db separator)
+    $databaseEntries = explode('|', $input);
+
+    foreach ($databaseEntries as $entry) {
+        $entry = trim($entry);
+        if ($entry === '' || $entry === 'all' || $entry === '*') {
+            continue;
+        }
+
+        if (str_contains($entry, ':')) {
+            // MongoDB format: dbname:collection1,collection2
+            $databaseName = str($entry)->before(':')->value();
+            $collections = str($entry)->after(':')->explode(',');
+
+            validateShellSafePath($databaseName, 'database name');
+
+            foreach ($collections as $collection) {
+                $collection = trim($collection);
+                if ($collection !== '') {
+                    validateShellSafePath($collection, 'collection name');
+                }
+            }
+        } else {
+            // Simple format: just a database name (may contain commas for non-Mongo)
+            $databases = explode(',', $entry);
+            foreach ($databases as $db) {
+                $db = trim($db);
+                if ($db !== '' && $db !== 'all' && $db !== '*') {
+                    validateShellSafePath($db, 'database name');
+                }
+            }
+        }
+    }
+
+    return $input;
+}
+
+/**
  * Validate that a string is a safe git ref (commit SHA, branch name, tag, or HEAD).
  *
  * Prevents command injection by enforcing an allowlist of characters valid for git refs.
@@ -339,7 +392,18 @@ function generate_application_name(string $git_repository, string $git_branch, ?
         $cuid = new Cuid2;
     }
 
-    return Str::kebab("$git_repository:$git_branch-$cuid");
+    $repo_name = str_contains($git_repository, '/') ? last(explode('/', $git_repository)) : $git_repository;
+
+    $name = Str::kebab("$repo_name:$git_branch-$cuid");
+
+    // Strip characters not allowed by NAME_PATTERN
+    $name = preg_replace('/[^\p{L}\p{M}\p{N}\s\-_.@\/&()#,:+]+/u', '', $name);
+
+    if (empty($name) || mb_strlen($name) < 3) {
+        return generate_random_name($cuid);
+    }
+
+    return $name;
 }
 
 /**
@@ -464,6 +528,36 @@ function validate_cron_expression($expression_to_validate): bool
     }
 
     return $isValid;
+}
+
+/**
+ * Determine if a cron schedule should run now, with deduplication.
+ *
+ * Uses getPreviousRunDate() + last-dispatch tracking to be resilient to queue delays.
+ * Even if the job runs minutes late, it still catches the missed cron window.
+ * Without a dedupKey, falls back to a simple isDue() check.
+ */
+function shouldRunCronNow(string $frequency, string $timezone, ?string $dedupKey = null, ?\Illuminate\Support\Carbon $executionTime = null): bool
+{
+    $cron = new \Cron\CronExpression($frequency);
+    $executionTime = ($executionTime ?? \Illuminate\Support\Carbon::now())->copy()->setTimezone($timezone);
+
+    if ($dedupKey === null) {
+        return $cron->isDue($executionTime);
+    }
+
+    $previousDue = \Illuminate\Support\Carbon::instance($cron->getPreviousRunDate($executionTime, allowCurrentDate: true));
+    $lastDispatched = Cache::get($dedupKey);
+
+    $shouldFire = $lastDispatched === null
+        ? $cron->isDue($executionTime)
+        : $previousDue->gt(\Illuminate\Support\Carbon::parse($lastDispatched));
+
+    // Always write: seeds on first miss, refreshes on dispatch.
+    // 30-day static TTL covers all intervals; orphan keys self-clean.
+    Cache::put($dedupKey, ($shouldFire ? $executionTime : $previousDue)->toIso8601String(), 2592000);
+
+    return $shouldFire;
 }
 
 function validate_timezone(string $timezone): bool

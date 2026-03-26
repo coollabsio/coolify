@@ -3,11 +3,14 @@
 namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\GenerateConfig;
+use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Support\ValidationPatterns;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
+use Livewire\Features\SupportEvents\Event;
 use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
 
@@ -194,9 +197,9 @@ class General extends Component
                 'baseDirectory.regex' => 'The base directory must be a valid path starting with / and containing only safe characters.',
                 'publishDirectory.regex' => 'The publish directory must be a valid path starting with / and containing only safe characters.',
                 'dockerfileTargetBuild.regex' => 'The Dockerfile target build must contain only alphanumeric characters, dots, hyphens, and underscores.',
-                'dockerComposeCustomStartCommand.regex' => 'The Docker Compose start command contains invalid characters. Shell operators like ;, &, |, $, and backticks are not allowed.',
-                'dockerComposeCustomBuildCommand.regex' => 'The Docker Compose build command contains invalid characters. Shell operators like ;, &, |, $, and backticks are not allowed.',
-                'customDockerRunOptions.regex' => 'The custom Docker run options contain invalid characters. Shell operators like ;, &, |, $, and backticks are not allowed.',
+                'dockerComposeCustomStartCommand.regex' => 'The Docker Compose start command contains invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
+                'dockerComposeCustomBuildCommand.regex' => 'The Docker Compose build command contains invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
+                'customDockerRunOptions.regex' => 'The custom Docker run options contain invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
                 'preDeploymentCommandContainer.regex' => 'The pre-deployment command container name must contain only alphanumeric characters, dots, hyphens, and underscores.',
                 'postDeploymentCommandContainer.regex' => 'The post-deployment command container name must contain only alphanumeric characters, dots, hyphens, and underscores.',
                 'name.required' => 'The Name field is required.',
@@ -288,7 +291,7 @@ class General extends Component
                 $this->authorize('update', $this->application);
                 $this->application->fqdn = null;
                 $this->application->settings->save();
-            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            } catch (AuthorizationException $e) {
                 // User doesn't have update permission, just continue without saving
             }
         }
@@ -309,7 +312,7 @@ class General extends Component
                 $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
                 $this->application->custom_labels = base64_encode($this->customLabels);
                 $this->application->save();
-            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            } catch (AuthorizationException $e) {
                 // User doesn't have update permission, just use existing labels
                 // $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
             }
@@ -321,7 +324,7 @@ class General extends Component
                 $this->authorize('update', $this->application);
                 $this->initLoadingCompose = true;
                 $this->dispatch('info', 'Loading docker compose file.');
-            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            } catch (AuthorizationException $e) {
                 // User doesn't have update permission, skip loading compose file
             }
         }
@@ -587,7 +590,7 @@ class General extends Component
         // Check if user has permission to update
         try {
             $this->authorize('update', $this->application);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
             // User doesn't have permission, revert the change and return
             $this->application->refresh();
             $this->syncData();
@@ -612,7 +615,7 @@ class General extends Component
                 $this->fqdn = null;
                 $this->application->fqdn = null;
                 $this->application->settings->save();
-            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            } catch (AuthorizationException $e) {
                 // User doesn't have update permission, just continue without saving
             }
         }
@@ -809,7 +812,7 @@ class General extends Component
                     restoreBaseDirectory: $oldBaseDirectory,
                     restoreDockerComposeLocation: $oldDockerComposeLocation
                 );
-                if ($compose_return instanceof \Livewire\Features\SupportEvents\Event) {
+                if ($compose_return instanceof Event) {
                     // Validation failed - restore original values to component properties
                     $this->baseDirectory = $oldBaseDirectory;
                     $this->dockerComposeLocation = $oldDockerComposeLocation;
@@ -939,7 +942,7 @@ class General extends Component
         $command = injectDockerComposeFlags(
             $this->dockerComposeCustomBuildCommand,
             ".{$normalizedBase}{$this->dockerComposeLocation}",
-            \App\Jobs\ApplicationDeploymentJob::BUILD_TIME_ENV_PATH
+            ApplicationDeploymentJob::BUILD_TIME_ENV_PATH
         );
 
         // Inject build args if not using build secrets

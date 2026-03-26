@@ -78,6 +78,7 @@ trait ExecuteRemoteCommand
             $customType = data_get($single_command, 'type');
             $ignore_errors = data_get($single_command, 'ignore_errors', false);
             $append = data_get($single_command, 'append', true);
+            $command_hidden = data_get($single_command, 'command_hidden', false);
             $this->save = data_get($single_command, 'save');
             if ($this->server->isNonRoot()) {
                 if (str($command)->startsWith('docker exec')) {
@@ -102,7 +103,7 @@ trait ExecuteRemoteCommand
 
             while ($attempt < $maxRetries && ! $commandExecuted) {
                 try {
-                    $this->executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors);
+                    $this->executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors, $command_hidden);
                     $commandExecuted = true;
                 } catch (\RuntimeException|DeploymentException $e) {
                     $lastError = $e;
@@ -152,10 +153,14 @@ trait ExecuteRemoteCommand
     /**
      * Execute the actual command with process handling
      */
-    private function executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors)
+    private function executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors, $command_hidden = false)
     {
+        if ($command_hidden && isset($this->application_deployment_queue)) {
+            $this->application_deployment_queue->addLogEntry('[CMD]: '.$this->redact_sensitive_info($command), hidden: true);
+        }
+
         $remote_command = SshMultiplexingHelper::generateSshCommand($this->server, $command);
-        $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
+        $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append, $command_hidden) {
             $output = str($output)->trim();
             if ($output->startsWith('╔')) {
                 $output = "\n".$output;
@@ -165,9 +170,9 @@ trait ExecuteRemoteCommand
             $sanitized_output = sanitize_utf8_text($output);
 
             $new_log_entry = [
-                'command' => $this->redact_sensitive_info($command),
+                'command' => $command_hidden ? null : $this->redact_sensitive_info($command),
                 'output' => $this->redact_sensitive_info($sanitized_output),
-                'type' => $customType ?? $type === 'err' ? 'stderr' : 'stdout',
+                'type' => $customType ?? ($type === 'err' ? 'stderr' : 'stdout'),
                 'timestamp' => Carbon::now('UTC'),
                 'hidden' => $hidden,
                 'batch' => static::$batch_counter,
