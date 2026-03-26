@@ -2,6 +2,7 @@
 
 namespace App\Actions\Fortify;
 
+use App\Jobs\SyncMailcheepContactJob;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -58,6 +59,14 @@ class CreateNewUser implements CreatesNewUsers
             $team = $user->teams()->first();
             if (isCloud()) {
                 $user->sendVerificationEmail();
+                if (config('subscription.mailcheep_api_key')) {
+                    SyncMailcheepContactJob::dispatch(
+                        action: 'create_or_update',
+                        email: $user->email,
+                        name: $user->name,
+                        customFields: ['team_id' => (string) $team->id],
+                    );
+                }
             } else {
                 $user->markEmailAsVerified();
             }

@@ -299,6 +299,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                         $team = data_get($subscription, 'team');
                         if ($team) {
                             $team->subscriptionEnded();
+                            SyncMailcheepContactJob::dispatchForTeam($team, 'add_to_churned');
                         } else {
                             // send_internal_notification('Subscription unpaid but no team found in Coolify for customer: '.$customerId);
                             throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");
@@ -309,6 +310,13 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                             $subscription->update([
                                 'stripe_past_due' => false,
                                 'stripe_invoice_paid' => true,
+                            ]);
+                        }
+                        $team = data_get($subscription, 'team');
+                        if ($team) {
+                            SyncMailcheepContactJob::dispatchForTeam($team, 'create_or_update', [
+                                'team_id' => (string) $team->id,
+                                'plan' => $subscription->billingInterval(),
                             ]);
                         }
                     }
@@ -328,6 +336,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                         $team = data_get($subscription, 'team');
                         if ($team) {
                             $team->subscriptionEnded();
+                            SyncMailcheepContactJob::dispatchForTeam($team, 'add_to_churned');
                         } else {
                             // send_internal_notification('Subscription deleted but no team found in Coolify for customer: '.$customerId);
                             throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");
