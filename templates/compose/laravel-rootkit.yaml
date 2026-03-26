@@ -310,18 +310,7 @@ services:
     image: nginx:alpine
     environment:
       - SERVICE_URL_NGINX_80
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      echo '[nginx] validating config' >&2;
-      nginx -t ||
-        ( echo '--- /etc/nginx/nginx.conf ---' >&2;
-          cat /etc/nginx/nginx.conf >&2 || true;
-          echo '--- /etc/nginx/conf.d/default.conf ---' >&2;
-          cat /etc/nginx/conf.d/default.conf >&2 || true;
-          exit 1
-        );
-      echo '[nginx] starting' >&2;
-      exec nginx -g 'daemon off;'
+    command: ["nginx", "-g", "daemon off;"]
     volumes:
       - laravel-files:/var/www/html:ro
       - type: bind
