@@ -309,7 +309,7 @@ services:
   nginx:
     image: nginx:alpine
     environment:
-      - SERVICE_URL_NGINX_80
+      - SERVICE_URL_NGINX
     command: ["nginx", "-g", "daemon off;"]
     volumes:
       - laravel-files:/var/www/html:ro

@@ -164,7 +164,7 @@ class StackForm extends Component
             $serviceUrl = $this->service->environment_variables()
                 ->where('key', $websiteUrlFieldKey)
                 ->first();
-            if (! $serviceUrl && in_array($websiteUrlFieldKey, ['SERVICE_FQDN_NGINX_80', 'SERVICE_FQDN_NGINX'], true)) {
+            if (! $serviceUrl && in_array($websiteUrlFieldKey, ['SERVICE_FQDN_NGINX', 'SERVICE_FQDN_NGINX_80'], true)) {
                 // Backward compatibility for services created before nginx FQDN became canonical.
                 $serviceUrl = $this->service->environment_variables()
                     ->whereIn('key', ['SERVICE_FQDN_NGINX_80', 'SERVICE_FQDN_NGINX', 'SERVICE_URL_NGINX_80', 'SERVICE_URL_NGINX', 'SERVICE_URL_LARAVEL'])
@@ -302,10 +302,6 @@ class StackForm extends Component
             $value = substr($value, 8);
         }
         $value = rtrim($value, '/');
-        if ($serviceUrlFieldKey === 'SERVICE_FQDN_NGINX_80' && ! str_contains($value, ':')) {
-            $value .= ':80';
-        }
-
         $serviceUrlField = $this->fields->get($serviceUrlFieldKey, []);
         if (! is_array($serviceUrlField)) {
             return;
@@ -325,13 +321,12 @@ class StackForm extends Component
 
         $fqdnWithoutScheme = $canonicalUrl;
         $fqdnWithoutPort = preg_replace('/:\d+$/', '', $fqdnWithoutScheme) ?? $fqdnWithoutScheme;
-        $fqdnWithPort = str_contains($fqdnWithoutScheme, ':') ? $fqdnWithoutScheme : $fqdnWithoutScheme.':80';
         $httpUrl = str_starts_with($fqdnWithoutPort, 'http://') || str_starts_with($fqdnWithoutPort, 'https://')
             ? $fqdnWithoutPort
             : 'http://'.$fqdnWithoutPort;
 
-        $this->setFieldValueIfPresent('SERVICE_FQDN_NGINX_80', $fqdnWithPort);
         $this->setFieldValueIfPresent('SERVICE_FQDN_NGINX', $fqdnWithoutPort);
+        $this->setFieldValueIfPresent('SERVICE_FQDN_NGINX_80', $fqdnWithoutPort);
         $this->setFieldValueIfPresent('SERVICE_URL_NGINX_80', $httpUrl);
         $this->setFieldValueIfPresent('SERVICE_URL_NGINX', $httpUrl);
         $this->setFieldValueIfPresent('SERVICE_URL_LARAVEL', $httpUrl);
@@ -339,21 +334,21 @@ class StackForm extends Component
 
     private function resolveWebsiteUrlFieldKey(): string
     {
-        if (str_contains($this->dockerComposeRaw, 'SERVICE_FQDN_NGINX')) {
-            return 'SERVICE_FQDN_NGINX';
-        }
         if (str_contains($this->dockerComposeRaw, 'SERVICE_FQDN_NGINX_80')) {
             return 'SERVICE_FQDN_NGINX_80';
+        }
+        if (str_contains($this->dockerComposeRaw, 'SERVICE_FQDN_NGINX')) {
+            return 'SERVICE_FQDN_NGINX';
         }
         if (str_contains($this->dockerComposeRaw, 'SERVICE_URL_NGINX_80')) {
             return 'SERVICE_URL_NGINX_80';
         }
 
-        if ($this->fields->has('SERVICE_FQDN_NGINX')) {
-            return 'SERVICE_FQDN_NGINX';
-        }
         if ($this->fields->has('SERVICE_FQDN_NGINX_80')) {
             return 'SERVICE_FQDN_NGINX_80';
+        }
+        if ($this->fields->has('SERVICE_FQDN_NGINX')) {
+            return 'SERVICE_FQDN_NGINX';
         }
         if ($this->fields->has('SERVICE_URL_NGINX_80')) {
             return 'SERVICE_URL_NGINX_80';
