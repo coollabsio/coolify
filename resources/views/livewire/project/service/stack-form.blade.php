@@ -32,9 +32,12 @@
                 helper="Public repository URL used to clone your Laravel project." wire:change="saveGithubRepoUrl" />
         </div>
     @endif
-    @if ($fields->has('SERVICE_URL_LARAVEL'))
+    @php
+        $websiteUrlFieldKey = $fields->has('SERVICE_URL_NGINX_80') ? 'SERVICE_URL_NGINX_80' : 'SERVICE_URL_LARAVEL';
+    @endphp
+    @if ($fields->has($websiteUrlFieldKey))
         <div class="w-full">
-            <x-forms.input canGate="update" :canResource="$service" id="fields.SERVICE_URL_LARAVEL.value"
+            <x-forms.input canGate="update" :canResource="$service" id="fields.{{ $websiteUrlFieldKey }}.value"
                 label="Website URL" placeholder="Introduzca la url de la pagina"
                 helper="Public URL routed by Coolify for your Laravel app. You can write only the domain."
                 wire:change="saveServiceUrl" />
@@ -58,7 +61,7 @@
         </div>
         <div class="grid grid-cols-2 gap-2">
             @foreach ($fields as $serviceName => $field)
-                @if ($serviceName === 'SERVICE_GITHUB_REPO_URL' || $serviceName === 'SERVICE_PHP_VERSION' || $serviceName === 'SERVICE_URL_LARAVEL')
+                @if ($serviceName === 'SERVICE_GITHUB_REPO_URL' || $serviceName === 'SERVICE_PHP_VERSION' || $serviceName === 'SERVICE_URL_LARAVEL' || $serviceName === 'SERVICE_URL_NGINX_80')
                     @continue
                 @endif
                 <div class="flex items-center gap-2"><span

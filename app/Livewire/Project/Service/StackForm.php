@@ -159,21 +159,22 @@ class StackForm extends Component
             $this->validationAttributes['fields.SERVICE_PHP_VERSION.value'] = 'PHP Version';
         }
 
-        if (! $this->fields->has('SERVICE_URL_LARAVEL')) {
+        $websiteUrlFieldKey = $this->fields->has('SERVICE_URL_NGINX_80') ? 'SERVICE_URL_NGINX_80' : 'SERVICE_URL_LARAVEL';
+        if (! $this->fields->has($websiteUrlFieldKey)) {
             $serviceUrl = $this->service->environment_variables()
-                ->where('key', 'SERVICE_URL_LARAVEL')
+                ->where('key', $websiteUrlFieldKey)
                 ->first();
 
-            $this->fields->put('SERVICE_URL_LARAVEL', [
-                'serviceName' => 'SERVICE_URL_LARAVEL',
-                'key' => 'SERVICE_URL_LARAVEL',
+            $this->fields->put($websiteUrlFieldKey, [
+                'serviceName' => $websiteUrlFieldKey,
+                'key' => $websiteUrlFieldKey,
                 'name' => 'Website URL',
                 'value' => data_get($serviceUrl, 'value', ''),
                 'isPassword' => false,
                 'rules' => 'required|string',
                 'customHelper' => 'Public URL routed by Coolify for your Laravel app.',
             ]);
-            $this->validationAttributes['fields.SERVICE_URL_LARAVEL.value'] = 'Website URL';
+            $this->validationAttributes["fields.{$websiteUrlFieldKey}.value"] = 'Website URL';
         }
     }
 
@@ -278,11 +279,12 @@ class StackForm extends Component
 
     private function normalizeServiceUrlField(): void
     {
-        if (! $this->fields->has('SERVICE_URL_LARAVEL')) {
+        $serviceUrlFieldKey = $this->fields->has('SERVICE_URL_NGINX_80') ? 'SERVICE_URL_NGINX_80' : 'SERVICE_URL_LARAVEL';
+        if (! $this->fields->has($serviceUrlFieldKey)) {
             return;
         }
 
-        $value = trim((string) data_get($this->fields, 'SERVICE_URL_LARAVEL.value', ''));
+        $value = trim((string) data_get($this->fields, "{$serviceUrlFieldKey}.value", ''));
         if ($value === '') {
             return;
         }
@@ -291,7 +293,7 @@ class StackForm extends Component
             $value = 'https://'.$value;
         }
 
-        data_set($this->fields, 'SERVICE_URL_LARAVEL.value', $value);
+        data_set($this->fields, "{$serviceUrlFieldKey}.value", $value);
     }
 
     public function render()
