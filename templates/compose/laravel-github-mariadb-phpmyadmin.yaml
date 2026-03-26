@@ -108,6 +108,24 @@ services:
           mkdir -p /var/www/html
           cd /var/www/html
 
+          # Always provide a visible status page while provisioning.
+          # nginx will serve this file if present.
+          mkdir -p /var/www/html/public
+          if [ ! -f /var/www/html/artisan ]; then
+            {
+              printf '%s\n' '<!doctype html>'
+              printf '%s\n' '<html lang="en"><head><meta charset="utf-8" />'
+              printf '%s\n' '<meta name="viewport" content="width=device-width, initial-scale=1" />'
+              printf '%s\n' '<title>Coolify: Laravel provisioning</title>'
+              printf '%s\n' '<style>:root{color-scheme:dark}body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#0b0f19;color:#e5e7eb}.wrap{max-width:960px;margin:0 auto;padding:32px 20px}.card{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:20px}h1{font-size:18px;margin:0 0 12px}p{margin:0 0 12px;color:#cbd5e1}.muted{color:#94a3b8;font-size:13px}</style></head><body>'
+              printf '%s\n' '<div class="wrap"><div class="card">'
+              printf '%s\n' '<h1>Provisioning in progress</h1>'
+              printf '%s\n' '<p>Coolify is cloning the repository and installing dependencies. This can take a few minutes on first deploy.</p>'
+              printf '%s\n' '<p class="muted">If this page does not change, check the Laravel logs in Coolify for the root cause.</p>'
+              printf '%s\n' '</div></div></body></html>'
+            } > /var/www/html/public/_coolify_error.html
+          fi
+
           REPO_URL="${SERVICE_GITHUB_REPO_URL:-https://github.com/coollabsio/coolify.git}"
 
           if [ ! -d .git ]; then
@@ -245,6 +263,7 @@ services:
           done
           if [ -f /var/www/html/artisan ]; then
             echo "Laravel is ready!"
+            rm -f /var/www/html/public/_coolify_error.html 2>/dev/null || true
           fi
 
           echo "Starting supervisor..."

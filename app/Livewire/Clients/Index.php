@@ -50,6 +50,12 @@ class Index extends Component
             abort(403);
         }
 
+        if (! Schema::hasColumn('teams', 'is_client')) {
+            $this->dispatch('error', 'No puedo crear clientes hasta ejecutar la migración (falta teams.is_client). Ejecuta: php artisan migrate');
+
+            return;
+        }
+
         $this->validate();
 
         try {
