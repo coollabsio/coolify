@@ -77,6 +77,7 @@ function allowedPathsForUnsubscribedAccounts()
         'login',
         'logout',
         'force-password-reset',
+        'two-factor-challenge',
         'livewire/update',
         'admin',
     ];
@@ -95,6 +96,7 @@ function allowedPathsForInvalidAccounts()
         'logout',
         'verify',
         'force-password-reset',
+        'two-factor-challenge',
         'livewire/update',
     ];
 }

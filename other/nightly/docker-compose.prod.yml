@@ -60,7 +60,7 @@ services:
       retries: 10
       timeout: 2s
   soketi:
-    image: '${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-realtime:1.0.10'
+    image: '${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-realtime:1.0.11'
     ports:
       - "${SOKETI_PORT:-6001}:6001"
       - "6002:6002"
@@ -72,6 +72,7 @@ services:
       SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID}"
       SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY}"
       SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET}"
+      SOKETI_HOST: "${SOKETI_HOST:-0.0.0.0}"
     healthcheck:
       test: [ "CMD-SHELL", "wget -qO- http://127.0.0.1:6001/ready && wget -qO- http://127.0.0.1:6002/ready || exit 1" ]
       interval: 5s

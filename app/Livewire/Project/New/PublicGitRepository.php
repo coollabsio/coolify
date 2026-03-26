@@ -70,16 +70,6 @@ class PublicGitRepository extends Component
 
     public bool $new_compose_services = false;
 
-    protected $rules = [
-        'repository_url' => ['required', 'string'],
-        'port' => 'required|numeric',
-        'isStatic' => 'required|boolean',
-        'publish_directory' => 'nullable|string',
-        'build_pack' => 'required|string',
-        'base_directory' => 'nullable|string',
-        'docker_compose_location' => 'nullable|string',
-    ];
-
     protected function rules()
     {
         return [
@@ -89,7 +79,7 @@ class PublicGitRepository extends Component
             'publish_directory' => 'nullable|string',
             'build_pack' => 'required|string',
             'base_directory' => 'nullable|string',
-            'docker_compose_location' => 'nullable|string',
+            'docker_compose_location' => \App\Support\ValidationPatterns::filePathRules(),
             'git_branch' => ['required', 'string', new ValidGitBranch],
         ];
     }

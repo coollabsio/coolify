@@ -7,12 +7,6 @@
     @endif
     <h1>Dashboard</h1>
     <div class="subtitle">Your self-hosted infrastructure.</div>
-    @if (request()->query->get('success'))
-        <div class=" mb-10 font-bold alert alert-success">
-            Your subscription has been activated! Welcome onboard! It could take a few seconds before your
-            subscription is activated.<br> Please be patient.
-        </div>
-    @endif
 
     <section class="-mt-2">
         <div class="flex items-center gap-2 pb-2">

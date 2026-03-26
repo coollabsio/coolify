@@ -20,6 +20,7 @@ class StandaloneMariadb extends BaseModel
 
     protected $casts = [
         'mariadb_password' => 'encrypted',
+        'public_port_timeout' => 'integer',
         'restart_count' => 'integer',
         'last_restart_at' => 'datetime',
         'last_restart_type' => 'string',
@@ -135,7 +136,7 @@ class StandaloneMariadb extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
-            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+            instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
         }
     }
 

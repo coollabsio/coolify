@@ -127,6 +127,10 @@ class DeployController extends Controller
         if (! $deployment) {
             return response()->json(['message' => 'Deployment not found.'], 404);
         }
+        $application = $deployment->application;
+        if (! $application || data_get($application->team(), 'id') !== (int) $teamId) {
+            return response()->json(['message' => 'Deployment not found.'], 404);
+        }
 
         return response()->json($this->removeSensitiveData($deployment));
     }

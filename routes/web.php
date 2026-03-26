@@ -84,6 +84,7 @@ use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
 use App\Models\ScheduledDatabaseBackupExecution;
+use App\Models\ServiceDatabase;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
@@ -140,6 +141,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('storages')->group(function () {
         Route::get('/', StorageIndex::class)->name('storage.index');
         Route::get('/{storage_uuid}', StorageShow::class)->name('storage.show');
+        Route::get('/{storage_uuid}/resources', StorageShow::class)->name('storage.resources');
     });
     Route::prefix('shared-variables')->group(function () {
         Route::get('/', SharedVariablesIndex::class)->name('shared-variables.index');
@@ -163,22 +165,36 @@ Route::middleware(['auth', 'verified'])->group(function () {
         }
 
         return response()->json(['authenticated' => false], 401);
-    })->name('terminal.auth');
+    })->name('terminal.auth')->middleware('can.access.terminal');
 
     Route::post('/terminal/auth/ips', function () {
         if (auth()->check()) {
             $team = auth()->user()->currentTeam();
-            $ipAddresses = $team->servers->where('settings.is_terminal_enabled', true)->pluck('ip')->toArray();
+            $ipAddresses = $team->servers
+                ->where('settings.is_terminal_enabled', true)
+                ->pluck('ip')
+                ->filter()
+                ->values();
 
-            return response()->json(['ipAddresses' => $ipAddresses], 200);
+            if (isDev()) {
+                $ipAddresses = $ipAddresses->merge([
+                    'coolify-testing-host',
+                    'host.docker.internal',
+                    'localhost',
+                    '127.0.0.1',
+                    base_ip(),
+                ])->filter()->unique()->values();
+            }
+
+            return response()->json(['ipAddresses' => $ipAddresses->all()], 200);
         }
 
         return response()->json(['ipAddresses' => []], 401);
-    })->name('terminal.auth.ips');
+    })->name('terminal.auth.ips')->middleware('can.access.terminal');
 
     Route::prefix('invitations')->group(function () {
-        Route::get('/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
-        Route::get('/{uuid}/revoke', [Controller::class, 'revokeInvitation'])->name('team.invitation.revoke');
+        Route::get('/{uuid}', [Controller::class, 'showInvitation'])->name('team.invitation.show');
+        Route::post('/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
     });
 
     Route::get('/projects', ProjectIndex::class)->name('project.index');
@@ -329,7 +345,7 @@ Route::middleware(['auth'])->group(function () {
                 }
             }
             $filename = data_get($execution, 'filename');
-            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
+            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === ServiceDatabase::class) {
                 $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
             } else {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;
@@ -370,7 +386,7 @@ Route::middleware(['auth'])->group(function () {
                 'Content-Type' => 'application/octet-stream',
                 'Content-Disposition' => 'attachment; filename="'.basename($filename).'"',
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 500);
         }
     })->name('download.backup');

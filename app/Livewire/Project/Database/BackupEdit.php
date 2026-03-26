@@ -105,21 +105,9 @@ class BackupEdit extends Component
             $this->backup->s3_storage_id = $this->s3StorageId;
 
             // Validate databases_to_backup to prevent command injection
+            // Handles all formats including MongoDB's "db:col1,col2|db2:col3"
             if (filled($this->databasesToBackup)) {
-                $databases = str($this->databasesToBackup)->explode(',');
-                foreach ($databases as $index => $db) {
-                    $dbName = trim($db);
-                    try {
-                        validateShellSafePath($dbName, 'database name');
-                    } catch (\Exception $e) {
-                        // Provide specific error message indicating which database failed validation
-                        $position = $index + 1;
-                        throw new \Exception(
-                            "Database #{$position} ('{$dbName}') validation failed: ".
-                            $e->getMessage()
-                        );
-                    }
-                }
+                validateDatabasesBackupInput($this->databasesToBackup);
             }
 
             $this->backup->databases_to_backup = $this->databasesToBackup;
@@ -146,12 +134,12 @@ class BackupEdit extends Component
         }
     }
 
-    public function delete($password)
+    public function delete($password, $selectedActions = [])
     {
         $this->authorize('manageBackups', $this->backup->database);
 
         if (! verifyPasswordConfirmation($password, $this)) {
-            return;
+            return 'The provided password is incorrect.';
         }
 
         try {

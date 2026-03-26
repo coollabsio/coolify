@@ -1,0 +1,108 @@
+name: PR Quality
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: write
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+jobs:
+  pr-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: peakoss/anti-slop@v0
+        with:
+          # General Settings
+          max-failures: 4
+
+          # PR Branch Checks
+          allowed-target-branches: "next"
+          blocked-target-branches: ""
+          allowed-source-branches: ""
+          blocked-source-branches: |
+            main
+            master
+            v4.x
+
+          # PR Quality Checks
+          max-negative-reactions: 0
+          require-maintainer-can-modify: true
+
+          # PR Title Checks
+          require-conventional-title: true
+
+          # PR Description Checks
+          require-description: true
+          max-description-length: 2500
+          max-emoji-count: 2
+          max-code-references: 5
+          require-linked-issue: false
+          blocked-terms: "STRAWBERRY"
+          blocked-issue-numbers: 8154
+
+          # PR Template Checks
+          require-pr-template: true
+          strict-pr-template-sections: "Contributor Agreement"
+          optional-pr-template-sections: "Issues,Preview"
+          max-additional-pr-template-sections: 2
+
+          # Commit Message Checks
+          max-commit-message-length: 500
+          require-conventional-commits: false
+          require-commit-author-match: true
+          blocked-commit-authors: ""
+
+          # File Checks
+          allowed-file-extensions: ""
+          allowed-paths: ""
+          blocked-paths: |
+            README.md
+            SECURITY.md
+            LICENSE
+            CODE_OF_CONDUCT.md
+            templates/service-templates-latest.json
+            templates/service-templates.json
+          require-final-newline: true
+          max-added-comments: 10
+
+          # User Checks
+          detect-spam-usernames: true
+          min-account-age: 30
+          max-daily-forks: 7
+          min-profile-completeness: 4
+
+          # Merge Checks
+          min-repo-merged-prs: 0
+          min-repo-merge-ratio: 0
+          min-global-merge-ratio: 30
+          global-merge-ratio-exclude-own: false
+
+          # Exemptions
+          exempt-draft-prs: false
+          exempt-bots: |
+            actions-user
+            dependabot[bot]
+            renovate[bot]
+            github-actions[bot]
+          exempt-users: ""
+          exempt-author-association: "OWNER,MEMBER,COLLABORATOR"
+          exempt-label: "quality/exempt"
+          exempt-pr-label: ""
+          exempt-all-milestones: false
+          exempt-all-pr-milestones: false
+          exempt-milestones: ""
+          exempt-pr-milestones: ""
+
+          # PR Success Actions
+          success-add-pr-labels: "quality/verified"
+
+          # PR Failure Actions
+          failure-remove-pr-labels: ""
+          failure-remove-all-pr-labels: true
+          failure-add-pr-labels: "quality/rejected"
+          failure-pr-message: "This PR did not pass quality checks so it will be closed. If you believe this is a mistake please let us know."
+          close-pr: true
+          lock-pr: false

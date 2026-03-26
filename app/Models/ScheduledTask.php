@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\HasSafeStringAttribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use OpenApi\Attributes as OA;
@@ -25,6 +26,7 @@ use OpenApi\Attributes as OA;
 )]
 class ScheduledTask extends BaseModel
 {
+    use HasFactory;
     use HasSafeStringAttribute;
 
     protected $guarded = [];

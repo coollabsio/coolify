@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Events\FileStorageChanged;
+use App\Jobs\ServerStorageSaveJob;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Symfony\Component\Yaml\Yaml;
@@ -14,6 +15,7 @@ class LocalFileVolume extends BaseModel
         // 'mount_path' => 'encrypted',
         'content' => 'encrypted',
         'is_directory' => 'boolean',
+        'is_preview_suffix_enabled' => 'boolean',
     ];
 
     use HasFactory;
@@ -26,7 +28,7 @@ class LocalFileVolume extends BaseModel
     {
         static::created(function (LocalFileVolume $fileVolume) {
             $fileVolume->load(['service']);
-            dispatch(new \App\Jobs\ServerStorageSaveJob($fileVolume));
+            dispatch(new ServerStorageSaveJob($fileVolume));
         });
     }
 
@@ -128,15 +130,22 @@ class LocalFileVolume extends BaseModel
             $server = $this->resource->destination->server;
         }
         $commands = collect([]);
+
+        // Validate fs_path early before any shell interpolation
+        validateShellSafePath($this->fs_path, 'storage path');
+        $escapedFsPath = escapeshellarg($this->fs_path);
+        $escapedWorkdir = escapeshellarg($workdir);
+
         if ($this->is_directory) {
-            $commands->push("mkdir -p $this->fs_path > /dev/null 2>&1 || true");
-            $commands->push("mkdir -p $workdir > /dev/null 2>&1 || true");
-            $commands->push("cd $workdir");
+            $commands->push("mkdir -p {$escapedFsPath} > /dev/null 2>&1 || true");
+            $commands->push("mkdir -p {$escapedWorkdir} > /dev/null 2>&1 || true");
+            $commands->push("cd {$escapedWorkdir}");
         }
         if (str($this->fs_path)->startsWith('.') || str($this->fs_path)->startsWith('/') || str($this->fs_path)->startsWith('~')) {
             $parent_dir = str($this->fs_path)->beforeLast('/');
             if ($parent_dir != '') {
-                $commands->push("mkdir -p $parent_dir > /dev/null 2>&1 || true");
+                $escapedParentDir = escapeshellarg($parent_dir);
+                $commands->push("mkdir -p {$escapedParentDir} > /dev/null 2>&1 || true");
             }
         }
         $path = data_get_str($this, 'fs_path');
@@ -146,7 +155,7 @@ class LocalFileVolume extends BaseModel
             $path = $workdir.$path;
         }
 
-        // Validate and escape path to prevent command injection
+        // Validate and escape resolved path (may differ from fs_path if relative)
         validateShellSafePath($path, 'storage path');
         $escapedPath = escapeshellarg($path);
 

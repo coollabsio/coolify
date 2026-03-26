@@ -108,10 +108,6 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
     public function failed(?\Throwable $exception): void
     {
         if ($exception instanceof \Illuminate\Queue\TimeoutExceededException) {
-            Log::warning('ServerConnectionCheckJob timed out', [
-                'server_id' => $this->server->id,
-                'server_name' => $this->server->name,
-            ]);
             $this->server->settings->update([
                 'is_reachable' => false,
                 'is_usable' => false,
@@ -131,11 +127,8 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             $serverData = $hetznerService->getServer($this->server->hetzner_server_id);
             $status = $serverData['status'] ?? null;
 
-        } catch (\Throwable $e) {
-            Log::debug('ServerConnectionCheck: Hetzner status check failed', [
-                'server_id' => $this->server->id,
-                'error' => $e->getMessage(),
-            ]);
+        } catch (\Throwable) {
+            // Silently ignore — server may have been deleted from Hetzner.
         }
         if ($this->server->hetzner_server_status !== $status) {
             $this->server->update(['hetzner_server_status' => $status]);

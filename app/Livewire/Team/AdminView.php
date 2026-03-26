@@ -49,14 +49,14 @@ class AdminView extends Component
         }
     }
 
-    public function delete($id, $password)
+    public function delete($id, $password, $selectedActions = [])
     {
         if (! isInstanceAdmin()) {
             return redirect()->route('dashboard');
         }
 
         if (! verifyPasswordConfirmation($password, $this)) {
-            return;
+            return 'The provided password is incorrect.';
         }
 
         if (! auth()->user()->isInstanceAdmin()) {
@@ -71,6 +71,8 @@ class AdminView extends Component
         try {
             $user->delete();
             $this->getUsers();
+
+            return true;
         } catch (\Exception $e) {
             return $this->dispatch('error', $e->getMessage());
         }

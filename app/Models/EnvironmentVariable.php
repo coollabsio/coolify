@@ -24,6 +24,7 @@ use OpenApi\Attributes as OA;
         'key' => ['type' => 'string'],
         'value' => ['type' => 'string'],
         'real_value' => ['type' => 'string'],
+        'comment' => ['type' => 'string', 'nullable' => true],
         'version' => ['type' => 'string'],
         'created_at' => ['type' => 'string'],
         'updated_at' => ['type' => 'string'],
@@ -31,7 +32,35 @@ use OpenApi\Attributes as OA;
 )]
 class EnvironmentVariable extends BaseModel
 {
-    protected $guarded = [];
+    protected $attributes = [
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ];
+
+    protected $fillable = [
+        // Core identification
+        'key',
+        'value',
+        'comment',
+
+        // Polymorphic relationship
+        'resourceable_type',
+        'resourceable_id',
+
+        // Boolean flags
+        'is_preview',
+        'is_multiline',
+        'is_literal',
+        'is_runtime',
+        'is_buildtime',
+        'is_shown_once',
+        'is_shared',
+        'is_required',
+
+        // Metadata
+        'version',
+        'order',
+    ];
 
     protected $casts = [
         'key' => 'string',
@@ -67,6 +96,7 @@ class EnvironmentVariable extends BaseModel
                             'is_literal' => $environment_variable->is_literal ?? false,
                             'is_runtime' => $environment_variable->is_runtime ?? false,
                             'is_buildtime' => $environment_variable->is_buildtime ?? false,
+                            'comment' => $environment_variable->comment,
                             'resourceable_type' => Application::class,
                             'resourceable_id' => $environment_variable->resourceable_id,
                             'is_preview' => true,
@@ -189,37 +219,7 @@ class EnvironmentVariable extends BaseModel
 
     private function get_real_environment_variables(?string $environment_variable = null, $resource = null)
     {
-        if ((is_null($environment_variable) && $environment_variable === '') || is_null($resource)) {
-            return null;
-        }
-        $environment_variable = trim($environment_variable);
-        $sharedEnvsFound = str($environment_variable)->matchAll('/{{(.*?)}}/');
-        if ($sharedEnvsFound->isEmpty()) {
-            return $environment_variable;
-        }
-        foreach ($sharedEnvsFound as $sharedEnv) {
-            $type = str($sharedEnv)->trim()->match('/(.*?)\./');
-            if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
-                continue;
-            }
-            $variable = str($sharedEnv)->trim()->match('/\.(.*)/');
-            if ($type->value() === 'environment') {
-                $id = $resource->environment->id;
-            } elseif ($type->value() === 'project') {
-                $id = $resource->environment->project->id;
-            } elseif ($type->value() === 'team') {
-                $id = $resource->team()->id;
-            }
-            if (is_null($id)) {
-                continue;
-            }
-            $environment_variable_found = SharedEnvironmentVariable::where('type', $type)->where('key', $variable)->where('team_id', $resource->team()->id)->where("{$type}_id", $id)->first();
-            if ($environment_variable_found) {
-                $environment_variable = str($environment_variable)->replace("{{{$sharedEnv}}}", $environment_variable_found->value);
-            }
-        }
-
-        return str($environment_variable)->value();
+        return resolveSharedEnvironmentVariables($environment_variable, $resource);
     }
 
     private function get_environment_variables(?string $environment_variable = null): ?string

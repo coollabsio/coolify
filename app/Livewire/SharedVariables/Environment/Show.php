@@ -40,6 +40,7 @@ class Show extends Component
                 'value' => $data['value'],
                 'is_multiline' => $data['is_multiline'],
                 'is_literal' => $data['is_literal'],
+                'comment' => $data['comment'] ?? null,
                 'type' => 'environment',
                 'team_id' => currentTeam()->id,
             ]);
@@ -138,7 +139,9 @@ class Show extends Component
     private function updateOrCreateVariables($variables)
     {
         $count = 0;
-        foreach ($variables as $key => $value) {
+        foreach ($variables as $key => $data) {
+            $value = is_array($data) ? ($data['value'] ?? '') : $data;
+
             $found = $this->environment->environment_variables()->where('key', $key)->first();
 
             if ($found) {

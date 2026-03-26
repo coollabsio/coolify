@@ -3,12 +3,14 @@
 namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\GenerateConfig;
+use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Support\ValidationPatterns;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
-use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Livewire\Features\SupportEvents\Event;
 use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
 
@@ -22,136 +24,95 @@ class General extends Component
 
     public Collection $services;
 
-    #[Validate('required|regex:/^[a-zA-Z0-9\s\-_.\/:()]+$/')]
     public string $name;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $description = null;
 
-    #[Validate(['nullable'])]
     public ?string $fqdn = null;
 
-    #[Validate(['required'])]
     public string $gitRepository;
 
-    #[Validate(['required'])]
     public string $gitBranch;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $gitCommitSha = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $installCommand = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $buildCommand = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $startCommand = null;
 
-    #[Validate(['required'])]
     public string $buildPack;
 
-    #[Validate(['required'])]
     public string $staticImage;
 
-    #[Validate(['required'])]
     public string $baseDirectory;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $publishDirectory = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $portsExposes = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $portsMappings = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $customNetworkAliases = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerfile = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerfileLocation = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerfileTargetBuild = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerRegistryImageName = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerRegistryImageTag = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerComposeLocation = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerCompose = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerComposeRaw = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerComposeCustomStartCommand = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerComposeCustomBuildCommand = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $customDockerRunOptions = null;
 
-    #[Validate(['string', 'nullable'])]
+    // Security: pre/post deployment commands are intentionally arbitrary shell — users need full
+    // flexibility (e.g. "php artisan migrate"). Access is gated by team authentication/authorization.
+    // Commands execute inside the application's own container, not on the host.
     public ?string $preDeploymentCommand = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $preDeploymentCommandContainer = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $postDeploymentCommand = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $postDeploymentCommandContainer = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $customNginxConfiguration = null;
 
-    #[Validate(['boolean', 'required'])]
     public bool $isStatic = false;
 
-    #[Validate(['boolean', 'required'])]
     public bool $isSpa = false;
 
-    #[Validate(['boolean', 'required'])]
     public bool $isBuildServerEnabled = false;
 
-    #[Validate(['boolean', 'required'])]
     public bool $isPreserveRepositoryEnabled = false;
 
-    #[Validate(['boolean', 'required'])]
     public bool $isContainerLabelEscapeEnabled = true;
 
-    #[Validate(['boolean', 'required'])]
     public bool $isContainerLabelReadonlyEnabled = false;
 
-    #[Validate(['boolean', 'required'])]
     public bool $isHttpBasicAuthEnabled = false;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $httpBasicAuthUsername = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $httpBasicAuthPassword = null;
 
-    #[Validate(['nullable'])]
     public ?string $watchPaths = null;
 
-    #[Validate(['string', 'required'])]
     public string $redirect;
 
-    #[Validate(['nullable'])]
     public $customLabels;
 
     public bool $labelsChanged = false;
@@ -184,33 +145,33 @@ class General extends Component
             'fqdn' => 'nullable',
             'gitRepository' => 'required',
             'gitBranch' => 'required',
-            'gitCommitSha' => 'nullable',
+            'gitCommitSha' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
             'installCommand' => 'nullable',
             'buildCommand' => 'nullable',
             'startCommand' => 'nullable',
             'buildPack' => 'required',
             'staticImage' => 'required',
-            'baseDirectory' => 'required',
-            'publishDirectory' => 'nullable',
+            'baseDirectory' => array_merge(['required'], array_slice(ValidationPatterns::directoryPathRules(), 1)),
+            'publishDirectory' => ValidationPatterns::directoryPathRules(),
             'portsExposes' => 'required',
             'portsMappings' => 'nullable',
             'customNetworkAliases' => 'nullable',
             'dockerfile' => 'nullable',
             'dockerRegistryImageName' => 'nullable',
             'dockerRegistryImageTag' => 'nullable',
-            'dockerfileLocation' => 'nullable',
-            'dockerComposeLocation' => 'nullable',
+            'dockerfileLocation' => ValidationPatterns::filePathRules(),
+            'dockerComposeLocation' => ValidationPatterns::filePathRules(),
             'dockerCompose' => 'nullable',
             'dockerComposeRaw' => 'nullable',
-            'dockerfileTargetBuild' => 'nullable',
-            'dockerComposeCustomStartCommand' => 'nullable',
-            'dockerComposeCustomBuildCommand' => 'nullable',
+            'dockerfileTargetBuild' => ValidationPatterns::dockerTargetRules(),
+            'dockerComposeCustomStartCommand' => ValidationPatterns::shellSafeCommandRules(),
+            'dockerComposeCustomBuildCommand' => ValidationPatterns::shellSafeCommandRules(),
             'customLabels' => 'nullable',
-            'customDockerRunOptions' => 'nullable',
+            'customDockerRunOptions' => ValidationPatterns::shellSafeCommandRules(2000),
             'preDeploymentCommand' => 'nullable',
-            'preDeploymentCommandContainer' => 'nullable',
+            'preDeploymentCommandContainer' => ['nullable', ...ValidationPatterns::containerNameRules()],
             'postDeploymentCommand' => 'nullable',
-            'postDeploymentCommandContainer' => 'nullable',
+            'postDeploymentCommandContainer' => ['nullable', ...ValidationPatterns::containerNameRules()],
             'customNginxConfiguration' => 'nullable',
             'isStatic' => 'boolean|required',
             'isSpa' => 'boolean|required',
@@ -231,6 +192,16 @@ class General extends Component
         return array_merge(
             ValidationPatterns::combinedMessages(),
             [
+                ...ValidationPatterns::filePathMessages('dockerfileLocation', 'Dockerfile'),
+                ...ValidationPatterns::filePathMessages('dockerComposeLocation', 'Docker Compose'),
+                'baseDirectory.regex' => 'The base directory must be a valid path starting with / and containing only safe characters.',
+                'publishDirectory.regex' => 'The publish directory must be a valid path starting with / and containing only safe characters.',
+                'dockerfileTargetBuild.regex' => 'The Dockerfile target build must contain only alphanumeric characters, dots, hyphens, and underscores.',
+                'dockerComposeCustomStartCommand.regex' => 'The Docker Compose start command contains invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
+                'dockerComposeCustomBuildCommand.regex' => 'The Docker Compose build command contains invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
+                'customDockerRunOptions.regex' => 'The custom Docker run options contain invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
+                'preDeploymentCommandContainer.regex' => 'The pre-deployment command container name must contain only alphanumeric characters, dots, hyphens, and underscores.',
+                'postDeploymentCommandContainer.regex' => 'The post-deployment command container name must contain only alphanumeric characters, dots, hyphens, and underscores.',
                 'name.required' => 'The Name field is required.',
                 'gitRepository.required' => 'The Git Repository field is required.',
                 'gitBranch.required' => 'The Git Branch field is required.',
@@ -320,7 +291,7 @@ class General extends Component
                 $this->authorize('update', $this->application);
                 $this->application->fqdn = null;
                 $this->application->settings->save();
-            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            } catch (AuthorizationException $e) {
                 // User doesn't have update permission, just continue without saving
             }
         }
@@ -341,7 +312,7 @@ class General extends Component
                 $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
                 $this->application->custom_labels = base64_encode($this->customLabels);
                 $this->application->save();
-            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            } catch (AuthorizationException $e) {
                 // User doesn't have update permission, just use existing labels
                 // $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
             }
@@ -353,7 +324,7 @@ class General extends Component
                 $this->authorize('update', $this->application);
                 $this->initLoadingCompose = true;
                 $this->dispatch('info', 'Loading docker compose file.');
-            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            } catch (AuthorizationException $e) {
                 // User doesn't have update permission, skip loading compose file
             }
         }
@@ -619,7 +590,7 @@ class General extends Component
         // Check if user has permission to update
         try {
             $this->authorize('update', $this->application);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
             // User doesn't have permission, revert the change and return
             $this->application->refresh();
             $this->syncData();
@@ -644,7 +615,7 @@ class General extends Component
                 $this->fqdn = null;
                 $this->application->fqdn = null;
                 $this->application->settings->save();
-            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            } catch (AuthorizationException $e) {
                 // User doesn't have update permission, just continue without saving
             }
         }
@@ -841,7 +812,7 @@ class General extends Component
                     restoreBaseDirectory: $oldBaseDirectory,
                     restoreDockerComposeLocation: $oldDockerComposeLocation
                 );
-                if ($compose_return instanceof \Livewire\Features\SupportEvents\Event) {
+                if ($compose_return instanceof Event) {
                     // Validation failed - restore original values to component properties
                     $this->baseDirectory = $oldBaseDirectory;
                     $this->dockerComposeLocation = $oldDockerComposeLocation;
@@ -971,7 +942,7 @@ class General extends Component
         $command = injectDockerComposeFlags(
             $this->dockerComposeCustomBuildCommand,
             ".{$normalizedBase}{$this->dockerComposeLocation}",
-            \App\Jobs\ApplicationDeploymentJob::BUILD_TIME_ENV_PATH
+            ApplicationDeploymentJob::BUILD_TIME_ENV_PATH
         );
 
         // Inject build args if not using build secrets

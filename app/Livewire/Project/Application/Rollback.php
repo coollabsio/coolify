@@ -50,6 +50,8 @@ class Rollback extends Component
     {
         $this->authorize('deploy', $this->application);
 
+        $commit = validateGitRef($commit, 'rollback commit');
+
         $deployment_uuid = new Cuid2;
 
         $result = queue_application_deployment(

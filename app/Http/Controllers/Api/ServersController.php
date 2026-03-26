@@ -7,10 +7,12 @@ use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Http\Controllers\Controller;
+use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
+use App\Rules\ValidServerIp;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 use Stringable;
@@ -288,15 +290,24 @@ class ServersController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $uuid = $request->get('uuid');
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (is_null($server)) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+        $uuid = $request->query('uuid');
         if ($uuid) {
-            $domains = Application::getDomainsByUuid($uuid);
+            $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $uuid)->first();
+            if (! $application) {
+                return response()->json(['message' => 'Application not found.'], 404);
+            }
 
-            return response()->json(serializeApiResponse($domains));
+            return response()->json(serializeApiResponse($application->fqdns));
         }
         $projects = Project::where('team_id', $teamId)->get();
         $domains = collect();
-        $applications = $projects->pluck('applications')->flatten();
+        $applications = $projects->pluck('applications')->flatten()->filter(function ($application) use ($server) {
+            return $application->destination?->server?->id === $server->id;
+        });
         $settings = instanceSettings();
         if ($applications->count() > 0) {
             foreach ($applications as $application) {
@@ -336,7 +347,9 @@ class ServersController extends Controller
                 }
             }
         }
-        $services = $projects->pluck('services')->flatten();
+        $services = $projects->pluck('services')->flatten()->filter(function ($service) use ($server) {
+            return $service->server_id === $server->id;
+        });
         if ($services->count() > 0) {
             foreach ($services as $service) {
                 $service_applications = $service->applications;
@@ -349,7 +362,8 @@ class ServersController extends Controller
                         })->filter(function (Stringable $fqdn) {
                             return $fqdn->isNotEmpty();
                         });
-                        if ($ip === 'host.docker.internal') {
+                        $serviceIp = $server->ip;
+                        if ($serviceIp === 'host.docker.internal') {
                             if ($settings->public_ipv4) {
                                 $domains->push([
                                     'domain' => $fqdn,
@@ -365,13 +379,13 @@ class ServersController extends Controller
                             if (! $settings->public_ipv4 && ! $settings->public_ipv6) {
                                 $domains->push([
                                     'domain' => $fqdn,
-                                    'ip' => $ip,
+                                    'ip' => $serviceIp,
                                 ]);
                             }
                         } else {
                             $domains->push([
                                 'domain' => $fqdn,
-                                'ip' => $ip,
+                                'ip' => $serviceIp,
                             ]);
                         }
                     }
@@ -469,10 +483,10 @@ class ServersController extends Controller
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
             'description' => 'string|nullable',
-            'ip' => 'string|required',
-            'port' => 'integer|nullable',
+            'ip' => ['string', 'required', new ValidServerIp],
+            'port' => 'integer|nullable|between:1,65535',
             'private_key_uuid' => 'string|required',
-            'user' => 'string|nullable',
+            'user' => ['string', 'nullable', 'regex:/^[a-zA-Z0-9_-]+$/'],
             'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
             'proxy_type' => 'string|nullable',
@@ -634,10 +648,10 @@ class ServersController extends Controller
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255|nullable',
             'description' => 'string|nullable',
-            'ip' => 'string|nullable',
-            'port' => 'integer|nullable',
+            'ip' => ['string', 'nullable', new ValidServerIp],
+            'port' => 'integer|nullable|between:1,65535',
             'private_key_uuid' => 'string|nullable',
-            'user' => 'string|nullable',
+            'user' => ['string', 'nullable', 'regex:/^[a-zA-Z0-9_-]+$/'],
             'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
             'proxy_type' => 'string|nullable',
@@ -754,12 +768,22 @@ class ServersController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
-        if ($server->definedResources()->count() > 0) {
-            return response()->json(['message' => 'Server has resources, so you need to delete them before.'], 400);
+
+        $force = filter_var($request->query('force', false), FILTER_VALIDATE_BOOLEAN);
+
+        if ($server->definedResources()->count() > 0 && ! $force) {
+            return response()->json(['message' => 'Server has resources. Use ?force=true to delete all resources and the server, or delete resources manually first.'], 400);
         }
         if ($server->isLocalhost()) {
             return response()->json(['message' => 'Local server cannot be deleted.'], 400);
         }
+
+        if ($force) {
+            foreach ($server->definedResources() as $resource) {
+                DeleteResourceJob::dispatch($resource);
+            }
+        }
+
         $server->delete();
         DeleteServer::dispatch(
             $server->id,

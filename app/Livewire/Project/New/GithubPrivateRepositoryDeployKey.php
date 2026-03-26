@@ -64,15 +64,6 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     private ?string $git_repository = null;
 
-    protected $rules = [
-        'repository_url' => ['required', 'string'],
-        'branch' => ['required', 'string'],
-        'port' => 'required|numeric',
-        'is_static' => 'required|boolean',
-        'publish_directory' => 'nullable|string',
-        'build_pack' => 'required|string',
-    ];
-
     protected function rules()
     {
         return [
@@ -82,6 +73,7 @@ class GithubPrivateRepositoryDeployKey extends Component
             'is_static' => 'required|boolean',
             'publish_directory' => 'nullable|string',
             'build_pack' => 'required|string',
+            'docker_compose_location' => \App\Support\ValidationPatterns::filePathRules(),
         ];
     }
 
