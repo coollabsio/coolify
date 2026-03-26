@@ -238,10 +238,23 @@ services:
   nginx:
     image: nginx:alpine
     # Skip /docker-entrypoint.d/ scripts: they try to PATCH nginx.conf (read-only bind) and still trigger io_setup issues.
-    # Shell wrapper: prints one line to stdout so Docker/Coolify log UI is not empty before the first HTTP request.
+    # Shell wrapper:
+    # - runs `nginx -t` first (so config errors show up immediately)
+    # - dumps configs to stderr on failure (prevents "empty logs" when nginx exits fast)
+    # - then execs nginx in foreground
     entrypoint: ["/bin/sh", "-c"]
     # Log to stderr: some log UIs only show stderr; avoids "empty" nginx logs before first request.
-    command: "echo '[nginx] starting' >&2; exec nginx -g 'daemon off;'"
+    command: >
+      echo '[nginx] validating config' >&2;
+      nginx -t ||
+        ( echo '--- /etc/nginx/nginx.conf ---' >&2;
+          cat /etc/nginx/nginx.conf >&2 || true;
+          echo '--- /etc/nginx/conf.d/default.conf ---' >&2;
+          cat /etc/nginx/conf.d/default.conf >&2 || true;
+          exit 1
+        );
+      echo '[nginx] starting' >&2;
+      exec nginx -g 'daemon off;'
     volumes:
       - laravel-files:/var/www/html:ro
       - type: bind
@@ -316,7 +329,7 @@ services:
     # Users may see 502 until PHP-FPM is ready; healthcheck is config-only so PHP slowness won't mark nginx unhealthy.
     depends_on:
       laravel:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
     expose:
       - "80"

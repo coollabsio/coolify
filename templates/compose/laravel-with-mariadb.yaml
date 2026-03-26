@@ -299,7 +299,7 @@ services:
           }
     depends_on:
       laravel:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
     expose:
       - "80"
