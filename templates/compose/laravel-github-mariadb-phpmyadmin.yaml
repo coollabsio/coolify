@@ -135,38 +135,22 @@ services:
               REQUIRED="$(printf '%s' "$COMPOSER_OUTPUT" | grep -Eo 'requires php[^\\n]+' | head -n 1 || true)"
               CURRENT="$(php -r 'echo PHP_VERSION;' 2>/dev/null || true)"
 
-              cat > /var/www/html/public/_coolify_error.html <<EOF
-              <!doctype html>
-              <html lang="en">
-              <head>
-                <meta charset="utf-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <title>Coolify: Laravel install failed</title>
-                <style>
-                  :root { color-scheme: dark; }
-                  body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#0b0f19; color:#e5e7eb; }
-                  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px; }
-                  .card { background:#111827; border:1px solid #1f2937; border-radius: 12px; padding: 20px; }
-                  h1 { font-size: 18px; margin: 0 0 12px; }
-                  p { margin: 0 0 12px; color:#cbd5e1; }
-                  pre { white-space: pre-wrap; word-break: break-word; background:#0b1220; border:1px solid #1f2937; border-radius: 10px; padding: 12px; color:#e5e7eb; }
-                  .muted { color:#94a3b8; font-size: 13px; }
-                </style>
-              </head>
-              <body>
-                <div class="wrap">
-                  <div class="card">
-                    <h1>Laravel dependency install failed</h1>
-                    <p>This service could not run <code>composer install</code>.</p>
-                    <p><strong>Current PHP:</strong> ${CURRENT}</p>
-                    <p><strong>Requirement:</strong> ${REQUIRED}</p>
-                    <p class="muted">Fix: In Coolify, set this service's PHP Version to a compatible version (e.g. 8.4) and redeploy.</p>
-                    <pre>${COMPOSER_OUTPUT}</pre>
-                  </div>
-                </div>
-              </body>
-              </html>
-EOF
+              {
+                printf '%s\n' '<!doctype html>'
+                printf '%s\n' '<html lang="en"><head><meta charset="utf-8" />'
+                printf '%s\n' '<meta name="viewport" content="width=device-width, initial-scale=1" />'
+                printf '%s\n' '<title>Coolify: Laravel install failed</title>'
+                printf '%s\n' '<style>:root{color-scheme:dark}body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#0b0f19;color:#e5e7eb}.wrap{max-width:960px;margin:0 auto;padding:32px 20px}.card{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:20px}h1{font-size:18px;margin:0 0 12px}p{margin:0 0 12px;color:#cbd5e1}pre{white-space:pre-wrap;word-break:break-word;background:#0b1220;border:1px solid #1f2937;border-radius:10px;padding:12px;color:#e5e7eb}.muted{color:#94a3b8;font-size:13px}</style></head><body>'
+                printf '%s\n' '<div class="wrap"><div class="card">'
+                printf '%s\n' '<h1>Laravel dependency install failed</h1>'
+                printf '%s\n' '<p>This service could not run <code>composer install</code>.</p>'
+                printf '%s\n' "<p><strong>Current PHP:</strong> ${CURRENT}</p>"
+                printf '%s\n' "<p><strong>Requirement:</strong> ${REQUIRED}</p>"
+                printf '%s\n' '<p class="muted">Fix: In Coolify, set this service&#39;s PHP Version to a compatible version (e.g. 8.4) and redeploy.</p>'
+                printf '%s\n' '<pre>'
+                printf '%s\n' "$COMPOSER_OUTPUT"
+                printf '%s\n' '</pre></div></div></body></html>'
+              } > /var/www/html/public/_coolify_error.html
             fi
           fi
 
