@@ -3,18 +3,14 @@
 namespace App\Livewire\Clients;
 
 use App\Models\Project;
-use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Component;
 
 class Show extends Component
 {
     public Team $client;
-
-    public Collection $assignedServers;
-
-    public Collection $availableServers;
 
     public Collection $assignedProjects;
 
@@ -26,6 +22,10 @@ class Show extends Component
     {
         if (! auth()->user()?->isInstanceAdmin()) {
             abort(403);
+        }
+
+        if (! Schema::hasColumn('teams', 'is_client')) {
+            abort(500, 'Missing migration: teams.is_client. Run php artisan migrate');
         }
 
         $this->client = Team::query()
@@ -41,38 +41,6 @@ class Show extends Component
     public function render()
     {
         return view('livewire.clients.show');
-    }
-
-    public function assignServer(int $serverId): void
-    {
-        if (! auth()->user()?->isInstanceAdmin()) {
-            abort(403);
-        }
-
-        $server = Server::query()
-            ->where('id', $serverId)
-            ->where('team_id', $this->sourceTeamId)
-            ->firstOrFail();
-
-        $server->update(['team_id' => $this->client->id]);
-        $this->refreshResources();
-        $this->dispatch('success', 'Servidor asignado.');
-    }
-
-    public function removeServer(int $serverId): void
-    {
-        if (! auth()->user()?->isInstanceAdmin()) {
-            abort(403);
-        }
-
-        $server = Server::query()
-            ->where('id', $serverId)
-            ->where('team_id', $this->client->id)
-            ->firstOrFail();
-
-        $server->update(['team_id' => $this->sourceTeamId]);
-        $this->refreshResources();
-        $this->dispatch('success', 'Servidor desasignado.');
     }
 
     public function assignProject(int $projectId): void
@@ -109,16 +77,6 @@ class Show extends Component
 
     private function refreshResources(): void
     {
-        $this->assignedServers = Server::query()
-            ->where('team_id', $this->client->id)
-            ->orderByRaw('LOWER(name)')
-            ->get();
-
-        $this->availableServers = Server::query()
-            ->where('team_id', $this->sourceTeamId)
-            ->orderByRaw('LOWER(name)')
-            ->get();
-
         $this->assignedProjects = Project::query()
             ->where('team_id', $this->client->id)
             ->orderByRaw('LOWER(name)')

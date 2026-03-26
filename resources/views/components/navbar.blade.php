@@ -293,7 +293,7 @@
                     </li>
                     @if (isInstanceAdmin())
                         <li>
-                            <a title="Cliente" {{ wireNavigate() }}
+                            <a title="Clientes" {{ wireNavigate() }}
                                 class="{{ request()->is('clients*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                                 href="{{ route('clients.index') }}">
                                 <svg class="menu-item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
@@ -304,7 +304,7 @@
                                     <path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855" />
                                     <path d="M8 8a4 4 0 1 1 8 0" />
                                 </svg>
-                                <span class="menu-item-label">Cliente</span>
+                                <span class="menu-item-label">Clientes</span>
                             </a>
                         </li>
                     @endif

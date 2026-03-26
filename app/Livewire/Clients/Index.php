@@ -6,6 +6,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Component;
@@ -81,6 +82,13 @@ class Index extends Component
 
     private function refreshClients(): void
     {
+        if (! Schema::hasColumn('teams', 'is_client')) {
+            $this->clients = collect();
+            $this->dispatch('error', 'Falta ejecutar la migración para Clientes (columna teams.is_client). Ejecuta: php artisan migrate');
+
+            return;
+        }
+
         $this->clients = Team::query()
             ->where('is_client', true)
             ->orderByRaw('LOWER(name)')
