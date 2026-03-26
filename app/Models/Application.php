@@ -582,28 +582,25 @@ class Application extends BaseModel
 
     public function gitCommitLink($link): string
     {
-        if (! is_null(data_get($this, 'source.html_url')) && ! is_null(data_get($this, 'git_repository')) && ! is_null(data_get($this, 'git_branch'))) {
-            if (str($this->source->html_url)->contains('bitbucket')) {
-                return "{$this->source->html_url}/{$this->git_repository}/commits/{$link}";
+        $git_repository = $this->git_repository;
+        $source_html_url = data_get($this, 'source.html_url');
+        $is_bitbucket = str($git_repository)->contains('bitbucket') || str($source_html_url)->contains('bitbucket');
+        $commit_path = $is_bitbucket ? 'commits' : 'commit';
+
+        if ($source_html_url && $git_repository && $this->git_branch) {
+            if (str_starts_with($git_repository, 'git@')) {
+                $git_repository = str($git_repository)->after(':')->before('.git')->value();
             }
 
-            return "{$this->source->html_url}/{$this->git_repository}/commit/{$link}";
+            return "{$source_html_url}/{$git_repository}/{$commit_path}/{$link}";
         }
-        if (str($this->git_repository)->contains('bitbucket')) {
-            $git_repository = str_replace('.git', '', $this->git_repository);
-            $url = Url::fromString($git_repository);
-            $url = $url->withUserInfo('');
-            $url = $url->withPath($url->getPath().'/commits/'.$link);
-
-            return $url->__toString();
-        }
-        if (strpos($this->git_repository, 'git@') === 0) {
+        if (str_starts_with($git_repository, 'git@')) {
             $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
-            if (data_get($this, 'source.html_url')) {
-                return "{$this->source->html_url}/{$git_repository}/commit/{$link}";
-            }
 
-            return "{$git_repository}/commit/{$link}";
+            return "https://{$git_repository}/{$commit_path}/{$link}";
+        }
+        if (str_starts_with($git_repository, 'http')) {
+            return str($git_repository)->replaceEnd('.git', '')->finish('/')->value()."{$commit_path}/{$link}";
         }
 
         return $this->git_repository;
