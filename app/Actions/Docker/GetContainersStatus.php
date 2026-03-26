@@ -5,6 +5,7 @@ namespace App\Actions\Docker;
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Actions\Shared\ComplexStatusCheck;
+use App\Actions\Shared\DockerInspectCache;
 use App\Events\ServiceChecked;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
@@ -47,10 +48,11 @@ class GetContainersStatus
         }
         $this->applications = $this->server->applications();
         $skip_these_applications = collect([]);
+        $dockerInspectCache = new DockerInspectCache();
         foreach ($this->applications as $application) {
             if ($application->additional_servers->count() > 0) {
                 $skip_these_applications->push($application);
-                ComplexStatusCheck::run($application);
+                ComplexStatusCheck::run($application, $dockerInspectCache);
                 $this->applications = $this->applications->filter(function ($value, $key) use ($application) {
                     return $value->id !== $application->id;
                 });
@@ -60,7 +62,12 @@ class GetContainersStatus
             return ! $skip_these_applications->pluck('id')->contains($value->id);
         });
         if ($this->containers === null) {
-            ['containers' => $this->containers, 'containerReplicates' => $this->containerReplicates] = $this->server->getContainers();
+            if (isset($dockerInspectCache->data[$this->server->id]) && !$this->server->isSwarm()) {
+                $this->containers = collect($dockerInspectCache->data[$this->server->id]);
+                $this->containerReplicates = collect([]);
+            } else {
+                ['containers' => $this->containers, 'containerReplicates' => $this->containerReplicates] = $this->server->getContainers();
+            }
         }
 
         if (is_null($this->containers)) {

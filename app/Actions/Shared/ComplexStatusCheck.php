@@ -5,6 +5,7 @@ namespace App\Actions\Shared;
 use App\Models\Application;
 use App\Services\ContainerStatusAggregator;
 use App\Traits\CalculatesExcludedStatus;
+use App\Actions\Shared\DockerInspectCache;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ComplexStatusCheck
@@ -12,10 +13,21 @@ class ComplexStatusCheck
     use AsAction;
     use CalculatesExcludedStatus;
 
-    public function handle(Application $application)
+    public function handle(Application $application, DockerInspectCache $dockerInspectCache = new DockerInspectCache())
     {
         $servers = $application->additional_servers;
         $servers->push($application->destination->server);
+
+        $serversToInspect = $servers->filter(fn($server) => !isset($dockerInspectCache->data[$server->id]));
+        
+        if ($serversToInspect->isNotEmpty()) {
+            $results = instant_remote_process(["docker container inspect $(docker container ls -aq) --format '{{json .}}'"], $serversToInspect, false);
+
+            foreach ($results as $serverId => $result) {
+                $dockerInspectCache->data[$serverId] = format_docker_command_output_to_json($result);
+            }
+        }
+
         foreach ($servers as $server) {
             $is_main_server = $application->destination->server->id === $server->id;
             if (! $server->isFunctional()) {
@@ -29,8 +41,15 @@ class ComplexStatusCheck
                     continue;
                 }
             }
-            $containers = instant_remote_process(["docker container inspect $(docker container ls -q --filter 'label=coolify.applicationId={$application->id}' --filter 'label=coolify.pullRequestId=0') --format '{{json .}}'"], $server, false);
-            $containers = format_docker_command_output_to_json($containers);
+            $allContainers = $dockerInspectCache->data[$server->id];
+
+            $containers = collect($allContainers)->filter(function ($container) use ($application) {
+                $labels = data_get($container, 'Config.Labels', []);
+                $appId = $labels['coolify.applicationId'] ?? null;
+                $pullRequestId = $labels['coolify.pullRequestId'] ?? null;
+
+                return $appId !== null && intval($appId) === $application->id && $pullRequestId !== null && intval($pullRequestId) === 0;
+            });
 
             if ($containers->count() > 0) {
                 $statusToSet = $this->aggregateContainerStatuses($application, $containers);
