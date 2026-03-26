@@ -159,11 +159,17 @@ class StackForm extends Component
             $this->validationAttributes['fields.SERVICE_PHP_VERSION.value'] = 'PHP Version';
         }
 
-        $websiteUrlFieldKey = $this->fields->has('SERVICE_URL_NGINX_80') ? 'SERVICE_URL_NGINX_80' : 'SERVICE_URL_LARAVEL';
+        $websiteUrlFieldKey = $this->resolveWebsiteUrlFieldKey();
         if (! $this->fields->has($websiteUrlFieldKey)) {
             $serviceUrl = $this->service->environment_variables()
                 ->where('key', $websiteUrlFieldKey)
                 ->first();
+            if (! $serviceUrl && $websiteUrlFieldKey === 'SERVICE_URL_NGINX_80') {
+                // Backward compatibility for services created before nginx URL became canonical.
+                $serviceUrl = $this->service->environment_variables()
+                    ->where('key', 'SERVICE_URL_LARAVEL')
+                    ->first();
+            }
 
             $this->fields->put($websiteUrlFieldKey, [
                 'serviceName' => $websiteUrlFieldKey,
@@ -221,6 +227,7 @@ class StackForm extends Component
     {
         try {
             $this->normalizeServiceUrlField();
+            $this->syncWebsiteUrlVariables();
             $this->validate();
             $this->syncLaravelDatabaseVariable();
             $this->syncData(true);
@@ -279,7 +286,7 @@ class StackForm extends Component
 
     private function normalizeServiceUrlField(): void
     {
-        $serviceUrlFieldKey = $this->fields->has('SERVICE_URL_NGINX_80') ? 'SERVICE_URL_NGINX_80' : 'SERVICE_URL_LARAVEL';
+        $serviceUrlFieldKey = $this->resolveWebsiteUrlFieldKey();
         if (! $this->fields->has($serviceUrlFieldKey)) {
             return;
         }
@@ -300,6 +307,32 @@ class StackForm extends Component
 
         $serviceUrlField['value'] = $value;
         $this->fields->put($serviceUrlFieldKey, $serviceUrlField);
+    }
+
+    private function syncWebsiteUrlVariables(): void
+    {
+        $canonicalFieldKey = $this->resolveWebsiteUrlFieldKey();
+        $canonicalUrl = trim((string) data_get($this->fields, "{$canonicalFieldKey}.value", ''));
+        if ($canonicalUrl === '') {
+            return;
+        }
+
+        if ($canonicalFieldKey === 'SERVICE_URL_NGINX_80') {
+            $laravelField = $this->fields->get('SERVICE_URL_LARAVEL', []);
+            if (is_array($laravelField) && $laravelField !== []) {
+                $laravelField['value'] = $canonicalUrl;
+                $this->fields->put('SERVICE_URL_LARAVEL', $laravelField);
+            }
+        }
+    }
+
+    private function resolveWebsiteUrlFieldKey(): string
+    {
+        if (str_contains($this->dockerComposeRaw, 'SERVICE_URL_NGINX_80')) {
+            return 'SERVICE_URL_NGINX_80';
+        }
+
+        return $this->fields->has('SERVICE_URL_NGINX_80') ? 'SERVICE_URL_NGINX_80' : 'SERVICE_URL_LARAVEL';
     }
 
     public function render()
