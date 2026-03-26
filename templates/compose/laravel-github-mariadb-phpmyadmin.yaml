@@ -6,7 +6,7 @@
 
 services:
   laravel:
-    image: php:${SERVICE_PHP_VERSION:-8.3}-fpm-alpine
+    image: php:${SERVICE_PHP_VERSION:-8.4}-fpm-alpine
     volumes:
       - laravel-files:/var/www/html
       - type: bind
@@ -123,7 +123,51 @@ services:
 
           if [ -f composer.json ]; then
             echo "Installing Composer dependencies..."
-            composer install --no-interaction --prefer-dist --optimize-autoloader
+            set +e
+            COMPOSER_OUTPUT="$(composer install --no-interaction --prefer-dist --optimize-autoloader 2>&1)"
+            COMPOSER_EXIT="$?"
+            set -e
+            if [ "$COMPOSER_EXIT" -ne 0 ]; then
+              echo "$COMPOSER_OUTPUT" >&2
+
+              mkdir -p /var/www/html/public
+
+              REQUIRED="$(printf '%s' "$COMPOSER_OUTPUT" | grep -Eo 'requires php[^\\n]+' | head -n 1 || true)"
+              CURRENT="$(php -r 'echo PHP_VERSION;' 2>/dev/null || true)"
+
+              cat > /var/www/html/public/_coolify_error.html <<EOF
+              <!doctype html>
+              <html lang="en">
+              <head>
+                <meta charset="utf-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <title>Coolify: Laravel install failed</title>
+                <style>
+                  :root { color-scheme: dark; }
+                  body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#0b0f19; color:#e5e7eb; }
+                  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px; }
+                  .card { background:#111827; border:1px solid #1f2937; border-radius: 12px; padding: 20px; }
+                  h1 { font-size: 18px; margin: 0 0 12px; }
+                  p { margin: 0 0 12px; color:#cbd5e1; }
+                  pre { white-space: pre-wrap; word-break: break-word; background:#0b1220; border:1px solid #1f2937; border-radius: 10px; padding: 12px; color:#e5e7eb; }
+                  .muted { color:#94a3b8; font-size: 13px; }
+                </style>
+              </head>
+              <body>
+                <div class="wrap">
+                  <div class="card">
+                    <h1>Laravel dependency install failed</h1>
+                    <p>This service could not run <code>composer install</code>.</p>
+                    <p><strong>Current PHP:</strong> ${CURRENT}</p>
+                    <p><strong>Requirement:</strong> ${REQUIRED}</p>
+                    <p class="muted">Fix: In Coolify, set this service's PHP Version to a compatible version (e.g. 8.4) and redeploy.</p>
+                    <pre>${COMPOSER_OUTPUT}</pre>
+                  </div>
+                </div>
+              </body>
+              </html>
+EOF
+            fi
           fi
 
           DB_NAME="${SERVICE_DATABASE_LARAVEL:-${MYSQL_DATABASE:-laravel}}"
@@ -194,13 +238,46 @@ services:
           waited=0
           while [ ! -f /var/www/html/artisan ]; do
             if [ $waited -ge $max_wait ]; then
-              echo "ERROR: Laravel not found after ${max_wait}s (maybe the repo doesn't have an artisan file?)"
-              exit 1
+              echo "WARNING: Laravel not ready after ${max_wait}s. Starting anyway so nginx can show an error page."
+              mkdir -p /var/www/html/public
+              if [ ! -f /var/www/html/public/_coolify_error.html ]; then
+                cat > /var/www/html/public/_coolify_error.html <<'EOF'
+                <!doctype html>
+                <html lang="en">
+                <head>
+                  <meta charset="utf-8" />
+                  <meta name="viewport" content="width=device-width, initial-scale=1" />
+                  <title>Coolify: Laravel not ready</title>
+                  <style>
+                    :root { color-scheme: dark; }
+                    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#0b0f19; color:#e5e7eb; }
+                    .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px; }
+                    .card { background:#111827; border:1px solid #1f2937; border-radius: 12px; padding: 20px; }
+                    h1 { font-size: 18px; margin: 0 0 12px; }
+                    p { margin: 0 0 12px; color:#cbd5e1; }
+                    .muted { color:#94a3b8; font-size: 13px; }
+                  </style>
+                </head>
+                <body>
+                  <div class="wrap">
+                    <div class="card">
+                      <h1>Laravel is not ready yet</h1>
+                      <p>The application did not finish installing (no <code>artisan</code> file found).</p>
+                      <p class="muted">Check the Laravel container logs in Coolify for the installation error and redeploy.</p>
+                    </div>
+                  </div>
+                </body>
+                </html>
+EOF
+              fi
+              break
             fi
             sleep 2
             waited=$((waited + 2))
           done
-          echo "Laravel is ready!"
+          if [ -f /var/www/html/artisan ]; then
+            echo "Laravel is ready!"
+          fi
 
           echo "Starting supervisor..."
           exec /usr/bin/supervisord -c /etc/supervisord.conf
@@ -307,7 +384,8 @@ services:
 
               # Standard Laravel front controller (avoid `if` in location — fragile and can surprise health/debug tools).
               location / {
-                  try_files $uri $uri/ /index.php?$query_string;
+                  # If an install error page exists, always show it (helps debug PHP/composer issues).
+                  try_files /_coolify_error.html $uri $uri/ /index.php?$query_string;
               }
 
               location ~ \.php$ {
@@ -329,7 +407,7 @@ services:
     # Users may see 502 until PHP-FPM is ready; healthcheck is config-only so PHP slowness won't mark nginx unhealthy.
     depends_on:
       laravel:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
     expose:
       - "80"

@@ -7,7 +7,7 @@
 
 services:
   laravel:
-    image: php:8.3-fpm-alpine
+    image: php:8.4-fpm-alpine
     volumes:
       - laravel-files:/var/www/html
       - type: bind
@@ -299,7 +299,7 @@ services:
           }
     depends_on:
       laravel:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
     expose:
       - "80"
