@@ -257,26 +257,28 @@ class StackForm extends Component
             ->withHeaders([
                 'Accept' => 'application/vnd.github+json',
                 'X-GitHub-Api-Version' => '2022-11-28',
+                'User-Agent' => 'Coolify-Laravel-RootKit',
             ])
             ->get("https://api.github.com/repos/{$owner}/{$repo}/branches", [
                 'per_page' => 100,
             ]);
 
-        if (! $response->successful()) {
-            $this->githubBranches = [];
-
-            return;
+        $branches = [];
+        if ($response->successful()) {
+            $branches = collect($response->json())
+                ->pluck('name')
+                ->filter(fn ($name) => is_string($name) && $name !== '')
+                ->unique()
+                ->values()
+                ->all();
         }
-
-        $branches = collect($response->json())
-            ->pluck('name')
-            ->filter(fn ($name) => is_string($name) && $name !== '')
-            ->unique()
-            ->values()
-            ->all();
+        if ($branches === []) {
+            $branches = $this->loadGithubBranchesFromRemoteGit($repoUrl);
+        }
 
         if ($branches === []) {
             $this->githubBranches = [];
+            $this->dispatch('warning', 'No se pudieron detectar ramas. Revisa URL, permisos o rate limit de GitHub.');
 
             return;
         }
@@ -305,6 +307,7 @@ class StackForm extends Component
         if (! in_array($selectedBranch, $this->githubBranches, true)) {
             $this->setFieldValueIfPresent('SERVICE_GITHUB_BRANCH', $this->githubBranches[0]);
         }
+        $this->dispatch('success', 'Ramas detectadas correctamente.');
     }
 
     public function saveServiceUrl(): void
@@ -521,6 +524,46 @@ class StackForm extends Component
         }
 
         return [(string) $segments[0], (string) $segments[1]];
+    }
+
+    private function loadGithubBranchesFromRemoteGit(string $repoUrl): array
+    {
+        $server = $this->service->server;
+        $url = trim($repoUrl);
+        if ($url !== '' && ! str_ends_with($url, '.git')) {
+            $url .= '.git';
+        }
+        if ($url === '') {
+            return [];
+        }
+
+        $command = "git ls-remote --heads ".escapeshellarg($url)." 2>/dev/null";
+        if ($server->isNonRoot()) {
+            $command = "sudo {$command}";
+        }
+
+        $output = (string) (instant_remote_process([$command], $server, false) ?? '');
+        if (trim($output) === '') {
+            return [];
+        }
+
+        $branches = [];
+        foreach (preg_split('/\r?\n/', trim($output)) ?: [] as $line) {
+            if (! is_string($line) || $line === '') {
+                continue;
+            }
+            $parts = preg_split('/\s+/', $line) ?: [];
+            $ref = $parts[1] ?? '';
+            if (! is_string($ref) || ! str_starts_with($ref, 'refs/heads/')) {
+                continue;
+            }
+            $branch = substr($ref, strlen('refs/heads/'));
+            if ($branch !== '') {
+                $branches[] = $branch;
+            }
+        }
+
+        return collect($branches)->unique()->values()->all();
     }
 
     public function render()
