@@ -28,6 +28,14 @@
                     >
                         Verificar Assets
                     </x-forms.button>
+                    <x-forms.button
+                        type="button"
+                        wire:click="deployLaravelChanges"
+                        wire:loading.attr="disabled"
+                        wire:target="deployLaravelChanges"
+                    >
+                        Deploy cambios
+                    </x-forms.button>
                 @endif
             @endcan
         </div>
@@ -56,6 +64,32 @@
                 helper="Public repository URL used to clone your Laravel project." wire:change="saveGithubRepoUrl" />
         </div>
     @endif
+    @if ($this->isLaravelRootkitStack() && $fields->has('SERVICE_GITHUB_BRANCH'))
+        <div class="w-full max-w-sm space-y-2">
+            @if (count($githubBranches) > 0)
+                <x-forms.select canGate="update" :canResource="$service" id="fields.SERVICE_GITHUB_BRANCH.value"
+                    label="Git Branch" wire:change="saveGithubBranch"
+                    helper="Detected branches from GitHub repository URL.">
+                    @foreach ($githubBranches as $branch)
+                        <option value="{{ $branch }}">{{ $branch }}</option>
+                    @endforeach
+                </x-forms.select>
+            @else
+                <x-forms.input canGate="update" :canResource="$service" id="fields.SERVICE_GITHUB_BRANCH.value"
+                    label="Git Branch" placeholder="main"
+                    helper="Branch to deploy from the GitHub repository."
+                    wire:change="saveGithubBranch" />
+            @endif
+            <x-forms.button
+                type="button"
+                wire:click="loadGithubBranches"
+                wire:loading.attr="disabled"
+                wire:target="loadGithubBranches"
+            >
+                Detectar ramas
+            </x-forms.button>
+        </div>
+    @endif
     @if ($fields->has('SERVICE_PHP_VERSION'))
         <div class="w-full max-w-xs">
             <x-forms.select canGate="update" :canResource="$service" id="fields.SERVICE_PHP_VERSION.value"
@@ -74,7 +108,7 @@
         </div>
         <div class="grid grid-cols-2 gap-2">
             @foreach ($fields as $serviceName => $field)
-                @if ($serviceName === 'SERVICE_GITHUB_REPO_URL' || $serviceName === 'SERVICE_PHP_VERSION' || $serviceName === 'SERVICE_URL_LARAVEL' || $serviceName === 'SERVICE_URL_NGINX' || $serviceName === 'SERVICE_URL_NGINX_80' || $serviceName === 'SERVICE_FQDN_NGINX' || $serviceName === 'SERVICE_FQDN_NGINX_80')
+                @if ($serviceName === 'SERVICE_GITHUB_REPO_URL' || $serviceName === 'SERVICE_GITHUB_BRANCH' || $serviceName === 'SERVICE_PHP_VERSION' || $serviceName === 'SERVICE_URL_LARAVEL' || $serviceName === 'SERVICE_URL_NGINX' || $serviceName === 'SERVICE_URL_NGINX_80' || $serviceName === 'SERVICE_FQDN_NGINX' || $serviceName === 'SERVICE_FQDN_NGINX_80')
                     @continue
                 @endif
                 <div class="flex items-center gap-2"><span

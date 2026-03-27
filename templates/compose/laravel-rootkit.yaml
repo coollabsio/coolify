@@ -125,6 +125,7 @@ services:
           fi
 
           REPO_URL="${SERVICE_GITHUB_REPO_URL:-https://github.com/crmhawkins/copiservi.git}"
+          REPO_BRANCH="${SERVICE_GITHUB_BRANCH:-main}"
           SERVICE_PUBLIC_URL_RUNTIME="${SERVICE_URL_NGINX_80:-${SERVICE_URL_NGINX:-}}"
           if [ -z "${SERVICE_PUBLIC_URL_RUNTIME}" ] && [ -n "${SERVICE_FQDN_NGINX_80:-}" ]; then
             SERVICE_PUBLIC_URL_RUNTIME="http://${SERVICE_FQDN_NGINX_80%:80}"
@@ -134,11 +135,19 @@ services:
           fi
 
           if [ ! -d .git ]; then
-            echo "Cloning repository ${REPO_URL}..."
+            echo "Cloning repository ${REPO_URL} (branch: ${REPO_BRANCH})..."
             rm -rf * .[!.]* 2>/dev/null || true
-            git clone "${REPO_URL}" .
+            git clone --branch "${REPO_BRANCH}" --single-branch "${REPO_URL}" .
           else
-            echo "Repository already exists..."
+            echo "Repository already exists. Syncing branch ${REPO_BRANCH}..."
+            set +e
+            git fetch --all --prune 2>&1
+            git checkout -B "${REPO_BRANCH}" "origin/${REPO_BRANCH}" 2>&1
+            GIT_SYNC_EXIT="$?"
+            set -e
+            if [ "$GIT_SYNC_EXIT" -ne 0 ]; then
+              echo "Failed to checkout branch ${REPO_BRANCH}. Falling back to repository default branch."
+            fi
           fi
 
           git config --global --add safe.directory /var/www/html || true
@@ -178,6 +187,8 @@ services:
 
           if [ -f package.json ]; then
             echo "Installing Node dependencies and building Vite assets..."
+            echo "Node version: $(node -v 2>/dev/null || echo unavailable)"
+            echo "NPM version: $(npm -v 2>/dev/null || echo unavailable)"
             set +e
             if [ -f package-lock.json ]; then
               NPM_OUTPUT="$(npm ci --no-audit --no-fund 2>&1 && npm run build 2>&1)"
@@ -199,6 +210,26 @@ services:
                 printf '%s\n' '<h1>Frontend asset build failed</h1>'
                 printf '%s\n' '<p>The service could not run <code>npm run build</code>, so CSS/JS assets are missing.</p>'
                 printf '%s\n' '<p class="muted">Check Laravel logs in Coolify to see the exact npm error, fix the project build dependencies, and redeploy.</p>'
+                printf '%s\n' '<pre>'
+                printf '%s\n' "$NPM_OUTPUT"
+                printf '%s\n' '</pre></div></div></body></html>'
+              } > /var/www/html/public/_coolify_error.html
+              exit 1
+            fi
+
+            if [ ! -f /var/www/html/public/build/manifest.json ]; then
+              echo "Vite build finished but manifest was not generated." >&2
+              mkdir -p /var/www/html/public
+              {
+                printf '%s\n' '<!doctype html>'
+                printf '%s\n' '<html lang="en"><head><meta charset="utf-8" />'
+                printf '%s\n' '<meta name="viewport" content="width=device-width, initial-scale=1" />'
+                printf '%s\n' '<title>Coolify: Vite manifest missing</title>'
+                printf '%s\n' '<style>:root{color-scheme:dark}body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#0b0f19;color:#e5e7eb}.wrap{max-width:960px;margin:0 auto;padding:32px 20px}.card{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:20px}h1{font-size:18px;margin:0 0 12px}p{margin:0 0 12px;color:#cbd5e1}pre{white-space:pre-wrap;word-break:break-word;background:#0b1220;border:1px solid #1f2937;border-radius:10px;padding:12px;color:#e5e7eb}.muted{color:#94a3b8;font-size:13px}</style></head><body>'
+                printf '%s\n' '<div class="wrap"><div class="card">'
+                printf '%s\n' '<h1>Vite manifest not found</h1>'
+                printf '%s\n' '<p>Build command finished, but <code>public/build/manifest.json</code> does not exist.</p>'
+                printf '%s\n' '<p class="muted">Review package scripts and vite config in the Laravel project, then redeploy.</p>'
                 printf '%s\n' '<pre>'
                 printf '%s\n' "$NPM_OUTPUT"
                 printf '%s\n' '</pre></div></div></body></html>'
@@ -251,6 +282,8 @@ services:
             echo "Running Laravel setup tasks..."
             php artisan key:generate --force || true
             php artisan optimize:clear || true
+            php artisan view:clear || true
+            php artisan config:clear || true
             DB_CONNECTION=mysql \
               DB_HOST=mariadb \
               DB_PORT=3306 \
@@ -304,6 +337,7 @@ services:
           exec /usr/bin/supervisord -c /etc/supervisord.conf
     environment:
       - SERVICE_GITHUB_REPO_URL=$SERVICE_GITHUB_REPO_URL
+      - SERVICE_GITHUB_BRANCH=$SERVICE_GITHUB_BRANCH
       - SERVICE_PHP_VERSION=$SERVICE_PHP_VERSION
       - SERVICE_FQDN_NGINX
       - SERVICE_FQDN_NGINX_80

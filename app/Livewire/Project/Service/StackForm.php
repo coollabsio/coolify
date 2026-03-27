@@ -6,6 +6,7 @@ use App\Models\Service;
 use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class StackForm extends Component
@@ -30,6 +31,8 @@ class StackForm extends Component
     public string $assetActionOutput = '';
 
     public bool $isRunningAssetAction = false;
+
+    public array $githubBranches = [];
 
     protected function rules(): array
     {
@@ -145,6 +148,22 @@ class StackForm extends Component
             ]);
             $this->validationAttributes['fields.SERVICE_GITHUB_REPO_URL.value'] = 'GitHub Repo URL';
         }
+        if ($this->isLaravelRootkitStack() && ! $this->fields->has('SERVICE_GITHUB_BRANCH')) {
+            $githubBranch = $this->service->environment_variables()
+                ->where('key', 'SERVICE_GITHUB_BRANCH')
+                ->first();
+
+            $this->fields->put('SERVICE_GITHUB_BRANCH', [
+                'serviceName' => 'SERVICE_GITHUB_BRANCH',
+                'key' => 'SERVICE_GITHUB_BRANCH',
+                'name' => 'Git Branch',
+                'value' => data_get($githubBranch, 'value', 'main'),
+                'isPassword' => false,
+                'rules' => 'required|string|max:120',
+                'customHelper' => 'Git branch to deploy from the configured repository.',
+            ]);
+            $this->validationAttributes['fields.SERVICE_GITHUB_BRANCH.value'] = 'Git Branch';
+        }
 
         if (! $this->fields->has('SERVICE_PHP_VERSION')) {
             $phpVersion = $this->service->environment_variables()
@@ -164,6 +183,7 @@ class StackForm extends Component
         }
 
         $this->setFieldValueIfPresent('SERVICE_URL_LARAVEL', '');
+        $this->loadGithubBranches();
     }
 
     public function isLaravelGitHubStack(): bool
@@ -191,6 +211,7 @@ class StackForm extends Component
 
     public function saveGithubRepoUrl(): void
     {
+        $this->loadGithubBranches();
         $this->submit(notify: false);
         $this->dispatch('success', 'GitHub repository URL saved.');
     }
@@ -199,6 +220,91 @@ class StackForm extends Component
     {
         $this->submit(notify: false);
         $this->dispatch('success', 'PHP version saved.');
+    }
+
+    public function saveGithubBranch(): void
+    {
+        $this->submit(notify: false);
+        $this->dispatch('success', 'Git branch saved.');
+    }
+
+    public function loadGithubBranches(): void
+    {
+        if (! $this->isLaravelRootkitStack()) {
+            return;
+        }
+        if (! $this->fields->has('SERVICE_GITHUB_REPO_URL')) {
+            return;
+        }
+
+        $repoUrl = trim((string) data_get($this->fields, 'SERVICE_GITHUB_REPO_URL.value', ''));
+        if ($repoUrl === '') {
+            $this->githubBranches = [];
+
+            return;
+        }
+
+        $ownerRepo = $this->extractGithubOwnerRepo($repoUrl);
+        if (! $ownerRepo) {
+            $this->githubBranches = [];
+
+            return;
+        }
+
+        [$owner, $repo] = $ownerRepo;
+        $response = Http::timeout(20)
+            ->retry(2, 250, throw: false)
+            ->withHeaders([
+                'Accept' => 'application/vnd.github+json',
+                'X-GitHub-Api-Version' => '2022-11-28',
+            ])
+            ->get("https://api.github.com/repos/{$owner}/{$repo}/branches", [
+                'per_page' => 100,
+            ]);
+
+        if (! $response->successful()) {
+            $this->githubBranches = [];
+
+            return;
+        }
+
+        $branches = collect($response->json())
+            ->pluck('name')
+            ->filter(fn ($name) => is_string($name) && $name !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($branches === []) {
+            $this->githubBranches = [];
+
+            return;
+        }
+
+        $priority = ['main', 'master', 'develop', 'dev'];
+        usort($branches, function (string $a, string $b) use ($priority): int {
+            $indexA = array_search($a, $priority, true);
+            $indexB = array_search($b, $priority, true);
+
+            if ($indexA !== false && $indexB !== false) {
+                return $indexA <=> $indexB;
+            }
+            if ($indexA !== false) {
+                return -1;
+            }
+            if ($indexB !== false) {
+                return 1;
+            }
+
+            return strcasecmp($a, $b);
+        });
+
+        $this->githubBranches = $branches;
+
+        $selectedBranch = trim((string) data_get($this->fields, 'SERVICE_GITHUB_BRANCH.value', ''));
+        if (! in_array($selectedBranch, $this->githubBranches, true)) {
+            $this->setFieldValueIfPresent('SERVICE_GITHUB_BRANCH', $this->githubBranches[0]);
+        }
     }
 
     public function saveServiceUrl(): void
@@ -230,6 +336,29 @@ class StackForm extends Component
         $this->runFrontendAssetCommand(
             "cd /var/www/html && test -f public/build/manifest.json && ls -la public/build && echo 'Vite assets OK'"
         );
+    }
+
+    public function deployLaravelChanges(): void
+    {
+        if (! $this->isLaravelRootkitStack()) {
+            $this->dispatch('error', 'This action is only available for Laravel RootKit services.');
+
+            return;
+        }
+
+        $branch = trim((string) data_get($this->fields, 'SERVICE_GITHUB_BRANCH.value', 'main'));
+        if ($branch === '') {
+            $branch = 'main';
+        }
+
+        $command = "cd /var/www/html"
+            ." && if [ -d .git ]; then git fetch origin ".escapeshellarg($branch)." && git checkout -B ".escapeshellarg($branch)." origin/".escapeshellarg($branch)." && git pull --ff-only origin ".escapeshellarg($branch)."; fi"
+            ." && if [ -f composer.json ]; then composer install --no-interaction --prefer-dist --optimize-autoloader; fi"
+            ." && if [ -f package.json ]; then if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi && npm run build; fi"
+            ." && if [ -f artisan ]; then php artisan optimize:clear || true; php artisan config:clear || true; php artisan route:clear || true; php artisan view:clear || true; php artisan cache:clear || true; php artisan migrate --force || true; fi"
+            ." && echo 'Quick deploy finished'";
+
+        $this->runFrontendAssetCommand($command);
     }
 
     public function instantSave()
@@ -362,6 +491,36 @@ class StackForm extends Component
             'server' => $server,
             'escapedContainer' => escapeshellarg($containerName),
         ];
+    }
+
+    private function extractGithubOwnerRepo(string $repoUrl): ?array
+    {
+        $url = trim($repoUrl);
+        if ($url === '') {
+            return null;
+        }
+
+        if (str_starts_with($url, 'git@github.com:')) {
+            $path = substr($url, strlen('git@github.com:'));
+        } else {
+            if (! str_starts_with($url, 'http://') && ! str_starts_with($url, 'https://')) {
+                $url = 'https://'.$url;
+            }
+            $parts = parse_url($url);
+            $host = strtolower((string) ($parts['host'] ?? ''));
+            if ($host !== 'github.com' && $host !== 'www.github.com') {
+                return null;
+            }
+            $path = trim((string) ($parts['path'] ?? ''), '/');
+        }
+
+        $path = preg_replace('/\.git$/', '', $path) ?? $path;
+        $segments = array_values(array_filter(explode('/', $path)));
+        if (count($segments) < 2) {
+            return null;
+        }
+
+        return [(string) $segments[0], (string) $segments[1]];
     }
 
     public function render()
