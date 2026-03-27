@@ -19,6 +19,8 @@ class LaravelGitSource extends Component
 
     public string $gitBranch = 'main';
 
+    public string $githubToken = '';
+
     /** @var array<int, string> */
     public array $branches = [];
 
@@ -34,6 +36,7 @@ class LaravelGitSource extends Component
 
         $this->repositoryUrl = (string) optional($this->service->environment_variables()->where('key', 'SERVICE_GITHUB_REPO_URL')->first())->value;
         $this->gitBranch = (string) (optional($this->service->environment_variables()->where('key', 'SERVICE_GITHUB_BRANCH')->first())->value ?? 'main');
+        $this->githubToken = (string) (optional($this->service->environment_variables()->where('key', 'SERVICE_GITHUB_TOKEN')->first())->value ?? '');
 
         $this->loadBranches();
     }
@@ -55,6 +58,7 @@ class LaravelGitSource extends Component
         $this->validate([
             'repositoryUrl' => 'required|url|max:500',
             'gitBranch' => 'required|string|max:120',
+            'githubToken' => 'nullable|string|max:500',
         ]);
 
         $fields = collect([
@@ -65,6 +69,10 @@ class LaravelGitSource extends Component
             [
                 'key' => 'SERVICE_GITHUB_BRANCH',
                 'value' => trim($this->gitBranch),
+            ],
+            [
+                'key' => 'SERVICE_GITHUB_TOKEN',
+                'value' => trim($this->githubToken),
             ],
         ]);
 
@@ -89,13 +97,17 @@ class LaravelGitSource extends Component
         }
 
         [$owner, $repo] = $ownerRepo;
-        $response = Http::timeout(20)
+        $request = Http::timeout(20)
             ->retry(2, 250, throw: false)
             ->withHeaders([
                 'Accept' => 'application/vnd.github+json',
                 'X-GitHub-Api-Version' => '2022-11-28',
                 'User-Agent' => 'Coolify-Laravel-RootKit',
-            ])
+            ]);
+        if ($this->githubToken !== '') {
+            $request = $request->withToken($this->githubToken);
+        }
+        $response = $request
             ->get("https://api.github.com/repos/{$owner}/{$repo}/branches", [
                 'per_page' => 100,
             ]);

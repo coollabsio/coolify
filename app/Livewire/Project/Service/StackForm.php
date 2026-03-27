@@ -164,6 +164,22 @@ class StackForm extends Component
             ]);
             $this->validationAttributes['fields.SERVICE_GITHUB_BRANCH.value'] = 'Git Branch';
         }
+        if ($this->isLaravelRootkitStack() && ! $this->fields->has('SERVICE_GITHUB_TOKEN')) {
+            $githubToken = $this->service->environment_variables()
+                ->where('key', 'SERVICE_GITHUB_TOKEN')
+                ->first();
+
+            $this->fields->put('SERVICE_GITHUB_TOKEN', [
+                'serviceName' => 'SERVICE_GITHUB_TOKEN',
+                'key' => 'SERVICE_GITHUB_TOKEN',
+                'name' => 'GitHub Token',
+                'value' => data_get($githubToken, 'value', ''),
+                'isPassword' => true,
+                'rules' => 'nullable|string|max:500',
+                'customHelper' => 'Optional token for private repositories. Used for branch detection and authenticated git fetch.',
+            ]);
+            $this->validationAttributes['fields.SERVICE_GITHUB_TOKEN.value'] = 'GitHub Token';
+        }
 
         if (! $this->fields->has('SERVICE_PHP_VERSION')) {
             $phpVersion = $this->service->environment_variables()
@@ -228,6 +244,12 @@ class StackForm extends Component
         $this->dispatch('success', 'Git branch saved.');
     }
 
+    public function saveGithubToken(): void
+    {
+        $this->submit(notify: false);
+        $this->dispatch('success', 'GitHub token saved.');
+    }
+
     public function loadGithubBranches(): void
     {
         if (! $this->isLaravelRootkitStack()) {
@@ -252,13 +274,18 @@ class StackForm extends Component
         }
 
         [$owner, $repo] = $ownerRepo;
-        $response = Http::timeout(20)
+        $githubToken = trim((string) data_get($this->fields, 'SERVICE_GITHUB_TOKEN.value', ''));
+        $request = Http::timeout(20)
             ->retry(2, 250, throw: false)
             ->withHeaders([
                 'Accept' => 'application/vnd.github+json',
                 'X-GitHub-Api-Version' => '2022-11-28',
                 'User-Agent' => 'Coolify-Laravel-RootKit',
-            ])
+            ]);
+        if ($githubToken !== '') {
+            $request = $request->withToken($githubToken);
+        }
+        $response = $request
             ->get("https://api.github.com/repos/{$owner}/{$repo}/branches", [
                 'per_page' => 100,
             ]);
@@ -273,7 +300,7 @@ class StackForm extends Component
                 ->all();
         }
         if ($branches === []) {
-            $branches = $this->loadGithubBranchesFromRemoteGit($repoUrl);
+            $branches = $this->loadGithubBranchesFromRemoteGit($repoUrl, $githubToken);
         }
 
         if ($branches === []) {
@@ -359,10 +386,12 @@ class StackForm extends Component
 
             return;
         }
+        $githubToken = trim((string) data_get($this->fields, 'SERVICE_GITHUB_TOKEN.value', ''));
+        $deployRepoUrl = $this->buildGithubUrlWithToken($repoUrl, $githubToken);
 
         $command = "cd /var/www/html"
             ." && if [ ! -d .git ]; then echo 'Repository is not initialized in /var/www/html (.git missing).'; exit 1; fi"
-            ." && git remote set-url origin ".escapeshellarg($repoUrl)
+            ." && git remote set-url origin ".escapeshellarg($deployRepoUrl)
             ." && git fetch origin ".escapeshellarg($branch)
             ." && git checkout -B ".escapeshellarg($branch)." origin/".escapeshellarg($branch)
             ." && git pull --ff-only origin ".escapeshellarg($branch)
@@ -550,10 +579,10 @@ class StackForm extends Component
         return [(string) $segments[0], (string) $segments[1]];
     }
 
-    private function loadGithubBranchesFromRemoteGit(string $repoUrl): array
+    private function loadGithubBranchesFromRemoteGit(string $repoUrl, string $githubToken = ''): array
     {
         $server = $this->service->server;
-        $url = trim($repoUrl);
+        $url = trim($this->buildGithubUrlWithToken($repoUrl, $githubToken));
         if ($url !== '' && ! str_ends_with($url, '.git')) {
             $url .= '.git';
         }
@@ -588,6 +617,41 @@ class StackForm extends Component
         }
 
         return collect($branches)->unique()->values()->all();
+    }
+
+    private function buildGithubUrlWithToken(string $repoUrl, string $githubToken): string
+    {
+        $url = trim($repoUrl);
+        $token = trim($githubToken);
+        if ($url === '' || $token === '') {
+            return $url;
+        }
+
+        if (str_starts_with($url, 'git@github.com:')) {
+            $path = substr($url, strlen('git@github.com:'));
+            if (! is_string($path) || $path === '') {
+                return $url;
+            }
+
+            return "https://x-access-token:{$token}@github.com/{$path}";
+        }
+
+        if (! str_starts_with($url, 'http://') && ! str_starts_with($url, 'https://')) {
+            $url = 'https://'.$url;
+        }
+
+        $parts = parse_url($url);
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        if ($host !== 'github.com' && $host !== 'www.github.com') {
+            return $repoUrl;
+        }
+
+        $path = (string) ($parts['path'] ?? '');
+        if ($path === '') {
+            return $repoUrl;
+        }
+
+        return "https://x-access-token:{$token}@github.com{$path}";
     }
 
     public function render()

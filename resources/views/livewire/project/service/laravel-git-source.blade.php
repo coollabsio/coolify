@@ -49,6 +49,11 @@
                             helper="Si no se detectan ramas, puedes escribirla manualmente." />
                     @endif
                 </div>
+
+                <div class="w-full max-w-sm">
+                    <x-forms.input id="githubToken" type="password" label="GitHub Token"
+                        helper="Opcional para repos privados. Se usa para detectar ramas con la API de GitHub." />
+                </div>
             </form>
         </div>
     </div>

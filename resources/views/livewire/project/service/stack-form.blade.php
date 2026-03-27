@@ -98,6 +98,14 @@
             </x-forms.button>
         </div>
     @endif
+    @if ($this->isLaravelRootkitStack() && $fields->has('SERVICE_GITHUB_TOKEN'))
+        <div class="w-full max-w-sm">
+            <x-forms.input canGate="update" :canResource="$service" type="password" id="fields.SERVICE_GITHUB_TOKEN.value"
+                label="GitHub Token"
+                helper="Opcional para repos privados. Se usa para detectar ramas y hacer fetch autenticado."
+                wire:change="saveGithubToken" />
+        </div>
+    @endif
     @if ($fields->has('SERVICE_PHP_VERSION'))
         <div class="w-full max-w-xs">
             <x-forms.select canGate="update" :canResource="$service" id="fields.SERVICE_PHP_VERSION.value"
@@ -116,7 +124,7 @@
         </div>
         <div class="grid grid-cols-2 gap-2">
             @foreach ($fields as $serviceName => $field)
-                @if ($serviceName === 'SERVICE_GITHUB_REPO_URL' || $serviceName === 'SERVICE_GITHUB_BRANCH' || $serviceName === 'SERVICE_PHP_VERSION' || $serviceName === 'SERVICE_URL_LARAVEL' || $serviceName === 'SERVICE_URL_NGINX' || $serviceName === 'SERVICE_URL_NGINX_80' || $serviceName === 'SERVICE_FQDN_NGINX' || $serviceName === 'SERVICE_FQDN_NGINX_80')
+                @if ($serviceName === 'SERVICE_GITHUB_REPO_URL' || $serviceName === 'SERVICE_GITHUB_BRANCH' || $serviceName === 'SERVICE_GITHUB_TOKEN' || $serviceName === 'SERVICE_PHP_VERSION' || $serviceName === 'SERVICE_URL_LARAVEL' || $serviceName === 'SERVICE_URL_NGINX' || $serviceName === 'SERVICE_URL_NGINX_80' || $serviceName === 'SERVICE_FQDN_NGINX' || $serviceName === 'SERVICE_FQDN_NGINX_80')
                     @continue
                 @endif
                 <div class="flex items-center gap-2"><span
