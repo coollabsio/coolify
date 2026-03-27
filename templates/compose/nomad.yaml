@@ -1,0 +1,29 @@
+# documentation: https://github.com/mauriceboe/NOMAD
+# slogan: Self-hosted collaborative travel planner with maps, budgets, packing lists, and real-time sync.
+# category: productivity
+# tags: travel,planner,collaboration,pwa,maps
+# logo: svgs/nomad.svg
+# port: 3000
+
+services:
+  nomad:
+    image: mauriceboe/nomad:latest
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=${PORT:?3000}
+      - SERVICE_URL_NOMAD_3000
+    volumes:
+      - type: bind
+        source: ./data
+        target: /app/data
+        is_directory: true
+      - type: bind
+        source: ./uploads
+        target: /app/uploads
+        is_directory: true
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
