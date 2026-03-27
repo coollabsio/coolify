@@ -36,6 +36,14 @@
                     >
                         Deploy cambios
                     </x-forms.button>
+                    <x-forms.button
+                        type="button"
+                        wire:click="runLaravelMigrations"
+                        wire:loading.attr="disabled"
+                        wire:target="runLaravelMigrations"
+                    >
+                        Run migrations
+                    </x-forms.button>
                 @endif
             @endcan
         </div>

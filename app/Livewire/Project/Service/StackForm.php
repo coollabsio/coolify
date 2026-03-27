@@ -353,16 +353,39 @@ class StackForm extends Component
         if ($branch === '') {
             $branch = 'main';
         }
+        $repoUrl = trim((string) data_get($this->fields, 'SERVICE_GITHUB_REPO_URL.value', ''));
+        if ($repoUrl === '') {
+            $this->dispatch('error', 'GitHub repository URL is required for Deploy cambios.');
+
+            return;
+        }
 
         $command = "cd /var/www/html"
-            ." && if [ -d .git ]; then git fetch origin ".escapeshellarg($branch)." && git checkout -B ".escapeshellarg($branch)." origin/".escapeshellarg($branch)." && git pull --ff-only origin ".escapeshellarg($branch)."; fi"
+            ." && if [ ! -d .git ]; then echo 'Repository is not initialized in /var/www/html (.git missing).'; exit 1; fi"
+            ." && git remote set-url origin ".escapeshellarg($repoUrl)
+            ." && git fetch origin ".escapeshellarg($branch)
+            ." && git checkout -B ".escapeshellarg($branch)." origin/".escapeshellarg($branch)
+            ." && git pull --ff-only origin ".escapeshellarg($branch)
             ." && if [ -f composer.json ]; then composer install --no-interaction --prefer-dist --optimize-autoloader; fi"
             ." && if [ -f package.json ]; then if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi && npm run build; fi"
             ." && if [ -f .env ]; then if grep -Eq '^ASSET_URL=' .env; then sed -i 's|^ASSET_URL=.*|ASSET_URL=|' .env; else echo 'ASSET_URL=' >> .env; fi; fi"
-            ." && if [ -f artisan ]; then php artisan optimize:clear || true; php artisan config:clear || true; php artisan route:clear || true; php artisan view:clear || true; php artisan cache:clear || true; php artisan migrate --force || true; fi"
+            ." && if [ -f artisan ]; then php artisan optimize:clear || true; php artisan config:clear || true; php artisan route:clear || true; php artisan view:clear || true; php artisan cache:clear || true; fi"
             ." && echo 'Quick deploy finished'";
 
         $this->runFrontendAssetCommand($command);
+    }
+
+    public function runLaravelMigrations(): void
+    {
+        if (! $this->isLaravelRootkitStack()) {
+            $this->dispatch('error', 'This action is only available for Laravel RootKit services.');
+
+            return;
+        }
+
+        $this->runFrontendAssetCommand(
+            "cd /var/www/html && if [ -f artisan ]; then php artisan migrate --force; else echo 'artisan file not found'; exit 1; fi"
+        );
     }
 
     public function instantSave()

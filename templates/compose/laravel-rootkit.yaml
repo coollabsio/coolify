@@ -302,7 +302,7 @@ services:
               DB_DATABASE="${DB_NAME}" \
               DB_USERNAME="${DB_USER}" \
               DB_PASSWORD="${DB_PASSWORD}" \
-              php artisan migrate --force || true
+              php artisan about >/dev/null 2>&1 || true
           fi
 
           mkdir -p /var/www/html/storage/logs
