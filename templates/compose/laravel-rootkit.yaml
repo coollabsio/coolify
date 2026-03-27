@@ -126,12 +126,15 @@ services:
 
           REPO_URL="${SERVICE_GITHUB_REPO_URL:-https://github.com/crmhawkins/copiservi.git}"
           REPO_BRANCH="${SERVICE_GITHUB_BRANCH:-main}"
-          SERVICE_PUBLIC_URL_RUNTIME="${SERVICE_URL_NGINX:-${SERVICE_URL_NGINX_80:-}}"
+          SERVICE_PUBLIC_URL_RUNTIME=""
+          if [ -z "${SERVICE_PUBLIC_URL_RUNTIME}" ] && [ -n "${SERVICE_FQDN_NGINX:-}" ]; then
+            SERVICE_PUBLIC_URL_RUNTIME="https://${SERVICE_FQDN_NGINX}"
+          fi
           if [ -z "${SERVICE_PUBLIC_URL_RUNTIME}" ] && [ -n "${SERVICE_FQDN_NGINX_80:-}" ]; then
             SERVICE_PUBLIC_URL_RUNTIME="https://${SERVICE_FQDN_NGINX_80%:80}"
           fi
-          if [ -z "${SERVICE_PUBLIC_URL_RUNTIME}" ] && [ -n "${SERVICE_FQDN_NGINX:-}" ]; then
-            SERVICE_PUBLIC_URL_RUNTIME="https://${SERVICE_FQDN_NGINX}"
+          if [ -z "${SERVICE_PUBLIC_URL_RUNTIME}" ]; then
+            SERVICE_PUBLIC_URL_RUNTIME="${SERVICE_URL_NGINX:-${SERVICE_URL_NGINX_80:-}}"
           fi
           if [ -n "${SERVICE_PUBLIC_URL_RUNTIME}" ] && [ "${SERVICE_PUBLIC_URL_RUNTIME#http://}" != "${SERVICE_PUBLIC_URL_RUNTIME}" ]; then
             SERVICE_PUBLIC_URL_RUNTIME="https://${SERVICE_PUBLIC_URL_RUNTIME#http://}"
@@ -261,7 +264,7 @@ services:
              echo "DB_USERNAME=${DB_USER}" >> .env
              echo "DB_PASSWORD=${DB_PASSWORD}" >> .env
              echo "APP_URL=${SERVICE_PUBLIC_URL_RUNTIME}" >> .env
-             echo "ASSET_URL=${SERVICE_PUBLIC_URL_RUNTIME}" >> .env
+             echo "ASSET_URL=" >> .env
           fi
 
           upsert_env() {
@@ -277,7 +280,9 @@ services:
 
           upsert_env "APP_KEY" ""
           upsert_env "APP_URL" "${SERVICE_PUBLIC_URL_RUNTIME}"
-          upsert_env "ASSET_URL" "${SERVICE_PUBLIC_URL_RUNTIME}"
+          # Keep assets on same host/domain as current request.
+          # This avoids cert/domain mismatch when service internal URLs differ.
+          upsert_env "ASSET_URL" ""
           upsert_env "DB_CONNECTION" "mysql"
           upsert_env "DB_HOST" "mariadb"
           upsert_env "DB_PORT" "3306"

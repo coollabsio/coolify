@@ -358,6 +358,7 @@ class StackForm extends Component
             ." && if [ -d .git ]; then git fetch origin ".escapeshellarg($branch)." && git checkout -B ".escapeshellarg($branch)." origin/".escapeshellarg($branch)." && git pull --ff-only origin ".escapeshellarg($branch)."; fi"
             ." && if [ -f composer.json ]; then composer install --no-interaction --prefer-dist --optimize-autoloader; fi"
             ." && if [ -f package.json ]; then if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi && npm run build; fi"
+            ." && if [ -f .env ]; then if grep -Eq '^ASSET_URL=' .env; then sed -i 's|^ASSET_URL=.*|ASSET_URL=|' .env; else echo 'ASSET_URL=' >> .env; fi; fi"
             ." && if [ -f artisan ]; then php artisan optimize:clear || true; php artisan config:clear || true; php artisan route:clear || true; php artisan view:clear || true; php artisan cache:clear || true; php artisan migrate --force || true; fi"
             ." && echo 'Quick deploy finished'";
 
