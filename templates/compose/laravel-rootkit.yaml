@@ -236,6 +236,8 @@ services:
               } > /var/www/html/public/_coolify_error.html
               exit 1
             fi
+            echo "Vite manifest detected:"
+            ls -la /var/www/html/public/build/manifest.json
           fi
 
           DB_NAME="${SERVICE_DATABASE_LARAVEL:-${MYSQL_DATABASE:-laravel}}"
@@ -416,7 +418,7 @@ services:
               set $php_upstream "laravel:9000";
 
               location / {
-                  try_files /_coolify_error.html $uri $uri/ /index.php?$query_string;
+                  try_files $uri $uri/ /index.php?$query_string;
               }
 
               location ~ \.php$ {
