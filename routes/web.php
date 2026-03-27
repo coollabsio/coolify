@@ -38,6 +38,7 @@ use App\Livewire\Project\Service\WordPressManager;
 use App\Livewire\Project\Service\LaravelManager;
 use App\Livewire\Project\Service\LaravelArtisan;
 use App\Livewire\Project\Service\LaravelCron;
+use App\Livewire\Project\Service\LaravelGitSource;
 use App\Livewire\Project\Shared\ExecuteContainerCommand;
 use App\Livewire\Project\Shared\FileExplorer;
 use App\Livewire\Project\Shared\Logs;
@@ -264,6 +265,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/laravel-manager', LaravelManager::class)->name('project.service.laravel-manager');
         Route::get('/laravel-artisan', LaravelArtisan::class)->name('project.service.laravel-artisan');
         Route::get('/laravel-cron', LaravelCron::class)->name('project.service.laravel-cron');
+        Route::get('/laravel-git-source', LaravelGitSource::class)->name('project.service.laravel-git-source');
         Route::get('/{stack_service_uuid}/backups', ServiceDatabaseBackups::class)->name('project.service.database.backups');
         Route::get('/{stack_service_uuid}/import', ServiceIndex::class)->name('project.service.database.import')->middleware('can.update.resource');
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');

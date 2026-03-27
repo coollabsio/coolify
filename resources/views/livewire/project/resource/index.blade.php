@@ -649,6 +649,18 @@
 </div>
 
 <script>
+    function removeRegenerateResourcesButton() {
+        const buttons = document.querySelectorAll('button');
+        buttons.forEach((button) => {
+            if (button.textContent?.trim() === 'Regenerate Resources') {
+                button.remove();
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', removeRegenerateResourcesButton);
+    document.addEventListener('livewire:navigated', removeRegenerateResourcesButton);
+
     function sortFn(a, b) {
         return a.name.localeCompare(b.name)
     }

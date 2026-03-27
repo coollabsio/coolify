@@ -160,4 +160,18 @@ class Configuration extends Component
             return false;
         }
     }
+
+    public function hasLaravelRootkit(): bool
+    {
+        if (! $this->service) {
+            return false;
+        }
+
+        $composeRaw = (string) data_get($this->service, 'docker_compose_raw', '');
+
+        return str_contains($composeRaw, 'APP_NAME=Laravel RootKit')
+            || (str_contains($composeRaw, 'SERVICE_GITHUB_REPO_URL')
+                && str_contains($composeRaw, 'SERVICE_DATABASE_LARAVEL')
+                && str_contains($composeRaw, 'phpmyadmin'));
+    }
 }
