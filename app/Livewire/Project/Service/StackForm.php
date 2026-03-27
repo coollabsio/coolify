@@ -27,6 +27,10 @@ class StackForm extends Component
 
     public ?bool $connectToDockerNetwork = null;
 
+    public string $assetActionOutput = '';
+
+    public bool $isRunningAssetAction = false;
+
     protected function rules(): array
     {
         $baseRules = [
@@ -159,29 +163,7 @@ class StackForm extends Component
             $this->validationAttributes['fields.SERVICE_PHP_VERSION.value'] = 'PHP Version';
         }
 
-        $websiteUrlFieldKey = $this->resolveWebsiteUrlFieldKey();
-        if (! $this->fields->has($websiteUrlFieldKey)) {
-            $serviceUrl = $this->service->environment_variables()
-                ->where('key', $websiteUrlFieldKey)
-                ->first();
-            if (! $serviceUrl && in_array($websiteUrlFieldKey, ['SERVICE_FQDN_NGINX', 'SERVICE_FQDN_NGINX_80'], true)) {
-                // Backward compatibility for services created before nginx FQDN became canonical.
-                $serviceUrl = $this->service->environment_variables()
-                    ->whereIn('key', ['SERVICE_FQDN_NGINX_80', 'SERVICE_FQDN_NGINX', 'SERVICE_URL_NGINX_80', 'SERVICE_URL_NGINX', 'SERVICE_URL_LARAVEL'])
-                    ->first();
-            }
-
-            $this->fields->put($websiteUrlFieldKey, [
-                'serviceName' => $websiteUrlFieldKey,
-                'key' => $websiteUrlFieldKey,
-                'name' => 'Website URL',
-                'value' => data_get($serviceUrl, 'value', ''),
-                'isPassword' => false,
-                'rules' => 'required|string',
-                'customHelper' => 'Public URL routed by Coolify for your Laravel app.',
-            ]);
-            $this->validationAttributes["fields.{$websiteUrlFieldKey}.value"] = 'Website URL';
-        }
+        $this->setFieldValueIfPresent('SERVICE_URL_LARAVEL', '');
     }
 
     public function isLaravelGitHubStack(): bool
@@ -189,6 +171,16 @@ class StackForm extends Component
         $raw = (string) ($this->dockerComposeRaw ?? $this->service->docker_compose_raw ?? '');
 
         return str_contains($raw, 'SERVICE_GITHUB_REPO_URL') || str_contains($raw, 'SERVICE_PHP_VERSION');
+    }
+
+    public function isLaravelRootkitStack(): bool
+    {
+        $raw = (string) ($this->dockerComposeRaw ?? $this->service->docker_compose_raw ?? '');
+
+        return str_contains($raw, 'APP_NAME=Laravel RootKit')
+            || (str_contains($raw, 'SERVICE_GITHUB_REPO_URL')
+                && str_contains($raw, 'SERVICE_DATABASE_LARAVEL')
+                && str_contains($raw, 'phpmyadmin'));
     }
 
     public function saveCompose($raw)
@@ -211,9 +203,33 @@ class StackForm extends Component
 
     public function saveServiceUrl(): void
     {
-        $this->normalizeServiceUrlField();
         $this->submit(notify: false);
-        $this->dispatch('success', 'Service URL saved.');
+    }
+
+    public function rebuildFrontendAssets(): void
+    {
+        if (! $this->isLaravelRootkitStack()) {
+            $this->dispatch('error', 'This action is only available for Laravel RootKit services.');
+
+            return;
+        }
+
+        $this->runFrontendAssetCommand(
+            "cd /var/www/html && if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi && npm run build"
+        );
+    }
+
+    public function verifyFrontendAssets(): void
+    {
+        if (! $this->isLaravelRootkitStack()) {
+            $this->dispatch('error', 'This action is only available for Laravel RootKit services.');
+
+            return;
+        }
+
+        $this->runFrontendAssetCommand(
+            "cd /var/www/html && test -f public/build/manifest.json && ls -la public/build && echo 'Vite assets OK'"
+        );
     }
 
     public function instantSave()
@@ -226,8 +242,7 @@ class StackForm extends Component
     public function submit($notify = true)
     {
         try {
-            $this->normalizeServiceUrlField();
-            $this->syncWebsiteUrlVariables();
+            $this->setFieldValueIfPresent('SERVICE_URL_LARAVEL', '');
             $this->validate();
             $this->syncLaravelDatabaseVariable();
             $this->syncData(true);
@@ -284,79 +299,6 @@ class StackForm extends Component
         ]);
     }
 
-    private function normalizeServiceUrlField(): void
-    {
-        $serviceUrlFieldKey = $this->resolveWebsiteUrlFieldKey();
-        if (! $this->fields->has($serviceUrlFieldKey)) {
-            return;
-        }
-
-        $value = trim((string) data_get($this->fields, "{$serviceUrlFieldKey}.value", ''));
-        if ($value === '') {
-            return;
-        }
-
-        if (str_starts_with($value, 'http://')) {
-            $value = substr($value, 7);
-        } elseif (str_starts_with($value, 'https://')) {
-            $value = substr($value, 8);
-        }
-        $value = rtrim($value, '/');
-        $serviceUrlField = $this->fields->get($serviceUrlFieldKey, []);
-        if (! is_array($serviceUrlField)) {
-            return;
-        }
-
-        $serviceUrlField['value'] = $value;
-        $this->fields->put($serviceUrlFieldKey, $serviceUrlField);
-    }
-
-    private function syncWebsiteUrlVariables(): void
-    {
-        $canonicalFieldKey = $this->resolveWebsiteUrlFieldKey();
-        $canonicalUrl = trim((string) data_get($this->fields, "{$canonicalFieldKey}.value", ''));
-        if ($canonicalUrl === '') {
-            return;
-        }
-
-        $fqdnWithoutScheme = $canonicalUrl;
-        $fqdnWithoutPort = preg_replace('/:\d+$/', '', $fqdnWithoutScheme) ?? $fqdnWithoutScheme;
-        $httpUrl = str_starts_with($fqdnWithoutPort, 'http://') || str_starts_with($fqdnWithoutPort, 'https://')
-            ? $fqdnWithoutPort
-            : 'http://'.$fqdnWithoutPort;
-
-        $this->setFieldValueIfPresent('SERVICE_FQDN_NGINX', $fqdnWithoutPort);
-        $this->setFieldValueIfPresent('SERVICE_FQDN_NGINX_80', $fqdnWithoutPort);
-        $this->setFieldValueIfPresent('SERVICE_URL_NGINX_80', $httpUrl);
-        $this->setFieldValueIfPresent('SERVICE_URL_NGINX', $httpUrl);
-        $this->setFieldValueIfPresent('SERVICE_URL_LARAVEL', $httpUrl);
-    }
-
-    private function resolveWebsiteUrlFieldKey(): string
-    {
-        if (str_contains($this->dockerComposeRaw, 'SERVICE_FQDN_NGINX_80')) {
-            return 'SERVICE_FQDN_NGINX_80';
-        }
-        if (str_contains($this->dockerComposeRaw, 'SERVICE_FQDN_NGINX')) {
-            return 'SERVICE_FQDN_NGINX';
-        }
-        if (str_contains($this->dockerComposeRaw, 'SERVICE_URL_NGINX_80')) {
-            return 'SERVICE_URL_NGINX_80';
-        }
-
-        if ($this->fields->has('SERVICE_FQDN_NGINX_80')) {
-            return 'SERVICE_FQDN_NGINX_80';
-        }
-        if ($this->fields->has('SERVICE_FQDN_NGINX')) {
-            return 'SERVICE_FQDN_NGINX';
-        }
-        if ($this->fields->has('SERVICE_URL_NGINX_80')) {
-            return 'SERVICE_URL_NGINX_80';
-        }
-
-        return 'SERVICE_URL_LARAVEL';
-    }
-
     private function setFieldValueIfPresent(string $key, string $value): void
     {
         $field = $this->fields->get($key, []);
@@ -366,6 +308,60 @@ class StackForm extends Component
 
         $field['value'] = $value;
         $this->fields->put($key, $field);
+    }
+
+    private function runFrontendAssetCommand(string $shellCommand): void
+    {
+        $this->isRunningAssetAction = true;
+        $this->assetActionOutput = '';
+
+        try {
+            $context = $this->getLaravelContainerContext();
+            if (! $context) {
+                $this->dispatch('error', 'Laravel container not found or not running.');
+
+                return;
+            }
+
+            $server = $context['server'];
+            $escapedContainer = $context['escapedContainer'];
+            $command = "docker exec {$escapedContainer} sh -lc ".escapeshellarg($shellCommand);
+            if ($server->isNonRoot()) {
+                $command = "sudo {$command}";
+            }
+
+            $this->assetActionOutput = (string) (instant_remote_process([$command], $server, false) ?? '');
+            $this->dispatch('success', 'Asset command executed.');
+        } catch (\Throwable $e) {
+            $this->assetActionOutput = $e->getMessage();
+            $this->dispatch('error', 'Asset command failed: '.$e->getMessage());
+        } finally {
+            $this->isRunningAssetAction = false;
+        }
+    }
+
+    private function getLaravelContainerContext(): ?array
+    {
+        $application = $this->service->applications
+            ->first(fn ($app) => str($app->name)->lower()->contains('laravel')
+                && str($app->status)->contains('running'));
+
+        if (! $application) {
+            $application = $this->service->applications
+                ->first(fn ($app) => str($app->status)->contains('running'));
+        }
+
+        if (! $application) {
+            return null;
+        }
+
+        $server = $application->service->server;
+        $containerName = $application->name.'-'.$this->service->uuid;
+
+        return [
+            'server' => $server,
+            'escapedContainer' => escapeshellarg($containerName),
+        ];
     }
 
     public function render()

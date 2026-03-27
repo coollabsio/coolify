@@ -67,7 +67,7 @@ services:
 
           if ! command -v supervisord >/dev/null 2>&1; then
             echo "Installing supervisor and required packages..."
-            apk add --no-cache supervisor curl git unzip
+            apk add --no-cache supervisor curl git unzip nodejs npm
           fi
 
           if php -m | grep -q "^pdo_mysql$" \
@@ -126,9 +126,6 @@ services:
 
           REPO_URL="${SERVICE_GITHUB_REPO_URL:-https://github.com/crmhawkins/copiservi.git}"
           SERVICE_PUBLIC_URL_RUNTIME="${SERVICE_URL_NGINX_80:-${SERVICE_URL_NGINX:-}}"
-          if [ -z "${SERVICE_PUBLIC_URL_RUNTIME}" ]; then
-            SERVICE_PUBLIC_URL_RUNTIME="${SERVICE_PUBLIC_URL:-}"
-          fi
           if [ -z "${SERVICE_PUBLIC_URL_RUNTIME}" ] && [ -n "${SERVICE_FQDN_NGINX_80:-}" ]; then
             SERVICE_PUBLIC_URL_RUNTIME="http://${SERVICE_FQDN_NGINX_80%:80}"
           fi
@@ -176,6 +173,37 @@ services:
                 printf '%s\n' "$COMPOSER_OUTPUT"
                 printf '%s\n' '</pre></div></div></body></html>'
               } > /var/www/html/public/_coolify_error.html
+            fi
+          fi
+
+          if [ -f package.json ]; then
+            echo "Installing Node dependencies and building Vite assets..."
+            set +e
+            if [ -f package-lock.json ]; then
+              NPM_OUTPUT="$(npm ci --no-audit --no-fund 2>&1 && npm run build 2>&1)"
+            else
+              NPM_OUTPUT="$(npm install --no-audit --no-fund 2>&1 && npm run build 2>&1)"
+            fi
+            NPM_EXIT="$?"
+            set -e
+            if [ "$NPM_EXIT" -ne 0 ]; then
+              echo "$NPM_OUTPUT" >&2
+              mkdir -p /var/www/html/public
+              {
+                printf '%s\n' '<!doctype html>'
+                printf '%s\n' '<html lang="en"><head><meta charset="utf-8" />'
+                printf '%s\n' '<meta name="viewport" content="width=device-width, initial-scale=1" />'
+                printf '%s\n' '<title>Coolify: Frontend build failed</title>'
+                printf '%s\n' '<style>:root{color-scheme:dark}body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#0b0f19;color:#e5e7eb}.wrap{max-width:960px;margin:0 auto;padding:32px 20px}.card{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:20px}h1{font-size:18px;margin:0 0 12px}p{margin:0 0 12px;color:#cbd5e1}pre{white-space:pre-wrap;word-break:break-word;background:#0b1220;border:1px solid #1f2937;border-radius:10px;padding:12px;color:#e5e7eb}.muted{color:#94a3b8;font-size:13px}</style></head><body>'
+                printf '%s\n' '<div class="wrap"><div class="card">'
+                printf '%s\n' '<h1>Frontend asset build failed</h1>'
+                printf '%s\n' '<p>The service could not run <code>npm run build</code>, so CSS/JS assets are missing.</p>'
+                printf '%s\n' '<p class="muted">Check Laravel logs in Coolify to see the exact npm error, fix the project build dependencies, and redeploy.</p>'
+                printf '%s\n' '<pre>'
+                printf '%s\n' "$NPM_OUTPUT"
+                printf '%s\n' '</pre></div></div></body></html>'
+              } > /var/www/html/public/_coolify_error.html
+              exit 1
             fi
           fi
 
@@ -277,8 +305,6 @@ services:
     environment:
       - SERVICE_GITHUB_REPO_URL=$SERVICE_GITHUB_REPO_URL
       - SERVICE_PHP_VERSION=$SERVICE_PHP_VERSION
-      - SERVICE_URL_NGINX
-      - SERVICE_URL_NGINX_80
       - SERVICE_FQDN_NGINX
       - SERVICE_FQDN_NGINX_80
       - APP_NAME=Laravel RootKit
@@ -308,8 +334,6 @@ services:
 
   nginx:
     image: nginx:alpine
-    environment:
-      - SERVICE_URL_NGINX
     command: ["nginx", "-g", "daemon off;"]
     volumes:
       - laravel-files:/var/www/html:ro

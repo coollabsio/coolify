@@ -11,10 +11,34 @@
                 <x-modal-input buttonTitle="Edit Compose File" title="Edit Docker Compose" :closeOutside="false">
                     <livewire:project.service.edit-compose serviceId="{{ $service->id }}" />
                 </x-modal-input>
+                @if ($this->isLaravelRootkitStack())
+                    <x-forms.button
+                        type="button"
+                        wire:click="rebuildFrontendAssets"
+                        wire:loading.attr="disabled"
+                        wire:target="rebuildFrontendAssets"
+                    >
+                        Rebuild CSS/JS
+                    </x-forms.button>
+                    <x-forms.button
+                        type="button"
+                        wire:click="verifyFrontendAssets"
+                        wire:loading.attr="disabled"
+                        wire:target="verifyFrontendAssets"
+                    >
+                        Verificar Assets
+                    </x-forms.button>
+                @endif
             @endcan
         </div>
         <div>Configuration</div>
     </div>
+    @if ($this->isLaravelRootkitStack() && $assetActionOutput !== '')
+        <div class="rounded border border-coolgray-300 dark:border-coolgray-700 p-3">
+            <div class="mb-2 text-sm font-semibold">Asset Command Output</div>
+            <pre class="whitespace-pre-wrap break-words text-xs">{{ $assetActionOutput }}</pre>
+        </div>
+    @endif
     <div class="flex gap-2">
         <x-forms.input canGate="update" :canResource="$service" id="name" required label="Service Name"
             placeholder="My super WordPress site" />
@@ -30,21 +54,6 @@
             <x-forms.input canGate="update" :canResource="$service" id="fields.SERVICE_GITHUB_REPO_URL.value"
                 label="GitHub Repository URL" placeholder="https://github.com/owner/repository.git"
                 helper="Public repository URL used to clone your Laravel project." wire:change="saveGithubRepoUrl" />
-        </div>
-    @endif
-    @php
-        $websiteUrlFieldKey = $fields->has('SERVICE_FQDN_NGINX_80')
-            ? 'SERVICE_FQDN_NGINX_80'
-            : ($fields->has('SERVICE_FQDN_NGINX')
-                ? 'SERVICE_FQDN_NGINX'
-                : ($fields->has('SERVICE_URL_NGINX_80') ? 'SERVICE_URL_NGINX_80' : 'SERVICE_URL_LARAVEL'));
-    @endphp
-    @if ($fields->has($websiteUrlFieldKey))
-        <div class="w-full">
-            <x-forms.input canGate="update" :canResource="$service" id="fields.{{ $websiteUrlFieldKey }}.value"
-                label="Website URL" placeholder="Introduzca la url de la pagina"
-                helper="Public URL routed by Coolify for your Laravel app. You can write only the domain."
-                wire:change="saveServiceUrl" />
         </div>
     @endif
     @if ($fields->has('SERVICE_PHP_VERSION'))
@@ -65,7 +74,7 @@
         </div>
         <div class="grid grid-cols-2 gap-2">
             @foreach ($fields as $serviceName => $field)
-                @if ($serviceName === 'SERVICE_GITHUB_REPO_URL' || $serviceName === 'SERVICE_PHP_VERSION' || $serviceName === 'SERVICE_URL_LARAVEL' || $serviceName === 'SERVICE_URL_NGINX_80' || $serviceName === 'SERVICE_FQDN_NGINX' || $serviceName === 'SERVICE_FQDN_NGINX_80')
+                @if ($serviceName === 'SERVICE_GITHUB_REPO_URL' || $serviceName === 'SERVICE_PHP_VERSION' || $serviceName === 'SERVICE_URL_LARAVEL' || $serviceName === 'SERVICE_URL_NGINX' || $serviceName === 'SERVICE_URL_NGINX_80' || $serviceName === 'SERVICE_FQDN_NGINX' || $serviceName === 'SERVICE_FQDN_NGINX_80')
                     @continue
                 @endif
                 <div class="flex items-center gap-2"><span
