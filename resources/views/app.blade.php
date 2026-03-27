@@ -4,9 +4,9 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="robots" content="noindex">
         @vite('resources/js/app.ts')
-        @inertiaHead
+        <x-inertia::head />
     </head>
     <body>
-        @inertia
+        <x-inertia::app />
     </body>
 </html>

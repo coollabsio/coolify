@@ -1,16 +1,16 @@
 .env
 .env.*
-!.env.testing
 !.env.example
 !.env.local.example
 !.env.production.example
+!.env.testing
 
 .bash_history
 .ssh
 
 .bun
-.npm
 node_modules
+.npm
 /vendor
 
 *.log
@@ -44,12 +44,12 @@ Thumbs.db
 *.sqlite*
 
 /auth.json
+Homestead.json
+Homestead.yaml
 .ignition.json
 .phpactor.json
 .phpunit.cache
 .phpunit.result.cache
-Homestead.json
-Homestead.yaml
 
 /public/build
 /public/hot
@@ -60,5 +60,3 @@ Homestead.yaml
 !/storage/app
 !/storage/framework
 !/storage/logs
-!/storage/phpstan
-!/storage/rector

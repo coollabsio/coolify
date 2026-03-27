@@ -87,12 +87,12 @@ return [
     'waits' => [
         'redis:high' => 10,
         'redis:default' => 20,
-        'redis:production-deployment' => 10,
-        'redis:standard-deployment' => 20,
-        'redis:worker-high' => 10,
-        'redis:worker-default' => 20,
-        'redis:worker-production-deployment' => 10,
-        'redis:worker-standard-deployment' => 20,
+        'redis:productionDeployment' => 10,
+        'redis:standardDeployment' => 20,
+        'redis:workerHigh' => 10,
+        'redis:workerDefault' => 20,
+        'redis:workerProductionDeployment' => 10,
+        'redis:workerStandardDeployment' => 20,
     ],
 
     /*
@@ -208,7 +208,7 @@ return [
             ],
             'deployments' => [
                 'connection' => 'redis',
-                'queue' => ['production-deployment', 'standard-deployment'],
+                'queue' => ['productionDeployment', 'standardDeployment'],
                 'balance' => false,
                 'autoScalingStrategy' => 'time',
                 'maxTime' => 3600,
@@ -223,7 +223,7 @@ return [
         ...((bool) env('WORKER_SERVER', false) ? [
             'worker-jobs' => [
                 'connection' => 'redis',
-                'queue' => ['worker-high', 'worker-default'],
+                'queue' => ['workerHigh', 'workerDefault'],
                 'balance' => false,
                 'autoScalingStrategy' => 'time',
                 'maxTime' => 3600,
@@ -236,7 +236,7 @@ return [
             ],
             'worker-deployments' => [
                 'connection' => 'redis',
-                'queue' => ['worker-production-deployment', 'worker-standard-deployment'],
+                'queue' => ['workerProductionDeployment', 'workerStandardDeployment'],
                 'balance' => false,
                 'autoScalingStrategy' => 'time',
                 'maxTime' => 3600,

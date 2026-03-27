@@ -4,19 +4,11 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use App\Models\EmailNotificationSettings;
-use App\Models\Environment;
-use App\Models\HostedEmailSettings;
-use App\Models\Project;
-use App\Models\Server;
-use App\Models\User;
-use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Console\DumpCommand;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -52,7 +44,7 @@ final class AppServiceProvider extends ServiceProvider
      */
     private function configureHttps(): void
     {
-        if (App::isProduction() && config()->boolean('app.force_https')) {
+        if (app()->isProduction() && config()->boolean('app.force_https')) {
             URL::forceScheme('https');
         }
     }
@@ -62,7 +54,7 @@ final class AppServiceProvider extends ServiceProvider
      */
     private function configurePasswordValidation(): void
     {
-        Password::defaults(fn () => App::isProduction()
+        Password::defaults(fn () => app()->isProduction()
             ? Password::min(12)
                 ->letters()
                 ->mixedCase()
@@ -77,8 +69,8 @@ final class AppServiceProvider extends ServiceProvider
      */
     private function configureCommands(): void
     {
-        DB::prohibitDestructiveCommands(App::isProduction());
-        DumpCommand::prohibit(App::isProduction());
+        DB::prohibitDestructiveCommands(app()->isProduction());
+        DumpCommand::prohibit(app()->isProduction());
     }
 
     /**
@@ -87,7 +79,7 @@ final class AppServiceProvider extends ServiceProvider
     private function configureModels(): void
     {
         Model::automaticallyEagerLoadRelationships();
-        Model::preventLazyLoading(! App::isProduction());
+        Model::preventLazyLoading(! app()->isProduction());
         Model::preventSilentlyDiscardingAttributes();
         Model::preventAccessingMissingAttributes();
 
@@ -120,7 +112,7 @@ final class AppServiceProvider extends ServiceProvider
      */
     private function configureRequestExceptions(): void
     {
-        if (! App::isProduction()) {
+        if (! app()->isProduction()) {
             RequestException::dontTruncate();
         }
     }

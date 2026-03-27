@@ -29,8 +29,8 @@
 	"license": "AGPL-3.0-or-later",
 	"require": {
 		"php": "^8.5",
-		"inertiajs/inertia-laravel": "^3.0.0-beta.3",
-		"laravel/framework": "^13.1.1",
+		"inertiajs/inertia-laravel": "^3.0.1",
+		"laravel/framework": "^13.2.0",
 		"laravel/horizon": "^5.45.4",
 		"laravel/tinker": "^3.0.0"
 	},
@@ -42,7 +42,7 @@
 		"laravel/pail": "^1.2.6",
 		"laravel/pint": "^1.29.0",
 		"mockery/mockery": "^1.6.12",
-		"mrpunyapal/peststan": "^0.1.0",
+		"mrpunyapal/peststan": "^0.1.3",
 		"nunomaduro/collision": "^8.9.1",
 		"pestphp/pest": "^4.4.3",
 		"pestphp/pest-plugin-laravel": "^4.1.0",
