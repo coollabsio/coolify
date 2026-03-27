@@ -6,8 +6,6 @@ use App\Http\Controllers\PhpMyAdminController;
 use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Boarding\Index as BoardingIndex;
-use App\Livewire\Clients\Index as ClientsIndex;
-use App\Livewire\Clients\Show as ClientsShow;
 use App\Livewire\Dashboard;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Show as DestinationShow;
@@ -192,8 +190,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/projects', ProjectIndex::class)->name('project.index');
-    Route::get('/clients', ClientsIndex::class)->name('clients.index');
-    Route::get('/clients/{teamId}', ClientsShow::class)->name('clients.show');
     Route::prefix('project/{project_uuid}')->group(function () {
         Route::get('/', ProjectShow::class)->name('project.show');
         Route::get('/edit', ProjectEdit::class)->name('project.edit')->middleware('can.update.resource');
