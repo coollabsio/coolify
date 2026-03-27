@@ -126,12 +126,15 @@ services:
 
           REPO_URL="${SERVICE_GITHUB_REPO_URL:-https://github.com/crmhawkins/copiservi.git}"
           REPO_BRANCH="${SERVICE_GITHUB_BRANCH:-main}"
-          SERVICE_PUBLIC_URL_RUNTIME="${SERVICE_URL_NGINX_80:-${SERVICE_URL_NGINX:-}}"
+          SERVICE_PUBLIC_URL_RUNTIME="${SERVICE_URL_NGINX:-${SERVICE_URL_NGINX_80:-}}"
           if [ -z "${SERVICE_PUBLIC_URL_RUNTIME}" ] && [ -n "${SERVICE_FQDN_NGINX_80:-}" ]; then
-            SERVICE_PUBLIC_URL_RUNTIME="http://${SERVICE_FQDN_NGINX_80%:80}"
+            SERVICE_PUBLIC_URL_RUNTIME="https://${SERVICE_FQDN_NGINX_80%:80}"
           fi
           if [ -z "${SERVICE_PUBLIC_URL_RUNTIME}" ] && [ -n "${SERVICE_FQDN_NGINX:-}" ]; then
-            SERVICE_PUBLIC_URL_RUNTIME="http://${SERVICE_FQDN_NGINX}"
+            SERVICE_PUBLIC_URL_RUNTIME="https://${SERVICE_FQDN_NGINX}"
+          fi
+          if [ -n "${SERVICE_PUBLIC_URL_RUNTIME}" ] && [ "${SERVICE_PUBLIC_URL_RUNTIME#http://}" != "${SERVICE_PUBLIC_URL_RUNTIME}" ]; then
+            SERVICE_PUBLIC_URL_RUNTIME="https://${SERVICE_PUBLIC_URL_RUNTIME#http://}"
           fi
 
           if [ ! -d .git ]; then
@@ -258,6 +261,7 @@ services:
              echo "DB_USERNAME=${DB_USER}" >> .env
              echo "DB_PASSWORD=${DB_PASSWORD}" >> .env
              echo "APP_URL=${SERVICE_PUBLIC_URL_RUNTIME}" >> .env
+             echo "ASSET_URL=${SERVICE_PUBLIC_URL_RUNTIME}" >> .env
           fi
 
           upsert_env() {
@@ -273,6 +277,7 @@ services:
 
           upsert_env "APP_KEY" ""
           upsert_env "APP_URL" "${SERVICE_PUBLIC_URL_RUNTIME}"
+          upsert_env "ASSET_URL" "${SERVICE_PUBLIC_URL_RUNTIME}"
           upsert_env "DB_CONNECTION" "mysql"
           upsert_env "DB_HOST" "mariadb"
           upsert_env "DB_PORT" "3306"
@@ -425,6 +430,10 @@ services:
                   fastcgi_pass $php_upstream;
                   fastcgi_index index.php;
                   fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                  fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
+                  fastcgi_param HTTP_X_FORWARDED_HOST $http_host;
+                  fastcgi_param HTTP_X_FORWARDED_FOR $proxy_add_x_forwarded_for;
+                  fastcgi_param HTTPS $http_x_forwarded_proto;
                   include fastcgi_params;
                   fastcgi_read_timeout 300;
                   fastcgi_buffers 16 16k;
