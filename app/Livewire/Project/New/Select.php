@@ -398,14 +398,15 @@ class Select extends Component
             $this->dispatch('success', 'Service catalog regenerated successfully.');
             $this->dispatch('services-catalog-regenerated');
         } catch (\Throwable $e) {
-            handleError($e, $this);
+            report($e);
+            $this->dispatch('error', 'Could not regenerate services from remote source. Current local catalog is kept.');
         }
     }
 
     private function loadAndRepairServiceTemplates(bool $force = false): Collection
     {
-        $localServices = collect(get_service_templates());
-        $sourceServices = $force ? collect(get_service_templates(force: true)) : $localServices;
+        $localServices = $this->getServiceTemplatesSafely();
+        $sourceServices = $force ? $this->getServiceTemplatesSafely(force: true) : $localServices;
 
         if ($sourceServices->isEmpty()) {
             $sourceServices = $localServices;
@@ -422,32 +423,28 @@ class Select extends Component
 
     private function persistServiceTemplates(Collection $services): void
     {
-        $targetFile = base_path('templates/'.config('constants.services.file_name'));
-        $normalized = $services->sortKeys()->toArray();
-        $newJson = json_encode($normalized, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        try {
+            $targetFile = base_path('templates/'.config('constants.services.file_name'));
+            $normalized = $services->sortKeys()->toArray();
+            $newJson = json_encode($normalized, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
-        if ($newJson === false) {
-            return;
+            if ($newJson === false) {
+                return;
+            }
+
+            $currentJson = File::exists($targetFile) ? (string) File::get($targetFile) : '';
+            if (trim($currentJson) === trim($newJson)) {
+                return;
+            }
+
+            File::put($targetFile, $newJson);
+        } catch (\Throwable $e) {
+            report($e);
         }
-
-        $currentJson = File::exists($targetFile) ? (string) File::get($targetFile) : '';
-        if (trim($currentJson) === trim($newJson)) {
-            return;
-        }
-
-        File::put($targetFile, $newJson);
     }
 
     private function ensureProtectedTemplatesExist(Collection $services): Collection
     {
-        $this->upsertServiceTemplateFromCompose(
-            services: $services,
-            key: 'laravel-with-mariadb',
-            composeFile: 'laravel-github-mariadb-phpmyadmin.yaml',
-            slogan: 'Laravel with GitHub deploy, Nginx, MariaDB and phpMyAdmin.',
-            tags: ['laravel', 'php', 'nginx', 'mariadb', 'phpmyadmin', 'github']
-        );
-
         $this->upsertServiceTemplateFromCompose(
             services: $services,
             key: 'laravel-rootkit',
@@ -485,12 +482,43 @@ class Select extends Component
 
     private function normalizeDuplicateLaravelTemplates(Collection $services): Collection
     {
-        // Keep only one Laravel+MariaDB+phpMyAdmin template in the catalog.
-        // We keep `laravel-with-mariadb` as the canonical key and drop the duplicate.
-        if ($services->has('laravel-github-mariadb-phpmyadmin')) {
-            $services->forget('laravel-github-mariadb-phpmyadmin');
-        }
+        // Keep only Laravel RootKit in the catalog.
+        $services->forget([
+            'laravel-with-mariadb',
+            // Backward compatibility for older catalogs that still contain this duplicate key.
+            'laravel-github-mariadb-phpmyadmin',
+        ]);
+
+        // Extra guard: remove legacy Laravel+MariaDB entries even if key changed upstream.
+        $services = $services->reject(function (mixed $service): bool {
+            if (! is_array($service)) {
+                return false;
+            }
+
+            $serviceName = (string) data_get($service, 'name', '');
+            $normalizedServiceName = str($serviceName)->lower()->slug()->value();
+
+            return $normalizedServiceName === 'laravel-with-mariadb'
+                || $normalizedServiceName === 'laravel-github-mariadb-phpmyadmin';
+        });
 
         return $services;
+    }
+
+    private function getServiceTemplatesSafely(bool $force = false): Collection
+    {
+        try {
+            $services = get_service_templates(force: $force);
+
+            if ($services instanceof Collection) {
+                return $services;
+            }
+
+            return collect($services);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return collect();
+        }
     }
 }

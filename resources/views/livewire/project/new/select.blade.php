@@ -146,7 +146,7 @@
                             :confirmWithPassword="false" :actions="[
                                 'This will regenerate the Services catalog shown in this page.',
                                 'No resources will be deleted.',
-                                'It will restore missing templates like Laravel + Nginx + MariaDB + phpMyAdmin if absent.',
+                                'It will restore protected templates like Laravel RootKit if absent.',
                             ]"
                             step2ButtonText="Regenerate" />
                     </div>
