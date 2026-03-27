@@ -126,6 +126,16 @@ services:
 
           REPO_URL="${SERVICE_GITHUB_REPO_URL:-https://github.com/crmhawkins/copiservi.git}"
           REPO_BRANCH="${SERVICE_GITHUB_BRANCH:-main}"
+          GITHUB_TOKEN="${SERVICE_GITHUB_TOKEN:-}"
+
+          REPO_URL="${REPO_URL%/}"
+          if [ -n "${GITHUB_TOKEN}" ]; then
+            if echo "${REPO_URL}" | grep -Eq '^git@github\.com:'; then
+              REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_URL#git@github.com:}"
+            elif echo "${REPO_URL}" | grep -Eq '^https?://(www\.)?github\.com/'; then
+              REPO_URL="$(echo "${REPO_URL}" | sed -E "s#^https?://(www\.)?github\.com/#https://x-access-token:${GITHUB_TOKEN}@github.com/#")"
+            fi
+          fi
           SERVICE_PUBLIC_URL_RUNTIME=""
           if [ -z "${SERVICE_PUBLIC_URL_RUNTIME}" ] && [ -n "${SERVICE_FQDN_NGINX:-}" ]; then
             SERVICE_PUBLIC_URL_RUNTIME="https://${SERVICE_FQDN_NGINX}"
@@ -141,7 +151,11 @@ services:
           fi
 
           if [ ! -d .git ]; then
-            echo "Cloning repository ${REPO_URL} (branch: ${REPO_BRANCH})..."
+            if [ -n "${GITHUB_TOKEN}" ]; then
+              echo "Cloning repository (branch: ${REPO_BRANCH}) using GitHub token..."
+            else
+              echo "Cloning repository ${REPO_URL} (branch: ${REPO_BRANCH})..."
+            fi
             rm -rf * .[!.]* 2>/dev/null || true
             git clone --branch "${REPO_BRANCH}" --single-branch "${REPO_URL}" .
           else
@@ -486,7 +500,7 @@ services:
       - PMA_PASSWORD=$SERVICE_PASSWORD_ROOT
       - PMA_PORT=3306
       - PMA_ARBITRARY=0
-      - PMA_ABSOLUTE_URI=$SERVICE_URL_PHPMYADMIN
+      - PMA_ABSOLUTE_URI=$SERVICE_URL_PHPMYADMIN/
       - UPLOAD_LIMIT=300M
     depends_on:
       mariadb:
