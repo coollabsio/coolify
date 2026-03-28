@@ -241,7 +241,8 @@ CREATE TABLE IF NOT EXISTS "discord_notification_settings" (
     "server_disk_usage_discord_notifications" INTEGER DEFAULT true NOT NULL,
     "server_reachable_discord_notifications" INTEGER DEFAULT false NOT NULL,
     "server_unreachable_discord_notifications" INTEGER DEFAULT true NOT NULL,
-    "discord_ping_enabled" INTEGER DEFAULT true NOT NULL,
+    "discord_ping_type" TEXT DEFAULT 'here' NOT NULL,
+    "discord_custom_ping_text" TEXT,
     "server_patch_discord_notifications" INTEGER DEFAULT true NOT NULL,
     "traefik_outdated_discord_notifications" INTEGER DEFAULT true NOT NULL
 );
