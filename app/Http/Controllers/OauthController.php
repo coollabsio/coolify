@@ -22,8 +22,8 @@ class OauthController extends Controller
             $user = User::whereEmail($oauthUser->email)->first();
             if (! $user) {
                 $settings = instanceSettings();
-                if (! $settings->is_registration_enabled) {
-                    abort(403, 'Registration is disabled');
+                if (! $settings->is_registration_enabled && ! ($settings->is_oauth_registration_enabled ?? false)) {
+                    abort(403, 'OAuth registration is disabled');
                 }
 
                 $user = User::create([
@@ -35,6 +35,10 @@ class OauthController extends Controller
 
             return redirect('/');
         } catch (\Exception $e) {
+            if ($e instanceof HttpException && filled($e->getMessage())) {
+                return redirect()->route('login')->withErrors([$e->getMessage()]);
+            }
+
             $errorCode = $e instanceof HttpException ? 'auth.failed' : 'auth.failed.callback';
 
             return redirect()->route('login')->withErrors([__($errorCode)]);
