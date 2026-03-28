@@ -1,0 +1,30 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: A fullstack but simple mail server with SMTP, IMAP, DKIM, and anti-spam.
+# category: hosting
+# tags: email, mail, smtp, imap, postfix, dovecot, dkim
+# logo: svgs/docker-mailserver.svg
+# port: 25
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: ${MAIL_HOSTNAME:-mail.example.com}
+    environment:
+      - OVERRIDE_HOSTNAME=${MAIL_HOSTNAME:-mail.example.com}
+      - POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS:-postmaster@example.com}
+      - ENABLE_CLAMAV=0
+      - ENABLE_SPAMASSASSIN=1
+      - SPOOF_PROTECTION=1
+      - PERMIT_DOCKER=none
+      - ONE_DIR=1
+    volumes:
+      - mail-data:/var/mail
+      - mail-state:/var/mail-state
+      - mail-logs:/var/log/mail
+      - mail-config:/tmp/docker-mailserver
+    stop_grace_period: 1m
+    healthcheck:
+      test: ["CMD-SHELL", "ss --listening --tcp | grep -P 'LISTEN.+:smtp' || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
