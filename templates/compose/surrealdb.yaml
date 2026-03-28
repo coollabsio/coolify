@@ -1,0 +1,21 @@
+# documentation: https://surrealdb.com/docs/surrealdb/installation/running/docker
+# slogan: SurrealDB is a multi-model database for modern applications.
+# category: database
+# tags: surrealdb, database, multi-model, nosql, sql, graph, document
+# logo: svgs/surrealdb.svg
+# port: 8000
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    user: root
+    command: start --user root --pass ${SERVICE_PASSWORD_SURREALDB} rocksdb:/data
+    environment:
+      - SERVICE_URL_SURREALDB_8000
+    volumes:
+      - surrealdb-data:/data
+    healthcheck:
+      test: ["CMD", "surreal", "isready", "--endpoint", "http://127.0.0.1:8000"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
