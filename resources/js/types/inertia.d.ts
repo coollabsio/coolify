@@ -4,6 +4,10 @@ declare module "@inertiajs/core" {
 	export interface InertiaConfig {
 		sharedPageProps: {
 			appName: string;
+			workspace: {
+				id: string;
+				name: string;
+			} | null;
 		};
 		// flashDataType: {
 		//     toast?: { type: "success" | "error"; message: string };
