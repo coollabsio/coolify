@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 return [
-    'version' => '5.0.0-alpha.1',
+    'version' => env('COOLIFY_VERSION', '5.0.0-alpha.1'),
+    'channel' => env('COOLIFY_CHANNEL', 'stable'),
     'helper_version' => '2.0.0',
     'self_hosted' => env('SELF_HOSTED', true),
     'autoupdate' => env('AUTOUPDATE_ENABLED', false),
