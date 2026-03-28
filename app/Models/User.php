@@ -395,7 +395,7 @@ class User extends Authenticatable implements SendsEmail
     public function requestEmailChange(string $newEmail): void
     {
         // Generate 6-digit code
-        $code = sprintf('%06d', mt_rand(0, 999999));
+        $code = sprintf('%06d', random_int(0, 999999));
 
         // Set expiration using config value
         $expiryMinutes = config('constants.email_change.verification_code_expiry_minutes', 10);
