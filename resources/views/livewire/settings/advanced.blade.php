@@ -16,10 +16,21 @@
                 <div class="pb-4">Advanced settings for your Coolify instance.</div>
 
                 <div class="flex flex-col gap-1">
+                    <h4 class="pt-2">Authentication Settings</h4>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="is_registration_enabled"
                             helper="Allow users to self-register. If disabled, only administrators can create accounts."
                             label="Registration Allowed" />
+                    </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                            helper="Allow users signing in with an enabled OAuth provider to create an account even when password registration is disabled."
+                            label="OAuth Self-Registration" />
+                    </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_only_enabled"
+                            helper="Users created through OAuth cannot create or reset passwords and must continue signing in with their OAuth provider."
+                            label="OAuth-Only Accounts" />
                     </div>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
