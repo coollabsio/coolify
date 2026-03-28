@@ -70,6 +70,10 @@
                             class="block w-full text-center py-3 px-4 rounded-lg border border-neutral-300 dark:border-coolgray-400 font-medium hover:border-coollabs dark:hover:border-warning transition-colors">
                             {{ __('auth.register_now') }}
                         </a>
+                    @elseif ($enabled_oauth_providers->isNotEmpty() && $is_oauth_registration_enabled)
+                        <div class="mt-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                            Self-registration is available through the OAuth providers below.
+                        </div>
                     @else
                         <div class="mt-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
                             {{ __('auth.registration_disabled') }}
