@@ -53,6 +53,13 @@ class Controller extends BaseController
             $request->merge([
                 'email' => Str::lower($arrayOfRequest['email']),
             ]);
+            $settings = instanceSettings();
+            $user = User::whereEmail($request->input(Fortify::email()))->first();
+            if (($settings->is_oauth_only_enabled ?? false) && $user && is_null($user->password)) {
+                return back()->withErrors([
+                    'email' => 'Password reset is disabled for OAuth-only accounts. Please sign in with your OAuth provider.',
+                ]);
+            }
             $type = set_transanctional_email_settings();
             if (blank($type)) {
                 return response()->json(['message' => 'Transactional emails are not active'], 400);
