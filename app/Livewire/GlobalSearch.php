@@ -620,6 +620,13 @@ class GlobalSearch extends Component
                     'search_text' => 'projects all list view',
                 ],
                 [
+                    'name' => 'Deployments',
+                    'type' => 'navigation',
+                    'description' => 'View all application deployments',
+                    'link' => route('deployments.index'),
+                    'search_text' => 'deployments history releases builds rollout logs',
+                ],
+                [
                     'name' => 'Destinations',
                     'type' => 'navigation',
                     'description' => 'View all destinations',

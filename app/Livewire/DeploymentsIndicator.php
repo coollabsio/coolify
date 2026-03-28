@@ -41,7 +41,8 @@ class DeploymentsIndicator extends Component
     #[Computed]
     public function shouldReduceOpacity(): bool
     {
-        return request()->routeIs('project.application.deployment.*');
+        return request()->routeIs('project.application.deployment.*')
+            || request()->routeIs('deployments.index');
     }
 
     public function toggleExpanded()

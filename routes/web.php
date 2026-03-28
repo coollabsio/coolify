@@ -6,6 +6,7 @@ use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
+use App\Livewire\Deployments\Index as DeploymentsGlobalIndex;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\ForcePasswordReset;
@@ -195,6 +196,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
         Route::get('/{uuid}/revoke', [Controller::class, 'revokeInvitation'])->name('team.invitation.revoke');
     });
+
+    Route::get('/deployments', DeploymentsGlobalIndex::class)->name('deployments.index');
 
     Route::get('/projects', ProjectIndex::class)->name('project.index');
     Route::prefix('project/{project_uuid}')->group(function () {
