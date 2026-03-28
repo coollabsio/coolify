@@ -40,6 +40,14 @@ final class Workspace extends Model
         return $this->hasMany(CustomRole::class);
     }
 
+    /**
+     * @return HasMany<WorkspaceMember, $this>
+     */
+    public function members(): HasMany
+    {
+        return $this->hasMany(WorkspaceMember::class);
+    }
+
     protected function casts(): array
     {
         return [

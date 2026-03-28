@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
 /**
@@ -40,6 +41,14 @@ final class User extends Authenticatable
     public function workspaces(): BelongsToMany
     {
         return $this->belongsToMany(Workspace::class, 'workspace_members');
+    }
+
+    /**
+     * @return HasMany<WorkspaceMember, $this>
+     */
+    public function memberships(): HasMany
+    {
+        return $this->hasMany(WorkspaceMember::class);
     }
 
     protected function casts(): array
