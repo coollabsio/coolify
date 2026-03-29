@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- OpenLiteSpeed logo approximation - green lightning bolt on dark background -->
+  <rect width="200" height="200" rx="20" fill="#1a1a2e"/>
+  <polygon points="115,20 70,110 100,110 85,180 145,80 112,80" fill="#00b300"/>
+  <polygon points="115,20 70,110 100,110 85,180 145,80 112,80" fill="url(#ols-grad)" opacity="0.9"/>
+  <defs>
+    <linearGradient id="ols-grad" x1="70" y1="20" x2="145" y2="180" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#39d353"/>
+      <stop offset="100%" stop-color="#006600"/>
+    </linearGradient>
+  </defs>
+</svg>
