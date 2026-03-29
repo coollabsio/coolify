@@ -3502,6 +3502,105 @@
                     }
                 ]
             },
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Create Storage",
+                "description": "Create a persistent storage or file storage for an application.",
+                "operationId": "create-storage-by-application-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "type",
+                                    "mount_path"
+                                ],
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "persistent",
+                                            "file"
+                                        ],
+                                        "description": "The type of storage."
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Volume name (persistent only, required for persistent)."
+                                    },
+                                    "mount_path": {
+                                        "type": "string",
+                                        "description": "The container mount path."
+                                    },
+                                    "host_path": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "The host path (persistent only, optional)."
+                                    },
+                                    "content": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "File content (file only, optional)."
+                                    },
+                                    "is_directory": {
+                                        "type": "boolean",
+                                        "description": "Whether this is a directory mount (file only, default false)."
+                                    },
+                                    "fs_path": {
+                                        "type": "string",
+                                        "description": "Host directory path (required when is_directory is true)."
+                                    }
+                                },
+                                "type": "object",
+                                "additionalProperties": false
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Storage created.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
             "patch": {
                 "tags": [
                     "Applications"
@@ -3527,13 +3626,16 @@
                         "application\/json": {
                             "schema": {
                                 "required": [
-                                    "id",
                                     "type"
                                 ],
                                 "properties": {
+                                    "uuid": {
+                                        "type": "string",
+                                        "description": "The UUID of the storage (preferred)."
+                                    },
                                     "id": {
                                         "type": "integer",
-                                        "description": "The ID of the storage."
+                                        "description": "The ID of the storage (deprecated, use uuid instead)."
                                     },
                                     "type": {
                                         "type": "string",
@@ -3578,6 +3680,70 @@
                         "content": {
                             "application\/json": {
                                 "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/applications\/{uuid}\/storages\/{storage_uuid}": {
+            "delete": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Delete Storage",
+                "description": "Delete a persistent storage or file storage by application UUID.",
+                "operationId": "delete-storage-by-application-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "storage_uuid",
+                        "in": "path",
+                        "description": "UUID of the storage.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Storage deleted.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
                                     "type": "object"
                                 }
                             }
@@ -6504,6 +6670,333 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/storages": {
+            "get": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "List Storages",
+                "description": "List all persistent storages and file storages by database UUID.",
+                "operationId": "list-storages-by-database-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "All storages by database UUID.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "persistent_storages": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        "file_storages": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Create Storage",
+                "description": "Create a persistent storage or file storage for a database.",
+                "operationId": "create-storage-by-database-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "type",
+                                    "mount_path"
+                                ],
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "persistent",
+                                            "file"
+                                        ],
+                                        "description": "The type of storage."
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Volume name (persistent only, required for persistent)."
+                                    },
+                                    "mount_path": {
+                                        "type": "string",
+                                        "description": "The container mount path."
+                                    },
+                                    "host_path": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "The host path (persistent only, optional)."
+                                    },
+                                    "content": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "File content (file only, optional)."
+                                    },
+                                    "is_directory": {
+                                        "type": "boolean",
+                                        "description": "Whether this is a directory mount (file only, default false)."
+                                    },
+                                    "fs_path": {
+                                        "type": "string",
+                                        "description": "Host directory path (required when is_directory is true)."
+                                    }
+                                },
+                                "type": "object",
+                                "additionalProperties": false
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Storage created.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Update Storage",
+                "description": "Update a persistent storage or file storage by database UUID.",
+                "operationId": "update-storage-by-database-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Storage updated. For read-only storages (from docker-compose or services), only is_preview_suffix_enabled can be updated.",
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "type"
+                                ],
+                                "properties": {
+                                    "uuid": {
+                                        "type": "string",
+                                        "description": "The UUID of the storage (preferred)."
+                                    },
+                                    "id": {
+                                        "type": "integer",
+                                        "description": "The ID of the storage (deprecated, use uuid instead)."
+                                    },
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "persistent",
+                                            "file"
+                                        ],
+                                        "description": "The type of storage: persistent or file."
+                                    },
+                                    "is_preview_suffix_enabled": {
+                                        "type": "boolean",
+                                        "description": "Whether to add -pr-N suffix for preview deployments."
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "The volume name (persistent only, not allowed for read-only storages)."
+                                    },
+                                    "mount_path": {
+                                        "type": "string",
+                                        "description": "The container mount path (not allowed for read-only storages)."
+                                    },
+                                    "host_path": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "The host path (persistent only, not allowed for read-only storages)."
+                                    },
+                                    "content": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "The file content (file only, not allowed for read-only storages)."
+                                    }
+                                },
+                                "type": "object",
+                                "additionalProperties": false
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Storage updated.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/storages\/{storage_uuid}": {
+            "delete": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Delete Storage",
+                "description": "Delete a persistent storage or file storage by database UUID.",
+                "operationId": "delete-storage-by-database-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "storage_uuid",
+                        "in": "path",
+                        "description": "UUID of the storage.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Storage deleted.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -11229,6 +11722,338 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/storages": {
+            "get": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "List Storages",
+                "description": "List all persistent storages and file storages by service UUID.",
+                "operationId": "list-storages-by-service-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "All storages by service UUID.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "persistent_storages": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        "file_storages": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Create Storage",
+                "description": "Create a persistent storage or file storage for a service sub-resource.",
+                "operationId": "create-storage-by-service-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "type",
+                                    "mount_path",
+                                    "resource_uuid"
+                                ],
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "persistent",
+                                            "file"
+                                        ],
+                                        "description": "The type of storage."
+                                    },
+                                    "resource_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the service application or database sub-resource."
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Volume name (persistent only, required for persistent)."
+                                    },
+                                    "mount_path": {
+                                        "type": "string",
+                                        "description": "The container mount path."
+                                    },
+                                    "host_path": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "The host path (persistent only, optional)."
+                                    },
+                                    "content": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "File content (file only, optional)."
+                                    },
+                                    "is_directory": {
+                                        "type": "boolean",
+                                        "description": "Whether this is a directory mount (file only, default false)."
+                                    },
+                                    "fs_path": {
+                                        "type": "string",
+                                        "description": "Host directory path (required when is_directory is true)."
+                                    }
+                                },
+                                "type": "object",
+                                "additionalProperties": false
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Storage created.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Update Storage",
+                "description": "Update a persistent storage or file storage by service UUID.",
+                "operationId": "update-storage-by-service-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Storage updated. For read-only storages (from docker-compose or services), only is_preview_suffix_enabled can be updated.",
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "type"
+                                ],
+                                "properties": {
+                                    "uuid": {
+                                        "type": "string",
+                                        "description": "The UUID of the storage (preferred)."
+                                    },
+                                    "id": {
+                                        "type": "integer",
+                                        "description": "The ID of the storage (deprecated, use uuid instead)."
+                                    },
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "persistent",
+                                            "file"
+                                        ],
+                                        "description": "The type of storage: persistent or file."
+                                    },
+                                    "is_preview_suffix_enabled": {
+                                        "type": "boolean",
+                                        "description": "Whether to add -pr-N suffix for preview deployments."
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "The volume name (persistent only, not allowed for read-only storages)."
+                                    },
+                                    "mount_path": {
+                                        "type": "string",
+                                        "description": "The container mount path (not allowed for read-only storages)."
+                                    },
+                                    "host_path": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "The host path (persistent only, not allowed for read-only storages)."
+                                    },
+                                    "content": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "The file content (file only, not allowed for read-only storages)."
+                                    }
+                                },
+                                "type": "object",
+                                "additionalProperties": false
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Storage updated.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/storages\/{storage_uuid}": {
+            "delete": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Delete Storage",
+                "description": "Delete a persistent storage or file storage by service UUID.",
+                "operationId": "delete-storage-by-service-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "storage_uuid",
+                        "in": "path",
+                        "description": "UUID of the storage.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Storage deleted.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [

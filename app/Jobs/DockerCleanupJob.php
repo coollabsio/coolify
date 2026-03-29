@@ -46,13 +46,19 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         try {
-            if (! $this->server->isFunctional()) {
-                return;
-            }
-
             $this->execution_log = DockerCleanupExecution::create([
                 'server_id' => $this->server->id,
             ]);
+
+            if (! $this->server->isFunctional()) {
+                $this->execution_log->update([
+                    'status' => 'failed',
+                    'message' => 'Server is not functional (unreachable, unusable, or disabled)',
+                    'finished_at' => Carbon::now()->toImmutable(),
+                ]);
+
+                return;
+            }
 
             $this->usageBefore = $this->server->getDiskUsage();
 

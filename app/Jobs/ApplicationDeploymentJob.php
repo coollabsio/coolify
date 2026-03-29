@@ -2334,13 +2334,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_nixpacks_env_variables();
         $nixpacks_command = "nixpacks plan -f json {$this->env_nixpacks_args}";
         if ($this->application->build_command) {
-            $nixpacks_command .= " --build-cmd \"{$this->application->build_command}\"";
+            $nixpacks_command .= ' --build-cmd '.escapeShellValue($this->application->build_command);
         }
         if ($this->application->start_command) {
-            $nixpacks_command .= " --start-cmd \"{$this->application->start_command}\"";
+            $nixpacks_command .= ' --start-cmd '.escapeShellValue($this->application->start_command);
         }
         if ($this->application->install_command) {
-            $nixpacks_command .= " --install-cmd \"{$this->application->install_command}\"";
+            $nixpacks_command .= ' --install-cmd '.escapeShellValue($this->application->install_command);
         }
         $nixpacks_command .= " {$this->workdir}";
 
@@ -2353,13 +2353,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->pull_request_id === 0) {
             foreach ($this->application->nixpacks_environment_variables as $env) {
                 if (! is_null($env->real_value) && $env->real_value !== '') {
-                    $this->env_nixpacks_args->push("--env {$env->key}={$env->real_value}");
+                    $value = ($env->is_literal || $env->is_multiline) ? trim($env->real_value, "'") : $env->real_value;
+                    $this->env_nixpacks_args->push('--env '.escapeShellValue("{$env->key}={$value}"));
                 }
             }
         } else {
             foreach ($this->application->nixpacks_environment_variables_preview as $env) {
                 if (! is_null($env->real_value) && $env->real_value !== '') {
-                    $this->env_nixpacks_args->push("--env {$env->key}={$env->real_value}");
+                    $value = ($env->is_literal || $env->is_multiline) ? trim($env->real_value, "'") : $env->real_value;
+                    $this->env_nixpacks_args->push('--env '.escapeShellValue("{$env->key}={$value}"));
                 }
             }
         }
@@ -2369,7 +2371,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $coolify_envs->each(function ($value, $key) {
             // Only add environment variables with non-null and non-empty values
             if (! is_null($value) && $value !== '') {
-                $this->env_nixpacks_args->push("--env {$key}={$value}");
+                $this->env_nixpacks_args->push('--env '.escapeShellValue("{$key}={$value}"));
             }
         });
 

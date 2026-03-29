@@ -2,7 +2,7 @@
 
 return [
     'coolify' => [
-        'version' => '4.0.0-beta.469',
+        'version' => '4.0.0-beta.470',
         'helper_version' => '1.0.12',
         'realtime_version' => '1.0.11',
         'self_hosted' => env('SELF_HOSTED', true),
@@ -53,6 +53,10 @@ return [
     'horizon' => [
         'is_horizon_enabled' => env('HORIZON_ENABLED', true),
         'is_scheduler_enabled' => env('SCHEDULER_ENABLED', true),
+    ],
+
+    'nightwatch' => [
+        'is_nightwatch_enabled' => env('NIGHTWATCH_ENABLED', false),
     ],
 
     'docker' => [

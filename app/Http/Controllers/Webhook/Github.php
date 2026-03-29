@@ -55,6 +55,9 @@ class Github extends Controller
                 $after_sha = data_get($payload, 'after', data_get($payload, 'pull_request.head.sha'));
                 $author_association = data_get($payload, 'pull_request.author_association');
             }
+            if (! in_array($x_github_event, ['push', 'pull_request'])) {
+                return response("Nothing to do. Event '$x_github_event' is not supported.");
+            }
             if (! $branch) {
                 return response('Nothing to do. No branch found in the request.');
             }
@@ -245,6 +248,9 @@ class Github extends Controller
                 $before_sha = data_get($payload, 'before');
                 $after_sha = data_get($payload, 'after', data_get($payload, 'pull_request.head.sha'));
                 $author_association = data_get($payload, 'pull_request.author_association');
+            }
+            if (! in_array($x_github_event, ['push', 'pull_request'])) {
+                return response("Nothing to do. Event '$x_github_event' is not supported.");
             }
             if (! $id || ! $branch) {
                 return response('Nothing to do. No id or branch found.');

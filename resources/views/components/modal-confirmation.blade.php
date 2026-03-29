@@ -190,7 +190,7 @@
     @endif
     <template x-teleport="body">
         <div x-show="modalOpen"
-            class="fixed top-0 left-0 z-99 flex items-center justify-center w-screen h-screen p-4" x-cloak>
+            class="fixed top-0 left-0 z-99 flex items-center justify-center w-screen h-screen p-0 sm:p-4" x-cloak>
             <div x-show="modalOpen" class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs">
             </div>
             <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
@@ -199,7 +199,7 @@
                 x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                class="relative w-full border rounded-sm min-w-full lg:min-w-[36rem] max-w-[48rem] max-h-[calc(100vh-2rem)] bg-neutral-100 border-neutral-400 dark:bg-base dark:border-coolgray-300 flex flex-col">
+                class="relative w-full border rounded-none sm:rounded-sm min-w-full lg:min-w-[36rem] max-w-full sm:max-w-[48rem] h-screen sm:h-auto max-h-screen sm:max-h-[calc(100vh-2rem)] bg-neutral-100 border-neutral-400 dark:bg-base dark:border-coolgray-300 flex flex-col">
                 <div class="flex justify-between items-center py-6 px-7 shrink-0">
                     <h3 class="pr-8 text-2xl font-bold">{{ $title }}</h3>
                     <button @click="modalOpen = false; resetModal()"

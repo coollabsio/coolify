@@ -1471,6 +1471,9 @@ $schema://$host {
         if ($validProxyTypes->contains(str($proxyType)->lower())) {
             $this->proxy->set('type', str($proxyType)->upper());
             $this->proxy->set('status', 'exited');
+            $this->proxy->set('last_saved_proxy_configuration', null);
+            $this->proxy->set('last_saved_settings', null);
+            $this->proxy->set('last_applied_settings', null);
             $this->save();
             if ($this->proxySet()) {
                 if ($async) {
