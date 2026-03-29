@@ -5285,5 +5285,20 @@
     ],
     "port": "8000",
     "logo": "svgs/surrealdb.svg"
+  },
+  "stalwart-mail": {
+    "documentation": "https://stalw.art/docs/get-started?utm_source=coolify.io",
+    "slogan": "Stalwart Mail Server is an open-source, all-in-one mail server solution with SMTP, IMAP, JMAP, and web-based admin.",
+    "compose": "c2VydmljZXM6CiAgc3RhbHdhcnQtbWFpbDoKICAgIGltYWdlOiAnc3RhbHdhcnRsYWJzL21haWwtc2VydmVyOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9TVEFMV0FSVF80NDMKICAgICAgLSBTRVJWSUNFX0ZRRE5fU1RBTFdBUlRfODA4MAogICAgdm9sdW1lczoKICAgICAgLSAnc3RhbHdhcnQtZGF0YTovb3B0L3N0YWx3YXJ0LW1haWwnCiAgICBwb3J0czoKICAgICAgLSAnMjU6MjUnCiAgICAgIC0gJzE0MzoxNDMnCiAgICAgIC0gJzQ2NTo0NjUnCiAgICAgIC0gJzU4Nzo1ODcnCiAgICAgIC0gJzk5Mzo5OTMnCiAgICAgIC0gJzQxOTA6NDE5MCcKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAnY3VybCAtZiBodHRwOi8vbG9jYWxob3N0OjgwODAvaGVhbHRoeiB8fCBleGl0IDEnCiAgICAgIGludGVydmFsOiAzMHMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDMK",
+    "tags": [
+      "email",
+      "mail-server",
+      "smtp",
+      "imap",
+      "jmap",
+      "stalwart"
+    ],
+    "port": "8080",
+    "logo": "svgs/stalwart.svg"
   }
 }
