@@ -13,6 +13,8 @@
 #
 # Coolify exposes the WordPress site via its built-in proxy on port 8088.
 # The OLS Admin Panel is available on port 7080 (internal / not proxied by default).
+#
+# Related issue: https://github.com/coollabsio/coolify/issues/8264
 
 services:
   wordpress:
