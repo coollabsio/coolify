@@ -298,6 +298,7 @@ function clone_application(Application $source, $destination, array $overrides =
 
         $newPersistentVolume = $volume->replicate([
             'id',
+            'uuid',
             'created_at',
             'updated_at',
         ])->fill([
