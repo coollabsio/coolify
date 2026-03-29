@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Enums\ProxyTypes;
 use App\Models\Server;
-use App\Models\Team;
 use App\Notifications\Server\TraefikVersionOutdated;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -27,6 +26,7 @@ class NotifyOutdatedTraefikServersJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         $servers = Server::whereNotNull('proxy')
+            ->with('team')
             ->whereProxyType(ProxyTypes::TRAEFIK->value)
             ->whereRelation('settings', 'is_reachable', true)
             ->whereRelation('settings', 'is_usable', true)
@@ -50,8 +50,8 @@ class NotifyOutdatedTraefikServersJob implements ShouldBeEncrypted, ShouldQueue
 
         $outdatedServers
             ->groupBy('team_id')
-            ->each(function ($teamServers, int|string $teamId): void {
-                $team = Team::find($teamId);
+            ->each(function ($teamServers): void {
+                $team = $teamServers->first()?->team;
 
                 if (! $team) {
                     return;

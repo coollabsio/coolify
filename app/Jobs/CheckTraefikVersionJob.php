@@ -4,12 +4,14 @@ namespace App\Jobs;
 
 use App\Enums\ProxyTypes;
 use App\Models\Server;
+use Illuminate\Bus\Batch;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Bus;
 
 class CheckTraefikVersionJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -38,28 +40,18 @@ class CheckTraefikVersionJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $checkedAt = now()->toIso8601String();
+        $jobs = $servers
+            ->map(fn (Server $server) => new CheckTraefikVersionForServerJob($server, $traefikVersions, false, $checkedAt))
+            ->all();
 
-        // Dispatch individual server check jobs in parallel
-        foreach ($servers as $server) {
-            CheckTraefikVersionForServerJob::dispatch($server, $traefikVersions, false, $checkedAt);
-        }
+        Bus::batch($jobs)
+            ->finally(function (Batch $batch) use ($checkedAt): void {
+                if ($batch->cancelled()) {
+                    return;
+                }
 
-        $delaySeconds = $this->calculateNotificationDelay($servers->count());
-        if (isDev()) {
-            $delaySeconds = 1;
-        }
-
-        NotifyOutdatedTraefikServersJob::dispatch($checkedAt)->delay(now()->addSeconds($delaySeconds));
-    }
-
-    protected function calculateNotificationDelay(int $serverCount): int
-    {
-        $minDelay = config('constants.server_checks.notification_delay_min');
-        $maxDelay = config('constants.server_checks.notification_delay_max');
-        $scalingFactor = config('constants.server_checks.notification_delay_scaling');
-
-        $calculatedDelay = (int) ($serverCount * $scalingFactor);
-
-        return min($maxDelay, max($minDelay, $calculatedDelay));
+                NotifyOutdatedTraefikServersJob::dispatch($checkedAt);
+            })
+            ->dispatch();
     }
 }

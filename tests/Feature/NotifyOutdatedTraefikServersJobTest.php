@@ -120,6 +120,11 @@ it('sends one aggregated notification per team for the same batch', function () 
     Notification::assertSentTo($team2, TraefikVersionOutdated::class, function (TraefikVersionOutdated $notification) use ($server3) {
         return $notification->servers->pluck('id')->all() === [$server3->id];
     });
+
+    $notificationCount = count(Notification::sent($team1, TraefikVersionOutdated::class))
+        + count(Notification::sent($team2, TraefikVersionOutdated::class));
+
+    expect($notificationCount)->toBe(2);
 });
 
 it('does not send notifications when no servers match the batch timestamp', function () {

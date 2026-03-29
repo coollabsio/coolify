@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Notifications\Server\TraefikVersionOutdated;
+use InvalidArgumentException;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -28,7 +29,11 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
         public array $traefikVersions,
         public bool $shouldNotify = true,
         public ?string $checkedAt = null
-    ) {}
+    ) {
+        if (! $this->shouldNotify && is_null($this->checkedAt)) {
+            throw new InvalidArgumentException('Batched Traefik version checks require a shared checkedAt timestamp.');
+        }
+    }
 
     /**
      * Execute the job.

@@ -31,6 +31,13 @@ it('can suppress immediate notifications for batched scans', function () {
     expect($job->checkedAt)->toBe($checkedAt);
 });
 
+it('rejects batched scans without a shared checkedAt timestamp', function () {
+    $server = \Mockery::mock(Server::class)->makePartial();
+
+    expect(fn () => new CheckTraefikVersionForServerJob($server, $this->traefikVersions, false))
+        ->toThrow(InvalidArgumentException::class);
+});
+
 it('parses version strings correctly', function () {
     $version = 'v3.5.0';
     $current = ltrim($version, 'v');

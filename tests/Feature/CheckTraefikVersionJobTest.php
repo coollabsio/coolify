@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ProxyTypes;
+use Illuminate\Bus\PendingBatch;
 use App\Jobs\CheckTraefikVersionForServerJob;
 use App\Jobs\CheckTraefikVersionJob;
 use App\Jobs\NotifyOutdatedTraefikServersJob;
@@ -9,8 +10,8 @@ use App\Models\Team;
 use App\Notifications\Server\TraefikVersionOutdated;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -201,26 +202,8 @@ it('scheduled traefik scan jobs exist and have correct structure', function () {
     expect($interfaces)->toContain(\Illuminate\Contracts\Queue\ShouldQueue::class);
 });
 
-it('calculates delay seconds correctly for notification job', function () {
-    $job = new CheckTraefikVersionJob;
-    $reflection = new \ReflectionMethod(CheckTraefikVersionJob::class, 'calculateNotificationDelay');
-    $reflection->setAccessible(true);
-
-    $minDelay = config('constants.server_checks.notification_delay_min');
-    $maxDelay = config('constants.server_checks.notification_delay_max');
-    $scalingFactor = config('constants.server_checks.notification_delay_scaling');
-
-    foreach ([10, 100, 1000, 5000] as $serverCount) {
-        $delaySeconds = $reflection->invoke($job, $serverCount);
-
-        expect($delaySeconds)->toBeGreaterThanOrEqual($minDelay);
-        expect($delaySeconds)->toBeLessThanOrEqual($maxDelay);
-        expect($delaySeconds)->toBe(min($maxDelay, max($minDelay, (int) ($serverCount * $scalingFactor))));
-    }
-});
-
-it('dispatches server checks without immediate notifications and queues one aggregation job', function () {
-    Queue::fake();
+it('dispatches server checks in a batch without immediate notifications', function () {
+    Bus::fake();
 
     $team = Team::factory()->create();
     $server1 = Server::factory()->create([
@@ -239,16 +222,19 @@ it('dispatches server checks without immediate notifications and queues one aggr
 
     (new CheckTraefikVersionJob)->handle();
 
-    Queue::assertPushed(CheckTraefikVersionForServerJob::class, 2);
-    Queue::assertPushed(CheckTraefikVersionForServerJob::class, function (CheckTraefikVersionForServerJob $job) use (&$batchCheckedAt) {
-        if ($batchCheckedAt === null) {
-            $batchCheckedAt = $job->checkedAt;
+    Bus::assertBatched(function (PendingBatch $batch) use (&$batchCheckedAt) {
+        if (count($batch->jobs) !== 2) {
+            return false;
         }
 
-        return $job->shouldNotify === false && $job->checkedAt === $batchCheckedAt;
-    });
-    Queue::assertPushed(NotifyOutdatedTraefikServersJob::class, function (NotifyOutdatedTraefikServersJob $job) use (&$batchCheckedAt) {
-        return $batchCheckedAt !== null && $job->checkedAt === $batchCheckedAt && ! is_null($job->delay);
+        $jobs = collect($batch->jobs);
+        $batchCheckedAt = $jobs->first()?->checkedAt;
+
+        return $jobs->every(function ($job) use ($batchCheckedAt) {
+            return $job instanceof CheckTraefikVersionForServerJob
+                && $job->shouldNotify === false
+                && $job->checkedAt === $batchCheckedAt;
+        });
     });
 });
 
