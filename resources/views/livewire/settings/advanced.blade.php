@@ -22,6 +22,16 @@
                             label="Registration Allowed" />
                     </div>
                     <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                            helper="Allow users to self-register via OAuth2 (e.g. GitHub, Google, Authentik) even when general self-registration is disabled. This lets you control access through your OAuth2 provider without opening registration to everyone."
+                            label="Allow OAuth2-Only Self-Registration" />
+                    </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_login_only"
+                            helper="Restrict users who registered via OAuth2 (i.e. have no password set) to OAuth2 login only. Prevents them from setting and using a password — useful for enforcing access control through tools like Authentik."
+                            label="Restrict OAuth2 Users to OAuth2 Login Only" />
+                    </div>
+                    <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."
                             label="Do Not Track" />

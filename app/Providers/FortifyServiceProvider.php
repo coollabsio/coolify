@@ -67,6 +67,8 @@ class FortifyServiceProvider extends ServiceProvider
 
             return view('auth.login', [
                 'is_registration_enabled' => $settings->is_registration_enabled,
+                'is_oauth_registration_enabled' => $settings->is_oauth_registration_enabled ?? false,
+                'is_oauth_login_only' => $settings->is_oauth_login_only ?? false,
                 'enabled_oauth_providers' => $enabled_oauth_providers,
             ]);
         });
@@ -74,6 +76,14 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::authenticateUsing(function (Request $request) {
             $email = strtolower($request->email);
             $user = User::where('email', $email)->with('teams')->first();
+
+            // If OAuth-only login is enforced, block password authentication
+            // for users that have no password set (i.e. registered via OAuth)
+            $settings = instanceSettings();
+            if ($user && $settings->is_oauth_login_only && empty($user->password)) {
+                return null;
+            }
+
             if (
                 $user &&
                 Hash::check($request->password, $user->password)
