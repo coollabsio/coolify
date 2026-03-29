@@ -5,6 +5,7 @@ namespace App\Notifications\Container;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -84,6 +85,24 @@ class ContainerStopped extends CustomEmailNotification
             level: 'error',
             message: "A resource ({$this->name}) has been stopped unexpectedly on {$this->server->name}",
             buttons: $buttons,
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        $buttons = [];
+        if ($this->url) {
+            $buttons[] = [
+                'text' => 'Open Application in Coolify',
+                'url' => $this->url,
+            ];
+        }
+
+        return new NtfyMessage(
+            title: 'Resource stopped',
+            message: "A resource ({$this->name}) has been stopped unexpectedly on {$this->server->name}",
+            buttons: $buttons,
+            level: 'error',
         );
     }
 

@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -53,6 +54,15 @@ class Reachable extends CustomEmailNotification
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
+            title: 'Server revived',
+            message: "Server '{$this->server->name}' revived. All automations & integrations are turned on again!",
+            level: 'success',
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
             title: 'Server revived',
             message: "Server '{$this->server->name}' revived. All automations & integrations are turned on again!",
             level: 'success',

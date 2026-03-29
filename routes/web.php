@@ -11,6 +11,7 @@ use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\ForcePasswordReset;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
+use App\Livewire\Notifications\Ntfy as NotificationNtfy;
 use App\Livewire\Notifications\Pushover as NotificationPushover;
 use App\Livewire\Notifications\Slack as NotificationSlack;
 use App\Livewire\Notifications\Telegram as NotificationTelegram;
@@ -135,6 +136,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/slack', NotificationSlack::class)->name('notifications.slack');
         Route::get('/pushover', NotificationPushover::class)->name('notifications.pushover');
         Route::get('/webhook', NotificationWebhook::class)->name('notifications.webhook');
+        Route::get('/ntfy', NotificationNtfy::class)->name('notifications.ntfy');
     });
 
     Route::prefix('storages')->group(function () {

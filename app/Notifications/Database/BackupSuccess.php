@@ -5,6 +5,7 @@ namespace App\Notifications\Database;
 use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -69,6 +70,15 @@ class BackupSuccess extends CustomEmailNotification
             title: 'Database backup successful',
             level: 'success',
             message: "Database backup for {$this->name} (db:{$this->database_name}) was successful.<br/><br/><b>Frequency:</b> {$this->frequency}.",
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
+            title: 'Database backup successful',
+            level: 'success',
+            message: "Database backup for {$this->name} (db:{$this->database_name}) was successful.\n\nFrequency: {$this->frequency}.",
         );
     }
 

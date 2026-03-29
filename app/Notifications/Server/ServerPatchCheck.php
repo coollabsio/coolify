@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -269,6 +270,80 @@ class ServerPatchCheck extends CustomEmailNotification
                     'url' => $this->serverUrl,
                 ],
             ],
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        // Handle error case
+        if (isset($this->patchData['error'])) {
+            $osId = $this->patchData['osId'] ?? 'unknown';
+            $packageManager = $this->patchData['package_manager'] ?? 'unknown';
+            $error = $this->patchData['error'];
+
+            $message = "[ERROR] Failed to check patches on {$this->server->name}!\n\n";
+            $message .= "Error Details:\n";
+            $message .= '- OS: '.ucfirst($osId)."\n";
+            $message .= "- Package Manager: {$packageManager}\n";
+            $message .= "- Error: {$error}\n\n";
+
+            return new NtfyMessage(
+                title: 'Server patch check failed',
+                message: $message,
+                buttons: [
+                    [
+                        'text' => 'Manage Server',
+                        'url' => $this->serverUrl,
+                    ],
+                ],
+                level: 'error',
+            );
+        }
+
+        $totalUpdates = $this->patchData['total_updates'] ?? 0;
+        $updates = $this->patchData['updates'] ?? [];
+        $osId = $this->patchData['osId'] ?? 'unknown';
+        $packageManager = $this->patchData['package_manager'] ?? 'unknown';
+
+        $message = "[ACTION REQUIRED] {$totalUpdates} server patches available on {$this->server->name}!\n\n";
+        $message .= "Summary:\n";
+        $message .= '- OS: '.ucfirst($osId)."\n";
+        $message .= "- Package Manager: {$packageManager}\n";
+        $message .= "- Total Updates: {$totalUpdates}\n\n";
+
+        if (count($updates) > 0) {
+            $message .= "Sample Updates:\n";
+            $sampleUpdates = array_slice($updates, 0, 3);
+            foreach ($sampleUpdates as $update) {
+                $message .= "- {$update['package']}: {$update['current_version']} -> {$update['new_version']}\n";
+            }
+            if (count($updates) > 3) {
+                $message .= '- ... and '.(count($updates) - 3)." more packages\n";
+            }
+
+            // Check for critical packages
+            $criticalPackages = collect($updates)->filter(function ($update) {
+                return str_contains(strtolower($update['package']), 'docker') ||
+                    str_contains(strtolower($update['package']), 'kernel') ||
+                    str_contains(strtolower($update['package']), 'openssh') ||
+                    str_contains(strtolower($update['package']), 'ssl');
+            });
+
+            if ($criticalPackages->count() > 0) {
+                $message .= "\nCritical packages detected: {$criticalPackages->count()} may require restarts";
+            }
+        }
+
+        return new NtfyMessage(
+            title: 'Server patches available',
+            message: $message,
+            buttons: [
+                [
+                    'text' => 'Manage Server Patches',
+                    'url' => $this->serverUrl,
+                ],
+            ],
+            level: 'info',
         );
     }
 

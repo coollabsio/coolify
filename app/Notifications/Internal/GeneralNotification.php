@@ -3,6 +3,7 @@
 namespace App\Notifications\Internal;
 
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Bus\Queueable;
@@ -47,6 +48,15 @@ class GeneralNotification extends Notification implements ShouldQueue
             title: 'General Notification',
             level: 'info',
             message: $this->message,
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
+            title: 'General Notification',
+            message: $this->message,
+            level: 'info',
         );
     }
 
