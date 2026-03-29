@@ -18,6 +18,17 @@ it('has correct queue and retry configuration', function () {
     expect($job->timeout)->toBe(60);
     expect($job->server)->toBe($server);
     expect($job->traefikVersions)->toBe($this->traefikVersions);
+    expect($job->shouldNotify)->toBeTrue();
+    expect($job->checkedAt)->toBeNull();
+});
+
+it('can suppress immediate notifications for batched scans', function () {
+    $server = \Mockery::mock(Server::class)->makePartial();
+    $checkedAt = '2026-03-29T00:00:00+00:00';
+    $job = new CheckTraefikVersionForServerJob($server, $this->traefikVersions, false, $checkedAt);
+
+    expect($job->shouldNotify)->toBeFalse();
+    expect($job->checkedAt)->toBe($checkedAt);
 });
 
 it('parses version strings correctly', function () {

@@ -25,7 +25,9 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function __construct(
         public Server $server,
-        public array $traefikVersions
+        public array $traefikVersions,
+        public bool $shouldNotify = true,
+        public ?string $checkedAt = null
     ) {}
 
     /**
@@ -150,7 +152,7 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
             'current' => $current,
             'latest' => $latest,
             'type' => $type,
-            'checked_at' => now()->toIso8601String(),
+            'checked_at' => $this->checkedAt ?? now()->toIso8601String(),
         ];
 
         // For minor upgrades, add the upgrade_target field (e.g., "v3.6")
@@ -166,8 +168,9 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->server->update(['traefik_outdated_info' => $outdatedInfo]);
 
-        // Send immediate notification to the team
-        $this->sendNotification($outdatedInfo);
+        if ($this->shouldNotify) {
+            $this->sendNotification($outdatedInfo);
+        }
     }
 
     /**
