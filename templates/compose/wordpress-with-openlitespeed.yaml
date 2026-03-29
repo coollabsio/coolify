@@ -1,5 +1,5 @@
 # WordPress + OpenLiteSpeed service template for Coolify
-# Uses the litespeedtech/openlitespeed image bundled with LiteSpeed Cache support
+# Uses the official litespeedtech/openlitespeed image with LiteSpeed Cache support
 services:
   openlitespeed:
     image: "litespeedtech/openlitespeed:latest"
