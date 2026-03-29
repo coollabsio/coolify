@@ -35,7 +35,7 @@ class Add extends Component
 
     public array $problematicVariables = [];
 
-    protected $listeners = ['clearAddEnv' => 'clear'];
+    protected $listeners = ['clearAddEnv' => 'clear', 'prefillFromDatabase' => 'prefillFromDatabase'];
 
     protected $rules = [
         'key' => 'required|string',
@@ -143,6 +143,14 @@ class Add extends Component
             'comment' => $this->comment,
         ]);
         $this->clear();
+    }
+
+    public function prefillFromDatabase(string $key, string $value): void
+    {
+        $this->clear();
+        $this->key = $key;
+        $this->value = $value;
+        $this->is_buildtime = false;
     }
 
     public function clear()

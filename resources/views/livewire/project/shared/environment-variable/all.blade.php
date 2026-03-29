@@ -5,7 +5,14 @@
             @can('manageEnvironment', $resource)
                 <div class="flex flex-col items-center">
                     <x-modal-input buttonTitle="+ Add" title="New Environment Variable" :closeOutside="false">
-                        <livewire:project.shared.environment-variable.add />
+                        @if ($resourceClass === 'App\Models\Application')
+                            <div class="flex flex-col w-full gap-2">
+                                <x-database-references :resource="$resource" />
+                                <livewire:project.shared.environment-variable.add />
+                            </div>
+                        @else
+                            <livewire:project.shared.environment-variable.add />
+                        @endif
                     </x-modal-input>
                 </div>
                 <x-forms.button
