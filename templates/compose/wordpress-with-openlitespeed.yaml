@@ -1,6 +1,18 @@
-# WordPress + OpenLiteSpeed Service Template for Coolify
-# Based on the litespeedtech/openlitespeed-wordpress image
-# Ref: https://github.com/litespeedtech/ols-docker-env
+# WordPress + OpenLiteSpeed Service Template
+# -------------------------------------------
+# Provides a production-ready WordPress stack running on OpenLiteSpeed (OLS)
+# web server with a MariaDB database backend.
+#
+# OpenLiteSpeed is an open-source, high-performance HTTP server from LiteSpeed
+# Technologies. It supports native LSCache for WordPress, which dramatically
+# reduces TTFB without a separate caching plugin.
+#
+# Images used:
+#   - litespeedtech/openlitespeed  (OLS + LSPHP all-in-one)
+#   - mariadb:lts                  (drop-in MySQL replacement)
+#
+# Coolify exposes the WordPress site via its built-in proxy on port 8088.
+# The OLS Admin Panel is available on port 7080 (internal / not proxied by default).
 
 services:
   wordpress:
