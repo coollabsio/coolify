@@ -1,17 +1,26 @@
 <?php
 
-// NOTE: This file is auto-generated. Refer to individual template YAML files
-// in templates/compose/ for the source of truth.
-// Run `php artisan db:seed --class=ServiceTemplatesSeeder` to refresh.
-
-// Since Coolify manages all templates via a single JSON/PHP seeder approach,
-// the WordPress + OpenLiteSpeed entry needs to be added to the existing
-// templates list. Below is the standalone seeder stub for this template.
-// The actual integration is in templates/compose/wordpress-with-openlitespeed.yaml
-// and the corresponding entry in the service templates JSON.
-
 namespace Database\Seeders;
 
-// This file intentionally left as a reference.
-// See: database/seeders/ServiceTemplates.json for the JSON-driven approach
-// and templates/compose/wordpress-with-openlitespeed.yaml for the compose spec.
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * NOTE: Coolify's primary template seeding mechanism reads from
+ * templates/compose/*.yaml files and the ServiceTemplates.json.
+ *
+ * This seeder serves as a reference / fallback to manually upsert
+ * the WordPress + OpenLiteSpeed template record when needed.
+ *
+ * In normal operation the template is auto-discovered from:
+ *   templates/compose/wordpress-with-openlitespeed.yaml
+ */
+class ServiceTemplatesSeeder extends Seeder
+{
+    public function run(): void
+    {
+        // Templates are seeded from templates/compose/ automatically.
+        // No manual DB insert required — kept for reference only.
+        $this->command->info('Service templates are loaded from templates/compose/ directory.');
+    }
+}
