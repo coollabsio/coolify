@@ -39,6 +39,7 @@
         </nav>
         @if ($database->destination->server->isFunctional())
             <div class="flex flex-wrap gap-2 items-center">
+                <x-container-name :name="$database->uuid" />
                 @if (!str($database->status)->startsWith('exited'))
                     <x-modal-confirmation title="Confirm Database Restart?" buttonTitle="Restart" submitAction="restart"
                         :actions="[

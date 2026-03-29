@@ -35,6 +35,7 @@
             @if ($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw))
                 <div>Please load a Compose file.</div>
             @else
+                <x-container-name :name="$application->settings->custom_internal_name ?: $application->uuid" />
                 @if (!$application->destination->server->isSwarm())
                     <div>
                         <x-applications.advanced :application="$application" />
