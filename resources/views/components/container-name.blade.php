@@ -1,8 +1,8 @@
 @props(['name'])
 
 <div class="flex items-center gap-1.5 px-2 h-8 text-sm rounded-sm border-2 dark:bg-coolgray-100 dark:border-coolgray-300 border-neutral-200" x-data="{ copied: false }">
-    <span class="text-neutral-400">Containername:</span>
-    <code class="dark:text-neutral-300">{{ $name }}</code>
+    <span class="text-neutral-400 whitespace-nowrap">Container name:</span>
+    <span class="dark:text-neutral-300">{{ $name }}</span>
     <button
         x-show="window.isSecureContext"
         @click.prevent="copied = true; navigator.clipboard.writeText({{ Js::from($name) }}); setTimeout(() => copied = false, 1500)"
