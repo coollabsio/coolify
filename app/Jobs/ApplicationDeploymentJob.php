@@ -2189,7 +2189,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ],
             );
         }
-        if ($this->saved_outputs->get('git_commit_sha') && ! $this->rollback) {
+        // Skip overwriting the commit when the application has a pinned SHA
+        $pinnedCommit = str(data_get($this->application, 'git_commit_sha'))->trim()->value();
+        $hasPinnedCommit = $this->pull_request_id === 0 && ! $this->rollback && $pinnedCommit !== '' && $pinnedCommit !== 'HEAD';
+
+        if ($hasPinnedCommit) {
+            $this->commit = $pinnedCommit;
+            if ($this->application_deployment_queue->commit !== $pinnedCommit) {
+                $this->application_deployment_queue->commit = $pinnedCommit;
+                $this->application_deployment_queue->save();
+            }
+        } elseif ($this->saved_outputs->get('git_commit_sha') && ! $this->rollback) {
             // Extract commit SHA from git ls-remote output, handling multi-line output (e.g., redirect warnings)
             // Expected format: "commit_sha\trefs/heads/branch" possibly preceded by warning lines
             // Note: Git warnings can be on the same line as the result (no newline)
