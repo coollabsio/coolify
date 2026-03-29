@@ -20,10 +20,10 @@
                 </div>
                 <div class="flex gap-2">
                     @if (version_compare($redisVersion, '6.0', '>='))
-                        <x-forms.input label="Username" id="redisUsername"
+                        <x-forms.input label="Username" id="redisUsername" copyable
                             helper="You can only change this in the database." canGate="update" :canResource="$database" />
                     @endif
-                    <x-forms.input label="Password" id="redisPassword" type="password"
+                    <x-forms.input label="Password" id="redisPassword" type="password" copyable
                         helper="You can only change this in the database." canGate="update" :canResource="$database" />
                 </div>
             @else
@@ -62,11 +62,11 @@
             </div>
             <x-forms.input label="Redis URL (internal)"
                 helper="If you change the user/password/port, this could be different. This is with the default values."
-                type="password" readonly wire:model="dbUrl" canGate="update" :canResource="$database" />
+                type="password" readonly copyable wire:model="dbUrl" canGate="update" :canResource="$database" />
             @if ($dbUrlPublic)
                 <x-forms.input label="Redis URL (public)"
                     helper="If you change the user/password/port, this could be different. This is with the default values."
-                    type="password" readonly wire:model="dbUrlPublic" canGate="update" :canResource="$database" />
+                    type="password" readonly copyable wire:model="dbUrlPublic" canGate="update" :canResource="$database" />
             @endif
         </div>
         <div class="flex flex-col gap-2">

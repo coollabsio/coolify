@@ -13,7 +13,10 @@
         </label>
     @endif
     @if ($type === 'password')
-        <div class="relative" x-data="{ type: 'password' }">
+        @if ($copyable)
+            <div class="flex gap-2 items-center">
+        @endif
+        <div class="relative {{ $copyable ? 'flex-1' : '' }}" x-data="{ type: 'password' }">
             @if ($allowToPeak)
                 <div x-on:click="changePasswordFieldType; type = type === 'password' ? 'text' : 'password'"
                     class="flex absolute inset-y-0 right-0 items-center pr-2 cursor-pointer dark:hover:text-white">
@@ -44,7 +47,29 @@
                 @if ($autofocus) x-ref="autofocusInput" @endif>
 
         </div>
+        @if ($copyable)
+                <button type="button" x-data="{ copied: false }"
+                    x-show="window.isSecureContext"
+                    @click.prevent="
+                        const input = $el.closest('.flex').querySelector('input');
+                        const val = input.value;
+                        if (val) { navigator.clipboard.writeText(val); copied = true; setTimeout(() => copied = false, 1500) }
+                    "
+                    class="p-1.5 text-neutral-400 hover:text-neutral-200 transition-colors shrink-0" title="Copy">
+                    <svg x-show="!copied" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <svg x-show="copied" x-cloak class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                </button>
+            </div>
+        @endif
     @else
+        @if ($copyable)
+            <div class="flex gap-2 items-center">
+        @endif
         <input autocomplete="{{ $autocomplete }}" @if ($value) value="{{ $value }}" @endif
             {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @readonly($readonly)
             @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]" @endif
@@ -55,6 +80,25 @@
             @if ($htmlId !== 'null') id={{ $htmlId }} @endif name="{{ $name }}"
             placeholder="{{ $attributes->get('placeholder') }}"
             @if ($autofocus) x-ref="autofocusInput" @endif>
+        @if ($copyable)
+                <button type="button" x-data="{ copied: false }"
+                    x-show="window.isSecureContext"
+                    @click.prevent="
+                        const input = $el.closest('.flex').querySelector('input');
+                        const val = input.value;
+                        if (val) { navigator.clipboard.writeText(val); copied = true; setTimeout(() => copied = false, 1500) }
+                    "
+                    class="p-1.5 text-neutral-400 hover:text-neutral-200 transition-colors shrink-0" title="Copy">
+                    <svg x-show="!copied" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <svg x-show="copied" x-cloak class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                </button>
+            </div>
+        @endif
     @endif
     @if (!$label && $helper)
         <x-helper :helper="$helper" />

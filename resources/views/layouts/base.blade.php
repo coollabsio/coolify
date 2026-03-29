@@ -206,7 +206,7 @@
         function changePasswordFieldType(event) {
             let element = event.target
             for (let i = 0; i < 10; i++) {
-                if (element.className === "relative") {
+                if (element.classList.contains("relative")) {
                     break;
                 }
                 element = element.parentElement;

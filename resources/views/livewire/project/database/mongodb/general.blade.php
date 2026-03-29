@@ -17,15 +17,15 @@
         </div>
         @if ($database->started_at)
             <div class="flex xl:flex-row flex-col gap-2">
-                <x-forms.input label="Initial Username" id="mongoInitdbRootUsername"
+                <x-forms.input label="Initial Username" id="mongoInitdbRootUsername" copyable
                     placeholder="If empty: postgres"
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work."
                     canGate="update" :canResource="$database" />
-                <x-forms.input label="Initial Password" id="mongoInitdbRootPassword" type="password"
+                <x-forms.input label="Initial Password" id="mongoInitdbRootPassword" type="password" copyable
                     required
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work."
                     canGate="update" :canResource="$database" />
-                <x-forms.input label="Initial Database" id="mongoInitdbDatabase"
+                <x-forms.input label="Initial Database" id="mongoInitdbDatabase" copyable
                     placeholder="If empty, it will be the same as Username." readonly
                     helper="You can only change this in the database." canGate="update" :canResource="$database" />
             </div>
@@ -52,11 +52,11 @@
             </div>
             <x-forms.input label="Mongo URL (internal)"
                 helper="If you change the user/password/port, this could be different. This is with the default values."
-                type="password" readonly wire:model="db_url" canGate="update" :canResource="$database" />
+                type="password" readonly copyable wire:model="db_url" canGate="update" :canResource="$database" />
             @if ($db_url_public)
                 <x-forms.input label="Mongo URL (public)"
                     helper="If you change the user/password/port, this could be different. This is with the default values."
-                    type="password" readonly wire:model="db_url_public" canGate="update" :canResource="$database" />
+                    type="password" readonly copyable wire:model="db_url_public" canGate="update" :canResource="$database" />
             @endif
         </div>
 

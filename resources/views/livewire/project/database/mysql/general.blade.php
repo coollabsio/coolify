@@ -17,16 +17,16 @@
         </div>
         @if ($database->started_at)
             <div class="flex xl:flex-row flex-col gap-2">
-                <x-forms.input label="Root Password" id="mysqlRootPassword" type="password" required
+                <x-forms.input label="Root Password" id="mysqlRootPassword" type="password" required copyable
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." canGate="update" :canResource="$database" />
-                <x-forms.input label="Normal User" id="mysqlUser" required
+                <x-forms.input label="Normal User" id="mysqlUser" required copyable
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." canGate="update" :canResource="$database" />
-                <x-forms.input label="Normal User Password" id="mysqlPassword" type="password" required
+                <x-forms.input label="Normal User Password" id="mysqlPassword" type="password" required copyable
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." canGate="update" :canResource="$database" />
             </div>
             <div class="flex flex-col gap-2">
                 <x-forms.input label="Initial Database" id="mysqlDatabase"
-                    placeholder="If empty, it will be the same as Username." readonly
+                    placeholder="If empty, it will be the same as Username." readonly copyable
                     helper="You can only change this in the database." canGate="update" :canResource="$database" />
             </div>
         @else
@@ -58,11 +58,11 @@
             </div>
             <x-forms.input label="MySQL URL (internal)"
                 helper="If you change the user/password/port, this could be different. This is with the default values."
-                type="password" readonly wire:model="db_url" />
+                type="password" readonly copyable wire:model="db_url" />
             @if ($db_url_public)
                 <x-forms.input label="MySQL URL (public)"
                     helper="If you change the user/password/port, this could be different. This is with the default values."
-                    type="password" readonly wire:model="db_url_public" />
+                    type="password" readonly copyable wire:model="db_url_public" />
             @endif
         </div>
 

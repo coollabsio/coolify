@@ -17,18 +17,18 @@
         </div>
         @if ($database->started_at)
             <div class="flex xl:flex-row flex-col gap-2">
-                <x-forms.input label="Root Password" id="mariadbRootPassword" type="password" required
+                <x-forms.input label="Root Password" id="mariadbRootPassword" type="password" required copyable
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work."
                     canGate="update" :canResource="$database" />
-                <x-forms.input label="Normal User" id="mariadbUser" required
+                <x-forms.input label="Normal User" id="mariadbUser" required copyable
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work."
                     canGate="update" :canResource="$database" />
-                <x-forms.input label="Normal User Password" id="mariadbPassword" type="password" required
+                <x-forms.input label="Normal User Password" id="mariadbPassword" type="password" required copyable
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work."
                     canGate="update" :canResource="$database" />
             </div>
             <div class="flex flex-col gap-2">
-                <x-forms.input label="Initial Database" id="mariadbDatabase"
+                <x-forms.input label="Initial Database" id="mariadbDatabase" copyable
                     placeholder="If empty, it will be the same as Username." readonly
                     helper="You can only change this in the database." />
             </div>
@@ -63,11 +63,11 @@
             </div>
             <x-forms.input label="MariaDB URL (internal)"
                 helper="If you change the user/password/port, this could be different. This is with the default values."
-                type="password" readonly wire:model="db_url" canGate="update" :canResource="$database" />
+                type="password" readonly copyable wire:model="db_url" canGate="update" :canResource="$database" />
             @if ($db_url_public)
                 <x-forms.input label="MariaDB URL (public)"
                     helper="If you change the user/password/port, this could be different. This is with the default values."
-                    type="password" readonly wire:model="db_url_public" canGate="update" :canResource="$database" />
+                    type="password" readonly copyable wire:model="db_url_public" canGate="update" :canResource="$database" />
             @endif
         </div>
 

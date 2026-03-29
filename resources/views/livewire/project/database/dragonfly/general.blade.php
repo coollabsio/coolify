@@ -18,7 +18,7 @@
 
         @if ($database->started_at)
             <div class="flex gap-2">
-                <x-forms.input label="Initial Password" id="dragonflyPassword" type="password" required readonly
+                <x-forms.input label="Initial Password" id="dragonflyPassword" type="password" required readonly copyable
                     helper="You can only change this in the database." canGate="update" :canResource="$database" />
             </div>
         @else
@@ -39,12 +39,12 @@
             </div>
             <x-forms.input label="Dragonfly URL (internal)"
                 helper="If you change the user/password/port, this could be different. This is with the default values."
-                type="password" readonly wire:model="dbUrl" canGate="update" :canResource="$database" />
+                type="password" readonly copyable wire:model="dbUrl" canGate="update" :canResource="$database" />
 
             @if ($dbUrlPublic)
                 <x-forms.input label="Dragonfly URL (public)"
                     helper="If you change the user/password/port, this could be different. This is with the default values."
-                    type="password" readonly wire:model="dbUrlPublic" canGate="update" :canResource="$database" />
+                    type="password" readonly copyable wire:model="dbUrlPublic" canGate="update" :canResource="$database" />
             @else
                 <x-forms.input label="Dragonfly URL (public)"
                     helper="If you change the user/password/port, this could be different. This is with the default values."

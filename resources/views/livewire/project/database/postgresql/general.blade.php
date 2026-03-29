@@ -32,13 +32,13 @@
         @if ($database->started_at)
             <div class="flex xl:flex-row flex-col gap-2">
                 <x-forms.input label="Username" id="postgresUser" placeholder="If empty: postgres" canGate="update"
-                    :canResource="$database"
+                    :canResource="$database" copyable
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
                 <x-forms.input label="Password" id="postgresPassword" type="password" required canGate="update"
-                    :canResource="$database"
+                    :canResource="$database" copyable
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
                 <x-forms.input label="Initial Database" id="postgresDb"
-                    placeholder="If empty, it will be the same as Username." readonly
+                    placeholder="If empty, it will be the same as Username." readonly copyable
                     helper="You can only change this in the database." />
             </div>
         @else
@@ -71,11 +71,11 @@
 
             <x-forms.input label="Postgres URL (internal)"
                 helper="If you change the user/password/port, this could be different. This is with the default values."
-                type="password" readonly wire:model="db_url" />
+                type="password" readonly copyable wire:model="db_url" />
             @if ($db_url_public)
                 <x-forms.input label="Postgres URL (public)"
                     helper="If you change the user/password/port, this could be different. This is with the default values."
-                    type="password" readonly wire:model="db_url_public" />
+                    type="password" readonly copyable wire:model="db_url_public" />
             @endif
         </div>
         <div class="flex flex-col gap-2">
