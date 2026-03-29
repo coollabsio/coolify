@@ -37,10 +37,29 @@ class CheckTraefikVersionJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
+        $checkedAt = now()->toIso8601String();
+
         // Dispatch individual server check jobs in parallel
-        // Each job will send immediate notifications when outdated Traefik is detected
         foreach ($servers as $server) {
-            CheckTraefikVersionForServerJob::dispatch($server, $traefikVersions);
+            CheckTraefikVersionForServerJob::dispatch($server, $traefikVersions, false, $checkedAt);
         }
+
+        $delaySeconds = $this->calculateNotificationDelay($servers->count());
+        if (isDev()) {
+            $delaySeconds = 1;
+        }
+
+        NotifyOutdatedTraefikServersJob::dispatch($checkedAt)->delay(now()->addSeconds($delaySeconds));
+    }
+
+    protected function calculateNotificationDelay(int $serverCount): int
+    {
+        $minDelay = config('constants.server_checks.notification_delay_min');
+        $maxDelay = config('constants.server_checks.notification_delay_max');
+        $scalingFactor = config('constants.server_checks.notification_delay_scaling');
+
+        $calculatedDelay = (int) ($serverCount * $scalingFactor);
+
+        return min($maxDelay, max($minDelay, $calculatedDelay));
     }
 }
