@@ -1,11 +1,16 @@
 <?php
 
+use App\Enums\ProxyTypes;
+use App\Jobs\CheckTraefikVersionForServerJob;
+use App\Jobs\CheckTraefikVersionJob;
+use App\Jobs\NotifyOutdatedTraefikServersJob;
 use App\Models\Server;
 use App\Models\Team;
 use App\Notifications\Server\TraefikVersionOutdated;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -180,39 +185,71 @@ it('groups servers by team correctly', function () {
     expect($grouped[$team2->id])->toHaveCount(1);
 });
 
-it('server check job exists and has correct structure', function () {
-    expect(class_exists(\App\Jobs\CheckTraefikVersionForServerJob::class))->toBeTrue();
+it('scheduled traefik scan jobs exist and have correct structure', function () {
+    expect(class_exists(CheckTraefikVersionForServerJob::class))->toBeTrue();
+    expect(class_exists(NotifyOutdatedTraefikServersJob::class))->toBeTrue();
 
     // Verify CheckTraefikVersionForServerJob has required properties
-    $reflection = new \ReflectionClass(\App\Jobs\CheckTraefikVersionForServerJob::class);
+    $reflection = new \ReflectionClass(CheckTraefikVersionForServerJob::class);
     expect($reflection->hasProperty('tries'))->toBeTrue();
     expect($reflection->hasProperty('timeout'))->toBeTrue();
+    expect($reflection->hasProperty('shouldNotify'))->toBeTrue();
+    expect($reflection->hasProperty('checkedAt'))->toBeTrue();
 
     // Verify it implements ShouldQueue
-    $interfaces = class_implements(\App\Jobs\CheckTraefikVersionForServerJob::class);
+    $interfaces = class_implements(CheckTraefikVersionForServerJob::class);
     expect($interfaces)->toContain(\Illuminate\Contracts\Queue\ShouldQueue::class);
 });
 
-it('sends immediate notifications when outdated traefik is detected', function () {
-    // Notifications are now sent immediately from CheckTraefikVersionForServerJob
-    // when outdated Traefik is detected, rather than being aggregated and delayed
+it('calculates delay seconds correctly for notification job', function () {
+    $job = new CheckTraefikVersionJob;
+    $reflection = new \ReflectionMethod(CheckTraefikVersionJob::class, 'calculateNotificationDelay');
+    $reflection->setAccessible(true);
+
+    $minDelay = config('constants.server_checks.notification_delay_min');
+    $maxDelay = config('constants.server_checks.notification_delay_max');
+    $scalingFactor = config('constants.server_checks.notification_delay_scaling');
+
+    foreach ([10, 100, 1000, 5000] as $serverCount) {
+        $delaySeconds = $reflection->invoke($job, $serverCount);
+
+        expect($delaySeconds)->toBeGreaterThanOrEqual($minDelay);
+        expect($delaySeconds)->toBeLessThanOrEqual($maxDelay);
+        expect($delaySeconds)->toBe(min($maxDelay, max($minDelay, (int) ($serverCount * $scalingFactor))));
+    }
+});
+
+it('dispatches server checks without immediate notifications and queues one aggregation job', function () {
+    Queue::fake();
+
     $team = Team::factory()->create();
-    $server = Server::factory()->make([
-        'name' => 'Server 1',
+    $server1 = Server::factory()->create([
         'team_id' => $team->id,
+        'proxy' => ['type' => ProxyTypes::TRAEFIK->value],
     ]);
+    $server1->settings->update(['is_reachable' => true, 'is_usable' => true]);
 
-    $server->outdatedInfo = [
-        'current' => '3.5.0',
-        'latest' => '3.5.6',
-        'type' => 'patch_update',
-    ];
+    $server2 = Server::factory()->create([
+        'team_id' => $team->id,
+        'proxy' => ['type' => ProxyTypes::TRAEFIK->value],
+    ]);
+    $server2->settings->update(['is_reachable' => true, 'is_usable' => true]);
 
-    // Each server triggers its own notification immediately
-    $notification = new TraefikVersionOutdated(collect([$server]));
+    $batchCheckedAt = null;
 
-    expect($notification->servers)->toHaveCount(1);
-    expect($notification->servers->first()->outdatedInfo['type'])->toBe('patch_update');
+    (new CheckTraefikVersionJob)->handle();
+
+    Queue::assertPushed(CheckTraefikVersionForServerJob::class, 2);
+    Queue::assertPushed(CheckTraefikVersionForServerJob::class, function (CheckTraefikVersionForServerJob $job) use (&$batchCheckedAt) {
+        if ($batchCheckedAt === null) {
+            $batchCheckedAt = $job->checkedAt;
+        }
+
+        return $job->shouldNotify === false && $job->checkedAt === $batchCheckedAt;
+    });
+    Queue::assertPushed(NotifyOutdatedTraefikServersJob::class, function (NotifyOutdatedTraefikServersJob $job) use (&$batchCheckedAt) {
+        return $batchCheckedAt !== null && $job->checkedAt === $batchCheckedAt && ! is_null($job->delay);
+    });
 });
 
 it('notification generates correct server proxy URLs', function () {
