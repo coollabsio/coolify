@@ -1,0 +1,47 @@
+# WordPress + OpenLiteSpeed service template for Coolify
+# Uses the litespeedtech/openlitespeed image bundled with LiteSpeed Cache support
+services:
+  openlitespeed:
+    image: "litespeedtech/openlitespeed:latest"
+    environment:
+      - SERVICE_FQDN_OPENLITESPEED_8088
+      - OLS_PHP_VERSION=${OLS_PHP_VERSION:-8.2}
+      - WORDPRESS_DB_HOST=mysql
+      - WORDPRESS_DB_NAME=${WORDPRESS_DB_NAME:-wordpress}
+      - WORDPRESS_DB_USER=${WORDPRESS_DB_USER:-wordpress}
+      - WORDPRESS_DB_PASSWORD=${WORDPRESS_DB_PASSWORD}
+      - WORDPRESS_TABLE_PREFIX=${WORDPRESS_TABLE_PREFIX:-wp_}
+      - WORDPRESS_DEBUG=${WORDPRESS_DEBUG:-false}
+    volumes:
+      - wordpress-data:/var/www/vhosts/localhost/html
+      - ols-config:/usr/local/lsws/conf
+      - ols-logs:/usr/local/lsws/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  mysql:
+    image: "mysql:8.0"
+    environment:
+      - MYSQL_DATABASE=${WORDPRESS_DB_NAME:-wordpress}
+      - MYSQL_USER=${WORDPRESS_DB_USER:-wordpress}
+      - MYSQL_PASSWORD=${WORDPRESS_DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+volumes:
+  wordpress-data:
+  ols-config:
+  ols-logs:
+  mysql-data:
