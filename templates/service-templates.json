@@ -1,99 +1,27 @@
-[
-  {
-    "templateVersion": "1.0.0",
-    "defaultVersion": "latest",
-    "type": "wordpress-with-openlitespeed",
-    "name": "WordPress with OpenLiteSpeed",
-    "icon": "https://cdn.worldvectorlogo.com/logos/wordpress-blue.svg",
-    "description": "WordPress powered by OpenLiteSpeed web server with MySQL database. Includes persistent volumes for WordPress files, OLS configuration, logs, and database data.",
-    "labels": {
-      "traefik.enable": "true"
-    },
-    "documentation": "https://github.com/litespeedtech/ols-docker-env",
-    "compose": "wordpress-with-openlitespeed.yaml",
-    "variables": [
-      {
-        "id": "SERVICE_FQDN_OPENLITESPEED_8088",
-        "name": "SERVICE_FQDN_OPENLITESPEED_8088",
-        "label": "Domain",
-        "defaultValue": "",
-        "description": "FQDN for the WordPress site (managed by Coolify proxy).",
-        "validations": {
-          "required": true
-        }
-      },
-      {
-        "id": "OLS_PHP_VERSION",
-        "name": "OLS_PHP_VERSION",
-        "label": "PHP Version",
-        "defaultValue": "8.2",
-        "description": "PHP version to use with OpenLiteSpeed (e.g. 8.1, 8.2, 8.3).",
-        "validations": {
-          "required": false
-        }
-      },
-      {
-        "id": "WORDPRESS_DB_NAME",
-        "name": "WORDPRESS_DB_NAME",
-        "label": "WordPress Database Name",
-        "defaultValue": "wordpress",
-        "description": "MySQL database name for WordPress.",
-        "validations": {
-          "required": true
-        }
-      },
-      {
-        "id": "WORDPRESS_DB_USER",
-        "name": "WORDPRESS_DB_USER",
-        "label": "WordPress Database User",
-        "defaultValue": "wordpress",
-        "description": "MySQL user for WordPress.",
-        "validations": {
-          "required": true
-        }
-      },
-      {
-        "id": "WORDPRESS_DB_PASSWORD",
-        "name": "WORDPRESS_DB_PASSWORD",
-        "label": "WordPress Database Password",
-        "defaultValue": "",
-        "description": "Password for the WordPress MySQL user.",
-        "generator": "password",
-        "validations": {
-          "required": true
-        }
-      },
-      {
-        "id": "MYSQL_ROOT_PASSWORD",
-        "name": "MYSQL_ROOT_PASSWORD",
-        "label": "MySQL Root Password",
-        "defaultValue": "",
-        "description": "Root password for the MySQL instance.",
-        "generator": "password",
-        "validations": {
-          "required": true
-        }
-      },
-      {
-        "id": "WORDPRESS_TABLE_PREFIX",
-        "name": "WORDPRESS_TABLE_PREFIX",
-        "label": "WordPress Table Prefix",
-        "defaultValue": "wp_",
-        "description": "Database table prefix for WordPress.",
-        "validations": {
-          "required": false
-        }
-      },
-      {
-        "id": "WORDPRESS_DEBUG",
-        "name": "WORDPRESS_DEBUG",
-        "label": "WordPress Debug Mode",
-        "defaultValue": "false",
-        "description": "Enable or disable WordPress debug mode (true/false).",
-        "validations": {
-          "required": false
-        }
-      }
-    ]
+{
+  "wordpress-with-openlitespeed": {
+    "name": "WordPress + OpenLiteSpeed",
+    "description": "A production-ready WordPress installation powered by OpenLiteSpeed web server with MariaDB. Includes persistent volumes for WordPress files, OLS configuration, and database data.",
+    "minversion": "4.0.0-beta.374",
+    "logo": "svgs/wordpress.svg",
+    "keywords": [
+      "wordpress",
+      "openlitespeed",
+      "ols",
+      "php",
+      "cms",
+      "mariadb",
+      "mysql",
+      "litespeed"
+    ],
+    "tags": [
+      "cms",
+      "wordpress",
+      "web"
+    ],
+    "compose": "templates/compose/wordpress-with-openlitespeed.yaml",
+    "documentation": "https://coolify.io/docs/services/wordpress-with-openlitespeed",
+    "slogan": "WordPress on OpenLiteSpeed — fast, lightweight, production-ready.",
+    "port": 8088
   }
-]
+}
