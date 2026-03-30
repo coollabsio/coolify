@@ -12,7 +12,17 @@ class S3Storage extends BaseModel
 {
     use HasFactory, HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+        'region',
+        'key',
+        'secret',
+        'bucket',
+        'endpoint',
+        'is_usable',
+        'unusable_email_sent',
+    ];
 
     protected $casts = [
         'is_usable' => 'boolean',

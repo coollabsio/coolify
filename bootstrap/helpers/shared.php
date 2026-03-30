@@ -16,6 +16,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -28,8 +29,10 @@ use App\Models\Team;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Process\Pool;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -49,10 +52,14 @@ use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Signer\Hmac\Sha256;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Token\Builder;
+use Livewire\Component;
+use Nubs\RandomNameGenerator\All;
+use Nubs\RandomNameGenerator\Alliteration;
 use phpseclib3\Crypt\EC;
 use phpseclib3\Crypt\RSA;
 use Poliander\Cron\CronExpression;
 use PurplePixie\PhpDns\DNSQuery;
+use PurplePixie\PhpDns\DNSTypes;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
@@ -116,7 +123,7 @@ function sanitize_string(?string $input = null): ?string
  * @param  string  $context  Descriptive name for error messages (e.g., 'volume source', 'service name')
  * @return string The validated input (unchanged if valid)
  *
- * @throws \Exception If dangerous characters are detected
+ * @throws Exception If dangerous characters are detected
  */
 function validateShellSafePath(string $input, string $context = 'path'): string
 {
@@ -138,7 +145,7 @@ function validateShellSafePath(string $input, string $context = 'path'): string
     // Check for dangerous characters
     foreach ($dangerousChars as $char => $description) {
         if (str_contains($input, $char)) {
-            throw new \Exception(
+            throw new Exception(
                 "Invalid {$context}: contains forbidden character '{$char}' ({$description}). ".
                 'Shell metacharacters are not allowed for security reasons.'
             );
@@ -160,7 +167,7 @@ function validateShellSafePath(string $input, string $context = 'path'): string
  * @param  string  $input  The databases_to_backup string
  * @return string The validated input
  *
- * @throws \Exception If any component contains dangerous characters
+ * @throws Exception If any component contains dangerous characters
  */
 function validateDatabasesBackupInput(string $input): string
 {
@@ -211,7 +218,7 @@ function validateDatabasesBackupInput(string $input): string
  * @param  string  $context  Descriptive name for error messages
  * @return string The validated input (trimmed)
  *
- * @throws \Exception If the input contains disallowed characters
+ * @throws Exception If the input contains disallowed characters
  */
 function validateGitRef(string $input, string $context = 'git ref'): string
 {
@@ -223,12 +230,12 @@ function validateGitRef(string $input, string $context = 'git ref'): string
 
     // Must not start with a hyphen (git flag injection)
     if (str_starts_with($input, '-')) {
-        throw new \Exception("Invalid {$context}: must not start with a hyphen.");
+        throw new Exception("Invalid {$context}: must not start with a hyphen.");
     }
 
     // Allow only alphanumeric characters, dots, hyphens, underscores, and slashes
     if (! preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/', $input)) {
-        throw new \Exception("Invalid {$context}: contains disallowed characters. Only alphanumeric characters, dots, hyphens, underscores, and slashes are allowed.");
+        throw new Exception("Invalid {$context}: contains disallowed characters. Only alphanumeric characters, dots, hyphens, underscores, and slashes are allowed.");
     }
 
     return $input;
@@ -282,7 +289,7 @@ function refreshSession(?Team $team = null): void
     });
     session(['currentTeam' => $team]);
 }
-function handleError(?Throwable $error = null, ?Livewire\Component $livewire = null, ?string $customErrorMessage = null)
+function handleError(?Throwable $error = null, ?Component $livewire = null, ?string $customErrorMessage = null)
 {
     if ($error instanceof TooManyRequestsException) {
         if (isset($livewire)) {
@@ -299,7 +306,7 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
         return 'Duplicate entry found. Please use a different name.';
     }
 
-    if ($error instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
+    if ($error instanceof ModelNotFoundException) {
         abort(404);
     }
 
@@ -329,7 +336,7 @@ function get_latest_sentinel_version(): string
         $versions = $response->json();
 
         return data_get($versions, 'coolify.sentinel.version');
-    } catch (\Throwable) {
+    } catch (Throwable) {
         return '0.0.0';
     }
 }
@@ -339,7 +346,7 @@ function get_latest_version_of_coolify(): string
         $versions = get_versions_data();
 
         return data_get($versions, 'coolify.v4.version', '0.0.0');
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
 
         return '0.0.0';
     }
@@ -347,9 +354,9 @@ function get_latest_version_of_coolify(): string
 
 function generate_random_name(?string $cuid = null): string
 {
-    $generator = new \Nubs\RandomNameGenerator\All(
+    $generator = new All(
         [
-            new \Nubs\RandomNameGenerator\Alliteration,
+            new Alliteration,
         ]
     );
     if (is_null($cuid)) {
@@ -448,7 +455,7 @@ function getFqdnWithoutPort(string $fqdn)
         $path = $url->getPath();
 
         return "$scheme://$host$path";
-    } catch (\Throwable) {
+    } catch (Throwable) {
         return $fqdn;
     }
 }
@@ -478,13 +485,13 @@ function base_url(bool $withPort = true): string
     }
     if ($settings->public_ipv6) {
         if ($withPort) {
-            return "http://$settings->public_ipv6:$port";
+            return "http://[$settings->public_ipv6]:$port";
         }
 
-        return "http://$settings->public_ipv6";
+        return "http://[$settings->public_ipv6]";
     }
 
-    return url('/');
+    return config('app.url');
 }
 
 function isSubscribed()
@@ -537,21 +544,21 @@ function validate_cron_expression($expression_to_validate): bool
  * Even if the job runs minutes late, it still catches the missed cron window.
  * Without a dedupKey, falls back to a simple isDue() check.
  */
-function shouldRunCronNow(string $frequency, string $timezone, ?string $dedupKey = null, ?\Illuminate\Support\Carbon $executionTime = null): bool
+function shouldRunCronNow(string $frequency, string $timezone, ?string $dedupKey = null, ?Carbon $executionTime = null): bool
 {
-    $cron = new \Cron\CronExpression($frequency);
-    $executionTime = ($executionTime ?? \Illuminate\Support\Carbon::now())->copy()->setTimezone($timezone);
+    $cron = new Cron\CronExpression($frequency);
+    $executionTime = ($executionTime ?? Carbon::now())->copy()->setTimezone($timezone);
 
     if ($dedupKey === null) {
         return $cron->isDue($executionTime);
     }
 
-    $previousDue = \Illuminate\Support\Carbon::instance($cron->getPreviousRunDate($executionTime, allowCurrentDate: true));
+    $previousDue = Carbon::instance($cron->getPreviousRunDate($executionTime, allowCurrentDate: true));
     $lastDispatched = Cache::get($dedupKey);
 
     $shouldFire = $lastDispatched === null
         ? $cron->isDue($executionTime)
-        : $previousDue->gt(\Illuminate\Support\Carbon::parse($lastDispatched));
+        : $previousDue->gt(Carbon::parse($lastDispatched));
 
     // Always write: seeds on first miss, refreshes on dispatch.
     // 30-day static TTL covers all intervals; orphan keys self-clean.
@@ -932,7 +939,7 @@ function get_service_templates(bool $force = false): Collection
             $services = $response->json();
 
             return collect($services);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             $services = File::get(base_path('templates/'.config('constants.services.file_name')));
 
             return collect(json_decode($services))->sortKeys();
@@ -955,7 +962,7 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
     }
 
     // ServiceDatabase has a different relationship path: service->environment->project->team_id
-    if ($resource instanceof \App\Models\ServiceDatabase) {
+    if ($resource instanceof ServiceDatabase) {
         if ($resource->service?->environment?->project?->team_id === $teamId) {
             return $resource;
         }
@@ -1081,7 +1088,7 @@ function generateGitManualWebhook($resource, $type)
     if ($resource->source_id !== 0 && ! is_null($resource->source_id)) {
         return null;
     }
-    if ($resource->getMorphClass() === \App\Models\Application::class) {
+    if ($resource->getMorphClass() === Application::class) {
         $baseUrl = base_url();
 
         return Url::fromString($baseUrl)."/webhooks/source/$type/events/manual";
@@ -1102,11 +1109,11 @@ function sanitizeLogsForExport(string $text): string
 
 function getTopLevelNetworks(Service|Application $resource)
 {
-    if ($resource->getMorphClass() === \App\Models\Service::class) {
+    if ($resource->getMorphClass() === Service::class) {
         if ($resource->docker_compose_raw) {
             try {
                 $yaml = Yaml::parse($resource->docker_compose_raw);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // If the docker-compose.yml file is not valid, we will return the network name as the key
                 $topLevelNetworks = collect([
                     $resource->uuid => [
@@ -1169,10 +1176,10 @@ function getTopLevelNetworks(Service|Application $resource)
 
             return $topLevelNetworks->keys();
         }
-    } elseif ($resource->getMorphClass() === \App\Models\Application::class) {
+    } elseif ($resource->getMorphClass() === Application::class) {
         try {
             $yaml = Yaml::parse($resource->docker_compose_raw);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // If the docker-compose.yml file is not valid, we will return the network name as the key
             $topLevelNetworks = collect([
                 $resource->uuid => [
@@ -1479,7 +1486,7 @@ function validateDNSEntry(string $fqdn, Server $server)
         $ip = $server->ip;
     }
     $found_matching_ip = false;
-    $type = \PurplePixie\PhpDns\DNSTypes::NAME_A;
+    $type = DNSTypes::NAME_A;
     foreach ($dns_servers as $dns_server) {
         try {
             $query = new DNSQuery($dns_server);
@@ -1500,7 +1507,7 @@ function validateDNSEntry(string $fqdn, Server $server)
                     }
                 }
             }
-        } catch (\Exception) {
+        } catch (Exception) {
         }
     }
 
@@ -1682,7 +1689,7 @@ function get_public_ips()
             }
             InstanceSettings::get()->update(['public_ipv4' => $ipv4]);
         }
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         echo "Error: {$e->getMessage()}\n";
     }
     try {
@@ -1697,7 +1704,7 @@ function get_public_ips()
             }
             InstanceSettings::get()->update(['public_ipv6' => $ipv6]);
         }
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         echo "Error: {$e->getMessage()}\n";
     }
 }
@@ -1795,15 +1802,15 @@ function customApiValidator(Collection|array $item, array $rules)
 }
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, ?int $preview_id = null)
 {
-    if ($resource->getMorphClass() === \App\Models\Service::class) {
+    if ($resource->getMorphClass() === Service::class) {
         if ($resource->docker_compose_raw) {
             // Extract inline comments from raw YAML before Symfony parser discards them
             $envComments = extractYamlEnvironmentComments($resource->docker_compose_raw);
 
             try {
                 $yaml = Yaml::parse($resource->docker_compose_raw);
-            } catch (\Exception $e) {
-                throw new \RuntimeException($e->getMessage());
+            } catch (Exception $e) {
+                throw new RuntimeException($e->getMessage());
             }
             $allServices = get_service_templates();
             $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
@@ -2567,10 +2574,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         } else {
             return collect([]);
         }
-    } elseif ($resource->getMorphClass() === \App\Models\Application::class) {
+    } elseif ($resource->getMorphClass() === Application::class) {
         try {
             $yaml = Yaml::parse($resource->docker_compose_raw);
-        } catch (\Exception) {
+        } catch (Exception) {
             return;
         }
         $server = $resource->destination->server;
@@ -3332,7 +3339,7 @@ function isAssociativeArray($array)
     }
 
     if (! is_array($array)) {
-        throw new \InvalidArgumentException('Input must be an array or a Collection.');
+        throw new InvalidArgumentException('Input must be an array or a Collection.');
     }
 
     if ($array === []) {
@@ -3448,7 +3455,7 @@ function wireNavigate(): string
 
         // Return wire:navigate.hover for SPA navigation with prefetching, or empty string if disabled
         return ($settings->is_wire_navigate_enabled ?? true) ? 'wire:navigate.hover' : '';
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         return 'wire:navigate.hover';
     }
 }
@@ -3457,13 +3464,13 @@ function wireNavigate(): string
  * Redirect to a named route with SPA navigation support.
  * Automatically uses wire:navigate when is_wire_navigate_enabled is true.
  */
-function redirectRoute(Livewire\Component $component, string $name, array $parameters = []): mixed
+function redirectRoute(Component $component, string $name, array $parameters = []): mixed
 {
     $navigate = true;
 
     try {
         $navigate = instanceSettings()->is_wire_navigate_enabled ?? true;
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         $navigate = true;
     }
 
@@ -3505,7 +3512,7 @@ function loadConfigFromGit(string $repository, string $branch, string $base_dire
     ]);
     try {
         return instant_remote_process($commands, $server);
-    } catch (\Exception) {
+    } catch (Exception) {
         // continue
     }
 }
@@ -3636,8 +3643,8 @@ function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|
         // If this happens, the user may have provided an HTTP URL when they needed an SSH one
         // Let's try and fix that for known Git providers
         switch ($source->getMorphClass()) {
-            case \App\Models\GithubApp::class:
-            case \App\Models\GitlabApp::class:
+            case GithubApp::class:
+            case GitlabApp::class:
                 $providerInfo['host'] = Url::fromString($source->html_url)->getHost();
                 $providerInfo['port'] = $source->custom_port;
                 $providerInfo['user'] = $source->custom_user;
@@ -3915,10 +3922,10 @@ function shouldSkipPasswordConfirmation(): bool
  * - User has no password (OAuth users)
  *
  * @param  mixed  $password  The password to verify (may be array if skipped by frontend)
- * @param  \Livewire\Component|null  $component  Optional Livewire component to add errors to
+ * @param  Component|null  $component  Optional Livewire component to add errors to
  * @return bool True if verification passed (or skipped), false if password is incorrect
  */
-function verifyPasswordConfirmation(mixed $password, ?Livewire\Component $component = null): bool
+function verifyPasswordConfirmation(mixed $password, ?Component $component = null): bool
 {
     // Skip if password confirmation should be skipped
     if (shouldSkipPasswordConfirmation()) {
@@ -3941,17 +3948,17 @@ function verifyPasswordConfirmation(mixed $password, ?Livewire\Component $compon
  * Extract hard-coded environment variables from docker-compose YAML.
  *
  * @param  string  $dockerComposeRaw  Raw YAML content
- * @return \Illuminate\Support\Collection Collection of arrays with: key, value, comment, service_name
+ * @return Collection Collection of arrays with: key, value, comment, service_name
  */
-function extractHardcodedEnvironmentVariables(string $dockerComposeRaw): \Illuminate\Support\Collection
+function extractHardcodedEnvironmentVariables(string $dockerComposeRaw): Collection
 {
     if (blank($dockerComposeRaw)) {
         return collect([]);
     }
 
     try {
-        $yaml = \Symfony\Component\Yaml\Yaml::parse($dockerComposeRaw);
-    } catch (\Exception $e) {
+        $yaml = Yaml::parse($dockerComposeRaw);
+    } catch (Exception $e) {
         // Malformed YAML - return empty collection
         return collect([]);
     }
@@ -4100,7 +4107,7 @@ function resolveSharedEnvironmentVariables(?string $value, $resource): ?string
         if (is_null($id)) {
             continue;
         }
-        $found = \App\Models\SharedEnvironmentVariable::where('type', $type)
+        $found = SharedEnvironmentVariable::where('type', $type)
             ->where('key', $variable)
             ->where('team_id', $resource->team()->id)
             ->where("{$type}_id", $id)

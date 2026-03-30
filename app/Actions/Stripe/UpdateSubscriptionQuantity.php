@@ -4,6 +4,7 @@ namespace App\Actions\Stripe;
 
 use App\Jobs\ServerLimitCheckJob;
 use App\Models\Team;
+use Stripe\Exception\InvalidRequestException;
 use Stripe\StripeClient;
 
 class UpdateSubscriptionQuantity
@@ -42,6 +43,7 @@ class UpdateSubscriptionQuantity
             }
 
             $currency = strtoupper($item->price->currency ?? 'usd');
+            $billingInterval = $item->price->recurring->interval ?? 'month';
 
             // Upcoming invoice gives us the prorated amount due now
             $upcomingInvoice = $this->stripe->invoices->upcoming([
@@ -99,6 +101,7 @@ class UpdateSubscriptionQuantity
                     'tax_description' => $taxDescription,
                     'quantity' => $quantity,
                     'currency' => $currency,
+                    'billing_interval' => $billingInterval,
                 ],
             ];
         } catch (\Exception $e) {
@@ -184,7 +187,7 @@ class UpdateSubscriptionQuantity
             \Log::info("Subscription {$subscription->stripe_subscription_id} quantity updated to {$quantity} for team {$team->name}");
 
             return ['success' => true, 'error' => null];
-        } catch (\Stripe\Exception\InvalidRequestException $e) {
+        } catch (InvalidRequestException $e) {
             \Log::error("Stripe update quantity error for team {$team->id}: ".$e->getMessage());
 
             return ['success' => false, 'error' => 'Stripe error: '.$e->getMessage()];

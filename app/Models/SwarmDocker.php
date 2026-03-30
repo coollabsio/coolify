@@ -2,9 +2,23 @@
 
 namespace App\Models;
 
+use App\Support\ValidationPatterns;
+
 class SwarmDocker extends BaseModel
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'network',
+    ];
+
+    public function setNetworkAttribute(string $value): void
+    {
+        if (! ValidationPatterns::isValidDockerNetwork($value)) {
+            throw new \InvalidArgumentException('Invalid Docker network name. Must start with alphanumeric and contain only alphanumeric characters, dots, hyphens, and underscores.');
+        }
+
+        $this->attributes['network'] = $value;
+    }
 
     public function applications()
     {

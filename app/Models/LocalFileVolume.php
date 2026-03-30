@@ -20,7 +20,18 @@ class LocalFileVolume extends BaseModel
 
     use HasFactory;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'fs_path',
+        'mount_path',
+        'content',
+        'resource_type',
+        'resource_id',
+        'is_directory',
+        'chown',
+        'chmod',
+        'is_based_on_git',
+        'is_preview_suffix_enabled',
+    ];
 
     public $appends = ['is_binary'];
 

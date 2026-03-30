@@ -233,7 +233,7 @@
                                     <x-forms.checkbox canGate="update" :canResource="$serviceDatabase" instantSave id="isPublic"
                                         label="Make it publicly available" />
                                 </div>
-                                <x-forms.input canGate="update" :canResource="$serviceDatabase" placeholder="5432"
+                                <x-forms.input type="number" canGate="update" :canResource="$serviceDatabase" placeholder="5432"
                                     disabled="{{ $serviceDatabase->is_public }}" id="publicPort" label="Public Port" />
                                 @if ($db_url_public)
                                     <x-forms.input label="Database IP:PORT (public)"

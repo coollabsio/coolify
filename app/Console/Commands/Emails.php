@@ -136,7 +136,7 @@ class Emails extends Command
                 $application = Application::all()->first();
                 $preview = ApplicationPreview::all()->first();
                 if (! $preview) {
-                    $preview = ApplicationPreview::create([
+                    $preview = ApplicationPreview::forceCreate([
                         'application_id' => $application->id,
                         'pull_request_id' => 1,
                         'pull_request_html_url' => 'http://example.com',

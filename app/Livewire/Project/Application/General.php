@@ -146,9 +146,9 @@ class General extends Component
             'gitRepository' => 'required',
             'gitBranch' => 'required',
             'gitCommitSha' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
-            'installCommand' => 'nullable',
-            'buildCommand' => 'nullable',
-            'startCommand' => 'nullable',
+            'installCommand' => ValidationPatterns::shellSafeCommandRules(),
+            'buildCommand' => ValidationPatterns::shellSafeCommandRules(),
+            'startCommand' => ValidationPatterns::shellSafeCommandRules(),
             'buildPack' => 'required',
             'staticImage' => 'required',
             'baseDirectory' => array_merge(['required'], array_slice(ValidationPatterns::directoryPathRules(), 1)),
@@ -200,6 +200,9 @@ class General extends Component
                 'dockerComposeCustomStartCommand.regex' => 'The Docker Compose start command contains invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
                 'dockerComposeCustomBuildCommand.regex' => 'The Docker Compose build command contains invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
                 'customDockerRunOptions.regex' => 'The custom Docker run options contain invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
+                'installCommand.regex' => 'The install command contains invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
+                'buildCommand.regex' => 'The build command contains invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
+                'startCommand.regex' => 'The start command contains invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
                 'preDeploymentCommandContainer.regex' => 'The pre-deployment command container name must contain only alphanumeric characters, dots, hyphens, and underscores.',
                 'postDeploymentCommandContainer.regex' => 'The post-deployment command container name must contain only alphanumeric characters, dots, hyphens, and underscores.',
                 'name.required' => 'The Name field is required.',
@@ -732,6 +735,7 @@ class General extends Component
         $this->authorize('update', $this->application);
 
         try {
+            $this->application->redirect = $this->redirect;
             $has_www = collect($this->application->fqdns)->filter(fn ($fqdn) => str($fqdn)->contains('www.'))->count();
             if ($has_www === 0 && $this->application->redirect === 'www') {
                 $this->dispatch('error', 'You want to redirect to www, but you do not have a www domain set.<br><br>Please add www to your domain list and as an A DNS record (if applicable).');

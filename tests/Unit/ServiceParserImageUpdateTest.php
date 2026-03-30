@@ -7,22 +7,24 @@
  * These tests verify the fix for the issue where changing an image in a
  * docker-compose file would create a new service instead of updating the existing one.
  */
-it('ensures service parser does not include image in firstOrCreate query', function () {
+it('ensures service parser does not include image in trusted service creation query', function () {
     // Read the serviceParser function from parsers.php
     $parsersFile = file_get_contents(__DIR__.'/../../bootstrap/helpers/parsers.php');
 
-    // Check that firstOrCreate is called with only name and service_id
-    // and NOT with image parameter in the ServiceApplication presave loop
+    // Check that trusted creation only uses name and service_id
+    // and does not include image in the creation payload
     expect($parsersFile)
-        ->toContain("firstOrCreate([\n                'name' => \$serviceName,\n                'service_id' => \$resource->id,\n            ]);")
-        ->not->toContain("firstOrCreate([\n                'name' => \$serviceName,\n                'image' => \$image,\n                'service_id' => \$resource->id,\n            ]);");
+        ->toContain("\$databaseFound = ServiceDatabase::where('name', \$serviceName)->where('service_id', \$resource->id)->first();")
+        ->toContain("\$applicationFound = ServiceApplication::where('name', \$serviceName)->where('service_id', \$resource->id)->first();")
+        ->toContain("forceCreate([\n                        'name' => \$serviceName,\n                        'service_id' => \$resource->id,\n                    ]);")
+        ->not->toContain("forceCreate([\n                        'name' => \$serviceName,\n                        'image' => \$image,\n                        'service_id' => \$resource->id,\n                    ]);");
 });
 
 it('ensures service parser updates image after finding or creating service', function () {
     // Read the serviceParser function from parsers.php
     $parsersFile = file_get_contents(__DIR__.'/../../bootstrap/helpers/parsers.php');
 
-    // Check that image update logic exists after firstOrCreate
+    // Check that image update logic exists after the trusted create/find branch
     expect($parsersFile)
         ->toContain('// Update image if it changed')
         ->toContain('if ($savedService->image !== $image) {')

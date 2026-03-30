@@ -29,7 +29,14 @@ class ScheduledTask extends BaseModel
     use HasFactory;
     use HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'enabled',
+        'name',
+        'command',
+        'frequency',
+        'container',
+        'timeout',
+    ];
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {

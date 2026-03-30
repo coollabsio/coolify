@@ -24,7 +24,10 @@ class Project extends BaseModel
     use HasFactory;
     use HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+    ];
 
     /**
      * Get query builder for projects owned by current team.
@@ -48,10 +51,10 @@ class Project extends BaseModel
     protected static function booted()
     {
         static::created(function ($project) {
-            ProjectSetting::create([
+            ProjectSetting::forceCreate([
                 'project_id' => $project->id,
             ]);
-            Environment::create([
+            Environment::forceCreate([
                 'name' => 'production',
                 'project_id' => $project->id,
                 'uuid' => (string) new Cuid2,

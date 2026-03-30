@@ -4,7 +4,11 @@ namespace App\Models;
 
 class CloudProviderToken extends BaseModel
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'provider',
+        'token',
+        'name',
+    ];
 
     protected $casts = [
         'token' => 'encrypted',

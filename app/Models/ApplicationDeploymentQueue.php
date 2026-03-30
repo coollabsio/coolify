@@ -16,6 +16,7 @@ use OpenApi\Attributes as OA;
         'application_id' => ['type' => 'string'],
         'deployment_uuid' => ['type' => 'string'],
         'pull_request_id' => ['type' => 'integer'],
+        'docker_registry_image_tag' => ['type' => 'string', 'nullable' => true],
         'force_rebuild' => ['type' => 'boolean'],
         'commit' => ['type' => 'string'],
         'status' => ['type' => 'string'],
@@ -39,9 +40,35 @@ use OpenApi\Attributes as OA;
 )]
 class ApplicationDeploymentQueue extends Model
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'application_id',
+        'deployment_uuid',
+        'pull_request_id',
+        'force_rebuild',
+        'commit',
+        'status',
+        'is_webhook',
+        'logs',
+        'current_process_id',
+        'restart_only',
+        'git_type',
+        'server_id',
+        'application_name',
+        'server_name',
+        'deployment_url',
+        'destination_id',
+        'only_this_server',
+        'rollback',
+        'commit_message',
+        'is_api',
+        'build_server_id',
+        'horizon_job_id',
+        'horizon_job_worker',
+        'finished_at',
+    ];
 
     protected $casts = [
+        'pull_request_id' => 'integer',
         'finished_at' => 'datetime',
     ];
 

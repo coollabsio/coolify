@@ -49,7 +49,7 @@ class InstallDocker
           }');
         $found = StandaloneDocker::where('server_id', $server->id);
         if ($found->count() == 0 && $server->id) {
-            StandaloneDocker::create([
+            StandaloneDocker::forceCreate([
                 'name' => 'coolify',
                 'network' => 'coolify',
                 'server_id' => $server->id,

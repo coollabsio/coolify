@@ -118,7 +118,7 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
 
         if (! $found) {
             if ($application->build_pack === 'dockercompose') {
-                $preview = ApplicationPreview::create([
+                $preview = ApplicationPreview::forceCreate([
                     'git_type' => 'github',
                     'application_id' => $application->id,
                     'pull_request_id' => $this->pullRequestId,
@@ -127,7 +127,7 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
                 ]);
                 $preview->generate_preview_fqdn_compose();
             } else {
-                $preview = ApplicationPreview::create([
+                $preview = ApplicationPreview::forceCreate([
                     'git_type' => 'github',
                     'application_id' => $application->id,
                     'pull_request_id' => $this->pullRequestId,

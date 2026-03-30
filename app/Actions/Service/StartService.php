@@ -40,10 +40,10 @@ class StartService
         $commands[] = "docker network connect $service->uuid coolify-proxy >/dev/null 2>&1 || true";
         if (data_get($service, 'connect_to_docker_network')) {
             $compose = data_get($service, 'docker_compose', []);
-            $network = $service->destination->network;
+            $safeNetwork = escapeshellarg($service->destination->network);
             $serviceNames = data_get(Yaml::parse($compose), 'services', []);
             foreach ($serviceNames as $serviceName => $serviceConfig) {
-                $commands[] = "docker network connect --alias {$serviceName}-{$service->uuid} $network {$serviceName}-{$service->uuid} >/dev/null 2>&1 || true";
+                $commands[] = "docker network connect --alias {$serviceName}-{$service->uuid} {$safeNetwork} {$serviceName}-{$service->uuid} >/dev/null 2>&1 || true";
             }
         }
 

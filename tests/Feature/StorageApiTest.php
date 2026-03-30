@@ -49,7 +49,7 @@ function createTestApplication($context): Application
 
 function createTestDatabase($context): StandalonePostgresql
 {
-    return StandalonePostgresql::create([
+    return StandalonePostgresql::forceCreate([
         'name' => 'test-postgres',
         'image' => 'postgres:15-alpine',
         'postgres_user' => 'postgres',

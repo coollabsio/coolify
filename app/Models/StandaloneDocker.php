@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Jobs\ConnectProxyToNetworksJob;
+use App\Support\ValidationPatterns;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
@@ -11,18 +12,31 @@ class StandaloneDocker extends BaseModel
     use HasFactory;
     use HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'network',
+    ];
 
     protected static function boot()
     {
         parent::boot();
         static::created(function ($newStandaloneDocker) {
             $server = $newStandaloneDocker->server;
+            $safeNetwork = escapeshellarg($newStandaloneDocker->network);
             instant_remote_process([
-                "docker network inspect $newStandaloneDocker->network >/dev/null 2>&1 || docker network create --driver overlay --attachable $newStandaloneDocker->network >/dev/null",
+                "docker network inspect {$safeNetwork} >/dev/null 2>&1 || docker network create --driver overlay --attachable {$safeNetwork} >/dev/null",
             ], $server, false);
             ConnectProxyToNetworksJob::dispatchSync($server);
         });
+    }
+
+    public function setNetworkAttribute(string $value): void
+    {
+        if (! ValidationPatterns::isValidDockerNetwork($value)) {
+            throw new \InvalidArgumentException('Invalid Docker network name. Must start with alphanumeric and contain only alphanumeric characters, dots, hyphens, and underscores.');
+        }
+
+        $this->attributes['network'] = $value;
     }
 
     public function applications()

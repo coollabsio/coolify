@@ -119,7 +119,7 @@ services:
       retries: 10
 
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
+    image: clickhouse/clickhouse-server:26.2.4.23
     user: "101:101"
     environment:
       - CLICKHOUSE_DB=${CLICKHOUSE_DB:-default}

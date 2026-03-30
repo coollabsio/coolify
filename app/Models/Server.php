@@ -34,6 +34,7 @@ use OpenApi\Attributes as OA;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Spatie\Url\Url;
+use Stevebauman\Purify\Facades\Purify;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
@@ -142,19 +143,19 @@ class Server extends BaseModel
             }
         });
         static::created(function ($server) {
-            ServerSetting::create([
+            ServerSetting::forceCreate([
                 'server_id' => $server->id,
             ]);
             if ($server->id === 0) {
                 if ($server->isSwarm()) {
-                    SwarmDocker::create([
+                    SwarmDocker::forceCreate([
                         'id' => 0,
                         'name' => 'coolify',
                         'network' => 'coolify-overlay',
                         'server_id' => $server->id,
                     ]);
                 } else {
-                    StandaloneDocker::create([
+                    StandaloneDocker::forceCreate([
                         'id' => 0,
                         'name' => 'coolify',
                         'network' => 'coolify',
@@ -163,13 +164,14 @@ class Server extends BaseModel
                 }
             } else {
                 if ($server->isSwarm()) {
-                    SwarmDocker::create([
+                    SwarmDocker::forceCreate([
                         'name' => 'coolify-overlay',
                         'network' => 'coolify-overlay',
                         'server_id' => $server->id,
                     ]);
                 } else {
-                    $standaloneDocker = new StandaloneDocker([
+                    $standaloneDocker = new StandaloneDocker;
+                    $standaloneDocker->forceFill([
                         'name' => 'coolify',
                         'uuid' => (string) new Cuid2,
                         'network' => 'coolify',
@@ -265,9 +267,14 @@ class Server extends BaseModel
         'server_metadata',
     ];
 
-    protected $guarded = [];
-
     use HasSafeStringAttribute;
+
+    public function setValidationLogsAttribute($value): void
+    {
+        $this->attributes['validation_logs'] = $value !== null
+            ? Purify::config('validation_logs')->clean($value)
+            : null;
+    }
 
     public function type()
     {
