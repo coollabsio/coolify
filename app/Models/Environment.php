@@ -25,7 +25,10 @@ class Environment extends BaseModel
     use HasFactory;
     use HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+    ];
 
     protected static function booted()
     {

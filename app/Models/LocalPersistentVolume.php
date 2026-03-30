@@ -7,7 +7,15 @@ use Symfony\Component\Yaml\Yaml;
 
 class LocalPersistentVolume extends BaseModel
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'mount_path',
+        'host_path',
+        'container_id',
+        'resource_type',
+        'resource_id',
+        'is_preview_suffix_enabled',
+    ];
 
     protected $casts = [
         'is_preview_suffix_enabled' => 'boolean',

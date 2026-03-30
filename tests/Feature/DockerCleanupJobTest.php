@@ -8,6 +8,22 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+it('persists the server id when creating an execution record', function () {
+    $user = User::factory()->create();
+    $team = $user->teams()->first();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+
+    $execution = DockerCleanupExecution::create([
+        'server_id' => $server->id,
+    ]);
+
+    expect($execution->server_id)->toBe($server->id);
+    $this->assertDatabaseHas('docker_cleanup_executions', [
+        'id' => $execution->id,
+        'server_id' => $server->id,
+    ]);
+});
+
 it('creates a failed execution record when server is not functional', function () {
     $user = User::factory()->create();
     $team = $user->teams()->first();

@@ -91,7 +91,7 @@ class Create extends Component
                     if (in_array($oneClickServiceName, NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK)) {
                         data_set($service_payload, 'connect_to_docker_network', true);
                     }
-                    $service = Service::create($service_payload);
+                    $service = Service::forceCreate($service_payload);
                     $service->name = "$oneClickServiceName-".$service->uuid;
                     $service->save();
                     if ($oneClickDotEnvs?->count() > 0) {

@@ -157,6 +157,19 @@ class Advanced extends Component
         }
     }
 
+    public function toggleRegistration($password): bool
+    {
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return false;
+        }
+
+        $this->settings->is_registration_enabled = $this->is_registration_enabled = true;
+        $this->settings->save();
+        $this->dispatch('success', 'Registration has been enabled.');
+
+        return true;
+    }
+
     public function toggleTwoStepConfirmation($password): bool
     {
         if (! verifyPasswordConfirmation($password, $this)) {

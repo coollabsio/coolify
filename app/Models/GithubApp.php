@@ -6,7 +6,25 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class GithubApp extends BaseModel
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'organization',
+        'api_url',
+        'html_url',
+        'custom_user',
+        'custom_port',
+        'app_id',
+        'installation_id',
+        'client_id',
+        'client_secret',
+        'webhook_secret',
+        'is_system_wide',
+        'is_public',
+        'contents',
+        'metadata',
+        'pull_requests',
+        'administration',
+    ];
 
     protected $appends = ['type'];
 
@@ -92,7 +110,7 @@ class GithubApp extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                if ($this->getMorphClass() === \App\Models\GithubApp::class) {
+                if ($this->getMorphClass() === GithubApp::class) {
                     return 'github';
                 }
             },

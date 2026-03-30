@@ -22,6 +22,9 @@ class SharedEnvironmentVariable extends Model
         'is_multiline',
         'is_literal',
         'is_shown_once',
+
+        // Metadata
+        'version',
     ];
 
     protected $casts = [

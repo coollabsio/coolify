@@ -24,7 +24,7 @@ class Docker extends Component
     #[Validate(['required', 'string'])]
     public string $name;
 
-    #[Validate(['required', 'string'])]
+    #[Validate(['required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/'])]
     public string $network;
 
     #[Validate(['required', 'string'])]
@@ -77,7 +77,7 @@ class Docker extends Component
                 if ($found) {
                     throw new \Exception('Network already added to this server.');
                 } else {
-                    $docker = SwarmDocker::create([
+                    $docker = SwarmDocker::forceCreate([
                         'name' => $this->name,
                         'network' => $this->network,
                         'server_id' => $this->selectedServer->id,
@@ -88,7 +88,7 @@ class Docker extends Component
                 if ($found) {
                     throw new \Exception('Network already added to this server.');
                 } else {
-                    $docker = StandaloneDocker::create([
+                    $docker = StandaloneDocker::forceCreate([
                         'name' => $this->name,
                         'network' => $this->network,
                         'server_id' => $this->selectedServer->id,

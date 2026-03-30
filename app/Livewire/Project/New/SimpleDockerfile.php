@@ -45,14 +45,14 @@ CMD ["nginx", "-g", "daemon off;"]
         }
         $destination_class = $destination->getMorphClass();
 
-        $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-        $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
+        $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
+        $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
 
         $port = get_port_from_dockerfile($this->dockerfile);
         if (! $port) {
             $port = 80;
         }
-        $application = Application::create([
+        $application = Application::forceCreate([
             'name' => 'dockerfile-'.new Cuid2,
             'repository_project_id' => 0,
             'git_repository' => 'coollabsio/coolify',

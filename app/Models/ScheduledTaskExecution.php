@@ -22,7 +22,15 @@ use OpenApi\Attributes as OA;
 )]
 class ScheduledTaskExecution extends BaseModel
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'status',
+        'message',
+        'finished_at',
+        'started_at',
+        'retry_count',
+        'duration',
+        'error_details',
+    ];
 
     protected function casts(): array
     {

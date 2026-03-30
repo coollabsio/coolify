@@ -144,7 +144,7 @@ class Gitea extends Controller
                             $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                             if (! $found) {
                                 if ($application->build_pack === 'dockercompose') {
-                                    $pr_app = ApplicationPreview::create([
+                                    $pr_app = ApplicationPreview::forceCreate([
                                         'git_type' => 'gitea',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,
@@ -153,7 +153,7 @@ class Gitea extends Controller
                                     ]);
                                     $pr_app->generate_preview_fqdn_compose();
                                 } else {
-                                    $pr_app = ApplicationPreview::create([
+                                    $pr_app = ApplicationPreview::forceCreate([
                                         'git_type' => 'gitea',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,

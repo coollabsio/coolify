@@ -1,12 +1,11 @@
-#!/command/execlineb -P
+#!/bin/sh
 
-# Use with-contenv to ensure environment variables are available
-with-contenv
 cd /var/www/html
 
-foreground {
-    php
-    artisan
-    start:nightwatch
-}
+if grep -qE '^NIGHTWATCH_ENABLED=true' .env 2>/dev/null; then
+    echo "   INFO  Nightwatch is enabled, starting..."
+    exec php artisan nightwatch:agent
+fi
 
+echo "   INFO  Nightwatch is disabled, sleeping."
+exec sleep infinity

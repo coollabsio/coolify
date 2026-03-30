@@ -14,9 +14,10 @@ it('populates fqdn from docker_compose_domains after generate_preview_fqdn_compo
         ]),
     ]);
 
-    $preview = ApplicationPreview::create([
+    $preview = ApplicationPreview::forceCreate([
         'application_id' => $application->id,
         'pull_request_id' => 42,
+        'pull_request_html_url' => 'https://github.com/example/repo/pull/42',
         'docker_compose_domains' => $application->docker_compose_domains,
     ]);
 
@@ -38,9 +39,10 @@ it('populates fqdn with multiple domains from multiple services', function () {
         ]),
     ]);
 
-    $preview = ApplicationPreview::create([
+    $preview = ApplicationPreview::forceCreate([
         'application_id' => $application->id,
         'pull_request_id' => 7,
+        'pull_request_html_url' => 'https://github.com/example/repo/pull/7',
         'docker_compose_domains' => $application->docker_compose_domains,
     ]);
 
@@ -63,9 +65,10 @@ it('sets fqdn to null when no domains are configured', function () {
         ]),
     ]);
 
-    $preview = ApplicationPreview::create([
+    $preview = ApplicationPreview::forceCreate([
         'application_id' => $application->id,
         'pull_request_id' => 99,
+        'pull_request_html_url' => 'https://github.com/example/repo/pull/99',
         'docker_compose_domains' => $application->docker_compose_domains,
     ]);
 

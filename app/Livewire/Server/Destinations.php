@@ -43,7 +43,7 @@ class Destinations extends Component
 
                 return;
             } else {
-                SwarmDocker::create([
+                SwarmDocker::forceCreate([
                     'name' => $this->server->name.'-'.$name,
                     'network' => $this->name,
                     'server_id' => $this->server->id,
@@ -57,7 +57,7 @@ class Destinations extends Component
 
                 return;
             } else {
-                StandaloneDocker::create([
+                StandaloneDocker::forceCreate([
                     'name' => $this->server->name.'-'.$name,
                     'network' => $name,
                     'server_id' => $this->server->id,

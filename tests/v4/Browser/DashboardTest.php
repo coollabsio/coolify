@@ -77,21 +77,21 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         ],
     ]);
 
-    Project::create([
+    Project::forceCreate([
         'uuid' => 'project-1',
         'name' => 'My first project',
         'description' => 'This is a test project in development',
         'team_id' => 0,
     ]);
 
-    Project::create([
+    Project::forceCreate([
         'uuid' => 'project-2',
         'name' => 'Production API',
         'description' => 'Backend services for production',
         'team_id' => 0,
     ]);
 
-    Project::create([
+    Project::forceCreate([
         'uuid' => 'project-3',
         'name' => 'Staging Environment',
         'description' => 'Staging and QA testing',

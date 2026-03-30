@@ -160,7 +160,7 @@
                                             <span class="dark:text-white" x-text="fmt(preview?.recurring_tax)"></span>
                                         </div>
                                         <div class="flex justify-between gap-6 text-sm font-bold pt-1.5 border-t dark:border-coolgray-400 border-neutral-200">
-                                            <span class="dark:text-white">Total / {{ $billingInterval === 'yearly' ? 'year' : 'month' }}</span>
+                                            <span class="dark:text-white">Total / <span x-text="preview?.billing_interval === 'year' ? 'year' : 'month'">month</span></span>
                                             <span class="dark:text-white" x-text="fmt(preview?.recurring_total)"></span>
                                         </div>
                                     </div>

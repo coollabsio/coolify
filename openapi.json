@@ -407,6 +407,11 @@
                                         "type": "boolean",
                                         "default": true,
                                         "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
+                                    },
+                                    "is_preserve_repository_enabled": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Preserve repository during deployment."
                                     }
                                 },
                                 "type": "object"
@@ -852,6 +857,11 @@
                                         "type": "boolean",
                                         "default": true,
                                         "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
+                                    },
+                                    "is_preserve_repository_enabled": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Preserve repository during deployment."
                                     }
                                 },
                                 "type": "object"
@@ -1297,6 +1307,11 @@
                                         "type": "boolean",
                                         "default": true,
                                         "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
+                                    },
+                                    "is_preserve_repository_enabled": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Preserve repository during deployment."
                                     }
                                 },
                                 "type": "object"
@@ -2704,6 +2719,10 @@
                                         "type": "boolean",
                                         "default": true,
                                         "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
+                                    },
+                                    "is_preserve_repository_enabled": {
+                                        "type": "boolean",
+                                        "description": "Preserve git repository during application update. If false, the existing repository will be removed and replaced with the new one. If true, the existing repository will be kept and the new one will be ignored. Default is false."
                                     }
                                 },
                                 "type": "object"
@@ -4544,6 +4563,10 @@
                                         "type": "integer",
                                         "description": "Public port of the database"
                                     },
+                                    "public_port_timeout": {
+                                        "type": "integer",
+                                        "description": "Public port timeout in seconds (default: 3600)"
+                                    },
                                     "limits_memory": {
                                         "type": "string",
                                         "description": "Memory limit of the database"
@@ -4989,6 +5012,10 @@
                                         "type": "integer",
                                         "description": "Public port of the database"
                                     },
+                                    "public_port_timeout": {
+                                        "type": "integer",
+                                        "description": "Public port timeout in seconds (default: 3600)"
+                                    },
                                     "limits_memory": {
                                         "type": "string",
                                         "description": "Memory limit of the database"
@@ -5117,6 +5144,10 @@
                                         "type": "integer",
                                         "description": "Public port of the database"
                                     },
+                                    "public_port_timeout": {
+                                        "type": "integer",
+                                        "description": "Public port timeout in seconds (default: 3600)"
+                                    },
                                     "limits_memory": {
                                         "type": "string",
                                         "description": "Memory limit of the database"
@@ -5240,6 +5271,10 @@
                                     "public_port": {
                                         "type": "integer",
                                         "description": "Public port of the database"
+                                    },
+                                    "public_port_timeout": {
+                                        "type": "integer",
+                                        "description": "Public port timeout in seconds (default: 3600)"
                                     },
                                     "limits_memory": {
                                         "type": "string",
@@ -5369,6 +5404,10 @@
                                         "type": "integer",
                                         "description": "Public port of the database"
                                     },
+                                    "public_port_timeout": {
+                                        "type": "integer",
+                                        "description": "Public port timeout in seconds (default: 3600)"
+                                    },
                                     "limits_memory": {
                                         "type": "string",
                                         "description": "Memory limit of the database"
@@ -5496,6 +5535,10 @@
                                     "public_port": {
                                         "type": "integer",
                                         "description": "Public port of the database"
+                                    },
+                                    "public_port_timeout": {
+                                        "type": "integer",
+                                        "description": "Public port timeout in seconds (default: 3600)"
                                     },
                                     "limits_memory": {
                                         "type": "string",
@@ -5637,6 +5680,10 @@
                                         "type": "integer",
                                         "description": "Public port of the database"
                                     },
+                                    "public_port_timeout": {
+                                        "type": "integer",
+                                        "description": "Public port timeout in seconds (default: 3600)"
+                                    },
                                     "limits_memory": {
                                         "type": "string",
                                         "description": "Memory limit of the database"
@@ -5777,6 +5824,10 @@
                                         "type": "integer",
                                         "description": "Public port of the database"
                                     },
+                                    "public_port_timeout": {
+                                        "type": "integer",
+                                        "description": "Public port timeout in seconds (default: 3600)"
+                                    },
                                     "limits_memory": {
                                         "type": "string",
                                         "description": "Memory limit of the database"
@@ -5904,6 +5955,10 @@
                                     "public_port": {
                                         "type": "integer",
                                         "description": "Public port of the database"
+                                    },
+                                    "public_port_timeout": {
+                                        "type": "integer",
+                                        "description": "Public port timeout in seconds (default: 3600)"
                                     },
                                     "limits_memory": {
                                         "type": "string",
@@ -7218,6 +7273,22 @@
                         "description": "Pull Request Id for deploying specific PR builds. Cannot be used with tag parameter.",
                         "schema": {
                             "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "pull_request_id",
+                        "in": "query",
+                        "description": "Preview deployment identifier. Alias of pr.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "docker_tag",
+                        "in": "query",
+                        "description": "Docker image tag for Docker Image preview deployments. Requires pull_request_id.",
+                        "schema": {
+                            "type": "string"
                         }
                     }
                 ],
@@ -12678,6 +12749,10 @@
                     },
                     "pull_request_id": {
                         "type": "integer"
+                    },
+                    "docker_registry_image_tag": {
+                        "type": "string",
+                        "nullable": true
                     },
                     "force_rebuild": {
                         "type": "boolean"

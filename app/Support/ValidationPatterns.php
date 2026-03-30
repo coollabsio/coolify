@@ -59,6 +59,13 @@ class ValidationPatterns
     public const CONTAINER_NAME_PATTERN = '/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/';
 
     /**
+     * Pattern for Docker network names
+     * Must start with alphanumeric, followed by alphanumeric, dots, hyphens, or underscores
+     * Matches Docker's network naming rules and prevents shell injection
+     */
+    public const DOCKER_NETWORK_PATTERN = '/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/';
+
+    /**
      * Get validation rules for name fields
      */
     public static function nameRules(bool $required = true, int $minLength = 3, int $maxLength = 255): array
@@ -208,6 +215,44 @@ class ValidationPatterns
     public static function isValidContainerName(string $name): bool
     {
         return preg_match(self::CONTAINER_NAME_PATTERN, $name) === 1;
+    }
+
+    /**
+     * Get validation rules for Docker network name fields
+     */
+    public static function dockerNetworkRules(bool $required = true, int $maxLength = 255): array
+    {
+        $rules = [];
+
+        if ($required) {
+            $rules[] = 'required';
+        } else {
+            $rules[] = 'nullable';
+        }
+
+        $rules[] = 'string';
+        $rules[] = "max:$maxLength";
+        $rules[] = 'regex:'.self::DOCKER_NETWORK_PATTERN;
+
+        return $rules;
+    }
+
+    /**
+     * Get validation messages for Docker network name fields
+     */
+    public static function dockerNetworkMessages(string $field = 'network'): array
+    {
+        return [
+            "{$field}.regex" => 'The network name must start with an alphanumeric character and contain only alphanumeric characters, dots, hyphens, and underscores.',
+        ];
+    }
+
+    /**
+     * Check if a string is a valid Docker network name.
+     */
+    public static function isValidDockerNetwork(string $name): bool
+    {
+        return preg_match(self::DOCKER_NETWORK_PATTERN, $name) === 1;
     }
 
     /**

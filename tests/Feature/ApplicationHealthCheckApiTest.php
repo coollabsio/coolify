@@ -25,13 +25,13 @@ beforeEach(function () {
     $this->server = Server::factory()->create(['team_id' => $this->team->id]);
 
     StandaloneDocker::withoutEvents(function () {
-        $this->destination = StandaloneDocker::firstOrCreate(
-            ['server_id' => $this->server->id, 'network' => 'coolify'],
+        $this->destination = $this->server->standaloneDockers()->firstOrCreate(
+            ['network' => 'coolify'],
             ['uuid' => (string) new Cuid2, 'name' => 'test-docker']
         );
     });
 
-    $this->project = Project::create([
+    $this->project = Project::forceCreate([
         'uuid' => (string) new Cuid2,
         'name' => 'test-project',
         'team_id' => $this->team->id,
