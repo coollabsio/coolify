@@ -67,7 +67,7 @@ class ForceDisabled extends CustomEmailNotification
         return new NtfyMessage(
             title: 'Server disabled',
             level: 'error',
-            message: "Server ({$this->server->name}) disabled because it is not paid!\nAll automations and integrations are stopped.\nPlease update your subscription to enable the server again: https://app.coolify.io/subscriptions",
+            message: "Server ({$this->server->name}) disabled because it is not paid!\nAll automations and integrations are stopped.\nPlease update your subscription to enable the server again: https://app.coolify.io/subscription",
         );
     }
 
