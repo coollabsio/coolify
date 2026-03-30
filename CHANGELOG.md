@@ -1200,7 +1200,6 @@ All notable changes to this project will be documented in this file.
 - *(api)* Improve docker_compose_domains
 - *(api)* Add more allowed fields
 - *(notifications)* Add mattermost notifications (#7963)
-- *(templates)* Add ElectricSQL docker compose template
 - *(service)* Add back soketi-app-manager
 - *(service)* Upgrade checkmate to v3 (#7995)
 - *(service)* Update pterodactyl version (#7981)
@@ -1302,6 +1301,7 @@ All notable changes to this project will be documented in this file.
 - *(storage)* Add storage endpoints and UUID support for databases and services
 - *(monitoring)* Add Laravel Nightwatch monitoring support
 - *(validation)* Make hostname validation case-insensitive and expand allowed characters
+- *(proxy)* Validate stored config matches current proxy type
 
 ### 🐛 Bug Fixes
 
@@ -4620,7 +4620,6 @@ All notable changes to this project will be documented in this file.
 - *(soketi)* Make host binding configurable for IPv6 support (#8619)
 - *(ssh)* Automatically fix SSH directory permissions during upgrade (#8635)
 - *(jobs)* Prevent non-due jobs firing on restart and enrich skip logs with resource links
-- *(database)* Close confirmation modal after import/restore
 - Application rollback uses correct commit sha
 - *(rollback)* Escape commit SHA to prevent shell injection
 - Save comment field when creating application environment variables
@@ -4666,7 +4665,6 @@ All notable changes to this project will be documented in this file.
 - *(sentinel)* Add token validation to prevent command injection
 - *(log-drain)* Prevent command injection by base64-encoding environment variables
 - *(git-ref-validation)* Prevent command injection via git references
-- *(docker)* Add path validation to prevent command injection in file locations
 - Prevent command injection and fix developer view shared variables error (#8889)
 - Build-time environment variables break Next.js (#8890)
 - *(modal)* Make confirmation modal close after dispatching Livewire actions (#8892)
@@ -4726,6 +4724,9 @@ All notable changes to this project will be documented in this file.
 - *(validation)* Make hostname validation case-insensitive and expand allowed name characters (#9134)
 - *(team)* Resolve server limit checks for API token authentication (#9123)
 - *(subscription)* Prevent duplicate subscriptions with updateOrCreate
+- *(parsers)* Preserve ${VAR} references in compose instead of resolving to DB values
+- *(parsers)* Preserve ${VAR} references in compose instead of resolving to DB values (#9147)
+- *(proxy)* Validate stored config matches proxy type (#9146)
 
 ### 💼 Other
 
@@ -5983,14 +5984,6 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Add Coolify design system reference
 - Add Coolify design system reference (#8237)
-- Update changelog
-- Update changelog
-- *(api)* Improve app endpoint deprecation description
-- Add Coolify design system reference
-- Add Coolify design system reference (#8237)
-- Update changelog
-- Update changelog
-- Update changelog
 - *(sponsors)* Add huge sponsors section and reorganize list
 - *(application)* Add comments explaining commit selection logic for rollback support
 - *(readme)* Add VPSDime to Big Sponsors list
@@ -5999,10 +5992,7 @@ All notable changes to this project will be documented in this file.
 - *(settings)* Clarify Do Not Track helper text
 - Update changelog
 - *(sponsors)* Add ScreenshotOne as a huge sponsor
-- *(settings)* Clarify Do Not Track helper text
 - Update changelog
-- Update changelog
-- *(sponsors)* Add ScreenshotOne as a huge sponsor
 - *(sponsors)* Update Brand.dev to Context.dev
 - *(readme)* Add PetroSky Cloud to sponsors
 
@@ -6825,26 +6815,12 @@ All notable changes to this project will be documented in this file.
 - Prepare for PR
 - Prepare for PR
 - Prepare for PR
-- Add pr quality check workflow
-- Do not build or generate changelog on pr-quality changes
-- Add pr quality check via anti slop action (#8344)
-- Improve pr quality workflow
-- Delete label removal workflow
-- Improve pr quality workflow (#8374)
-- Prepare for PR
-- Prepare for PR
-- Prepare for PR
-- *(repo)* Improve contributor PR template
-- Add anti-slop v0.2 options to the pr-quality check
-- Improve pr template and quality check workflow (#8574)
 - Prepare for PR
 - Prepare for PR
 - Prepare for PR
 - *(ui)* Add labels header
 - *(ui)* Add container labels header (#8752)
 - *(templates)* Update n8n templates to 2.10.2 (#8679)
-- Prepare for PR
-- Prepare for PR
 - Prepare for PR
 - Prepare for PR
 - Prepare for PR
@@ -6865,9 +6841,11 @@ All notable changes to this project will be documented in this file.
 - *(service)* Update SeaweedFS images to version 4.13 (#8738)
 - *(templates)* Bump databasus image version
 - Remove coolify-examples-1 submodule
+- Update pr-quality.yaml
 - *(versions)* Bump coolify, sentinel, and traefik versions
 - *(versions)* Bump sentinel to 0.0.21
 - *(service)* Disable Booklore service (#9105)
+- Bump version to 4.0.0-beta.470
 
 ### ◀️ Revert
 
