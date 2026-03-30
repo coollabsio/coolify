@@ -14,7 +14,6 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 /**
  * @property-read string $id
  * @property-read string $name
- * @property-read string|null $display_name
  * @property-read string $email
  * @property-read string|null $notification_email
  * @property-read CarbonInterface|null $email_verified_at
@@ -39,7 +38,6 @@ final class User extends Authenticatable
         return [
             'id' => 'string',
             'name' => 'string',
-            'display_name' => 'string',
             'email' => 'string',
             'notification_email' => 'string',
             'email_verified_at' => 'datetime',
