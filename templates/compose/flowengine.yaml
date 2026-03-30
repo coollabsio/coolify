@@ -1,0 +1,218 @@
+# documentation: https://github.com/FlowEngine-cloud/flowengine
+# slogan: White-label client portal for automation agencies. Manage n8n instances and deliver them to clients under your own brand.
+# category: automation
+# tags: n8n,portal,automation,agency,whitelabel,client-portal,self-hosted
+# logo: https://raw.githubusercontent.com/FlowEngine-cloud/flowengine/main/public/logo.png
+# port: 3000
+
+# NOTE: When submitting to coollabsio/coolify, save this file as:
+#   templates/compose/flowengine.yaml
+
+services:
+
+  # ── Init: clone repo to get migration files ──────────────────────────────
+  flowengine-setup:
+    image: alpine/git:latest
+    command:
+      - sh
+      - -c
+      - |
+        git clone --depth=1 https://github.com/FlowEngine-cloud/flowengine.git /tmp/repo
+        mkdir -p /initdb /migrations /kongconfig
+        cp /tmp/repo/migrations/00-init-roles.sh /initdb/00-init-roles.sh
+        cp /tmp/repo/migrations/supabase-schema.sql /migrations/supabase-schema.sql
+        cp /tmp/repo/migrations/seed.sql /migrations/seed.sql
+        cp /tmp/repo/docker/kong.yml /kongconfig/kong.yml
+        chmod +x /initdb/00-init-roles.sh
+        echo "Setup complete."
+    volumes:
+      - flowengine-initdb:/initdb
+      - flowengine-migrations:/migrations
+      - flowengine-kongconfig:/kongconfig
+    restart: "no"
+
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
+  postgres:
+    image: supabase/postgres:15.8.1.060
+    depends_on:
+      flowengine-setup:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_USER: supabase_admin
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      POSTGRES_DB: postgres
+      JWT_SECRET: ${SERVICE_PASSWORD_JWT}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - flowengine-initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supabase_admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── GoTrue (Auth) ─────────────────────────────────────────────────────────
+  auth:
+    image: supabase/gotrue:v2.170.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${SERVICE_FQDN_KONG_8000}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/postgres?search_path=auth
+      GOTRUE_SITE_URL: ${SERVICE_FQDN_PORTAL_3000}
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_SECRET: ${SERVICE_PASSWORD_JWT}
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/callback
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/callback
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/callback
+    restart: unless-stopped
+
+  # ── PostgREST ─────────────────────────────────────────────────────────────
+  rest:
+    image: postgrest/postgrest:v12.2.8
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage,graphql_public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${SERVICE_PASSWORD_JWT}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+    restart: unless-stopped
+
+  # ── Storage ───────────────────────────────────────────────────────────────
+  storage:
+    image: supabase/storage-api:v1.14.3
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ANON_KEY: ${SERVICE_SUPABASEANON_KEY}
+      SERVICE_KEY: ${SERVICE_SUPABASESERVICE_KEY}
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: ${SERVICE_PASSWORD_JWT}
+      DATABASE_URL: postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/postgres
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: stub
+      GLOBAL_S3_BUCKET: stub
+      IS_MULTITENANT: "false"
+    volumes:
+      - storage-data:/var/lib/storage
+    restart: unless-stopped
+
+  # ── Realtime ──────────────────────────────────────────────────────────────
+  realtime:
+    image: supabase/realtime:v2.34.18
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      DB_NAME: postgres
+      DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"
+      DB_ENC_KEY: supabaserealtime
+      API_JWT_SECRET: ${SERVICE_PASSWORD_JWT}
+      APP_NAME: realtime
+      FLY_ALLOC_ID: fly123
+      FLY_APP_NAME: realtime
+      SECRET_KEY_BASE: ${SERVICE_PASSWORD_JWT}
+      ERL_AFLAGS: "-proto_dist inet_tcp"
+      ENABLE_TAILSCALE: "false"
+      DNS_NODES: "''"
+    restart: unless-stopped
+
+  # ── Kong (API Gateway) ────────────────────────────────────────────────────
+  kong:
+    image: kong:2.8.1
+    depends_on:
+      flowengine-setup:
+        condition: service_completed_successfully
+      auth:
+        condition: service_started
+      rest:
+        condition: service_started
+      storage:
+        condition: service_started
+      realtime:
+        condition: service_started
+    environment:
+      - SERVICE_URL_KONG_8000
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+    volumes:
+      - flowengine-kongconfig:/var/lib/kong:ro
+    restart: unless-stopped
+
+  # ── DB Migrations ─────────────────────────────────────────────────────────
+  db-migrate:
+    image: supabase/postgres:15.8.1.060
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    environment:
+      PGPASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - flowengine-migrations:/migrations:ro
+    command:
+      - bash
+      - -c
+      - |
+        sleep 5
+        psql -h postgres -U supabase_admin -d postgres -f /migrations/supabase-schema.sql || true
+        psql -h postgres -U supabase_admin -d postgres -f /migrations/seed.sql || true
+        psql -h postgres -U supabase_admin -d postgres -c "NOTIFY pgrst, 'reload schema';" || true
+    restart: "no"
+
+  # ── FlowEngine Portal (Next.js) ───────────────────────────────────────────
+  portal:
+    image: ghcr.io/flowengine-cloud/flowengine:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kong:
+        condition: service_started
+    environment:
+      - SERVICE_FQDN_PORTAL_3000
+      NEXT_PUBLIC_SUPABASE_URL: ${SERVICE_FQDN_KONG_8000}
+      SUPABASE_URL: http://kong:8000
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SERVICE_SUPABASEANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_SUPABASESERVICE_KEY}
+      NEXT_PUBLIC_APP_URL: ${SERVICE_FQDN_PORTAL_3000}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  storage-data:
+  flowengine-initdb:
+  flowengine-migrations:
+  flowengine-kongconfig:
