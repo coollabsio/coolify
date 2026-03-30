@@ -8,7 +8,9 @@ All notable changes to this project will be documented in this file.
 
 ### Breaking Changes
 
--
+Most breaking changes are automatically handled by the upgrade migration. See the [v5 Upgrade Guide](docs) for details.
+
+- Database primary keys unified from two columns (numeric `id` + CUIDv2 `uuid`) into a single ULID `id` column
 
 ### Security
 
@@ -17,6 +19,8 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Complete redesign of the Coolify User Interface and User Experience
+- Separate notification email in addition to the user's account email
+- "Remember me" option on login, keeping users authenticated for 14 days (without it, sessions expire after 24 hours of inactivity)
 - **v4 to v5 upgrade migration**
   - Coolify v4 database as `old_pgsql` connection
   -
@@ -31,7 +35,7 @@ All notable changes to this project will be documented in this file.
   -
 - **Laravel Configurations**
   - Hashing algorithm from `bcrypt` to `argon2id` for enhanced security
-  - Session driver to Redis with inactive sessions expiring after 24h (previously 14 days)
+  - Session driver to Redis (for proper TTL) with inactive sessions expiring after 24h (previously 14 days)
   - Encrypted user session data
   - Password reset token expiration from 60 minutes to 10 minutes
   - Jobs dispatch only after all DB transactions complete, preventing race conditions
@@ -64,9 +68,9 @@ All notable changes to this project will be documented in this file.
 
 ### Refactored
 
-- All database migrations for a cleaner, more consistent and stable database schema
-- All database models for improved maintainability
-- Replace hardcoded queue strings with a `ProcessingQueue` enum
+- All database migrations for a cleaner, more consistent and stable database schema (no more `down()` methods, no more defaults in the DB...)
+- All database models for improved maintainability, consistency and database interoperability (SQLite and Postgres)
+- Hardcoded queue strings replaced with a `ProcessingQueue` enum
 - `config/constants.php` to `config/coolify.php` for all Coolify-specific settings
 - Environment variable naming to be shorter and more consistent
 
