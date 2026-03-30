@@ -326,7 +326,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'scheduled_database_backup_id' => $this->backup->id,
                             'local_storage_deleted' => false,
                         ]);
-                        $this->backup_standalone_postgresql($database);
+                        
+                        // Use pgBackRest if enabled, otherwise use traditional pg_dump
+                        if ($this->backup->use_pgbackrest ?? false) {
+                            $this->backup_postgresql_with_pgbackrest($database);
+                        } else {
+                            $this->backup_standalone_postgresql($database);
+                        }
                     } elseif (str($databaseType)->contains('mongo')) {
                         if ($database === '*') {
                             $database = 'all';
@@ -548,6 +554,66 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->backup_output === '') {
                 $this->backup_output = null;
             }
+        } catch (\Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
+        }
+    }
+
+    private function backup_postgresql_with_pgbackrest(string $database): void
+    {
+        try {
+            $commands = [];
+            $commands[] = 'mkdir -p '.$this->backup_dir;
+            
+            // Simple pgBackRest configuration
+            $configDir = $this->backup_dir . '/.pgbackrest';
+            $commands[] = "mkdir -p $configDir";
+            
+            // Create basic pgBackRest config
+            $config = "[global]\n";
+            $config .= "repo1-path=/var/lib/pgbackrest\n";
+            $config .= "log-level-console=info\n\n";
+            $config .= "[main]\n";
+            $config .= "pg1-host=localhost\n";
+            $config .= "pg1-path=/var/lib/postgresql/data\n";
+            
+            $configFile = "$configDir/pgbackrest.conf";
+            $commands[] = "cat > $configFile << 'EOF'\n$config\nEOF";
+            
+            // Run pgBackRest backup using Docker
+            $pgbackrestContainer = "pgbackrest-{$this->container_name}-" . uniqid();
+            $backupCommand = "docker run --rm --name $pgbackrestContainer";
+            $backupCommand .= " --network container:$this->container_name";
+            $backupCommand .= " -v $configDir:/etc/pgbackrest";
+            $backupCommand .= " -v {$this->backup_dir}:/var/lib/pgbackrest";
+            
+            if ($this->postgres_password) {
+                $backupCommand .= " -e PGPASSWORD=\"{$this->postgres_password}\"";
+            }
+            
+            $backupCommand .= " pgbackrest/pgbackrest:latest";
+            $backupCommand .= " pgbackrest --stanza=main --type=full backup";
+            
+            $commands[] = $backupCommand;
+            
+            // For S3 compatibility, create a tar archive
+            if ($this->backup->save_s3) {
+                $exportFile = "{$this->backup_dir}/pgbackrest-backup-{$database}-" . Carbon::now()->timestamp . '.tar.gz';
+                $commands[] = "cd {$this->backup_dir} && tar -czf $exportFile backup/ || true";
+                $this->backup_location = $exportFile;
+            } else {
+                $this->backup_location = "{$this->backup_dir}/backup/";
+            }
+            
+            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = trim($this->backup_output);
+            if ($this->backup_output === '') {
+                $this->backup_output = null;
+            }
+            
+            Log::info("pgBackRest backup completed for database: $database");
+            
         } catch (\Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;

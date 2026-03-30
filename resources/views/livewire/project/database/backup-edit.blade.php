@@ -56,6 +56,10 @@
                         helper="Comma separated list of databases to backup. Empty will include the default one."
                         id="databasesToBackup" />
                 @endif
+                <div class="w-48">
+                    <x-forms.checkbox label="Use pgBackRest" id="usePgbackrest" instantSave
+                        helper="Enable pgBackRest for better performance with large databases." />
+                </div>
             @elseif($backup->database_type === 'App\Models\StandaloneMongodb')
                 <x-forms.input label="Databases To Include"
                     helper="A list of databases to backup. You can specify which collection(s) per database to exclude from the backup. Empty will include all databases and collections.<br><br>Example:<br><br>database1:collection1,collection2|database2:collection3,collection4<br><br> database1 will include all collections except collection1 and collection2. <br>database2 will include all collections except collection3 and collection4.<br><br>Another Example:<br><br>database1:collection1|database2<br><br> database1 will include all collections except collection1.<br>database2 will include ALL collections."

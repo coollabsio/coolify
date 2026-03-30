@@ -78,6 +78,9 @@ class BackupEdit extends Component
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int $timeout = 3600;
 
+    #[Validate(['required', 'boolean'])]
+    public bool $usePgbackrest = false;
+
     public function mount()
     {
         try {
@@ -125,6 +128,7 @@ class BackupEdit extends Component
             $this->backup->databases_to_backup = $this->databasesToBackup;
             $this->backup->dump_all = $this->dumpAll;
             $this->backup->timeout = $this->timeout;
+            $this->backup->use_pgbackrest = $this->usePgbackrest;
             $this->customValidate();
             $this->backup->save();
         } else {
@@ -143,6 +147,7 @@ class BackupEdit extends Component
             $this->databasesToBackup = $this->backup->databases_to_backup;
             $this->dumpAll = $this->backup->dump_all;
             $this->timeout = $this->backup->timeout;
+            $this->usePgbackrest = $this->backup->use_pgbackrest ?? false;
         }
     }
 
