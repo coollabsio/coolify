@@ -6,6 +6,7 @@ use App\Enums\ActivityTypes;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
+use App\Support\ContainerName;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -279,9 +280,17 @@ class FileExplorer extends Component
     public function updatedSelectedContainer()
     {
         if ($this->selected_container !== 'default') {
-            $this->currentPath = '/';
+            $this->selected_container = ContainerName::normalize((string) $this->selected_container);
             $this->checkDatabaseType();
             $this->checkForDatabaseContainers();
+
+            $defaultPath = $this->detectDefaultPathForSelectedContainer();
+            if ($defaultPath !== null) {
+                $this->currentPath = $defaultPath;
+            } else {
+                $this->currentPath = '/';
+            }
+
             $this->loadFiles();
             $this->isUnzipInstalled = null;
             $this->isZipInstalled = null;
@@ -293,12 +302,93 @@ class FileExplorer extends Component
         }
     }
 
+    private function detectDefaultPathForSelectedContainer(): ?string
+    {
+        if (! $this->shouldDefaultToLaravelRootkitPath()) {
+            return null;
+        }
+
+        $container = collect($this->containers)->first(function ($container): bool {
+            return ContainerName::normalize((string) data_get($container, 'container.Names')) === ContainerName::normalize((string) $this->selected_container);
+        });
+        if (is_null($container)) {
+            return null;
+        }
+
+        $server = data_get($container, 'server');
+        if (! $server || ! $server instanceof Server) {
+            return null;
+        }
+
+        $containerName = (string) data_get($container, 'container.Names', '');
+        $escapedContainer = escapeshellarg($containerName);
+
+        $candidates = [
+            '/var/www/html',
+            '/app',
+            '/var/www',
+            '/',
+        ];
+
+        foreach ($candidates as $path) {
+            try {
+                $escapedPath = escapeshellarg($path);
+                $command = "docker exec {$escapedContainer} sh -c 'test -d {$escapedPath} && echo ok || echo no'";
+                if ($server->isNonRoot()) {
+                    $command = "sudo {$command}";
+                }
+                $exists = trim((string) (instant_remote_process([$command], $server, false) ?? '')) === 'ok';
+                if (! $exists) {
+                    continue;
+                }
+
+                if ($path === '/var/www/html') {
+                    $artisanCheck = "docker exec {$escapedContainer} sh -c 'test -f /var/www/html/artisan && echo ok || echo no'";
+                    if ($server->isNonRoot()) {
+                        $artisanCheck = "sudo {$artisanCheck}";
+                    }
+                    $isLaravel = trim((string) (instant_remote_process([$artisanCheck], $server, false) ?? '')) === 'ok';
+                    if ($isLaravel) {
+                        return '/var/www/html';
+                    }
+                }
+
+                return $path;
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    private function shouldDefaultToLaravelRootkitPath(): bool
+    {
+        if ($this->type !== 'service') {
+            return false;
+        }
+        if (! ($this->resource instanceof Service)) {
+            return false;
+        }
+
+        $composeRaw = (string) ($this->resource->docker_compose_raw ?? '');
+        if ($composeRaw === '') {
+            return false;
+        }
+
+        // Keep this behavior scoped to the Laravel Rootkit stack only.
+        // Markers are intentionally simple and resilient to minor template edits.
+        return str_contains($composeRaw, 'APP_NAME=Laravel RootKit')
+            || (str_contains($composeRaw, 'SERVICE_GITHUB_REPO_URL')
+                && str_contains($composeRaw, 'laravel-files:/var/www/html'));
+    }
+
     public function checkForDatabaseContainers()
     {
         $this->hasMySQLOrMariaDBContainer = false;
 
         foreach ($this->containers as $container) {
-            $containerName = data_get($container, 'container.Names', '');
+            $containerName = ContainerName::normalize((string) data_get($container, 'container.Names', ''));
 
             // Check by name
             if (str_contains(strtolower($containerName), 'mysql') ||
@@ -335,14 +425,16 @@ class FileExplorer extends Component
             return;
         }
 
-        $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+        $container = collect($this->containers)->first(function ($container): bool {
+            return ContainerName::normalize((string) data_get($container, 'container.Names')) === ContainerName::normalize((string) $this->selected_container);
+        });
         if (is_null($container)) {
             $this->isMySQLOrMariaDB = false;
 
             return;
         }
 
-        $containerName = data_get($container, 'container.Names', '');
+        $containerName = ContainerName::normalize((string) data_get($container, 'container.Names', ''));
         $server = data_get($container, 'server');
 
         // Check if container name contains mysql or mariadb
@@ -483,7 +575,9 @@ class FileExplorer extends Component
         $this->isLoading = true;
 
         try {
-            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            $container = collect($this->containers)->first(function ($container): bool {
+                return ContainerName::normalize((string) data_get($container, 'container.Names')) === ContainerName::normalize((string) $this->selected_container);
+            });
             if (is_null($container)) {
                 $this->dispatch('error', 'Container not found.');
 
@@ -503,7 +597,7 @@ class FileExplorer extends Component
                 return;
             }
 
-            $containerName = data_get($container, 'container.Names');
+            $containerName = ContainerName::normalize((string) data_get($container, 'container.Names'));
             $escapedContainer = escapeshellarg($containerName);
             $escapedPath = escapeshellarg($this->currentPath);
 
@@ -516,6 +610,14 @@ class FileExplorer extends Component
             $output = instant_remote_process([$command], $server, false);
             $this->files = $this->parseFileList($output ?? '');
             $this->syncSelectedFilesWithCurrentDirectory();
+
+            if ($this->files === [] && $this->currentPath === '/var/www') {
+                $defaultPath = $this->detectDefaultPathForSelectedContainer();
+                if ($defaultPath === '/var/www/html') {
+                    $this->currentPath = '/var/www/html';
+                    $this->loadFiles();
+                }
+            }
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to load files: '.$e->getMessage());
             $this->files = [];
@@ -698,7 +800,9 @@ class FileExplorer extends Component
     public function loadFileContent(string $path)
     {
         try {
-            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            $container = collect($this->containers)->first(function ($container): bool {
+                return ContainerName::normalize((string) data_get($container, 'container.Names')) === ContainerName::normalize((string) $this->selected_container);
+            });
             if (is_null($container)) {
                 $this->dispatch('error', 'Container not found.');
 
@@ -706,7 +810,7 @@ class FileExplorer extends Component
             }
 
             $server = data_get($container, 'server');
-            $containerName = data_get($container, 'container.Names');
+            $containerName = ContainerName::normalize((string) data_get($container, 'container.Names'));
             $escapedContainer = escapeshellarg($containerName);
             $escapedPath = escapeshellarg($path);
 
@@ -729,7 +833,9 @@ class FileExplorer extends Component
         }
 
         try {
-            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            $container = collect($this->containers)->first(function ($container): bool {
+                return ContainerName::normalize((string) data_get($container, 'container.Names')) === ContainerName::normalize((string) $this->selected_container);
+            });
             if (is_null($container)) {
                 $this->dispatch('error', 'Container not found.');
 
@@ -737,7 +843,7 @@ class FileExplorer extends Component
             }
 
             $server = data_get($container, 'server');
-            $containerName = data_get($container, 'container.Names');
+            $containerName = ContainerName::normalize((string) data_get($container, 'container.Names'));
             $escapedContainer = escapeshellarg($containerName);
             $escapedPath = escapeshellarg($this->selectedFile);
 
@@ -2318,13 +2424,15 @@ class FileExplorer extends Component
 
         foreach ($commonPaths as $path) {
             try {
-                $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+                $container = collect($this->containers)->first(function ($container): bool {
+                    return ContainerName::normalize((string) data_get($container, 'container.Names')) === ContainerName::normalize((string) $this->selected_container);
+                });
                 if (is_null($container)) {
                     continue;
                 }
 
                 $server = data_get($container, 'server');
-                $containerName = data_get($container, 'container.Names');
+                $containerName = ContainerName::normalize((string) data_get($container, 'container.Names'));
                 $escapedContainer = escapeshellarg($containerName);
                 $escapedPath = escapeshellarg($path);
 
@@ -2343,6 +2451,12 @@ class FileExplorer extends Component
             } catch (\Throwable $e) {
                 continue;
             }
+        }
+
+        if ($filename === '.env') {
+            $this->dispatch('warning', 'Este proyecto no tiene .env');
+
+            return;
         }
 
         $this->dispatch('error', "File {$filename} not found in common locations. Make sure you're in the correct directory or the file exists.");
