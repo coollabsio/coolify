@@ -115,7 +115,7 @@ When a new version is released and a new GitHub release is created, it doesn't i
   - Updates are managed by Andras, who ensures each cloud version is thoroughly tested and stable before releasing it.
 
 > [!IMPORTANT]
-> The cloud version of Coolify may be several versions behind the latest GitHub releases even if the CDN is updated. This is intentional to ensure stability and reliability for cloud users and Andras will manully update the cloud version when the update is ready.
+> The cloud version of Coolify may be several versions behind the latest GitHub releases even if the CDN is updated. This is intentional to ensure stability and reliability for cloud users and Andras will manually update the cloud version when the update is ready.
 
 ## Manually Update/ Downgrade to Specific Versions
 

@@ -25,7 +25,7 @@ All notable changes to this project will be documented in this file.
 - Languagetool service
 - Send version with update request
 - Service secrets
-- Webhooks inititate all applications with the correct branch
+- Webhooks initiate all applications with the correct branch
 - Check ssl for new apps/services first
 - Autodeploy pause
 - Install pnpm into docker image if pnpm lock file is used
@@ -167,7 +167,7 @@ All notable changes to this project will be documented in this file.
 - *(ui)* Add libretranslate service icon
 - Handle invite_only plausible analytics
 - Init h2c (http2/grpc) support
-- Http + h2c paralel
+- Http + h2c parallel
 - Github raw icon url
 - Remove svg support
 - Add host path to any container
@@ -186,7 +186,7 @@ All notable changes to this project will be documented in this file.
 - Add arm build to dev
 - Disk cleanup threshold by server
 - Notify user of disk cleanup init
-- Pricing plans ans subs
+- Pricing plans and subs
 - Add s3 storages
 - Init postgresql database
 - Add backup notifications
@@ -299,7 +299,7 @@ All notable changes to this project will be documented in this file.
 - Dynamic configuration for caddy
 - Reset password
 - Show resources on source page
-- Able to run scheduler/horizon programatically
+- Able to run scheduler/horizon programmatically
 - Change page width
 - Watch paths
 - Able to make rsa/ed ssh keys
@@ -453,7 +453,7 @@ All notable changes to this project will be documented in this file.
 - Restart service without pulling the latest image
 - Add strapi template
 - Add it-tools service template and logo
-- Add homarr service tamplate and logo
+- Add homarr service template and logo
 - Add Argilla service configuration to Service model
 - Add Invoice Ninja service configuration to Service model
 - Project search on frontend
@@ -489,9 +489,9 @@ All notable changes to this project will be documented in this file.
 - Add EdgeDB
 - Show warning if people would like to use sslip with https
 - Add is shared to env variables
-- Variabel sync and support shared vars
+- Variable sync and support shared vars
 - Add notification settings to server_disk_usage
-- Add coder service tamplate and logo
+- Add coder service template and logo
 - Debug mode for sentinel
 - Add jitsi template
 - Add --gpu support for custom docker command
@@ -508,7 +508,7 @@ All notable changes to this project will be documented in this file.
 - Add hex magic env var
 - Add deploy-only token permission
 - Able to deploy without cache on every commit
-- Update private key nam with new slug as well
+- Update private key name with new slug as well
 - Allow disabling default redirect, set status to 503
 - Add TLS configuration for default redirect in Server model
 - Slack notifications
@@ -1014,7 +1014,7 @@ All notable changes to this project will be documented in this file.
 - *(signoz)* Update config.xml and users.xml to ensure clickhouse boots correctly
 - *(signoz)* Update otel-collector configuration to match upstream
 - *(signoz)* Fix otel-collector config for version v0.128.0
-- *(signoz)* Remove unecessary port mapping for otel-collector
+- *(signoz)* Remove unnecessary port mapping for otel-collector
 - *(signoz)* Add SIGNOZ_JWT_SECRET env var generation
 - *(signoz)* Upgrade clickhouse image to 25.5.6
 - *(signoz)* Use latest tag for signoz/zookeeper
@@ -1201,7 +1201,7 @@ All notable changes to this project will be documented in this file.
 - Status is not available yet
 - Docker Engine bug related to live-restore and IPs
 - Version
-- PreventDefault on a button, thats all
+- PreventDefault on a button, that's all
 - Haproxy check should not throw error
 - Delete all build files
 - Cleanup images
@@ -1336,8 +1336,8 @@ All notable changes to this project will be documented in this file.
 - Add default webhook domain for n8n
 - Add git lfs while deploying
 - Try to update build status several times
-- Update stucked builds
-- Update stucked builds on startup
+- Update stuck builds
+- Update stuck builds on startup
 - Revert seed
 - Lame fixing
 - Remove asyncUntil
@@ -1363,7 +1363,7 @@ All notable changes to this project will be documented in this file.
 - Typo
 - Missing buildpack
 - Enable https for Ghost
-- Postgres root passwor shown and set
+- Postgres root password shown and set
 - Able to change postgres user password from ui
 - DB Connecting string generator
 - Missing install repositories GitHub
@@ -1480,7 +1480,7 @@ All notable changes to this project will be documented in this file.
 - PR deployments view
 - Minio urls + domain checks
 - Remove gh token on git source changes
-- Do not fetch app state in case of missconfiguration
+- Do not fetch app state in case of misconfiguration
 - Demo instance save domain instantly
 - Instant save on demo instance
 - New source canceled view
@@ -1494,9 +1494,9 @@ All notable changes to this project will be documented in this file.
 - Only restart coolify proxy in case of version prior to 2.9.2
 - Force restart proxy on seeding
 - Add GIT ENV variable for submodules
-- Recurisve clone instead of submodule
+- Recursive clone instead of submodule
 - Versions
-- Only reconfigure coolify proxy if its missconfigured
+- Only reconfigure coolify proxy if its misconfigured
 - Demo version forms
 - Typo
 - Revert gh and gl cloning
@@ -1597,7 +1597,7 @@ All notable changes to this project will be documented in this file.
 - White-labeled env
 - Schema
 - Coolify-network on verification
-- Cleanup stucked prisma-engines
+- Cleanup stuck prisma-engines
 - Toast
 - Secrets
 - Cleanup prisma engine if there is more than 1
@@ -1640,7 +1640,7 @@ All notable changes to this project will be documented in this file.
 - Clear queue on cancelling jobs
 - Cancelling jobs
 - Dashboard for admins
-- Never stop deplyo queue
+- Never stop deploy queue
 - Build queue system
 - High cpu usage
 - Worker
@@ -1712,7 +1712,7 @@ All notable changes to this project will be documented in this file.
 - Ispublic status on databases
 - Port checkers
 - Ui variables
-- Glitchtip env to pyhton boolean
+- Glitchtip env to python boolean
 - Autoupdater
 - Show restarting apps
 - Show restarting application & logs
@@ -1804,7 +1804,7 @@ All notable changes to this project will be documented in this file.
 - Initial deploy status
 - Show logs better
 - Do not start tcp proxy without main container
-- Cleanup stucked tcp proxies
+- Cleanup stuck tcp proxies
 - Default 0 pending invitations
 - Handle forked repositories
 - Typo
@@ -1848,7 +1848,7 @@ All notable changes to this project will be documented in this file.
 - Webhooks
 - Websecure redirect
 - Wb for previews
-- Pr stopps main deployment
+- Pr stops main deployment
 - Preview wbh
 - Wh catchall for all
 - Remove old minio proxies
@@ -1975,9 +1975,9 @@ All notable changes to this project will be documented in this file.
 - Secrets
 - Www redirect
 - Cleanup function
-- Cleanup stucked containers
+- Cleanup stuck containers
 - Deletion + cleanupStuckedContainers
-- Stucked containers
+- Stuck containers
 - CleanupStuckedContainers
 - CleanupStuckedContainers
 - Typos in docs
@@ -2001,7 +2001,7 @@ All notable changes to this project will be documented in this file.
 - Typo
 - Ssh
 - Nullable name on deploy_keys
-- Enviroments
+- Environments
 - Remove dd - oops
 - Add inprogress activity
 - Application view
@@ -2111,7 +2111,7 @@ All notable changes to this project will be documented in this file.
 - Delete database related things when delete database
 - Remove -q from docker compose
 - Errors in views
-- Only send internal notifcations to enabled channels
+- Only send internal notifications to enabled channels
 - Recovery code
 - Email sending error
 - Sentry 4469575117
@@ -2223,7 +2223,7 @@ All notable changes to this project will be documented in this file.
 - File/dir based volumes are now read from the server
 - Respect server fqdn
 - If public repository does not have a main branch
-- Preselect branc on private repos
+- Preselect branch on private repos
 - Deploykey branch
 - Backups are now working again
 - Not found base_branch in git webhooks
@@ -2304,7 +2304,7 @@ All notable changes to this project will be documented in this file.
 - Check localhost connection
 - Send unreachable/revived notifications
 - Boarding + verification
-- Make sure proxy wont start in NONE mode
+- Make sure proxy won't start in NONE mode
 - Service check status 10 sec
 - IsCloud in production seeder
 - Make sure to use IP address
@@ -2338,7 +2338,7 @@ All notable changes to this project will be documented in this file.
 - Add config_hash if its null (old deployments)
 - Label generation
 - Labels
-- Email channel no recepients
+- Email channel no recipients
 - Limit horizon processes to 2 by default
 - Add custom port as ssh option to deploy_key based commands
 - Remove custom port from git repo url
@@ -2346,10 +2346,10 @@ All notable changes to this project will be documented in this file.
 - Service docs links
 - Add PGUSER to prevent HC warning
 - Preselect s3 storage if available
-- Port exposes change, shoud regenerate label
+- Port exposes change, should regenerate label
 - Boarding
 - Clone to with the same environment name
-- Cleanup stucked resources on start
+- Cleanup stuck resources on start
 - Do not allow to delete env if a resource is defined
 - Service template generator + appwrite
 - Mongodb backup
@@ -2459,7 +2459,7 @@ All notable changes to this project will be documented in this file.
 - Init
 - Comma in traefik custom labels
 - Ignore if dynamic config could not be set
-- Service env variable ovewritten if it has a default value
+- Service env variable overwritten if it has a default value
 - Labelling
 - Non-ascii chars in labels
 - Labels
@@ -2527,7 +2527,7 @@ All notable changes to this project will be documented in this file.
 - Escape build envs properly for nixpacks + docker build
 - Undead endpoint
 - Upload limit on ui
-- Save cmd output propely (merge)
+- Save cmd output properly (merge)
 - Load profile on remote commands
 - Load profile and set envs on remote cmd
 - Restart should not update config hash
@@ -2554,7 +2554,7 @@ All notable changes to this project will be documented in this file.
 - Service deletion function
 - Service deletion fix
 - Dns validation + duplicated fqdns
-- Validate server navbar upated
+- Validate server navbar updated
 - Regenerate labels on application clone
 - Service deletion
 - Not able to use other shared envs
@@ -2651,13 +2651,13 @@ All notable changes to this project will be documented in this file.
 - Ui for tags
 - Update resources view
 - Realtime connection check
-- Multline env in dev mode
+- Multiline env in dev mode
 - Scheduled backup for other service databases (supabase)
 - PR deployments should not be distributed to 2 servers
 - Name/from address required for resend
 - Autoupdater
 - Async service loads
-- Disabled inputs are not trucated
+- Disabled inputs are not truncated
 - Duplicated generated fqdns are now working
 - Uis
 - Ui for cftunnels
@@ -2676,7 +2676,7 @@ All notable changes to this project will be documented in this file.
 - How to update docker-compose, environment variables and fqdns
 - Git submodule update
 - Unintended left padding on sidebar
-- Hashed random delimeter in ssh commands + make sure to remove the delimeter from the command
+- Hashed random delimiter in ssh commands + make sure to remove the delimiter from the command
 - Service config hash update
 - Redeploy if image not found in restart only mode
 - Check each required binaries one-by-one
@@ -2698,7 +2698,7 @@ All notable changes to this project will be documented in this file.
 - Mongo db backup
 - Backups
 - Autoupdate
-- Respect start period and chekc interval for hc
+- Respect start period and check interval for hc
 - Parse HEALTHCHECK from dockerfile
 - Make s3 name and endpoint required
 - Able to update source path for predefined volumes
@@ -2791,7 +2791,7 @@ All notable changes to this project will be documented in this file.
 - Stripprefix middleware correctly labeled to http
 - Bitbucket link
 - Compose generator
-- Do no truncate repositories wtih domain (git) in it
+- Do no truncate repositories with domain (git) in it
 - In services should edit compose file for volumes and envs
 - Handle laravel deployment better
 - Db proxy status shown better in the UI
@@ -2952,7 +2952,7 @@ All notable changes to this project will be documented in this file.
 - Update helper image pulling logic to only pull if the version is newer
 - Parser
 - Plunk NEXT_PUBLIC_API_URI
-- Reenable overlapping servercheckjob
+- Re-enable overlapping servercheckjob
 - Appwrite template + parser
 - Don't add `networks` key if `network_mode` is used
 - Remove debug statement in shared.php
@@ -3000,7 +3000,7 @@ All notable changes to this project will be documented in this file.
 - Handle deletion of 'hello' in confirmation modal for dev environment
 - Remove autofocuses
 - Ipv6 scp should use -6 flag
-- Cleanup stucked applicationdeploymentqueue
+- Cleanup stuck applicationdeploymentqueue
 - Realtime watch in development mode
 - Able to select root permission easier
 - Able to support more database dynamically from Coolify's UI
@@ -3012,7 +3012,7 @@ All notable changes to this project will be documented in this file.
 - Parse proxy config and check the set ports usage
 - Update FQDN
 - Scheduled backup for services view
-- Parser, espacing container labels
+- Parser, escaping container labels
 - Reset description and subject fields after submitting feedback
 - Tag mass redeployments
 - Service env orders, application env orders
@@ -3227,7 +3227,7 @@ All notable changes to this project will be documented in this file.
 - Add warning color
 - Import NotificationSlack correctly
 - Add middleware to new abilities, better ux for selecting permissions, etc.
-- Root + read:sensive could read senstive data with a middlewarew
+- Root + read:sensive could read sensitive data with a middlewarew
 - Always have download logs button on scheduled tasks
 - Missing css
 - Development image
@@ -3236,7 +3236,7 @@ All notable changes to this project will be documented in this file.
 - Drop all unused smtp columns
 - Backward compatibility
 - Email notification channel enabled function
-- Instance email settins
+- Instance email settings
 - Make sure resend is false if SMTP is true and vice versa
 - Email Notification saving
 - Slack and discord url now uses text filed because encryption makes the url very long
@@ -3998,7 +3998,7 @@ All notable changes to this project will be documented in this file.
 - Make email envs not required
 - Domain on coolify
 - *(templates)* Update Lobe-chat openai base_url env + required envs
-- *(templates)* Lobechat environnement variable
+- *(templates)* Lobechat environment variable
 - *(lobe-chat)* Update Docker image tag to a specific version 1.135.5
 - Enable docker network connection for pgadmin service
 - *(template/filebrowser)* Correct routing and healthcheck for Filebrowser
@@ -4483,7 +4483,7 @@ All notable changes to this project will be documented in this file.
 - Fine-tune
 - Fixes
 - Fix
-- Dashbord fixes
+- Dashboard fixes
 - Fixes
 - Fixes
 - Route to the correct path when creating destination from db config
@@ -4580,7 +4580,7 @@ All notable changes to this project will be documented in this file.
 - Boarding
 - Backup existing database
 - User should know that the public key
-- Services are not availble yet
+- Services are not available yet
 - Show registered users on waitlist page
 - Nixpacksarchive
 - Add Plausible analytics
@@ -4689,7 +4689,7 @@ All notable changes to this project will be documented in this file.
 - Pull helper image if not available otherwise s3 backup upload fails
 - Set a default server timezone
 - Implement SSH Multiplexing
-- Enabel mux
+- Enable mux
 - Cleanup stale multiplexing connections
 - Remote servers with port and user
 - Do not change localhost server name on revalidation
@@ -4704,7 +4704,7 @@ All notable changes to this project will be documented in this file.
 - Add a fingerprint to every private key on save, create...
 - Make sure invalid private keys can not be added
 - Encrypt private SSH keys in the DB
-- Add is_sftp and is_server_ssh_key coloums
+- Add is_sftp and is_server_ssh_key columns
 - New ssh key file name on disk
 - Store all keys on disk by default
 - Populate SSH key folder
@@ -4723,7 +4723,7 @@ All notable changes to this project will be documented in this file.
 - Do not delete SSH Key from disk during server validation error
 - UI bug, do not write ssh key to disk in server dialog
 - SSH Multiplexing for Jobs
-- SSH algorhytm text
+- SSH algorithm text
 - Few multiplexing things
 - Clear mux directory
 - Multiplexing do not write file manually
@@ -4737,8 +4737,8 @@ All notable changes to this project will be documented in this file.
 - Confirm file storage
 - Stop service confirm
 - DB image cleanup
-- Confirm ressource operation
-- Environment variabel deletion
+- Confirm resource operation
+- Environment variable deletion
 - Confirm scheduled tasks
 - Confirm API token
 - Confirm private key
@@ -4765,7 +4765,7 @@ All notable changes to this project will be documented in this file.
 - Use the new confirmation flow
 - Typo
 - Typo in install script
-- If API is disabeled do not show API token creation stuff
+- If API is disabled do not show API token creation stuff
 - Disable API by default
 - Add debug bar
 - Remove memlock as it caused problems for some users
@@ -4823,7 +4823,7 @@ All notable changes to this project will be documented in this file.
 - *(styles)* Enhance focus styles for buttons and links
 - *(components)* Enhance close button accessibility in modal
 - Ente config
-- Cofig variables
+- Config variables
 - Lean Config
 - Env
 - Services & Env variables
@@ -5216,7 +5216,7 @@ All notable changes to this project will be documented in this file.
 - *(jobs)* Unify middleware configuration to prevent job release after expiration for DockerCleanupJob and PushServerUpdateJob
 - *(service)* Observium
 - *(service)* Improve leantime
-- *(service)* Imporve limesurvey
+- *(service)* Improve limesurvey
 - *(service)* Improve CodiMD
 - *(service)* Typsense
 - *(services)* Improve yamtrack
@@ -5882,7 +5882,7 @@ All notable changes to this project will be documented in this file.
 - Update chart styling and loading text
 - Update sentinel version to 0.0.9
 - Update Spanish translation for failed authentication messages
-- Add portuguese traslation
+- Add portuguese translation
 - Add Turkish translations
 - Add Vietnamese translate
 - Add Treive logo to donations section
@@ -5958,7 +5958,7 @@ All notable changes to this project will be documented in this file.
 - Update Coolify version to 4.0.0-beta.328
 - Update sponsor links in README.md
 - Update version.json to versions.json in GitHub workflow
-- Cleanup stucked resources and scheduled backups
+- Cleanup stuck resources and scheduled backups
 - Update GitHub workflow to use versions.json instead of version.json
 - Update GitHub workflow to use versions.json instead of version.json
 - Update GitHub workflow to use versions.json instead of version.json
@@ -6176,7 +6176,7 @@ All notable changes to this project will be documented in this file.
 - Remove ray debugging
 - Version ++
 - Improve Penpot healthchecks
-- Switch up readonly lables to make more sense
+- Switch up readonly labels to make more sense
 - Remove unused computed fields
 - Use the new job dispatch
 - Disable volume data cloning for now
@@ -6187,7 +6187,7 @@ All notable changes to this project will be documented in this file.
 - Css
 - More css as it still looks like shit
 - Final css touches
-- Ajust time to 50s (tests done)
+- Adjust time to 50s (tests done)
 - Remove debug log, finally found it
 - Remove more logging
 - Remove limit on commit message
@@ -6310,7 +6310,7 @@ All notable changes to this project will be documented in this file.
 - Clarify usage of custom redis configuration (#6321)
 - *(changelogs)* Add .gitignore for changelogs directory and remove outdated changelog files for May, June, and July 2025
 - *(service)* Change affine images (#6366)
-- Elasticsearch URL, fromatting and add category
+- Elasticsearch URL, formatting and add category
 - Update service-templates json files
 - *(docs)* Remove AGENTS.md file; enhance CLAUDE.md with detailed form authorization patterns and service configuration examples
 - *(cleanup)* Remove unused GitLab view files for change, new, and show pages
@@ -6402,7 +6402,7 @@ All notable changes to this project will be documented in this file.
 
 ### ◀️ Revert
 
-- Show usage everytime
+- Show usage every time
 - Revert: revert
 - Wip
 - Variable parsing

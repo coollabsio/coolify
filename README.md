@@ -73,7 +73,7 @@ Thank you so much!
 * [Context.dev](https://context.dev?ref=coolify.io) - API to personalize your product with logos, colors, and company info from any domain
 * [ByteBase](https://www.bytebase.com?ref=coolify.io) - Database CI/CD and Security at Scale
 * [CodeRabbit](https://coderabbit.ai?ref=coolify.io) - Cut Code Review Time & Bugs in Half
-* [COMIT](https://comit.international?ref=coolify.io) - New York Times award–winning contractor
+* [COMMIT](https://commit.international?ref=coolify.io) - New York Times award–winning contractor
 * [CompAI](https://www.trycomp.ai?ref=coolify.io) - Open source compliance automation platform
 * [Convex](https://convex.link/coolify.io) - Open-source reactive database for web app developers
 * [CubePath](https://cubepath.com/?ref=coolify.io) - Dedicated Servers & Instant Deploy
