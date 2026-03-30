@@ -78,6 +78,18 @@ class BackupEdit extends Component
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int $timeout = 3600;
 
+    #[Validate(['required', 'boolean'])]
+    public bool $usePgbackrest = false;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $pgbackrestConfig = null;
+
+    #[Validate(['required', 'string', 'in:full,incr,diff'])]
+    public string $backupType = 'full';
+
+    #[Validate(['required', 'integer', 'min:1', 'max:365'])]
+    public int $fullBackupFrequency = 7;
+
     public function mount()
     {
         try {
@@ -125,6 +137,10 @@ class BackupEdit extends Component
             $this->backup->databases_to_backup = $this->databasesToBackup;
             $this->backup->dump_all = $this->dumpAll;
             $this->backup->timeout = $this->timeout;
+            $this->backup->use_pgbackrest = $this->usePgbackrest;
+            $this->backup->pgbackrest_config = $this->pgbackrestConfig;
+            $this->backup->backup_type = $this->backupType;
+            $this->backup->full_backup_frequency = $this->fullBackupFrequency;
             $this->customValidate();
             $this->backup->save();
         } else {
@@ -143,6 +159,10 @@ class BackupEdit extends Component
             $this->databasesToBackup = $this->backup->databases_to_backup;
             $this->dumpAll = $this->backup->dump_all;
             $this->timeout = $this->backup->timeout;
+            $this->usePgbackrest = $this->backup->use_pgbackrest ?? false;
+            $this->pgbackrestConfig = $this->backup->pgbackrest_config;
+            $this->backupType = $this->backup->backup_type ?? 'full';
+            $this->fullBackupFrequency = $this->backup->full_backup_frequency ?? 7;
         }
     }
 

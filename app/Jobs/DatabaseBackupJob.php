@@ -319,14 +319,27 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             $this->backup_file = '/pg-dump-all-'.Carbon::now()->timestamp.'.gz';
                         }
                         $this->backup_location = $this->backup_dir.$this->backup_file;
+                        
+                        // Determine backup type for pgBackRest
+                        $backupType = 'full'; // Default for traditional pg_dump
+                        if ($this->backup->use_pgbackrest) {
+                            $backupType = $this->determinePgbackrestBackupType();
+                        }
+                        
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
                             'uuid' => $this->backup_log_uuid,
                             'database_name' => $database,
                             'filename' => $this->backup_location,
                             'scheduled_database_backup_id' => $this->backup->id,
                             'local_storage_deleted' => false,
+                            'backup_type' => $backupType,
                         ]);
-                        $this->backup_standalone_postgresql($database);
+                        // Check if pgBackRest is enabled for this backup
+                        if ($this->backup->use_pgbackrest) {
+                            $this->backup_standalone_postgresql_pgbackrest($database);
+                        } else {
+                            $this->backup_standalone_postgresql($database);
+                        }
                     } elseif (str($databaseType)->contains('mongo')) {
                         if ($database === '*') {
                             $database = 'all';
@@ -552,6 +565,131 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $this->add_to_error_output($e->getMessage());
             throw $e;
         }
+    }
+
+    private function backup_standalone_postgresql_pgbackrest(string $database): void
+    {
+        try {
+            $commands = [];
+            $commands[] = 'mkdir -p '.$this->backup_dir;
+            
+            // Determine backup type based on configuration and last full backup
+            $backupType = $this->determinePgbackrestBackupType();
+            
+            // Setup pgBackRest configuration directory
+            $configDir = $this->backup_dir . '/.pgbackrest';
+            $commands[] = "mkdir -p $configDir";
+            
+            // Create pgBackRest configuration file
+            $pgbackrestConfig = $this->generate_pgbackrest_config($database);
+            $configFile = "$configDir/pgbackrest.conf";
+            $commands[] = "cat > $configFile << 'EOF'\n$pgbackrestConfig\nEOF";
+            
+            // Install pgBackRest if not present (using official Docker image approach)
+            $pgbackrestContainer = "pgbackrest-{$this->container_name}-" . uniqid();
+            
+            // Create pgBackRest backup command
+            $backupCommand = "docker run --rm --name $pgbackrestContainer";
+            $backupCommand .= " --network container:$this->container_name";
+            $backupCommand .= " -v $configDir:/etc/pgbackrest";
+            $backupCommand .= " -v {$this->backup_dir}:/var/lib/pgbackrest";
+            
+            // Set environment variables
+            if ($this->postgres_password) {
+                $backupCommand .= " -e PGPASSWORD=\"{$this->postgres_password}\"";
+            }
+            $backupCommand .= " -e POSTGRES_USER=\"{$this->database->postgres_user}\"";
+            $backupCommand .= " -e POSTGRES_DB=\"$database\"";
+            
+            // Use pgBackRest official Docker image
+            $backupCommand .= " pgbackrest/pgbackrest:latest";
+            $backupCommand .= " pgbackrest --stanza=main --type=$backupType backup";
+            
+            $commands[] = $backupCommand;
+            
+            // Create archive command for S3 export if needed
+            if ($this->backup->save_s3 && $this->s3) {
+                $archiveCommand = "docker run --rm";
+                $archiveCommand .= " -v {$this->backup_dir}:/var/lib/pgbackrest";
+                $archiveCommand .= " pgbackrest/pgbackrest:latest";
+                $archiveCommand .= " pgbackrest --stanza=main --type=backup archive-get";
+                $commands[] = $archiveCommand;
+                
+                // Export to standard format for S3 compatibility
+                $exportFile = "{$this->backup_dir}/pgbackrest-export-{$database}-" . Carbon::now()->timestamp . '.tar.gz';
+                $commands[] = "cd {$this->backup_dir} && tar -czf $exportFile backup/";
+                $this->backup_location = $exportFile;
+            } else {
+                // For local-only backups, point to the backup directory
+                $this->backup_location = "{$this->backup_dir}/backup/";
+            }
+            
+            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = trim($this->backup_output);
+            if ($this->backup_output === '') {
+                $this->backup_output = null;
+            }
+            
+            // Log successful pgBackRest backup
+            Log::info("pgBackRest backup completed", [
+                'database' => $database,
+                'backup_type' => $backupType,
+                'container' => $this->container_name,
+                'location' => $this->backup_location
+            ]);
+            
+        } catch (\Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
+        }
+    }
+    
+    private function determinePgbackrestBackupType(): string
+    {
+        // If it's the first backup or we haven't had a full backup in the specified frequency, do full
+        $lastFullBackup = ScheduledDatabaseBackupExecution::where('scheduled_database_backup_id', $this->backup->id)
+            ->where('backup_type', 'full')
+            ->where('status', 'success')
+            ->orderBy('created_at', 'desc')
+            ->first();
+            
+        if (!$lastFullBackup) {
+            return 'full';
+        }
+        
+        $daysSinceLastFull = now()->diffInDays($lastFullBackup->created_at);
+        
+        if ($daysSinceLastFull >= ($this->backup->full_backup_frequency ?? 7)) {
+            return 'full';
+        }
+        
+        // Default to incremental for efficiency
+        return 'incr';
+    }
+    
+    private function generate_pgbackrest_config(string $database): string
+    {
+        $config = "[global]\n";
+        $config .= "repo1-path=/var/lib/pgbackrest\n";
+        $config .= "repo1-retention-full=7\n";
+        $config .= "repo1-retention-diff=4\n";
+        $config .= "log-level-console=info\n";
+        $config .= "log-level-file=debug\n";
+        $config .= "compress-type=gz\n";
+        $config .= "compress-level=6\n\n";
+        
+        $config .= "[main]\n";
+        $config .= "pg1-host=localhost\n";
+        $config .= "pg1-host-user={$this->database->postgres_user}\n";
+        $config .= "pg1-path=/var/lib/postgresql/data\n";
+        
+        // Add custom configuration if provided
+        if (!empty($this->backup->pgbackrest_config)) {
+            $config .= "\n# Custom configuration\n";
+            $config .= $this->backup->pgbackrest_config;
+        }
+        
+        return $config;
     }
 
     private function backup_standalone_mysql(string $database): void

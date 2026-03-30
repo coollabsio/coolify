@@ -56,6 +56,23 @@
                         helper="Comma separated list of databases to backup. Empty will include the default one."
                         id="databasesToBackup" />
                 @endif
+                
+                <h4 class="mt-4 font-semibold">pgBackRest Configuration</h4>
+                <div class="w-48">
+                    <x-forms.checkbox label="Use pgBackRest" id="usePgbackrest" instantSave
+                        helper="Enable pgBackRest for incremental backups. Recommended for large databases (>10GB)." />
+                </div>
+                @if ($backup->use_pgbackrest)
+                    <x-forms.select label="Backup Type" id="backupType" instantSave>
+                        <option value="full">Full Backup</option>
+                        <option value="incr">Incremental Backup</option>
+                        <option value="diff">Differential Backup</option>
+                    </x-forms.select>
+                    <x-forms.input label="Full Backup Frequency (days)" id="fullBackupFrequency" 
+                        helper="Days between full backups when using incremental/differential mode." type="number" />
+                    <x-forms.textarea label="Custom pgBackRest Config" id="pgbackrestConfig" 
+                        helper="Additional pgBackRest configuration options. Advanced users only." />
+                @endif
             @elseif($backup->database_type === 'App\Models\StandaloneMongodb')
                 <x-forms.input label="Databases To Include"
                     helper="A list of databases to backup. You can specify which collection(s) per database to exclude from the backup. Empty will include all databases and collections.<br><br>Example:<br><br>database1:collection1,collection2|database2:collection3,collection4<br><br> database1 will include all collections except collection1 and collection2. <br>database2 will include all collections except collection3 and collection4.<br><br>Another Example:<br><br>database1:collection1|database2<br><br> database1 will include all collections except collection1.<br>database2 will include ALL collections."
