@@ -126,3 +126,9 @@ test('EnvironmentVariable real_value still resolves shared variables after refac
 
     expect($env->real_value)->toBe('redis://dragonfly:6379');
 });
+
+test('resolveSharedEnvironmentVariables returns original when server has no destination', function () {
+    // When a resource has no destination (destination?->server is null), server vars are skipped gracefully
+    $resolved = resolveSharedEnvironmentVariables('{{server.SOME_VAR}}', $this->application);
+    expect($resolved)->toBe('{{server.SOME_VAR}}');
+});

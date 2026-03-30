@@ -72,6 +72,8 @@ use App\Livewire\SharedVariables\Environment\Show as EnvironmentSharedVariablesS
 use App\Livewire\SharedVariables\Index as SharedVariablesIndex;
 use App\Livewire\SharedVariables\Project\Index as ProjectSharedVariablesIndex;
 use App\Livewire\SharedVariables\Project\Show as ProjectSharedVariablesShow;
+use App\Livewire\SharedVariables\Server\Index as ServerSharedVariablesIndex;
+use App\Livewire\SharedVariables\Server\Show as ServerSharedVariablesShow;
 use App\Livewire\SharedVariables\Team\Index as TeamSharedVariablesIndex;
 use App\Livewire\Source\Github\Change as GitHubChange;
 use App\Livewire\Storage\Index as StorageIndex;
@@ -149,6 +151,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/project/{project_uuid}', ProjectSharedVariablesShow::class)->name('shared-variables.project.show');
         Route::get('/environments', EnvironmentSharedVariablesIndex::class)->name('shared-variables.environment.index');
         Route::get('/environments/project/{project_uuid}/environment/{environment_uuid}', EnvironmentSharedVariablesShow::class)->name('shared-variables.environment.show');
+        Route::get('/servers', ServerSharedVariablesIndex::class)->name('shared-variables.server.index');
+        Route::get('/servers/{server_uuid}', ServerSharedVariablesShow::class)->name('shared-variables.server.show');
     });
 
     Route::prefix('team')->group(function () {

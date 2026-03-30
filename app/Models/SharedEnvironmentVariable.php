@@ -17,6 +17,7 @@ class SharedEnvironmentVariable extends Model
         'team_id',
         'project_id',
         'environment_id',
+        'server_id',
 
         // Boolean flags
         'is_multiline',
@@ -42,5 +43,10 @@ class SharedEnvironmentVariable extends Model
     public function environment()
     {
         return $this->belongsTo(Environment::class);
+    }
+
+    public function server()
+    {
+        return $this->belongsTo(Server::class);
     }
 }

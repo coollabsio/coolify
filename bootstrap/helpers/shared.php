@@ -4043,6 +4043,8 @@ function resolveSharedEnvironmentVariables(?string $value, $resource): ?string
             $id = $resource->environment->project->id;
         } elseif ($type->value() === 'team') {
             $id = $resource->team()->id;
+        } elseif ($type->value() === 'server') {
+            $id = $resource->destination?->server?->id;
         }
         if (is_null($id)) {
             continue;
