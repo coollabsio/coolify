@@ -120,6 +120,82 @@ test('deleting s3 storage disables s3 on linked backups', function () {
     expect($unrelatedBackup->save_s3)->toBeTruthy();
 });
 
+test('failed method does not overwrite successful backup status', function () {
+    $team = Team::factory()->create();
+
+    $backup = ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
+        'save_s3' => false,
+        'database_type' => 'App\Models\StandalonePostgresql',
+        'database_id' => 1,
+        'team_id' => $team->id,
+    ]);
+
+    $log = ScheduledDatabaseBackupExecution::create([
+        'uuid' => 'test-uuid-success-guard',
+        'database_name' => 'test_db',
+        'filename' => '/backup/test.dmp',
+        'scheduled_database_backup_id' => $backup->id,
+        'status' => 'success',
+        'message' => 'Backup completed successfully',
+        'size' => 1024,
+    ]);
+
+    $job = new DatabaseBackupJob($backup);
+
+    $reflection = new ReflectionClass($job);
+
+    $teamProp = $reflection->getProperty('team');
+    $teamProp->setValue($job, $team);
+
+    $logUuidProp = $reflection->getProperty('backup_log_uuid');
+    $logUuidProp->setValue($job, 'test-uuid-success-guard');
+
+    // Simulate a post-backup failure (e.g. notification error)
+    $job->failed(new Exception('Request to the Resend API failed'));
+
+    $log->refresh();
+    expect($log->status)->toBe('success');
+    expect($log->message)->toBe('Backup completed successfully');
+    expect($log->size)->toBe(1024);
+});
+
+test('failed method updates status when backup was not successful', function () {
+    $team = Team::factory()->create();
+
+    $backup = ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
+        'save_s3' => false,
+        'database_type' => 'App\Models\StandalonePostgresql',
+        'database_id' => 1,
+        'team_id' => $team->id,
+    ]);
+
+    $log = ScheduledDatabaseBackupExecution::create([
+        'uuid' => 'test-uuid-pending-guard',
+        'database_name' => 'test_db',
+        'filename' => '/backup/test.dmp',
+        'scheduled_database_backup_id' => $backup->id,
+        'status' => 'pending',
+    ]);
+
+    $job = new DatabaseBackupJob($backup);
+
+    $reflection = new ReflectionClass($job);
+
+    $teamProp = $reflection->getProperty('team');
+    $teamProp->setValue($job, $team);
+
+    $logUuidProp = $reflection->getProperty('backup_log_uuid');
+    $logUuidProp->setValue($job, 'test-uuid-pending-guard');
+
+    $job->failed(new Exception('Some real failure'));
+
+    $log->refresh();
+    expect($log->status)->toBe('failed');
+    expect($log->message)->toContain('Some real failure');
+});
+
 test('s3 storage has scheduled backups relationship', function () {
     $team = Team::factory()->create();
 

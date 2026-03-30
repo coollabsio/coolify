@@ -121,7 +121,7 @@ class Index extends Component
             }
 
             if ($this->selectedExistingServer) {
-                $this->createdServer = Server::find($this->selectedExistingServer);
+                $this->createdServer = Server::ownedByCurrentTeam()->find($this->selectedExistingServer);
                 if ($this->createdServer) {
                     $this->serverPublicKey = $this->createdServer->privateKey->getPublicKey();
                     $this->updateServerDetails();
@@ -145,7 +145,7 @@ class Index extends Component
         }
 
         if ($this->selectedProject) {
-            $this->createdProject = Project::find($this->selectedProject);
+            $this->createdProject = Project::ownedByCurrentTeam()->find($this->selectedProject);
             if (! $this->createdProject) {
                 $this->projects = Project::ownedByCurrentTeam(['name'])->get();
             }
@@ -431,7 +431,10 @@ class Index extends Component
 
     public function selectExistingProject()
     {
-        $this->createdProject = Project::find($this->selectedProject);
+        $this->createdProject = Project::ownedByCurrentTeam()->find($this->selectedProject);
+        if (! $this->createdProject) {
+            return $this->dispatch('error', 'Project not found.');
+        }
         $this->currentState = 'create-resource';
     }
 

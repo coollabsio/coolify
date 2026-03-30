@@ -144,8 +144,8 @@ class GithubPrivateRepositoryDeployKey extends Component
             // Note: git_repository has already been validated and transformed in get_git_source()
             // It may now be in SSH format (git@host:repo.git) which is valid for deploy keys
 
-            $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-            $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
+            $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
+            $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
             if ($this->git_source === 'other') {
                 $application_init = [
                     'name' => generate_random_name(),

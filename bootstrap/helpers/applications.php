@@ -6,6 +6,7 @@ use App\Jobs\ApplicationDeploymentJob;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use Spatie\Url\Url;
@@ -192,7 +193,7 @@ function clone_application(Application $source, $destination, array $overrides =
     $server = $destination->server;
 
     if ($server->team_id !== currentTeam()->id) {
-        throw new \RuntimeException('Destination does not belong to the current team.');
+        throw new RuntimeException('Destination does not belong to the current team.');
     }
 
     // Prepare name and URL
@@ -211,7 +212,7 @@ function clone_application(Application $source, $destination, array $overrides =
         'updated_at',
         'additional_servers_count',
         'additional_networks_count',
-    ])->fill(array_merge([
+    ])->forceFill(array_merge([
         'uuid' => $uuid,
         'name' => $name,
         'fqdn' => $url,
@@ -299,6 +300,7 @@ function clone_application(Application $source, $destination, array $overrides =
             'id',
             'created_at',
             'updated_at',
+            'uuid',
         ])->fill([
             'name' => $newName,
             'resource_id' => $newApplication->id,
@@ -322,8 +324,8 @@ function clone_application(Application $source, $destination, array $overrides =
                     destination: $source->destination,
                     no_questions_asked: true
                 );
-            } catch (\Exception $e) {
-                \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+            } catch (Exception $e) {
+                Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
             }
         }
     }
@@ -344,7 +346,7 @@ function clone_application(Application $source, $destination, array $overrides =
     // Clone production environment variables without triggering the created hook
     $environmentVariables = $source->environment_variables()->get();
     foreach ($environmentVariables as $environmentVariable) {
-        \App\Models\EnvironmentVariable::withoutEvents(function () use ($environmentVariable, $newApplication) {
+        EnvironmentVariable::withoutEvents(function () use ($environmentVariable, $newApplication) {
             $newEnvironmentVariable = $environmentVariable->replicate([
                 'id',
                 'created_at',
@@ -361,7 +363,7 @@ function clone_application(Application $source, $destination, array $overrides =
     // Clone preview environment variables
     $previewEnvironmentVariables = $source->environment_variables_preview()->get();
     foreach ($previewEnvironmentVariables as $previewEnvironmentVariable) {
-        \App\Models\EnvironmentVariable::withoutEvents(function () use ($previewEnvironmentVariable, $newApplication) {
+        EnvironmentVariable::withoutEvents(function () use ($previewEnvironmentVariable, $newApplication) {
             $newPreviewEnvironmentVariable = $previewEnvironmentVariable->replicate([
                 'id',
                 'created_at',

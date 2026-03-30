@@ -13,7 +13,32 @@ class StandaloneMysql extends BaseModel
 {
     use ClearsGlobalSearchCache, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+        'mysql_root_password',
+        'mysql_user',
+        'mysql_password',
+        'mysql_database',
+        'mysql_conf',
+        'status',
+        'image',
+        'is_public',
+        'public_port',
+        'ports_mappings',
+        'limits_memory',
+        'limits_memory_swap',
+        'limits_memory_swappiness',
+        'limits_memory_reservation',
+        'limits_cpus',
+        'limits_cpuset',
+        'limits_cpu_shares',
+        'started_at',
+        'restart_count',
+        'last_restart_at',
+        'last_restart_type',
+        'last_online_at',
+    ];
 
     protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
@@ -136,7 +161,7 @@ class StandaloneMysql extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
-            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+            instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
         }
     }
 

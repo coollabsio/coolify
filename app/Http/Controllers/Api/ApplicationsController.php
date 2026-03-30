@@ -20,6 +20,7 @@ use App\Models\Service;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Services\DockerImageParser;
+use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -229,6 +230,7 @@ class ApplicationsController extends Controller
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
+                            'is_preserve_repository_enabled' => ['type' => 'boolean', 'default' => false, 'description' => 'Preserve repository during deployment.'],
                         ],
                     )
                 ),
@@ -394,6 +396,7 @@ class ApplicationsController extends Controller
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
+                            'is_preserve_repository_enabled' => ['type' => 'boolean', 'default' => false, 'description' => 'Preserve repository during deployment.'],
                         ],
                     )
                 ),
@@ -559,6 +562,7 @@ class ApplicationsController extends Controller
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
+                            'is_preserve_repository_enabled' => ['type' => 'boolean', 'default' => false, 'description' => 'Preserve repository during deployment.'],
                         ],
                     )
                 ),
@@ -1002,10 +1006,10 @@ class ApplicationsController extends Controller
         $this->authorize('create', Application::class);
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
-        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled'];
+        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled'];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
@@ -1054,6 +1058,7 @@ class ApplicationsController extends Controller
         $connectToDockerNetwork = $request->connect_to_docker_network;
         $customNginxConfiguration = $request->custom_nginx_configuration;
         $isContainerLabelEscapeEnabled = $request->boolean('is_container_label_escape_enabled', true);
+        $isPreserveRepositoryEnabled = $request->boolean('is_preserve_repository_enabled',false);
 
         if (! is_null($customNginxConfiguration)) {
             if (! isBase64Encoded($customNginxConfiguration)) {
@@ -1150,14 +1155,14 @@ class ApplicationsController extends Controller
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
             }
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
 
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
-            $application->fill($request->all());
+            $application->fill($request->only($allowedFields));
             $dockerComposeDomainsJson = collect();
             if ($request->has('docker_compose_domains')) {
                 $dockerComposeDomains = collect($request->docker_compose_domains);
@@ -1266,6 +1271,10 @@ class ApplicationsController extends Controller
                 $application->settings->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
                 $application->settings->save();
             }
+            if (isset($isPreserveRepositoryEnabled)) {
+                $application->settings->is_preserve_repository_enabled = $isPreserveRepositoryEnabled;
+                $application->settings->save();
+            }
             $application->refresh();
             // Auto-generate domain if requested and no custom domain provided
             if ($autogenerateDomain && blank($fqdn)) {
@@ -1345,7 +1354,7 @@ class ApplicationsController extends Controller
             }
 
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
             $githubApp = GithubApp::whereTeamId($teamId)->where('uuid', $githubAppUuid)->first();
@@ -1384,7 +1393,7 @@ class ApplicationsController extends Controller
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
-            $application->fill($request->all());
+            $application->fill($request->only($allowedFields));
 
             $dockerComposeDomainsJson = collect();
             if ($request->has('docker_compose_domains')) {
@@ -1498,6 +1507,10 @@ class ApplicationsController extends Controller
                 $application->settings->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
                 $application->settings->save();
             }
+            if (isset($isPreserveRepositoryEnabled)) {
+                $application->settings->is_preserve_repository_enabled = $isPreserveRepositoryEnabled;
+                $application->settings->save();
+            }
             if ($application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
@@ -1573,7 +1586,7 @@ class ApplicationsController extends Controller
             }
 
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
             $privateKey = PrivateKey::whereTeamId($teamId)->where('uuid', $request->private_key_uuid)->first();
@@ -1584,7 +1597,7 @@ class ApplicationsController extends Controller
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
-            $application->fill($request->all());
+            $application->fill($request->only($allowedFields));
 
             $dockerComposeDomainsJson = collect();
             if ($request->has('docker_compose_domains')) {
@@ -1694,6 +1707,10 @@ class ApplicationsController extends Controller
                 $application->settings->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
                 $application->settings->save();
             }
+            if (isset($isPreserveRepositoryEnabled)) {
+                $application->settings->is_preserve_repository_enabled = $isPreserveRepositoryEnabled;
+                $application->settings->save();
+            }
             if ($application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
@@ -1742,7 +1759,7 @@ class ApplicationsController extends Controller
             }
 
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
             if (! isBase64Encoded($request->dockerfile)) {
@@ -1771,7 +1788,7 @@ class ApplicationsController extends Controller
             }
 
             $application = new Application;
-            $application->fill($request->all());
+            $application->fill($request->only($allowedFields));
             $application->fqdn = $fqdn;
             $application->ports_exposes = $port;
             $application->build_pack = 'dockerfile';
@@ -1850,7 +1867,7 @@ class ApplicationsController extends Controller
                 $request->offsetSet('name', 'docker-image-'.new Cuid2);
             }
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
             // Process docker image name and tag using DockerImageParser
@@ -1883,7 +1900,7 @@ class ApplicationsController extends Controller
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
-            $application->fill($request->all());
+            $application->fill($request->only($allowedFields));
             $application->fqdn = $fqdn;
             $application->build_pack = 'dockerimage';
             $application->destination_id = $destination->id;
@@ -1974,7 +1991,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
             if (! isBase64Encoded($request->docker_compose_raw)) {
@@ -1999,7 +2016,7 @@ class ApplicationsController extends Controller
 
             $service = new Service;
             removeUnnecessaryFieldsFromRequest($request);
-            $service->fill($request->all());
+            $service->fill($request->only($allowedFields));
 
             $service->docker_compose_raw = $dockerComposeRaw;
             $service->environment_id = $environment->id;
@@ -2389,6 +2406,7 @@ class ApplicationsController extends Controller
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
+                            'is_preserve_repository_enabled' => ['type' => 'boolean', 'description' => 'Preserve git repository during application update. If false, the existing repository will be removed and replaced with the new one. If true, the existing repository will be kept and the new one will be ignored. Default is false.'],
                         ],
                     )
                 ),
@@ -2460,7 +2478,7 @@ class ApplicationsController extends Controller
             return invalidTokenResponse();
         }
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
 
@@ -2474,7 +2492,7 @@ class ApplicationsController extends Controller
         $this->authorize('update', $application);
 
         $server = $application->destination->server;
-        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled'];
+        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled'];
 
         $validationRules = [
             'name' => 'string|max:255',
@@ -2530,7 +2548,7 @@ class ApplicationsController extends Controller
             }
         }
         $return = $this->validateDataApplications($request, $server);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -2721,7 +2739,7 @@ class ApplicationsController extends Controller
         $connectToDockerNetwork = $request->connect_to_docker_network;
         $useBuildServer = $request->use_build_server;
         $isContainerLabelEscapeEnabled = $request->boolean('is_container_label_escape_enabled');
-
+        $isPreserveRepositoryEnabled = $request->boolean('is_preserve_repository_enabled');
         if (isset($useBuildServer)) {
             $application->settings->is_build_server_enabled = $useBuildServer;
             $application->settings->save();
@@ -2756,10 +2774,13 @@ class ApplicationsController extends Controller
             $application->settings->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
             $application->settings->save();
         }
-
+        if ($request->has('is_preserve_repository_enabled')) {
+            $application->settings->is_preserve_repository_enabled = $isPreserveRepositoryEnabled;
+            $application->settings->save();
+        }
         removeUnnecessaryFieldsFromRequest($request);
 
-        $data = $request->all();
+        $data = $request->only($allowedFields);
         if ($requestHasDomains && $server->isProxyShouldRun()) {
             data_set($data, 'fqdn', $domains);
         }
@@ -2956,7 +2977,7 @@ class ApplicationsController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
@@ -3157,7 +3178,7 @@ class ApplicationsController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
@@ -4077,7 +4098,7 @@ class ApplicationsController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
 
@@ -4096,7 +4117,7 @@ class ApplicationsController extends Controller
             'id' => 'integer',
             'type' => 'required|string|in:persistent,file',
             'is_preview_suffix_enabled' => 'boolean',
-            'name' => 'string',
+            'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'string',
             'host_path' => 'string|nullable',
             'content' => 'string|nullable',
@@ -4274,7 +4295,7 @@ class ApplicationsController extends Controller
 
         $validator = customApiValidator($request->all(), [
             'type' => 'required|string|in:persistent,file',
-            'name' => 'string',
+            'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'required|string',
             'host_path' => 'string|nullable',
             'content' => 'string|nullable',
@@ -4361,6 +4382,9 @@ class ApplicationsController extends Controller
             ]);
         } else {
             $mountPath = str($request->mount_path)->trim()->start('/')->value();
+
+            validateShellSafePath($mountPath, 'file storage path');
+
             $fsPath = application_configuration_dir().'/'.$application->uuid.$mountPath;
 
             $storage = LocalFileVolume::create([

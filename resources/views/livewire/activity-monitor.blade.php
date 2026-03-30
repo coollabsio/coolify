@@ -34,10 +34,10 @@
             }
         }" x-init="// Initial scroll
         $nextTick(() => scrollToBottom());
-        
+
         // Add scroll event listener
         $el.addEventListener('scroll', () => handleScroll());
-        
+
         // Set up mutation observer to watch for content changes
         observer = new MutationObserver(() => {
             $nextTick(() => scrollToBottom());

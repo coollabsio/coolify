@@ -11,7 +11,9 @@ use App\Enums\ProxyTypes;
 use App\Events\ServerReachabilityChanged;
 use App\Helpers\SslHelper;
 use App\Jobs\CheckAndStartSentinelJob;
+use App\Jobs\CheckTraefikVersionForServerJob;
 use App\Jobs\RegenerateSslCertJob;
+use App\Livewire\Server\Proxy;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use App\Services\ConfigurationRepository;
@@ -77,8 +79,8 @@ use Visus\Cuid2\Cuid2;
  * - Traefik image uses the 'latest' tag (no fixed version tracking)
  * - No Traefik version detected on the server
  *
- * @see \App\Jobs\CheckTraefikVersionForServerJob Where this data is populated
- * @see \App\Livewire\Server\Proxy Where this data is read and displayed
+ * @see CheckTraefikVersionForServerJob Where this data is populated
+ * @see Proxy Where this data is read and displayed
  */
 #[OA\Schema(
     description: 'Server model',
@@ -263,9 +265,14 @@ class Server extends BaseModel
         'server_metadata',
     ];
 
-    protected $guarded = [];
-
     use HasSafeStringAttribute;
+
+    public function setValidationLogsAttribute($value): void
+    {
+        $this->attributes['validation_logs'] = $value !== null
+            ? \Stevebauman\Purify\Facades\Purify::config('validation_logs')->clean($value)
+            : null;
+    }
 
     public function type()
     {
@@ -719,17 +726,17 @@ $schema://$host {
 
     public function stopUnmanaged($id)
     {
-        return instant_remote_process(["docker stop -t 0 $id"], $this);
+        return instant_remote_process(['docker stop -t 0 '.escapeshellarg($id)], $this);
     }
 
     public function restartUnmanaged($id)
     {
-        return instant_remote_process(["docker restart $id"], $this);
+        return instant_remote_process(['docker restart '.escapeshellarg($id)], $this);
     }
 
     public function startUnmanaged($id)
     {
-        return instant_remote_process(["docker start $id"], $this);
+        return instant_remote_process(['docker start '.escapeshellarg($id)], $this);
     }
 
     public function getContainers()
@@ -1460,7 +1467,7 @@ $schema://$host {
 
     public function restartContainer(string $containerName)
     {
-        return instant_remote_process(['docker restart '.$containerName], $this, false);
+        return instant_remote_process(['docker restart '.escapeshellarg($containerName)], $this, false);
     }
 
     public function changeProxy(string $proxyType, bool $async = true)

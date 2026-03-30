@@ -290,7 +290,11 @@ class ServersController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $uuid = $request->get('uuid');
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (is_null($server)) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+        $uuid = $request->query('uuid');
         if ($uuid) {
             $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $uuid)->first();
             if (! $application) {
@@ -301,7 +305,9 @@ class ServersController extends Controller
         }
         $projects = Project::where('team_id', $teamId)->get();
         $domains = collect();
-        $applications = $projects->pluck('applications')->flatten();
+        $applications = $projects->pluck('applications')->flatten()->filter(function ($application) use ($server) {
+            return $application->destination?->server?->id === $server->id;
+        });
         $settings = instanceSettings();
         if ($applications->count() > 0) {
             foreach ($applications as $application) {
@@ -341,7 +347,9 @@ class ServersController extends Controller
                 }
             }
         }
-        $services = $projects->pluck('services')->flatten();
+        $services = $projects->pluck('services')->flatten()->filter(function ($service) use ($server) {
+            return $service->server_id === $server->id;
+        });
         if ($services->count() > 0) {
             foreach ($services as $service) {
                 $service_applications = $service->applications;
@@ -354,7 +362,8 @@ class ServersController extends Controller
                         })->filter(function (Stringable $fqdn) {
                             return $fqdn->isNotEmpty();
                         });
-                        if ($ip === 'host.docker.internal') {
+                        $serviceIp = $server->ip;
+                        if ($serviceIp === 'host.docker.internal') {
                             if ($settings->public_ipv4) {
                                 $domains->push([
                                     'domain' => $fqdn,
@@ -370,13 +379,13 @@ class ServersController extends Controller
                             if (! $settings->public_ipv4 && ! $settings->public_ipv6) {
                                 $domains->push([
                                     'domain' => $fqdn,
-                                    'ip' => $ip,
+                                    'ip' => $serviceIp,
                                 ]);
                             }
                         } else {
                             $domains->push([
                                 'domain' => $fqdn,
-                                'ip' => $ip,
+                                'ip' => $serviceIp,
                             ]);
                         }
                     }

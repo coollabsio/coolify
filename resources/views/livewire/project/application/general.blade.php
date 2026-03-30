@@ -49,7 +49,13 @@
                             !is_null($parsedServices) &&
                                 count($parsedServices) > 0 &&
                                 !$application->settings->is_raw_compose_deployment_enabled)
-                            <h3 class="pt-6">Domains</h3>
+                            @php
+                                $hasNonDatabaseService = collect(data_get($parsedServices, 'services', []))
+                                    ->contains(fn($service) => !isDatabaseImage(data_get($service, 'image')));
+                            @endphp
+                            @if ($hasNonDatabaseService)
+                                <h3 class="pt-6">Domains</h3>
+                            @endif
                             @foreach (data_get($parsedServices, 'services') as $serviceName => $service)
                                 @if (!isDatabaseImage(data_get($service, 'image')))
                                     <div class="flex items-end gap-2">
@@ -86,18 +92,20 @@
                         ]" />
                 @endcan
             @endif
-            <div class="w-96 pb-6">
-                @if ($application->could_set_build_commands())
-                    <x-forms.checkbox instantSave id="isStatic" label="Is it a static site?"
-                        helper="If your application is a static site or the final build assets should be served as a static site, enable this."
-                        x-bind:disabled="!canUpdate" />
-                @endif
-                @if ($isStatic && $buildPack !== 'static')
-                    <x-forms.checkbox label="Is it a SPA (Single Page Application)?"
-                        helper="If your application is a SPA, enable this." id="isSpa" instantSave
-                        x-bind:disabled="!canUpdate"></x-forms.checkbox>
-                @endif
-            </div>
+            @if ($application->could_set_build_commands() || ($isStatic && $buildPack !== 'static'))
+                <div class="w-96 pb-6">
+                    @if ($application->could_set_build_commands())
+                        <x-forms.checkbox instantSave id="isStatic" label="Is it a static site?"
+                            helper="If your application is a static site or the final build assets should be served as a static site, enable this."
+                            x-bind:disabled="!canUpdate" />
+                    @endif
+                    @if ($isStatic && $buildPack !== 'static')
+                        <x-forms.checkbox label="Is it a SPA (Single Page Application)?"
+                            helper="If your application is a SPA, enable this." id="isSpa" instantSave
+                            x-bind:disabled="!canUpdate"></x-forms.checkbox>
+                    @endif
+                </div>
+            @endif
             @if ($buildPack !== 'dockercompose')
                 <div class="flex items-end gap-2">
                     @if ($application->settings->is_container_label_readonly_enabled == false)
@@ -209,7 +217,7 @@
                     @endif
                 </div>
             @endif
-            <div>
+            <div class="pt-6">
                 <h3>Build</h3>
                 @if ($application->build_pack === 'dockerimage')
                     <x-forms.input

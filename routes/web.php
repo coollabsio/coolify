@@ -84,12 +84,11 @@ use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
 use App\Models\ScheduledDatabaseBackupExecution;
+use App\Models\ServiceDatabase;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-
-Route::get('/admin', AdminIndex::class)->name('admin.index');
 
 Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot')->middleware('throttle:forgot-password');
 Route::get('/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
@@ -108,6 +107,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/', Dashboard::class)->name('dashboard');
+    Route::get('/admin', AdminIndex::class)->name('admin.index');
     Route::get('/onboarding', BoardingIndex::class)->name('onboarding');
 
     Route::get('/subscription', SubscriptionShow::class)->name('subscription.show');
@@ -164,7 +164,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         }
 
         return response()->json(['authenticated' => false], 401);
-    })->name('terminal.auth');
+    })->name('terminal.auth')->middleware('can.access.terminal');
 
     Route::post('/terminal/auth/ips', function () {
         if (auth()->check()) {
@@ -189,11 +189,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         }
 
         return response()->json(['ipAddresses' => []], 401);
-    })->name('terminal.auth.ips');
+    })->name('terminal.auth.ips')->middleware('can.access.terminal');
 
     Route::prefix('invitations')->group(function () {
-        Route::get('/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
-        Route::get('/{uuid}/revoke', [Controller::class, 'revokeInvitation'])->name('team.invitation.revoke');
+        Route::get('/{uuid}', [Controller::class, 'showInvitation'])->name('team.invitation.show');
+        Route::post('/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
     });
 
     Route::get('/projects', ProjectIndex::class)->name('project.index');
@@ -344,7 +344,7 @@ Route::middleware(['auth'])->group(function () {
                 }
             }
             $filename = data_get($execution, 'filename');
-            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
+            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === ServiceDatabase::class) {
                 $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
             } else {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;
@@ -385,7 +385,7 @@ Route::middleware(['auth'])->group(function () {
                 'Content-Type' => 'application/octet-stream',
                 'Content-Disposition' => 'attachment; filename="'.basename($filename).'"',
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 500);
         }
     })->name('download.backup');

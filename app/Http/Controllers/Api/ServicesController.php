@@ -13,6 +13,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
+use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -302,7 +303,7 @@ class ServicesController extends Controller
         $this->authorize('create', Service::class);
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validationRules = [
@@ -925,7 +926,7 @@ class ServicesController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
 
@@ -2015,7 +2016,7 @@ class ServicesController extends Controller
         $validator = customApiValidator($request->all(), [
             'type' => 'required|string|in:persistent,file',
             'resource_uuid' => 'required|string',
-            'name' => 'string',
+            'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'required|string',
             'host_path' => 'string|nullable',
             'content' => 'string|nullable',
@@ -2110,6 +2111,9 @@ class ServicesController extends Controller
             ]);
         } else {
             $mountPath = str($request->mount_path)->trim()->start('/')->value();
+
+            validateShellSafePath($mountPath, 'file storage path');
+
             $fsPath = service_configuration_dir().'/'.$service->uuid.$mountPath;
 
             $storage = LocalFileVolume::create([
@@ -2221,7 +2225,7 @@ class ServicesController extends Controller
             'id' => 'integer',
             'type' => 'required|string|in:persistent,file',
             'is_preview_suffix_enabled' => 'boolean',
-            'name' => 'string',
+            'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'string',
             'host_path' => 'string|nullable',
             'content' => 'string|nullable',

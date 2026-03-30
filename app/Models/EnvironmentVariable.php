@@ -32,6 +32,11 @@ use OpenApi\Attributes as OA;
 )]
 class EnvironmentVariable extends BaseModel
 {
+    protected $attributes = [
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ];
+
     protected $fillable = [
         // Core identification
         'key',

@@ -250,7 +250,7 @@ class DeployController extends Controller
             ]);
 
             // Get the server
-            $server = Server::find($build_server_id);
+            $server = Server::whereTeamId($teamId)->find($build_server_id);
 
             if ($server) {
                 // Add cancellation log entry

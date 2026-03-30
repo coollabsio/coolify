@@ -91,3 +91,53 @@ test('file storage accepts paths with underscores and hyphens', function () {
     expect(fn () => validateShellSafePath('/tmp/upload_dir-2024', 'storage path'))
         ->not->toThrow(Exception::class);
 });
+
+// --- Regression tests for GHSA-46hp-7m8g-7622 ---
+// These verify that file mount paths (not just directory mounts) are validated,
+// and that saveStorageOnServer() validates fs_path before any shell interpolation.
+
+test('file storage rejects command injection in file mount path context', function () {
+    $maliciousPaths = [
+        '/app/config$(id)',
+        '/app/config;whoami',
+        '/app/config|cat /etc/passwd',
+        '/app/config`id`',
+        '/app/config&whoami',
+        '/app/config>/tmp/pwned',
+        '/app/config</etc/shadow',
+        "/app/config\nrm -rf /",
+    ];
+
+    foreach ($maliciousPaths as $path) {
+        expect(fn () => validateShellSafePath($path, 'file storage path'))
+            ->toThrow(Exception::class);
+    }
+});
+
+test('file storage rejects variable substitution in paths', function () {
+    expect(fn () => validateShellSafePath('/data/${IFS}cat${IFS}/etc/passwd', 'file storage path'))
+        ->toThrow(Exception::class);
+});
+
+test('file storage accepts safe file mount paths', function () {
+    $safePaths = [
+        '/etc/nginx/nginx.conf',
+        '/app/.env',
+        '/data/coolify/services/abc123/config.yml',
+        '/var/www/html/index.php',
+        '/opt/app/config/database.json',
+    ];
+
+    foreach ($safePaths as $path) {
+        expect(fn () => validateShellSafePath($path, 'file storage path'))
+            ->not->toThrow(Exception::class);
+    }
+});
+
+test('file storage accepts relative dot-prefixed paths', function () {
+    expect(fn () => validateShellSafePath('./config/app.yaml', 'storage path'))
+        ->not->toThrow(Exception::class);
+
+    expect(fn () => validateShellSafePath('./data', 'storage path'))
+        ->not->toThrow(Exception::class);
+});
