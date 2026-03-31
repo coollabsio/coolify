@@ -5,6 +5,7 @@
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
 		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
+		"@inertiajs/core": "^3.0.0",
 		"@inertiajs/svelte": "^3.0.0",
 		"@inertiajs/vite": "^3.0.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
