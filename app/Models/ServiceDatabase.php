@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class ServiceDatabase extends BaseModel
 {
@@ -11,6 +12,7 @@ class ServiceDatabase extends BaseModel
 
     protected $fillable = [
         'service_id',
+        'application_id',
         'name',
         'human_name',
         'description',
@@ -52,7 +54,10 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -61,7 +66,10 @@ class ServiceDatabase extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        return ServiceDatabase::where(function ($query) {
+            $query->whereRelation('service.environment.project.team', 'id', currentTeam()->id)
+                ->orWhereRelation('application.environment.project.team', 'id', currentTeam()->id);
+        })->orderBy('name');
     }
 
     /**
@@ -139,8 +147,12 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = $this->parentServer();
+        if (! $server) {
+            return null;
+        }
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -149,17 +161,30 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'service.environment.project.team');
+        return data_get($this, 'service.environment.project.team')
+            ?? data_get($this, 'application.environment.project.team');
     }
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->service->uuid}";
+        if ($this->service) {
+            return service_configuration_dir()."/{$this->service->uuid}";
+        }
+        if ($this->application) {
+            return base_configuration_dir()."/applications/{$this->application->uuid}";
+        }
+
+        return service_configuration_dir();
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function persistentStorages()
@@ -190,5 +215,89 @@ class ServiceDatabase extends BaseModel
             str($this->databaseType())->contains('mariadb') ||
             str($this->databaseType())->contains('mongo') ||
             filled($this->custom_type);
+    }
+
+    public function parentServer()
+    {
+        return data_get($this, 'service.destination.server')
+            ?? data_get($this, 'application.destination.server');
+    }
+
+    public function parentDestination()
+    {
+        return data_get($this, 'service.destination')
+            ?? data_get($this, 'application.destination');
+    }
+
+    public function parentEnvironment()
+    {
+        return data_get($this, 'service.environment')
+            ?? data_get($this, 'application.environment');
+    }
+
+    public function parentProject()
+    {
+        return data_get($this, 'service.environment.project')
+            ?? data_get($this, 'application.environment.project');
+    }
+
+    public function parentNetworkName(int $pullRequestId = 0): ?string
+    {
+        if ($this->service) {
+            return $this->service->uuid;
+        }
+        if ($this->application) {
+            return $pullRequestId !== 0
+                ? "{$this->application->uuid}-{$pullRequestId}"
+                : $this->application->uuid;
+        }
+
+        return null;
+    }
+
+    public function currentContainerName(int $pullRequestId = 0): ?string
+    {
+        if ($this->service) {
+            return "{$this->name}-{$this->service->uuid}";
+        }
+
+        if (! $this->application) {
+            return null;
+        }
+
+        $server = $this->parentServer();
+        if (! $server) {
+            return null;
+        }
+
+        $serviceSlug = Str::slug($this->name);
+        $containers = getCurrentApplicationContainerStatus($server, $this->application->id, $pullRequestId, false)
+            ->filter(function ($container) use ($serviceSlug) {
+                $labels = data_get($container, 'Labels', '');
+
+                return str($labels)->contains("coolify.serviceName={$serviceSlug}");
+            });
+
+        $runningContainer = $containers->first(function ($container) {
+            $status = (string) (data_get($container, 'State') ?: data_get($container, 'Status', ''));
+
+            return str($status)->lower()->contains('running') || str($status)->contains('Up');
+        });
+
+        return data_get($runningContainer ?: $containers->first(), 'Names');
+    }
+
+    public function backupDirectoryName(int $pullRequestId = 0): ?string
+    {
+        $containerName = $this->currentContainerName($pullRequestId);
+        if (! $containerName) {
+            return null;
+        }
+
+        $parentName = $this->service
+            ? str($this->service->name)->slug()->value()
+            : ($this->application ? str($this->application->name)->slug()->value() : str($this->name)->slug()->value());
+
+        return $parentName.'-'.$containerName;
     }
 }

@@ -16,6 +16,7 @@ use App\Livewire\Notifications\Slack as NotificationSlack;
 use App\Livewire\Notifications\Telegram as NotificationTelegram;
 use App\Livewire\Notifications\Webhook as NotificationWebhook;
 use App\Livewire\Profile\Index as ProfileIndex;
+use App\Livewire\Project\Application\ComposeDatabaseBackups as ApplicationComposeDatabaseBackups;
 use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
 use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
 use App\Livewire\Project\Application\Deployment\Show as DeploymentShow;
@@ -33,7 +34,6 @@ use App\Livewire\Project\Service\DatabaseBackups as ServiceDatabaseBackups;
 use App\Livewire\Project\Service\Index as ServiceIndex;
 use App\Livewire\Project\Shared\ExecuteContainerCommand;
 use App\Livewire\Project\Shared\Logs;
-use App\Livewire\Project\Shared\ScheduledTask\Show as ScheduledTaskShow;
 use App\Livewire\Project\Show as ProjectShow;
 use App\Livewire\Security\ApiTokens;
 use App\Livewire\Security\CloudInitScripts;
@@ -232,6 +232,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::get('/deployment', DeploymentIndex::class)->name('project.application.deployment.index');
         Route::get('/deployment/{deployment_uuid}', DeploymentShow::class)->name('project.application.deployment.show');
+        Route::get('/compose-database/{stack_service_uuid}/backups', ApplicationComposeDatabaseBackups::class)->name('project.application.compose-database.backups');
         Route::get('/logs', Logs::class)->name('project.application.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.application.command')->middleware('can.access.terminal');
         Route::get('/tasks/{task_uuid}', ApplicationConfiguration::class)->name('project.application.scheduled-tasks');
@@ -349,7 +350,7 @@ Route::middleware(['auth'])->group(function () {
             }
             $filename = data_get($execution, 'filename');
             if ($execution->scheduledDatabaseBackup->database->getMorphClass() === ServiceDatabase::class) {
-                $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
+                $server = $execution->scheduledDatabaseBackup->database->parentServer();
             } else {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;
             }

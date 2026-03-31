@@ -11,6 +11,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Notifications\Container\ContainerRestarted;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -29,11 +30,15 @@ class StartDatabaseProxy
         $proxyContainerName = "{$database->uuid}-proxy";
         $isSSLEnabled = $database->enable_ssl ?? false;
 
-        if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
+        if ($database->getMorphClass() === ServiceDatabase::class) {
             $databaseType = $database->databaseType();
-            $network = $database->service->uuid;
-            $server = data_get($database, 'service.destination.server');
-            $containerName = "{$database->name}-{$database->service->uuid}";
+            $network = $database->parentNetworkName();
+            $server = $database->parentServer();
+            $containerName = $database->currentContainerName();
+        }
+
+        if (! $network || ! $server || ! $containerName) {
+            throw new \Exception('Unable to resolve database network/container/server for proxy startup.');
         }
         $internalPort = match ($databaseType) {
             'standalone-mariadb', 'standalone-mysql' => 3306,
@@ -129,10 +134,11 @@ class StartDatabaseProxy
                 $database->update(['is_public' => false]);
 
                 $team = data_get($database, 'environment.project.team')
-                    ?? data_get($database, 'service.environment.project.team');
+                    ?? data_get($database, 'service.environment.project.team')
+                    ?? $database->team();
 
                 $team?->notify(
-                    new \App\Notifications\Container\ContainerRestarted(
+                    new ContainerRestarted(
                         "TCP Proxy for {$database->name} database has been disabled due to error: {$e->getMessage()}",
                         $server,
                     )

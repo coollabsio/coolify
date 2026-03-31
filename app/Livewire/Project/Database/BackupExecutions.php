@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ServiceDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
@@ -78,8 +79,8 @@ class BackupExecutions extends Component
             return;
         }
 
-        $server = $execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class
-            ? $execution->scheduledDatabaseBackup->database->service->destination->server
+        $server = $execution->scheduledDatabaseBackup->database->getMorphClass() === ServiceDatabase::class
+            ? $execution->scheduledDatabaseBackup->database->parentServer()
             : $execution->scheduledDatabaseBackup->database->destination->server;
 
         try {
@@ -185,8 +186,8 @@ class BackupExecutions extends Component
         if ($this->database) {
             $server = null;
 
-            if ($this->database instanceof \App\Models\ServiceDatabase) {
-                $server = $this->database->service->destination->server;
+            if ($this->database instanceof ServiceDatabase) {
+                $server = $this->database->parentServer();
             } elseif ($this->database->destination && $this->database->destination->server) {
                 $server = $this->database->destination->server;
             }

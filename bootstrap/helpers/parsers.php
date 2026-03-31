@@ -681,6 +681,18 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         $coolifyEnvironments = collect([]);
 
         $isDatabase = isDatabaseImage($image, $service);
+        if ($isDatabase && $pullRequestId === 0) {
+            ServiceDatabase::updateOrCreate(
+                [
+                    'name' => $serviceName,
+                    'application_id' => $resource->id,
+                ],
+                [
+                    'image' => $image,
+                    'service_id' => null,
+                ]
+            );
+        }
         $volumesParsed = collect([]);
 
         $baseName = generateApplicationContainerName(

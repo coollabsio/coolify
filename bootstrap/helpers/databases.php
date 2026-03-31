@@ -3,6 +3,7 @@
 use App\Models\EnvironmentVariable;
 use App\Models\S3Storage;
 use App\Models\Server;
+use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
@@ -14,6 +15,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Visus\Cuid2\Cuid2;
 
 function create_standalone_postgresql($environmentId, $destinationUuid, ?array $otherData = null, string $databaseImage = 'postgres:16-alpine'): StandalonePostgresql
@@ -23,7 +25,7 @@ function create_standalone_postgresql($environmentId, $destinationUuid, ?array $
     $database->uuid = (new Cuid2);
     $database->name = 'postgresql-database-'.$database->uuid;
     $database->image = $databaseImage;
-    $database->postgres_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
+    $database->postgres_password = Str::password(length: 64, symbols: false);
     $database->environment_id = $environmentId;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();
@@ -42,7 +44,7 @@ function create_standalone_redis($environment_id, $destination_uuid, ?array $oth
     $database->uuid = (new Cuid2);
     $database->name = 'redis-database-'.$database->uuid;
 
-    $redis_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
+    $redis_password = Str::password(length: 64, symbols: false);
     if ($otherData && isset($otherData['redis_password'])) {
         $redis_password = $otherData['redis_password'];
         unset($otherData['redis_password']);
@@ -81,7 +83,7 @@ function create_standalone_mongodb($environment_id, $destination_uuid, ?array $o
     $database = new StandaloneMongodb;
     $database->uuid = (new Cuid2);
     $database->name = 'mongodb-database-'.$database->uuid;
-    $database->mongo_initdb_root_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
+    $database->mongo_initdb_root_password = Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();
@@ -99,8 +101,8 @@ function create_standalone_mysql($environment_id, $destination_uuid, ?array $oth
     $database = new StandaloneMysql;
     $database->uuid = (new Cuid2);
     $database->name = 'mysql-database-'.$database->uuid;
-    $database->mysql_root_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
-    $database->mysql_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
+    $database->mysql_root_password = Str::password(length: 64, symbols: false);
+    $database->mysql_password = Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();
@@ -118,8 +120,8 @@ function create_standalone_mariadb($environment_id, $destination_uuid, ?array $o
     $database = new StandaloneMariadb;
     $database->uuid = (new Cuid2);
     $database->name = 'mariadb-database-'.$database->uuid;
-    $database->mariadb_root_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
-    $database->mariadb_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
+    $database->mariadb_root_password = Str::password(length: 64, symbols: false);
+    $database->mariadb_password = Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();
@@ -137,7 +139,7 @@ function create_standalone_keydb($environment_id, $destination_uuid, ?array $oth
     $database = new StandaloneKeydb;
     $database->uuid = (new Cuid2);
     $database->name = 'keydb-database-'.$database->uuid;
-    $database->keydb_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
+    $database->keydb_password = Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();
@@ -155,7 +157,7 @@ function create_standalone_dragonfly($environment_id, $destination_uuid, ?array 
     $database = new StandaloneDragonfly;
     $database->uuid = (new Cuid2);
     $database->name = 'dragonfly-database-'.$database->uuid;
-    $database->dragonfly_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
+    $database->dragonfly_password = Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();
@@ -173,7 +175,7 @@ function create_standalone_clickhouse($environment_id, $destination_uuid, ?array
     $database = new StandaloneClickhouse;
     $database->uuid = (new Cuid2);
     $database->name = 'clickhouse-database-'.$database->uuid;
-    $database->clickhouse_admin_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
+    $database->clickhouse_admin_password = Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();
@@ -279,7 +281,7 @@ function removeOldBackups($backup): void
             ->whereNull('s3_uploaded')
             ->delete();
 
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         throw $e;
     }
 }
@@ -345,8 +347,8 @@ function deleteOldBackupsLocally($backup): Collection
     $processedBackups = collect();
 
     $server = null;
-    if ($backup->database_type === \App\Models\ServiceDatabase::class) {
-        $server = $backup->database->service->server;
+    if ($backup->database_type === ServiceDatabase::class) {
+        $server = $backup->database->parentServer();
     } else {
         $server = $backup->database->destination->server;
     }

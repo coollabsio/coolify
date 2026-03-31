@@ -2916,6 +2916,18 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             // Decide if the service is a database
             $image = data_get_str($service, 'image');
             $isDatabase = isDatabaseImage($image, $service);
+            if ($isDatabase && $pull_request_id === 0) {
+                ServiceDatabase::updateOrCreate(
+                    [
+                        'name' => $serviceName,
+                        'application_id' => $resource->id,
+                    ],
+                    [
+                        'image' => $image,
+                        'service_id' => null,
+                    ]
+                );
+            }
             data_set($service, 'is_database', $isDatabase);
 
             // Collect/create/update networks

@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ServiceDatabase;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
@@ -144,8 +145,8 @@ class BackupEdit extends Component
 
         try {
             $server = null;
-            if ($this->backup->database instanceof \App\Models\ServiceDatabase) {
-                $server = $this->backup->database->service->destination->server;
+            if ($this->backup->database instanceof ServiceDatabase) {
+                $server = $this->backup->database->parentServer();
             } elseif ($this->backup->database->destination && $this->backup->database->destination->server) {
                 $server = $this->backup->database->destination->server;
             }
@@ -170,8 +171,17 @@ class BackupEdit extends Component
 
             $this->backup->delete();
 
-            if ($this->backup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
+            if ($this->backup->database->getMorphClass() === ServiceDatabase::class) {
                 $serviceDatabase = $this->backup->database;
+
+                if ($serviceDatabase->application) {
+                    return redirect()->route('project.application.compose-database.backups', [
+                        'project_uuid' => $this->parameters['project_uuid'],
+                        'environment_uuid' => $this->parameters['environment_uuid'],
+                        'application_uuid' => $serviceDatabase->application->uuid,
+                        'stack_service_uuid' => $serviceDatabase->uuid,
+                    ]);
+                }
 
                 return redirect()->route('project.service.database.backups', [
                     'project_uuid' => $this->parameters['project_uuid'],
@@ -182,7 +192,7 @@ class BackupEdit extends Component
             } else {
                 return redirect()->route('project.database.backup.index', $this->parameters);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->dispatch('error', 'Failed to delete backup: '.$e->getMessage());
 
             return handleError($e, $this);
@@ -214,7 +224,7 @@ class BackupEdit extends Component
 
         $isValid = validate_cron_expression($this->backup->frequency);
         if (! $isValid) {
-            throw new \Exception('Invalid Cron / Human expression');
+            throw new Exception('Invalid Cron / Human expression');
         }
         $this->validate();
     }

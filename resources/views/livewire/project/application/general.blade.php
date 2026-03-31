@@ -69,6 +69,30 @@
                                                 Domain</x-forms.button>
                                         @endcan
                                     </div>
+                                @else
+                                    @php
+                                        $serviceDatabase = $application->databases()->where('name', $serviceName)->first();
+                                    @endphp
+                                    @if ($serviceDatabase && $serviceDatabase->isBackupSolutionAvailable())
+                                        <div class="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 px-4 py-3 dark:border-coolgray-400">
+                                            <div class="flex-1">
+                                                <div class="font-medium">{{ $serviceName }}</div>
+                                                <div class="text-sm text-gray-600 dark:text-gray-400">
+                                                    This compose-managed database supports scheduled backups.
+                                                </div>
+                                            </div>
+                                            <a {{ wireNavigate() }}
+                                                href="{{ route('project.application.compose-database.backups', [
+                                                    'project_uuid' => $application->project()->uuid,
+                                                    'environment_uuid' => $application->environment->uuid,
+                                                    'application_uuid' => $application->uuid,
+                                                    'stack_service_uuid' => $serviceDatabase->uuid,
+                                                ]) }}"
+                                                class="inline-flex items-center rounded-md bg-coollabs px-3 py-2 text-sm font-medium text-white transition hover:opacity-90">
+                                                Manage Backups
+                                            </a>
+                                        </div>
+                                    @endif
                                 @endif
                             @endforeach
                         @endif
