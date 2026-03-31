@@ -146,6 +146,7 @@ class ResourceOperations extends Component
                 ])->forceFill([
                     'name' => $newName,
                     'resource_id' => $new_resource->id,
+                    'uuid' => null,
                 ]);
                 $newPersistentVolume->save();
 
