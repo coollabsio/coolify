@@ -92,7 +92,7 @@ services:
       retries: 3
 
   meilisearch:
-    image: getmeili/meilisearch:v1.12.3
+    image: getmeili/meilisearch:v1.35.1
     environment:
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
       - MEILI_NO_ANALYTICS=${MEILI_NO_ANALYTICS:-false}
