@@ -1,0 +1,9 @@
+telemetry = false
+
+[env]
+file = false
+
+[install]
+linker = "isolated"
+frozenLockfile = true
+minimumReleaseAge = 604800 # 7 days
