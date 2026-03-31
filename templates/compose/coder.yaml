@@ -41,7 +41,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "pg_isready -U ${POSTGRES_USER:-username} -d ${POSTGRES_DB:-coder}"
+        - "pg_isready -U ${POSTGRES_USER:-username} -d ${POSTGRES_DB:-coder-db}"
       interval: 5s
       timeout: 5s
       retries: 5
