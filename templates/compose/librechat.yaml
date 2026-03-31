@@ -64,7 +64,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://127.0.0.1:3080/api/health",
+          "http://127.0.0.1:3080/health",
         ]
       interval: 5s
       timeout: 10s
