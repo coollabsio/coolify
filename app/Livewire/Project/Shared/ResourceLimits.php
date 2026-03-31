@@ -34,7 +34,7 @@ class ResourceLimits extends Component
         'limitsMemoryReservation' => ['required', 'string', 'regex:/^(0|\d+[bBkKmMgG])$/'],
         'limitsCpus' => ['nullable', 'regex:/^\d*\.?\d+$/'],
         'limitsCpuset' => ['nullable', 'regex:/^\d+([,-]\d+)*$/'],
-        'limitsCpuShares' => 'nullable|integer|min:0',
+        'limitsCpuShares' => 'nullable|integer|min:0|max:1024',
     ];
 
     protected $validationAttributes = [
@@ -57,7 +57,8 @@ class ResourceLimits extends Component
         'limitsMemorySwappiness.min' => 'Swappiness must be between 0 and 100.',
         'limitsMemorySwappiness.max' => 'Swappiness must be between 0 and 100.',
         'limitsCpuShares.integer' => 'CPU Weight must be a whole number.',
-        'limitsCpuShares.min' => 'CPU Weight must be a positive number.',
+        'limitsCpuShares.min' => 'CPU Weight must be between 0 and 1024.',
+        'limitsCpuShares.max' => 'CPU Weight must be between 0 and 1024.',
     ];
 
     /**
