@@ -30,6 +30,8 @@ class LaravelManager extends Component
 
     public string $envContent = '';
 
+    public bool $envFileExists = true;
+
     public array $phpIniSettings = [];
 
     public bool $isLoadingEnv = false;
@@ -121,6 +123,7 @@ class LaravelManager extends Component
 
         $this->isLoadingEnv = true;
         $this->envContent = '';
+        $this->envFileExists = true;
 
         try {
             $container = collect($this->laravelContainers)->firstWhere('id', $this->selectedContainerForEnv);
@@ -152,9 +155,10 @@ class LaravelManager extends Component
             $envContent = instant_remote_process([$readCommand], $server, false) ?? '';
 
             if ($envContent === 'notfound' || empty($envContent)) {
-                $this->dispatch('warning', '.env file not found. Creating default .env file...');
-                $this->createDefaultEnvFile($server, $escapedContainer, $envPath);
-                $envContent = instant_remote_process([$readCommand], $server, false) ?? '';
+                $this->envFileExists = false;
+                $this->dispatch('warning', 'Este proyecto no tiene .env');
+
+                return;
             }
 
             // Store the complete .env content
@@ -169,71 +173,15 @@ class LaravelManager extends Component
     }
 
 
-    private function createDefaultEnvFile($server, $escapedContainer, $envPath)
-    {
-        try {
-            // Get environment variables from service
-            $envVars = $this->service->environment_variables()->get();
-            $defaultEnv = [];
-
-            foreach ($envVars as $envVar) {
-                $key = $envVar->key;
-                $value = $envVar->value ?? '';
-                $defaultEnv[] = "{$key}={$value}";
-            }
-
-            // Add Laravel defaults
-            $requiredKeys = [
-                'APP_NAME' => 'Laravel',
-                'APP_ENV' => 'production',
-                'APP_KEY' => '',
-                'APP_DEBUG' => 'false',
-                'APP_URL' => $this->service->fqdn ? 'https://'.$this->service->fqdn : 'http://localhost',
-                'LOG_CHANNEL' => 'stack',
-                'LOG_LEVEL' => 'debug',
-                'DB_CONNECTION' => 'mysql',
-                'DB_HOST' => 'mariadb',
-                'DB_PORT' => '3306',
-                'QUEUE_CONNECTION' => 'database',
-                'CACHE_DRIVER' => 'file',
-                'SESSION_DRIVER' => 'file',
-            ];
-
-            foreach ($requiredKeys as $key => $defaultValue) {
-                $defaultEnv[] = "{$key}={$defaultValue}";
-            }
-
-            $envContent = implode("\n", $defaultEnv);
-
-            // Write to container
-            $tmpFilename = 'temp/'.uniqid('laravel-env-').'.env';
-            Storage::disk('local')->put($tmpFilename, $envContent);
-            $localTmpPath = Storage::disk('local')->path($tmpFilename);
-
-            $serverTmpPath = '/tmp/'.basename($tmpFilename);
-            instant_scp($localTmpPath, $serverTmpPath, $server);
-
-            $escapedServerTmp = escapeshellarg($serverTmpPath);
-            $copyCommand = "docker cp {$escapedServerTmp} {$escapedContainer}:{$envPath}";
-            if ($server->isNonRoot()) {
-                $copyCommand = "sudo {$copyCommand}";
-            }
-            instant_remote_process([$copyCommand], $server);
-
-            Storage::disk('local')->delete($tmpFilename);
-            $cleanCommand = "rm -f {$escapedServerTmp}";
-            if ($server->isNonRoot()) {
-                $cleanCommand = "sudo {$cleanCommand}";
-            }
-            instant_remote_process([$cleanCommand], $server, false);
-        } catch (\Throwable $e) {
-            $this->dispatch('error', 'Failed to create default .env file: '.$e->getMessage());
-        }
-    }
-
     public function saveEnvFile()
     {
         if (! $this->selectedContainerForEnv) {
+            return;
+        }
+
+        if (! $this->envFileExists) {
+            $this->dispatch('warning', 'Este proyecto no tiene .env');
+
             return;
         }
 

@@ -90,6 +90,10 @@
                                         </svg>
                                         <span class="ml-2 text-gray-600 dark:text-gray-400">Cargando archivo .env...</span>
                                     </div>
+                                @elseif (!$envFileExists)
+                                    <div class="p-4 text-sm text-gray-600 dark:text-gray-400 border border-coolgray-300 dark:border-coolgray-600 rounded bg-white dark:bg-coolgray-800">
+                                        Este proyecto no tiene .env
+                                    </div>
                                 @else
                                     <div class="space-y-4">
                                         <div class="p-4 border border-coolgray-300 dark:border-coolgray-600 rounded bg-white dark:bg-coolgray-800">

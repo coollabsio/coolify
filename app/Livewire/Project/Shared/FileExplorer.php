@@ -197,6 +197,12 @@ class FileExplorer extends Component
                 $this->selected_container = $requestedContainer;
                 try {
                     $this->checkDatabaseType();
+                    if (! (is_string($requestedPath) && $requestedPath !== '')) {
+                        $defaultPath = $this->detectDefaultPathForSelectedContainer();
+                        if ($defaultPath !== null) {
+                            $this->currentPath = $defaultPath;
+                        }
+                    }
                     $this->loadFiles();
                 } catch (\Throwable) {
                     // Fallback to default behavior if requested container is invalid at runtime.
