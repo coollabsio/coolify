@@ -27,6 +27,8 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - WEBSOCKETS_ENABLED=true
+      - CORS_ENABLED=${CORS_ENABLED:-true}
+      - CORS_ORIGIN=${CORS_ORIGIN:-true}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8055/admin/login"]
       interval: 5s

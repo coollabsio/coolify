@@ -22,6 +22,8 @@ services:
       - DB_CLIENT=sqlite3
       - DB_FILENAME=/directus/database/data.db
       - WEBSOCKETS_ENABLED=true
+      - CORS_ENABLED=${CORS_ENABLED:-true}
+      - CORS_ORIGIN=${CORS_ORIGIN:-true}
     healthcheck:
       test:
         ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8055/admin/login"]
