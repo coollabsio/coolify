@@ -403,13 +403,27 @@ services:
 
   nginx:
     image: nginx:alpine
-    command: ["nginx", "-g", "daemon off;"]
+    # Skip /docker-entrypoint.d/ scripts: they try to patch nginx.conf (read-only bind)
+    # and can make startup harder to diagnose on constrained hosts.
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      echo '[nginx] validating config' >&2;
+      nginx -t ||
+        ( echo '--- /etc/nginx/nginx.conf ---' >&2;
+          cat /etc/nginx/nginx.conf >&2 || true;
+          echo '--- /etc/nginx/conf.d/default.conf ---' >&2;
+          cat /etc/nginx/conf.d/default.conf >&2 || true;
+          exit 1
+        );
+      echo '[nginx] starting' >&2;
+      exec nginx -g 'daemon off;'
     volumes:
       - laravel-files:/var/www/html:ro
       - type: bind
         source: ./nginx-main.conf
         target: /etc/nginx/nginx.conf
         content: |
+          # Minimal + aio off: avoids io_setup() issues on constrained hosts.
           user nginx;
           worker_processes 1;
           error_log /dev/stderr warn;
@@ -447,21 +461,19 @@ services:
               access_log /dev/stdout;
               error_log /dev/stderr;
 
+              # Resolve upstreams via Docker embedded DNS to avoid startup crashes
+              # when the `laravel` container is not yet resolvable.
               resolver 127.0.0.11 ipv6=off valid=10s;
               set $php_upstream "laravel:9000";
 
               location / {
-                  try_files $uri $uri/ /index.php?$query_string;
+                  try_files /_coolify_error.html $uri $uri/ /index.php?$query_string;
               }
 
               location ~ \.php$ {
                   fastcgi_pass $php_upstream;
                   fastcgi_index index.php;
                   fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-                  fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
-                  fastcgi_param HTTP_X_FORWARDED_HOST $http_host;
-                  fastcgi_param HTTP_X_FORWARDED_FOR $proxy_add_x_forwarded_for;
-                  fastcgi_param HTTPS $http_x_forwarded_proto;
                   include fastcgi_params;
                   fastcgi_read_timeout 300;
                   fastcgi_buffers 16 16k;
@@ -472,9 +484,12 @@ services:
                   deny all;
               }
           }
+    # Start nginx as soon as laravel container exists (not after Laravel healthcheck).
+    # Otherwise nginx container can be missing for a long time and the UI may show "No such container".
+    # Users may briefly see 502 until PHP-FPM is ready; nginx healthcheck stays config-only for stability.
     depends_on:
       laravel:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
     expose:
       - "80"
