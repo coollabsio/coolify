@@ -473,7 +473,7 @@ services:
     # Users may briefly see 502 until PHP-FPM is ready; nginx healthcheck stays config-only for stability.
     depends_on:
       laravel:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
     expose:
       - "80"

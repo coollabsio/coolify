@@ -30,7 +30,7 @@ it('configures laravel rootkit to use file cache and guarded schedule run mode',
         ->toContain('numprocs=6')
         ->toContain('php -m | grep -q "^exif$"')
         ->toContain('pdo_mysql zip bcmath gd intl exif mbstring opcache')
-        ->toContain('condition: service_started')
+        ->toContain('condition: service_healthy')
         ->toContain('No such container')
         ->toContain('command: ["nginx", "-g", "daemon off;"]')
         ->toContain('try_files $uri $uri/ /index.php?$query_string;')
