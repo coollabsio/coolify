@@ -461,6 +461,10 @@ class StackForm extends Component
                 'label' => 'queue:restart',
                 'command' => 'php artisan queue:restart --no-ansi',
             ],
+            'queue-work-once' => [
+                'label' => 'queue:work --stop-when-empty',
+                'command' => 'php artisan queue:work --queue="${SERVICE_LARAVEL_QUEUE_NAMES:-default}" --stop-when-empty --tries=3 --timeout=600 --no-ansi',
+            ],
         ];
 
         $selectedCommand = $commands[$commandName] ?? null;

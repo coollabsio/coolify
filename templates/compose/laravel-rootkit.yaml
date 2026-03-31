@@ -50,7 +50,7 @@ services:
           stderr_logfile_maxbytes=0
           autostart=true
           autorestart=true
-          numprocs=2
+          numprocs=6
           stopwaitsecs=3600
 
       - type: bind

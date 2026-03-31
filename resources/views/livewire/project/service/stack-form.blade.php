@@ -68,6 +68,14 @@
                     >
                         Queue restart
                     </x-forms.button>
+                    <x-forms.button
+                        type="button"
+                        wire:click="runLaravelMaintenanceCommand('queue-work-once')"
+                        wire:loading.attr="disabled"
+                        wire:target="runLaravelMaintenanceCommand('queue-work-once')"
+                    >
+                        Run queue worker
+                    </x-forms.button>
                 @endif
             @endcan
         </div>

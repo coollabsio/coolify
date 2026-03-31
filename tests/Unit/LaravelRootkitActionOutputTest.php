@@ -14,7 +14,8 @@ it('reports deployed commits and focused failure stages in rootkit stack actions
         ->toContain('runLaravelMaintenanceCommand')
         ->toContain("'clear-config-and-cache'")
         ->toContain("'config-cache'")
-        ->toContain("'queue-restart'");
+        ->toContain("'queue-restart'")
+        ->toContain("'queue-work-once'");
 });
 
 it('configures laravel rootkit to use file cache and guarded schedule run mode', function () {
@@ -26,6 +27,7 @@ it('configures laravel rootkit to use file cache and guarded schedule run mode',
         ->toContain('SERVICE_LARAVEL_QUEUE_NAMES')
         ->toContain('php artisan schedule:list --no-interaction')
         ->toContain('queue:work --queue=${SERVICE_LARAVEL_QUEUE_NAMES:-default}')
+        ->toContain('numprocs=6')
         ->toContain('CACHE_STORE=file')
         ->toContain('upsert_env "CACHE_STORE" "file"')
         ->toContain('upsert_env "SESSION_DRIVER" "file"')
