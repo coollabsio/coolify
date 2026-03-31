@@ -6,8 +6,8 @@ namespace App\Enums;
 
 enum Permission: string
 {
-    case WorkspaceRead = 'workspaceRead';
     case WorkspaceCreate = 'workspaceCreate';
+    case WorkspaceRead = 'workspaceRead';
     case WorkspaceUpdate = 'workspaceUpdate';
-    case WorkspaceDestroy = 'workspaceDestroy';
+    case WorkspaceDelete = 'workspaceDelete';
 }
