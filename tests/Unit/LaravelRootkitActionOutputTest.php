@@ -35,6 +35,8 @@ it('configures laravel rootkit to use file cache and guarded schedule run mode',
         ->toContain('command: ["nginx", "-g", "daemon off;"]')
         ->toContain('try_files $uri $uri/ /index.php?$query_string;')
         ->toContain('fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;')
+        ->toContain('fastcgi_param HTTP_X_FORWARDED_HOST $http_x_forwarded_host;')
+        ->toContain('fastcgi_param HTTP_X_FORWARDED_PORT $http_x_forwarded_port;')
         ->toContain('fastcgi_param HTTPS $http_x_forwarded_proto;')
         ->toContain('fastcgi_param REQUEST_SCHEME $http_x_forwarded_proto;')
         ->toContain('CACHE_STORE=file')
