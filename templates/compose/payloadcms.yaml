@@ -1,0 +1,41 @@
+# documentation: https://payloadcms.com
+# slogan: PayloadCMS is an open-source headless CMS and application framework built with Next.js.
+# category: cms
+# tags: cms, headless-cms, nextjs, api, content-management, typescript
+# logo: svgs/payload.svg
+# port: 3000
+
+services:
+  payload:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npx create-payload-app@latest my-app --db postgres --db-connection-string postgresql://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgresql:5432/payload --no-deps -y 2>/dev/null; cd my-app && npm run build && npm run serve"
+    volumes:
+      - payload-data:/app/my-app
+      - payload-media:/app/my-app/public/media
+    environment:
+      - SERVICE_URL_PAYLOAD_3000
+      - DATABASE_URI=postgresql://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgresql:5432/payload
+      - PAYLOAD_SECRET=$SERVICE_PASSWORD_64_PAYLOADSECRET
+      - NODE_ENV=production
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+  postgresql:
+    image: postgres:16
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRESQL
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRESQL
+      - POSTGRES_DB=payload
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
