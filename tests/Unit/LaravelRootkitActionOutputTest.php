@@ -28,6 +28,8 @@ it('configures laravel rootkit to use file cache and guarded schedule run mode',
         ->toContain('php artisan schedule:list --no-interaction')
         ->toContain('queue:work --queue=${SERVICE_LARAVEL_QUEUE_NAMES:-default}')
         ->toContain('numprocs=6')
+        ->toContain('php -m | grep -q "^exif$"')
+        ->toContain('pdo_mysql zip bcmath gd intl exif mbstring opcache')
         ->toContain('CACHE_STORE=file')
         ->toContain('upsert_env "CACHE_STORE" "file"')
         ->toContain('upsert_env "SESSION_DRIVER" "file"')

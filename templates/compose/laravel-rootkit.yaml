@@ -74,6 +74,7 @@ services:
             && php -m | grep -q "^zip$" \
             && php -m | grep -q "^gd$" \
             && php -m | grep -q "^intl$" \
+            && php -m | grep -q "^exif$" \
             && php -m | grep -q "^mbstring$" \
             && php -m | grep -q "^bcmath$" \
             && php -m | grep -q "^opcache$"; then
@@ -91,7 +92,7 @@ services:
               icu-dev \
               libxml2-dev
             docker-php-ext-configure gd --with-freetype --with-jpeg
-            docker-php-ext-install -j"$(nproc)" pdo_mysql zip bcmath gd intl mbstring opcache
+            docker-php-ext-install -j"$(nproc)" pdo_mysql zip bcmath gd intl exif mbstring opcache
           fi
 
           if ! grep -q "listen = 0.0.0.0:9000" /usr/local/etc/php-fpm.d/www.conf 2>/dev/null; then
