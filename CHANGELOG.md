@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 
 Most breaking changes are automatically handled by the upgrade migration. See the [v5 Upgrade Guide](docs) for details.
 
+- Most description fields are now limited to 255 characters, as descriptions should rarely need more
 - Database primary keys unified from two columns (numeric `id` + CUIDv2 `uuid`) into a single ULID `id` column
 
 ### Security
@@ -21,10 +22,21 @@ Most breaking changes are automatically handled by the upgrade migration. See th
 - Complete redesign of the Coolify User Interface and User Experience
 - Separate notification email in addition to the user's account email
 - "Remember me" option on login, keeping users authenticated for 14 days (without it, sessions expire after 24 hours of inactivity)
+- **Workspaces**
+  - Workspaces replacing v4 teams (clearer name, fully self-contained and isolated from each other)
+  - Option to require 2FA workspace-wide
+  - Concurrent builds limit and default deployment timeout to workspace settings
+  - Workspace global scope and middleware (~114 lines) replacing ~1,970 manual team checks, written in 12 different ways (~2,800 lines) across ~400 files
+  - Support for multiple workspaces open simultaneously in different browser tabs (via query parameter, avoiding a long and ugly path segment)
+  - Automatic workspace selection via URL parameter > cookie > session > auto-select (single workspace)
+- **Permission System**
+  - `UserRole` enum defining all predefined roles in one place, replacing scattered role-check methods (`isAdmin()`, `isMember()`, etc.) with a single enum-based approach supporting granular permissions and adding new permissions to existing roles without a database migration
+  - `Permission` enum with granular permissions per feature (e.g. `WorkspaceRead`, `WorkspaceCreate`, `WorkspaceUpdate`, `WorkspaceDestroy`), defined as string-backed enums so changes are code-only, not database migrations
+  - Custom roles with configurable permissions assignable to workspace members
 - **v4 to v5 upgrade migration**
   - Coolify v4 database as `old_pgsql` connection
   -
-- Worker Servers that replace build servers with servers that can also run jobs (Horizon workers) in addition to building Docker images
+- Worker servers replacing build servers, capable of running Horizon workers (queue job workers) in addition to building Docker images
 
 ### Changed
 
@@ -58,8 +70,8 @@ Most breaking changes are automatically handled by the upgrade migration. See th
 
 - `laravel.log` file growing indefinitely and consuming excessive disk space
 - Failed jobs being logged into the database (Horizon already handles this) causing excessive disk usage in some cases
-- Maximum concurrent builds setting not being respected when set to more than 4 on v4.x because only 4 Horizon workers are available by default
--
+- Maximum concurrent builds setting not respected when set above 4 in v4, as only 4 Horizon workers were available by default
+- Concurrent builds setting incorrectly scoped per-server instead of workspace-wide
 
 ### Removed
 
@@ -70,6 +82,7 @@ Most breaking changes are automatically handled by the upgrade migration. See th
 
 - All database migrations for a cleaner, more consistent and stable database schema (no more `down()` methods, no more defaults in the DB...)
 - All database models for improved maintainability, consistency and database interoperability (SQLite and Postgres)
+- Many hardcoded or static strings stored in DB columns into automatically cast PHP string-backed enums
 - Hardcoded queue strings replaced with a `ProcessingQueue` enum
 - `config/constants.php` to `config/coolify.php` for all Coolify-specific settings
 - Environment variable naming to be shorter and more consistent

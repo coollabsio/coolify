@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -50,6 +51,11 @@ final class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'appName' => config()->string('app.name'),
+            'workspace' => function (): ?array {
+                $id = session('workspace');
+
+                return is_string($id) ? Workspace::find($id)?->only('id', 'name') : null;
+            },
         ];
     }
 }
