@@ -1,0 +1,64 @@
+# documentation: https://openreplay.com
+# slogan: OpenReplay is an open-source session replay and product analytics suite.
+# category: analytics
+# tags: analytics, session-replay, monitoring, product-analytics, open-source
+# logo: svgs/openreplay.svg
+# port: 80
+
+services:
+  openreplay:
+    image: openreplay/openreplay:latest
+    volumes:
+      - openreplay-data:/mnt/openreplay
+    environment:
+      - SERVICE_URL_OPENREPLAY
+      - DOMAIN_NAME=$SERVICE_FQDN_OPENREPLAY
+      - LICENSE_KEY=${LICENSE_KEY:-}
+      - POSTGRES_STRING=postgresql://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgresql:5432/openreplay
+      - REDIS_STRING=redis://redis:6379
+      - S3_HOST=minio
+      - S3_PORT=9000
+      - S3_KEY=$SERVICE_USER_MINIO
+      - S3_SECRET=$SERVICE_PASSWORD_MINIO
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+  postgresql:
+    image: postgres:16
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRESQL
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRESQL
+      - POSTGRES_DB=openreplay
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  redis:
+    image: redis:7
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    environment:
+      - MINIO_ROOT_USER=$SERVICE_USER_MINIO
+      - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
