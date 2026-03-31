@@ -55,9 +55,18 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
         Gate::define('viewHorizon', function ($user) {
             $root_user = User::find(0);
 
-            return in_array($user->email, [
-                $root_user->email,
-            ]);
+            // Get additional allowed emails from environment variable
+            $allowedEmails = array_filter(
+                array_map('trim', explode(',', env('HORIZON_ALLOWED_EMAILS', '')))
+            );
+
+            // Merge root user email with additional allowed emails
+            $authorizedEmails = array_merge(
+                [$root_user->email],
+                $allowedEmails
+            );
+
+            return in_array($user->email, $authorizedEmails);
         });
     }
 }
