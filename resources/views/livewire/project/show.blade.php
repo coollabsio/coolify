@@ -21,7 +21,10 @@
     <div class="text-xs truncate subtitle lg:text-sm">{{ $project->name }}.</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($project->environments->sortBy('created_at') as $environment)
-            <div class="gap-2 coolbox group">
+            <div @class([
+                'gap-2 coolbox group',
+                'border-l-4' => $environment->color,
+            ]) @if($environment->color) style="border-left-color: {{ $environment->color }}" @endif>
                 <div class="flex flex-1 mx-6">
                     <a class="flex flex-col justify-center flex-1" {{ wireNavigate() }}
                         href="{{ route('project.resource.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}">
