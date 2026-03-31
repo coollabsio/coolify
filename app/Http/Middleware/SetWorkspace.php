@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
@@ -23,11 +24,11 @@ final class SetWorkspace
 
         if ($request->query->has('workspace')) {
             $workspaceId = $request->query->getString('workspace');
+            $memberId = $this->resolveMembership($user, $workspaceId);
 
-            // Abort if the workspace ID was tampered with, does not exist, or the user is not a member.
-            abort_unless($this->isMember($user, $workspaceId), 404);
+            abort_if($memberId === null, 404);
 
-            $this->persist($workspaceId);
+            $this->persist($workspaceId, $memberId);
 
             return $next($request);
         }
@@ -39,13 +40,13 @@ final class SetWorkspace
     {
         $candidate = $request->cookie('workspace');
 
-        if (is_string($candidate) && $this->isMember($user, $candidate)) {
+        if (is_string($candidate) && $this->resolveMembership($user, $candidate) !== null) {
             return $this->redirectWithWorkspace($request, $candidate);
         }
 
         $candidate = session('workspace');
 
-        if (is_string($candidate) && $this->isMember($user, $candidate)) {
+        if (is_string($candidate) && $this->resolveMembership($user, $candidate) !== null) {
             return $this->redirectWithWorkspace($request, $candidate);
         }
 
@@ -69,15 +70,20 @@ final class SetWorkspace
         return redirect()->to($request->fullUrlWithQuery(['workspace' => $workspaceId]));
     }
 
-    private function isMember(User $user, string $workspaceId): bool
+    private function resolveMembership(User $user, string $workspaceId): ?string
     {
-        return $user->workspaces()->whereKey($workspaceId)->exists();
+        $id = $user->memberships()
+            ->withoutGlobalScope(WorkspaceScope::class)
+            ->where('workspace_id', $workspaceId)
+            ->value('id');
+
+        return is_string($id) ? $id : null;
     }
 
-    private function persist(string $workspaceId): void
+    private function persist(string $workspaceId, string $memberId): void
     {
-        session(['workspace' => $workspaceId]);
-        context(['workspace' => $workspaceId]);
+        session(['workspace' => $workspaceId, 'workspace_member' => $memberId]);
+        context(['workspace' => $workspaceId, 'workspace_member' => $memberId]);
         cookie()->queue('workspace', $workspaceId, 30 * 24 * 60);
     }
 }
