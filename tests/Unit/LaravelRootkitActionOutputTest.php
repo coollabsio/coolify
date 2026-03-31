@@ -10,7 +10,11 @@ it('reports deployed commits and focused failure stages in rootkit stack actions
         ->toContain('Failed at: npm install/build')
         ->toContain('Migration status before run:')
         ->toContain('Migrations completed successfully with no warnings.')
-        ->toContain('Failed at: php artisan migrate --force');
+        ->toContain('Failed at: php artisan migrate --force')
+        ->toContain('runLaravelMaintenanceCommand')
+        ->toContain("'clear-config-and-cache'")
+        ->toContain("'config-cache'")
+        ->toContain("'queue-restart'");
 });
 
 it('configures laravel rootkit to use file cache and schedule work mode', function () {
@@ -20,7 +24,9 @@ it('configures laravel rootkit to use file cache and schedule work mode', functi
         ->toContain('php artisan schedule:work --no-interaction')
         ->toContain('CACHE_STORE=file')
         ->toContain('upsert_env "CACHE_STORE" "file"')
-        ->toContain('upsert_env "SESSION_DRIVER" "file"');
+        ->toContain('upsert_env "SESSION_DRIVER" "file"')
+        ->toContain('if [ -z "${CURRENT_APP_KEY}" ]; then')
+        ->not->toContain('upsert_env "APP_KEY" ""');
 });
 
 it('loads cron tasks from artisan schedule list or project source fallback', function () {
@@ -31,7 +37,10 @@ it('loads cron tasks from artisan schedule list or project source fallback', fun
         ->toContain('php artisan schedule:list --format=json --no-interaction')
         ->toContain('php artisan schedule:list --json --no-interaction')
         ->toContain('parseScheduleSourceOutput')
-        ->toContain('Showing schedule definitions detected in project source');
+        ->toContain('Showing schedule definitions detected in project source')
+        ->toContain('sanitizeScheduleCommandOutput');
 
-    expect($cronView)->toContain('Origen');
+    expect($cronView)
+        ->toContain('Origen')
+        ->toContain('text-black');
 });

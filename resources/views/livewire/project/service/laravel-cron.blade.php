@@ -28,10 +28,10 @@
                         No Laravel containers detected in this service.
                     </div>
                 @else
-                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6">
-                        <div class="p-4 border border-coolgray-300 dark:border-coolgray-600 rounded bg-white dark:bg-coolgray-800">
+                    <div class="box-without-bg-without-border bg-white p-6 text-black">
+                        <div class="p-4 border border-coolgray-300 rounded bg-white text-black">
                             <div class="mt-2 flex items-center justify-between mb-3">
-                                <h3 class="font-semibold dark:text-white">Tareas programadas</h3>
+                                <h3 class="font-semibold text-black">Tareas programadas</h3>
                                 <x-forms.button
                                     wire:click="loadScheduleList"
                                     wire:loading.attr="disabled"
@@ -42,18 +42,18 @@
                             </div>
 
                             @if ($isLoadingScheduleList)
-                                <div class="p-4 text-sm text-gray-600 dark:text-gray-300">
+                                <div class="p-4 text-sm text-black">
                                     Cargando schedule list...
                                 </div>
                             @elseif (empty($scheduledTasks))
-                                <div class="p-4 text-sm text-gray-600 dark:text-gray-300">
+                                <div class="p-4 text-sm text-black">
                                     No hay tareas programadas detectadas.
                                 </div>
                             @else
                                 <div class="overflow-x-auto">
-                                    <table class="w-full text-sm">
+                                    <table class="w-full text-sm text-black">
                                         <thead>
-                                        <tr class="text-left text-xs text-gray-500 dark:text-gray-400">
+                                        <tr class="text-left text-xs text-black">
                                             <th class="px-2 py-2">Command</th>
                                             <th class="px-2 py-2">Intervalo</th>
                                             <th class="px-2 py-2">Próxima</th>
@@ -64,12 +64,12 @@
                                         </thead>
                                         <tbody>
                                         @foreach ($scheduledTasks as $taskIndex => $task)
-                                            <tr class="border-t border-coolgray-200 dark:border-coolgray-700">
+                                            <tr class="border-t border-coolgray-200 text-black">
                                                 <td class="px-2 py-2">
-                                                    <span class="font-mono">{{ $task['command'] }}</span>
+                                                    <span class="font-mono whitespace-pre-wrap text-black">{{ $task['command'] }}</span>
                                                 </td>
                                                 <td class="px-2 py-2">
-                                                    <span class="font-mono">{{ $task['expression'] }}</span>
+                                                    <span class="font-mono text-black">{{ $task['expression'] }}</span>
                                                 </td>
                                                 <td class="px-2 py-2">
                                                     {{ $task['next_due'] }}
@@ -97,8 +97,8 @@
                             @endif
 
                             <div class="mt-6">
-                                <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">Salida:</div>
-                                <pre class="w-full whitespace-pre-wrap break-words bg-white dark:bg-coolgray-900 text-gray-900 dark:text-gray-100 border border-coolgray-300 dark:border-coolgray-600 px-4 py-3 rounded text-sm font-mono min-h-32">{{ $schedulerOutput }}</pre>
+                                <div class="text-sm text-black mb-2">Salida:</div>
+                                <pre class="w-full whitespace-pre-wrap break-words bg-white text-black border border-coolgray-300 px-4 py-3 rounded text-sm font-mono min-h-32">{{ $schedulerOutput }}</pre>
                             </div>
                         </div>
                     </div>

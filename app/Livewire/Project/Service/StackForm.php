@@ -440,6 +440,49 @@ class StackForm extends Component
         );
     }
 
+    public function runLaravelMaintenanceCommand(string $commandName): void
+    {
+        if (! $this->isLaravelRootkitStack()) {
+            $this->dispatch('error', 'This action is only available for Laravel RootKit services.');
+
+            return;
+        }
+
+        $commands = [
+            'clear-config-and-cache' => [
+                'label' => 'config:clear && cache:clear',
+                'command' => 'php artisan config:clear --no-ansi && php artisan cache:clear --no-ansi',
+            ],
+            'config-cache' => [
+                'label' => 'config:cache',
+                'command' => 'php artisan config:cache --no-ansi',
+            ],
+            'queue-restart' => [
+                'label' => 'queue:restart',
+                'command' => 'php artisan queue:restart --no-ansi',
+            ],
+        ];
+
+        $selectedCommand = $commands[$commandName] ?? null;
+
+        if (! is_array($selectedCommand)) {
+            $this->dispatch('error', 'Unknown Laravel maintenance command.');
+
+            return;
+        }
+
+        $this->runFrontendAssetCommand(
+            "cd /var/www/html && if [ -f artisan ]; then "
+            ."echo 'Running Laravel maintenance command:'; "
+            ."echo ".escapeshellarg($selectedCommand['label'])."; "
+            ."MAINTENANCE_OUTPUT_FILE=/tmp/coolify-maintenance-command.log; "
+            ."if sh -lc ".escapeshellarg($selectedCommand['command'])." >\"\$MAINTENANCE_OUTPUT_FILE\" 2>&1; then "
+            ."if [ -s \"\$MAINTENANCE_OUTPUT_FILE\" ]; then sed -n '1,220p' \"\$MAINTENANCE_OUTPUT_FILE\"; else echo 'Command completed successfully with no output.'; fi; "
+            ."else echo 'ERROR: maintenance command failed'; echo 'Failed at: ".addslashes($selectedCommand['label'])."'; sed -n '1,220p' \"\$MAINTENANCE_OUTPUT_FILE\"; exit 1; fi; "
+            ."else echo 'artisan file not found'; exit 1; fi"
+        );
+    }
+
     public function instantSave()
     {
         $this->syncData(true);

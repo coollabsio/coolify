@@ -305,6 +305,11 @@ class LaravelCron extends Component
             return [];
         }
 
+        $raw = $this->sanitizeScheduleCommandOutput($raw);
+        if ($raw === '') {
+            return [];
+        }
+
         // If json is available, prefer it. Laravel supports `--format=json` in some versions.
         $decoded = null;
         if (str_starts_with($raw, '{') || str_starts_with($raw, '[')) {
@@ -411,6 +416,39 @@ class LaravelCron extends Component
         return $result;
     }
 
+    private function sanitizeScheduleCommandOutput(string $raw): string
+    {
+        $raw = preg_replace('/\e\[[\d;]*[A-Za-z]/', '', $raw) ?? $raw;
+
+        $lines = preg_split('/\r?\n/', $raw) ?: [];
+        $cleaned = [];
+
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+
+            if ($trimmed === '') {
+                $cleaned[] = $line;
+
+                continue;
+            }
+
+            if (str_starts_with($trimmed, 'Deprecated:')
+                || str_starts_with($trimmed, 'PHP Deprecated:')
+                || str_starts_with($trimmed, 'Warning:')
+                || str_starts_with($trimmed, 'PHP Warning:')) {
+                continue;
+            }
+
+            if (str_contains($trimmed, '/vendor/serpapi/google-search-results-php/restclient.php')) {
+                continue;
+            }
+
+            $cleaned[] = $line;
+        }
+
+        return trim(implode("\n", $cleaned));
+    }
+
     /**
      * @return array<int, array{command: string, expression: string, next_due: string, last_run: string, description: string}>
      */
@@ -421,6 +459,8 @@ class LaravelCron extends Component
         }
 
         $tasks = [];
+        $currentTask = null;
+
         foreach (preg_split('/\r?\n/', $raw) ?: [] as $line) {
             $line = trim($line);
             if ($line === '') {
@@ -431,13 +471,30 @@ class LaravelCron extends Component
             $location = count($parts) >= 2 ? "{$parts[0]}:{$parts[1]}" : 'project source';
             $content = count($parts) === 3 ? trim($parts[2]) : $line;
 
-            $tasks[] = [
-                'command' => $content,
-                'expression' => 'Defined in source',
-                'next_due' => 'Resolve via artisan schedule:list',
-                'last_run' => '',
-                'description' => $location,
-            ];
+            $startsNewTask = str_contains($content, 'Schedule::');
+
+            if ($startsNewTask || $currentTask === null) {
+                if ($currentTask !== null) {
+                    $tasks[] = $currentTask;
+                }
+
+                $currentTask = [
+                    'command' => $content,
+                    'expression' => 'Defined in source',
+                    'next_due' => 'Resolve via artisan schedule:list',
+                    'last_run' => '',
+                    'description' => $location,
+                ];
+
+                continue;
+            }
+
+            $currentTask['command'] .= "\n".$content;
+            $currentTask['description'] .= ' -> '.$location;
+        }
+
+        if ($currentTask !== null) {
+            $tasks[] = $currentTask;
         }
 
         return collect($tasks)

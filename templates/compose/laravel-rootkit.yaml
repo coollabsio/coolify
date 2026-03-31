@@ -292,7 +292,6 @@ services:
             fi
           }
 
-          upsert_env "APP_KEY" ""
           upsert_env "APP_URL" "${SERVICE_PUBLIC_URL_RUNTIME}"
           # Keep assets on same host/domain as current request.
           # This avoids cert/domain mismatch when service internal URLs differ.
@@ -309,7 +308,10 @@ services:
 
           if [ -f artisan ]; then
             echo "Running Laravel setup tasks..."
-            php artisan key:generate --force || true
+            CURRENT_APP_KEY="$(grep -E '^APP_KEY=' .env 2>/dev/null | tail -n 1 | cut -d '=' -f2-)"
+            if [ -z "${CURRENT_APP_KEY}" ]; then
+              php artisan key:generate --force || true
+            fi
             php artisan optimize:clear || true
             php artisan view:clear || true
             php artisan config:clear || true

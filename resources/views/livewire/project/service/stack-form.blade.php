@@ -44,6 +44,30 @@
                     >
                         Run migrations
                     </x-forms.button>
+                    <x-forms.button
+                        type="button"
+                        wire:click="runLaravelMaintenanceCommand('clear-config-and-cache')"
+                        wire:loading.attr="disabled"
+                        wire:target="runLaravelMaintenanceCommand('clear-config-and-cache')"
+                    >
+                        Clear config/cache
+                    </x-forms.button>
+                    <x-forms.button
+                        type="button"
+                        wire:click="runLaravelMaintenanceCommand('config-cache')"
+                        wire:loading.attr="disabled"
+                        wire:target="runLaravelMaintenanceCommand('config-cache')"
+                    >
+                        Config cache
+                    </x-forms.button>
+                    <x-forms.button
+                        type="button"
+                        wire:click="runLaravelMaintenanceCommand('queue-restart')"
+                        wire:loading.attr="disabled"
+                        wire:target="runLaravelMaintenanceCommand('queue-restart')"
+                    >
+                        Queue restart
+                    </x-forms.button>
                 @endif
             @endcan
         </div>
