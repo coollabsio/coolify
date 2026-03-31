@@ -11,6 +11,7 @@ services:
     environment:
       - SERVICE_URL_ODOO_8069
       - HOST=postgresql
+      - PROXY_MODE=true
       - USER=$SERVICE_USER_POSTGRES
       - PASSWORD=$SERVICE_PASSWORD_POSTGRES
     volumes:
