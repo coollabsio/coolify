@@ -1,7 +1,6 @@
 import { WebSocketServer } from 'ws';
 import http from 'http';
 import pty from 'node-pty';
-import axios from 'axios';
 import cookie from 'cookie';
 import 'dotenv/config';
 import {
@@ -9,6 +8,7 @@ import {
     extractSshArgs,
     extractTargetHost,
     extractTimeout,
+    httpPost,
     isAuthorizedTargetHost,
 } from './terminal-utils.js';
 
@@ -74,14 +74,12 @@ const verifyClient = async (info, callback) => {
 
     try {
         // Authenticate with Laravel backend
-        const response = await axios.post(`http://coolify:8080/terminal/auth`, null, {
-            headers: {
+        const response = await httpPost(`http://coolify:8080/terminal/auth`, {
                 'Cookie': `${sessionCookieName}=${laravelSession}`,
                 'X-XSRF-TOKEN': xsrfToken
-            },
-        });
+            });
 
-        if (response.status === 200) {
+        if (response.ok) {
             logTerminal('log', 'Websocket client authentication succeeded.', requestContext);
             callback(true);
         } else {
@@ -95,8 +93,6 @@ const verifyClient = async (info, callback) => {
         logTerminal('error', 'Websocket client authentication failed.', {
             ...requestContext,
             error: error.message,
-            responseStatus: error.response?.status,
-            responseData: error.response?.data,
         });
         callback(false, 500, 'Internal Server Error');
     }
@@ -125,13 +121,22 @@ wss.on('connection', async (ws, req) => {
     }
 
     try {
-        const response = await axios.post(`http://coolify:8080/terminal/auth/ips`, null, {
-            headers: {
+        const response = await httpPost(`http://coolify:8080/terminal/auth/ips`, {
                 'Cookie': `${sessionCookieName}=${laravelSession}`,
                 'X-XSRF-TOKEN': xsrfToken
-            },
-        });
-        userSession.authorizedIPs = response.data.ipAddresses || [];
+            });
+
+        if (!response.ok) {
+            logTerminal('error', 'Failed to fetch authorized terminal hosts.', {
+                ...connectionContext,
+                status: response.status,
+            });
+            ws.close(1011, 'Failed to fetch terminal authorization data');
+            return;
+        }
+
+        const data = await response.json();
+        userSession.authorizedIPs = data.ipAddresses || [];
         logTerminal('log', 'Fetched authorized terminal hosts for websocket session.', {
             ...connectionContext,
             authorizedIPs: userSession.authorizedIPs,
@@ -140,8 +145,6 @@ wss.on('connection', async (ws, req) => {
         logTerminal('error', 'Failed to fetch authorized terminal hosts.', {
             ...connectionContext,
             error: error.message,
-            responseStatus: error.response?.status,
-            responseData: error.response?.data,
         });
         ws.close(1011, 'Failed to fetch terminal authorization data');
         return;
