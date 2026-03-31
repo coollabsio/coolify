@@ -458,6 +458,12 @@ services:
                   fastcgi_pass $php_upstream;
                   fastcgi_index index.php;
                   fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                  fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
+                  fastcgi_param HTTP_X_FORWARDED_FOR $http_x_forwarded_for;
+                  fastcgi_param HTTP_X_FORWARDED_HOST $http_host;
+                  fastcgi_param HTTP_X_FORWARDED_PORT $server_port;
+                  fastcgi_param HTTPS $http_x_forwarded_proto;
+                  fastcgi_param REQUEST_SCHEME $http_x_forwarded_proto;
                   include fastcgi_params;
                   fastcgi_read_timeout 300;
                   fastcgi_buffers 16 16k;
