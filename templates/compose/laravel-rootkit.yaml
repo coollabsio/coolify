@@ -31,7 +31,7 @@ services:
           autorestart=true
 
           [program:scheduler]
-          command=sh -c "while true; do if [ -f /var/www/html/artisan ]; then php /var/www/html/artisan schedule:run --verbose --no-interaction 2>&1; else echo 'Waiting for Laravel installation...'; fi; sleep 60; done"
+          command=sh -c "while [ ! -f /var/www/html/artisan ]; do echo 'Waiting for Laravel installation...'; sleep 10; done; cd /var/www/html && php artisan optimize:clear >/dev/null 2>&1 || true; php artisan config:clear >/dev/null 2>&1 || true; php artisan schedule:work --no-interaction 2>&1"
           redirect_stderr=true
           stdout_logfile=/dev/stdout
           stdout_logfile_maxbytes=0
@@ -303,6 +303,9 @@ services:
           upsert_env "DB_DATABASE" "${DB_NAME}"
           upsert_env "DB_USERNAME" "${DB_USER}"
           upsert_env "DB_PASSWORD" "${DB_PASSWORD}"
+          upsert_env "CACHE_STORE" "file"
+          upsert_env "CACHE_DRIVER" "file"
+          upsert_env "SESSION_DRIVER" "file"
 
           if [ -f artisan ]; then
             echo "Running Laravel setup tasks..."
@@ -379,6 +382,7 @@ services:
       - DB_USERNAME=${SERVICE_USER_LARAVEL:-laravel}
       - DB_PASSWORD=${SERVICE_PASSWORD_LARAVEL:-password}
       - QUEUE_CONNECTION=database
+      - CACHE_STORE=file
       - CACHE_DRIVER=file
       - SESSION_DRIVER=file
     depends_on:

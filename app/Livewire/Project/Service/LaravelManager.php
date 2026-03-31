@@ -372,7 +372,7 @@ class LaravelManager extends Component
             $escapedContainer = escapeshellarg($containerName);
 
             // Check if scheduler process is running
-            $checkCommand = "docker exec {$escapedContainer} sh -c 'ps aux | grep \"schedule:run\" | grep -v grep || echo notfound'";
+            $checkCommand = "docker exec {$escapedContainer} sh -c 'ps aux | grep -E \"schedule:(run|work)\" | grep -v grep || echo notfound'";
             if ($server->isNonRoot()) {
                 $checkCommand = "sudo {$checkCommand}";
             }
@@ -392,7 +392,9 @@ class LaravelManager extends Component
             } else {
                 $this->isSchedulerEnabled = false;
                 $this->schedulerStatus = 'Stopped';
-                $this->schedulerOutput = 'Scheduler is not running';
+                $this->schedulerOutput = $supervisorStatus !== '' && $supervisorStatus !== 'notfound'
+                    ? $supervisorStatus
+                    : 'Scheduler is not running';
             }
 
             $this->dispatch('success', 'Scheduler status checked.');
@@ -482,7 +484,16 @@ class LaravelManager extends Component
             $containerName = $container['container_name'];
             $escapedContainer = escapeshellarg($containerName);
 
-            $command = "docker exec {$escapedContainer} php /var/www/html/artisan schedule:run --verbose";
+            $command = "docker exec {$escapedContainer} sh -lc "
+                .escapeshellarg(
+                    "cd /var/www/html && php artisan optimize:clear >/dev/null 2>&1 || true; "
+                    ."php artisan config:clear >/dev/null 2>&1 || true; "
+                    ."echo 'Scheduler execution context:'; "
+                    .'echo "APP_ENV=${APP_ENV:-}"; '
+                    .'echo "CACHE_STORE=${CACHE_STORE:-}"; '
+                    .'echo "QUEUE_CONNECTION=${QUEUE_CONNECTION:-}"; '
+                    ."php artisan schedule:run --verbose --no-interaction"
+                );
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
             }

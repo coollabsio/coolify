@@ -389,17 +389,22 @@ class StackForm extends Component
         $githubToken = trim((string) data_get($this->fields, 'SERVICE_GITHUB_TOKEN.value', ''));
         $deployRepoUrl = $this->buildGithubUrlWithToken($repoUrl, $githubToken);
 
+        $branchRef = escapeshellarg("origin/{$branch}");
+
         $command = "cd /var/www/html"
-            ." && if [ ! -d .git ]; then echo 'Repository is not initialized in /var/www/html (.git missing).'; exit 1; fi"
+            ." && if [ ! -d .git ]; then echo 'ERROR: Repository is not initialized in /var/www/html (.git missing).'; exit 1; fi"
+            ." && CURRENT_HEAD=\"\$(git rev-parse HEAD 2>/dev/null || true)\""
             ." && git remote set-url origin ".escapeshellarg($deployRepoUrl)
-            ." && git fetch origin ".escapeshellarg($branch)
-            ." && git checkout -B ".escapeshellarg($branch)." origin/".escapeshellarg($branch)
-            ." && git pull --ff-only origin ".escapeshellarg($branch)
-            ." && if [ -f composer.json ]; then composer install --no-interaction --prefer-dist --optimize-autoloader; fi"
-            ." && if [ -f package.json ]; then if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi && npm run build; fi"
+            ." && if ! git fetch --quiet origin ".escapeshellarg($branch)."; then echo 'ERROR: git fetch failed'; exit 1; fi"
+            ." && TARGET_HEAD=\"\$(git rev-parse {$branchRef} 2>/dev/null || true)\""
+            ." && if [ -z \"\$TARGET_HEAD\" ]; then echo 'ERROR: Unable to resolve target commit from remote branch.'; exit 1; fi"
+            ." && if [ -n \"\$CURRENT_HEAD\" ] && [ \"\$CURRENT_HEAD\" = \"\$TARGET_HEAD\" ]; then echo 'No new commits to deploy.'; else echo 'New commits deployed:'; if [ -n \"\$CURRENT_HEAD\" ]; then git log --reverse --format='%h %s (%an)' \"\$CURRENT_HEAD..\$TARGET_HEAD\"; else git log --reverse --format='%h %s (%an)' -n 10 \"\$TARGET_HEAD\"; fi; fi"
+            ." && if ! git checkout -B ".escapeshellarg($branch)." {$branchRef}; then echo 'ERROR: git checkout failed'; exit 1; fi"
+            ." && if [ -f composer.json ]; then if ! composer install --no-interaction --prefer-dist --optimize-autoloader >/tmp/coolify-composer-install.log 2>&1; then echo 'ERROR: composer install failed'; echo 'Failed at: composer install'; sed -n '1,220p' /tmp/coolify-composer-install.log; exit 1; fi; fi"
+            ." && if [ -f package.json ]; then if [ -f package-lock.json ]; then NPM_INSTALL_CMD='npm ci --no-audit --no-fund'; else NPM_INSTALL_CMD='npm install --no-audit --no-fund'; fi; if ! sh -lc \"\$NPM_INSTALL_CMD && npm run build\" >/tmp/coolify-npm-build.log 2>&1; then echo 'ERROR: frontend build failed'; echo 'Failed at: npm install/build'; sed -n '1,220p' /tmp/coolify-npm-build.log; exit 1; fi; fi"
             ." && if [ -f .env ]; then if grep -Eq '^ASSET_URL=' .env; then sed -i 's|^ASSET_URL=.*|ASSET_URL=|' .env; else echo 'ASSET_URL=' >> .env; fi; fi"
-            ." && if [ -f artisan ]; then php artisan optimize:clear || true; php artisan config:clear || true; php artisan route:clear || true; php artisan view:clear || true; php artisan cache:clear || true; fi"
-            ." && echo 'Quick deploy finished'";
+            ." && if [ -f artisan ]; then php artisan optimize:clear >/tmp/coolify-artisan-clear.log 2>&1 || true; fi"
+            ." && echo \"Deploy completed successfully at commit \$(git rev-parse --short HEAD)\"";
 
         $this->runFrontendAssetCommand($command);
     }
@@ -413,7 +418,25 @@ class StackForm extends Component
         }
 
         $this->runFrontendAssetCommand(
-            "cd /var/www/html && if [ -f artisan ]; then php artisan migrate --force; else echo 'artisan file not found'; exit 1; fi"
+            "cd /var/www/html && if [ -f artisan ]; then "
+            ."php artisan optimize:clear || true; "
+            ."php artisan config:clear || true; "
+            ."echo 'Laravel migration context:'; "
+            .'echo "APP_ENV=${APP_ENV:-}"; '
+            .'echo "DB_CONNECTION=${DB_CONNECTION:-}"; '
+            .'echo "DB_HOST=${DB_HOST:-}"; '
+            .'echo "DB_PORT=${DB_PORT:-}"; '
+            .'echo "DB_DATABASE=${DB_DATABASE:-}"; '
+            .'echo "DB_USERNAME=${DB_USERNAME:-}"; '
+            .'echo "CACHE_STORE=${CACHE_STORE:-}"; '
+            .'echo "QUEUE_CONNECTION=${QUEUE_CONNECTION:-}"; '
+            ."echo 'Migration status before run:'; "
+            ."php artisan migrate:status --no-ansi || true; "
+            ."MIGRATION_OUTPUT_FILE=/tmp/coolify-migrate-output.log; "
+            ."if php artisan migrate --force --no-ansi >\"\$MIGRATION_OUTPUT_FILE\" 2>&1; then "
+            ."if [ -s \"\$MIGRATION_OUTPUT_FILE\" ]; then echo 'Migrations completed with output:'; sed -n '1,220p' \"\$MIGRATION_OUTPUT_FILE\"; else echo 'Migrations completed successfully with no warnings.'; fi; "
+            ."else echo 'ERROR: migrations failed'; echo 'Failed at: php artisan migrate --force'; sed -n '1,220p' \"\$MIGRATION_OUTPUT_FILE\"; exit 1; fi; "
+            ."else echo 'artisan file not found'; exit 1; fi"
         );
     }
 

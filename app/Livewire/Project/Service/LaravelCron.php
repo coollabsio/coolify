@@ -139,6 +139,7 @@ class LaravelCron extends Component
 
     public function loadCronData(): void
     {
+        $this->checkSchedulerStatus();
         $this->loadScheduleList();
     }
 
@@ -170,7 +171,7 @@ class LaravelCron extends Component
             $server = $application->service->server;
             $escapedContainer = escapeshellarg($container['container_name']);
 
-            $checkCommand = "docker exec {$escapedContainer} sh -c 'ps aux | grep \"schedule:run\" | grep -v grep || echo notfound'";
+            $checkCommand = "docker exec {$escapedContainer} sh -c 'ps aux | grep -E \"schedule:(run|work)\" | grep -v grep || echo notfound'";
             if ($server->isNonRoot()) {
                 $checkCommand = "sudo {$checkCommand}";
             }
@@ -189,7 +190,9 @@ class LaravelCron extends Component
             } else {
                 $this->isSchedulerEnabled = false;
                 $this->schedulerStatus = 'Stopped';
-                $this->schedulerOutput = 'Scheduler is not running';
+                $this->schedulerOutput = $supervisorStatus !== '' && $supervisorStatus !== 'notfound'
+                    ? $supervisorStatus
+                    : 'Scheduler is not running';
             }
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Error checking scheduler status: '.$e->getMessage());
@@ -218,8 +221,13 @@ class LaravelCron extends Component
             $server = $context['server'];
             $escapedContainer = $context['escapedContainer'];
 
-            // Prefer json if supported; fallback to plain table.
-            $jsonCommand = "docker exec {$escapedContainer} php /var/www/html/artisan schedule:list --format=json";
+            // Prefer the framework output from the deployed Laravel app.
+            $jsonCommand = "docker exec {$escapedContainer} sh -lc "
+                .escapeshellarg(
+                    "cd /var/www/html && php artisan optimize:clear >/dev/null 2>&1 || true; "
+                    ."php artisan config:clear >/dev/null 2>&1 || true; "
+                    ."php artisan schedule:list --format=json --no-interaction"
+                );
             $rawJson = '';
             if ($server->isNonRoot()) {
                 $jsonCommand = "sudo {$jsonCommand}";
@@ -230,7 +238,10 @@ class LaravelCron extends Component
 
             if ($parsed === []) {
                 // Some Laravel versions use --json instead.
-                $jsonCommand = "docker exec {$escapedContainer} php /var/www/html/artisan schedule:list --json";
+                $jsonCommand = "docker exec {$escapedContainer} sh -lc "
+                    .escapeshellarg(
+                        "cd /var/www/html && php artisan schedule:list --json --no-interaction"
+                    );
                 if ($server->isNonRoot()) {
                     $jsonCommand = "sudo {$jsonCommand}";
                 }
@@ -245,7 +256,10 @@ class LaravelCron extends Component
                 return;
             }
 
-            $plainCommand = "docker exec {$escapedContainer} php /var/www/html/artisan schedule:list";
+            $plainCommand = "docker exec {$escapedContainer} sh -lc "
+                .escapeshellarg(
+                    "cd /var/www/html && php artisan schedule:list --no-interaction"
+                );
             if ($server->isNonRoot()) {
                 $plainCommand = "sudo {$plainCommand}";
             }
@@ -254,6 +268,27 @@ class LaravelCron extends Component
             $rawPlain = trim($rawPlain);
 
             $this->scheduledTasks = $this->parseScheduleListOutput($rawPlain);
+            if ($this->scheduledTasks !== []) {
+                return;
+            }
+
+            $sourceCommand = "docker exec {$escapedContainer} sh -lc "
+                .escapeshellarg(
+                    "cd /var/www/html && "
+                    ."(grep -RInE \"Schedule::|->(cron|everyMinute|everyTwoMinutes|everyThreeMinutes|everyFourMinutes|everyFiveMinutes|everyTenMinutes|everyFifteenMinutes|everyThirtyMinutes|hourly|daily|weekly|monthly|yearly|timezone|between|weekdays|sundays|mondays|tuesdays|wednesdays|thursdays|fridays|saturdays|withoutOverlapping|onOneServer|runInBackground)\" routes app/Console 2>/dev/null || true)"
+                );
+            if ($server->isNonRoot()) {
+                $sourceCommand = "sudo {$sourceCommand}";
+            }
+
+            $rawSource = trim((string) (instant_remote_process([$sourceCommand], $server, false) ?? ''));
+            $this->scheduledTasks = $this->parseScheduleSourceOutput($rawSource);
+
+            if ($this->scheduledTasks !== []) {
+                $this->schedulerOutput = "Showing schedule definitions detected in project source because `php artisan schedule:list` returned no parseable tasks.\n\n".$rawSource;
+            } elseif ($rawPlain !== '') {
+                $this->schedulerOutput = $rawPlain;
+            }
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Error loading schedule list: '.$e->getMessage());
         } finally {
@@ -374,6 +409,41 @@ class LaravelCron extends Component
         }
 
         return $result;
+    }
+
+    /**
+     * @return array<int, array{command: string, expression: string, next_due: string, last_run: string, description: string}>
+     */
+    private function parseScheduleSourceOutput(string $raw): array
+    {
+        if ($raw === '') {
+            return [];
+        }
+
+        $tasks = [];
+        foreach (preg_split('/\r?\n/', $raw) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+
+            $parts = preg_split('/:/', $line, 3);
+            $location = count($parts) >= 2 ? "{$parts[0]}:{$parts[1]}" : 'project source';
+            $content = count($parts) === 3 ? trim($parts[2]) : $line;
+
+            $tasks[] = [
+                'command' => $content,
+                'expression' => 'Defined in source',
+                'next_due' => 'Resolve via artisan schedule:list',
+                'last_run' => '',
+                'description' => $location,
+            ];
+        }
+
+        return collect($tasks)
+            ->unique(fn (array $task) => $task['command'].'|'.$task['description'])
+            ->values()
+            ->all();
     }
 
     public function executeTaskNow(int $index): void
@@ -499,7 +569,16 @@ class LaravelCron extends Component
             $server = $application->service->server;
             $escapedContainer = escapeshellarg($container['container_name']);
 
-            $command = "docker exec {$escapedContainer} php /var/www/html/artisan schedule:run --verbose";
+            $command = "docker exec {$escapedContainer} sh -lc "
+                .escapeshellarg(
+                    "cd /var/www/html && php artisan optimize:clear >/dev/null 2>&1 || true; "
+                    ."php artisan config:clear >/dev/null 2>&1 || true; "
+                    ."echo 'Scheduler execution context:'; "
+                    .'echo "APP_ENV=${APP_ENV:-}"; '
+                    .'echo "CACHE_STORE=${CACHE_STORE:-}"; '
+                    .'echo "QUEUE_CONNECTION=${QUEUE_CONNECTION:-}"; '
+                    ."php artisan schedule:run --verbose --no-interaction"
+                );
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
             }

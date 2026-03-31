@@ -58,6 +58,7 @@
                                             <th class="px-2 py-2">Intervalo</th>
                                             <th class="px-2 py-2">Próxima</th>
                                             <th class="px-2 py-2">Última</th>
+                                            <th class="px-2 py-2">Origen</th>
                                             <th class="px-2 py-2">Acción</th>
                                         </tr>
                                         </thead>
@@ -75,6 +76,9 @@
                                                 </td>
                                                 <td class="px-2 py-2">
                                                     {{ $task['last_run'] }}
+                                                </td>
+                                                <td class="px-2 py-2">
+                                                    {{ $task['description'] }}
                                                 </td>
                                                 <td class="px-2 py-2">
                                                     <x-forms.button
