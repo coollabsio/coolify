@@ -17,11 +17,13 @@ it('reports deployed commits and focused failure stages in rootkit stack actions
         ->toContain("'queue-restart'");
 });
 
-it('configures laravel rootkit to use file cache and schedule work mode', function () {
+it('configures laravel rootkit to use file cache and guarded schedule run mode', function () {
     $template = file_get_contents(__DIR__.'/../../templates/compose/laravel-rootkit.yaml');
 
     expect($template)
-        ->toContain('php artisan schedule:work --no-interaction')
+        ->toContain('php artisan schedule:run --no-interaction')
+        ->toContain('SERVICE_LARAVEL_SCHEDULER_ENABLED')
+        ->toContain('php artisan schedule:list --no-interaction')
         ->toContain('CACHE_STORE=file')
         ->toContain('upsert_env "CACHE_STORE" "file"')
         ->toContain('upsert_env "SESSION_DRIVER" "file"')

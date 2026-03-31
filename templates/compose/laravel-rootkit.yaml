@@ -31,7 +31,7 @@ services:
           autorestart=true
 
           [program:scheduler]
-          command=sh -c "while [ ! -f /var/www/html/artisan ]; do echo 'Waiting for Laravel installation...'; sleep 10; done; cd /var/www/html && php artisan optimize:clear >/dev/null 2>&1 || true; php artisan config:clear >/dev/null 2>&1 || true; php artisan schedule:work --no-interaction 2>&1"
+          command=sh -c "while [ ! -f /var/www/html/artisan ]; do echo 'Waiting for Laravel installation...'; sleep 10; done; cd /var/www/html && php artisan optimize:clear >/dev/null 2>&1 || true; php artisan config:clear >/dev/null 2>&1 || true; while true; do if [ \"${SERVICE_LARAVEL_SCHEDULER_ENABLED:-true}\" != \"true\" ]; then echo 'Laravel scheduler disabled via SERVICE_LARAVEL_SCHEDULER_ENABLED'; sleep 60; continue; fi; if php artisan schedule:list --no-interaction >/dev/null 2>&1; then php artisan schedule:run --no-interaction 2>&1; else echo 'Laravel scheduler unavailable, retrying in 60 seconds'; fi; sleep 60; done"
           redirect_stderr=true
           stdout_logfile=/dev/stdout
           stdout_logfile_maxbytes=0
@@ -387,6 +387,7 @@ services:
       - CACHE_STORE=file
       - CACHE_DRIVER=file
       - SESSION_DRIVER=file
+      - SERVICE_LARAVEL_SCHEDULER_ENABLED=${SERVICE_LARAVEL_SCHEDULER_ENABLED:-true}
     depends_on:
       mariadb:
         condition: service_healthy
