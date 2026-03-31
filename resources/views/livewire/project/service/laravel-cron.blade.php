@@ -19,12 +19,13 @@
                 href="{{ route('project.service.laravel-cron', ['project_uuid' => $parameters['project_uuid'], 'environment_uuid' => $parameters['environment_uuid'], 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Laravel Cron</span></a>
         </div>
 
-        <div class="w-full overflow-x-hidden">
-            <div class="box-without-bg">
-                <div class="mb-6 rounded-lg border border-coolgray-300 bg-white px-5 py-4 text-black shadow-sm">
-                    <h2 class="text-xl font-bold text-black">Laravel Scheduler (Cron)</h2>
-                </div>
+        <div class="flex w-full flex-col overflow-x-hidden gap-6">
+            <div class="rounded-lg border border-coolgray-300 bg-white px-5 py-4 text-black shadow-sm">
+                <h2 class="text-xl font-bold !text-black" style="color: #000000;">Laravel Scheduler (Cron)</h2>
+            </div>
 
+            <div class="box-without-bg">
+                <div class="w-full">
                 @if (empty($laravelContainers))
                     <div class="rounded-lg border border-coolgray-200 bg-white p-4 text-sm text-black">
                         No Laravel containers detected in this service.
@@ -33,7 +34,7 @@
                     <div class="box-without-bg-without-border rounded-xl border border-coolgray-300 bg-white p-6 text-black shadow-sm">
                         <div class="rounded-lg border border-coolgray-300 bg-white p-4 text-black">
                             <div class="mb-3 mt-2 flex items-center justify-between">
-                                <h3 class="font-semibold text-black">Tareas programadas</h3>
+                                <h3 class="font-semibold !text-black" style="color: #000000;">Tareas programadas</h3>
                                 <x-forms.button
                                     wire:click="loadScheduleList"
                                     wire:loading.attr="disabled"
@@ -101,6 +102,7 @@
                         </div>
                     </div>
                 @endif
+                </div>
             </div>
         </div>
     </div>
