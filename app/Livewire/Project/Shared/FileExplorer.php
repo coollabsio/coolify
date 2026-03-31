@@ -6,7 +6,6 @@ use App\Enums\ActivityTypes;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
-use App\Support\ContainerName;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -286,7 +285,7 @@ class FileExplorer extends Component
     public function updatedSelectedContainer()
     {
         if ($this->selected_container !== 'default') {
-            $this->selected_container = ContainerName::normalize((string) $this->selected_container);
+            $this->selected_container = $this->normalizeContainerName((string) $this->selected_container);
             $this->checkDatabaseType();
             $this->checkForDatabaseContainers();
 
@@ -315,7 +314,7 @@ class FileExplorer extends Component
         }
 
         $container = collect($this->containers)->first(function ($container): bool {
-            return ContainerName::normalize((string) data_get($container, 'container.Names')) === ContainerName::normalize((string) $this->selected_container);
+            return $this->normalizeContainerName((string) data_get($container, 'container.Names')) === $this->normalizeContainerName((string) $this->selected_container);
         });
         if (is_null($container)) {
             return null;
@@ -389,12 +388,23 @@ class FileExplorer extends Component
                 && str_contains($composeRaw, 'laravel-files:/var/www/html'));
     }
 
+    private function normalizeContainerName(string $name): string
+    {
+        $name = trim($name);
+
+        if ($name === '') {
+            return '';
+        }
+
+        return ltrim($name, '/');
+    }
+
     public function checkForDatabaseContainers()
     {
         $this->hasMySQLOrMariaDBContainer = false;
 
         foreach ($this->containers as $container) {
-            $containerName = ContainerName::normalize((string) data_get($container, 'container.Names', ''));
+            $containerName = $this->normalizeContainerName((string) data_get($container, 'container.Names', ''));
 
             // Check by name
             if (str_contains(strtolower($containerName), 'mysql') ||
@@ -432,7 +442,7 @@ class FileExplorer extends Component
         }
 
         $container = collect($this->containers)->first(function ($container): bool {
-            return ContainerName::normalize((string) data_get($container, 'container.Names')) === ContainerName::normalize((string) $this->selected_container);
+            return $this->normalizeContainerName((string) data_get($container, 'container.Names')) === $this->normalizeContainerName((string) $this->selected_container);
         });
         if (is_null($container)) {
             $this->isMySQLOrMariaDB = false;
@@ -440,7 +450,7 @@ class FileExplorer extends Component
             return;
         }
 
-        $containerName = ContainerName::normalize((string) data_get($container, 'container.Names', ''));
+        $containerName = $this->normalizeContainerName((string) data_get($container, 'container.Names', ''));
         $server = data_get($container, 'server');
 
         // Check if container name contains mysql or mariadb
@@ -582,7 +592,7 @@ class FileExplorer extends Component
 
         try {
             $container = collect($this->containers)->first(function ($container): bool {
-                return ContainerName::normalize((string) data_get($container, 'container.Names')) === ContainerName::normalize((string) $this->selected_container);
+                return $this->normalizeContainerName((string) data_get($container, 'container.Names')) === $this->normalizeContainerName((string) $this->selected_container);
             });
             if (is_null($container)) {
                 $this->dispatch('error', 'Container not found.');
@@ -603,7 +613,7 @@ class FileExplorer extends Component
                 return;
             }
 
-            $containerName = ContainerName::normalize((string) data_get($container, 'container.Names'));
+            $containerName = $this->normalizeContainerName((string) data_get($container, 'container.Names'));
             $escapedContainer = escapeshellarg($containerName);
             $escapedPath = escapeshellarg($this->currentPath);
 
@@ -807,7 +817,7 @@ class FileExplorer extends Component
     {
         try {
             $container = collect($this->containers)->first(function ($container): bool {
-                return ContainerName::normalize((string) data_get($container, 'container.Names')) === ContainerName::normalize((string) $this->selected_container);
+                return $this->normalizeContainerName((string) data_get($container, 'container.Names')) === $this->normalizeContainerName((string) $this->selected_container);
             });
             if (is_null($container)) {
                 $this->dispatch('error', 'Container not found.');
@@ -816,7 +826,7 @@ class FileExplorer extends Component
             }
 
             $server = data_get($container, 'server');
-            $containerName = ContainerName::normalize((string) data_get($container, 'container.Names'));
+            $containerName = $this->normalizeContainerName((string) data_get($container, 'container.Names'));
             $escapedContainer = escapeshellarg($containerName);
             $escapedPath = escapeshellarg($path);
 
@@ -840,7 +850,7 @@ class FileExplorer extends Component
 
         try {
             $container = collect($this->containers)->first(function ($container): bool {
-                return ContainerName::normalize((string) data_get($container, 'container.Names')) === ContainerName::normalize((string) $this->selected_container);
+                return $this->normalizeContainerName((string) data_get($container, 'container.Names')) === $this->normalizeContainerName((string) $this->selected_container);
             });
             if (is_null($container)) {
                 $this->dispatch('error', 'Container not found.');
@@ -849,7 +859,7 @@ class FileExplorer extends Component
             }
 
             $server = data_get($container, 'server');
-            $containerName = ContainerName::normalize((string) data_get($container, 'container.Names'));
+            $containerName = $this->normalizeContainerName((string) data_get($container, 'container.Names'));
             $escapedContainer = escapeshellarg($containerName);
             $escapedPath = escapeshellarg($this->selectedFile);
 
@@ -2431,14 +2441,14 @@ class FileExplorer extends Component
         foreach ($commonPaths as $path) {
             try {
                 $container = collect($this->containers)->first(function ($container): bool {
-                    return ContainerName::normalize((string) data_get($container, 'container.Names')) === ContainerName::normalize((string) $this->selected_container);
+                    return $this->normalizeContainerName((string) data_get($container, 'container.Names')) === $this->normalizeContainerName((string) $this->selected_container);
                 });
                 if (is_null($container)) {
                     continue;
                 }
 
                 $server = data_get($container, 'server');
-                $containerName = ContainerName::normalize((string) data_get($container, 'container.Names'));
+                $containerName = $this->normalizeContainerName((string) data_get($container, 'container.Names'));
                 $escapedContainer = escapeshellarg($containerName);
                 $escapedPath = escapeshellarg($path);
 
