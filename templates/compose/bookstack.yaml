@@ -53,7 +53,7 @@ services:
       - PGID=1000
       - TZ=${TZ:-Europe/Berlin}
       - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-bookstack}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-bookstackapp}
       - MYSQL_USER=${SERVICE_USER_MYSQL}
       - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
     volumes:
