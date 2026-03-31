@@ -5,10 +5,12 @@ namespace App\Livewire\Project\Database;
 use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\Service;
+use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Import extends Component
@@ -104,17 +106,22 @@ class Import extends Component
     public bool $unsupported = false;
 
     // Store IDs instead of models for proper Livewire serialization
+    #[Locked]
     public ?int $resourceId = null;
 
+    #[Locked]
     public ?string $resourceType = null;
 
+    #[Locked]
     public ?int $serverId = null;
 
     // View-friendly properties to avoid computed property access in Blade
+    #[Locked]
     public string $resourceUuid = '';
 
     public string $resourceStatus = '';
 
+    #[Locked]
     public string $resourceDbType = '';
 
     public array $parameters = [];
@@ -135,6 +142,7 @@ class Import extends Component
 
     public bool $error = false;
 
+    #[Locked]
     public string $container;
 
     public array $importCommands = [];
@@ -181,7 +189,7 @@ class Import extends Component
             return null;
         }
 
-        return Server::find($this->serverId);
+        return Server::ownedByCurrentTeam()->find($this->serverId);
     }
 
     public function getListeners()
@@ -409,6 +417,12 @@ EOD;
 
         $this->authorize('update', $this->resource);
 
+        if (! ValidationPatterns::isValidContainerName($this->container)) {
+            $this->dispatch('error', 'Invalid container name.');
+
+            return true;
+        }
+
         if ($this->filename === '') {
             $this->dispatch('error', 'Please select a file to import.');
 
@@ -592,6 +606,12 @@ EOD;
         }
 
         $this->authorize('update', $this->resource);
+
+        if (! ValidationPatterns::isValidContainerName($this->container)) {
+            $this->dispatch('error', 'Invalid container name.');
+
+            return true;
+        }
 
         if (! $this->s3StorageId || blank($this->s3Path)) {
             $this->dispatch('error', 'Please select S3 storage and provide a path first.');

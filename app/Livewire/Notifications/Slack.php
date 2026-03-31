@@ -5,6 +5,7 @@ namespace App\Livewire\Notifications;
 use App\Models\SlackNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
+use App\Rules\SafeWebhookUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -25,7 +26,7 @@ class Slack extends Component
     #[Validate(['boolean'])]
     public bool $slackEnabled = false;
 
-    #[Validate(['url', 'nullable'])]
+    #[Validate(['nullable', new SafeWebhookUrl])]
     public ?string $slackWebhookUrl = null;
 
     #[Validate(['boolean'])]

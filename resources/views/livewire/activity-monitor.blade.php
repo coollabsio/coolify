@@ -34,10 +34,10 @@
             }
         }" x-init="// Initial scroll
         $nextTick(() => scrollToBottom());
-        
+
         // Add scroll event listener
         $el.addEventListener('scroll', () => handleScroll());
-        
+
         // Set up mutation observer to watch for content changes
         observer = new MutationObserver(() => {
             $nextTick(() => scrollToBottom());
@@ -52,7 +52,7 @@
                 'flex-1 min-h-0' => $fullHeight,
                 'max-h-96' => !$fullHeight,
             ])>
-            <pre class="font-mono whitespace-pre-wrap" @if ($isPollingActive) wire:poll.1000ms="polling" @endif>{{ RunRemoteProcess::decodeOutput($activity) }}</pre>
+            <pre class="font-logs whitespace-pre-wrap" @if ($isPollingActive) wire:poll.1000ms="polling" @endif>{{ RunRemoteProcess::decodeOutput($activity) }}</pre>
         </div>
     @else
         @if ($showWaiting)

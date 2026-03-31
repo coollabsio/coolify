@@ -24,7 +24,7 @@ class Docker extends Component
     #[Validate(['required', 'string'])]
     public string $name;
 
-    #[Validate(['required', 'string'])]
+    #[Validate(['required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/'])]
     public string $network;
 
     #[Validate(['required', 'string'])]

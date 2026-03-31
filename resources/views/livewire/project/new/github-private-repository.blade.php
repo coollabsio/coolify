@@ -5,11 +5,13 @@
             <livewire:source.github.create />
         </x-modal-input>
         @if ($repositories->count() > 0)
-            <a target="_blank" class="flex hover:no-underline" href="{{ getInstallationPath($github_app) }}">
-                <x-forms.button>
-                    Change Repositories on GitHub
-                    <x-external-link />
-                </x-forms.button>
+            <x-forms.button wire:click.prevent="loadRepositories({{ $github_app->id }})">
+                Refresh Repository List
+            </x-forms.button>
+            <a target="_blank" class="inline-flex items-center self-center gap-1 text-sm hover:underline dark:text-neutral-400"
+                href="{{ getInstallationPath($github_app) }}">
+                Change Repositories on GitHub
+                <x-external-link />
             </a>
         @endif
     </div>
@@ -51,7 +53,10 @@
                                 @endforeach
                             </x-forms.datalist>
                         </div>
-                        <x-forms.button wire:click.prevent="loadBranches"> Load Repository </x-forms.button>
+                        <x-forms.button :showLoadingIndicator="false" wire:click.prevent="loadBranches" wire:target="loadBranches, selected_repository_id">
+                            Load Repository
+                            <x-loading-on-button wire:loading.delay wire:target="loadBranches, selected_repository_id" />
+                        </x-forms.button>
                     </div>
                 @else
                     <div>No repositories found. Check your GitHub App configuration.</div>

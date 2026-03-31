@@ -1,12 +1,14 @@
 <?php
 
+use App\Models\Application;
+use App\Models\ApplicationSetting;
+
 /**
  * Security tests for git ref validation (GHSA-mw5w-2vvh-mgf4).
  *
  * Ensures that git_commit_sha and related inputs are validated
  * to prevent OS command injection via shell metacharacters.
  */
-
 describe('validateGitRef', function () {
     test('accepts valid hex commit SHAs', function () {
         expect(validateGitRef('abc123def456'))->toBe('abc123def456');
@@ -93,31 +95,31 @@ describe('validateGitRef', function () {
 describe('executeInDocker git log escaping', function () {
     test('git log command escapes commit SHA to prevent injection', function () {
         $maliciousCommit = "HEAD'; id; #";
-        $command = "cd /workdir && git log -1 ".escapeshellarg($maliciousCommit).' --pretty=%B';
+        $command = 'cd /workdir && git log -1 '.escapeshellarg($maliciousCommit).' --pretty=%B';
         $result = executeInDocker('test-container', $command);
 
         // The malicious payload must not be able to break out of quoting
-        expect($result)->not->toContain("id;");
+        expect($result)->not->toContain('id;');
         expect($result)->toContain("'HEAD'\\''");
     });
 });
 
 describe('buildGitCheckoutCommand escaping', function () {
     test('checkout command escapes target to prevent injection', function () {
-        $app = new \App\Models\Application;
-        $app->forceFill(['uuid' => 'test-uuid']);
+        $app = new Application;
+        $app->fill(['uuid' => 'test-uuid']);
 
-        $settings = new \App\Models\ApplicationSetting;
+        $settings = new ApplicationSetting;
         $settings->is_git_submodules_enabled = false;
         $app->setRelation('settings', $settings);
 
-        $method = new \ReflectionMethod($app, 'buildGitCheckoutCommand');
+        $method = new ReflectionMethod($app, 'buildGitCheckoutCommand');
 
         $result = $method->invoke($app, 'abc123');
         expect($result)->toContain("git checkout 'abc123'");
 
         $result = $method->invoke($app, "abc'; id; #");
-        expect($result)->not->toContain("id;");
+        expect($result)->not->toContain('id;');
         expect($result)->toContain("git checkout 'abc'");
     });
 });

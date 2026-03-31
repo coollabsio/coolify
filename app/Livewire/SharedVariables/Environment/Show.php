@@ -51,11 +51,14 @@ class Show extends Component
         }
     }
 
-    public function mount()
+    public function mount(?string $project_uuid = null, ?string $environment_uuid = null)
     {
         $this->parameters = get_route_parameters();
-        $this->project = Project::ownedByCurrentTeam()->where('uuid', request()->route('project_uuid'))->firstOrFail();
-        $this->environment = $this->project->environments()->where('uuid', request()->route('environment_uuid'))->firstOrFail();
+        $projectUuid = $project_uuid ?? request()->route('project_uuid');
+        $environmentUuid = $environment_uuid ?? request()->route('environment_uuid');
+
+        $this->project = Project::ownedByCurrentTeam()->where('uuid', $projectUuid)->firstOrFail();
+        $this->environment = $this->project->environments()->where('uuid', $environmentUuid)->firstOrFail();
         $this->getDevView();
     }
 

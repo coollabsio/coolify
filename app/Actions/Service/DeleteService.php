@@ -33,7 +33,7 @@ class DeleteService
                     }
                 }
                 foreach ($storagesToDelete as $storage) {
-                    $commands[] = "docker volume rm -f $storage->name";
+                    $commands[] = 'docker volume rm -f '.escapeshellarg($storage->name);
                 }
 
                 // Execute volume deletion first, this must be done first otherwise volumes will not be deleted.

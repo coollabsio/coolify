@@ -10,7 +10,23 @@ class ApplicationPreview extends BaseModel
 {
     use SoftDeletes;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'uuid',
+        'application_id',
+        'pull_request_id',
+        'pull_request_html_url',
+        'pull_request_issue_comment_id',
+        'fqdn',
+        'status',
+        'git_type',
+        'docker_compose_domains',
+        'docker_registry_image_tag',
+        'last_online_at',
+    ];
+
+    protected $casts = [
+        'pull_request_id' => 'integer',
+    ];
 
     protected static function booted()
     {
@@ -37,7 +53,7 @@ class ApplicationPreview extends BaseModel
                 $persistentStorages = $preview->persistentStorages()->get() ?? collect();
                 if ($persistentStorages->count() > 0) {
                     foreach ($persistentStorages as $storage) {
-                        instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+                        instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
                     }
                 }
             }
@@ -47,7 +63,7 @@ class ApplicationPreview extends BaseModel
         });
         static::saving(function ($preview) {
             if ($preview->isDirty('status')) {
-                $preview->forceFill(['last_online_at' => now()]);
+                $preview->last_online_at = now();
             }
         });
     }
@@ -69,7 +85,7 @@ class ApplicationPreview extends BaseModel
 
     public function persistentStorages()
     {
-        return $this->morphMany(\App\Models\LocalPersistentVolume::class, 'resource');
+        return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
 
     public function generate_preview_fqdn()

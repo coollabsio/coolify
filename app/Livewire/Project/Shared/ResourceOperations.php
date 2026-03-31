@@ -7,9 +7,18 @@ use App\Actions\Database\StopDatabase;
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
 use App\Jobs\VolumeCloneJob;
+use App\Models\Application;
 use App\Models\Environment;
 use App\Models\Project;
+use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use App\Models\SwarmDocker;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -60,7 +69,7 @@ class ResourceOperations extends Component
         $uuid = (string) new Cuid2;
         $server = $new_destination->server;
 
-        if ($this->resource->getMorphClass() === \App\Models\Application::class) {
+        if ($this->resource->getMorphClass() === Application::class) {
             $new_resource = clone_application($this->resource, $new_destination, ['uuid' => $uuid], $this->cloneVolumeData);
 
             $route = route('project.application.configuration', [
@@ -71,14 +80,14 @@ class ResourceOperations extends Component
 
             return redirect()->to($route);
         } elseif (
-            $this->resource->getMorphClass() === \App\Models\StandalonePostgresql::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneMongodb::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneMysql::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneMariadb::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneRedis::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneKeydb::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneClickhouse::class
+            $this->resource->getMorphClass() === StandalonePostgresql::class ||
+            $this->resource->getMorphClass() === StandaloneMongodb::class ||
+            $this->resource->getMorphClass() === StandaloneMysql::class ||
+            $this->resource->getMorphClass() === StandaloneMariadb::class ||
+            $this->resource->getMorphClass() === StandaloneRedis::class ||
+            $this->resource->getMorphClass() === StandaloneKeydb::class ||
+            $this->resource->getMorphClass() === StandaloneDragonfly::class ||
+            $this->resource->getMorphClass() === StandaloneClickhouse::class
         ) {
             $uuid = (string) new Cuid2;
             $new_resource = $this->resource->replicate([
@@ -133,6 +142,7 @@ class ResourceOperations extends Component
                     'id',
                     'created_at',
                     'updated_at',
+                    'uuid',
                 ])->fill([
                     'name' => $newName,
                     'resource_id' => $new_resource->id,
@@ -254,9 +264,9 @@ class ResourceOperations extends Component
             }
 
             foreach ($new_resource->applications() as $application) {
-                $application->update([
+                $application->fill([
                     'status' => 'exited',
-                ]);
+                ])->save();
 
                 $persistentVolumes = $application->persistentStorages()->get();
                 foreach ($persistentVolumes as $volume) {
@@ -271,6 +281,7 @@ class ResourceOperations extends Component
                         'id',
                         'created_at',
                         'updated_at',
+                        'uuid',
                     ])->fill([
                         'name' => $newName,
                         'resource_id' => $application->id,
@@ -296,9 +307,9 @@ class ResourceOperations extends Component
             }
 
             foreach ($new_resource->databases() as $database) {
-                $database->update([
+                $database->fill([
                     'status' => 'exited',
-                ]);
+                ])->save();
 
                 $persistentVolumes = $database->persistentStorages()->get();
                 foreach ($persistentVolumes as $volume) {
@@ -313,6 +324,7 @@ class ResourceOperations extends Component
                         'id',
                         'created_at',
                         'updated_at',
+                        'uuid',
                     ])->fill([
                         'name' => $newName,
                         'resource_id' => $database->id,
@@ -354,9 +366,9 @@ class ResourceOperations extends Component
         try {
             $this->authorize('update', $this->resource);
             $new_environment = Environment::ownedByCurrentTeam()->findOrFail($environment_id);
-            $this->resource->update([
+            $this->resource->fill([
                 'environment_id' => $environment_id,
-            ]);
+            ])->save();
             if ($this->resource->type() === 'application') {
                 $route = route('project.application.configuration', [
                     'project_uuid' => $new_environment->project->uuid,

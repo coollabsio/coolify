@@ -72,7 +72,7 @@
                     <div class="flex flex-col gap-4">
                         <div class="flex flex-col w-full gap-2 xl:flex-row">
                             <x-forms.input canGate="update" :canResource="$settings" required id="smtpHost" placeholder="smtp.mailgun.org" label="Host" />
-                            <x-forms.input canGate="update" :canResource="$settings" required id="smtpPort" placeholder="587" label="Port" />
+                            <x-forms.input canGate="update" :canResource="$settings" required id="smtpPort" type="number" placeholder="587" label="Port" />
                             <x-forms.select canGate="update" :canResource="$settings" required id="smtpEncryption" label="Encryption">
                                 <option value="starttls">StartTLS</option>
                                 <option value="tls">TLS/SSL</option>
@@ -82,7 +82,7 @@
                         <div class="flex flex-col w-full gap-2 xl:flex-row">
                             <x-forms.input canGate="update" :canResource="$settings" id="smtpUsername" label="SMTP Username" />
                             <x-forms.input canGate="update" :canResource="$settings" id="smtpPassword" type="password" label="SMTP Password" />
-                            <x-forms.input canGate="update" :canResource="$settings" id="smtpTimeout" helper="Timeout value for sending emails."
+                            <x-forms.input canGate="update" :canResource="$settings" id="smtpTimeout" type="number"  helper="Timeout value for sending emails."
                                 label="Timeout" />
                         </div>
                     </div>

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Stripe\UpdateSubscriptionQuantity;
 use App\Models\Subscription;
 use App\Models\Team;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -72,25 +73,15 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                         // send_internal_notification("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}, subscriptionid: {$subscriptionId}.");
                         throw new \RuntimeException("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}, subscriptionid: {$subscriptionId}.");
                     }
-                    $subscription = Subscription::where('team_id', $teamId)->first();
-                    if ($subscription) {
-                        // send_internal_notification('Old subscription activated for team: '.$teamId);
-                        $subscription->update([
+                    Subscription::updateOrCreate(
+                        ['team_id' => $teamId],
+                        [
                             'stripe_subscription_id' => $subscriptionId,
                             'stripe_customer_id' => $customerId,
                             'stripe_invoice_paid' => true,
                             'stripe_past_due' => false,
-                        ]);
-                    } else {
-                        // send_internal_notification('New subscription for team: '.$teamId);
-                        Subscription::create([
-                            'team_id' => $teamId,
-                            'stripe_subscription_id' => $subscriptionId,
-                            'stripe_customer_id' => $customerId,
-                            'stripe_invoice_paid' => true,
-                            'stripe_past_due' => false,
-                        ]);
-                    }
+                        ]
+                    );
                     break;
                 case 'invoice.paid':
                     $customerId = data_get($data, 'customer');
@@ -226,18 +217,15 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                         // send_internal_notification("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}.");
                         throw new \RuntimeException("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}.");
                     }
-                    $subscription = Subscription::where('team_id', $teamId)->first();
-                    if ($subscription) {
-                        // send_internal_notification("Subscription already exists for team: {$teamId}");
-                        throw new \RuntimeException("Subscription already exists for team: {$teamId}");
-                    } else {
-                        Subscription::create([
-                            'team_id' => $teamId,
+                    Subscription::updateOrCreate(
+                        ['team_id' => $teamId],
+                        [
                             'stripe_subscription_id' => $subscriptionId,
                             'stripe_customer_id' => $customerId,
                             'stripe_invoice_paid' => false,
-                        ]);
-                    }
+                        ]
+                    );
+                    break;
                 case 'customer.subscription.updated':
                     $teamId = data_get($data, 'metadata.team_id');
                     $userId = data_get($data, 'metadata.user_id');
@@ -252,34 +240,33 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                     if (! $subscription) {
                         if ($status === 'incomplete_expired') {
-                            // send_internal_notification('Subscription incomplete expired');
                             throw new \RuntimeException('Subscription incomplete expired');
                         }
-                        if ($teamId) {
-                            $subscription = Subscription::create([
-                                'team_id' => $teamId,
+                        if (! $teamId) {
+                            throw new \RuntimeException('No subscription and team id found');
+                        }
+                        $subscription = Subscription::firstOrCreate(
+                            ['team_id' => $teamId],
+                            [
                                 'stripe_subscription_id' => $subscriptionId,
                                 'stripe_customer_id' => $customerId,
                                 'stripe_invoice_paid' => false,
-                            ]);
-                        } else {
-                            // send_internal_notification('No subscription and team id found');
-                            throw new \RuntimeException('No subscription and team id found');
-                        }
+                            ]
+                        );
                     }
                     $cancelAtPeriodEnd = data_get($data, 'cancel_at_period_end');
                     $feedback = data_get($data, 'cancellation_details.feedback');
                     $comment = data_get($data, 'cancellation_details.comment');
                     $lookup_key = data_get($data, 'items.data.0.price.lookup_key');
                     if (str($lookup_key)->contains('dynamic')) {
-                        $quantity = data_get($data, 'items.data.0.quantity', 2);
+                        $quantity = min((int) data_get($data, 'items.data.0.quantity', 2), UpdateSubscriptionQuantity::MAX_SERVER_LIMIT);
                         $team = data_get($subscription, 'team');
                         if ($team) {
                             $team->update([
                                 'custom_server_limit' => $quantity,
                             ]);
+                            ServerLimitCheckJob::dispatch($team);
                         }
-                        ServerLimitCheckJob::dispatch($team);
                     }
                     $subscription->update([
                         'stripe_feedback' => $feedback,

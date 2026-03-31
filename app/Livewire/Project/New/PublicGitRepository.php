@@ -11,6 +11,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
+use App\Support\ValidationPatterns;
 use Carbon\Carbon;
 use Livewire\Component;
 use Spatie\Url\Url;
@@ -72,7 +73,7 @@ class PublicGitRepository extends Component
             'publish_directory' => 'nullable|string',
             'build_pack' => 'required|string',
             'base_directory' => 'nullable|string',
-            'docker_compose_location' => \App\Support\ValidationPatterns::filePathRules(),
+            'docker_compose_location' => ValidationPatterns::filePathRules(),
             'git_branch' => ['required', 'string', new ValidGitBranch],
         ];
     }
@@ -233,7 +234,7 @@ class PublicGitRepository extends Component
 
             return;
         }
-        if ($this->git_source->getMorphClass() === \App\Models\GithubApp::class) {
+        if ($this->git_source->getMorphClass() === GithubApp::class) {
             ['rate_limit_remaining' => $this->rate_limit_remaining, 'rate_limit_reset' => $this->rate_limit_reset] = githubApi(source: $this->git_source, endpoint: "/repos/{$this->git_repository}/branches/{$this->git_branch}");
             $this->rate_limit_reset = Carbon::parse((int) $this->rate_limit_reset)->format('Y-M-d H:i:s');
             $this->branchFound = true;
@@ -278,8 +279,8 @@ class PublicGitRepository extends Component
             }
             $destination_class = $destination->getMorphClass();
 
-            $project = Project::where('uuid', $project_uuid)->first();
-            $environment = $project->load(['environments'])->environments->where('uuid', $environment_uuid)->first();
+            $project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->firstOrFail();
+            $environment = $project->environments()->where('uuid', $environment_uuid)->firstOrFail();
 
             if ($this->build_pack === 'dockercompose' && isDev() && $this->new_compose_services) {
                 $server = $destination->server;

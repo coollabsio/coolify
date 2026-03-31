@@ -118,7 +118,100 @@ class Application extends BaseModel
 
     private static $parserVersion = '5';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+        'fqdn',
+        'git_repository',
+        'git_branch',
+        'git_commit_sha',
+        'git_full_url',
+        'docker_registry_image_name',
+        'docker_registry_image_tag',
+        'build_pack',
+        'static_image',
+        'install_command',
+        'build_command',
+        'start_command',
+        'ports_exposes',
+        'ports_mappings',
+        'base_directory',
+        'publish_directory',
+        'health_check_enabled',
+        'health_check_path',
+        'health_check_port',
+        'health_check_host',
+        'health_check_method',
+        'health_check_return_code',
+        'health_check_scheme',
+        'health_check_response_text',
+        'health_check_interval',
+        'health_check_timeout',
+        'health_check_retries',
+        'health_check_start_period',
+        'health_check_type',
+        'health_check_command',
+        'limits_memory',
+        'limits_memory_swap',
+        'limits_memory_swappiness',
+        'limits_memory_reservation',
+        'limits_cpus',
+        'limits_cpuset',
+        'limits_cpu_shares',
+        'status',
+        'preview_url_template',
+        'dockerfile',
+        'dockerfile_location',
+        'dockerfile_target_build',
+        'custom_labels',
+        'custom_docker_run_options',
+        'post_deployment_command',
+        'post_deployment_command_container',
+        'pre_deployment_command',
+        'pre_deployment_command_container',
+        'manual_webhook_secret_github',
+        'manual_webhook_secret_gitlab',
+        'manual_webhook_secret_bitbucket',
+        'manual_webhook_secret_gitea',
+        'docker_compose_location',
+        'docker_compose_pr_location',
+        'docker_compose',
+        'docker_compose_pr',
+        'docker_compose_raw',
+        'docker_compose_pr_raw',
+        'docker_compose_domains',
+        'docker_compose_custom_start_command',
+        'docker_compose_custom_build_command',
+        'swarm_replicas',
+        'swarm_placement_constraints',
+        'watch_paths',
+        'redirect',
+        'compose_parsing_version',
+        'custom_nginx_configuration',
+        'custom_network_aliases',
+        'custom_healthcheck_found',
+        'nixpkgsarchive',
+        'is_http_basic_auth_enabled',
+        'http_basic_auth_username',
+        'http_basic_auth_password',
+        'connect_to_docker_network',
+        'force_domain_override',
+        'is_container_label_escape_enabled',
+        'use_build_server',
+        'config_hash',
+        'last_online_at',
+        'restart_count',
+        'last_restart_at',
+        'last_restart_type',
+        'uuid',
+        'environment_id',
+        'destination_id',
+        'destination_type',
+        'source_id',
+        'source_type',
+        'repository_project_id',
+        'private_key_id',
+    ];
 
     protected $appends = ['server_status'];
 
@@ -177,7 +270,7 @@ class Application extends BaseModel
                 }
             }
             if (count($payload) > 0) {
-                $application->forceFill($payload);
+                $application->fill($payload);
             }
 
             // Buildpack switching cleanup logic
@@ -390,7 +483,7 @@ class Application extends BaseModel
             }
             $server = data_get($this, 'destination.server');
             foreach ($persistentStorages as $storage) {
-                instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+                instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
             }
         }
     }
@@ -1051,7 +1144,7 @@ class Application extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->custom_network_aliases.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->settings->use_build_secrets.$this->settings->inject_build_args_to_dockerfile.$this->settings->include_source_commit_in_build);
+        $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->custom_network_aliases.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->settings?->use_build_secrets.$this->settings?->inject_build_args_to_dockerfile.$this->settings?->include_source_commit_in_build);
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
             $newConfigHash .= json_encode($this->environment_variables()->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
         } else {
@@ -1145,7 +1238,7 @@ class Application extends BaseModel
                 'is_accessible' => true,
                 'error' => null,
             ];
-        } catch (\RuntimeException $ex) {
+        } catch (RuntimeException $ex) {
             return [
                 'is_accessible' => false,
                 'error' => $ex->getMessage(),
@@ -1202,7 +1295,7 @@ class Application extends BaseModel
                 ];
             }
 
-            if ($this->source->getMorphClass() === \App\Models\GitlabApp::class) {
+            if ($this->source->getMorphClass() === GitlabApp::class) {
                 $gitlabSource = $this->source;
                 $private_key = data_get($gitlabSource, 'privateKey.private_key');
 
@@ -1354,7 +1447,7 @@ class Application extends BaseModel
             $source_html_url_host = $url['host'];
             $source_html_url_scheme = $url['scheme'];
 
-            if ($this->source->getMorphClass() === \App\Models\GithubApp::class) {
+            if ($this->source->getMorphClass() === GithubApp::class) {
                 if ($this->source->is_public) {
                     $fullRepoUrl = "{$this->source->html_url}/{$customRepository}";
                     $escapedRepoUrl = escapeshellarg("{$this->source->html_url}/{$customRepository}");
@@ -1409,7 +1502,7 @@ class Application extends BaseModel
                 ];
             }
 
-            if ($this->source->getMorphClass() === \App\Models\GitlabApp::class) {
+            if ($this->source->getMorphClass() === GitlabApp::class) {
                 $gitlabSource = $this->source;
                 $private_key = data_get($gitlabSource, 'privateKey.private_key');
 
@@ -1600,7 +1693,7 @@ class Application extends BaseModel
         try {
             $yaml = Yaml::parse($this->docker_compose_raw);
         } catch (\Exception $e) {
-            throw new \RuntimeException($e->getMessage());
+            throw new RuntimeException($e->getMessage());
         }
         $services = data_get($yaml, 'services');
 
@@ -1682,7 +1775,7 @@ class Application extends BaseModel
         $fileList = collect([".$workdir$composeFile"]);
         $gitRemoteStatus = $this->getGitRemoteStatus(deployment_uuid: $uuid);
         if (! $gitRemoteStatus['is_accessible']) {
-            throw new \RuntimeException("Failed to read Git source:\n\n{$gitRemoteStatus['error']}");
+            throw new RuntimeException('Failed to read Git source. Please verify repository access and try again.');
         }
         $getGitVersion = instant_remote_process(['git --version'], $this->destination->server, false);
         $gitVersion = str($getGitVersion)->explode(' ')->last();
@@ -1732,15 +1825,15 @@ class Application extends BaseModel
             $this->save();
 
             if (str($e->getMessage())->contains('No such file')) {
-                throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile (branch: {$this->git_branch})<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
+                throw new RuntimeException("Docker Compose file not found at: $workdir$composeFile (branch: {$this->git_branch})<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
             }
             if (str($e->getMessage())->contains('fatal: repository') && str($e->getMessage())->contains('does not exist')) {
                 if ($this->deploymentType() === 'deploy_key') {
-                    throw new \RuntimeException('Your deploy key does not have access to the repository. Please check your deploy key and try again.');
+                    throw new RuntimeException('Your deploy key does not have access to the repository. Please check your deploy key and try again.');
                 }
-                throw new \RuntimeException('Repository does not exist. Please check your repository URL and try again.');
+                throw new RuntimeException('Repository does not exist. Please check your repository URL and try again.');
             }
-            throw new \RuntimeException($e->getMessage());
+            throw new RuntimeException('Failed to read the Docker Compose file from the repository.');
         } finally {
             // Cleanup only - restoration happens in catch block
             $commands = collect([
@@ -1793,7 +1886,7 @@ class Application extends BaseModel
             $this->base_directory = $initialBaseDirectory;
             $this->save();
 
-            throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile (branch: {$this->git_branch})<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
+            throw new RuntimeException("Docker Compose file not found at: $workdir$composeFile (branch: {$this->git_branch})<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
         }
     }
 

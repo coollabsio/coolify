@@ -36,9 +36,9 @@ class General extends Component
 
     public ?bool $isPublic = null;
 
-    public ?int $publicPort = null;
+    public mixed $publicPort = null;
 
-    public ?int $publicPortTimeout = 3600;
+    public mixed $publicPortTimeout = 3600;
 
     public ?string $customDockerRunOptions = null;
 
@@ -59,7 +59,8 @@ class General extends Component
 
         return [
             "echo-private:team.{$teamId},DatabaseProxyStopped" => 'databaseProxyStopped',
-            "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
+            "echo-private:user.{$userId},DatabaseStatusChanged" => 'refresh',
+            "echo-private:team.{$teamId},ServiceChecked" => 'refresh',
         ];
     }
 
@@ -93,9 +94,9 @@ class General extends Component
             'keydbConf' => 'nullable|string',
             'keydbPassword' => 'required|string',
             'image' => 'required|string',
-            'portsMappings' => 'nullable|string',
+            'portsMappings' => ValidationPatterns::portMappingRules(),
             'isPublic' => 'nullable|boolean',
-            'publicPort' => 'nullable|integer',
+            'publicPort' => 'nullable|integer|min:1|max:65535',
             'publicPortTimeout' => 'nullable|integer|min:1',
             'customDockerRunOptions' => 'nullable|string',
             'dbUrl' => 'nullable|string',
@@ -111,12 +112,15 @@ class General extends Component
     {
         return array_merge(
             ValidationPatterns::combinedMessages(),
+            ValidationPatterns::portMappingMessages(),
             [
                 'keydbPassword.required' => 'The KeyDB Password field is required.',
                 'keydbPassword.string' => 'The KeyDB Password must be a string.',
                 'image.required' => 'The Docker Image field is required.',
                 'image.string' => 'The Docker Image must be a string.',
                 'publicPort.integer' => 'The Public Port must be an integer.',
+                'publicPort.min' => 'The Public Port must be at least 1.',
+                'publicPort.max' => 'The Public Port must not exceed 65535.',
                 'publicPortTimeout.integer' => 'The Public Port Timeout must be an integer.',
                 'publicPortTimeout.min' => 'The Public Port Timeout must be at least 1.',
             ]
@@ -134,8 +138,8 @@ class General extends Component
             $this->database->image = $this->image;
             $this->database->ports_mappings = $this->portsMappings;
             $this->database->is_public = $this->isPublic;
-            $this->database->public_port = $this->publicPort;
-            $this->database->public_port_timeout = $this->publicPortTimeout;
+            $this->database->public_port = $this->publicPort ?: null;
+            $this->database->public_port_timeout = $this->publicPortTimeout ?: null;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->enable_ssl = $this->enable_ssl;
@@ -224,6 +228,9 @@ class General extends Component
         try {
             $this->authorize('manageEnvironment', $this->database);
 
+            if ($this->portsMappings) {
+                $this->portsMappings = str($this->portsMappings)->replace(' ', '')->trim()->toString();
+            }
             if (str($this->publicPort)->isEmpty()) {
                 $this->publicPort = null;
             }
@@ -269,9 +276,20 @@ class General extends Component
                 ->where('is_ca_certificate', true)
                 ->first();
 
+            if (! $caCert) {
+                $this->server->generateCaCertificate();
+                $caCert = $this->server->sslCertificates()->where('is_ca_certificate', true)->first();
+            }
+
+            if (! $caCert) {
+                $this->dispatch('error', 'No CA certificate found for this database. Please generate a CA certificate for this server in the server/advanced page.');
+
+                return;
+            }
+
             SslHelper::generateSslCertificate(
-                commonName: $existingCert->commonName,
-                subjectAlternativeNames: $existingCert->subjectAlternativeNames ?? [],
+                commonName: $existingCert->common_name,
+                subjectAlternativeNames: $existingCert->subject_alternative_names ?? [],
                 resourceType: $existingCert->resource_type,
                 resourceId: $existingCert->resource_id,
                 serverId: $existingCert->server_id,
@@ -286,5 +304,11 @@ class General extends Component
         } catch (Exception $e) {
             handleError($e, $this);
         }
+    }
+
+    public function refresh(): void
+    {
+        $this->database->refresh();
+        $this->syncData();
     }
 }

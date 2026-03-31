@@ -2,10 +2,12 @@
 
 namespace App\Actions\Proxy;
 
+use App\Enums\ProxyTypes;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Symfony\Component\Yaml\Yaml;
 
 class GetProxyConfiguration
 {
@@ -23,6 +25,17 @@ class GetProxyConfiguration
         if (! $forceRegenerate) {
             // Primary source: database
             $proxy_configuration = $server->proxy->get('last_saved_proxy_configuration');
+
+            // Validate stored config matches current proxy type
+            if (! empty(trim($proxy_configuration ?? ''))) {
+                if (! $this->configMatchesProxyType($proxyType, $proxy_configuration)) {
+                    Log::warning('Stored proxy config does not match current proxy type, will regenerate', [
+                        'server_id' => $server->id,
+                        'proxy_type' => $proxyType,
+                    ]);
+                    $proxy_configuration = null;
+                }
+            }
 
             // Backfill: existing servers may not have DB config yet — read from disk once
             if (empty(trim($proxy_configuration ?? ''))) {
@@ -53,6 +66,29 @@ class GetProxyConfiguration
         ProxyDashboardCacheService::isTraefikDashboardAvailableFromConfiguration($server, $proxy_configuration);
 
         return $proxy_configuration;
+    }
+
+    /**
+     * Check that the stored docker-compose YAML contains the expected service
+     * for the server's current proxy type. Returns false if the config belongs
+     * to a different proxy type (e.g. Traefik config on a CADDY server).
+     */
+    private function configMatchesProxyType(string $proxyType, string $configuration): bool
+    {
+        try {
+            $yaml = Yaml::parse($configuration);
+            $services = data_get($yaml, 'services', []);
+
+            return match ($proxyType) {
+                ProxyTypes::TRAEFIK->value => isset($services['traefik']),
+                ProxyTypes::CADDY->value => isset($services['caddy']),
+                ProxyTypes::NGINX->value => isset($services['nginx']),
+                default => true,
+            };
+        } catch (\Throwable $e) {
+            // If YAML is unparseable, don't block — let the existing flow handle it
+            return true;
+        }
     }
 
     /**

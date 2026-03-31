@@ -14,7 +14,7 @@
                 href="{{ route('project.service.environment-variables', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Environment Variables</span></a>
             <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
                 href="{{ route('project.service.storages', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Persistent Storages</span></a>
-            <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
+            <a @class(['sub-menu-item', 'menu-item-active' => str($currentRoute)->startsWith('project.service.scheduled-tasks')]) {{ wireNavigate() }}
                 href="{{ route('project.service.scheduled-tasks.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Scheduled Tasks</span></a>
             <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
                 href="{{ route('project.service.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Webhooks</span></a>
@@ -189,6 +189,8 @@
                 @endforeach
             @elseif ($currentRoute === 'project.service.scheduled-tasks.show')
                 <livewire:project.shared.scheduled-task.all :resource="$service" />
+            @elseif ($currentRoute === 'project.service.scheduled-tasks')
+                <livewire:project.shared.scheduled-task.show />
             @elseif ($currentRoute === 'project.service.webhooks')
                 <livewire:project.shared.webhooks :resource="$service" />
             @elseif ($currentRoute === 'project.service.resource-operations')

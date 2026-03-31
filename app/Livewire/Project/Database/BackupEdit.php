@@ -76,7 +76,7 @@ class BackupEdit extends Component
     public bool $dumpAll = false;
 
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
-    public int $timeout = 3600;
+    public int|string $timeout = 3600;
 
     public function mount()
     {
@@ -105,21 +105,9 @@ class BackupEdit extends Component
             $this->backup->s3_storage_id = $this->s3StorageId;
 
             // Validate databases_to_backup to prevent command injection
+            // Handles all formats including MongoDB's "db:col1,col2|db2:col3"
             if (filled($this->databasesToBackup)) {
-                $databases = str($this->databasesToBackup)->explode(',');
-                foreach ($databases as $index => $db) {
-                    $dbName = trim($db);
-                    try {
-                        validateShellSafePath($dbName, 'database name');
-                    } catch (\Exception $e) {
-                        // Provide specific error message indicating which database failed validation
-                        $position = $index + 1;
-                        throw new \Exception(
-                            "Database #{$position} ('{$dbName}') validation failed: ".
-                            $e->getMessage()
-                        );
-                    }
-                }
+                validateDatabasesBackupInput($this->databasesToBackup);
             }
 
             $this->backup->databases_to_backup = $this->databasesToBackup;

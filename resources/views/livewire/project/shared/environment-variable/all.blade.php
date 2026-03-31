@@ -84,21 +84,21 @@
                     Inline comments with space before # (e.g., <code class="font-mono">KEY=value #comment</code>) are stripped.
                 </x-callout>
 
-                <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables"
+                <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables" monospace
                     label="Production Environment Variables"></x-forms.textarea>
 
                 @if ($showPreview)
-                    <x-forms.textarea rows="10" class="whitespace-pre-wrap" label="Preview Deployments Environment Variables"
+                    <x-forms.textarea rows="10" class="whitespace-pre-wrap" label="Preview Deployments Environment Variables" monospace
                         id="variablesPreview" wire:model="variablesPreview"></x-forms.textarea>
                 @endif
 
                 <x-forms.button type="submit" class="btn btn-primary">Save All Environment Variables</x-forms.button>
             @else
-                <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables"
+                <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables" monospace
                     label="Production Environment Variables" disabled></x-forms.textarea>
 
                 @if ($showPreview)
-                    <x-forms.textarea rows="10" class="whitespace-pre-wrap" label="Preview Deployments Environment Variables"
+                    <x-forms.textarea rows="10" class="whitespace-pre-wrap" label="Preview Deployments Environment Variables" monospace
                         id="variablesPreview" wire:model="variablesPreview" disabled></x-forms.textarea>
                 @endif
             @endcan

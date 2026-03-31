@@ -137,6 +137,11 @@ function checkMinimumDockerEngineVersion($dockerVersion)
 
     return $dockerVersion;
 }
+function escapeShellValue(string $value): string
+{
+    return "'".str_replace("'", "'\\''", $value)."'";
+}
+
 function executeInDocker(string $containerId, string $command)
 {
     $escapedCommand = str_replace("'", "'\\''", $command);

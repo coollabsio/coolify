@@ -88,11 +88,11 @@ it('filters out null environment variables from nixpacks build command', functio
     $envArgsProperty->setAccessible(true);
     $envArgs = $envArgsProperty->getValue($job);
 
-    // Verify that only valid environment variables are included
-    expect($envArgs)->toContain('--env VALID_VAR=valid_value');
-    expect($envArgs)->toContain('--env ANOTHER_VALID_VAR=another_value');
-    expect($envArgs)->toContain('--env COOLIFY_FQDN=example.com');
-    expect($envArgs)->toContain('--env SOURCE_COMMIT=abc123');
+    // Verify that only valid environment variables are included (values are now single-quote escaped)
+    expect($envArgs)->toContain("--env 'VALID_VAR=valid_value'");
+    expect($envArgs)->toContain("--env 'ANOTHER_VALID_VAR=another_value'");
+    expect($envArgs)->toContain("--env 'COOLIFY_FQDN=example.com'");
+    expect($envArgs)->toContain("--env 'SOURCE_COMMIT=abc123'");
 
     // Verify that null and empty environment variables are filtered out
     expect($envArgs)->not->toContain('NULL_VAR');
@@ -102,7 +102,7 @@ it('filters out null environment variables from nixpacks build command', functio
 
     // Verify no environment variables end with just '=' (which indicates null/empty value)
     expect($envArgs)->not->toMatch('/--env [A-Z_]+=$/');
-    expect($envArgs)->not->toMatch('/--env [A-Z_]+= /');
+    expect($envArgs)->not->toMatch("/--env '[A-Z_]+='$/");
 });
 
 it('filters out null environment variables from nixpacks preview deployments', function () {
@@ -164,9 +164,9 @@ it('filters out null environment variables from nixpacks preview deployments', f
     $envArgsProperty->setAccessible(true);
     $envArgs = $envArgsProperty->getValue($job);
 
-    // Verify that only valid environment variables are included
-    expect($envArgs)->toContain('--env PREVIEW_VAR=preview_value');
-    expect($envArgs)->toContain('--env COOLIFY_FQDN=preview.example.com');
+    // Verify that only valid environment variables are included (values are now single-quote escaped)
+    expect($envArgs)->toContain("--env 'PREVIEW_VAR=preview_value'");
+    expect($envArgs)->toContain("--env 'COOLIFY_FQDN=preview.example.com'");
 
     // Verify that null environment variables are filtered out
     expect($envArgs)->not->toContain('NULL_PREVIEW_VAR');
@@ -335,7 +335,7 @@ it('preserves environment variables with zero values', function () {
     $envArgsProperty->setAccessible(true);
     $envArgs = $envArgsProperty->getValue($job);
 
-    // Verify that zero and false string values are preserved
-    expect($envArgs)->toContain('--env ZERO_VALUE=0');
-    expect($envArgs)->toContain('--env FALSE_VALUE=false');
+    // Verify that zero and false string values are preserved (values are now single-quote escaped)
+    expect($envArgs)->toContain("--env 'ZERO_VALUE=0'");
+    expect($envArgs)->toContain("--env 'FALSE_VALUE=false'");
 });

@@ -9,7 +9,43 @@ use Spatie\Url\Url;
 
 class InstanceSettings extends Model
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'public_ipv4',
+        'public_ipv6',
+        'fqdn',
+        'public_port_min',
+        'public_port_max',
+        'do_not_track',
+        'is_auto_update_enabled',
+        'is_registration_enabled',
+        'next_channel',
+        'smtp_enabled',
+        'smtp_from_address',
+        'smtp_from_name',
+        'smtp_recipients',
+        'smtp_host',
+        'smtp_port',
+        'smtp_encryption',
+        'smtp_username',
+        'smtp_password',
+        'smtp_timeout',
+        'resend_enabled',
+        'resend_api_key',
+        'is_dns_validation_enabled',
+        'custom_dns_servers',
+        'instance_name',
+        'is_api_enabled',
+        'allowed_ips',
+        'auto_update_frequency',
+        'update_check_frequency',
+        'new_version_available',
+        'instance_timezone',
+        'helper_version',
+        'disable_two_step_confirmation',
+        'is_sponsorship_popup_enabled',
+        'dev_helper_version',
+        'is_wire_navigate_enabled',
+    ];
 
     protected $casts = [
         'smtp_enabled' => 'boolean',

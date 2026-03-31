@@ -54,7 +54,7 @@ class CloneMe extends Component
     public function mount($project_uuid)
     {
         $this->project_uuid = $project_uuid;
-        $this->project = Project::where('uuid', $project_uuid)->firstOrFail();
+        $this->project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->firstOrFail();
         $this->environment = $this->project->environments->where('uuid', $this->environment_uuid)->first();
         $this->project_id = $this->project->id;
         $this->servers = currentTeam()
@@ -187,6 +187,7 @@ class CloneMe extends Component
                         'id',
                         'created_at',
                         'updated_at',
+                        'uuid',
                     ])->fill([
                         'name' => $newName,
                         'resource_id' => $newDatabase->id,
@@ -298,9 +299,9 @@ class CloneMe extends Component
                 }
 
                 foreach ($newService->applications() as $application) {
-                    $application->update([
+                    $application->fill([
                         'status' => 'exited',
-                    ]);
+                    ])->save();
 
                     $persistentVolumes = $application->persistentStorages()->get();
                     foreach ($persistentVolumes as $volume) {
@@ -315,6 +316,7 @@ class CloneMe extends Component
                             'id',
                             'created_at',
                             'updated_at',
+                            'uuid',
                         ])->fill([
                             'name' => $newName,
                             'resource_id' => $application->id,
@@ -352,9 +354,9 @@ class CloneMe extends Component
                 }
 
                 foreach ($newService->databases() as $database) {
-                    $database->update([
+                    $database->fill([
                         'status' => 'exited',
-                    ]);
+                    ])->save();
 
                     $persistentVolumes = $database->persistentStorages()->get();
                     foreach ($persistentVolumes as $volume) {
@@ -369,6 +371,7 @@ class CloneMe extends Component
                             'id',
                             'created_at',
                             'updated_at',
+                            'uuid',
                         ])->fill([
                             'name' => $newName,
                             'resource_id' => $database->id,

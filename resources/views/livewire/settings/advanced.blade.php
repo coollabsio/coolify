@@ -16,11 +16,31 @@
                 <div class="pb-4">Advanced settings for your Coolify instance.</div>
 
                 <div class="flex flex-col gap-1">
-                    <div class="md:w-96">
-                        <x-forms.checkbox instantSave id="is_registration_enabled"
-                            helper="Allow users to self-register. If disabled, only administrators can create accounts."
-                            label="Registration Allowed" />
-                    </div>
+                    @if ($is_registration_enabled)
+                        <div class="md:w-96" wire:key="registration-enabled">
+                            <x-forms.checkbox instantSave id="is_registration_enabled"
+                                helper="Allow users to self-register. If disabled, only administrators can create accounts."
+                                label="Registration Allowed" />
+                        </div>
+                    @else
+                        <div class="flex items-center justify-between gap-2 md:w-96"
+                            wire:key="registration-disabled">
+                            <label class="flex items-center gap-2">
+                                Registration Allowed
+                                <x-helper
+                                    helper="Allow users to self-register. If disabled, only administrators can create accounts.">
+                                </x-helper>
+                            </label>
+                            <x-modal-confirmation title="Enable Registration?" buttonTitle="Enable" isErrorButton
+                                submitAction="toggleRegistration" :actions="[
+                                    'Enables registration for everyone',
+                                ]"
+                                warningMessage="Enabling registration allows anyone to create an account on this instance. Make sure you understand the implications before proceeding."
+                                confirmationText="ENABLE REGISTRATION"
+                                confirmationLabel="Please type the confirmation text to enable registration."
+                                shortConfirmationLabel="Confirmation text" />
+                        </div>
+                    @endif
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."
