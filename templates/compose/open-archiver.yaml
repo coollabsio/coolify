@@ -18,7 +18,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-open_archive}
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-open-archiver-db}
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-open_archive}
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILISEARCH}
       - MEILI_HOST=http://meilisearch:7700
       - REDIS_HOST=valkey
@@ -51,7 +51,7 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-open-archiver-db}
+      - POSTGRES_DB=${POSTGRES_DB:-open_archive}
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - LC_ALL=C
