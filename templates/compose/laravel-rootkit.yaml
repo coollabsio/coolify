@@ -403,27 +403,13 @@ services:
 
   nginx:
     image: nginx:alpine
-    # Skip /docker-entrypoint.d/ scripts: they try to patch nginx.conf (read-only bind)
-    # and can make startup harder to diagnose on constrained hosts.
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      echo '[nginx] validating config' >&2;
-      nginx -t ||
-        ( echo '--- /etc/nginx/nginx.conf ---' >&2;
-          cat /etc/nginx/nginx.conf >&2 || true;
-          echo '--- /etc/nginx/conf.d/default.conf ---' >&2;
-          cat /etc/nginx/conf.d/default.conf >&2 || true;
-          exit 1
-        );
-      echo '[nginx] starting' >&2;
-      exec nginx -g 'daemon off;'
+    command: ["nginx", "-g", "daemon off;"]
     volumes:
       - laravel-files:/var/www/html:ro
       - type: bind
         source: ./nginx-main.conf
         target: /etc/nginx/nginx.conf
         content: |
-          # Minimal + aio off: avoids io_setup() issues on constrained hosts.
           user nginx;
           worker_processes 1;
           error_log /dev/stderr warn;
@@ -461,13 +447,11 @@ services:
               access_log /dev/stdout;
               error_log /dev/stderr;
 
-              # Resolve upstreams via Docker embedded DNS to avoid startup crashes
-              # when the `laravel` container is not yet resolvable.
               resolver 127.0.0.11 ipv6=off valid=10s;
               set $php_upstream "laravel:9000";
 
               location / {
-                  try_files /_coolify_error.html $uri $uri/ /index.php?$query_string;
+                  try_files $uri $uri/ /index.php?$query_string;
               }
 
               location ~ \.php$ {
