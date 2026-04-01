@@ -35,6 +35,14 @@ return [
 
     'connections' => [
 
+        'sqlite' => [
+            'driver' => 'sqlite',
+            'url' => env('DATABASE_URL'),
+            'database' => env('DB_DATABASE', database_path('database.sqlite')),
+            'prefix' => '',
+            'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
+        ],
+
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DATABASE_URL'),
@@ -48,9 +56,6 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => 'prefer',
-            'options' => [
-                (defined('Pdo\Pgsql::ATTR_DISABLE_PREPARES') ? \Pdo\Pgsql::ATTR_DISABLE_PREPARES : \PDO::PGSQL_ATTR_DISABLE_PREPARES) => env('DB_DISABLE_PREPARES', false),
-            ],
         ],
 
         'testing' => [
