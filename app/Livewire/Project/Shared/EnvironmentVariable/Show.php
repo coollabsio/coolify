@@ -2,12 +2,17 @@
 
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
+use App\Models\Application;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
+use App\Models\LocalFileVolume;
 use App\Models\Project;
+use App\Models\Server;
+use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -80,7 +85,7 @@ class Show extends Component
     public function mount()
     {
         $this->syncData();
-        if ($this->env->getMorphClass() === \App\Models\SharedEnvironmentVariable::class) {
+        if ($this->env->getMorphClass() === SharedEnvironmentVariable::class) {
             $this->isSharedVariable = true;
         }
         $this->parameters = get_route_parameters();
@@ -203,6 +208,13 @@ class Show extends Component
             $this->serialize();
             $this->syncData(true);
             $this->syncData(false);
+
+            // Re-resolve volume paths that reference env vars (e.g., ${VAR:-./path})
+            $resourceable = $this->env->resourceable ?? null;
+            if ($resourceable) {
+                LocalFileVolume::reResolveVolumePaths($resourceable);
+            }
+
             $this->dispatch('success', 'Environment variable updated.');
             $this->dispatch('envsUpdated');
             $this->dispatch('configurationChanged');
@@ -233,7 +245,7 @@ class Show extends Component
             $result['team'] = $team->environment_variables()
                 ->pluck('key')
                 ->toArray();
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
             // User not authorized to view team variables
         }
 
@@ -264,12 +276,12 @@ class Show extends Component
                                 $result['environment'] = $environment->environment_variables()
                                     ->pluck('key')
                                     ->toArray();
-                            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                            } catch (AuthorizationException $e) {
                                 // User not authorized to view environment variables
                             }
                         }
                     }
-                } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                } catch (AuthorizationException $e) {
                     // User not authorized to view project variables
                 }
             }
@@ -279,7 +291,7 @@ class Show extends Component
         $serverUuid = data_get($this->parameters, 'server_uuid');
         if ($serverUuid) {
             // If we have a specific server_uuid, show variables for that server
-            $server = \App\Models\Server::where('team_id', $team->id)
+            $server = Server::where('team_id', $team->id)
                 ->where('uuid', $serverUuid)
                 ->first();
 
@@ -289,7 +301,7 @@ class Show extends Component
                     $result['server'] = $server->environment_variables()
                         ->pluck('key')
                         ->toArray();
-                } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                } catch (AuthorizationException $e) {
                     // User not authorized to view server variables
                 }
             }
@@ -297,7 +309,7 @@ class Show extends Component
             // For application environment variables, try to use the application's destination server
             $applicationUuid = data_get($this->parameters, 'application_uuid');
             if ($applicationUuid) {
-                $application = \App\Models\Application::whereRelation('environment.project.team', 'id', $team->id)
+                $application = Application::whereRelation('environment.project.team', 'id', $team->id)
                     ->where('uuid', $applicationUuid)
                     ->with('destination.server')
                     ->first();
@@ -308,7 +320,7 @@ class Show extends Component
                         $result['server'] = $application->destination->server->environment_variables()
                             ->pluck('key')
                             ->toArray();
-                    } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                    } catch (AuthorizationException $e) {
                         // User not authorized to view server variables
                     }
                 }
@@ -316,7 +328,7 @@ class Show extends Component
                 // For service environment variables, try to use the service's server
                 $serviceUuid = data_get($this->parameters, 'service_uuid');
                 if ($serviceUuid) {
-                    $service = \App\Models\Service::whereRelation('environment.project.team', 'id', $team->id)
+                    $service = Service::whereRelation('environment.project.team', 'id', $team->id)
                         ->where('uuid', $serviceUuid)
                         ->with('server')
                         ->first();
@@ -327,7 +339,7 @@ class Show extends Component
                             $result['server'] = $service->server->environment_variables()
                                 ->pluck('key')
                                 ->toArray();
-                        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                        } catch (AuthorizationException $e) {
                             // User not authorized to view server variables
                         }
                     }

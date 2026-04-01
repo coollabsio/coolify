@@ -11,7 +11,8 @@
         @endif
         <div class="flex flex-col justify-center text-sm select-text">
             <div class="flex gap-2  md:flex-row flex-col">
-                <x-forms.input label="Source Path" :value="$fileStorage->fs_path" readonly />
+                <x-forms.input label="Source Path" :value="$fileStorage->fs_path" readonly
+                    helper="{{ $resolvedFromEnvVar ? 'Resolved from environment variable: $' . $resolvedFromEnvVar : '' }}" />
                 <x-forms.input label="Destination Path" :value="$fileStorage->mount_path" readonly />
             </div>
         </div>

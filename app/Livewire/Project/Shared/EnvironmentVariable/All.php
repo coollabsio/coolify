@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
+use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -38,7 +39,7 @@ class All extends Component
         $this->is_env_sorting_enabled = data_get($this->resource, 'settings.is_env_sorting_enabled', false);
         $this->use_build_secrets = data_get($this->resource, 'settings.use_build_secrets', false);
         $this->resourceClass = get_class($this->resource);
-        $resourceWithPreviews = [\App\Models\Application::class];
+        $resourceWithPreviews = [Application::class];
         $simpleDockerfile = filled(data_get($this->resource, 'dockerfile'));
         if (str($this->resourceClass)->contains($resourceWithPreviews) && ! $simpleDockerfile) {
             $this->showPreview = true;
