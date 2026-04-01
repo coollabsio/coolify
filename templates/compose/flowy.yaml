@@ -1,0 +1,58 @@
+# documentation: https://github.com/Xen0Xys/Flowy
+# slogan: Flowy is a self-hosted finance platform built for people who are tired of juggling spreadsheets, disconnected banking apps, and shared Google Sheets that nobody agrees on.
+# category: productivity
+# tags: flowy, self-hosted, fintech, budgeting, finances
+# logo: svgs/flowy.webp
+# port: 3000, 4000
+
+services:
+  postgres:
+    image: tensorchord/vchord-postgres:pg18-v1.1.1
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-flowy}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -d ${POSTGRES_DB:-flowy} -U ${SERVICE_USER_POSTGRES}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - flowy-postgres-data:/var/lib/postgresql
+
+  server:
+    image: xen0xys/flowy-server:latest
+    environment:
+      - SERVICE_URL_SERVER_4000
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-flowy}
+      - APP_NAME=Flowy Server
+      - APP_SECRET=${SERVICE_BASE64_128_APPSECRET}
+      - PREFIX=${APP_PREFIX:-}
+      - CORS_ORIGINS=${SERVICE_URL_WEB}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://server:4000/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    image: xen0xys/flowy-web:latest
+    environment:
+      - SERVICE_URL_WEB_3000
+      - NUXT_PUBLIC_API_BASE=${SERVICE_URL_SERVER}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://web:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      server:
+        condition: service_started
+    restart: unless-stopped
