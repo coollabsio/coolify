@@ -303,11 +303,11 @@ function clone_application(Application $source, $destination, array $overrides =
             'id',
             'created_at',
             'updated_at',
-            'uuid',
         ])->fill([
             'name' => $newName,
             'resource_id' => $newApplication->id,
         ]);
+        $newPersistentVolume->uuid = (string) new Cuid2;
         $newPersistentVolume->save();
 
         if ($cloneVolumeData) {

@@ -142,11 +142,11 @@ class ResourceOperations extends Component
                     'id',
                     'created_at',
                     'updated_at',
-                    'uuid',
                 ])->fill([
                     'name' => $newName,
                     'resource_id' => $new_resource->id,
                 ]);
+                $newPersistentVolume->uuid = (string) new Cuid2;
                 $newPersistentVolume->save();
 
                 if ($this->cloneVolumeData) {
@@ -281,11 +281,11 @@ class ResourceOperations extends Component
                         'id',
                         'created_at',
                         'updated_at',
-                        'uuid',
                     ])->fill([
                         'name' => $newName,
                         'resource_id' => $application->id,
                     ]);
+                    $newPersistentVolume->uuid = (string) new Cuid2;
                     $newPersistentVolume->save();
 
                     if ($this->cloneVolumeData) {
@@ -324,11 +324,11 @@ class ResourceOperations extends Component
                         'id',
                         'created_at',
                         'updated_at',
-                        'uuid',
                     ])->fill([
                         'name' => $newName,
                         'resource_id' => $database->id,
                     ]);
+                    $newPersistentVolume->uuid = (string) new Cuid2;
                     $newPersistentVolume->save();
 
                     if ($this->cloneVolumeData) {
