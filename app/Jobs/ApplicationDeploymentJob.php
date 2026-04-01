@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Docker\GetContainersStatus;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Helpers\DockerHelper;
 use App\Enums\ProcessStatus;
 use App\Events\ApplicationConfigurationChanged;
 use App\Events\ServiceStatusChanged;
@@ -2577,10 +2578,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                             ),
                         ],
                     ],
-                    'mem_limit' => $this->application->limits_memory,
-                    'memswap_limit' => $this->application->limits_memory_swap,
+                    'mem_limit' => DockerHelper::normalizeMemoryLimit($this->application->limits_memory),
+                    'memswap_limit' => DockerHelper::normalizeMemoryLimit($this->application->limits_memory_swap),
                     'mem_swappiness' => $this->application->limits_memory_swappiness,
-                    'mem_reservation' => $this->application->limits_memory_reservation,
+                    'mem_reservation' => DockerHelper::normalizeMemoryLimit($this->application->limits_memory_reservation),
                     'cpus' => (float) $this->application->limits_cpus,
                     'cpu_shares' => $this->application->limits_cpu_shares,
                 ],
