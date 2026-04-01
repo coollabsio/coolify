@@ -46,7 +46,7 @@ class Service extends BaseModel
 {
     use ClearsGlobalSearchCache, HasFactory, HasSafeStringAttribute, SoftDeletes;
 
-    private static $parserVersion = '5';
+    private static $parserVersion = '6';
 
     protected $fillable = [
         'uuid',

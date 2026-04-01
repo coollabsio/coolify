@@ -61,8 +61,12 @@ test('parses volumes with other modes', function () {
 });
 
 test('parses volumes with environment variables', function () {
-    // Variable with default value — preserved for env-aware resolution
+    // v5 and below: default is stripped
     $result = parseDockerVolumeString('${VOLUME_DB_PATH:-db}:/data/db');
+    expect($result['source']->value())->toBe('db');
+
+    // v6+: preserved for env-aware resolution
+    $result = parseDockerVolumeString('${VOLUME_DB_PATH:-db}:/data/db', preserveEnvDefaults: true);
     expect($result['source']->value())->toBe('${VOLUME_DB_PATH:-db}');
     expect($result['target']->value())->toBe('/data/db');
     expect($result['mode'])->toBeNull();
@@ -79,8 +83,12 @@ test('parses volumes with environment variables', function () {
     expect($result['target']->value())->toBe('/data');
     expect($result['mode'])->toBeNull();
 
-    // Variable with mode — preserved for env-aware resolution
+    // Variable with mode — v5: default is stripped
     $result = parseDockerVolumeString('${DATA_PATH:-./data}:/app/data:ro');
+    expect($result['source']->value())->toBe('./data');
+
+    // Variable with mode — v6+: preserved for env-aware resolution
+    $result = parseDockerVolumeString('${DATA_PATH:-./data}:/app/data:ro', preserveEnvDefaults: true);
     expect($result['source']->value())->toBe('${DATA_PATH:-./data}');
     expect($result['target']->value())->toBe('/app/data');
     expect($result['mode']->value())->toBe('ro');
@@ -163,7 +171,7 @@ test('handles whitespace correctly', function () {
 test('preserved env var syntax allows resolveEnvVarDefault to apply env overrides', function () {
     // Regression: parseDockerVolumeString used to eagerly replace ${VAR:-default} with the default,
     // preventing resolveEnvVarDefault() from checking $allEnvironments for an override.
-    $parsed = parseDockerVolumeString('${AO_CONFIG_FILE:-./agent-orchestrator.yaml}:/app/agent-orchestrator.yaml:ro');
+    $parsed = parseDockerVolumeString('${AO_CONFIG_FILE:-./agent-orchestrator.yaml}:/app/agent-orchestrator.yaml:ro', preserveEnvDefaults: true);
 
     // Source must still contain the full env var syntax
     expect($parsed['source']->value())->toBe('${AO_CONFIG_FILE:-./agent-orchestrator.yaml}');
@@ -195,8 +203,12 @@ test('parses all valid Docker volume modes', function () {
 });
 
 test('parses complex real-world examples', function () {
-    // MongoDB volume with environment variable — preserved for env-aware resolution
+    // MongoDB volume with environment variable — v5: default is stripped
     $result = parseDockerVolumeString('${VOLUME_DB_PATH:-./data/db}:/data/db');
+    expect($result['source']->value())->toBe('./data/db');
+
+    // v6+: preserved for env-aware resolution
+    $result = parseDockerVolumeString('${VOLUME_DB_PATH:-./data/db}:/data/db', preserveEnvDefaults: true);
     expect($result['source']->value())->toBe('${VOLUME_DB_PATH:-./data/db}');
     expect($result['target']->value())->toBe('/data/db');
     expect($result['mode'])->toBeNull();

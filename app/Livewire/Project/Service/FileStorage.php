@@ -67,7 +67,7 @@ class FileStorage extends Component
         }
 
         $this->isReadOnly = $this->fileStorage->shouldBeReadOnlyInUI();
-        $this->resolvedFromEnvVar = $this->detectEnvVarSource();
+        $this->resolvedFromEnvVar = $this->isV6Parser() ? $this->detectEnvVarSource() : null;
         $this->syncData();
     }
 
@@ -88,6 +88,15 @@ class FileStorage extends Component
             $this->isBasedOnGit = $this->fileStorage->is_based_on_git;
             $this->isPreviewSuffixEnabled = $this->fileStorage->is_preview_suffix_enabled ?? true;
         }
+    }
+
+    private function isV6Parser(): bool
+    {
+        $version = $this->resource instanceof Application
+            ? $this->resource->compose_parsing_version
+            : ($this->resource->service->compose_parsing_version ?? null);
+
+        return (int) $version >= 6;
     }
 
     /**

@@ -113,7 +113,7 @@ function validateVolumeStringForInjection(string $volumeString): void
     parseDockerVolumeString($volumeString);
 }
 
-function parseDockerVolumeString(string $volumeString): array
+function parseDockerVolumeString(string $volumeString, bool $preserveEnvDefaults = false): array
 {
     $volumeString = trim($volumeString);
     $source = null;
@@ -288,21 +288,23 @@ function parseDockerVolumeString(string $volumeString): array
     }
 
     // Handle environment variable expansion in source
-    // Preserve ${VAR:-default} so that resolveEnvVarDefault() in applicationParser/serviceParser
-    // can check $allEnvironments first before falling back to the default value.
-    // Only strip to ${VAR} when the default part is explicitly empty.
     if ($source && preg_match('/^\$\{([^}]+)\}$/', $source, $matches)) {
         $varContent = $matches[1];
         if (strpos($varContent, ':-') !== false) {
             $parts = explode(':-', $varContent, 2);
             $varName = $parts[0];
             $defaultValue = $parts[1] ?? '';
-            if ($defaultValue === '') {
+            if ($defaultValue !== '') {
+                if ($preserveEnvDefaults) {
+                    // v6+: keep ${VAR:-default} so resolveEnvVarDefault() can apply env overrides
+                } else {
+                    // v5 and below: strip to just the default value (v4.x behavior)
+                    $source = $defaultValue;
+                }
+            } else {
                 // Empty default — clean up to simple variable reference
                 $source = '${'.$varName.'}';
             }
-            // Non-empty default: keep $source as-is (e.g. ${VAR:-./path})
-            // so resolveEnvVarDefault() can apply env overrides
         }
     }
 
@@ -694,6 +696,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         $predefinedPort = null;
 
         $originalResource = $resource;
+        $isV6 = (int) $resource->compose_parsing_version >= 6;
 
         if ($volumes->count() > 0) {
             foreach ($volumes as $index => $volume) {
@@ -703,11 +706,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $content = null;
                 $isDirectory = false;
                 if (is_string($volume)) {
-                    $parsed = parseDockerVolumeString($volume);
+                    $parsed = parseDockerVolumeString($volume, $isV6);
                     $source = $parsed['source'];
                     $target = $parsed['target'];
-                    // Resolve env vars in source (e.g., ${VAR} -> value from Coolify env vars)
-                    $source = resolveEnvVarDefault($source, $allEnvironments);
+                    // v6+: resolve env vars in source (e.g., ${VAR} -> value from Coolify env vars)
+                    if ($isV6) {
+                        $source = resolveEnvVarDefault($source, $allEnvironments);
+                    }
                     // Mode is available in $parsed['mode'] if needed
                     $foundConfig = $fileStorages->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
@@ -732,8 +737,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $content = data_get($volume, 'content');
                     $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
 
-                    // Resolve environment variable defaults (e.g., ${VAR:-./path} -> ./path)
-                    if ($source !== null && ! empty($source->value())) {
+                    // v6+: resolve environment variable defaults (e.g., ${VAR:-./path} -> ./path)
+                    if ($isV6 && $source !== null && ! empty($source->value())) {
                         $source = resolveEnvVarDefault($source, $allEnvironments);
                     }
 
@@ -2087,6 +2092,7 @@ function serviceParser(Service $resource): Collection
         }
 
         $originalResource = $savedService;
+        $isV6 = (int) $resource->compose_parsing_version >= 6;
 
         if ($volumes->count() > 0) {
             foreach ($volumes as $index => $volume) {
@@ -2096,11 +2102,13 @@ function serviceParser(Service $resource): Collection
                 $content = null;
                 $isDirectory = false;
                 if (is_string($volume)) {
-                    $parsed = parseDockerVolumeString($volume);
+                    $parsed = parseDockerVolumeString($volume, $isV6);
                     $source = $parsed['source'];
                     $target = $parsed['target'];
-                    // Resolve env vars in source (e.g., ${VAR} -> value from Coolify env vars)
-                    $source = resolveEnvVarDefault($source, $allEnvironments);
+                    // v6+: resolve env vars in source (e.g., ${VAR} -> value from Coolify env vars)
+                    if ($isV6) {
+                        $source = resolveEnvVarDefault($source, $allEnvironments);
+                    }
                     // Mode is available in $parsed['mode'] if needed
                     $foundConfig = $fileStorages->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
@@ -2125,8 +2133,8 @@ function serviceParser(Service $resource): Collection
                     $content = data_get($volume, 'content');
                     $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
 
-                    // Resolve environment variable defaults (e.g., ${VAR:-./path} -> ./path)
-                    if ($source !== null && ! empty($source->value())) {
+                    // v6+: resolve environment variable defaults (e.g., ${VAR:-./path} -> ./path)
+                    if ($isV6 && $source !== null && ! empty($source->value())) {
                         $source = resolveEnvVarDefault($source, $allEnvironments);
                     }
 

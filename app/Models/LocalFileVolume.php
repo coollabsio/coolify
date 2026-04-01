@@ -7,6 +7,7 @@ use App\Jobs\ServerStorageSaveJob;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
 use Symfony\Component\Yaml\Yaml;
 
@@ -137,6 +138,10 @@ class LocalFileVolume extends BaseModel
 
     private static function reResolveForApplication(Application $application): void
     {
+        if ((int) $application->compose_parsing_version < 6) {
+            return;
+        }
+
         $dockerComposeRaw = $application->docker_compose_raw;
         if (! $dockerComposeRaw) {
             return;
@@ -179,6 +184,10 @@ class LocalFileVolume extends BaseModel
 
     private static function reResolveForService(Service $service): void
     {
+        if ((int) $service->compose_parsing_version < 6) {
+            return;
+        }
+
         $dockerComposeRaw = $service->docker_compose_raw;
         if (! $dockerComposeRaw) {
             return;
@@ -250,7 +259,49 @@ class LocalFileVolume extends BaseModel
                 if ($fileVolume->fs_path !== $resolved->value()) {
                     $fileVolume->update(['fs_path' => $resolved->value()]);
                 }
+            } else {
+                // Env var removed or no longer resolves to local path — convert back to named volume
+                $slugWithoutUuid = Str::slug($resolved, '-');
+                $name = $resource->uuid.'_'.$slugWithoutUuid;
+                LocalPersistentVolume::updateOrCreate(
+                    [
+                        'mount_path' => $fileVolume->mount_path,
+                        'resource_id' => $resource->id,
+                        'resource_type' => get_class($resource),
+                    ],
+                    [
+                        'name' => $name,
+                    ]
+                );
+                $fileVolume->delete();
             }
+        }
+
+        // Reclassify: when env var now resolves to a local path, create LocalFileVolume
+        // and remove stale LocalPersistentVolume
+        foreach ($rawSources as $mountPath => $rawSource) {
+            $sourceStr = $rawSource instanceof Stringable ? $rawSource : str($rawSource);
+            if (! str_contains($sourceStr->value(), '${')) {
+                continue;
+            }
+
+            $resolved = resolveEnvVarDefault($sourceStr, $envVars);
+            if (! sourceIsLocal($resolved)) {
+                continue;
+            }
+
+            if (! $resource->fileStorages()->where('mount_path', $mountPath)->exists()) {
+                $fsPath = replaceLocalSource($resolved, $mainDirectory);
+                LocalFileVolume::create([
+                    'mount_path' => $mountPath,
+                    'fs_path' => $fsPath,
+                    'is_directory' => true,
+                    'resource_id' => $resource->id,
+                    'resource_type' => get_class($resource),
+                ]);
+            }
+
+            $resource->persistentStorages()->where('mount_path', $mountPath)->delete();
         }
     }
 
