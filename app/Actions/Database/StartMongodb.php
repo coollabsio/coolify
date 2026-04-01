@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Helpers\DockerHelper;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandaloneMongodb;
@@ -120,10 +121,10 @@ class StartMongodb
                         'retries' => 10,
                         'start_period' => '5s',
                     ],
-                    'mem_limit' => $this->database->limits_memory,
-                    'memswap_limit' => $this->database->limits_memory_swap,
+                    'mem_limit' => DockerHelper::normalizeMemoryLimit($this->database->limits_memory),
+                    'memswap_limit' => DockerHelper::normalizeMemoryLimit($this->database->limits_memory_swap),
                     'mem_swappiness' => $this->database->limits_memory_swappiness,
-                    'mem_reservation' => $this->database->limits_memory_reservation,
+                    'mem_reservation' => DockerHelper::normalizeMemoryLimit($this->database->limits_memory_reservation),
                     'cpus' => (float) $this->database->limits_cpus,
                     'cpu_shares' => $this->database->limits_cpu_shares,
                 ],
