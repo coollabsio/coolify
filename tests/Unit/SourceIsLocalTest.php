@@ -27,10 +27,11 @@ test('sourceIsLocal rejects named volumes', function () {
     expect(sourceIsLocal(str('data')))->toBeFalse();
 });
 
-test('resolveEnvVarDefault bare dot fallback is recognized as local by sourceIsLocal', function () {
-    // When no env var is set and no default exists, resolveEnvVarDefault returns "."
+test('resolveEnvVarDefault unresolvable bare env var is NOT local', function () {
+    // When no env var is set and no default exists, resolveEnvVarDefault returns the
+    // original string — sourceIsLocal must NOT treat it as a local bind mount.
     $resolved = resolveEnvVarDefault(str('${UNDEFINED_VAR}'), collect());
-    expect(sourceIsLocal($resolved))->toBeTrue();
+    expect(sourceIsLocal($resolved))->toBeFalse();
 });
 
 test('resolveEnvVarDefault with fallback path is recognized as local', function () {

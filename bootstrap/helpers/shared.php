@@ -1262,8 +1262,9 @@ function resolveEnvVarDefault(Stringable $source, ?Collection $environmentVariab
             return str($defaultValue);
         }
 
-        // 3. No env var and no default — fall back to current directory (coolify data dir)
-        return str('.');
+        // 3. No env var and no default — return original reference unchanged so callers
+        // (e.g. sourceIsLocal()) don't misclassify it as a local bind mount.
+        return $source;
     }
 
     return $source;

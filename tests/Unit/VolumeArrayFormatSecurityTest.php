@@ -312,14 +312,14 @@ test('resolveEnvVarDefault resolves variable with absolute default path', functi
     expect($result->value())->toBe('/var/lib/data');
 });
 
-test('resolveEnvVarDefault falls back to dot when no default and no env vars', function () {
+test('resolveEnvVarDefault returns original string when no default and no env vars', function () {
     $result = resolveEnvVarDefault(str('${DATA_PATH}'));
-    expect($result->value())->toBe('.');
+    expect($result->value())->toBe('${DATA_PATH}');
 });
 
-test('resolveEnvVarDefault falls back to dot when empty default and no env vars', function () {
+test('resolveEnvVarDefault returns original string when empty default and no env vars', function () {
     $result = resolveEnvVarDefault(str('${DATA_PATH:-}'));
-    expect($result->value())->toBe('.');
+    expect($result->value())->toBe('${DATA_PATH:-}');
 });
 
 test('resolveEnvVarDefault keeps non-env-var string unchanged', function () {
@@ -369,10 +369,10 @@ test('resolveEnvVarDefault falls back to default when env var is empty string', 
     expect($result->value())->toBe('./default-config.yaml');
 });
 
-test('resolveEnvVarDefault falls back to dot when env var not set and no default', function () {
+test('resolveEnvVarDefault returns original string when env var not set and no default', function () {
     $envVars = collect(['OTHER_VAR' => '/other/path']);
     $result = resolveEnvVarDefault(str('${DATA_PATH}'), $envVars);
-    expect($result->value())->toBe('.');
+    expect($result->value())->toBe('${DATA_PATH}');
 });
 
 test('resolveEnvVarDefault preview env var overrides normal env var', function () {
@@ -435,4 +435,20 @@ test('LocalFileVolume resolvedFsPath with unresolvable env var throws RuntimeExc
 
     expect(fn () => $volume->resolvedFsPath())
         ->toThrow(RuntimeException::class, 'Cannot resolve storage path');
+});
+
+// Regression: bare ${VAR} must NOT be misclassified as a local bind mount
+test('bare unresolved env var is not treated as local path by sourceIsLocal', function () {
+    $result = resolveEnvVarDefault(str('${DATA_VOLUME}'));
+    expect(sourceIsLocal($result))->toBeFalse();
+});
+
+test('bare unresolved env var with empty default is not treated as local path', function () {
+    $result = resolveEnvVarDefault(str('${DATA_VOLUME:-}'));
+    expect(sourceIsLocal($result))->toBeFalse();
+});
+
+test('env var with local default IS treated as local path by sourceIsLocal', function () {
+    $result = resolveEnvVarDefault(str('${CONFIG_FILE:-./config.yaml}'));
+    expect(sourceIsLocal($result))->toBeTrue();
 });

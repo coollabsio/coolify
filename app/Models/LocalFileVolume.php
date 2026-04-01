@@ -58,7 +58,7 @@ class LocalFileVolume extends BaseModel
         $resolved = resolveEnvVarDefault(str($this->fs_path), $envVars);
         $value = $resolved->value();
 
-        if ($value === '.' || $value === '') {
+        if ($value === '.' || $value === '' || str_contains($value, '${')) {
             throw new \RuntimeException(
                 'Cannot resolve storage path: environment variable has no value and no default was provided. '
                 .'Original path: '.$this->fs_path
