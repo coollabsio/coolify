@@ -3,9 +3,9 @@
         @if ($isReadOnly)
             <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
                 @if ($fileStorage->is_directory)
-                    This directory is mounted as read-only and cannot be modified from the UI.
+                    This directory is mounted as read-only inside the container. Content editing is disabled, but you can still convert or delete it.
                 @else
-                    This file is mounted as read-only and cannot be modified from the UI.
+                    This file is mounted as read-only inside the container. Content editing is disabled, but you can still convert or delete it.
                 @endif
             </div>
         @endif
@@ -26,47 +26,59 @@
             @endcan
         @endif
         <form wire:submit='submit' class="flex flex-col gap-2">
-            @if (!$isReadOnly)
-                @can('update', $resource)
-                    <div class="flex gap-2">
-                        @if ($fileStorage->is_directory)
-                            <x-modal-confirmation :ignoreWire="false" title="Confirm Directory Conversion to File?"
-                                buttonTitle="Convert to file" submitAction="convertToFile" :actions="[
-                                    'All files in this directory will be permanently deleted and an empty file will be created in its place.',
+            {{-- Action buttons: always available with update permission, regardless of read-only status --}}
+            @can('update', $resource)
+                <div class="flex gap-2">
+                    @if ($fileStorage->is_directory)
+                        <x-modal-confirmation :ignoreWire="false" title="Confirm Directory Conversion to File?"
+                            buttonTitle="Convert to file" submitAction="convertToFile" :actions="[
+                                'All files in this directory will be permanently deleted and an empty file will be created in its place.',
+                            ]"
+                            confirmationText="{{ $fs_path }}"
+                            confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
+                            shortConfirmationLabel="Filepath" :confirmWithPassword="false" step2ButtonText="Convert to file" />
+                        <x-modal-confirmation :ignoreWire="false" title="Confirm Directory Deletion?" buttonTitle="Delete"
+                            isErrorButton submitAction="delete" :checkboxes="$directoryDeletionCheckboxes" :actions="[
+                                'The selected directory and all its contents will be permanently deleted from the container.',
+                            ]"
+                            confirmationText="{{ $fs_path }}"
+                            confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
+                            shortConfirmationLabel="Filepath" />
+                    @else
+                        @if (!$fileStorage->is_binary)
+                            <x-modal-confirmation :ignoreWire="false" title="Confirm File Conversion to Directory?"
+                                buttonTitle="Convert to directory" submitAction="convertToDirectory" :actions="[
+                                    'The selected file will be permanently deleted and an empty directory will be created in its place.',
                                 ]"
                                 confirmationText="{{ $fs_path }}"
                                 confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
-                                shortConfirmationLabel="Filepath" :confirmWithPassword="false" step2ButtonText="Convert to file" />
-                            <x-modal-confirmation :ignoreWire="false" title="Confirm Directory Deletion?" buttonTitle="Delete"
-                                isErrorButton submitAction="delete" :checkboxes="$directoryDeletionCheckboxes" :actions="[
-                                    'The selected directory and all its contents will be permanently deleted from the container.',
-                                ]"
-                                confirmationText="{{ $fs_path }}"
-                                confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
-                                shortConfirmationLabel="Filepath" />
-                        @else
-                            @if (!$fileStorage->is_binary)
-                                <x-modal-confirmation :ignoreWire="false" title="Confirm File Conversion to Directory?"
-                                    buttonTitle="Convert to directory" submitAction="convertToDirectory" :actions="[
-                                        'The selected file will be permanently deleted and an empty directory will be created in its place.',
-                                    ]"
-                                    confirmationText="{{ $fs_path }}"
-                                    confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
-                                    shortConfirmationLabel="Filepath" :confirmWithPassword="false"
-                                    step2ButtonText="Convert to directory" />
-                            @endif
+                                shortConfirmationLabel="Filepath" :confirmWithPassword="false"
+                                step2ButtonText="Convert to directory" />
+                        @endif
+                        <x-forms.button type="button" wire:click="loadStorageOnServer">Load from
+                            server</x-forms.button>
+                        <x-modal-confirmation :ignoreWire="false" title="Confirm File Deletion?" buttonTitle="Delete"
+                            isErrorButton submitAction="delete" :checkboxes="$fileDeletionCheckboxes" :actions="['The selected file will be permanently deleted from the container.']"
+                            confirmationText="{{ $fs_path }}"
+                            confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
+                            shortConfirmationLabel="Filepath" />
+                    @endif
+                </div>
+            @else
+                @if (!$fileStorage->is_directory)
+                    @can('view', $resource)
+                        <div class="flex gap-2">
                             <x-forms.button type="button" wire:click="loadStorageOnServer">Load from
                                 server</x-forms.button>
-                            <x-modal-confirmation :ignoreWire="false" title="Confirm File Deletion?" buttonTitle="Delete"
-                                isErrorButton submitAction="delete" :checkboxes="$fileDeletionCheckboxes" :actions="['The selected file will be permanently deleted from the container.']"
-                                confirmationText="{{ $fs_path }}"
-                                confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
-                                shortConfirmationLabel="Filepath" />
-                        @endif
-                    </div>
-                @endcan
-                @if (!$fileStorage->is_directory)
-                    @can('update', $resource)
+                        </div>
+                    @endcan
+                @endif
+            @endcan
+
+            {{-- Content editing: gated by read-only status --}}
+            @if (!$fileStorage->is_directory)
+                @can('update', $resource)
+                    @if (!$isReadOnly)
                         @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
                             <div class="w-96">
                                 <x-forms.checkbox instantSave label="Is this based on the Git repository?"
@@ -92,17 +104,8 @@
                             label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
                             helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
                             rows="20" id="content" disabled></x-forms.textarea>
-                    @endcan
-                @endif
-            @else
-                {{-- Read-only view --}}
-                @if (!$fileStorage->is_directory)
-                    @can('view', $resource)
-                        <div class="flex gap-2">
-                            <x-forms.button type="button" wire:click="loadStorageOnServer">Load from
-                                server</x-forms.button>
-                        </div>
-                    @endcan
+                    @endif
+                @else
                     @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
                         <div class="w-96">
                             <x-forms.checkbox disabled label="Is this based on the Git repository?"
@@ -113,7 +116,7 @@
                         label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
                         helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
                         rows="20" id="content" disabled></x-forms.textarea>
-                @endif
+                @endcan
             @endif
         </form>
     </div>

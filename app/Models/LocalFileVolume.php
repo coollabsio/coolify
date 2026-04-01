@@ -6,6 +6,7 @@ use App\Events\FileStorageChanged;
 use App\Jobs\ServerStorageSaveJob;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Stringable;
 use Symfony\Component\Yaml\Yaml;
 
@@ -46,14 +47,59 @@ class LocalFileVolume extends BaseModel
 
     /**
      * Resolve env var default syntax from fs_path (e.g., ${VAR:-./path} -> ./path).
-     * Normally fs_path is stored already resolved by the parser, but legacy records
-     * may still contain raw Docker Compose variable syntax.
+     * Resolves against the owning resource's environment variables so that
+     * Coolify-defined values take precedence over defaults.
+     *
+     * @throws \RuntimeException if the resolved path is bare '.' or empty (unresolvable variable with no default)
      */
     public function resolvedFsPath(): string
     {
-        $resolved = resolveEnvVarDefault(str($this->fs_path));
+        $envVars = $this->getResourceEnvironmentVariables();
+        $resolved = resolveEnvVarDefault(str($this->fs_path), $envVars);
+        $value = $resolved->value();
 
-        return $resolved->value();
+        if ($value === '.' || $value === '') {
+            throw new \RuntimeException(
+                'Cannot resolve storage path: environment variable has no value and no default was provided. '
+                .'Original path: '.$this->fs_path
+            );
+        }
+
+        return $value;
+    }
+
+    /**
+     * Gather environment variables from the owning resource (and its parent
+     * service when the resource is a ServiceApplication or ServiceDatabase).
+     */
+    private function getResourceEnvironmentVariables(): Collection
+    {
+        if ($this->exists) {
+            $this->loadMissing(['service']);
+        }
+        $resource = $this->resource;
+
+        if (! $resource) {
+            return collect();
+        }
+
+        $envVars = collect();
+
+        // Service children (ServiceApplication / ServiceDatabase) — merge parent service env vars
+        $parentService = data_get($resource, 'service');
+        if ($parentService && method_exists($parentService, 'environment_variables')) {
+            $envVars = $parentService->environment_variables()->get(['key', 'value'])
+                ->mapWithKeys(fn ($item) => [$item['key'] => $item['value']]);
+        }
+
+        // Resource's own env vars (overrides parent service vars)
+        if (method_exists($resource, 'environment_variables')) {
+            $resourceEnvVars = $resource->environment_variables()->get(['key', 'value'])
+                ->mapWithKeys(fn ($item) => [$item['key'] => $item['value']]);
+            $envVars = $envVars->merge($resourceEnvVars);
+        }
+
+        return $envVars;
     }
 
     protected function isBinary(): Attribute
@@ -146,7 +192,7 @@ class LocalFileVolume extends BaseModel
         $serviceEnvVars = $service->environment_variables()->get(['key', 'value'])
             ->mapWithKeys(fn ($item) => [$item['key'] => $item['value']]);
 
-        $mainDirectory = str(base_configuration_dir().'/applications/'.$service->uuid);
+        $mainDirectory = str(base_configuration_dir().'/services/'.$service->uuid);
 
         $volumeOwners = collect()
             ->merge($service->applications ?? collect())

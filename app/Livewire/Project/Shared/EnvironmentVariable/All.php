@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
+use App\Models\LocalFileVolume;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -186,6 +187,9 @@ class All extends Component
 
             $this->updateOrder();
             $this->getDevView();
+
+            // Re-resolve volume paths that reference env vars (e.g., ${VAR:-./path})
+            LocalFileVolume::reResolveVolumePaths($this->resource);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {

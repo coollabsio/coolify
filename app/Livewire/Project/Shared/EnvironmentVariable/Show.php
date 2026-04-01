@@ -366,7 +366,14 @@ class Show extends Component
                 }
             }
 
+            $resourceable = $this->env->resourceable ?? null;
             $this->env->delete();
+
+            // Re-resolve volume paths that reference env vars (e.g., ${VAR:-./path})
+            if ($resourceable) {
+                LocalFileVolume::reResolveVolumePaths($resourceable);
+            }
+
             $this->dispatch('environmentVariableDeleted');
             $this->dispatch('success', 'Environment variable deleted successfully.');
         } catch (\Exception $e) {

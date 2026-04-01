@@ -429,9 +429,10 @@ test('LocalFileVolume resolvedFsPath resolved value passes validateShellSafePath
         ->not->toThrow(Exception::class);
 });
 
-test('LocalFileVolume resolvedFsPath with simple env var falls back to dot', function () {
+test('LocalFileVolume resolvedFsPath with unresolvable env var throws RuntimeException', function () {
     $volume = new LocalFileVolume;
     $volume->fs_path = '${DATA_PATH}';
 
-    expect($volume->resolvedFsPath())->toBe('.');
+    expect(fn () => $volume->resolvedFsPath())
+        ->toThrow(RuntimeException::class, 'Cannot resolve storage path');
 });

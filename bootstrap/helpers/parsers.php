@@ -288,20 +288,21 @@ function parseDockerVolumeString(string $volumeString): array
     }
 
     // Handle environment variable expansion in source
-    // Example: ${VOLUME_DB_PATH:-db} should extract default value if present
-    // Only extract the default value here — full env var resolution happens in the parsers
+    // Preserve ${VAR:-default} so that resolveEnvVarDefault() in applicationParser/serviceParser
+    // can check $allEnvironments first before falling back to the default value.
+    // Only strip to ${VAR} when the default part is explicitly empty.
     if ($source && preg_match('/^\$\{([^}]+)\}$/', $source, $matches)) {
         $varContent = $matches[1];
         if (strpos($varContent, ':-') !== false) {
             $parts = explode(':-', $varContent, 2);
             $varName = $parts[0];
             $defaultValue = $parts[1] ?? '';
-            if ($defaultValue !== '') {
-                $source = $defaultValue;
-            } else {
+            if ($defaultValue === '') {
                 // Empty default — clean up to simple variable reference
                 $source = '${'.$varName.'}';
             }
+            // Non-empty default: keep $source as-is (e.g. ${VAR:-./path})
+            // so resolveEnvVarDefault() can apply env overrides
         }
     }
 
@@ -312,11 +313,11 @@ function parseDockerVolumeString(string $volumeString): array
         // Also allow env vars followed by safe path concatenation (e.g., ${VAR}/path)
         $sourceStr = is_string($source) ? $source : $source;
 
-        // Skip validation for simple environment variable references
-        // Pattern 1: ${WORD_CHARS} with no special characters inside
-        // Pattern 2: ${WORD_CHARS}/path/to/file (env var with path concatenation)
-        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceStr);
-        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceStr);
+        // Skip validation for environment variable references (with or without defaults)
+        // Pattern 1: ${VAR} or ${VAR:-safe_default}
+        // Pattern 2: ${VAR}/path or ${VAR:-safe_default}/path
+        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*(:-[a-zA-Z0-9_.\/~\-]*)?\}$/', $sourceStr);
+        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*(:-[a-zA-Z0-9_.\/~\-]*)?\}[\/\w\.\-]*$/', $sourceStr);
 
         if (! $isSimpleEnvVar && ! $isEnvVarWithPath) {
             try {
@@ -739,9 +740,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
                         $sourceValue = $source->value();
-                        // Allow environment variable references and env vars with path concatenation
-                        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceValue);
-                        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceValue);
+                        // Allow environment variable references (with or without defaults) and path concatenation
+                        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*(:-[a-zA-Z0-9_.\/~\-]*)?\}$/', $sourceValue);
+                        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*(:-[a-zA-Z0-9_.\/~\-]*)?\}[\/\w\.\-]*$/', $sourceValue);
 
                         if (! $isSimpleEnvVar && ! $isEnvVarWithPath) {
                             try {
@@ -2132,9 +2133,9 @@ function serviceParser(Service $resource): Collection
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
                         $sourceValue = $source->value();
-                        // Allow environment variable references and env vars with path concatenation
-                        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceValue);
-                        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceValue);
+                        // Allow environment variable references (with or without defaults) and path concatenation
+                        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*(:-[a-zA-Z0-9_.\/~\-]*)?\}$/', $sourceValue);
+                        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*(:-[a-zA-Z0-9_.\/~\-]*)?\}[\/\w\.\-]*$/', $sourceValue);
 
                         if (! $isSimpleEnvVar && ! $isEnvVarWithPath) {
                             try {

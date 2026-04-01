@@ -1271,7 +1271,7 @@ function resolveEnvVarDefault(Stringable $source, ?Collection $environmentVariab
 
 function sourceIsLocal(Stringable $source)
 {
-    if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~') || $source->startsWith('..') || $source->startsWith('~/') || $source->startsWith('../')) {
+    if ($source->value() === '.' || $source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~') || $source->startsWith('..') || $source->startsWith('~/') || $source->startsWith('../')) {
         return true;
     }
 
