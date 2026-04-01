@@ -22,6 +22,11 @@
                             label="Registration Allowed" />
                     </div>
                     <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                            helper="Allow users to self-register via OAUTH. Even if enabled, only existing users can login via OAUTH if the main registration is disabled. When disabled, OAuth only works for existing accounts."
+                            label="OAUTH Registration Allowed" />
+                    </div>
+                    <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."
                             label="Do Not Track" />

@@ -27,6 +27,8 @@ class InstanceSettings extends Model
 
         'allowed_ip_ranges' => 'array',
         'is_auto_update_enabled' => 'boolean',
+        'is_registration_enabled' => 'boolean',
+        'is_oauth_registration_enabled' => 'boolean',
         'auto_update_frequency' => 'string',
         'update_check_frequency' => 'string',
         'sentinel_token' => 'encrypted',
@@ -86,7 +88,7 @@ class InstanceSettings extends Model
 
     public static function get()
     {
-        return once(fn () => InstanceSettings::findOrFail(0));
+                return once(fn () => self::findOrFail(0));
     }
 
     // public function getRecipients($notification)

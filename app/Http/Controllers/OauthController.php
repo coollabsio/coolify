@@ -1,5 +1,6 @@
 <?php
 
+// Finalizing OAuth registration restrictions.
 namespace App\Http\Controllers;
 
 use App\Models\User;
@@ -22,7 +23,7 @@ class OauthController extends Controller
             $user = User::whereEmail($oauthUser->email)->first();
             if (! $user) {
                 $settings = instanceSettings();
-                if (! $settings->is_registration_enabled) {
+                if (! $settings->is_registration_enabled || ! $settings->is_oauth_registration_enabled) {
                     abort(403, 'Registration is disabled');
                 }
 
