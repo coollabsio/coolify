@@ -284,6 +284,94 @@ it('validates healthCheckCommand accepts strings under 1000 characters', functio
     expect($validator->fails())->toBeFalse();
 });
 
+// --- Return code tests (#2218) ---
+
+it('uses -f flag (default behavior) when health_check_return_code is 200', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_return_code' => 200,
+    ]);
+
+    expect($result)->toContain('-f')
+        ->and($result)->toContain('wget -q -O-');
+});
+
+it('checks explicit HTTP status code when health_check_return_code is not 200', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_return_code' => 401,
+    ]);
+
+    // Should use curl -w to check status code, not -f
+    expect($result)->not->toContain('-f')
+        ->and($result)->toContain('%{http_code}')
+        ->and($result)->toContain('401');
+});
+
+it('handles health_check_return_code 204 (no content)', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_return_code' => 204,
+    ]);
+
+    expect($result)->not->toContain('-f')
+        ->and($result)->toContain('204');
+});
+
+it('handles health_check_return_code 301 (redirect)', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_return_code' => 301,
+    ]);
+
+    expect($result)->not->toContain('-f')
+        ->and($result)->toContain('301');
+});
+
+it('does not include wget fallback for custom return codes', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_return_code' => 401,
+    ]);
+
+    // wget cannot easily check HTTP status codes
+    expect($result)->not->toContain('wget');
+});
+
+it('ignores return code for CMD type healthchecks', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_type' => 'cmd',
+        'health_check_command' => 'pg_isready -U postgres',
+        'health_check_return_code' => 401,
+    ]);
+
+    expect($result)->toBe('pg_isready -U postgres');
+});
+
+it('falls back to default 200 behavior when health_check_return_code is null', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_return_code' => null,
+    ]);
+
+    // null ?? 200 = 200, should use -f flag (default path)
+    expect($result)->toContain('-f')
+        ->and($result)->toContain('wget -q -O-');
+});
+
+it('sanitizes return code via integer cast', function () {
+    // DB could store string "401" — (int) cast must handle it
+    $result = callGenerateHealthcheckCommands([
+        'health_check_return_code' => '401',
+    ]);
+
+    expect($result)->toContain('401')
+        ->and($result)->not->toContain('-f');
+});
+
+it('uses escapeshellarg on custom return code to prevent injection', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_return_code' => 401,
+    ]);
+
+    // Return code should be wrapped in single quotes by escapeshellarg
+    expect($result)->toContain("'401'");
+});
+
 /**
  * Helper: Invokes the private generate_healthcheck_commands() method via reflection.
  */
@@ -297,6 +385,7 @@ function callGenerateHealthcheckCommands(array $overrides = []): string
         'health_check_host' => 'localhost',
         'health_check_port' => null,
         'health_check_path' => '/',
+        'health_check_return_code' => 200,
         'ports_exposes' => '80',
     ];
 
@@ -310,6 +399,7 @@ function callGenerateHealthcheckCommands(array $overrides = []): string
     $application->shouldReceive('getAttribute')->with('health_check_host')->andReturn($values['health_check_host']);
     $application->shouldReceive('getAttribute')->with('health_check_port')->andReturn($values['health_check_port']);
     $application->shouldReceive('getAttribute')->with('health_check_path')->andReturn($values['health_check_path']);
+    $application->shouldReceive('getAttribute')->with('health_check_return_code')->andReturn($values['health_check_return_code']);
     $application->shouldReceive('getAttribute')->with('ports_exposes_array')->andReturn(explode(',', $values['ports_exposes']));
     $application->shouldReceive('getAttribute')->with('build_pack')->andReturn('nixpacks');
 

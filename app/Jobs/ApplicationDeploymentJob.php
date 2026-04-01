@@ -2889,11 +2889,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->full_healthcheck_url = "{$method}: {$scheme}://{$host}:{$health_check_port}/";
         }
 
-        $generated_healthchecks_commands = [
-            "curl -s -X {$escapedMethod} -f {$url} > /dev/null || wget -q -O- {$url} > /dev/null || exit 1",
-        ];
+        $returnCode = (int) ($this->application->health_check_return_code ?? 200);
 
-        return implode(' ', $generated_healthchecks_commands);
+        if ($returnCode === 200) {
+            // Default behavior: use -f flag (fails on non-2xx) with wget fallback
+            $generated_healthchecks_commands = "curl -s -X {$escapedMethod} -f {$url} > /dev/null || wget -q -O- {$url} > /dev/null || exit 1";
+        } else {
+            // Custom return code: check explicit HTTP status code
+            $escapedReturnCode = escapeshellarg((string) $returnCode);
+            $generated_healthchecks_commands = "test \"$(curl -s -o /dev/null -w '%{http_code}' -X {$escapedMethod} {$url})\" = {$escapedReturnCode} || exit 1";
+        }
+
+        return $generated_healthchecks_commands;
     }
 
     private function sanitizeHealthCheckValue(string $value, string $pattern, string $default): string
