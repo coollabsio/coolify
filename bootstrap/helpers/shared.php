@@ -2589,6 +2589,25 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
             }
 
+
+            // Detect if this service is a database
+            $image = data_get_str($service, 'image');
+            $isDatabase = isDatabaseImage($image, $service);
+
+            // If database detected, create Service and ServiceDatabase records for backup support
+            if ($isDatabase) {
+                // Create or find Service record for this Application
+                $dbService = \App\Models\Service::firstOrCreate(
+                    ['name' => $serviceName, 'environment_id' => $resource->environment_id],
+                    ['server_id' => $resource->destination->server_id, 'destination_id' => $resource->destination_id, 'destination_type' => get_class($resource->destination)]
+                );
+                // Create ServiceDatabase record
+                \App\Models\ServiceDatabase::firstOrCreate(
+                    ['name' => $serviceName, 'service_id' => $dbService->id],
+                    ['image' => $image->value()]
+                );
+            }
+            data_set($service, 'is_database', $isDatabase);
             $baseName = generateApplicationContainerName($resource, $pull_request_id);
             $containerName = "$serviceName-$baseName";
             if ($resource->compose_parsing_version === '1') {
