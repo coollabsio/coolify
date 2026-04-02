@@ -1,0 +1,38 @@
+# documentation: https://openlitespeed.org
+# slogan: OpenLiteSpeed is a high-performance open source web server, ready for WordPress.
+# category: cms
+# tags: cms, blog, content, management, litespeed, openlitespeed
+# logo: svgs/wordpress.svg
+
+services:
+  litespeed:
+    image: litespeedtech/openlitespeed:latest
+    environment:
+      - SERVICE_URL_WORDPRESS
+      - TZ=UTC
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+      - "7080:7080"
+    volumes:
+      - lsws-conf:/usr/local/lsws/conf
+      - lsws-admin:/usr/local/lsws/admin/conf
+      - lsws-www:/var/www/vhosts/
+    depends_on:
+      - mariadb
+
+  mariadb:
+    image: mariadb:11
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

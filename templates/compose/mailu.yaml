@@ -1,0 +1,97 @@
+# documentation: https://mailu.io/
+# slogan: Mailu - A Free Software, drop-in email server as a set of Docker images.
+# category: email
+# tags: email, smtp, imap, self-hosted, mailu
+# logo: svgs/email.svg
+
+services:
+  front:
+    image: mailu/nginx:2024.06
+    restart: always
+    environment:
+      - DOMAIN=$SERVICE_FQDN_MAILU
+      - HOSTNAMES=$SERVICE_FQDN_MAILU
+      - SECRET_KEY=$SERVICE_PASSWORD_MAILUSECRET
+      - LOG_LEVEL=INFO
+      - AUTH_RATELIMIT_IP=600/minute
+      - WEBMAIL=roundcube
+    ports:
+      - "80:80"
+      - "443:443"
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "143:143"
+      - "993:993"
+    volumes:
+      - mailu-certs:/certs
+      - mailu-overrides:/overrides
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f -L http://localhost/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  resolver:
+    image: mailu/unbound:2024.06
+    restart: always
+    environment:
+      - DOMAIN=$SERVICE_FQDN_MAILU
+      - HOSTNAMES=$SERVICE_FQDN_MAILU
+      - SECRET_KEY=$SERVICE_PASSWORD_MAILUSECRET
+      - LOG_LEVEL=INFO
+    volumes:
+      - mailu-unbound:/data
+
+  admin:
+    image: mailu/admin:2024.06
+    restart: always
+    environment:
+      - DOMAIN=$SERVICE_FQDN_MAILU
+      - HOSTNAMES=$SERVICE_FQDN_MAILU
+      - SECRET_KEY=$SERVICE_PASSWORD_MAILUSECRET
+      - LOG_LEVEL=INFO
+      - WEBMAIL=roundcube
+    volumes:
+      - mailu-data:/data
+      - mailu-dkim:/dkim
+
+  imap:
+    image: mailu/dovecot:2024.06
+    restart: always
+    environment:
+      - DOMAIN=$SERVICE_FQDN_MAILU
+      - HOSTNAMES=$SERVICE_FQDN_MAILU
+      - SECRET_KEY=$SERVICE_PASSWORD_MAILUSECRET
+      - LOG_LEVEL=INFO
+    volumes:
+      - mailu-mail:/mail
+      - mailu-overrides:/overrides
+
+  smtp:
+    image: mailu/postfix:2024.06
+    restart: always
+    environment:
+      - DOMAIN=$SERVICE_FQDN_MAILU
+      - HOSTNAMES=$SERVICE_FQDN_MAILU
+      - SECRET_KEY=$SERVICE_PASSWORD_MAILUSECRET
+      - LOG_LEVEL=INFO
+    volumes:
+      - mailu-mailqueue:/queue
+
+  webmail:
+    image: mailu/roundcube:2024.06
+    restart: always
+    environment:
+      - DOMAIN=$SERVICE_FQDN_MAILU
+      - HOSTNAMES=$SERVICE_FQDN_MAILU
+      - SECRET_KEY=$SERVICE_PASSWORD_MAILUSECRET
+      - LOG_LEVEL=INFO
+    volumes:
+      - mailu-webmail:/data
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - mailu-redis:/data

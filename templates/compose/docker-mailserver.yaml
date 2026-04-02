@@ -1,0 +1,39 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/
+# slogan: A fullstack but simple mail server (SMTP, IMAP, LDAP, Antispam, Antivirus, etc.) using Docker.
+# category: email
+# tags: email, smtp, imap, self-hosted, dms
+# logo: svgs/email.svg
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    environment:
+      - OVERRIDE_HOSTNAME=$SERVICE_FQDN_MAILSERVER
+      - PERMIT_DOCKER=connected-networks
+      - POSTMASTER_ADDRESS=postmaster@$SERVICE_FQDN_MAILSERVER
+      - ENABLE_SPAMASSASSIN=1
+      - SPAMASSASSIN_SPAM_TO_INBOX=1
+      - ENABLE_CLAMAV=0
+      - ENABLE_FAIL2BAN=1
+      - ENABLE_POSTGREY=0
+      - ENABLE_SASLAUTHD=0
+      - ONE_DIR=1
+      - LOG_LEVEL=info
+    ports:
+      - "25:25"
+      - "143:143"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - mailserver-data:/var/mail/
+      - mailserver-state:/var/mail-state/
+      - mailserver-logs:/var/log/mail/
+      - mailserver-config:/tmp/docker-mailserver/
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test: "ss --listening --ipv4 --tcp | grep --silent ':smtp' || exit 1"
+      timeout: 3s
+      retries: 0
