@@ -226,6 +226,22 @@ class StartPostgresql
         $this->commands[] = "docker stop -t 10 $container_name 2>/dev/null || true";
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
+        // pgBackRest WAL archiving configuration
+        if ($this->database->pgbackrest_enabled) {
+            $stanzaName = $container_name;
+            $walConfig = \App\Services\Backup\PgBackrestService::getPostgresWalConfig($stanzaName);
+            $command = array_merge($command, $walConfig);
+
+            // Add pgbackrest data volume
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'],
+                [$container_name . '-pgbackrest:/var/lib/pgbackrest']
+            );
+            $docker_compose['volumes'][$container_name . '-pgbackrest'] = [
+                'name' => $container_name . '-pgbackrest',
+            ];
+        }
+
         if ($this->database->enable_ssl) {
             $this->commands[] = executeInDocker($this->database->uuid, "chown {$this->database->postgres_user}:{$this->database->postgres_user} /var/lib/postgresql/certs/server.key /var/lib/postgresql/certs/server.crt");
         }

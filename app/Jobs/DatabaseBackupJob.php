@@ -326,7 +326,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'scheduled_database_backup_id' => $this->backup->id,
                             'local_storage_deleted' => false,
                         ]);
-                        $this->backup_standalone_postgresql($database);
+                        if ($this->backup->engine === 'pgbackrest') {
+                            $this->backup_standalone_postgresql_pgbackrest($database);
+                        } else {
+                            $this->backup_standalone_postgresql($database);
+                        }
                     } elseif (str($databaseType)->contains('mongo')) {
                         if ($database === '*') {
                             $database = 'all';
@@ -581,6 +585,69 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;
+        }
+    }
+
+
+    private function backup_standalone_postgresql_pgbackrest(string $database): void
+    {
+        try {
+            $stanzaName = $this->container_name;
+            $backupType = $this->backup->pgbackrest_backup_type ?? 'full';
+            $escapedUsername = escapeshellarg($this->database->postgres_user);
+            $commands = [];
+
+            // Check if pgbackrest is available in the container
+            $commands[] = "docker exec $this->container_name which pgbackrest";
+
+            // Ensure pgbackrest directories exist
+            $commands[] = "docker exec $this->container_name mkdir -p /etc/pgbackrest /var/lib/pgbackrest /var/log/pgbackrest";
+
+            // Generate pgbackrest config
+            $pgDataPath = '/var/lib/postgresql/data';
+            $config = \App\Services\Backup\PgBackrestService::generateConfig($stanzaName, $pgDataPath, $this->s3);
+            $configBase64 = base64_encode($config);
+            $commands[] = "echo '$configBase64' | base64 -d | docker exec -i $this->container_name tee /etc/pgbackrest/pgbackrest.conf > /dev/null";
+
+            // Create stanza if it doesn't exist
+            $commands[] = "docker exec -u postgres $this->container_name pgbackrest --stanza=$stanzaName stanza-create 2>/dev/null || true";
+
+            // Run backup
+            $backupCommand = \App\Services\Backup\PgBackrestService::getBackupCommand(
+                $this->container_name,
+                $stanzaName,
+                'postgres',
+                $backupType
+            );
+            $commands[] = $backupCommand;
+
+            // Get backup info for logging
+            $commands[] = \App\Services\Backup\PgBackrestService::getInfoCommand(
+                $this->container_name,
+                $stanzaName,
+                'postgres'
+            );
+
+            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = trim($this->backup_output);
+            if ($this->backup_output === '') {
+                $this->backup_output = null;
+            }
+
+            // pgbackrest manages its own storage, mark as successful
+            $this->backup_status = 'success';
+            if ($this->s3) {
+                $this->s3_uploaded = true;
+            }
+        } catch (\Throwable $e) {
+            $this->add_to_error_output('pgBackRest backup failed: ' . $e->getMessage());
+            $this->add_to_error_output('Falling back to pg_dump...');
+            // Fallback to pg_dump
+            if ($this->backup->engine === 'pgbackrest') {
+                            $this->backup_standalone_postgresql_pgbackrest($database);
+                        } else {
+                            $this->backup_standalone_postgresql($database);
+                        }
         }
     }
 

@@ -21,6 +21,8 @@ class ScheduledDatabaseBackup extends BaseModel
         's3_storage_id',
         'databases_to_backup',
         'dump_all',
+        'engine',
+        'pgbackrest_backup_type',
         'database_backup_retention_days_locally',
         'database_backup_retention_max_storage_locally',
         'database_backup_retention_amount_s3',

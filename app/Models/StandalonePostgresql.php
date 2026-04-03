@@ -23,6 +23,7 @@ class StandalonePostgresql extends BaseModel
         'postgres_initdb_args',
         'postgres_host_auth_method',
         'postgres_conf',
+        'pgbackrest_enabled',
         'init_scripts',
         'status',
         'image',
