@@ -40,7 +40,13 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 {
     use HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+        'personal_team',
+        'show_boarding',
+        'custom_server_limit',
+    ];
 
     protected $casts = [
         'personal_team' => 'boolean',
@@ -226,7 +232,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     public function environment_variables()
     {
-        return $this->hasMany(SharedEnvironmentVariable::class)->whereNull('project_id')->whereNull('environment_id');
+        return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'team');
     }
 
     public function members()

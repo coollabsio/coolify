@@ -32,6 +32,11 @@ use OpenApi\Attributes as OA;
 )]
 class EnvironmentVariable extends BaseModel
 {
+    protected $attributes = [
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ];
+
     protected $fillable = [
         // Core identification
         'key',
@@ -147,6 +152,17 @@ class EnvironmentVariable extends BaseModel
                     return null;
                 }
 
+                // Load relationships needed for shared variable resolution
+                if (! $resource->relationLoaded('environment')) {
+                    $resource->load('environment');
+                }
+                if (! $resource->relationLoaded('server') && method_exists($resource, 'server')) {
+                    $resource->load('server');
+                }
+                if (! $resource->relationLoaded('destination') && method_exists($resource, 'destination')) {
+                    $resource->load('destination.server');
+                }
+
                 $real_value = $this->get_real_environment_variables($this->value, $resource);
 
                 // Skip escaping for valid JSON objects/arrays to prevent quote corruption (see #6160)
@@ -212,9 +228,99 @@ class EnvironmentVariable extends BaseModel
         );
     }
 
+    public function get_real_environment_variables_with_server(?string $environment_variable = null, $resource = null, $server = null)
+    {
+        return $this->get_real_environment_variables_internal($environment_variable, $resource, $server);
+    }
+
+    public function getResolvedValueWithServer($server = null)
+    {
+        if (! $this->relationLoaded('resourceable')) {
+            $this->load('resourceable');
+        }
+        $resource = $this->resourceable;
+        if (! $resource) {
+            return null;
+        }
+
+        // Load relationships needed for shared variable resolution
+        if (! $resource->relationLoaded('environment')) {
+            $resource->load('environment');
+        }
+        if (! $resource->relationLoaded('server') && method_exists($resource, 'server')) {
+            $resource->load('server');
+        }
+        if (! $resource->relationLoaded('destination') && method_exists($resource, 'destination')) {
+            $resource->load('destination.server');
+        }
+
+        $real_value = $this->get_real_environment_variables_internal($this->value, $resource, $server);
+
+        // Skip escaping for valid JSON objects/arrays to prevent quote corruption (see #6160)
+        if (json_validate($real_value) && (str_starts_with($real_value, '{') || str_starts_with($real_value, '['))) {
+            return $real_value;
+        }
+
+        if ($this->is_literal || $this->is_multiline) {
+            $real_value = '\''.$real_value.'\'';
+        } else {
+            $real_value = escapeEnvVariables($real_value);
+        }
+
+        return $real_value;
+    }
+
     private function get_real_environment_variables(?string $environment_variable = null, $resource = null)
     {
-        return resolveSharedEnvironmentVariables($environment_variable, $resource);
+        return $this->get_real_environment_variables_internal($environment_variable, $resource);
+    }
+
+    private function get_real_environment_variables_internal(?string $environment_variable = null, $resource = null, $serverOverride = null)
+    {
+        if (is_null($environment_variable) || $environment_variable === '' || is_null($resource)) {
+            return $environment_variable;
+        }
+        $environment_variable = trim($environment_variable);
+        $sharedEnvsFound = str($environment_variable)->matchAll('/{{(.*?)}}/');
+        if ($sharedEnvsFound->isEmpty()) {
+            return $environment_variable;
+        }
+        foreach ($sharedEnvsFound as $sharedEnv) {
+            $type = str($sharedEnv)->trim()->match('/(.*?)\./');
+            if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+                continue;
+            }
+            $variable = str($sharedEnv)->trim()->match('/\.(.*)/');
+            $id = null;
+            if ($type->value() === 'environment') {
+                $id = $resource->environment->id;
+            } elseif ($type->value() === 'project') {
+                $id = $resource->environment->project->id;
+            } elseif ($type->value() === 'team') {
+                $id = $resource->team()->id;
+            } elseif ($type->value() === 'server') {
+                if ($serverOverride) {
+                    $id = $serverOverride->id;
+                } elseif (isset($resource->server) && $resource->server) {
+                    $id = $resource->server->id;
+                } elseif (isset($resource->destination) && $resource->destination && isset($resource->destination->server)) {
+                    $id = $resource->destination->server->id;
+                }
+            }
+            if (is_null($id)) {
+                continue;
+            }
+            $found = SharedEnvironmentVariable::where('type', $type)
+                ->where('key', $variable)
+                ->where('team_id', $resource->team()->id)
+                ->where("{$type}_id", $id)
+                ->first();
+            if ($found) {
+                $environment_variable = str($environment_variable)->replace("{{{$sharedEnv}}}", $found->value);
+            }
+        }
+
+        return str($environment_variable)->value();
     }
 
     private function get_environment_variables(?string $environment_variable = null): ?string

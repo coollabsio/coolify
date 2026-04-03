@@ -121,8 +121,8 @@ class DockerImage extends Component
         }
         $destination_class = $destination->getMorphClass();
 
-        $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-        $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
+        $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
+        $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
 
         // Append @sha256 to image name if using digest and not already present
         $imageName = $parser->getFullImageNameWithoutTag();

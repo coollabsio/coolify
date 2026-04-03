@@ -25,13 +25,13 @@ class Sentinel extends Component
     public ?string $sentinelUpdatedAt = null;
 
     #[Validate(['required', 'integer', 'min:1'])]
-    public int $sentinelMetricsRefreshRateSeconds;
+    public int|string $sentinelMetricsRefreshRateSeconds;
 
     #[Validate(['required', 'integer', 'min:1'])]
-    public int $sentinelMetricsHistoryDays;
+    public int|string $sentinelMetricsHistoryDays;
 
     #[Validate(['required', 'integer', 'min:10'])]
-    public int $sentinelPushIntervalSeconds;
+    public int|string $sentinelPushIntervalSeconds;
 
     #[Validate(['nullable', 'url'])]
     public ?string $sentinelCustomUrl = null;

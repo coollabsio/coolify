@@ -17,11 +17,15 @@ class SharedEnvironmentVariable extends Model
         'team_id',
         'project_id',
         'environment_id',
+        'server_id',
 
         // Boolean flags
         'is_multiline',
         'is_literal',
         'is_shown_once',
+
+        // Metadata
+        'version',
     ];
 
     protected $casts = [
@@ -42,5 +46,10 @@ class SharedEnvironmentVariable extends Model
     public function environment()
     {
         return $this->belongsTo(Environment::class);
+    }
+
+    public function server()
+    {
+        return $this->belongsTo(Server::class);
     }
 }

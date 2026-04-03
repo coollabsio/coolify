@@ -3,11 +3,14 @@
 namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\GenerateConfig;
+use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Support\ValidationPatterns;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
+use Livewire\Features\SupportEvents\Event;
 use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
 
@@ -143,15 +146,15 @@ class General extends Component
             'gitRepository' => 'required',
             'gitBranch' => 'required',
             'gitCommitSha' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
-            'installCommand' => 'nullable',
-            'buildCommand' => 'nullable',
-            'startCommand' => 'nullable',
+            'installCommand' => ValidationPatterns::shellSafeCommandRules(),
+            'buildCommand' => ValidationPatterns::shellSafeCommandRules(),
+            'startCommand' => ValidationPatterns::shellSafeCommandRules(),
             'buildPack' => 'required',
             'staticImage' => 'required',
             'baseDirectory' => array_merge(['required'], array_slice(ValidationPatterns::directoryPathRules(), 1)),
             'publishDirectory' => ValidationPatterns::directoryPathRules(),
-            'portsExposes' => 'required',
-            'portsMappings' => 'nullable',
+            'portsExposes' => ['required', 'string', 'regex:/^(\d+)(,\d+)*$/'],
+            'portsMappings' => ValidationPatterns::portMappingRules(),
             'customNetworkAliases' => 'nullable',
             'dockerfile' => 'nullable',
             'dockerRegistryImageName' => 'nullable',
@@ -194,9 +197,12 @@ class General extends Component
                 'baseDirectory.regex' => 'The base directory must be a valid path starting with / and containing only safe characters.',
                 'publishDirectory.regex' => 'The publish directory must be a valid path starting with / and containing only safe characters.',
                 'dockerfileTargetBuild.regex' => 'The Dockerfile target build must contain only alphanumeric characters, dots, hyphens, and underscores.',
-                'dockerComposeCustomStartCommand.regex' => 'The Docker Compose start command contains invalid characters. Shell operators like ;, &, |, $, and backticks are not allowed.',
-                'dockerComposeCustomBuildCommand.regex' => 'The Docker Compose build command contains invalid characters. Shell operators like ;, &, |, $, and backticks are not allowed.',
-                'customDockerRunOptions.regex' => 'The custom Docker run options contain invalid characters. Shell operators like ;, &, |, $, and backticks are not allowed.',
+                'dockerComposeCustomStartCommand.regex' => 'The Docker Compose start command contains invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
+                'dockerComposeCustomBuildCommand.regex' => 'The Docker Compose build command contains invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
+                'customDockerRunOptions.regex' => 'The custom Docker run options contain invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
+                'installCommand.regex' => 'The install command contains invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
+                'buildCommand.regex' => 'The build command contains invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
+                'startCommand.regex' => 'The start command contains invalid characters. Shell operators like ;, |, $, and backticks are not allowed.',
                 'preDeploymentCommandContainer.regex' => 'The pre-deployment command container name must contain only alphanumeric characters, dots, hyphens, and underscores.',
                 'postDeploymentCommandContainer.regex' => 'The post-deployment command container name must contain only alphanumeric characters, dots, hyphens, and underscores.',
                 'name.required' => 'The Name field is required.',
@@ -206,6 +212,8 @@ class General extends Component
                 'staticImage.required' => 'The Static Image field is required.',
                 'baseDirectory.required' => 'The Base Directory field is required.',
                 'portsExposes.required' => 'The Exposed Ports field is required.',
+                'portsExposes.regex' => 'Ports exposes must be a comma-separated list of port numbers (e.g. 3000,3001).',
+                ...ValidationPatterns::portMappingMessages(),
                 'isStatic.required' => 'The Static setting is required.',
                 'isStatic.boolean' => 'The Static setting must be true or false.',
                 'isSpa.required' => 'The SPA setting is required.',
@@ -288,7 +296,7 @@ class General extends Component
                 $this->authorize('update', $this->application);
                 $this->application->fqdn = null;
                 $this->application->settings->save();
-            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            } catch (AuthorizationException $e) {
                 // User doesn't have update permission, just continue without saving
             }
         }
@@ -309,7 +317,7 @@ class General extends Component
                 $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
                 $this->application->custom_labels = base64_encode($this->customLabels);
                 $this->application->save();
-            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            } catch (AuthorizationException $e) {
                 // User doesn't have update permission, just use existing labels
                 // $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
             }
@@ -321,7 +329,7 @@ class General extends Component
                 $this->authorize('update', $this->application);
                 $this->initLoadingCompose = true;
                 $this->dispatch('info', 'Loading docker compose file.');
-            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            } catch (AuthorizationException $e) {
                 // User doesn't have update permission, skip loading compose file
             }
         }
@@ -587,7 +595,7 @@ class General extends Component
         // Check if user has permission to update
         try {
             $this->authorize('update', $this->application);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
             // User doesn't have permission, revert the change and return
             $this->application->refresh();
             $this->syncData();
@@ -612,7 +620,7 @@ class General extends Component
                 $this->fqdn = null;
                 $this->application->fqdn = null;
                 $this->application->settings->save();
-            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            } catch (AuthorizationException $e) {
                 // User doesn't have update permission, just continue without saving
             }
         }
@@ -729,6 +737,7 @@ class General extends Component
         $this->authorize('update', $this->application);
 
         try {
+            $this->application->redirect = $this->redirect;
             $has_www = collect($this->application->fqdns)->filter(fn ($fqdn) => str($fqdn)->contains('www.'))->count();
             if ($has_www === 0 && $this->application->redirect === 'www') {
                 $this->dispatch('error', 'You want to redirect to www, but you do not have a www domain set.<br><br>Please add www to your domain list and as an A DNS record (if applicable).');
@@ -749,6 +758,12 @@ class General extends Component
             $this->authorize('update', $this->application);
 
             $this->resetErrorBag();
+
+            $this->portsExposes = str($this->portsExposes)->replace(' ', '')->trim()->toString();
+            if ($this->portsMappings) {
+                $this->portsMappings = str($this->portsMappings)->replace(' ', '')->trim()->toString();
+            }
+
             $this->validate();
 
             $oldPortsExposes = $this->application->ports_exposes;
@@ -809,7 +824,7 @@ class General extends Component
                     restoreBaseDirectory: $oldBaseDirectory,
                     restoreDockerComposeLocation: $oldDockerComposeLocation
                 );
-                if ($compose_return instanceof \Livewire\Features\SupportEvents\Event) {
+                if ($compose_return instanceof Event) {
                     // Validation failed - restore original values to component properties
                     $this->baseDirectory = $oldBaseDirectory;
                     $this->dockerComposeLocation = $oldDockerComposeLocation;
@@ -939,7 +954,7 @@ class General extends Component
         $command = injectDockerComposeFlags(
             $this->dockerComposeCustomBuildCommand,
             ".{$normalizedBase}{$this->dockerComposeLocation}",
-            \App\Jobs\ApplicationDeploymentJob::BUILD_TIME_ENV_PATH
+            ApplicationDeploymentJob::BUILD_TIME_ENV_PATH
         );
 
         // Inject build args if not using build secrets

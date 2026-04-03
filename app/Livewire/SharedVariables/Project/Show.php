@@ -44,9 +44,9 @@ class Show extends Component
         }
     }
 
-    public function mount()
+    public function mount(?string $project_uuid = null)
     {
-        $projectUuid = request()->route('project_uuid');
+        $projectUuid = $project_uuid ?? request()->route('project_uuid');
         $teamId = currentTeam()->id;
         $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
         if (! $project) {

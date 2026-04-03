@@ -480,7 +480,7 @@
                         @php
                             $displayLines = collect(explode("\n", $outputs))->filter(fn($line) => trim($line) !== '');
                         @endphp
-                        <div id="logs" class="font-mono max-w-full cursor-default">
+                        <div id="logs" class="font-logs max-w-full cursor-default">
                             <div x-show="searchQuery.trim() && matchCount === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
                                 No matches found.
@@ -518,7 +518,7 @@
                         </div>
                     @else
                         <pre id="logs"
-                            class="font-mono whitespace-pre-wrap break-all max-w-full text-neutral-400">No logs yet.</pre>
+                            class="font-logs whitespace-pre-wrap break-all max-w-full text-neutral-400">No logs yet.</pre>
                     @endif
                 </div>
             </div>

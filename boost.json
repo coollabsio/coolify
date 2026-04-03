@@ -6,18 +6,23 @@
         "opencode"
     ],
     "guidelines": true,
-    "herd_mcp": false,
     "mcp": true,
+    "nightwatch_mcp": false,
     "packages": [
         "laravel/fortify",
-        "spatie/laravel-ray"
+        "spatie/laravel-ray",
+        "lorisleiva/laravel-actions"
     ],
     "sail": false,
     "skills": [
+        "laravel-best-practices",
+        "configuring-horizon",
+        "socialite-development",
         "livewire-development",
         "pest-testing",
         "tailwindcss-development",
-        "developing-with-fortify",
+        "fortify-development",
+        "laravel-actions",
         "debugging-output-and-previewing-html-using-ray"
     ]
 }

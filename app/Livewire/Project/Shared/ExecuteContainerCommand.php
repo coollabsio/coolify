@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Shared;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
+use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -181,7 +182,7 @@ class ExecuteContainerCommand extends Component
         }
         try {
             // Validate container name format
-            if (! preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/', $this->selected_container)) {
+            if (! ValidationPatterns::isValidContainerName($this->selected_container)) {
                 throw new \InvalidArgumentException('Invalid container name format');
             }
 

@@ -95,9 +95,9 @@ function sharedDataApplications()
         'git_commit_sha' => ['string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
         'docker_registry_image_name' => 'string|nullable',
         'docker_registry_image_tag' => 'string|nullable',
-        'install_command' => 'string|nullable',
-        'build_command' => 'string|nullable',
-        'start_command' => 'string|nullable',
+        'install_command' => \App\Support\ValidationPatterns::shellSafeCommandRules(),
+        'build_command' => \App\Support\ValidationPatterns::shellSafeCommandRules(),
+        'start_command' => \App\Support\ValidationPatterns::shellSafeCommandRules(),
         'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/',
         'ports_mappings' => 'string|regex:/^(\d+:\d+)(,\d+:\d+)*$/|nullable',
         'custom_network_aliases' => 'string|nullable',
@@ -144,6 +144,7 @@ function sharedDataApplications()
         'docker_compose_custom_start_command' => \App\Support\ValidationPatterns::shellSafeCommandRules(),
         'docker_compose_custom_build_command' => \App\Support\ValidationPatterns::shellSafeCommandRules(),
         'is_container_label_escape_enabled' => 'boolean',
+        'is_preserve_repository_enabled' => 'boolean'
     ];
 }
 
@@ -193,5 +194,6 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('force_domain_override');
     $request->offsetUnset('autogenerate_domain');
     $request->offsetUnset('is_container_label_escape_enabled');
+    $request->offsetUnset('is_preserve_repository_enabled');
     $request->offsetUnset('docker_compose_raw');
 }

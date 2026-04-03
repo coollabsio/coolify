@@ -11,7 +11,9 @@ use App\Enums\ProxyTypes;
 use App\Events\ServerReachabilityChanged;
 use App\Helpers\SslHelper;
 use App\Jobs\CheckAndStartSentinelJob;
+use App\Jobs\CheckTraefikVersionForServerJob;
 use App\Jobs\RegenerateSslCertJob;
+use App\Livewire\Server\Proxy;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use App\Services\ConfigurationRepository;
@@ -32,6 +34,7 @@ use OpenApi\Attributes as OA;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Spatie\Url\Url;
+use Stevebauman\Purify\Facades\Purify;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
@@ -77,8 +80,8 @@ use Visus\Cuid2\Cuid2;
  * - Traefik image uses the 'latest' tag (no fixed version tracking)
  * - No Traefik version detected on the server
  *
- * @see \App\Jobs\CheckTraefikVersionForServerJob Where this data is populated
- * @see \App\Livewire\Server\Proxy Where this data is read and displayed
+ * @see CheckTraefikVersionForServerJob Where this data is populated
+ * @see Proxy Where this data is read and displayed
  */
 #[OA\Schema(
     description: 'Server model',
@@ -132,7 +135,7 @@ class Server extends BaseModel
                     $payload['ip_previous'] = $server->getOriginal('ip');
                 }
             }
-            $server->forceFill($payload);
+            $server->fill($payload);
         });
         static::saved(function ($server) {
             if ($server->wasChanged('private_key_id') || $server->privateKey?->isDirty()) {
@@ -145,19 +148,14 @@ class Server extends BaseModel
             ]);
             if ($server->id === 0) {
                 if ($server->isSwarm()) {
-                    SwarmDocker::create([
+                    (new SwarmDocker)->forceFill([
                         'id' => 0,
                         'name' => 'coolify',
                         'network' => 'coolify-overlay',
                         'server_id' => $server->id,
-                    ]);
+                    ])->save();
                 } else {
-                    StandaloneDocker::create([
-                        'id' => 0,
-                        'name' => 'coolify',
-                        'network' => 'coolify',
-                        'server_id' => $server->id,
-                    ]);
+                    (new StandaloneDocker)->forceFill($server->defaultStandaloneDockerAttributes(id: 0))->saveQuietly();
                 }
             } else {
                 if ($server->isSwarm()) {
@@ -167,18 +165,32 @@ class Server extends BaseModel
                         'server_id' => $server->id,
                     ]);
                 } else {
-                    $standaloneDocker = new StandaloneDocker([
-                        'name' => 'coolify',
-                        'uuid' => (string) new Cuid2,
-                        'network' => 'coolify',
-                        'server_id' => $server->id,
-                    ]);
+                    $standaloneDocker = new StandaloneDocker;
+                    $standaloneDocker->forceFill($server->defaultStandaloneDockerAttributes());
                     $standaloneDocker->saveQuietly();
                 }
             }
             if (! isset($server->proxy->redirect_enabled)) {
                 $server->proxy->redirect_enabled = true;
             }
+
+            // Create predefined server shared variables
+            SharedEnvironmentVariable::create([
+                'key' => 'COOLIFY_SERVER_UUID',
+                'value' => $server->uuid,
+                'type' => 'server',
+                'server_id' => $server->id,
+                'team_id' => $server->team_id,
+                'is_literal' => true,
+            ]);
+            SharedEnvironmentVariable::create([
+                'key' => 'COOLIFY_SERVER_NAME',
+                'value' => $server->name,
+                'type' => 'server',
+                'server_id' => $server->id,
+                'team_id' => $server->team_id,
+                'is_literal' => true,
+            ]);
         });
         static::retrieved(function ($server) {
             if (! isset($server->proxy->redirect_enabled)) {
@@ -261,11 +273,17 @@ class Server extends BaseModel
         'detected_traefik_version',
         'traefik_outdated_info',
         'server_metadata',
+        'ip_previous',
     ];
 
-    protected $guarded = [];
-
     use HasSafeStringAttribute;
+
+    public function setValidationLogsAttribute($value): void
+    {
+        $this->attributes['validation_logs'] = $value !== null
+            ? Purify::config('validation_logs')->clean($value)
+            : null;
+    }
 
     public function type()
     {
@@ -719,17 +737,17 @@ $schema://$host {
 
     public function stopUnmanaged($id)
     {
-        return instant_remote_process(["docker stop -t 0 $id"], $this);
+        return instant_remote_process(['docker stop -t 0 '.escapeshellarg($id)], $this);
     }
 
     public function restartUnmanaged($id)
     {
-        return instant_remote_process(["docker restart $id"], $this);
+        return instant_remote_process(['docker restart '.escapeshellarg($id)], $this);
     }
 
     public function startUnmanaged($id)
     {
-        return instant_remote_process(["docker start $id"], $this);
+        return instant_remote_process(['docker start '.escapeshellarg($id)], $this);
     }
 
     public function getContainers()
@@ -1013,6 +1031,30 @@ $schema://$host {
     public function team()
     {
         return $this->belongsTo(Team::class);
+    }
+
+    /**
+     * @return array{id?: int, name: string, uuid: string, network: string, server_id: int}
+     */
+    public function defaultStandaloneDockerAttributes(?int $id = null): array
+    {
+        $attributes = [
+            'name' => 'coolify',
+            'uuid' => (string) new Cuid2,
+            'network' => 'coolify',
+            'server_id' => $this->id,
+        ];
+
+        if (! is_null($id)) {
+            $attributes['id'] = $id;
+        }
+
+        return $attributes;
+    }
+
+    public function environment_variables()
+    {
+        return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'server');
     }
 
     public function isProxyShouldRun()
@@ -1460,7 +1502,7 @@ $schema://$host {
 
     public function restartContainer(string $containerName)
     {
-        return instant_remote_process(['docker restart '.$containerName], $this, false);
+        return instant_remote_process(['docker restart '.escapeshellarg($containerName)], $this, false);
     }
 
     public function changeProxy(string $proxyType, bool $async = true)

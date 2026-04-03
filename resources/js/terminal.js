@@ -186,7 +186,7 @@ export function initializeTerminalComponent() {
                     this.term = new Terminal({
                         cols: 80,
                         rows: 30,
-                        fontFamily: '"Fira Code", courier-new, courier, monospace, "Powerline Extra Symbols"',
+                        fontFamily: '"Geist Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace, "Powerline Extra Symbols"',
                         cursorBlink: true,
                         rendererType: 'canvas',
                         convertEol: true,

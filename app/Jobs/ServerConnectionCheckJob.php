@@ -2,8 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
 use App\Services\ConfigurationRepository;
+use App\Services\HetznerService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -11,7 +13,9 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Process;
 
 class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -19,7 +23,7 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public $tries = 1;
 
-    public $timeout = 30;
+    public $timeout = 15;
 
     public function __construct(
         public Server $server,
@@ -28,7 +32,7 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping('server-connection-check-'.$this->server->uuid))->expireAfter(45)->dontRelease()];
+        return [(new WithoutOverlapping('server-connection-check-'.$this->server->uuid))->expireAfter(25)->dontRelease()];
     }
 
     private function disableSshMux(): void
@@ -72,6 +76,7 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                     'is_reachable' => false,
                     'is_usable' => false,
                 ]);
+                $this->server->increment('unreachable_count');
 
                 Log::warning('ServerConnectionCheck: Server not reachable', [
                     'server_id' => $this->server->id,
@@ -90,6 +95,10 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 'is_usable' => $isUsable,
             ]);
 
+            if ($this->server->unreachable_count > 0) {
+                $this->server->update(['unreachable_count' => 0]);
+            }
+
         } catch (\Throwable $e) {
 
             Log::error('ServerConnectionCheckJob failed', [
@@ -100,6 +109,7 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 'is_reachable' => false,
                 'is_usable' => false,
             ]);
+            $this->server->increment('unreachable_count');
 
             return;
         }
@@ -107,11 +117,12 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public function failed(?\Throwable $exception): void
     {
-        if ($exception instanceof \Illuminate\Queue\TimeoutExceededException) {
+        if ($exception instanceof TimeoutExceededException) {
             $this->server->settings->update([
                 'is_reachable' => false,
                 'is_usable' => false,
             ]);
+            $this->server->increment('unreachable_count');
 
             // Delete the queue job so it doesn't appear in Horizon's failed list.
             $this->job?->delete();
@@ -123,7 +134,7 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
         $status = null;
 
         try {
-            $hetznerService = new \App\Services\HetznerService($this->server->cloudProviderToken->token);
+            $hetznerService = new HetznerService($this->server->cloudProviderToken->token);
             $serverData = $hetznerService->getServer($this->server->hetzner_server_id);
             $status = $serverData['status'] ?? null;
 
@@ -144,15 +155,18 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
     private function checkConnection(): bool
     {
         try {
-            // Use instant_remote_process with a simple command
-            // This will automatically handle mux, sudo, IPv6, Cloudflare tunnel, etc.
-            $output = instant_remote_process_with_timeout(
-                ['ls -la /'],
-                $this->server,
-                false // don't throw error
-            );
+            // Single SSH attempt without SshRetryHandler — retries waste time for connectivity checks.
+            // Backoff is managed at the dispatch level via unreachable_count.
+            $commands = ['ls -la /'];
+            if ($this->server->isNonRoot()) {
+                $commands = parseCommandsByLineForSudo(collect($commands), $this->server);
+            }
+            $commandString = implode("\n", $commands);
 
-            return $output !== null;
+            $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $commandString, true);
+            $process = Process::timeout(10)->run($sshCommand);
+
+            return $process->exitCode() === 0;
         } catch (\Throwable $e) {
             Log::debug('ServerConnectionCheck: Connection check failed', [
                 'server_id' => $this->server->id,
