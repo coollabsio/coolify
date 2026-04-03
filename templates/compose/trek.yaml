@@ -21,6 +21,8 @@ services:
       - 'OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}'
       - 'OIDC_DISPLAY_NAME=${OIDC_DISPLAY_NAME:-SSO}'
       - 'OIDC_ONLY=${OIDC_ONLY:-false}'
+      - 'ADMIN_EMAIL=${ADMIN_EMAIL:-admin@trek.local}'
+      - ADMIN_PASSWORD=$SERVICE_PASSWORD_ADMIN
     volumes:
       - trek-data:/app/data
       - trek-uploads:/app/uploads
