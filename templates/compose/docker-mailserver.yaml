@@ -1,7 +1,5 @@
-# documentation: https://docker-mailserver.github.io/docker-mailserver/
-# slogan: A fullstack but simple mail server (SMTP, IMAP, LDAP, Antispam, Antivirus, etc.) using Docker.
+# slogan: A fullstack but simple mail server using Docker.
 # category: email
-# tags: email, smtp, imap, self-hosted, dms
 # logo: svgs/email.svg
 
 services:

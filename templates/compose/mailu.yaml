@@ -1,7 +1,6 @@
 # documentation: https://mailu.io/
 # slogan: Mailu - A Free Software, drop-in email server as a set of Docker images.
 # category: email
-# tags: email, smtp, imap, self-hosted, mailu
 # logo: svgs/email.svg
 
 services:
