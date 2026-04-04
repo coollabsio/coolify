@@ -16,6 +16,9 @@ class Advanced extends Component
     public bool $is_registration_enabled;
 
     #[Validate('boolean')]
+    public bool $is_oauth_registration_enabled;
+
+    #[Validate('boolean')]
     public bool $do_not_track;
 
     #[Validate('boolean')]
@@ -41,6 +44,7 @@ class Advanced extends Component
     {
         return [
             'is_registration_enabled' => 'boolean',
+            'is_oauth_registration_enabled' => 'boolean',
             'do_not_track' => 'boolean',
             'is_dns_validation_enabled' => 'boolean',
             'custom_dns_servers' => ['nullable', 'string', new ValidDnsServers],
@@ -67,6 +71,7 @@ class Advanced extends Component
         $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
         $this->is_sponsorship_popup_enabled = $this->settings->is_sponsorship_popup_enabled;
         $this->is_wire_navigate_enabled = $this->settings->is_wire_navigate_enabled ?? true;
+        $this->is_oauth_registration_enabled = $this->settings->is_oauth_registration_enabled;
     }
 
     public function submit()
@@ -150,6 +155,7 @@ class Advanced extends Component
             $this->settings->is_sponsorship_popup_enabled = $this->is_sponsorship_popup_enabled;
             $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation;
             $this->settings->is_wire_navigate_enabled = $this->is_wire_navigate_enabled;
+            $this->settings->is_oauth_registration_enabled = $this->is_oauth_registration_enabled;
             $this->settings->save();
             $this->dispatch('success', 'Settings updated!');
         } catch (\Exception $e) {
@@ -166,6 +172,19 @@ class Advanced extends Component
         $this->settings->is_registration_enabled = $this->is_registration_enabled = true;
         $this->settings->save();
         $this->dispatch('success', 'Registration has been enabled.');
+
+        return true;
+    }
+
+    public function toggleOauthRegistration($password): bool
+    {
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return false;
+        }
+
+        $this->settings->is_oauth_registration_enabled = $this->is_oauth_registration_enabled = true;
+        $this->settings->save();
+        $this->dispatch('success', 'OAuth registration has been enabled.');
 
         return true;
     }

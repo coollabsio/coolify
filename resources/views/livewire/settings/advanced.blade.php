@@ -41,6 +41,33 @@
                                 shortConfirmationLabel="Confirmation text" />
                         </div>
                     @endif
+                    <div class="flex flex-col gap-1">
+                        @if ($is_oauth_registration_enabled)
+                            <div class="md:w-96" wire:key="oauth-registration-enabled">
+                                <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                                    helper="Allow users to self-register via OAuth (Google, GitHub, etc.) even if general registration is disabled."
+                                    label="OAuth Registration Allowed" />
+                            </div>
+                        @else
+                            <div class="flex items-center justify-between gap-2 md:w-96"
+                                wire:key="oauth-registration-disabled">
+                                <label class="flex items-center gap-2">
+                                    OAuth Registration Allowed
+                                    <x-helper
+                                        helper="Allow users to self-register via OAuth (Google, GitHub, etc.) even if general registration is disabled.">
+                                    </x-helper>
+                                </label>
+                                <x-modal-confirmation title="Enable OAuth Registration?" buttonTitle="Enable" isErrorButton
+                                    submitAction="toggleOauthRegistration" :actions="[
+                                        'Enables registration specifically for OAuth providers',
+                                    ]"
+                                    warningMessage="Enabling OAuth registration allows anyone with a valid account from your configured OAuth providers to create an account on this instance."
+                                    confirmationText="ENABLE OAUTH REGISTRATION"
+                                    confirmationLabel="Please type the confirmation text to enable OAuth registration."
+                                    shortConfirmationLabel="Confirmation text" />
+                            </div>
+                        @endif
+                    </div>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."
