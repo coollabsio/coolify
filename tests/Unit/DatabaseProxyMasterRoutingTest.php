@@ -2,11 +2,9 @@
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
-use App\Events\DatabaseProxyStopped;
 use App\Models\ServiceDatabase;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
-use Illuminate\Support\Facades\Event;
 
 it('runs standalone database proxy on the master domain router server for remote deployments', function () {
     $edgeServer = \Mockery::mock(Server::class)->makePartial();
@@ -791,8 +789,6 @@ it('normalizes remote host with scheme and path before building database upstrea
 });
 
 it('dispatches database proxy stopped event with standalone database team id', function () {
-    Event::fake([DatabaseProxyStopped::class]);
-
     $deploymentServer = \Mockery::mock(Server::class)->makePartial();
     $deploymentServer->id = 301;
 
@@ -808,6 +804,8 @@ it('dispatches database proxy stopped event with standalone database team id', f
 
     $action = new class extends StopDatabaseProxy
     {
+        public array $dispatchedTeamIds = [];
+
         protected function runRemoteCommands(array $commands, Server $server, bool $throwError = true): ?string
         {
             return null;
@@ -817,16 +815,19 @@ it('dispatches database proxy stopped event with standalone database team id', f
         {
             return null;
         }
+
+        protected function dispatchDatabaseProxyStoppedEvent($database): void
+        {
+            $this->dispatchedTeamIds[] = $this->resolveDatabaseTeamId($database);
+        }
     };
 
     $action->handle($database);
 
-    Event::assertDispatched(DatabaseProxyStopped::class, fn (DatabaseProxyStopped $event) => $event->teamId === 777);
+    expect($action->dispatchedTeamIds)->toBe([777]);
 });
 
 it('dispatches database proxy stopped event with service database team id', function () {
-    Event::fake([DatabaseProxyStopped::class]);
-
     $deploymentServer = \Mockery::mock(Server::class)->makePartial();
     $deploymentServer->id = 302;
 
@@ -841,6 +842,8 @@ it('dispatches database proxy stopped event with service database team id', func
 
     $action = new class extends StopDatabaseProxy
     {
+        public array $dispatchedTeamIds = [];
+
         protected function runRemoteCommands(array $commands, Server $server, bool $throwError = true): ?string
         {
             return null;
@@ -850,9 +853,14 @@ it('dispatches database proxy stopped event with service database team id', func
         {
             return null;
         }
+
+        protected function dispatchDatabaseProxyStoppedEvent($database): void
+        {
+            $this->dispatchedTeamIds[] = $this->resolveDatabaseTeamId($database);
+        }
     };
 
     $action->handle($database);
 
-    Event::assertDispatched(DatabaseProxyStopped::class, fn (DatabaseProxyStopped $event) => $event->teamId === 778);
+    expect($action->dispatchedTeamIds)->toBe([778]);
 });
