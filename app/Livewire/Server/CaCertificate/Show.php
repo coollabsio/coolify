@@ -84,6 +84,8 @@ class Show extends Component
                 ));
             }
             $this->dispatch('success', 'CA Certificate saved successfully.');
+
+            return true;
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -111,6 +113,8 @@ class Show extends Component
 
             $this->loadCaCertificate();
             $this->dispatch('success', 'CA Certificate regenerated successfully.');
+
+            return true;
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
