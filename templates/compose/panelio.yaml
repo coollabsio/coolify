@@ -1,0 +1,21 @@
+# documentation: https://github.com/Vellis59/panelio
+# slogan: A self-hosted services dashboard with a built-in admin UI — manage everything from your browser
+# category: productivity
+# tags: dashboard,homepage,admin,self-hosted
+# logo: svgs/panelio.svg
+# port: 3000
+
+services:
+  panelio:
+    image: ghcr.io/vellis59/panelio:1.0.0
+    environment:
+      - SERVICE_FQDN_PANELIO_3000
+      - PANELIO_ADMIN_PASSWORD=${PANELIO_ADMIN_PASSWORD:-changeme}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - panelio-config:/app/config
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/healthcheck"]
+      interval: 10s
+      timeout: 3s
+      start_period: 20s
