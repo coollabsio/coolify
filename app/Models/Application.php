@@ -907,6 +907,16 @@ class Application extends BaseModel
         return $this->belongsTo(Environment::class);
     }
 
+    public function service_databases()
+    {
+        return $this->hasMany(ServiceDatabase::class);
+    }
+
+    public function scheduledBackups()
+    {
+        return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
+    }
+
     public function previews()
     {
         return $this->hasMany(ApplicationPreview::class)->orderBy('pull_request_id', 'desc');

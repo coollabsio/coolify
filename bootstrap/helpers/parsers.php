@@ -1264,6 +1264,16 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         );
 
         $isDatabase = isDatabaseImage($image, $service);
+        if ($isDatabase) {
+            $savedDb = ServiceDatabase::firstOrCreate([
+                'name' => $serviceName,
+                'application_id' => $resource->id,
+            ]);
+            if ($savedDb->image !== $image) {
+                $savedDb->image = $image;
+                $savedDb->save();
+            }
+        }
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
             $fqdnsWithoutPort = $fqdns->map(function ($fqdn) {

@@ -31,7 +31,17 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceDatabase::where(function ($query) {
+            $query->whereHas('service', function ($q) use ($teamId) {
+                $q->whereHas('environment.project.team', function ($q2) use ($teamId) {
+                    $q2->where('id', $teamId);
+                });
+            })->orWhereHas('application', function ($q) use ($teamId) {
+                $q->whereHas('project.team', function ($q2) use ($teamId) {
+                    $q2->where('id', $teamId);
+                });
+            });
+        })->orderBy('name');
     }
 
     /**
@@ -40,7 +50,17 @@ class ServiceDatabase extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        return ServiceDatabase::where(function ($query) {
+            $query->whereHas('service', function ($q) {
+                $q->whereHas('environment.project.team', function ($q2) {
+                    $q2->where('id', currentTeam()->id);
+                });
+            })->orWhereHas('application', function ($q) {
+                $q->whereHas('project.team', function ($q2) {
+                    $q2->where('id', currentTeam()->id);
+                });
+            });
+        })->orderBy('name');
     }
 
     /**
@@ -55,8 +75,10 @@ class ServiceDatabase extends BaseModel
 
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        $parent = $this->parent();
+        $container_id = $this->name.'-'.$parent->uuid;
+        $server = $parent instanceof Service ? $parent->server : $parent->destination->server;
+        remote_process(["docker restart {$container_id}"], $server);
     }
 
     public function isRunning()
@@ -118,8 +140,10 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $parent = $this->parent();
+        $server = $parent instanceof Service ? $parent->server : $parent->destination->server;
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -128,17 +152,33 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'service.environment.project.team');
+        if ($this->service) {
+            return $this->service->environment->project->team;
+        } elseif ($this->application) {
+            return $this->application->project->team;
+        }
+        return null;
     }
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->service->uuid}";
+        $uuid = $this->service?->uuid ?? $this->application?->uuid;
+        return service_configuration_dir()."/{$uuid}";
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
+    }
+
+    public function parent()
+    {
+        return $this->service ?? $this->application;
     }
 
     public function persistentStorages()
