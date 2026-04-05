@@ -990,17 +990,16 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             }
             if ($key->value() === $parsedValue->value()) {
                 // Simple variable reference (e.g. DATABASE_URL: ${DATABASE_URL})
-                // Ensure the variable exists in DB for .env generation and UI display
-                $resource->environment_variables()->firstOrCreate([
+                // Use firstOrCreate to avoid overwriting user-saved values on redeploy
+                $envVar = $resource->environment_variables()->firstOrCreate([
                     'key' => $key,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
                 ], [
                     'is_preview' => false,
                 ]);
-                // Keep the ${VAR} reference in compose — Docker Compose resolves from .env at deploy time.
-                // Do NOT replace with DB value: if user updates env var without re-parsing compose,
-                // a stale resolved value in environment: would override the correct .env value.
+                // Add the variable to the environment using the saved DB value
+                $environment[$key->value()] = $envVar->value;
             } else {
                 if ($value->startsWith('$')) {
                     $isRequired = false;
@@ -1664,15 +1663,12 @@ function serviceParser(Service $resource): Collection
             // Use the already determined migrated service
             $savedService = $migratedApp ?: $migratedDb;
         } elseif ($isDatabase) {
-            $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
-            if ($applicationFound) {
-                $savedService = $applicationFound;
-            } else {
-                $savedService = ServiceDatabase::firstOrCreate([
-                    'name' => $serviceName,
-                    'service_id' => $resource->id,
-                ]);
-            }
+            // For detected databases, always create ServiceDatabase records (not ServiceApplication)
+            // This ensures backup functionality is available for database containers in docker compose
+            $savedService = ServiceDatabase::firstOrCreate([
+                'name' => $serviceName,
+                'service_id' => $resource->id,
+            ]);
         } else {
             $savedService = ServiceApplication::firstOrCreate([
                 'name' => $serviceName,
@@ -2051,15 +2047,12 @@ function serviceParser(Service $resource): Collection
             // Use the already determined migrated service
             $savedService = $migratedApp ?: $migratedDb;
         } elseif ($isDatabase) {
-            $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
-            if ($applicationFound) {
-                $savedService = $applicationFound;
-            } else {
-                $savedService = ServiceDatabase::firstOrCreate([
-                    'name' => $serviceName,
-                    'service_id' => $resource->id,
-                ]);
-            }
+            // For detected databases, always create ServiceDatabase records (not ServiceApplication)
+            // This ensures backup functionality is available for database containers in docker compose
+            $savedService = ServiceDatabase::firstOrCreate([
+                'name' => $serviceName,
+                'service_id' => $resource->id,
+            ]);
         } else {
             $savedService = ServiceApplication::firstOrCreate([
                 'name' => $serviceName,
@@ -2342,8 +2335,8 @@ function serviceParser(Service $resource): Collection
             }
             if ($key->value() === $parsedValue->value()) {
                 // Simple variable reference (e.g. DATABASE_URL: ${DATABASE_URL})
-                // Ensure the variable exists in DB for .env generation and UI display
-                $resource->environment_variables()->firstOrCreate([
+                // Use firstOrCreate to avoid overwriting user-saved values on redeploy
+                $envVar = $resource->environment_variables()->firstOrCreate([
                     'key' => $key,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
@@ -2351,9 +2344,8 @@ function serviceParser(Service $resource): Collection
                     'is_preview' => false,
                     'comment' => $envComments[$originalKey] ?? null,
                 ]);
-                // Keep the ${VAR} reference in compose — Docker Compose resolves from .env at deploy time.
-                // Do NOT replace with DB value: if user updates env var without re-parsing compose,
-                // a stale resolved value in environment: would override the correct .env value.
+                // Add the variable to the environment using the saved DB value
+                $environment[$key->value()] = $envVar->value;
             } else {
                 if ($value->startsWith('$')) {
                     $isRequired = false;
