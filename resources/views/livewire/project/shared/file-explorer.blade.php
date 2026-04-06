@@ -443,17 +443,16 @@
                                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
                                                             </svg>
                                                         </x-forms.button>
-                                                        <x-modal-confirmation title="Delete File?" buttonTitle="Delete" submitAction="deleteFileByEncodedPath('{{ $filePathEncoded }}')" :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Delete" step2ButtonText="Confirm" :ignoreWire="false">
-                                            <x-slot:content>
-                                                <div class="cursor-pointer" title="Delete">
-                                                    <x-forms.button @click.prevent="modalOpen=true" class="!text-xs !px-2 !py-1" type="button">
-                                                        <svg class="w-4 h-4 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                        </svg>
-                                                    </x-forms.button>
-                                                </div>
-                                            </x-slot:content>
-                                        </x-modal-confirmation>
+                                                        <x-forms.button
+                                                            wire:click="setDeleteTarget('{{ $filePathEncoded }}')"
+                                                            @click="$dispatch('open-delete-confirm')"
+                                                            class="!text-xs !px-2 !py-1"
+                                                            type="button"
+                                                            title="Delete">
+                                                            <svg class="w-4 h-4 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                            </svg>
+                                                        </x-forms.button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -462,6 +461,44 @@
                                 </table>
                             </div>
                         @endif
+                    </div>
+
+                    <!-- Shared Delete Confirmation Modal -->
+                    <div
+                        x-data="{ open: false }"
+                        @open-delete-confirm.window="open = true"
+                        wire:ignore.self
+                    >
+                        <template x-teleport="body">
+                            <div x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                                <div @click="open = false" class="absolute inset-0 bg-black/20 backdrop-blur-xs"></div>
+                                <div
+                                    x-show="open"
+                                    x-transition:enter="ease-out duration-100"
+                                    x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
+                                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                                    x-transition:leave="ease-in duration-100"
+                                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                                    x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
+                                    class="relative w-full max-w-md rounded-sm border bg-neutral-100 border-neutral-400 dark:bg-base dark:border-coolgray-300 p-6"
+                                >
+                                    <h3 class="text-xl font-bold mb-4">Delete File?</h3>
+                                    <p class="mb-6 text-sm">This operation is permanent and cannot be undone.</p>
+                                    <div class="flex justify-between gap-2">
+                                        <x-forms.button @click="open = false" class="dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
+                                            Cancel
+                                        </x-forms.button>
+                                        <x-forms.button
+                                            isError
+                                            @click="open = false"
+                                            wire:click="deletePendingFile"
+                                        >
+                                            Confirm
+                                        </x-forms.button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
                     </div>
 
                     <!-- File Editor Modal -->

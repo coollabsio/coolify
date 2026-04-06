@@ -89,6 +89,8 @@ class FileExplorer extends Component
 
     public array $compressionTasks = [];
 
+    public ?string $pendingDeletePath = null;
+
     public array $databases = [];
 
     public ?string $selectedDatabase = null;
@@ -1078,6 +1080,22 @@ class FileExplorer extends Component
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to delete file: '.$e->getMessage());
         }
+    }
+
+    public function setDeleteTarget(string $encodedPath): void
+    {
+        $this->pendingDeletePath = $encodedPath;
+    }
+
+    public function deletePendingFile(): void
+    {
+        if ($this->pendingDeletePath === null) {
+            return;
+        }
+
+        $encodedPath = $this->pendingDeletePath;
+        $this->pendingDeletePath = null;
+        $this->deleteFileByEncodedPath($encodedPath);
     }
 
     public function deleteFileByEncodedPath(string $encodedPath, string $password = '')
