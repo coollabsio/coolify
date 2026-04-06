@@ -662,10 +662,23 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit);
-            // Always add .env file to services
+            // Add .env file only to non-database services.
+            // Database services already receive their credentials through the `environment:` section
+            // parsed from the compose file. Injecting the shared .env into database containers
+            // would expose all application environment variables to those containers, which is a
+            // security concern (cross-container credential leakage).
             $services = collect(data_get($composeFile, 'services', []));
             $services = $services->map(function ($service, $name) {
-                $service['env_file'] = ['.env'];
+                $image = data_get($service, 'image', '');
+                if (! isDatabaseImage($image, $service)) {
+                    $existingEnvFiles = data_get($service, 'env_file');
+                    $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
+                        ->push('.env')
+                        ->unique()
+                        ->values()
+                        ->toArray();
+                    $service['env_file'] = $envFiles;
+                }
 
                 return $service;
             });

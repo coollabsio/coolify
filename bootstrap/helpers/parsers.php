@@ -1417,15 +1417,19 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Applications behave consistently with manual .env file usage
-        $existingEnvFiles = data_get($service, 'env_file');
-        $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
-            ->unique()
-            ->values();
+        // Auto-inject .env file for non-database services so Coolify environment variables
+        // are available inside those containers. Database services receive their credentials
+        // through the parsed `environment:` section and do not need access to the shared
+        // application .env, which prevents cross-container credential leakage.
+        if (! $isDatabase) {
+            $existingEnvFiles = data_get($service, 'env_file');
+            $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
+                ->push('.env')
+                ->unique()
+                ->values();
 
-        $payload['env_file'] = $envFiles;
+            $payload['env_file'] = $envFiles;
+        }
 
         // Inject commit-based image tag for services with build directive (for rollback support)
         // Only inject if service has build but no explicit image defined
@@ -2691,15 +2695,19 @@ function serviceParser(Service $resource): Collection
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Services behave consistently with Applications
-        $existingEnvFiles = data_get($service, 'env_file');
-        $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
-            ->unique()
-            ->values();
+        // Auto-inject .env file for non-database services so Coolify environment variables
+        // are available inside those containers. Database services receive their credentials
+        // through the parsed `environment:` section and do not need access to the shared
+        // application .env, which prevents cross-container credential leakage.
+        if (! $isDatabase) {
+            $existingEnvFiles = data_get($service, 'env_file');
+            $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
+                ->push('.env')
+                ->unique()
+                ->values();
 
-        $payload['env_file'] = $envFiles;
+            $payload['env_file'] = $envFiles;
+        }
 
         $parsedServices->put($serviceName, $payload);
     }
