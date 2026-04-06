@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Project\Shared;
 
-use App\Enums\ActivityTypes;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
@@ -410,6 +409,7 @@ class FileExplorer extends Component
             if (str_contains(strtolower($containerName), 'mysql') ||
                 str_contains(strtolower($containerName), 'mariadb')) {
                 $this->hasMySQLOrMariaDBContainer = true;
+
                 return;
             }
 
@@ -425,6 +425,7 @@ class FileExplorer extends Component
                 if (str_contains(strtolower($image), 'mysql') ||
                     str_contains(strtolower($image), 'mariadb')) {
                     $this->hasMySQLOrMariaDBContainer = true;
+
                     return;
                 }
             } catch (\Throwable $e) {
@@ -682,17 +683,6 @@ class FileExplorer extends Component
                     'permissions' => $permissions,
                     'date' => $date,
                 ];
-
-                // Add download URL for files (not directories)
-                if (!$isDirectory && !empty($fullPath)) {
-                    try {
-                        $fileData['download_url'] = $this->getDownloadUrl($fullPath);
-                    } catch (\Throwable $e) {
-                        $fileData['download_url'] = '#';
-                    }
-                } else {
-                    $fileData['download_url'] = '#';
-                }
 
                 $files[] = $fileData;
             }
@@ -1378,54 +1368,55 @@ class FileExplorer extends Component
                 // Try multiple methods: unzip command, Python, or PHP
                 // Para archivos grandes, ejecutar con output periódico para mantener conexión activa
                 $extractionCommand = "cd {$fileDirEscaped} && ";
-                $extractionCommand .= "if command -v unzip >/dev/null 2>&1; then ";
+                $extractionCommand .= 'if command -v unzip >/dev/null 2>&1; then ';
                 // Ejecutar unzip en background con output periódico usando un script temporal
                 // Esto mantiene la conexión activa y permite capturar el resultado
                 $extractionCommand .= "(unzip -o {$fileNameEscaped} -d . 2>&1 | while IFS= read -r line; do echo \"PROGRESS: \\\$line\"; done; echo 'EXTRACTION_SUCCESS') || echo 'EXTRACTION_FAILED'; ";
-                $extractionCommand .= "elif command -v python3 >/dev/null 2>&1; then ";
+                $extractionCommand .= 'elif command -v python3 >/dev/null 2>&1; then ';
                 // Python con output periódico cada 100 archivos
                 $extractionCommand .= "python3 -c \"import zipfile, os, sys; z=zipfile.ZipFile('{$archiveFileNameForPython}'); files=z.namelist(); total=len(files); [z.extract(f, '.') or (print(f'PROGRESS: Extracted {i+1}/{total}') if (i+1)%100==0 else None) for i, f in enumerate(files)]; z.close(); print('EXTRACTION_SUCCESS')\" 2>&1 || echo 'EXTRACTION_FAILED'; ";
-                $extractionCommand .= "elif command -v python >/dev/null 2>&1; then ";
+                $extractionCommand .= 'elif command -v python >/dev/null 2>&1; then ';
                 $extractionCommand .= "python -c \"import zipfile, os, sys; z=zipfile.ZipFile('{$archiveFileNameForPython}'); files=z.namelist(); total=len(files); [z.extract(f, '.') or (print(f'PROGRESS: Extracted {i+1}/{total}') if (i+1)%100==0 else None) for i, f in enumerate(files)]; z.close(); print('EXTRACTION_SUCCESS')\" 2>&1 || echo 'EXTRACTION_FAILED'; ";
-                $extractionCommand .= "elif command -v php >/dev/null 2>&1; then ";
+                $extractionCommand .= 'elif command -v php >/dev/null 2>&1; then ';
                 $extractionCommand .= "php -r \"\\\$zip = new ZipArchive(); if (\\\$zip->open('{$archiveFileNameForPhp}') === TRUE) { \\\$total = \\\$zip->numFiles; for (\\\$i = 0; \\\$i < \\\$total; \\\$i++) { \\\$zip->extractTo('.', [\\\$zip->getNameIndex(\\\$i)]); if ((\\\$i+1) % 100 == 0) echo 'PROGRESS: Extracted ' . (\\\$i+1) . '/' . \\\$total . ' files...' . PHP_EOL; } \\\$zip->close(); echo 'EXTRACTION_SUCCESS'; } else { echo 'EXTRACTION_FAILED'; }\" 2>&1; ";
-                $extractionCommand .= "else ";
+                $extractionCommand .= 'else ';
                 $extractionCommand .= "echo 'TOOL_NOT_FOUND:unzip'; ";
-                $extractionCommand .= "fi";
+                $extractionCommand .= 'fi';
             } elseif (preg_match('/\.(tar\.gz|tgz)$/i', $filePath)) {
                 $extractionCommand = "cd {$fileDirEscaped} && ";
-                $extractionCommand .= "if command -v tar >/dev/null 2>&1; then ";
+                $extractionCommand .= 'if command -v tar >/dev/null 2>&1; then ';
                 $extractionCommand .= "tar -xzf {$fileNameEscaped} -C . 2>&1 && echo 'EXTRACTION_SUCCESS'; ";
                 $extractionCommand .= "else echo 'TOOL_NOT_FOUND:tar'; fi";
             } elseif (preg_match('/\.(tar\.bz2|tbz2|tbz)$/i', $filePath)) {
                 $extractionCommand = "cd {$fileDirEscaped} && ";
-                $extractionCommand .= "if command -v tar >/dev/null 2>&1; then ";
+                $extractionCommand .= 'if command -v tar >/dev/null 2>&1; then ';
                 $extractionCommand .= "tar -xjf {$fileNameEscaped} -C . 2>&1 && echo 'EXTRACTION_SUCCESS'; ";
                 $extractionCommand .= "else echo 'TOOL_NOT_FOUND:tar'; fi";
             } elseif (preg_match('/\.(tar\.xz|txz)$/i', $filePath)) {
                 $extractionCommand = "cd {$fileDirEscaped} && ";
-                $extractionCommand .= "if command -v tar >/dev/null 2>&1; then ";
+                $extractionCommand .= 'if command -v tar >/dev/null 2>&1; then ';
                 $extractionCommand .= "tar -xJf {$fileNameEscaped} -C . 2>&1 && echo 'EXTRACTION_SUCCESS'; ";
                 $extractionCommand .= "else echo 'TOOL_NOT_FOUND:tar'; fi";
             } elseif (str_ends_with(strtolower($filePath), '.tar')) {
                 $extractionCommand = "cd {$fileDirEscaped} && ";
-                $extractionCommand .= "if command -v tar >/dev/null 2>&1; then ";
+                $extractionCommand .= 'if command -v tar >/dev/null 2>&1; then ';
                 $extractionCommand .= "tar -xf {$fileNameEscaped} -C . 2>&1 && echo 'EXTRACTION_SUCCESS'; ";
                 $extractionCommand .= "else echo 'TOOL_NOT_FOUND:tar'; fi";
             } elseif (str_ends_with(strtolower($filePath), '.gz')) {
                 $extractionCommand = "cd {$fileDirEscaped} && ";
-                $extractionCommand .= "if command -v gzip >/dev/null 2>&1; then ";
+                $extractionCommand .= 'if command -v gzip >/dev/null 2>&1; then ';
                 $extractionCommand .= "gzip -d -k {$fileNameEscaped} 2>&1 && echo 'EXTRACTION_SUCCESS'; ";
                 $extractionCommand .= "else echo 'TOOL_NOT_FOUND:gzip'; fi";
             } else {
                 $this->dispatch('error', 'Unsupported archive format.');
                 $this->showExtractDialog = false;
+
                 return;
             }
 
             $innerCommand = $extractionCommand;
 
-            $command = "docker exec {$escapedContainer} sh -c " . escapeshellarg($innerCommand);
+            $command = "docker exec {$escapedContainer} sh -c ".escapeshellarg($innerCommand);
 
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
@@ -1453,7 +1444,7 @@ class FileExplorer extends Component
             } elseif (str_contains($output, 'EXTRACTION_FAILED')) {
                 // Show error output from extraction command
                 $this->dispatch('error', 'Extraction failed: '.$output);
-            } elseif (!empty($output)) {
+            } elseif (! empty($output)) {
                 // Si hay output pero no contiene EXTRACTION_SUCCESS, puede ser un error parcial
                 $this->dispatch('error', 'Extraction may have failed. Output: '.substr($output, 0, 500));
             } else {
@@ -1463,9 +1454,10 @@ class FileExplorer extends Component
 
             $this->selectedFiles = [];
             $this->showExtractDialog = false;
+
             return;
         } catch (\Throwable $e) {
-            $this->dispatch('error', 'Failed to extract file. Ensure the container has the required tools (e.g., unzip, tar). Error: ' . $e->getMessage());
+            $this->dispatch('error', 'Failed to extract file. Ensure the container has the required tools (e.g., unzip, tar). Error: '.$e->getMessage());
             $this->showExtractDialog = false;
         }
     }
@@ -1518,15 +1510,15 @@ class FileExplorer extends Component
             $this->dispatch('info', 'Installing unzip... This may take a moment.');
 
             $installCommand = "docker exec {$escapedContainer} sh -c '";
-            $installCommand .= "if command -v apk >/dev/null 2>&1; then ";
-            $installCommand .= "apk add --no-cache unzip 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
-            $installCommand .= "elif command -v apt-get >/dev/null 2>&1; then ";
-            $installCommand .= "apt-get update -qq && apt-get install -y -qq unzip 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
-            $installCommand .= "elif command -v yum >/dev/null 2>&1; then ";
-            $installCommand .= "yum install -y -q unzip 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
-            $installCommand .= "elif command -v dnf >/dev/null 2>&1; then ";
-            $installCommand .= "dnf install -y -q unzip 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
-            $installCommand .= "else echo NO_PACKAGE_MANAGER; ";
+            $installCommand .= 'if command -v apk >/dev/null 2>&1; then ';
+            $installCommand .= 'apk add --no-cache unzip 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ';
+            $installCommand .= 'elif command -v apt-get >/dev/null 2>&1; then ';
+            $installCommand .= 'apt-get update -qq && apt-get install -y -qq unzip 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ';
+            $installCommand .= 'elif command -v yum >/dev/null 2>&1; then ';
+            $installCommand .= 'yum install -y -q unzip 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ';
+            $installCommand .= 'elif command -v dnf >/dev/null 2>&1; then ';
+            $installCommand .= 'dnf install -y -q unzip 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ';
+            $installCommand .= 'else echo NO_PACKAGE_MANAGER; ';
             $installCommand .= "fi'";
 
             if ($server->isNonRoot()) {
@@ -1757,7 +1749,7 @@ class FileExplorer extends Component
             $logFile = '/tmp/coolify-compress-'.date('Ymd-His').'-'.substr(md5((string) $archivePath), 0, 8).'.log';
             $escapedLogFile = escapeshellarg($logFile);
             $backgroundCommand = "({$innerCommand}) > {$escapedLogFile} 2>&1 & echo __COMPRESS_STARTED__ $!";
-            $command = "docker exec {$escapedContainer} sh -c " . escapeshellarg($backgroundCommand);
+            $command = "docker exec {$escapedContainer} sh -c ".escapeshellarg($backgroundCommand);
 
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
@@ -1991,6 +1983,7 @@ class FileExplorer extends Component
             if (! str_ends_with(strtolower($this->importDatabaseFile), '.sql')) {
                 $this->dispatch('error', 'Only .sql files are allowed for database import.');
                 $this->showImportDatabaseDialog = false;
+
                 return;
             }
 
@@ -2128,6 +2121,7 @@ class FileExplorer extends Component
                             instant_remote_process([$updateCommand], $server, false);
 
                             $this->dispatch('success', "WordPress prefix detectado automáticamente: {$prefix}");
+
                             return;
                         }
                     }
@@ -2478,6 +2472,12 @@ class FileExplorer extends Component
         $this->dispatch('error', "File {$filename} not found in common locations. Make sure you're in the correct directory or the file exists.");
     }
 
+    public function downloadFile(string $path): void
+    {
+        $url = $this->getDownloadUrl($path);
+        $this->dispatch('open-file-download', url: $url);
+    }
+
     public function getDownloadUrl(string $path): string
     {
         if (empty($path)) {
@@ -2540,7 +2540,7 @@ class FileExplorer extends Component
                 }
 
                 $containerExists = instant_remote_process([$checkCommand], $server, false);
-                if (!empty(trim($containerExists))) {
+                if (! empty(trim($containerExists))) {
                     // phpMyAdmin está integrado, obtener URL y credenciales
                     $phpMyAdminUrl = $this->getPhpMyAdminUrlForDatabase($database);
                     if ($phpMyAdminUrl) {
@@ -2625,7 +2625,7 @@ class FileExplorer extends Component
                     encryptedData: $encryptedData
                 );
 
-            return;
+                return;
             }
         }
 
@@ -2645,6 +2645,7 @@ class FileExplorer extends Component
                  $this->resource instanceof \App\Models\StandaloneMysql)) {
                 // Si ya es una base de datos, usarla directamente
                 $databases->push($this->resource);
+
                 return $databases;
             } elseif ($this->type === 'service' && $this->resource instanceof \App\Models\Service) {
                 $environment = $this->resource->environment;
@@ -2704,7 +2705,7 @@ class FileExplorer extends Component
                         if ($appName->contains('phpmyadmin') || $imageName->contains('phpmyadmin')) {
                             if ($app->fqdn) {
                                 $fqdns = $app->fqdns;
-                                if (!empty($fqdns)) {
+                                if (! empty($fqdns)) {
                                     return $fqdns[0];
                                 }
                             }
@@ -2732,7 +2733,7 @@ class FileExplorer extends Component
             }
 
             $url = trim(instant_remote_process([$envCommand], $server, false) ?? '');
-            if (!empty($url)) {
+            if (! empty($url)) {
                 return $url;
             }
 
@@ -2744,6 +2745,7 @@ class FileExplorer extends Component
             return $url;
         } catch (\Throwable $e) {
             \Log::error('Error getting phpMyAdmin URL for database: '.$e->getMessage());
+
             return null;
         }
     }
@@ -2762,7 +2764,7 @@ class FileExplorer extends Component
                 $rootPassword = $database->mysql_root_password;
             }
 
-            if (!$rootPassword) {
+            if (! $rootPassword) {
                 return null;
             }
 
@@ -2778,6 +2780,7 @@ class FileExplorer extends Component
             ];
         } catch (\Throwable $e) {
             \Log::error('Error getting database credentials for integrated phpMyAdmin: '.$e->getMessage());
+
             return null;
         }
     }
@@ -2835,7 +2838,7 @@ class FileExplorer extends Component
                         }
 
                         $containerExists = instant_remote_process([$checkCommand], $server, false);
-                        if (!empty(trim($containerExists))) {
+                        if (! empty(trim($containerExists))) {
                             // El contenedor existe, retornar un servicio virtual
                             // Necesitamos obtener la URL desde las variables de entorno o generar una
                             return $this->createVirtualPhpMyAdminService($this->resource);
@@ -3118,6 +3121,7 @@ class FileExplorer extends Component
                         'dbService' => $dbService->id,
                         'dbContainer' => $dbContainer,
                     ]);
+
                     return null;
                 }
             }
@@ -3155,7 +3159,7 @@ class FileExplorer extends Component
                 $dbServiceNetworks = collect($dbService->networks())->pluck('name')->toArray();
                 $commonNetworks = array_intersect($phpMyAdminNetworks, $dbServiceNetworks);
 
-                if (!empty($commonNetworks)) {
+                if (! empty($commonNetworks)) {
                     // Están en la misma red: intentar primero con solo el nombre del servicio
                     // Si eso no funciona, se puede probar con el nombre completo del contenedor
                     // Pero primero intentemos con el nombre simple del servicio (más común)
@@ -3215,7 +3219,7 @@ class FileExplorer extends Component
                             // Buscar una red común
                             $commonNetwork = array_intersect($phpMyAdminNetworks, $dbNetworks);
 
-                            if (!empty($commonNetwork)) {
+                            if (! empty($commonNetwork)) {
                                 // Están en una red común: obtener la IP en esa red
                                 $commonNetworkName = reset($commonNetwork);
                                 $ipCommand = "docker inspect --format='{{index .NetworkSettings.Networks \"{$commonNetworkName}\" | .IPAddress}}' {$escapedDbContainer} 2>/dev/null";
@@ -3225,7 +3229,7 @@ class FileExplorer extends Component
 
                                 $containerIP = trim(instant_remote_process([$ipCommand], $server, false) ?? '');
 
-                                if (!empty($containerIP) && filter_var($containerIP, FILTER_VALIDATE_IP)) {
+                                if (! empty($containerIP) && filter_var($containerIP, FILTER_VALIDATE_IP)) {
                                     $dbHost = $containerIP;
                                     \Log::info('phpMyAdmin: Using container IP in common network', [
                                         'container' => $dbContainerName,
@@ -3242,7 +3246,7 @@ class FileExplorer extends Component
 
                                 $containerIP = trim(instant_remote_process([$ipCommand], $server, false) ?? '');
 
-                                if (!empty($containerIP) && filter_var($containerIP, FILTER_VALIDATE_IP)) {
+                                if (! empty($containerIP) && filter_var($containerIP, FILTER_VALIDATE_IP)) {
                                     $dbHost = $containerIP;
                                     \Log::info('phpMyAdmin: Using container IP (no common network)', [
                                         'container' => $dbContainerName,
@@ -3279,7 +3283,6 @@ class FileExplorer extends Component
             return null;
         }
     }
-
 
     // Métodos del panel integrado de bases de datos - ya no se usan (reemplazado por phpMyAdmin)
     // Se mantienen comentados por si se necesitan en el futuro
@@ -3624,6 +3627,7 @@ class FileExplorer extends Component
                 if ($index === 0) {
                     // First line should be headers
                     $headers = array_map('trim', $values);
+
                     continue;
                 }
 
@@ -3841,7 +3845,7 @@ class FileExplorer extends Component
     }
 
     /**
-     * @param array<string, mixed> $task
+     * @param  array<string, mixed>  $task
      */
     private function addCompressionTask(array $task): void
     {
@@ -3900,15 +3904,15 @@ class FileExplorer extends Component
         }
 
         $installCommand = "docker exec {$escapedContainer} sh -c '";
-        $installCommand .= "if command -v apk >/dev/null 2>&1; then ";
+        $installCommand .= 'if command -v apk >/dev/null 2>&1; then ';
         $installCommand .= "apk add --no-cache {$safeCommand} 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
-        $installCommand .= "elif command -v apt-get >/dev/null 2>&1; then ";
+        $installCommand .= 'elif command -v apt-get >/dev/null 2>&1; then ';
         $installCommand .= "apt-get update -qq && apt-get install -y -qq {$safeCommand} 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
-        $installCommand .= "elif command -v yum >/dev/null 2>&1; then ";
+        $installCommand .= 'elif command -v yum >/dev/null 2>&1; then ';
         $installCommand .= "yum install -y -q {$safeCommand} 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
-        $installCommand .= "elif command -v dnf >/dev/null 2>&1; then ";
+        $installCommand .= 'elif command -v dnf >/dev/null 2>&1; then ';
         $installCommand .= "dnf install -y -q {$safeCommand} 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
-        $installCommand .= "else echo NO_PACKAGE_MANAGER; ";
+        $installCommand .= 'else echo NO_PACKAGE_MANAGER; ';
         $installCommand .= "fi'";
 
         if ($server->isNonRoot()) {

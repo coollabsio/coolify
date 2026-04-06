@@ -400,11 +400,11 @@
                                                 <td class="p-2">
                                                     <div class="flex items-center justify-end gap-1">
                                                         @if (!$file['is_directory'])
-                                                            <a href="{{ $file['download_url'] ?? '#' }}" target="_blank" class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-white bg-coollabs rounded hover:bg-coollabs-600" title="Download">
+                                                            <button wire:click="downloadFile('{{ $file['path'] }}')" class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-white bg-coollabs rounded hover:bg-coollabs-600" title="Download">
                                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                                                                 </svg>
-                                                            </a>
+                                                            </button>
                                                         @endif
                                                         <x-forms.button wire:click="compressFileByEncodedPath('{{ $filePathEncoded }}')" class="!text-xs !px-2 !py-1" title="Compress">
                                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -899,6 +899,10 @@
 
             Livewire.on('console-log', (data) => {
                 console.log('[FileExplorer Debug]', data);
+            });
+
+            Livewire.on('open-file-download', (data) => {
+                window.open(data.url, '_blank');
             });
 
             Livewire.on('openPhpMyAdmin', handleOpenPhpMyAdmin);
