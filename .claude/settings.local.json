@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find . -type f -name .env*)",
+      "Bash(find . -path */routes/*.php -type f)",
+      "Bash(find . -type f -name *.php -exec grep -l \"eval\\\\|assert\\\\|create_function\" {})",
+      "Bash(2)",
+      "Bash(grep -r \"auth\\\\|middleware\" ./app/Http/Controllers/Api/*.php)",
+      "Bash(find ./app/Http/Controllers/Api -name OtherController.php -exec grep -A 30 \"function feedback\\\\|function healthcheck\" {} +)",
+      "Bash(grep -r \"include\\\\|require\\\\|file_get_contents.*$\\\\|fopen.*$\" ./app/Http/Controllers -n)",
+      "Bash(xargs grep:*)"
+    ]
+  }
+}
