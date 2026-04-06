@@ -1,0 +1,34 @@
+# documentation: https://surrealdb.com/docs/surrealdb/introduction/start
+# slogan: SurrealDB is an innovative NewSQL cloud database suitable for serverless, JAMstack, single-page, and traditional applications.
+# category: database
+# tags: surrealdb,database,nosql,graph,document,multi-model,sql,newsql
+# logo: svgs/surrealdb.svg
+# port: 8000
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:v3.0.5
+    command:
+      - start
+      - --bind
+      - 0.0.0.0:8000
+      - --log
+      - info
+      - surrealkv:/data/surreal.db
+    environment:
+      - SERVICE_URL_SURREALDB_8000
+      - SURREAL_USER=${SERVICE_USER_SURREALDB}
+      - SURREAL_PASS=${SERVICE_PASSWORD_SURREALDB}
+    volumes:
+      - surrealdb_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - /surreal
+        - isready
+        - --endpoint
+        - http://localhost:8000
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 10s

@@ -1,0 +1,80 @@
+# documentation: https://surrealdb.com/docs/surrealdb/introduction/start
+# slogan: SurrealDB with TiKV backend — distributed, transactional key-value store for production-grade horizontal scalability.
+# category: database
+# tags: surrealdb,database,nosql,graph,document,multi-model,sql,newsql,tikv,distributed
+# logo: svgs/surrealdb.svg
+# port: 8000
+
+services:
+  pd:
+    image: pingcap/pd:v8.5.5
+    command:
+      - --name=pd
+      - --client-urls=http://0.0.0.0:2379
+      - --peer-urls=http://0.0.0.0:2380
+      - --advertise-client-urls=http://pd:2379
+      - --advertise-peer-urls=http://pd:2380
+      - --data-dir=/data
+    volumes:
+      - pd_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--spider'
+        - 'http://localhost:2379/pd/api/v1/health'
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  tikv:
+    image: pingcap/tikv:v8.5.5
+    depends_on:
+      pd:
+        condition: service_healthy
+    command:
+      - --addr=0.0.0.0:20160
+      - --advertise-addr=tikv:20160
+      - --pd-endpoints=pd:2379
+      - --data-dir=/data
+    volumes:
+      - tikv_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--spider'
+        - 'http://localhost:20180/metrics'
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  surrealdb:
+    image: surrealdb/surrealdb:v3.0.5
+    depends_on:
+      tikv:
+        condition: service_healthy
+    command:
+      - start
+      - --bind
+      - 0.0.0.0:8000
+      - --log
+      - info
+      - tikv://pd:2379
+    environment:
+      - SERVICE_URL_SURREALDB_8000
+      - SURREAL_USER=${SERVICE_USER_SURREALDB}
+      - SURREAL_PASS=${SERVICE_PASSWORD_SURREALDB}
+    healthcheck:
+      test:
+        - CMD
+        - /surreal
+        - isready
+        - --endpoint
+        - http://localhost:8000
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
