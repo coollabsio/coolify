@@ -42,6 +42,17 @@
                         </div>
                     @endif
                     <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_only"
+                            helper="Only allow login via configured OAuth providers. Password-based login will be disabled except for the first administrator."
+                            label="OAuth Only Login" />
+                    </div>
+                    @if ($is_oauth_only && $enabled_oauth_providers === 0)
+                        <x-callout type="error" title="No OAuth Providers Configured" class="mt-2 text-error">
+                            You have enabled OAuth-only login, but no OAuth providers are currently enabled.
+                            This may lock you out of your instance. Please configure at least one OAuth provider in <b>Settings > OAuth</b>.
+                        </x-callout>
+                    @endif
+                    <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."
                             label="Do Not Track" />
