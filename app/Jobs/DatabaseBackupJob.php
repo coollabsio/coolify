@@ -101,7 +101,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (data_get($this->backup, 'database_type') === ServiceDatabase::class) {
                 $this->database = data_get($this->backup, 'database');
-                $this->server = $this->database->service->server;
+                if ($this->database->application_id) {
+                    $this->server = $this->database->application->destination->server;
+                } else {
+                    $this->server = $this->database->service->server;
+                }
                 $this->s3 = $this->backup->s3;
             } else {
                 $this->database = data_get($this->backup, 'database');
@@ -131,11 +135,18 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (data_get($this->backup, 'database_type') === ServiceDatabase::class) {
                 $databaseType = $this->database->databaseType();
-                $serviceUuid = $this->database->service->uuid;
-                $serviceName = str($this->database->service->name)->slug();
-                if (str($databaseType)->contains('postgres')) {
+                if ($this->database->application_id) {
+                    $applicationUuid = $this->database->application->uuid;
+                    $applicationName = str($this->database->application->name)->slug();
+                    $this->container_name = "{$this->database->name}-$applicationUuid";
+                    $this->directory_name = $applicationName.'-'.$this->container_name;
+                } else {
+                    $serviceUuid = $this->database->service->uuid;
+                    $serviceName = str($this->database->service->name)->slug();
                     $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName.'-'.$this->container_name;
+                }
+                if (str($databaseType)->contains('postgres')) {
                     $commands[] = "docker exec $this->container_name env | grep POSTGRES_";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
@@ -684,7 +695,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $endpoint = $this->s3->endpoint;
             $this->s3->testConnection(shouldSave: true);
             if (data_get($this->backup, 'database_type') === ServiceDatabase::class) {
-                $network = $this->database->service->destination->network;
+                if ($this->database->application_id) {
+                    $network = $this->database->application->destination->network;
+                } else {
+                    $network = $this->database->service->destination->network;
+                }
             } else {
                 $network = $this->database->destination->network;
             }

@@ -595,6 +595,16 @@ class Application extends BaseModel
         return $this->morphMany(LocalFileVolume::class, 'resource');
     }
 
+    public function service_databases()
+    {
+        return $this->hasMany(ServiceDatabase::class);
+    }
+
+    public function scheduledBackups()
+    {
+        return $this->hasManyThrough(ScheduledDatabaseBackup::class, ServiceDatabase::class, 'application_id', 'database_id')->where('database_type', ServiceDatabase::class);
+    }
+
     public function type()
     {
         return 'application';

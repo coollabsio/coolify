@@ -66,6 +66,10 @@
                 href="{{ route('project.application.tags', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Tags</span></a>
             <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.application.danger', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Danger Zone</span></a>
+            @if ($application->build_pack === 'dockercompose' && $application->service_databases()->exists())
+                <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
+                    href="{{ route('project.application.backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Backups</span></a>
+            @endif
         </div>
         <div class="w-full sm:flex-grow">
             @if ($currentRoute === 'project.application.configuration')
@@ -104,6 +108,8 @@
                 <livewire:project.shared.tags :resource="$application" />
             @elseif ($currentRoute === 'project.application.danger')
                 <livewire:project.shared.danger :resource="$application" />
+            @elseif ($currentRoute === 'project.application.backups')
+                <livewire:project.application.backups :application="$application" />
             @endif
         </div>
     </div>
