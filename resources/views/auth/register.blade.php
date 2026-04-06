@@ -50,30 +50,36 @@ $email = getOldOrLocal('email', 'test3@example.com');
                         </div>
                     @endif
 
-                    <form action="/register" method="POST" class="flex flex-col gap-4">
-                        @csrf
-                        <x-forms.input id="name" required type="text" name="name" value="{{ $name }}"
-                            label="{{ __('input.name') }}" />
-                        <x-forms.input id="email" required type="email" name="email" value="{{ $email }}"
-                            label="{{ __('input.email') }}" />
-                        <x-forms.input id="password" required type="password" name="password"
-                            label="{{ __('input.password') }}" />
-                        <x-forms.input id="password_confirmation" required type="password" name="password_confirmation"
-                            label="{{ __('input.password.again') }}" />
+                    @if ($is_oauth_only && !$isFirstUser)
+                        <x-callout type="warning" title="Note" class="mb-4">
+                            Registration is only allowed via OAuth providers. Please go back to the login page and use an OAuth provider.
+                        </x-callout>
+                    @else
+                        <form action="/register" method="POST" class="flex flex-col gap-4">
+                            @csrf
+                            <x-forms.input id="name" required type="text" name="name" value="{{ $name }}"
+                                label="{{ __('input.name') }}" />
+                            <x-forms.input id="email" required type="email" name="email" value="{{ $email }}"
+                                label="{{ __('input.email') }}" />
+                            <x-forms.input id="password" required type="password" name="password"
+                                label="{{ __('input.password') }}" />
+                            <x-forms.input id="password_confirmation" required type="password" name="password_confirmation"
+                                label="{{ __('input.password.again') }}" />
 
-                        <div
-                            class="p-4 bg-neutral-50 dark:bg-coolgray-200 rounded-lg border border-neutral-200 dark:border-coolgray-400">
-                            <p class="text-xs dark:text-neutral-400">
-                                Your password should be min 8 characters long and contain at least one uppercase letter,
-                                one lowercase letter, one number, and one symbol.
-                            </p>
-                        </div>
+                            <div
+                                class="p-4 bg-neutral-50 dark:bg-coolgray-200 rounded-lg border border-neutral-200 dark:border-coolgray-400">
+                                <p class="text-xs dark:text-neutral-400">
+                                    Your password should be min 8 characters long and contain at least one uppercase letter,
+                                    one lowercase letter, one number, and one symbol.
+                                </p>
+                            </div>
 
-                        <x-forms.button class="w-full justify-center py-3 box-boarding mt-2" type="submit"
-                            isHighlighted>
-                            Create Account
-                        </x-forms.button>
-                    </form>
+                            <x-forms.button class="w-full justify-center py-3 box-boarding mt-2" type="submit"
+                                isHighlighted>
+                                Create Account
+                            </x-forms.button>
+                        </form>
+                    @endif
 
                     @if (!$isFirstUser)
                         <div class="relative my-6">
