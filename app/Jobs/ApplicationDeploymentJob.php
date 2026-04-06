@@ -2516,6 +2516,24 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         }
 
+        // Inject user-defined server-level environment variables into every deployment,
+        // regardless of whether this is a pull-request preview or a production deployment.
+        // These allow administrators to distinguish deployments across multiple servers
+        // (e.g. REGION=eu-west, RACK=srv-01). Application-level variables always take
+        // precedence: we skip any server variable whose key is already present in the
+        // application environment or in the Coolify-generated vars collected above.
+        $appEnvs = $this->pull_request_id !== 0
+            ? $this->application->environment_variables_preview
+            : $this->application->environment_variables;
+        $serverEnvVars = $this->mainServer->environment_variables()
+            ->whereNotIn('key', ['COOLIFY_SERVER_UUID', 'COOLIFY_SERVER_NAME'])
+            ->get();
+        foreach ($serverEnvVars as $serverEnv) {
+            if ($appEnvs->where('key', $serverEnv->key)->isEmpty() && ! $coolify_envs->has($serverEnv->key)) {
+                $coolify_envs->put($serverEnv->key, $serverEnv->value);
+            }
+        }
+
         return $coolify_envs;
     }
 
