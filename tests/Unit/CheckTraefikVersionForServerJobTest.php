@@ -2,6 +2,7 @@
 
 use App\Jobs\CheckTraefikVersionForServerJob;
 use App\Models\Server;
+use App\Notifications\Server\TraefikVersionOutdated;
 
 beforeEach(function () {
     $this->traefikVersions = [
@@ -36,6 +37,44 @@ it('rejects batched scans without a shared scan identifier', function () {
 
     expect(fn () => new CheckTraefikVersionForServerJob($server, $this->traefikVersions, false))
         ->toThrow(InvalidArgumentException::class);
+});
+
+it('rejects batched scans with empty or whitespace scan identifiers', function () {
+    $server = \Mockery::mock(Server::class)->makePartial();
+
+    expect(fn () => new CheckTraefikVersionForServerJob($server, $this->traefikVersions, false, ''))
+        ->toThrow(InvalidArgumentException::class);
+
+    expect(fn () => new CheckTraefikVersionForServerJob($server, $this->traefikVersions, false, " \n\t "))
+        ->toThrow(InvalidArgumentException::class);
+});
+
+it('includes non-null scan ids in outdated info even when they are whitespace only', function () {
+    $scanId = " \n\t ";
+    $server = \Mockery::mock(Server::class)->makePartial();
+    $teamRelation = \Mockery::mock();
+    $team = \Mockery::mock();
+
+    $server->shouldReceive('update')
+        ->once()
+        ->with(\Mockery::on(function (array $payload) use ($scanId): bool {
+            $outdatedInfo = $payload['traefik_outdated_info'] ?? null;
+
+            return is_array($outdatedInfo)
+                && $outdatedInfo['current'] === '3.5.0'
+                && $outdatedInfo['latest'] === '3.5.6'
+                && $outdatedInfo['type'] === 'patch_update'
+                && $outdatedInfo['scan_id'] === $scanId;
+        }));
+    $server->shouldReceive('team')->once()->andReturn($teamRelation);
+    $teamRelation->shouldReceive('first')->once()->andReturn($team);
+    $team->shouldReceive('notify')->once()->with(\Mockery::type(TraefikVersionOutdated::class));
+
+    $job = new CheckTraefikVersionForServerJob($server, $this->traefikVersions, true, $scanId);
+
+    $method = new ReflectionMethod(CheckTraefikVersionForServerJob::class, 'storeOutdatedInfo');
+    $method->setAccessible(true);
+    $method->invoke($job, '3.5.0', '3.5.6', 'patch_update', null, null);
 });
 
 it('parses version strings correctly', function () {

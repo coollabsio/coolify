@@ -66,14 +66,34 @@ class CheckTraefikVersionJob implements ShouldBeEncrypted, ShouldQueue
                         return;
                     }
 
-                    try {
-                        NotifyOutdatedTraefikServersJob::dispatch($scanId, self::SCAN_LOCK_KEY, $lockOwner);
-                    } catch (Throwable $exception) {
-                        self::releaseScanLock($lockOwner);
-
-                        throw $exception;
-                    }
+                    self::dispatchNotificationJobs($scanId, $lockOwner);
                 })
+                ->dispatch();
+        } catch (Throwable $exception) {
+            self::releaseScanLock($lockOwner);
+
+            throw $exception;
+        }
+    }
+
+    private static function dispatchNotificationJobs(string $scanId, ?string $lockOwner): void
+    {
+        $teamIds = NotifyOutdatedTraefikServersJob::teamIdsForScan($scanId);
+
+        if ($teamIds->isEmpty()) {
+            self::releaseScanLock($lockOwner);
+
+            return;
+        }
+
+        $jobs = $teamIds
+            ->map(fn (int $teamId) => new NotifyOutdatedTraefikServersJob($teamId, $scanId))
+            ->all();
+
+        try {
+            Bus::batch($jobs)
+                ->allowFailures()
+                ->finally(fn () => self::releaseScanLock($lockOwner))
                 ->dispatch();
         } catch (Throwable $exception) {
             self::releaseScanLock($lockOwner);

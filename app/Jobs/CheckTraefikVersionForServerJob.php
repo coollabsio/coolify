@@ -6,6 +6,7 @@ use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Notifications\Server\TraefikVersionOutdated;
 use InvalidArgumentException;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,7 +16,7 @@ use Illuminate\Queue\SerializesModels;
 
 class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 3;
 
@@ -30,7 +31,7 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
         public bool $shouldNotify = true,
         public ?string $scanId = null
     ) {
-        if (! $this->shouldNotify && is_null($this->scanId)) {
+        if (! $this->shouldNotify && ($this->scanId === null || trim($this->scanId) === '')) {
             throw new InvalidArgumentException('Batched Traefik version checks require a shared scan identifier.');
         }
     }
@@ -160,7 +161,7 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
             'checked_at' => now()->toIso8601String(),
         ];
 
-        if ($this->scanId) {
+        if ($this->scanId !== null) {
             $outdatedInfo['scan_id'] = $this->scanId;
         }
 

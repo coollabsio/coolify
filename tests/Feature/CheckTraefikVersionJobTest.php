@@ -8,6 +8,7 @@ use App\Jobs\NotifyOutdatedTraefikServersJob;
 use App\Models\Server;
 use App\Models\Team;
 use App\Notifications\Server\TraefikVersionOutdated;
+use Illuminate\Bus\Batch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Bus;
@@ -237,6 +238,72 @@ it('dispatches server checks in a batch without immediate notifications', functi
                 && filled($job->scanId)
                 && $job->scanId === $batchScanId;
         });
+    });
+});
+
+it('dispatches one notification job per affected team after the scan batch finishes', function () {
+    Bus::fake();
+
+    $checkedAt = '2026-03-29T00:00:00+00:00';
+    $team1 = Team::factory()->create();
+    $team2 = Team::factory()->create();
+
+    $team1Server = Server::factory()->create([
+        'team_id' => $team1->id,
+        'proxy' => ['type' => ProxyTypes::TRAEFIK->value],
+    ]);
+    $team1Server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+
+    $team2Server = Server::factory()->create([
+        'team_id' => $team2->id,
+        'proxy' => ['type' => ProxyTypes::TRAEFIK->value],
+    ]);
+    $team2Server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+
+    (new CheckTraefikVersionJob)->handle();
+
+    $scanBatch = collect(Bus::dispatchedBatches())
+        ->first(function (PendingBatch $batch): bool {
+            return $batch->jobs->every(fn ($job) => $job instanceof CheckTraefikVersionForServerJob);
+        });
+
+    expect($scanBatch)->not->toBeNull();
+
+    $scanId = $scanBatch->jobs->first()->scanId;
+
+    $team1Server->update([
+        'traefik_outdated_info' => [
+            'current' => '3.5.0',
+            'latest' => '3.5.6',
+            'type' => 'patch_update',
+            'scan_id' => $scanId,
+            'checked_at' => $checkedAt,
+        ],
+    ]);
+    $team2Server->update([
+        'traefik_outdated_info' => [
+            'current' => '3.4.0',
+            'latest' => '3.4.9',
+            'type' => 'patch_update',
+            'scan_id' => $scanId,
+            'checked_at' => $checkedAt,
+        ],
+    ]);
+
+    $scanBatch->finallyCallbacks()[0](\Mockery::mock(Batch::class, function ($mock): void {
+        $mock->shouldReceive('cancelled')->andReturnFalse();
+    }));
+
+    Bus::assertBatched(function (PendingBatch $batch) use ($scanBatch, $scanId, $team1, $team2) {
+        if ($batch === $scanBatch) {
+            return false;
+        }
+
+        $jobs = collect($batch->jobs);
+
+        return $jobs->count() === 2
+            && $jobs->every(fn ($job) => $job instanceof NotifyOutdatedTraefikServersJob && $job->scanId === $scanId)
+            && $jobs->pluck('teamId')->sort()->values()->all() === [$team1->id, $team2->id];
     });
 });
 
