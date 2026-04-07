@@ -649,7 +649,7 @@ class Application extends BaseModel
                     return "https://{$git_repository}/settings/hooks";
                 }
 
-                return $this->git_repository;
+                return rtrim($this->git_repository, '/').'/settings/hooks';
             }
         );
     }
