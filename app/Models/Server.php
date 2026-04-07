@@ -244,6 +244,7 @@ class Server extends BaseModel
     protected $casts = [
         'proxy' => SchemalessAttributes::class,
         'traefik_outdated_info' => 'array',
+        'patch_check_data' => 'array',
         'server_metadata' => 'array',
         'logdrain_axiom_api_key' => 'encrypted',
         'logdrain_newrelic_license_key' => 'encrypted',
@@ -272,6 +273,7 @@ class Server extends BaseModel
         'is_validating',
         'detected_traefik_version',
         'traefik_outdated_info',
+        'patch_check_data',
         'server_metadata',
         'ip_previous',
     ];

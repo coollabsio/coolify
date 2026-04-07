@@ -31,6 +31,8 @@ class WebhookNotificationSettings extends Model
         'server_unreachable_webhook_notifications',
         'server_patch_webhook_notifications',
         'traefik_outdated_webhook_notifications',
+        'bundle_patch_notifications',
+        'bundle_traefik_notifications',
     ];
 
     protected function casts(): array
@@ -53,6 +55,8 @@ class WebhookNotificationSettings extends Model
             'server_unreachable_webhook_notifications' => 'boolean',
             'server_patch_webhook_notifications' => 'boolean',
             'traefik_outdated_webhook_notifications' => 'boolean',
+            'bundle_patch_notifications' => 'boolean',
+            'bundle_traefik_notifications' => 'boolean',
         ];
     }
 

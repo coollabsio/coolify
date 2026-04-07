@@ -68,9 +68,21 @@ trait HasNotificationSettings
     }
 
     /**
-     * Get all enabled notification channels for an event
+     * Map event types to their bundle setting column name.
      */
-    public function getEnabledChannels(string $event): array
+    protected static array $bundleSettingMap = [
+        'server_patch' => 'bundle_patch_notifications',
+        'traefik_outdated' => 'bundle_traefik_notifications',
+    ];
+
+    /**
+     * Get all enabled notification channels for an event.
+     *
+     * @param  string  $event  The event type (e.g. 'server_patch', 'traefik_outdated')
+     * @param  bool  $bundledOnly  Only return channels that have bundling enabled for this event
+     * @param  bool  $unbundledOnly  Only return channels that have bundling disabled for this event
+     */
+    public function getEnabledChannels(string $event, bool $bundledOnly = false, bool $unbundledOnly = false): array
     {
         $channels = [];
 
@@ -87,8 +99,22 @@ trait HasNotificationSettings
             unset($channelMap['email']);
         }
 
+        $bundleColumn = static::$bundleSettingMap[$event] ?? null;
+
         foreach ($channelMap as $channel => $channelClass) {
             if ($this->isNotificationEnabled($channel) && $this->isNotificationTypeEnabled($channel, $event)) {
+                if ($bundleColumn && ($bundledOnly || $unbundledOnly)) {
+                    $settings = $this->getNotificationSettings($channel);
+                    $isBundled = (bool) ($settings->$bundleColumn ?? false);
+
+                    if ($bundledOnly && ! $isBundled) {
+                        continue;
+                    }
+                    if ($unbundledOnly && $isBundled) {
+                        continue;
+                    }
+                }
+
                 $channels[] = $channelClass;
             }
         }

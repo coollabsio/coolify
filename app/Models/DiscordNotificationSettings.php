@@ -32,6 +32,8 @@ class DiscordNotificationSettings extends Model
         'server_patch_discord_notifications',
         'traefik_outdated_discord_notifications',
         'discord_ping_enabled',
+        'bundle_patch_notifications',
+        'bundle_traefik_notifications',
     ];
 
     protected $casts = [
@@ -52,6 +54,8 @@ class DiscordNotificationSettings extends Model
         'server_patch_discord_notifications' => 'boolean',
         'traefik_outdated_discord_notifications' => 'boolean',
         'discord_ping_enabled' => 'boolean',
+        'bundle_patch_notifications' => 'boolean',
+        'bundle_traefik_notifications' => 'boolean',
     ];
 
     public function team()

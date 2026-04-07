@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Bus;
 
 class CheckTraefikVersionJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -37,10 +38,13 @@ class CheckTraefikVersionJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        // Dispatch individual server check jobs in parallel
-        // Each job will send immediate notifications when outdated Traefik is detected
-        foreach ($servers as $server) {
-            CheckTraefikVersionForServerJob::dispatch($server, $traefikVersions);
-        }
+        $jobs = $servers->map(fn ($server) => new CheckTraefikVersionForServerJob($server, $traefikVersions));
+
+        Bus::batch($jobs)
+            ->allowFailures()
+            ->finally(fn () => SendTraefikOutdatedNotificationJob::dispatch())
+            ->name('traefik-version-check')
+            ->onQueue('high')
+            ->dispatch();
     }
 }

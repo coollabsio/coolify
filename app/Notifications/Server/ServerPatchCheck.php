@@ -2,55 +2,66 @@
 
 namespace App\Notifications\Server;
 
-use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Collection;
 
 class ServerPatchCheck extends CustomEmailNotification
 {
-    public string $serverUrl;
-
-    public function __construct(public Server $server, public array $patchData)
-    {
+    public function __construct(
+        public Collection $servers,
+        public bool $bundledOnly = false,
+        public bool $unbundledOnly = false,
+    ) {
         $this->onQueue('high');
-        $this->serverUrl = base_url().'/server/'.$this->server->uuid.'/security/patches';
     }
 
     public function via(object $notifiable): array
     {
-        return $notifiable->getEnabledChannels('server_patch');
+        return $notifiable->getEnabledChannels('server_patch', bundledOnly: $this->bundledOnly, unbundledOnly: $this->unbundledOnly);
+    }
+
+    private function serverUrl(object $server): string
+    {
+        return base_url().'/server/'.$server->uuid.'/security/patches';
+    }
+
+    private function hasErrors(): bool
+    {
+        return $this->servers->contains(fn ($s) => isset($s->patch_check_data['error']));
+    }
+
+    private function errorServers(): Collection
+    {
+        return $this->servers->filter(fn ($s) => isset($s->patch_check_data['error']));
+    }
+
+    private function updateServers(): Collection
+    {
+        return $this->servers->filter(fn ($s) => ! isset($s->patch_check_data['error']));
     }
 
     public function toMail($notifiable = null): MailMessage
     {
         $mail = new MailMessage;
+        $count = $this->servers->count();
 
-        // Handle error case
-        if (isset($this->patchData['error'])) {
-            $mail->subject("Coolify: [ERROR] Failed to check patches on {$this->server->name}");
-            $mail->view('emails.server-patches-error', [
-                'name' => $this->server->name,
-                'error' => $this->patchData['error'],
-                'osId' => $this->patchData['osId'] ?? 'unknown',
-                'package_manager' => $this->patchData['package_manager'] ?? 'unknown',
-                'server_url' => $this->serverUrl,
-            ]);
+        $serversWithUrls = $this->servers->map(function ($server) {
+            return [
+                'name' => $server->name,
+                'uuid' => $server->uuid,
+                'url' => $this->serverUrl($server),
+                'patchData' => $server->patch_check_data,
+            ];
+        });
 
-            return $mail;
-        }
-
-        $totalUpdates = $this->patchData['total_updates'] ?? 0;
-        $mail->subject("Coolify: [ACTION REQUIRED] {$totalUpdates} server patches available on {$this->server->name}");
-        $mail->view('emails.server-patches', [
-            'name' => $this->server->name,
-            'total_updates' => $totalUpdates,
-            'updates' => $this->patchData['updates'] ?? [],
-            'osId' => $this->patchData['osId'] ?? 'unknown',
-            'package_manager' => $this->patchData['package_manager'] ?? 'unknown',
-            'server_url' => $this->serverUrl,
+        $mail->subject("Coolify: Server patches available on {$count} server(s)");
+        $mail->view('emails.server-patches-bundled', [
+            'servers' => $serversWithUrls,
+            'count' => $count,
         ]);
 
         return $mail;
@@ -58,283 +69,123 @@ class ServerPatchCheck extends CustomEmailNotification
 
     public function toDiscord(): DiscordMessage
     {
-        // Handle error case
-        if (isset($this->patchData['error'])) {
-            $osId = $this->patchData['osId'] ?? 'unknown';
-            $packageManager = $this->patchData['package_manager'] ?? 'unknown';
-            $error = $this->patchData['error'];
+        $count = $this->servers->count();
+        $description = "**{$count} server(s)** have package updates or errors.\n\n";
 
-            $description = "**Failed to check for updates** on server {$this->server->name}\n\n";
-            $description .= "**Error Details:**\n";
-            $description .= '• OS: '.ucfirst($osId)."\n";
-            $description .= "• Package Manager: {$packageManager}\n";
-            $description .= "• Error: {$error}\n\n";
-            $description .= "[Manage Server]($this->serverUrl)";
-
-            return new DiscordMessage(
-                title: ':x: Coolify: [ERROR] Failed to check patches on '.$this->server->name,
-                description: $description,
-                color: DiscordMessage::errorColor(),
-            );
+        foreach ($this->errorServers() as $server) {
+            $data = $server->patch_check_data;
+            $description .= ":x: **{$server->name}** — failed to check updates\n";
+            $description .= "  Error: {$data['error']}\n";
         }
 
-        $totalUpdates = $this->patchData['total_updates'] ?? 0;
-        $updates = $this->patchData['updates'] ?? [];
-        $osId = $this->patchData['osId'] ?? 'unknown';
-        $packageManager = $this->patchData['package_manager'] ?? 'unknown';
+        foreach ($this->updateServers() as $server) {
+            $data = $server->patch_check_data;
+            $total = $data['total_updates'] ?? 0;
+            $description .= ":warning: **{$server->name}** — {$total} updates available\n";
 
-        $description = "**{$totalUpdates} package updates** available for server {$this->server->name}\n\n";
-        $description .= "**Summary:**\n";
-        $description .= '• OS: '.ucfirst($osId)."\n";
-        $description .= "• Package Manager: {$packageManager}\n";
-        $description .= "• Total Updates: {$totalUpdates}\n\n";
+            $updates = $data['updates'] ?? [];
+            $criticalPackages = collect($updates)->filter(fn ($u) => str_contains(strtolower($u['package']), 'docker') ||
+                str_contains(strtolower($u['package']), 'kernel') ||
+                str_contains(strtolower($u['package']), 'openssh') ||
+                str_contains(strtolower($u['package']), 'ssl')
+            );
 
-        // Show first few packages
-        if (count($updates) > 0) {
-            $description .= "**Sample Updates:**\n";
-            $sampleUpdates = array_slice($updates, 0, 5);
-            foreach ($sampleUpdates as $update) {
-                $description .= "• {$update['package']}: {$update['current_version']} → {$update['new_version']}\n";
+            if ($criticalPackages->isNotEmpty()) {
+                $description .= "  ⚠ {$criticalPackages->count()} critical package(s)\n";
             }
-            if (count($updates) > 5) {
-                $description .= '• ... and '.(count($updates) - 5)." more packages\n";
-            }
-
-            // Check for critical packages
-            $criticalPackages = collect($updates)->filter(function ($update) {
-                return str_contains(strtolower($update['package']), 'docker') ||
-                    str_contains(strtolower($update['package']), 'kernel') ||
-                    str_contains(strtolower($update['package']), 'openssh') ||
-                    str_contains(strtolower($update['package']), 'ssl');
-            });
-
-            if ($criticalPackages->count() > 0) {
-                $description .= "\n **Critical packages detected** ({$criticalPackages->count()} packages may require restarts)";
-            }
-            $description .= "\n [Manage Server Patches]($this->serverUrl)";
         }
 
         return new DiscordMessage(
-            title: ':warning: Coolify: [ACTION REQUIRED] Server patches available on '.$this->server->name,
+            title: ':warning: Coolify: [ACTION REQUIRED] Server patches available',
             description: $description,
             color: DiscordMessage::errorColor(),
         );
-
     }
 
     public function toTelegram(): array
     {
-        // Handle error case
-        if (isset($this->patchData['error'])) {
-            $osId = $this->patchData['osId'] ?? 'unknown';
-            $packageManager = $this->patchData['package_manager'] ?? 'unknown';
-            $error = $this->patchData['error'];
+        $count = $this->servers->count();
+        $message = "🔧 Coolify: [ACTION REQUIRED] Server patches available on {$count} server(s)!\n\n";
 
-            $message = "❌ Coolify: [ERROR] Failed to check patches on {$this->server->name}!\n\n";
-            $message .= "📊 Error Details:\n";
-            $message .= '• OS: '.ucfirst($osId)."\n";
-            $message .= "• Package Manager: {$packageManager}\n";
-            $message .= "• Error: {$error}\n\n";
-
-            return [
-                'message' => $message,
-                'buttons' => [
-                    [
-                        'text' => 'Manage Server',
-                        'url' => $this->serverUrl,
-                    ],
-                ],
-            ];
+        foreach ($this->errorServers() as $server) {
+            $data = $server->patch_check_data;
+            $message .= "❌ {$server->name} — failed to check updates\n";
+            $message .= "  Error: {$data['error']}\n";
         }
 
-        $totalUpdates = $this->patchData['total_updates'] ?? 0;
-        $updates = $this->patchData['updates'] ?? [];
-        $osId = $this->patchData['osId'] ?? 'unknown';
-        $packageManager = $this->patchData['package_manager'] ?? 'unknown';
+        foreach ($this->updateServers() as $server) {
+            $data = $server->patch_check_data;
+            $total = $data['total_updates'] ?? 0;
+            $message .= "📦 {$server->name} — {$total} updates available\n";
 
-        $message = "🔧 Coolify: [ACTION REQUIRED] {$totalUpdates} server patches available on {$this->server->name}!\n\n";
-        $message .= "📊 Summary:\n";
-        $message .= '• OS: '.ucfirst($osId)."\n";
-        $message .= "• Package Manager: {$packageManager}\n";
-        $message .= "• Total Updates: {$totalUpdates}\n\n";
+            $updates = $data['updates'] ?? [];
+            $criticalPackages = collect($updates)->filter(fn ($u) => str_contains(strtolower($u['package']), 'docker') ||
+                str_contains(strtolower($u['package']), 'kernel') ||
+                str_contains(strtolower($u['package']), 'openssh') ||
+                str_contains(strtolower($u['package']), 'ssl')
+            );
 
-        if (count($updates) > 0) {
-            $message .= "📦 Sample Updates:\n";
-            $sampleUpdates = array_slice($updates, 0, 5);
-            foreach ($sampleUpdates as $update) {
-                $message .= "• {$update['package']}: {$update['current_version']} → {$update['new_version']}\n";
-            }
-            if (count($updates) > 5) {
-                $message .= '• ... and '.(count($updates) - 5)." more packages\n";
-            }
-
-            // Check for critical packages
-            $criticalPackages = collect($updates)->filter(function ($update) {
-                return str_contains(strtolower($update['package']), 'docker') ||
-                    str_contains(strtolower($update['package']), 'kernel') ||
-                    str_contains(strtolower($update['package']), 'openssh') ||
-                    str_contains(strtolower($update['package']), 'ssl');
-            });
-
-            if ($criticalPackages->count() > 0) {
-                $message .= "\n⚠️ Critical packages detected: {$criticalPackages->count()} packages may require restarts\n";
-                foreach ($criticalPackages->take(3) as $package) {
-                    $message .= "• {$package['package']}: {$package['current_version']} → {$package['new_version']}\n";
-                }
-                if ($criticalPackages->count() > 3) {
-                    $message .= '• ... and '.($criticalPackages->count() - 3)." more critical packages\n";
-                }
+            if ($criticalPackages->isNotEmpty()) {
+                $message .= "  ⚠️ {$criticalPackages->count()} critical package(s)\n";
             }
         }
 
         return [
             'message' => $message,
-            'buttons' => [
-                [
-                    'text' => 'Manage Server Patches',
-                    'url' => $this->serverUrl,
-                ],
-            ],
+            'buttons' => [],
         ];
     }
 
     public function toPushover(): PushoverMessage
     {
-        // Handle error case
-        if (isset($this->patchData['error'])) {
-            $osId = $this->patchData['osId'] ?? 'unknown';
-            $packageManager = $this->patchData['package_manager'] ?? 'unknown';
-            $error = $this->patchData['error'];
+        $count = $this->servers->count();
+        $message = "Server patches available on {$count} server(s)!\n\n";
 
-            $message = "[ERROR] Failed to check patches on {$this->server->name}!\n\n";
-            $message .= "Error Details:\n";
-            $message .= '• OS: '.ucfirst($osId)."\n";
-            $message .= "• Package Manager: {$packageManager}\n";
-            $message .= "• Error: {$error}\n\n";
-
-            return new PushoverMessage(
-                title: 'Server patch check failed',
-                level: 'error',
-                message: $message,
-                buttons: [
-                    [
-                        'text' => 'Manage Server',
-                        'url' => $this->serverUrl,
-                    ],
-                ],
-            );
+        foreach ($this->errorServers() as $server) {
+            $data = $server->patch_check_data;
+            $message .= "[ERROR] {$server->name} — {$data['error']}\n";
         }
 
-        $totalUpdates = $this->patchData['total_updates'] ?? 0;
-        $updates = $this->patchData['updates'] ?? [];
-        $osId = $this->patchData['osId'] ?? 'unknown';
-        $packageManager = $this->patchData['package_manager'] ?? 'unknown';
-
-        $message = "[ACTION REQUIRED] {$totalUpdates} server patches available on {$this->server->name}!\n\n";
-        $message .= "Summary:\n";
-        $message .= '• OS: '.ucfirst($osId)."\n";
-        $message .= "• Package Manager: {$packageManager}\n";
-        $message .= "• Total Updates: {$totalUpdates}\n\n";
-
-        if (count($updates) > 0) {
-            $message .= "Sample Updates:\n";
-            $sampleUpdates = array_slice($updates, 0, 3);
-            foreach ($sampleUpdates as $update) {
-                $message .= "• {$update['package']}: {$update['current_version']} → {$update['new_version']}\n";
-            }
-            if (count($updates) > 3) {
-                $message .= '• ... and '.(count($updates) - 3)." more packages\n";
-            }
-
-            // Check for critical packages
-            $criticalPackages = collect($updates)->filter(function ($update) {
-                return str_contains(strtolower($update['package']), 'docker') ||
-                    str_contains(strtolower($update['package']), 'kernel') ||
-                    str_contains(strtolower($update['package']), 'openssh') ||
-                    str_contains(strtolower($update['package']), 'ssl');
-            });
-
-            if ($criticalPackages->count() > 0) {
-                $message .= "\nCritical packages detected: {$criticalPackages->count()} may require restarts";
-            }
+        foreach ($this->updateServers() as $server) {
+            $data = $server->patch_check_data;
+            $total = $data['total_updates'] ?? 0;
+            $message .= "{$server->name} — {$total} updates\n";
         }
 
         return new PushoverMessage(
             title: 'Server patches available',
             level: 'error',
             message: $message,
-            buttons: [
-                [
-                    'text' => 'Manage Server Patches',
-                    'url' => $this->serverUrl,
-                ],
-            ],
         );
     }
 
     public function toSlack(): SlackMessage
     {
-        // Handle error case
-        if (isset($this->patchData['error'])) {
-            $osId = $this->patchData['osId'] ?? 'unknown';
-            $packageManager = $this->patchData['package_manager'] ?? 'unknown';
-            $error = $this->patchData['error'];
+        $count = $this->servers->count();
+        $description = "Server patches available on {$count} server(s)!\n\n";
 
-            $description = "Failed to check patches on '{$this->server->name}'!\n\n";
-            $description .= "*Error Details:*\n";
-            $description .= '• OS: '.ucfirst($osId)."\n";
-            $description .= "• Package Manager: {$packageManager}\n";
-            $description .= "• Error: `{$error}`\n\n";
-            $description .= "\n:link: <{$this->serverUrl}|Manage Server>";
+        foreach ($this->errorServers() as $server) {
+            $data = $server->patch_check_data;
+            $description .= ":x: *{$server->name}* — failed to check updates\n";
+            $description .= "  Error: `{$data['error']}`\n";
+        }
 
-            return new SlackMessage(
-                title: 'Coolify: [ERROR] Server patch check failed',
-                description: $description,
-                color: SlackMessage::errorColor()
+        foreach ($this->updateServers() as $server) {
+            $data = $server->patch_check_data;
+            $total = $data['total_updates'] ?? 0;
+            $description .= ":warning: *{$server->name}* — {$total} updates available\n";
+
+            $updates = $data['updates'] ?? [];
+            $criticalPackages = collect($updates)->filter(fn ($u) => str_contains(strtolower($u['package']), 'docker') ||
+                str_contains(strtolower($u['package']), 'kernel') ||
+                str_contains(strtolower($u['package']), 'openssh') ||
+                str_contains(strtolower($u['package']), 'ssl')
             );
-        }
 
-        $totalUpdates = $this->patchData['total_updates'] ?? 0;
-        $updates = $this->patchData['updates'] ?? [];
-        $osId = $this->patchData['osId'] ?? 'unknown';
-        $packageManager = $this->patchData['package_manager'] ?? 'unknown';
-
-        $description = "{$totalUpdates} server patches available on '{$this->server->name}'!\n\n";
-        $description .= "*Summary:*\n";
-        $description .= '• OS: '.ucfirst($osId)."\n";
-        $description .= "• Package Manager: {$packageManager}\n";
-        $description .= "• Total Updates: {$totalUpdates}\n\n";
-
-        if (count($updates) > 0) {
-            $description .= "*Sample Updates:*\n";
-            $sampleUpdates = array_slice($updates, 0, 5);
-            foreach ($sampleUpdates as $update) {
-                $description .= "• `{$update['package']}`: {$update['current_version']} → {$update['new_version']}\n";
-            }
-            if (count($updates) > 5) {
-                $description .= '• ... and '.(count($updates) - 5)." more packages\n";
-            }
-
-            // Check for critical packages
-            $criticalPackages = collect($updates)->filter(function ($update) {
-                return str_contains(strtolower($update['package']), 'docker') ||
-                    str_contains(strtolower($update['package']), 'kernel') ||
-                    str_contains(strtolower($update['package']), 'openssh') ||
-                    str_contains(strtolower($update['package']), 'ssl');
-            });
-
-            if ($criticalPackages->count() > 0) {
-                $description .= "\n:warning: *Critical packages detected:* {$criticalPackages->count()} packages may require restarts\n";
-                foreach ($criticalPackages->take(3) as $package) {
-                    $description .= "• `{$package['package']}`: {$package['current_version']} → {$package['new_version']}\n";
-                }
-                if ($criticalPackages->count() > 3) {
-                    $description .= '• ... and '.($criticalPackages->count() - 3)." more critical packages\n";
-                }
+            if ($criticalPackages->isNotEmpty()) {
+                $description .= "  :warning: {$criticalPackages->count()} critical package(s)\n";
             }
         }
-
-        $description .= "\n:link: <{$this->serverUrl}|Manage Server Patches>";
 
         return new SlackMessage(
             title: 'Coolify: [ACTION REQUIRED] Server patches available',
@@ -345,44 +196,45 @@ class ServerPatchCheck extends CustomEmailNotification
 
     public function toWebhook(): array
     {
-        // Handle error case
-        if (isset($this->patchData['error'])) {
+        $servers = $this->servers->map(function ($server) {
+            $data = $server->patch_check_data;
+
+            if (isset($data['error'])) {
+                return [
+                    'server_name' => $server->name,
+                    'server_uuid' => $server->uuid,
+                    'event' => 'server_patch_check_error',
+                    'error' => $data['error'],
+                    'os_id' => $data['osId'] ?? 'unknown',
+                    'package_manager' => $data['package_manager'] ?? 'unknown',
+                ];
+            }
+
+            $updates = $data['updates'] ?? [];
+            $criticalPackages = collect($updates)->filter(fn ($u) => str_contains(strtolower($u['package']), 'docker') ||
+                str_contains(strtolower($u['package']), 'kernel') ||
+                str_contains(strtolower($u['package']), 'openssh') ||
+                str_contains(strtolower($u['package']), 'ssl')
+            );
+
             return [
-                'success' => false,
-                'message' => 'Failed to check patches',
-                'event' => 'server_patch_check_error',
-                'server_name' => $this->server->name,
-                'server_uuid' => $this->server->uuid,
-                'os_id' => $this->patchData['osId'] ?? 'unknown',
-                'package_manager' => $this->patchData['package_manager'] ?? 'unknown',
-                'error' => $this->patchData['error'],
-                'url' => $this->serverUrl,
+                'server_name' => $server->name,
+                'server_uuid' => $server->uuid,
+                'event' => 'server_patch_check',
+                'total_updates' => $data['total_updates'] ?? 0,
+                'os_id' => $data['osId'] ?? 'unknown',
+                'package_manager' => $data['package_manager'] ?? 'unknown',
+                'updates' => $updates,
+                'critical_packages_count' => $criticalPackages->count(),
             ];
-        }
-
-        $totalUpdates = $this->patchData['total_updates'] ?? 0;
-        $updates = $this->patchData['updates'] ?? [];
-
-        // Check for critical packages
-        $criticalPackages = collect($updates)->filter(function ($update) {
-            return str_contains(strtolower($update['package']), 'docker') ||
-                str_contains(strtolower($update['package']), 'kernel') ||
-                str_contains(strtolower($update['package']), 'openssh') ||
-                str_contains(strtolower($update['package']), 'ssl');
-        });
+        })->toArray();
 
         return [
             'success' => false,
             'message' => 'Server patches available',
             'event' => 'server_patch_check',
-            'server_name' => $this->server->name,
-            'server_uuid' => $this->server->uuid,
-            'total_updates' => $totalUpdates,
-            'os_id' => $this->patchData['osId'] ?? 'unknown',
-            'package_manager' => $this->patchData['package_manager'] ?? 'unknown',
-            'updates' => $updates,
-            'critical_packages_count' => $criticalPackages->count(),
-            'url' => $this->serverUrl,
+            'affected_servers_count' => $this->servers->count(),
+            'servers' => $servers,
         ];
     }
 }

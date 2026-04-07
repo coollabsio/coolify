@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Server\CheckUpdates;
 use App\Models\Server;
 use App\Notifications\Server\ServerPatchCheck;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -12,10 +13,11 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class ServerPatchCheckJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 3;
 
@@ -23,7 +25,7 @@ class ServerPatchCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping('server-patch-check-'.$this->server->uuid))->expireAfter(600)->dontRelease()];
+        return [(new WithoutOverlapping('server-patch-check-'.$this->server->uuid))->expireAfter(600)->releaseAfter(60)];
     }
 
     public function __construct(public Server $server) {}
@@ -43,21 +45,21 @@ class ServerPatchCheckJob implements ShouldBeEncrypted, ShouldQueue
             // Check for updates
             $patchData = CheckUpdates::run($this->server);
 
-            if (isset($patchData['error'])) {
-                $team->notify(new ServerPatchCheck($this->server, $patchData));
-
-                return; // Skip if there's an error checking for updates
-            }
-
             $totalUpdates = $patchData['total_updates'] ?? 0;
 
-            // Only send notification if there are updates available
-            if ($totalUpdates > 0) {
-                $team->notify(new ServerPatchCheck($this->server, $patchData));
+            if (isset($patchData['error']) || $totalUpdates > 0) {
+                $this->server->update(['patch_check_data' => $patchData]);
+
+                // Send immediate notification to channels that have bundling disabled
+                $unbundledChannels = $team->getEnabledChannels('server_patch', unbundledOnly: true);
+                if (! empty($unbundledChannels)) {
+                    $team->notify(new ServerPatchCheck(collect([$this->server]), unbundledOnly: true));
+                }
+            } else {
+                $this->server->update(['patch_check_data' => null]);
             }
         } catch (\Throwable $e) {
-            // Log error but don't fail the job
-            \Illuminate\Support\Facades\Log::error('ServerPatchCheckJob failed: '.$e->getMessage(), [
+            Log::error('ServerPatchCheckJob failed: '.$e->getMessage(), [
                 'server_id' => $this->server->id,
                 'server_name' => $this->server->name,
                 'error' => $e->getMessage(),

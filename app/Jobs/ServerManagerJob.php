@@ -13,6 +13,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 
 class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
@@ -29,6 +30,8 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
     private string $instanceTimezone;
 
     private string $checkFrequency = '* * * * *';
+
+    private array $pendingPatchCheckJobs = [];
 
     /**
      * Create a new job instance.
@@ -60,6 +63,9 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
 
         // Process server-specific scheduled tasks
         $this->processScheduledTasks($servers);
+
+        // Dispatch collected patch check jobs as a batch (if bundling is enabled)
+        $this->dispatchPatchCheckJobs();
     }
 
     private function getServers(): Collection
@@ -160,11 +166,11 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        // Dispatch ServerPatchCheckJob if due (weekly)
+        // Collect ServerPatchCheckJob if due (weekly)
         $shouldRunPatchCheck = shouldRunCronNow('0 0 * * 0', $serverTimezone, "server-patch-check:{$server->id}", $this->executionTime);
 
-        if ($shouldRunPatchCheck) { // Weekly on Sunday at midnight
-            ServerPatchCheckJob::dispatch($server);
+        if ($shouldRunPatchCheck) {
+            $this->pendingPatchCheckJobs[] = new ServerPatchCheckJob($server);
         }
 
         // Note: CheckAndStartSentinelJob is only dispatched daily (line above) for version updates.
@@ -204,5 +210,21 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         $serverHash = abs(crc32((string) $server->id));
 
         return ($cycleIndex + $serverHash) % $interval !== 0;
+    }
+
+    private function dispatchPatchCheckJobs(): void
+    {
+        if (empty($this->pendingPatchCheckJobs)) {
+            return;
+        }
+
+        $serverIds = collect($this->pendingPatchCheckJobs)->map(fn ($job) => $job->server->id)->all();
+
+        Bus::batch($this->pendingPatchCheckJobs)
+            ->allowFailures()
+            ->finally(fn () => SendPatchCheckNotificationJob::dispatch($serverIds))
+            ->name('server-patch-check')
+            ->onQueue('high')
+            ->dispatch();
     }
 }

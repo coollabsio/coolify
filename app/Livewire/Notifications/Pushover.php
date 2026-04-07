@@ -73,6 +73,12 @@ class Pushover extends Component
     #[Validate(['boolean'])]
     public bool $traefikOutdatedPushoverNotifications = true;
 
+    #[Validate(['boolean'])]
+    public bool $bundlePatchNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $bundleTraefikNotifications = false;
+
     public function mount()
     {
         try {
@@ -109,6 +115,9 @@ class Pushover extends Component
             $this->settings->server_patch_pushover_notifications = $this->serverPatchPushoverNotifications;
             $this->settings->traefik_outdated_pushover_notifications = $this->traefikOutdatedPushoverNotifications;
 
+            $this->settings->bundle_patch_notifications = $this->bundlePatchNotifications;
+            $this->settings->bundle_traefik_notifications = $this->bundleTraefikNotifications;
+
             $this->settings->save();
             refreshSession();
         } else {
@@ -130,6 +139,9 @@ class Pushover extends Component
             $this->serverUnreachablePushoverNotifications = $this->settings->server_unreachable_pushover_notifications;
             $this->serverPatchPushoverNotifications = $this->settings->server_patch_pushover_notifications;
             $this->traefikOutdatedPushoverNotifications = $this->settings->traefik_outdated_pushover_notifications;
+
+            $this->bundlePatchNotifications = $this->settings->bundle_patch_notifications ?? false;
+            $this->bundleTraefikNotifications = $this->settings->bundle_traefik_notifications ?? false;
         }
     }
 

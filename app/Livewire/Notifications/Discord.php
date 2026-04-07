@@ -69,6 +69,12 @@ class Discord extends Component
     #[Validate(['boolean'])]
     public bool $discordPingEnabled = true;
 
+    #[Validate(['boolean'])]
+    public bool $bundlePatchNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $bundleTraefikNotifications = false;
+
     public function mount()
     {
         try {
@@ -106,6 +112,9 @@ class Discord extends Component
 
             $this->settings->discord_ping_enabled = $this->discordPingEnabled;
 
+            $this->settings->bundle_patch_notifications = $this->bundlePatchNotifications;
+            $this->settings->bundle_traefik_notifications = $this->bundleTraefikNotifications;
+
             $this->settings->save();
             refreshSession();
         } else {
@@ -128,6 +137,9 @@ class Discord extends Component
             $this->traefikOutdatedDiscordNotifications = $this->settings->traefik_outdated_discord_notifications;
 
             $this->discordPingEnabled = $this->settings->discord_ping_enabled;
+
+            $this->bundlePatchNotifications = $this->settings->bundle_patch_notifications ?? false;
+            $this->bundleTraefikNotifications = $this->settings->bundle_traefik_notifications ?? false;
         }
     }
 

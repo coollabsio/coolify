@@ -47,6 +47,8 @@ class TelegramNotificationSettings extends Model
         'telegram_notifications_server_unreachable_thread_id',
         'telegram_notifications_server_patch_thread_id',
         'telegram_notifications_traefik_outdated_thread_id',
+        'bundle_patch_notifications',
+        'bundle_traefik_notifications',
     ];
 
     protected $casts = [
@@ -81,6 +83,8 @@ class TelegramNotificationSettings extends Model
         'telegram_notifications_server_unreachable_thread_id' => 'encrypted',
         'telegram_notifications_server_patch_thread_id' => 'encrypted',
         'telegram_notifications_traefik_outdated_thread_id' => 'encrypted',
+        'bundle_patch_notifications' => 'boolean',
+        'bundle_traefik_notifications' => 'boolean',
     ];
 
     public function team()

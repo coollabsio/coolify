@@ -110,6 +110,12 @@ class Email extends Component
     #[Validate(['nullable', 'email'])]
     public ?string $testEmailAddress = null;
 
+    #[Validate(['boolean'])]
+    public bool $bundlePatchNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $bundleTraefikNotifications = false;
+
     public function mount()
     {
         try {
@@ -159,6 +165,9 @@ class Email extends Component
             $this->settings->server_unreachable_email_notifications = $this->serverUnreachableEmailNotifications;
             $this->settings->server_patch_email_notifications = $this->serverPatchEmailNotifications;
             $this->settings->traefik_outdated_email_notifications = $this->traefikOutdatedEmailNotifications;
+
+            $this->settings->bundle_patch_notifications = $this->bundlePatchNotifications;
+            $this->settings->bundle_traefik_notifications = $this->bundleTraefikNotifications;
             $this->settings->save();
 
         } else {
@@ -192,6 +201,9 @@ class Email extends Component
             $this->serverUnreachableEmailNotifications = $this->settings->server_unreachable_email_notifications;
             $this->serverPatchEmailNotifications = $this->settings->server_patch_email_notifications;
             $this->traefikOutdatedEmailNotifications = $this->settings->traefik_outdated_email_notifications;
+
+            $this->bundlePatchNotifications = $this->settings->bundle_patch_notifications ?? false;
+            $this->bundleTraefikNotifications = $this->settings->bundle_traefik_notifications ?? false;
         }
     }
 

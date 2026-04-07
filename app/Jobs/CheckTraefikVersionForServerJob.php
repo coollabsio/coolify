@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Notifications\Server\TraefikVersionOutdated;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -14,7 +15,7 @@ use Illuminate\Queue\SerializesModels;
 
 class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 3;
 
@@ -142,7 +143,7 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Store outdated information in database and send immediate notification.
+     * Store outdated information in database.
      */
     private function storeOutdatedInfo(string $current, string $latest, string $type, ?string $upgradeTarget = null, ?array $newerBranchInfo = null): void
     {
@@ -166,23 +167,13 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->server->update(['traefik_outdated_info' => $outdatedInfo]);
 
-        // Send immediate notification to the team
-        $this->sendNotification($outdatedInfo);
-    }
-
-    /**
-     * Send notification to team about outdated Traefik.
-     */
-    private function sendNotification(array $outdatedInfo): void
-    {
-        // Attach the outdated info as a dynamic property for the notification
-        $this->server->outdatedInfo = $outdatedInfo;
-
-        // Get the team and send notification
+        // Send immediate notification to channels that have bundling disabled
         $team = $this->server->team()->first();
-
         if ($team) {
-            $team->notify(new TraefikVersionOutdated(collect([$this->server])));
+            $unbundledChannels = $team->getEnabledChannels('traefik_outdated', unbundledOnly: true);
+            if (! empty($unbundledChannels)) {
+                $team->notify(new TraefikVersionOutdated(collect([$this->server]), unbundledOnly: true));
+            }
         }
     }
 }

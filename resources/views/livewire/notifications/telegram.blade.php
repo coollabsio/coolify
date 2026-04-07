@@ -169,6 +169,11 @@
                     <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
                         id="telegramNotificationsServerPatchThreadId" />
                 </div>
+                <div class="pl-5">
+                    <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="bundlePatchNotifications"
+                        helper="Bundle server patch notifications into a single notification listing all affected servers."
+                        label="Bundle Notifications" />
+                </div>
 
                 <div class="pl-1 flex gap-2">
                     <div class="w-96">
@@ -177,6 +182,11 @@
                     </div>
                     <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
                         id="telegramNotificationsTraefikOutdatedThreadId" />
+                </div>
+                <div class="pl-5">
+                    <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="bundleTraefikNotifications"
+                        helper="Bundle Traefik outdated notifications into a single notification listing all affected servers."
+                        label="Bundle Notifications" />
                 </div>
             </div>
         </div>

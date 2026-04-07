@@ -71,6 +71,12 @@ class Slack extends Component
     #[Validate(['boolean'])]
     public bool $traefikOutdatedSlackNotifications = true;
 
+    #[Validate(['boolean'])]
+    public bool $bundlePatchNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $bundleTraefikNotifications = false;
+
     public function mount()
     {
         try {
@@ -106,6 +112,9 @@ class Slack extends Component
             $this->settings->server_patch_slack_notifications = $this->serverPatchSlackNotifications;
             $this->settings->traefik_outdated_slack_notifications = $this->traefikOutdatedSlackNotifications;
 
+            $this->settings->bundle_patch_notifications = $this->bundlePatchNotifications;
+            $this->settings->bundle_traefik_notifications = $this->bundleTraefikNotifications;
+
             $this->settings->save();
             refreshSession();
         } else {
@@ -126,6 +135,9 @@ class Slack extends Component
             $this->serverUnreachableSlackNotifications = $this->settings->server_unreachable_slack_notifications;
             $this->serverPatchSlackNotifications = $this->settings->server_patch_slack_notifications;
             $this->traefikOutdatedSlackNotifications = $this->settings->traefik_outdated_slack_notifications;
+
+            $this->bundlePatchNotifications = $this->settings->bundle_patch_notifications ?? false;
+            $this->bundleTraefikNotifications = $this->settings->bundle_traefik_notifications ?? false;
         }
     }
 

@@ -80,8 +80,18 @@
                     label="Server Unreachable" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverPatchDiscordNotifications"
                     label="Server Patching" />
+                <div class="pl-5">
+                    <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="bundlePatchNotifications"
+                        helper="Bundle server patch notifications into a single notification listing all affected servers."
+                        label="Bundle Notifications" />
+                </div>
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="traefikOutdatedDiscordNotifications"
                     label="Traefik Proxy Outdated" />
+                <div class="pl-5">
+                    <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="bundleTraefikNotifications"
+                        helper="Bundle Traefik outdated notifications into a single notification listing all affected servers."
+                        label="Bundle Notifications" />
+                </div>
             </div>
         </div>
     </div>

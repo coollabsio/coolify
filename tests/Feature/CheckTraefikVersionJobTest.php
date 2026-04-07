@@ -1,20 +1,31 @@
 <?php
 
+use App\Jobs\CheckTraefikVersionForServerJob;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
 use App\Notifications\Server\TraefikVersionOutdated;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Once;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    Notification::fake();
+    InstanceSettings::unguarded(function () {
+        InstanceSettings::updateOrCreate(
+            ['id' => 0],
+            ['fqdn' => 'https://coolify.test']
+        );
+    });
+    Once::flush();
 });
 
 it('detects servers table has detected_traefik_version column', function () {
-    expect(\Illuminate\Support\Facades\Schema::hasColumn('servers', 'detected_traefik_version'))->toBeTrue();
+    expect(Schema::hasColumn('servers', 'detected_traefik_version'))->toBeTrue();
 });
 
 it('server model casts detected_traefik_version as string', function () {
@@ -101,7 +112,7 @@ it('notification class accepts servers collection with outdated info', function 
         'team_id' => $team->id,
         'detected_traefik_version' => 'v3.5.0',
     ]);
-    $server1->outdatedInfo = [
+    $server1->traefik_outdated_info = [
         'current' => '3.5.0',
         'latest' => '3.5.6',
         'type' => 'patch_update',
@@ -112,7 +123,7 @@ it('notification class accepts servers collection with outdated info', function 
         'team_id' => $team->id,
         'detected_traefik_version' => 'v3.4.0',
     ]);
-    $server2->outdatedInfo = [
+    $server2->traefik_outdated_info = [
         'current' => '3.4.0',
         'latest' => '3.6.0',
         'type' => 'minor_upgrade',
@@ -123,8 +134,8 @@ it('notification class accepts servers collection with outdated info', function 
     $notification = new TraefikVersionOutdated($servers);
 
     expect($notification->servers)->toHaveCount(2);
-    expect($notification->servers->first()->outdatedInfo['type'])->toBe('patch_update');
-    expect($notification->servers->last()->outdatedInfo['type'])->toBe('minor_upgrade');
+    expect($notification->servers->first()->traefik_outdated_info['type'])->toBe('patch_update');
+    expect($notification->servers->last()->traefik_outdated_info['type'])->toBe('minor_upgrade');
 });
 
 it('notification channels can be retrieved', function () {
@@ -137,7 +148,7 @@ it('notification channels can be retrieved', function () {
 });
 
 it('traefik version check command exists', function () {
-    $commands = \Illuminate\Support\Facades\Artisan::all();
+    $commands = Artisan::all();
 
     expect($commands)->toHaveKey('traefik:check-version');
 });
@@ -181,38 +192,47 @@ it('groups servers by team correctly', function () {
 });
 
 it('server check job exists and has correct structure', function () {
-    expect(class_exists(\App\Jobs\CheckTraefikVersionForServerJob::class))->toBeTrue();
+    expect(class_exists(CheckTraefikVersionForServerJob::class))->toBeTrue();
 
     // Verify CheckTraefikVersionForServerJob has required properties
-    $reflection = new \ReflectionClass(\App\Jobs\CheckTraefikVersionForServerJob::class);
+    $reflection = new ReflectionClass(CheckTraefikVersionForServerJob::class);
     expect($reflection->hasProperty('tries'))->toBeTrue();
     expect($reflection->hasProperty('timeout'))->toBeTrue();
 
     // Verify it implements ShouldQueue
-    $interfaces = class_implements(\App\Jobs\CheckTraefikVersionForServerJob::class);
-    expect($interfaces)->toContain(\Illuminate\Contracts\Queue\ShouldQueue::class);
+    $interfaces = class_implements(CheckTraefikVersionForServerJob::class);
+    expect($interfaces)->toContain(ShouldQueue::class);
 });
 
-it('sends immediate notifications when outdated traefik is detected', function () {
-    // Notifications are now sent immediately from CheckTraefikVersionForServerJob
-    // when outdated Traefik is detected, rather than being aggregated and delayed
+it('sends bundled notifications after all server checks complete', function () {
+    // Notifications are sent by SendTraefikOutdatedNotificationJob after all per-server checks,
+    // bundling all outdated servers into a single notification per team
     $team = Team::factory()->create();
-    $server = Server::factory()->make([
+    $server1 = Server::factory()->make([
         'name' => 'Server 1',
         'team_id' => $team->id,
     ]);
-
-    $server->outdatedInfo = [
+    $server1->traefik_outdated_info = [
         'current' => '3.5.0',
         'latest' => '3.5.6',
         'type' => 'patch_update',
     ];
 
-    // Each server triggers its own notification immediately
-    $notification = new TraefikVersionOutdated(collect([$server]));
+    $server2 = Server::factory()->make([
+        'name' => 'Server 2',
+        'team_id' => $team->id,
+    ]);
+    $server2->traefik_outdated_info = [
+        'current' => '3.4.0',
+        'latest' => '3.6.0',
+        'type' => 'minor_upgrade',
+    ];
 
-    expect($notification->servers)->toHaveCount(1);
-    expect($notification->servers->first()->outdatedInfo['type'])->toBe('patch_update');
+    $notification = new TraefikVersionOutdated(collect([$server1, $server2]));
+
+    expect($notification->servers)->toHaveCount(2);
+    expect($notification->servers->first()->traefik_outdated_info['type'])->toBe('patch_update');
+    expect($notification->servers->last()->traefik_outdated_info['type'])->toBe('minor_upgrade');
 });
 
 it('notification generates correct server proxy URLs', function () {
@@ -223,7 +243,7 @@ it('notification generates correct server proxy URLs', function () {
         'uuid' => 'test-uuid-123',
     ]);
 
-    $server->outdatedInfo = [
+    $server->traefik_outdated_info = [
         'current' => '3.5.0',
         'latest' => '3.5.6',
         'type' => 'patch_update',
@@ -247,7 +267,7 @@ it('notification transforms multiple servers with URLs correctly', function () {
         'team_id' => $team->id,
         'uuid' => 'uuid-1',
     ]);
-    $server1->outdatedInfo = [
+    $server1->traefik_outdated_info = [
         'current' => '3.5.0',
         'latest' => '3.5.6',
         'type' => 'patch_update',
@@ -258,7 +278,7 @@ it('notification transforms multiple servers with URLs correctly', function () {
         'team_id' => $team->id,
         'uuid' => 'uuid-2',
     ]);
-    $server2->outdatedInfo = [
+    $server2->traefik_outdated_info = [
         'current' => '3.4.0',
         'latest' => '3.6.0',
         'type' => 'minor_upgrade',
@@ -287,7 +307,7 @@ it('notification uses base_url helper not config app.url', function () {
         'uuid' => 'test-uuid',
     ]);
 
-    $server->outdatedInfo = [
+    $server->traefik_outdated_info = [
         'current' => '3.5.0',
         'latest' => '3.5.6',
         'type' => 'patch_update',

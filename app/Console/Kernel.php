@@ -80,6 +80,7 @@ class Kernel extends ConsoleKernel
             $this->scheduleInstance->job(new CheckTraefikVersionJob)->weekly()->sundays()->at('00:00')->timezone($this->instanceTimezone)->onOneServer();
 
             $this->scheduleInstance->command('cleanup:database --yes')->daily();
+            $this->scheduleInstance->command('queue:prune-batches --hours=48')->daily();
             $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();
 
             // Cleanup orphaned PR preview containers daily
