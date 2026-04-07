@@ -89,6 +89,9 @@ class CheckUpdates
 
                     return $out;
                 case 'apt':
+                    // Fix docker.list if it contains numeric VERSION_CODENAME (e.g. "13" instead of "trixie" on Debian 13)
+                    // This happens when Coolify's InstallDocker created the file with an empty/numeric VERSION_CODENAME
+                    instant_remote_process(["sed -i 's|download.docker.com/linux/debian] 13 |download.docker.com/linux/debian trixie |g' /etc/apt/sources.list.d/docker.list 2>/dev/null || true"], $server);
                     instant_remote_process(['apt-get update -qq'], $server);
                     $output = instant_remote_process(['LANG=C apt list --upgradable 2>/dev/null'], $server);
 
