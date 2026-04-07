@@ -479,6 +479,7 @@
                     @if ($outputs)
                         @php
                             $displayLines = collect(explode("\n", $outputs))->filter(fn($line) => trim($line) !== '');
+                            $instanceTimezone = instanceSettings()->instance_timezone ?: 'UTC';
                         @endphp
                         <div id="logs" class="font-logs max-w-full cursor-default">
                             <div x-show="searchQuery.trim() && matchCount === 0"
@@ -491,19 +492,20 @@
                                     $timestamp = '';
                                     $logContent = $line;
                                     if (preg_match('/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z?\s(.*)$/', $line, $matches)) {
-                                        $year = $matches[1];
-                                        $month = $matches[2];
-                                        $day = $matches[3];
-                                        $time = $matches[4];
                                         $microseconds = isset($matches[5]) ? substr($matches[5], 0, 6) : '000000';
                                         $logContent = $matches[6];
 
+                                        // Parse UTC timestamp and convert to the configured instance timezone
+                                        $carbon = \Carbon\Carbon::parse(
+                                            "{$matches[1]}-{$matches[2]}-{$matches[3]}T{$matches[4]}Z"
+                                        )->setTimezone($instanceTimezone);
+
                                         // Convert month number to abbreviated name
                                         $monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                                        $monthName = $monthNames[(int)$month - 1] ?? $month;
+                                        $monthName = $monthNames[$carbon->month - 1];
 
                                         // Format for display: 2025-Dec-04 09:44:58
-                                        $timestamp = "{$year}-{$monthName}-{$day} {$time}";
+                                        $timestamp = $carbon->format('Y') . '-' . $monthName . '-' . $carbon->format('d H:i:s');
                                         // Include microseconds in key for uniqueness
                                         $lineKey = "{$timestamp}.{$microseconds}";
                                     }
