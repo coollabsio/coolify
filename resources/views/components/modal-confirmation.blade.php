@@ -335,8 +335,10 @@
                                         submitting = true;
                                         submitForm().then((result) => {
                                             submitting = false;
-                                            modalOpen = false;
-                                            resetModal();
+                                            if (result === true || result == null) {
+                                                modalOpen = false;
+                                                resetModal();
+                                            }
                                         }).catch(() => {
                                             submitting = false;
                                         });
