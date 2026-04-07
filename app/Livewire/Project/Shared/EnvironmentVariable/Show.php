@@ -182,6 +182,16 @@ class Show extends Component
         $this->dispatch('refreshEnvs');
     }
 
+    public function unlock()
+    {
+        $this->authorize('update', $this->env);
+
+        $this->env->is_shown_once = false;
+        $this->env->save();
+        $this->checkEnvs();
+        $this->dispatch('refreshEnvs');
+    }
+
     public function instantSave()
     {
         $this->submit();

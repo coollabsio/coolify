@@ -30,6 +30,9 @@
                             helper="Add a note to document what this environment variable is used for." maxlength="256" />
                     </div>
                     <x-forms.button type="submit">Update</x-forms.button>
+                    @if (!$isMagicVariable)
+                        <x-forms.button wire:click='unlock'>Unlock</x-forms.button>
+                    @endif
                 </div>
                 <div class="flex flex-col w-full gap-3">
                     <div class="flex flex-wrap w-full items-center gap-4">
