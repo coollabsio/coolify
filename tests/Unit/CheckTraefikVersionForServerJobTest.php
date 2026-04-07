@@ -19,19 +19,19 @@ it('has correct queue and retry configuration', function () {
     expect($job->server)->toBe($server);
     expect($job->traefikVersions)->toBe($this->traefikVersions);
     expect($job->shouldNotify)->toBeTrue();
-    expect($job->checkedAt)->toBeNull();
+    expect($job->scanId)->toBeNull();
 });
 
 it('can suppress immediate notifications for batched scans', function () {
     $server = \Mockery::mock(Server::class)->makePartial();
-    $checkedAt = '2026-03-29T00:00:00+00:00';
-    $job = new CheckTraefikVersionForServerJob($server, $this->traefikVersions, false, $checkedAt);
+    $scanId = 'scan-2026-03-29';
+    $job = new CheckTraefikVersionForServerJob($server, $this->traefikVersions, false, $scanId);
 
     expect($job->shouldNotify)->toBeFalse();
-    expect($job->checkedAt)->toBe($checkedAt);
+    expect($job->scanId)->toBe($scanId);
 });
 
-it('rejects batched scans without a shared checkedAt timestamp', function () {
+it('rejects batched scans without a shared scan identifier', function () {
     $server = \Mockery::mock(Server::class)->makePartial();
 
     expect(fn () => new CheckTraefikVersionForServerJob($server, $this->traefikVersions, false))

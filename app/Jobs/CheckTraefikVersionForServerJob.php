@@ -28,10 +28,10 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
         public Server $server,
         public array $traefikVersions,
         public bool $shouldNotify = true,
-        public ?string $checkedAt = null
+        public ?string $scanId = null
     ) {
-        if (! $this->shouldNotify && is_null($this->checkedAt)) {
-            throw new InvalidArgumentException('Batched Traefik version checks require a shared checkedAt timestamp.');
+        if (! $this->shouldNotify && is_null($this->scanId)) {
+            throw new InvalidArgumentException('Batched Traefik version checks require a shared scan identifier.');
         }
     }
 
@@ -149,7 +149,7 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Store outdated information in database and send immediate notification.
+     * Store outdated information in database and optionally send an immediate notification.
      */
     private function storeOutdatedInfo(string $current, string $latest, string $type, ?string $upgradeTarget = null, ?array $newerBranchInfo = null): void
     {
@@ -157,8 +157,12 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
             'current' => $current,
             'latest' => $latest,
             'type' => $type,
-            'checked_at' => $this->checkedAt ?? now()->toIso8601String(),
+            'checked_at' => now()->toIso8601String(),
         ];
+
+        if ($this->scanId) {
+            $outdatedInfo['scan_id'] = $this->scanId;
+        }
 
         // For minor upgrades, add the upgrade_target field (e.g., "v3.6")
         if ($type === 'minor_upgrade' && $upgradeTarget) {

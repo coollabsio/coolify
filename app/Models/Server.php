@@ -43,6 +43,7 @@ use Visus\Cuid2\Cuid2;
  *     latest: string,
  *     type: 'patch_update'|'minor_upgrade',
  *     checked_at: string,
+ *     scan_id?: string,
  *     newer_branch_target?: string,
  *     newer_branch_latest?: string,
  *     upgrade_target?: string
@@ -58,6 +59,7 @@ use Visus\Cuid2\Cuid2;
  *     'latest' => '3.5.2',               // Latest patch version available
  *     'type' => 'patch_update',          // Update type identifier
  *     'checked_at' => '2025-11-14T10:00:00Z',  // ISO8601 timestamp
+ *     'scan_id' => '32f5f6d7-7ae0-4aa7-9fcb-3a0b75155eab', // (Optional) Batched scan identifier
  *     'newer_branch_target' => 'v3.6',   // (Optional) Available major/minor version
  *     'newer_branch_latest' => '3.6.2'   // (Optional) Latest version in that branch
  * ]
@@ -70,7 +72,8 @@ use Visus\Cuid2\Cuid2;
  *     'latest' => '3.6.2',               // Latest version in target branch
  *     'type' => 'minor_upgrade',         // Update type identifier
  *     'upgrade_target' => 'v3.6',        // Target branch (with 'v' prefix)
- *     'checked_at' => '2025-11-14T10:00:00Z'  // ISO8601 timestamp
+ *     'checked_at' => '2025-11-14T10:00:00Z', // ISO8601 timestamp
+ *     'scan_id' => '32f5f6d7-7ae0-4aa7-9fcb-3a0b75155eab' // (Optional) Batched scan identifier
  * ]
  * ```
  *

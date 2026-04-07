@@ -11,6 +11,7 @@ use App\Notifications\Server\TraefikVersionOutdated;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 
 uses(RefreshDatabase::class);
@@ -195,7 +196,7 @@ it('scheduled traefik scan jobs exist and have correct structure', function () {
     expect($reflection->hasProperty('tries'))->toBeTrue();
     expect($reflection->hasProperty('timeout'))->toBeTrue();
     expect($reflection->hasProperty('shouldNotify'))->toBeTrue();
-    expect($reflection->hasProperty('checkedAt'))->toBeTrue();
+    expect($reflection->hasProperty('scanId'))->toBeTrue();
 
     // Verify it implements ShouldQueue
     $interfaces = class_implements(CheckTraefikVersionForServerJob::class);
@@ -218,24 +219,47 @@ it('dispatches server checks in a batch without immediate notifications', functi
     ]);
     $server2->settings->update(['is_reachable' => true, 'is_usable' => true]);
 
-    $batchCheckedAt = null;
+    $batchScanId = null;
 
     (new CheckTraefikVersionJob)->handle();
 
-    Bus::assertBatched(function (PendingBatch $batch) use (&$batchCheckedAt) {
+    Bus::assertBatched(function (PendingBatch $batch) use (&$batchScanId) {
         if (count($batch->jobs) !== 2) {
             return false;
         }
 
         $jobs = collect($batch->jobs);
-        $batchCheckedAt = $jobs->first()?->checkedAt;
+        $batchScanId = $jobs->first()?->scanId;
 
-        return $jobs->every(function ($job) use ($batchCheckedAt) {
+        return $jobs->every(function ($job) use ($batchScanId) {
             return $job instanceof CheckTraefikVersionForServerJob
                 && $job->shouldNotify === false
-                && $job->checkedAt === $batchCheckedAt;
+                && filled($job->scanId)
+                && $job->scanId === $batchScanId;
         });
     });
+});
+
+it('skips dispatching a new batch while another traefik scan is still locked', function () {
+    Bus::fake();
+
+    $team = Team::factory()->create();
+    $server = Server::factory()->create([
+        'team_id' => $team->id,
+        'proxy' => ['type' => ProxyTypes::TRAEFIK->value],
+    ]);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+
+    $lock = Cache::lock('traefik-version-scan', 60);
+    expect($lock->get())->toBeTrue();
+
+    try {
+        (new CheckTraefikVersionJob)->handle();
+
+        Bus::assertNothingBatched();
+    } finally {
+        $lock->release();
+    }
 });
 
 it('notification generates correct server proxy URLs', function () {
