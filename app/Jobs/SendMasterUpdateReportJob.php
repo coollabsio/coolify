@@ -29,39 +29,40 @@ class SendMasterUpdateReportJob implements ShouldBeEncrypted, ShouldQueue
         $now = now($timezone);
 
         Team::query()
-            ->with('emailNotificationSettings')
-            ->get()
-            ->each(function (Team $team) use ($builder, $now) {
-                $settings = $team->emailNotificationSettings;
+            ->with(['emailNotificationSettings', 'servers'])
+            ->chunkById(100, function (Collection $teams) use ($builder, $now): void {
+                foreach ($teams as $team) {
+                    $settings = $team->emailNotificationSettings;
 
-                if (! $settings || ! $settings->isEnabled() || ! $settings->master_update_report_email_notifications) {
-                    return;
-                }
+                    if (! $settings || ! $settings->isEnabled() || ! $settings->master_update_report_email_notifications) {
+                        continue;
+                    }
 
-                if (! $this->isDueToday($settings->master_update_report_frequency ?? 'weekly', $settings->master_update_report_day ?? 'monday', $now)) {
-                    return;
-                }
+                    if (! $this->isDueToday($settings->master_update_report_frequency ?? 'weekly', $settings->master_update_report_day ?? 'monday', $now)) {
+                        continue;
+                    }
 
-                $items = collect($builder->collect($team));
-                if ($items->isEmpty()) {
-                    return;
-                }
+                    $items = collect($builder->collect($team));
+                    if ($items->isEmpty()) {
+                        continue;
+                    }
 
-                $pendingItems = $this->filterPendingItems($team, $items);
-                if ($pendingItems->isEmpty()) {
-                    return;
-                }
+                    $pendingItems = $this->filterPendingItems($team, $items);
+                    if ($pendingItems->isEmpty()) {
+                        continue;
+                    }
 
-                $sections = $this->buildSections($pendingItems);
+                    $sections = $this->buildSections($pendingItems);
 
-                try {
-                    $team->notifyNow(new MasterUpdateReport($sections, $pendingItems->count()));
-                    $this->persistStates($team, $pendingItems);
-                } catch (\Throwable $e) {
-                    Log::error('Failed to send master update report.', [
-                        'team_id' => $team->id,
-                        'error' => $e->getMessage(),
-                    ]);
+                    try {
+                        $team->notifyNow(new MasterUpdateReport($sections, $pendingItems->count()));
+                        $this->persistStates($team, $pendingItems);
+                    } catch (\Throwable $e) {
+                        Log::error('Failed to send master update report.', [
+                            'team_id' => $team->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 }
             });
     }
@@ -116,18 +117,27 @@ class SendMasterUpdateReportJob implements ShouldBeEncrypted, ShouldQueue
 
     protected function persistStates(Team $team, Collection $items): void
     {
-        foreach ($items as $item) {
-            UpdateNotificationReportState::updateOrCreate(
-                [
-                    'team_id' => $team->id,
-                    'item_type' => $item['item_type'],
-                    'item_key' => $item['item_key'],
-                ],
-                [
-                    'fingerprint' => $item['fingerprint'],
-                    'last_reported_at' => now(),
-                ]
-            );
+        if ($items->isEmpty()) {
+            return;
         }
+
+        $timestamp = now();
+        $rows = $items
+            ->map(fn (array $item) => [
+                'team_id' => $team->id,
+                'item_type' => $item['item_type'],
+                'item_key' => $item['item_key'],
+                'fingerprint' => $item['fingerprint'],
+                'last_reported_at' => $timestamp,
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ])
+            ->all();
+
+        UpdateNotificationReportState::query()->upsert(
+            $rows,
+            ['team_id', 'item_type', 'item_key'],
+            ['fingerprint', 'last_reported_at', 'updated_at']
+        );
     }
 }

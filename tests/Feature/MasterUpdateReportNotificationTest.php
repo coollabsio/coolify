@@ -18,10 +18,6 @@ beforeEach(function () {
     ]);
 });
 
-afterEach(function () {
-    Mockery::close();
-});
-
 it('renders only sections that contain updates', function () {
     $notification = new MasterUpdateReport([
         'coolify_upgrades' => [[
@@ -58,13 +54,11 @@ it('removes the direct server patch email channel when the master report is enab
     ]);
     $team->refresh();
 
-    $server = Mockery::mock(Server::class);
-    $server->shouldReceive('getAttribute')->with('uuid')->andReturn('server-1');
-    $server->shouldReceive('getAttribute')->with('name')->andReturn('Server One');
-    $server->shouldReceive('setAttribute')->andReturnSelf();
-    $server->shouldReceive('getSchemalessAttributes')->andReturn([]);
-    $server->uuid = 'server-1';
-    $server->name = 'Server One';
+    $server = Server::factory()->make([
+        'uuid' => 'server-1',
+        'name' => 'Server One',
+        'team_id' => $team->id,
+    ]);
 
     $notification = new ServerPatchCheck($server, [
         'total_updates' => 1,
@@ -85,13 +79,11 @@ it('keeps the direct server patch error email channel when the master report is 
     ]);
     $team->refresh();
 
-    $server = Mockery::mock(Server::class);
-    $server->shouldReceive('getAttribute')->with('uuid')->andReturn('server-1');
-    $server->shouldReceive('getAttribute')->with('name')->andReturn('Server One');
-    $server->shouldReceive('setAttribute')->andReturnSelf();
-    $server->shouldReceive('getSchemalessAttributes')->andReturn([]);
-    $server->uuid = 'server-1';
-    $server->name = 'Server One';
+    $server = Server::factory()->make([
+        'uuid' => 'server-1',
+        'name' => 'Server One',
+        'team_id' => $team->id,
+    ]);
 
     $notification = new ServerPatchCheck($server, [
         'error' => 'Failed to check for updates',

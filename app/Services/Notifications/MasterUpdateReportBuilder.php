@@ -4,6 +4,7 @@ namespace App\Services\Notifications;
 
 use App\Actions\Server\CheckUpdates;
 use App\Models\Application;
+use App\Models\Server;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
@@ -280,7 +281,7 @@ class MasterUpdateReportBuilder
         string $label,
         string $imageReference,
         ?string $url,
-        $server,
+        ?Server $server,
     ): ?array {
         $update = $this->imageUpdateDetector->detect($imageReference, $server);
         if (! $update) {

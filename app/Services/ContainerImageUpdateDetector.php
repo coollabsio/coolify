@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Server;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ContainerImageUpdateDetector
 {
@@ -132,7 +133,13 @@ class ContainerImageUpdateDetector
                 ->filter(fn ($tag) => filled($tag['name']))
                 ->values()
                 ->all();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            Log::debug('Failed to fetch Docker Hub tags for container image update detection.', [
+                'repository' => $repository,
+                'method' => __METHOD__,
+                'error' => $e->getMessage(),
+            ]);
+
             return [];
         }
     }
@@ -174,7 +181,13 @@ class ContainerImageUpdateDetector
                 ->filter(fn ($tag) => filled($tag['name']))
                 ->values()
                 ->all();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            Log::debug('Failed to fetch GHCR tags for container image update detection.', [
+                'repository' => $repository,
+                'method' => __METHOD__,
+                'error' => $e->getMessage(),
+            ]);
+
             return [];
         }
     }
@@ -210,7 +223,13 @@ class ContainerImageUpdateDetector
                 ->filter(fn ($tag) => filled($tag['name']))
                 ->values()
                 ->all();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            Log::debug('Failed to fetch Quay tags for container image update detection.', [
+                'repository' => $repository,
+                'method' => __METHOD__,
+                'error' => $e->getMessage(),
+            ]);
+
             return [];
         }
     }
@@ -240,7 +259,13 @@ class ContainerImageUpdateDetector
                 ->filter(fn ($tag) => filled($tag['name']))
                 ->values()
                 ->all();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            Log::debug('Failed to fetch Codeberg tags for container image update detection.', [
+                'repository' => $repository,
+                'method' => __METHOD__,
+                'error' => $e->getMessage(),
+            ]);
+
             return [];
         }
     }

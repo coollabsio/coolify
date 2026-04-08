@@ -3,6 +3,10 @@
 use App\Services\ContainerImageUpdateDetector;
 use Illuminate\Support\Facades\Http;
 
+beforeEach(function () {
+    Http::preventStrayRequests();
+});
+
 it('detects a newer semantic image tag on docker hub', function () {
     Http::fake([
         'https://hub.docker.com/v2/repositories/library/redis/tags*' => Http::response([
