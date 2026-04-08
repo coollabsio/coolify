@@ -73,6 +73,32 @@ it('removes the direct server patch email channel when the master report is enab
     expect($notification->via($team))->not->toContain(EmailChannel::class);
 });
 
+it('keeps the direct server patch error email channel when the master report is enabled', function () {
+    $team = Team::factory()->create();
+    $team->emailNotificationSettings()->update([
+        'use_instance_email_settings' => true,
+        'server_patch_email_notifications' => true,
+        'master_update_report_email_notifications' => true,
+    ]);
+    $team->refresh();
+
+    $server = Mockery::mock(Server::class);
+    $server->shouldReceive('getAttribute')->with('uuid')->andReturn('server-1');
+    $server->shouldReceive('getAttribute')->with('name')->andReturn('Server One');
+    $server->shouldReceive('setAttribute')->andReturnSelf();
+    $server->shouldReceive('getSchemalessAttributes')->andReturn([]);
+    $server->uuid = 'server-1';
+    $server->name = 'Server One';
+
+    $notification = new ServerPatchCheck($server, [
+        'error' => 'Failed to check for updates',
+        'osId' => 'ubuntu',
+        'package_manager' => 'apt',
+    ]);
+
+    expect($notification->via($team))->toContain(EmailChannel::class);
+});
+
 it('removes the direct traefik email channel when the master report is enabled', function () {
     $team = Team::factory()->create();
     $team->emailNotificationSettings()->update([

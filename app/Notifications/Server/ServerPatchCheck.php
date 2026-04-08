@@ -24,7 +24,10 @@ class ServerPatchCheck extends CustomEmailNotification
     {
         $channels = $notifiable->getEnabledChannels('server_patch');
 
-        if (data_get($notifiable, 'emailNotificationSettings.master_update_report_email_notifications', false)) {
+        if (
+            data_get($notifiable, 'emailNotificationSettings.master_update_report_email_notifications', false)
+            && ! isset($this->patchData['error'])
+        ) {
             $channels = array_values(array_filter($channels, fn ($channel) => $channel !== EmailChannel::class));
         }
 
