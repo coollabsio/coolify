@@ -32,6 +32,7 @@ services:
 
           [program:scheduler]
           command=sh -c "while [ ! -f /var/www/html/artisan ]; do echo 'Waiting for Laravel installation...'; sleep 10; done; cd /var/www/html && php artisan optimize:clear >/dev/null 2>&1 || true; php artisan config:clear >/dev/null 2>&1 || true; while true; do if [ \"${SERVICE_LARAVEL_SCHEDULER_ENABLED:-true}\" != \"true\" ]; then echo 'Laravel scheduler disabled via SERVICE_LARAVEL_SCHEDULER_ENABLED'; sleep 60; continue; fi; if php artisan schedule:list --no-interaction >/dev/null 2>&1; then php artisan schedule:run --no-interaction 2>&1; else echo 'Laravel scheduler unavailable, retrying in 60 seconds'; fi; sleep 60; done"
+          user=www-data
           redirect_stderr=true
           stdout_logfile=/dev/stdout
           stdout_logfile_maxbytes=0
@@ -43,6 +44,7 @@ services:
           [program:queue-worker]
           process_name=%(program_name)s_%(process_num)02d
           command=sh -c "while [ ! -f /var/www/html/artisan ]; do echo 'Waiting for Laravel installation...'; sleep 10; done; php /var/www/html/artisan queue:work --queue=${SERVICE_LARAVEL_QUEUE_NAMES:-default} --sleep=3 --tries=3 --max-time=3600"
+          user=www-data
           redirect_stderr=true
           stdout_logfile=/dev/stdout
           stdout_logfile_maxbytes=0
@@ -130,10 +132,16 @@ services:
           GITHUB_TOKEN="${SERVICE_GITHUB_TOKEN:-}"
 
           REPO_URL="${REPO_URL%/}"
+          # REPO_URL_PUBLIC is the version WITHOUT the embedded token. It is
+          # what ends up in .git/config after clone/fetch so the token is not
+          # persisted on disk, where anyone with shell access could read it.
+          REPO_URL_PUBLIC="${REPO_URL}"
           if [ -n "${GITHUB_TOKEN}" ]; then
             if echo "${REPO_URL}" | grep -Eq '^git@github\.com:'; then
+              REPO_URL_PUBLIC="https://github.com/${REPO_URL#git@github.com:}"
               REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_URL#git@github.com:}"
             elif echo "${REPO_URL}" | grep -Eq '^https?://(www\.)?github\.com/'; then
+              REPO_URL_PUBLIC="$(echo "${REPO_URL}" | sed -E 's#^https?://(www\.)?github\.com/#https://github.com/#')"
               REPO_URL="$(echo "${REPO_URL}" | sed -E "s#^https?://(www\.)?github\.com/#https://x-access-token:${GITHUB_TOKEN}@github.com/#")"
             fi
           fi
@@ -155,19 +163,44 @@ services:
             if [ -n "${GITHUB_TOKEN}" ]; then
               echo "Cloning repository (branch: ${REPO_BRANCH}) using GitHub token..."
             else
-              echo "Cloning repository ${REPO_URL} (branch: ${REPO_BRANCH})..."
+              echo "Cloning repository ${REPO_URL_PUBLIC} (branch: ${REPO_BRANCH})..."
             fi
             rm -rf * .[!.]* 2>/dev/null || true
-            git clone --branch "${REPO_BRANCH}" --single-branch "${REPO_URL}" .
+            git clone --depth 1 --no-tags --branch "${REPO_BRANCH}" --single-branch "${REPO_URL}" .
+            # Remove the token from .git/config so a long-lived container
+            # cannot leak it. Subsequent fetches use GIT_ASKPASS below.
+            git remote set-url origin "${REPO_URL_PUBLIC}"
           else
             echo "Repository already exists. Syncing branch ${REPO_BRANCH}..."
+            # Ensure the on-disk remote url is the tokenless one before fetch.
+            git remote set-url origin "${REPO_URL_PUBLIC}" 2>/dev/null || true
             set +e
-            git fetch --all --prune 2>&1
+            if [ -n "${GITHUB_TOKEN}" ]; then
+              # Inject the token via a one-shot Authorization header so it is
+              # never persisted in .git/config. base64 -w0 is the GNU flag and
+              # fails silently on BusyBox; fall back to plain base64 in that case.
+              AUTH_B64="$(printf 'x-access-token:%s' "${GITHUB_TOKEN}" | base64 -w0 2>/dev/null \
+                || printf 'x-access-token:%s' "${GITHUB_TOKEN}" | base64 | tr -d '\n')"
+              git -c "http.extraHeader=Authorization: Basic ${AUTH_B64}" \
+                fetch --prune origin 2>&1
+              unset AUTH_B64
+            else
+              git fetch --prune origin 2>&1
+            fi
             git checkout -B "${REPO_BRANCH}" "origin/${REPO_BRANCH}" 2>&1
             GIT_SYNC_EXIT="$?"
             set -e
             if [ "$GIT_SYNC_EXIT" -ne 0 ]; then
               echo "Failed to checkout branch ${REPO_BRANCH}. Falling back to repository default branch."
+              set +e
+              DEFAULT_BRANCH="$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's#^refs/remotes/origin/##')"
+              set -e
+              if [ -n "$DEFAULT_BRANCH" ]; then
+                echo "Default branch detected: ${DEFAULT_BRANCH}"
+                git checkout -B "$DEFAULT_BRANCH" "origin/$DEFAULT_BRANCH" 2>&1 || true
+              else
+                echo "Could not determine default branch; keeping working tree as-is."
+              fi
             fi
           fi
 
@@ -235,10 +268,11 @@ services:
                 printf '%s\n' "$NPM_OUTPUT"
                 printf '%s\n' '</pre></div></div></body></html>'
               } > /var/www/html/public/_coolify_error.html
-              exit 1
-            fi
-
-            if [ ! -f /var/www/html/public/build/manifest.json ]; then
+              # Do NOT exit here. Nginx still needs to come up to serve the
+              # error page above; the composer-install path follows the same
+              # convention. Workers will keep failing and supervisord will
+              # restart them, which is noisy but acceptable.
+            elif [ ! -f /var/www/html/public/build/manifest.json ]; then
               echo "Vite build finished but manifest was not generated." >&2
               mkdir -p /var/www/html/public
               {
@@ -255,10 +289,10 @@ services:
                 printf '%s\n' "$NPM_OUTPUT"
                 printf '%s\n' '</pre></div></div></body></html>'
               } > /var/www/html/public/_coolify_error.html
-              exit 1
+            else
+              echo "Vite manifest detected:"
+              ls -la /var/www/html/public/build/manifest.json
             fi
-            echo "Vite manifest detected:"
-            ls -la /var/www/html/public/build/manifest.json
           fi
 
           DB_NAME="${SERVICE_DATABASE_LARAVEL:-${MYSQL_DATABASE:-laravel}}"
@@ -331,7 +365,13 @@ services:
           mkdir -p /var/www/html/storage/framework/views
           mkdir -p /var/www/html/bootstrap/cache
 
-          chown -R www-data:www-data /var/www/html
+          # Only recursively chown the directories Laravel actually needs to
+          # write to. Recursively chowning the whole project (vendor/, public/, ...)
+          # is O(n) over all files and slows restarts noticeably for medium/large
+          # apps. Source files stay owned by root with world-readable perms,
+          # which is enough for the php-fpm worker (running as www-data) to read.
+          chown www-data:www-data /var/www/html
+          chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
           chmod -R 775 /var/www/html/storage
           chmod -R 775 /var/www/html/bootstrap/cache
 
@@ -374,10 +414,10 @@ services:
       - SERVICE_FQDN_NGINX
       - SERVICE_FQDN_NGINX_80
       - APP_NAME=Laravel RootKit
-      - APP_ENV=production
-      - APP_DEBUG=false
+      - APP_ENV=${SERVICE_LARAVEL_APP_ENV:-production}
+      - APP_DEBUG=${SERVICE_LARAVEL_APP_DEBUG:-false}
       - LOG_CHANNEL=stack
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=${SERVICE_LARAVEL_LOG_LEVEL:-debug}
       - DB_CONNECTION=mysql
       - DB_HOST=mariadb
       - DB_PORT=3306
@@ -428,6 +468,17 @@ services:
               directio off;
               keepalive_timeout 65;
               client_max_body_size 100M;
+
+              # Translate X-Forwarded-Proto into a safe on/off value so that
+              # fastcgi_param HTTPS is only truthy when the upstream proxy
+              # actually terminated TLS. Passing the raw $http_x_forwarded_proto
+              # string would make Laravel treat HTTP requests as HTTPS because
+              # Symfony::isSecure() accepts any non-"off" value.
+              map $http_x_forwarded_proto $fastcgi_https {
+                  default off;
+                  https on;
+              }
+
               include /etc/nginx/conf.d/*.conf;
           }
       - type: bind
@@ -462,7 +513,7 @@ services:
                   fastcgi_param HTTP_X_FORWARDED_FOR $http_x_forwarded_for;
                   fastcgi_param HTTP_X_FORWARDED_HOST $http_x_forwarded_host;
                   fastcgi_param HTTP_X_FORWARDED_PORT $http_x_forwarded_port;
-                  fastcgi_param HTTPS $http_x_forwarded_proto;
+                  fastcgi_param HTTPS $fastcgi_https;
                   fastcgi_param REQUEST_SCHEME $http_x_forwarded_proto;
                   include fastcgi_params;
                   fastcgi_read_timeout 300;
@@ -507,6 +558,8 @@ services:
 
   phpmyadmin:
     image: phpmyadmin:latest
+    expose:
+      - "80"
     environment:
       - SERVICE_URL_PHPMYADMIN
       - PMA_HOST=mariadb

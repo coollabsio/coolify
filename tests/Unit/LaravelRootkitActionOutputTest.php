@@ -37,13 +37,32 @@ it('configures laravel rootkit to use file cache and guarded schedule run mode',
         ->toContain('fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;')
         ->toContain('fastcgi_param HTTP_X_FORWARDED_HOST $http_x_forwarded_host;')
         ->toContain('fastcgi_param HTTP_X_FORWARDED_PORT $http_x_forwarded_port;')
-        ->toContain('fastcgi_param HTTPS $http_x_forwarded_proto;')
+        // HTTPS fastcgi_param must derive from a safe map (on/off), not
+        // directly from $http_x_forwarded_proto which would evaluate truthy
+        // for plain HTTP requests in Symfony::isSecure().
+        ->toContain('map $http_x_forwarded_proto $fastcgi_https {')
+        ->toContain('fastcgi_param HTTPS $fastcgi_https;')
+        ->not->toContain('fastcgi_param HTTPS $http_x_forwarded_proto;')
         ->toContain('fastcgi_param REQUEST_SCHEME $http_x_forwarded_proto;')
         ->toContain('CACHE_STORE=file')
         ->toContain('upsert_env "CACHE_STORE" "file"')
         ->toContain('upsert_env "SESSION_DRIVER" "file"')
         ->toContain('if [ -z "${CURRENT_APP_KEY}" ]; then')
-        ->not->toContain('upsert_env "APP_KEY" ""');
+        ->not->toContain('upsert_env "APP_KEY" ""')
+        // Security and robustness fixes applied to the entrypoint.
+        ->toContain('REPO_URL_PUBLIC')
+        ->toContain('git remote set-url origin "${REPO_URL_PUBLIC}"')
+        ->toContain('git clone --depth 1 --no-tags')
+        ->toContain('DEFAULT_BRANCH="$(git symbolic-ref')
+        // Scheduler and queue workers must run as the php-fpm user so cache
+        // and session files are not created as root.
+        ->toContain('user=www-data')
+        // Chown is scoped: full tree chown is removed in favour of writable
+        // directories only, which keeps restarts fast on large codebases.
+        ->toContain('chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache')
+        ->not->toContain('chown -R www-data:www-data /var/www/html'."\n")
+        // APP_DEBUG is configurable via Coolify env var.
+        ->toContain('APP_DEBUG=${SERVICE_LARAVEL_APP_DEBUG:-false}');
 });
 
 it('loads cron tasks from artisan schedule list or project source fallback', function () {
