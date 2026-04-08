@@ -21,8 +21,11 @@ class CheckTraefikVersionJob implements ShouldBeEncrypted, ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     private const SCAN_LOCK_KEY = 'traefik-version-scan';
+    private const SCAN_SNAPSHOT_CACHE_KEY_PREFIX = 'traefik-version-scan:snapshot:';
+    private const SCAN_SNAPSHOT_LOCK_KEY_PREFIX = 'traefik-version-scan:snapshot-lock:';
 
     private const SCAN_LOCK_TTL_SECONDS = 21600;
+    private const SCAN_SNAPSHOT_LOCK_TTL_SECONDS = 10;
 
     public $tries = 3;
 
@@ -61,6 +64,7 @@ class CheckTraefikVersionJob implements ShouldBeEncrypted, ShouldQueue
             Bus::batch($jobs)
                 ->finally(function (Batch $batch) use ($scanId, $lockOwner): void {
                     if ($batch->cancelled()) {
+                        self::forgetOutdatedServerSnapshots($scanId);
                         self::releaseScanLock($lockOwner);
 
                         return;
@@ -70,36 +74,67 @@ class CheckTraefikVersionJob implements ShouldBeEncrypted, ShouldQueue
                 })
                 ->dispatch();
         } catch (Throwable $exception) {
+            self::forgetOutdatedServerSnapshots($scanId);
             self::releaseScanLock($lockOwner);
 
             throw $exception;
         }
     }
 
+    public static function recordOutdatedServerSnapshot(string $scanId, Server $server, array $outdatedInfo): void
+    {
+        Cache::lock(self::snapshotLockKey($scanId), self::SCAN_SNAPSHOT_LOCK_TTL_SECONDS)
+            ->block(self::SCAN_SNAPSHOT_LOCK_TTL_SECONDS, function () use ($scanId, $server, $outdatedInfo): void {
+                $snapshots = Cache::get(self::snapshotCacheKey($scanId), []);
+
+                $teamSnapshots = $snapshots[$server->team_id] ?? [];
+                $teamSnapshots[$server->id] = [
+                    'id' => $server->id,
+                    'name' => $server->name,
+                    'uuid' => $server->uuid,
+                    'outdatedInfo' => $outdatedInfo,
+                ];
+
+                $snapshots[$server->team_id] = $teamSnapshots;
+
+                Cache::put(self::snapshotCacheKey($scanId), $snapshots, self::SCAN_LOCK_TTL_SECONDS);
+            });
+    }
+
     private static function dispatchNotificationJobs(string $scanId, ?string $lockOwner): void
     {
-        $teamIds = NotifyOutdatedTraefikServersJob::teamIdsForScan($scanId);
+        $serverSnapshotsByTeam = collect(Cache::get(self::snapshotCacheKey($scanId), []));
 
-        if ($teamIds->isEmpty()) {
+        if ($serverSnapshotsByTeam->isEmpty()) {
+            self::forgetOutdatedServerSnapshots($scanId);
             self::releaseScanLock($lockOwner);
 
             return;
         }
 
-        $jobs = $teamIds
-            ->map(fn (int $teamId) => new NotifyOutdatedTraefikServersJob($teamId, $scanId))
+        $jobs = $serverSnapshotsByTeam
+            ->map(fn (array $teamServers, int|string $teamId) => new NotifyOutdatedTraefikServersJob($teamId, $scanId, array_values($teamServers)))
             ->all();
 
         try {
             Bus::batch($jobs)
                 ->allowFailures()
-                ->finally(fn () => self::releaseScanLock($lockOwner))
+                ->finally(function () use ($scanId, $lockOwner): void {
+                    self::forgetOutdatedServerSnapshots($scanId);
+                    self::releaseScanLock($lockOwner);
+                })
                 ->dispatch();
         } catch (Throwable $exception) {
+            self::forgetOutdatedServerSnapshots($scanId);
             self::releaseScanLock($lockOwner);
 
             throw $exception;
         }
+    }
+
+    private static function forgetOutdatedServerSnapshots(string $scanId): void
+    {
+        Cache::forget(self::snapshotCacheKey($scanId));
     }
 
     private static function releaseScanLock(?string $lockOwner): void
@@ -112,5 +147,15 @@ class CheckTraefikVersionJob implements ShouldBeEncrypted, ShouldQueue
             fn () => Cache::restoreLock(self::SCAN_LOCK_KEY, $lockOwner)->release(),
             report: false
         );
+    }
+
+    private static function snapshotCacheKey(string $scanId): string
+    {
+        return self::SCAN_SNAPSHOT_CACHE_KEY_PREFIX.$scanId;
+    }
+
+    private static function snapshotLockKey(string $scanId): string
+    {
+        return self::SCAN_SNAPSHOT_LOCK_KEY_PREFIX.$scanId;
     }
 }

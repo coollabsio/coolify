@@ -178,6 +178,10 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->server->update(['traefik_outdated_info' => $outdatedInfo]);
 
+        if (! $this->shouldNotify && $this->scanId !== null) {
+            CheckTraefikVersionJob::recordOutdatedServerSnapshot($this->scanId, $this->server, $outdatedInfo);
+        }
+
         if ($this->shouldNotify) {
             $this->sendNotification($outdatedInfo);
         }

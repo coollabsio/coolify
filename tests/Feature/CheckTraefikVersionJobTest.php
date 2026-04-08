@@ -5,6 +5,7 @@ use Illuminate\Bus\PendingBatch;
 use App\Jobs\CheckTraefikVersionForServerJob;
 use App\Jobs\CheckTraefikVersionJob;
 use App\Jobs\NotifyOutdatedTraefikServersJob;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
 use App\Notifications\Server\TraefikVersionOutdated;
@@ -19,6 +20,10 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Notification::fake();
+    InstanceSettings::create([
+        'id' => 0,
+        'fqdn' => 'https://coolify.example.com',
+    ]);
 });
 
 it('detects servers table has detected_traefik_version column', function () {
@@ -289,21 +294,31 @@ it('dispatches one notification job per affected team after the scan batch finis
             'checked_at' => $checkedAt,
         ],
     ]);
+    CheckTraefikVersionJob::recordOutdatedServerSnapshot($scanId, $team1Server->fresh(), $team1Server->fresh()->traefik_outdated_info);
+    CheckTraefikVersionJob::recordOutdatedServerSnapshot($scanId, $team2Server->fresh(), $team2Server->fresh()->traefik_outdated_info);
+
+    $team1Server->settings->update(['is_reachable' => false, 'is_usable' => false]);
+    $team2Server->settings->update(['is_reachable' => false, 'is_usable' => false]);
 
     $scanBatch->finallyCallbacks()[0](\Mockery::mock(Batch::class, function ($mock): void {
         $mock->shouldReceive('cancelled')->andReturnFalse();
     }));
 
-    Bus::assertBatched(function (PendingBatch $batch) use ($scanBatch, $scanId, $team1, $team2) {
+    Bus::assertBatched(function (PendingBatch $batch) use ($scanBatch, $scanId, $team1, $team2, $team1Server, $team2Server) {
         if ($batch === $scanBatch) {
             return false;
         }
 
         $jobs = collect($batch->jobs);
+        $serversByTeam = $jobs
+            ->mapWithKeys(fn (NotifyOutdatedTraefikServersJob $job) => [$job->teamId => collect($job->servers)->pluck('id')->all()])
+            ->all();
 
         return $jobs->count() === 2
             && $jobs->every(fn ($job) => $job instanceof NotifyOutdatedTraefikServersJob && $job->scanId === $scanId)
-            && $jobs->pluck('teamId')->sort()->values()->all() === [$team1->id, $team2->id];
+            && array_keys($serversByTeam) === [$team1->id, $team2->id]
+            && $serversByTeam[$team1->id] === [$team1Server->id]
+            && $serversByTeam[$team2->id] === [$team2Server->id];
     });
 });
 

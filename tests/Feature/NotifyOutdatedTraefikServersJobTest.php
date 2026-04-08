@@ -12,17 +12,30 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Notification::fake();
+    $this->snapshot = fn (Server $server): array => [
+        'id' => $server->id,
+        'name' => $server->name,
+        'uuid' => $server->uuid,
+        'outdatedInfo' => $server->traefik_outdated_info,
+    ];
 });
 
 it('has correct queue and retry configuration', function () {
     $team = Team::factory()->create();
     $scanId = 'scan-2026-03-29';
-    $job = new NotifyOutdatedTraefikServersJob($team->id, $scanId);
+    $servers = [[
+        'id' => 1,
+        'name' => 'server-1',
+        'uuid' => 'uuid-1',
+        'outdatedInfo' => ['current' => '3.5.0', 'latest' => '3.5.6', 'type' => 'patch_update'],
+    ]];
+    $job = new NotifyOutdatedTraefikServersJob($team->id, $scanId, $servers);
 
     expect($job->tries)->toBe(3);
     expect($job->queue)->toBe('high');
     expect($job->teamId)->toBe($team->id);
     expect($job->scanId)->toBe($scanId);
+    expect($job->servers)->toBe($servers);
 });
 
 it('sends one aggregated notification for the requested team only', function () {
@@ -119,7 +132,10 @@ it('sends one aggregated notification for the requested team only', function () 
     ]);
     $otherProxyServer->settings->update(['is_reachable' => true, 'is_usable' => true]);
 
-    $job = new NotifyOutdatedTraefikServersJob($team1->id, $scanId);
+    $job = new NotifyOutdatedTraefikServersJob($team1->id, $scanId, [
+        ($this->snapshot)($server1),
+        ($this->snapshot)($server2),
+    ]);
     $job->handle();
 
     Notification::assertSentTo($team1, TraefikVersionOutdated::class, function (TraefikVersionOutdated $notification) use ($server1, $server2) {
@@ -130,7 +146,7 @@ it('sends one aggregated notification for the requested team only', function () 
     expect(count(Notification::sent($team1, TraefikVersionOutdated::class)))->toBe(1);
 });
 
-it('does not send notifications when no servers match the batch scan id', function () {
+it('uses the captured scan snapshot even if a server becomes unusable before notification dispatch', function () {
     $scanId = 'scan-2026-03-29';
     $team = Team::factory()->create();
     $team->emailNotificationSettings->update([
@@ -151,51 +167,28 @@ it('does not send notifications when no servers match the batch scan id', functi
     ]);
     $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
 
-    $job = new NotifyOutdatedTraefikServersJob($team->id, $scanId);
+    $job = new NotifyOutdatedTraefikServersJob($team->id, $scanId, [
+        ($this->snapshot)($server),
+    ]);
+
+    $server->settings->update(['is_reachable' => false, 'is_usable' => false]);
     $job->handle();
 
-    Notification::assertNothingSent();
+    Notification::assertSentTo($team, TraefikVersionOutdated::class, function (TraefikVersionOutdated $notification) use ($server) {
+        return $notification->servers->pluck('id')->all() === [$server->id];
+    });
 });
 
-it('ignores servers from other scans even when checked_at matches', function () {
+it('does not send notifications when the captured snapshot is empty', function () {
     $scanId = 'scan-current';
-    $checkedAt = '2026-03-29T00:00:00+00:00';
     $team = Team::factory()->create();
     $team->emailNotificationSettings->update([
         'use_instance_email_settings' => true,
         'traefik_outdated_email_notifications' => true,
     ]);
 
-    $matchingServer = Server::factory()->create([
-        'team_id' => $team->id,
-        'proxy' => ['type' => ProxyTypes::TRAEFIK->value],
-        'traefik_outdated_info' => [
-            'current' => '3.5.0',
-            'latest' => '3.5.6',
-            'type' => 'patch_update',
-            'scan_id' => $scanId,
-            'checked_at' => $checkedAt,
-        ],
-    ]);
-    $matchingServer->settings->update(['is_reachable' => true, 'is_usable' => true]);
-
-    $sameTimestampDifferentScan = Server::factory()->create([
-        'team_id' => $team->id,
-        'proxy' => ['type' => ProxyTypes::TRAEFIK->value],
-        'traefik_outdated_info' => [
-            'current' => '3.4.0',
-            'latest' => '3.4.9',
-            'type' => 'patch_update',
-            'scan_id' => 'scan-other',
-            'checked_at' => $checkedAt,
-        ],
-    ]);
-    $sameTimestampDifferentScan->settings->update(['is_reachable' => true, 'is_usable' => true]);
-
-    $job = new NotifyOutdatedTraefikServersJob($team->id, $scanId);
+    $job = new NotifyOutdatedTraefikServersJob($team->id, $scanId, []);
     $job->handle();
 
-    Notification::assertSentTo($team, TraefikVersionOutdated::class, function (TraefikVersionOutdated $notification) use ($matchingServer) {
-        return $notification->servers->pluck('id')->all() === [$matchingServer->id];
-    });
+    Notification::assertNothingSent();
 });

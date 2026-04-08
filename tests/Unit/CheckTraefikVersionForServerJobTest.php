@@ -77,6 +77,37 @@ it('includes non-null scan ids in outdated info even when they are whitespace on
     $method->invoke($job, '3.5.0', '3.5.6', 'patch_update', null, null);
 });
 
+it('sends an immediate notification when shouldNotify is enabled', function () {
+    $server = \Mockery::mock(Server::class)->makePartial();
+    $teamRelation = \Mockery::mock();
+    $team = \Mockery::mock();
+
+    $server->shouldReceive('update')
+        ->once()
+        ->with(\Mockery::on(function (array $payload): bool {
+            $outdatedInfo = $payload['traefik_outdated_info'] ?? null;
+
+            return is_array($outdatedInfo)
+                && $outdatedInfo['current'] === '3.5.0'
+                && $outdatedInfo['latest'] === '3.5.6'
+                && $outdatedInfo['type'] === 'patch_update'
+                && ! array_key_exists('scan_id', $outdatedInfo);
+        }));
+    $server->shouldReceive('team')->once()->andReturn($teamRelation);
+    $teamRelation->shouldReceive('first')->once()->andReturn($team);
+    $team->shouldReceive('notify')->once()->with(\Mockery::on(function (TraefikVersionOutdated $notification) use ($server): bool {
+        return $notification->servers->count() === 1
+            && $notification->servers->first() === $server
+            && ($notification->servers->first()->outdatedInfo['type'] ?? null) === 'patch_update';
+    }));
+
+    $job = new CheckTraefikVersionForServerJob($server, $this->traefikVersions);
+
+    $method = new ReflectionMethod(CheckTraefikVersionForServerJob::class, 'storeOutdatedInfo');
+    $method->setAccessible(true);
+    $method->invoke($job, '3.5.0', '3.5.6', 'patch_update', null, null);
+});
+
 it('parses version strings correctly', function () {
     $version = 'v3.5.0';
     $current = ltrim($version, 'v');
