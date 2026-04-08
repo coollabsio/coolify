@@ -41,6 +41,9 @@ class EmailNotificationSettings extends Model
         'server_unreachable_email_notifications',
         'server_patch_email_notifications',
         'traefik_outdated_email_notifications',
+        'master_update_report_email_notifications',
+        'master_update_report_frequency',
+        'master_update_report_day',
     ];
 
     protected $casts = [
@@ -69,6 +72,9 @@ class EmailNotificationSettings extends Model
         'server_disk_usage_email_notifications' => 'boolean',
         'server_patch_email_notifications' => 'boolean',
         'traefik_outdated_email_notifications' => 'boolean',
+        'master_update_report_email_notifications' => 'boolean',
+        'master_update_report_frequency' => 'string',
+        'master_update_report_day' => 'string',
     ];
 
     public function team()

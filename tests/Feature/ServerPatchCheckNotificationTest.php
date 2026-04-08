@@ -12,7 +12,7 @@ beforeEach(function () {
     // This avoids Mockery alias/overload issues that pollute global state
     $this->setInstanceSettings = function ($fqdn = null, $publicIpv4 = null, $publicIpv6 = null) {
         InstanceSettings::query()->delete();
-        InstanceSettings::create([
+        InstanceSettings::query()->forceCreate([
             'id' => 0,
             'fqdn' => $fqdn,
             'public_ipv4' => $publicIpv4,

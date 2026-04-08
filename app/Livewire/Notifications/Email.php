@@ -107,6 +107,15 @@ class Email extends Component
     #[Validate(['boolean'])]
     public bool $traefikOutdatedEmailNotifications = true;
 
+    #[Validate(['boolean'])]
+    public bool $masterUpdateReportEmailNotifications = true;
+
+    #[Validate(['required', 'string', 'in:daily,weekly'])]
+    public string $masterUpdateReportFrequency = 'weekly';
+
+    #[Validate(['required', 'string', 'in:monday,tuesday,wednesday,thursday,friday,saturday,sunday'])]
+    public string $masterUpdateReportDay = 'monday';
+
     #[Validate(['nullable', 'email'])]
     public ?string $testEmailAddress = null;
 
@@ -159,6 +168,9 @@ class Email extends Component
             $this->settings->server_unreachable_email_notifications = $this->serverUnreachableEmailNotifications;
             $this->settings->server_patch_email_notifications = $this->serverPatchEmailNotifications;
             $this->settings->traefik_outdated_email_notifications = $this->traefikOutdatedEmailNotifications;
+            $this->settings->master_update_report_email_notifications = $this->masterUpdateReportEmailNotifications;
+            $this->settings->master_update_report_frequency = $this->masterUpdateReportFrequency;
+            $this->settings->master_update_report_day = $this->masterUpdateReportDay;
             $this->settings->save();
 
         } else {
@@ -192,6 +204,9 @@ class Email extends Component
             $this->serverUnreachableEmailNotifications = $this->settings->server_unreachable_email_notifications;
             $this->serverPatchEmailNotifications = $this->settings->server_patch_email_notifications;
             $this->traefikOutdatedEmailNotifications = $this->settings->traefik_outdated_email_notifications;
+            $this->masterUpdateReportEmailNotifications = $this->settings->master_update_report_email_notifications ?? true;
+            $this->masterUpdateReportFrequency = $this->settings->master_update_report_frequency ?? 'weekly';
+            $this->masterUpdateReportDay = $this->settings->master_update_report_day ?? 'monday';
         }
     }
 

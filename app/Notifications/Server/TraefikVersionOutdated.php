@@ -2,6 +2,7 @@
 
 namespace App\Notifications\Server;
 
+use App\Notifications\Channels\EmailChannel;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
@@ -18,7 +19,13 @@ class TraefikVersionOutdated extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        return $notifiable->getEnabledChannels('traefik_outdated');
+        $channels = $notifiable->getEnabledChannels('traefik_outdated');
+
+        if (data_get($notifiable, 'emailNotificationSettings.master_update_report_email_notifications', false)) {
+            $channels = array_values(array_filter($channels, fn ($channel) => $channel !== EmailChannel::class));
+        }
+
+        return $channels;
     }
 
     private function formatVersion(string $version): string

@@ -117,6 +117,33 @@
     </p>
     <div class="flex flex-col gap-4 max-w-2xl">
         <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
+            <h3 class="font-medium mb-3">Master Update Report</h3>
+            <div class="flex flex-col gap-4 pl-1">
+                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="masterUpdateReportEmailNotifications"
+                    helper="Send one bundled update email instead of repeating the same unchanged update notices. Container image updates and Coolify upgrades are included here."
+                    label="Enabled" />
+                <div class="flex flex-col gap-4 xl:flex-row">
+                    <x-forms.select canGate="update" :canResource="$settings" id="masterUpdateReportFrequency"
+                        wire:change="saveModel"
+                        label="Frequency">
+                        <option value="weekly">Weekly</option>
+                        <option value="daily">Daily</option>
+                    </x-forms.select>
+                    <x-forms.select canGate="update" :canResource="$settings" id="masterUpdateReportDay"
+                        wire:change="saveModel"
+                        label="Send Day" helper="Used for weekly reports.">
+                        <option value="monday">Monday</option>
+                        <option value="tuesday">Tuesday</option>
+                        <option value="wednesday">Wednesday</option>
+                        <option value="thursday">Thursday</option>
+                        <option value="friday">Friday</option>
+                        <option value="saturday">Saturday</option>
+                        <option value="sunday">Sunday</option>
+                    </x-forms.select>
+                </div>
+            </div>
+        </div>
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="font-medium mb-3">Deployments</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="deploymentSuccessEmailNotifications"
@@ -160,8 +187,10 @@
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverUnreachableEmailNotifications"
                     label="Server Unreachable" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverPatchEmailNotifications"
+                    helper="Include server package updates in the master update report."
                     label="Server Patching" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="traefikOutdatedEmailNotifications"
+                    helper="Include proxy upgrades in the master update report."
                     label="Traefik Proxy Outdated" />
             </div>
         </div>

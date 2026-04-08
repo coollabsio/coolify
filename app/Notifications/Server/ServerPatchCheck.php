@@ -3,6 +3,7 @@
 namespace App\Notifications\Server;
 
 use App\Models\Server;
+use App\Notifications\Channels\EmailChannel;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
@@ -21,7 +22,13 @@ class ServerPatchCheck extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        return $notifiable->getEnabledChannels('server_patch');
+        $channels = $notifiable->getEnabledChannels('server_patch');
+
+        if (data_get($notifiable, 'emailNotificationSettings.master_update_report_email_notifications', false)) {
+            $channels = array_values(array_filter($channels, fn ($channel) => $channel !== EmailChannel::class));
+        }
+
+        return $channels;
     }
 
     public function toMail($notifiable = null): MailMessage

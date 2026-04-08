@@ -11,6 +11,7 @@ use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\RegenerateSslCertJob;
 use App\Jobs\ScheduledJobManager;
+use App\Jobs\SendMasterUpdateReportJob;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\UpdateCoolifyJob;
 use App\Models\InstanceSettings;
@@ -78,6 +79,7 @@ class Kernel extends ConsoleKernel
             $this->scheduleInstance->job(new RegenerateSslCertJob)->twiceDaily();
 
             $this->scheduleInstance->job(new CheckTraefikVersionJob)->weekly()->sundays()->at('00:00')->timezone($this->instanceTimezone)->onOneServer();
+            $this->scheduleInstance->job(new SendMasterUpdateReportJob)->dailyAt('00:15')->timezone($this->instanceTimezone)->onOneServer();
 
             $this->scheduleInstance->command('cleanup:database --yes')->daily();
             $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();
