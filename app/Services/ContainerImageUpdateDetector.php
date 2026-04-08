@@ -148,9 +148,13 @@ class ContainerImageUpdateDetector
             $owner = $parts[0];
             $package = $parts[1];
 
-            $response = Http::timeout(10)
-                ->withHeaders(['Accept' => 'application/vnd.github.v3+json'])
-                ->get("https://api.github.com/users/{$owner}/packages/container/{$package}/versions", ['per_page' => 100]);
+            $client = Http::timeout(10)
+                ->withHeaders(['Accept' => 'application/vnd.github.v3+json']);
+
+            $response = $client->get("https://api.github.com/users/{$owner}/packages/container/{$package}/versions", ['per_page' => 100]);
+            if ($response->status() === 404) {
+                $response = $client->get("https://api.github.com/orgs/{$owner}/packages/container/{$package}/versions", ['per_page' => 100]);
+            }
 
             if (! $response->successful()) {
                 return [];
@@ -251,7 +255,7 @@ class ContainerImageUpdateDetector
             return null;
         }
 
-        return $this->preferShorterVersion($matchingVersions);
+        return $this->highestVersion($matchingVersions);
     }
 
     protected function findBestTag(array $tags, string $currentTag, string $repository): ?string
@@ -292,7 +296,7 @@ class ContainerImageUpdateDetector
                 return preg_match("/^v?{$cleanTag}(\\.\\d+)?(\\.\\d+)?$/", data_get($tag, 'name', '')) === 1;
             });
             if (! empty($matchingTags)) {
-                $bestVersion = $this->preferShorterVersion(array_column($matchingTags, 'name'));
+                $bestVersion = $this->preferFloatingVersion(array_column($matchingTags, 'name'));
                 if ($bestVersion !== $currentTag) {
                     return $repository.':'.$bestVersion;
                 }
@@ -306,10 +310,13 @@ class ContainerImageUpdateDetector
             $parts = explode('.', $cleanTag);
             $majorMinor = $parts[0].'.'.$parts[1];
             $matchingTags = array_filter($tags, function ($tag) use ($majorMinor) {
-                return str_starts_with(ltrim(data_get($tag, 'name', ''), 'v'), $majorMinor);
+                return preg_match('/^v?'.preg_quote($majorMinor, '/').'(\.\d+)?$/', data_get($tag, 'name', '')) === 1;
             });
             if (! empty($matchingTags)) {
-                $bestVersion = $this->preferShorterVersion(array_column($matchingTags, 'name'));
+                $matchingVersions = array_column($matchingTags, 'name');
+                $bestVersion = count($parts) === 2
+                    ? $this->preferFloatingVersion($matchingVersions)
+                    : $this->highestVersion($matchingVersions);
                 if ($bestVersion !== $currentTag && version_compare(ltrim($bestVersion, 'v'), ltrim($currentTag, 'v'), '>')) {
                     return $repository.':'.$bestVersion;
                 }
@@ -325,10 +332,9 @@ class ContainerImageUpdateDetector
         return null;
     }
 
-    protected function preferShorterVersion(array $versions): string
+    protected function preferFloatingVersion(array $versions): string
     {
-        $sorted = $this->sortSemanticVersions($versions);
-        $highest = $sorted[0] ?? '';
+        $highest = $this->highestVersion($versions);
         if ($highest === '') {
             return '';
         }
@@ -348,6 +354,13 @@ class ContainerImageUpdateDetector
         }
 
         return $highest;
+    }
+
+    protected function highestVersion(array $versions): string
+    {
+        $sorted = $this->sortSemanticVersions($versions);
+
+        return $sorted[0] ?? '';
     }
 
     protected function sortSemanticVersions(array $versions): array
