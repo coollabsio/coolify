@@ -1,3 +1,4 @@
+<x-emails.layout>
 {{ $totalUpdates }} new update{{ $totalUpdates === 1 ? '' : 's' }} detected across your Coolify resources.
 
 @if(!empty($sections['coolify_upgrades']))
@@ -46,3 +47,4 @@
 @endif
 @endforeach
 @endif
+</x-emails.layout>

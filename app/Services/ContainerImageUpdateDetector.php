@@ -140,20 +140,21 @@ class ContainerImageUpdateDetector
     protected function fetchGhcrTags(string $repository): array
     {
         try {
-            $parts = explode('/', str_replace('ghcr.io/', '', $repository));
-            if (count($parts) < 2) {
+            $ghcrRepository = $this->parseGhcrRepository($repository);
+            if (! $ghcrRepository) {
                 return [];
             }
 
-            $owner = $parts[0];
-            $package = $parts[1];
+            $owner = $ghcrRepository['owner'];
+            $package = $ghcrRepository['package'];
+            $encodedPackage = rawurlencode($package);
 
             $client = Http::timeout(10)
                 ->withHeaders(['Accept' => 'application/vnd.github.v3+json']);
 
-            $response = $client->get("https://api.github.com/users/{$owner}/packages/container/{$package}/versions", ['per_page' => 100]);
+            $response = $client->get("https://api.github.com/users/{$owner}/packages/container/{$encodedPackage}/versions", ['per_page' => 100]);
             if ($response->status() === 404) {
-                $response = $client->get("https://api.github.com/orgs/{$owner}/packages/container/{$package}/versions", ['per_page' => 100]);
+                $response = $client->get("https://api.github.com/orgs/{$owner}/packages/container/{$encodedPackage}/versions", ['per_page' => 100]);
             }
 
             if (! $response->successful()) {
@@ -176,6 +177,19 @@ class ContainerImageUpdateDetector
         } catch (\Throwable) {
             return [];
         }
+    }
+
+    protected function parseGhcrRepository(string $repository): ?array
+    {
+        $parts = explode('/', str_replace('ghcr.io/', '', $repository));
+        if (count($parts) < 2) {
+            return null;
+        }
+
+        return [
+            'owner' => $parts[0],
+            'package' => implode('/', array_slice($parts, 1)),
+        ];
     }
 
     protected function fetchQuayTags(string $repository): array
@@ -423,9 +437,13 @@ class ContainerImageUpdateDetector
         $repository = $parser->getFullImageNameWithoutTag();
 
         if (str_starts_with($repository, 'ghcr.io/')) {
-            $parts = explode('/', str_replace('ghcr.io/', '', $repository));
-            if (count($parts) >= 2) {
-                return "https://github.com/{$parts[0]}/{$parts[1]}/pkgs/container/{$parts[1]}";
+            $ghcrRepository = $this->parseGhcrRepository($repository);
+            if ($ghcrRepository) {
+                $owner = data_get($ghcrRepository, 'owner');
+                $package = data_get($ghcrRepository, 'package');
+                $displayPackage = str_replace('%2F', '/', rawurlencode($package));
+
+                return "https://github.com/orgs/{$owner}/packages/container/package/{$displayPackage}";
             }
         }
 

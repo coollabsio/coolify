@@ -42,6 +42,9 @@ it('renders only sections that contain updates', function () {
 
     expect($rendered)->toContain('Coolify')
         ->toContain('Container Images')
+        ->toContain('Hello,')
+        ->toContain('Contact Support')
+        ->not->toContain('**Coolify**')
         ->not->toContain('Proxy Upgrades')
         ->not->toContain('Server Patches');
 });
