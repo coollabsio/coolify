@@ -2142,8 +2142,13 @@ class Application extends BaseModel
 
     public function parseHealthcheckFromDockerfile($dockerfile, bool $isInit = false)
     {
-        $dockerfile = str($dockerfile)->trim()->explode("\n");
-        $hasHealthcheck = str($dockerfile)->contains('HEALTHCHECK');
+        $allLines = str($dockerfile)->trim()->explode("\n");
+
+        // When dockerfile_target_build is set, only search for HEALTHCHECK
+        // within the target stage's line range (multi-stage support)
+        $lines = $this->extractTargetStageLines($allLines);
+
+        $hasHealthcheck = str($lines)->contains('HEALTHCHECK');
 
         // Always check if healthcheck was removed, regardless of health_check_enabled setting
         if (! $hasHealthcheck && $this->custom_healthcheck_found) {
@@ -2160,9 +2165,15 @@ class Application extends BaseModel
 
         if ($hasHealthcheck && ($this->isHealthcheckDisabled() || $isInit)) {
             $healthcheckCommand = null;
-            $lines = $dockerfile->toArray();
-            foreach ($lines as $line) {
+            $linesArray = $lines->toArray();
+            foreach ($linesArray as $line) {
                 $trimmedLine = trim($line);
+
+                // Handle HEALTHCHECK NONE — explicitly disables healthcheck
+                if (preg_match('/^HEALTHCHECK\s+NONE\s*$/i', $trimmedLine)) {
+                    return;
+                }
+
                 if (str_starts_with($trimmedLine, 'HEALTHCHECK')) {
                     $healthcheckCommand .= trim($trimmedLine, '\\ ');
 
@@ -2200,6 +2211,45 @@ class Application extends BaseModel
                 }
             }
         }
+    }
+
+    /**
+     * Extract lines belonging to the target build stage from a multi-stage Dockerfile.
+     * When dockerfile_target_build is not set, returns all lines (original behavior).
+     */
+    private function extractTargetStageLines($allLines): \Illuminate\Support\Collection
+    {
+        $targetStage = $this->dockerfile_target_build;
+
+        if (empty($targetStage)) {
+            return $allLines;
+        }
+
+        $linesArray = $allLines->toArray();
+        $targetStartIndex = null;
+        $targetEndIndex = count($linesArray);
+
+        foreach ($linesArray as $index => $line) {
+            $trimmedLine = trim($line);
+            // Match FROM ... AS <stage_name> (case-insensitive)
+            if (preg_match('/^FROM\s+.+\s+AS\s+(\S+)/i', $trimmedLine, $matches)) {
+                $stageName = $matches[1];
+                if (strcasecmp($stageName, $targetStage) === 0) {
+                    $targetStartIndex = $index;
+                } elseif ($targetStartIndex !== null) {
+                    // Next FROM after our target stage — end of target stage
+                    $targetEndIndex = $index;
+                    break;
+                }
+            }
+        }
+
+        // Target stage not found — fall back to all lines
+        if ($targetStartIndex === null) {
+            return $allLines;
+        }
+
+        return collect(array_slice($linesArray, $targetStartIndex, $targetEndIndex - $targetStartIndex));
     }
 
     public function getLimits(): array
