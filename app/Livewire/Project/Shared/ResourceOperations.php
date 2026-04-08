@@ -146,6 +146,8 @@ class ResourceOperations extends Component
                 ])->fill([
                     'name' => $newName,
                     'resource_id' => $new_resource->id,
+                ])->forceFill([
+                    'uuid' => (string) new Cuid2,
                 ]);
                 $newPersistentVolume->save();
 
@@ -285,6 +287,8 @@ class ResourceOperations extends Component
                     ])->fill([
                         'name' => $newName,
                         'resource_id' => $application->id,
+                    ])->forceFill([
+                        'uuid' => (string) new Cuid2,
                     ]);
                     $newPersistentVolume->save();
 
@@ -328,6 +332,8 @@ class ResourceOperations extends Component
                     ])->fill([
                         'name' => $newName,
                         'resource_id' => $database->id,
+                    ])->forceFill([
+                        'uuid' => (string) new Cuid2,
                     ]);
                     $newPersistentVolume->save();
 

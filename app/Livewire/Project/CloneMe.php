@@ -191,6 +191,8 @@ class CloneMe extends Component
                     ])->fill([
                         'name' => $newName,
                         'resource_id' => $newDatabase->id,
+                    ])->forceFill([
+                        'uuid' => (string) new Cuid2,
                     ]);
                     $newPersistentVolume->save();
 
@@ -320,6 +322,8 @@ class CloneMe extends Component
                         ])->fill([
                             'name' => $newName,
                             'resource_id' => $application->id,
+                        ])->forceFill([
+                            'uuid' => (string) new Cuid2,
                         ]);
                         $newPersistentVolume->save();
 
@@ -375,6 +379,8 @@ class CloneMe extends Component
                         ])->fill([
                             'name' => $newName,
                             'resource_id' => $database->id,
+                        ])->forceFill([
+                            'uuid' => (string) new Cuid2,
                         ]);
                         $newPersistentVolume->save();
 
