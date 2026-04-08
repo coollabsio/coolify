@@ -5,13 +5,14 @@ namespace App\Models;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\RestrictsToClientProjects;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneKeydb extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasFactory, HasMetrics, HasSafeStringAttribute, RestrictsToClientProjects, SoftDeletes;
 
     protected $guarded = [];
 

@@ -56,6 +56,9 @@ class AuthServiceProvider extends ServiceProvider
         // Team policy
         \App\Models\Team::class => \App\Policies\TeamPolicy::class,
 
+        // User policy (used by the Usuarios management module)
+        \App\Models\User::class => \App\Policies\UserPolicy::class,
+
         // Git source policies
         \App\Models\GithubApp::class => \App\Policies\GithubAppPolicy::class,
 

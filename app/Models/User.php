@@ -41,7 +41,18 @@ class User extends Authenticatable implements SendsEmail
 {
     use DeletesUserSessions, HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
-    protected $guarded = [];
+    /**
+     * Sensitive columns that must never be mass-assigned. They can only be
+     * changed via explicit attribute assignment (e.g. $user->is_client = true).
+     * This blocks privilege escalation through tainted request payloads while
+     * leaving the rest of the columns mass-assignable for backwards compatibility.
+     */
+    protected $guarded = [
+        'id',
+        'is_client',
+        'force_password_reset',
+        'email_verified_at',
+    ];
 
     protected $hidden = [
         'password',
@@ -53,6 +64,7 @@ class User extends Authenticatable implements SendsEmail
     protected $casts = [
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',
+        'is_client' => 'boolean',
         'show_boarding' => 'boolean',
         'email_change_code_expires_at' => 'datetime',
     ];
@@ -78,6 +90,12 @@ class User extends Authenticatable implements SendsEmail
         parent::boot();
 
         static::created(function (User $user) {
+            // Client users are attached to an existing team by the admin that
+            // creates them; they must not get an automatic personal team.
+            if ($user->is_client) {
+                return;
+            }
+
             $team = [
                 'name' => $user->name."'s Team",
                 'personal_team' => true,
@@ -123,8 +141,11 @@ class User extends Authenticatable implements SendsEmail
 
                             continue;
                         } else {
+                            // Exclude client users when looking for a successor
+                            // owner — clients must never be promoted to owner of
+                            // a team they were only granted scoped access to.
                             $found_other_member_who_is_not_owner = $team->members->filter(function ($member) {
-                                return $member->pivot->role === 'member';
+                                return $member->pivot->role === 'member' && ! $member->is_client;
                             })->first();
 
                             if ($found_other_member_who_is_not_owner) {
@@ -473,5 +494,24 @@ class User extends Authenticatable implements SendsEmail
     public function hasPassword(): bool
     {
         return ! empty($this->password);
+    }
+
+    /**
+     * Whether this user is a scoped client whose access is restricted to a
+     * specific subset of projects via the project_user pivot.
+     */
+    public function isClient(): bool
+    {
+        return (bool) $this->is_client;
+    }
+
+    /**
+     * Projects the user has explicit, scoped access to. Used by the global
+     * scope on Project (and related models) to filter resource queries when
+     * the authenticated user is a client.
+     */
+    public function assignedProjects()
+    {
+        return $this->belongsToMany(Project::class, 'project_user')->withTimestamps();
     }
 }

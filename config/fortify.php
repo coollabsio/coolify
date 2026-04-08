@@ -133,6 +133,10 @@ return [
     */
 
     'features' => [
+        // Registration must remain enabled at the framework level so that the
+        // first-user bootstrap (User::count() === 0) still works. Public
+        // registration after that point is gated by InstanceSettings::is_registration_enabled
+        // — see FortifyServiceProvider::registerView().
         Features::registration(),
         Features::resetPasswords(),
         // Features::emailVerification(),

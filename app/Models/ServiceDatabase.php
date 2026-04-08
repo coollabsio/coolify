@@ -2,14 +2,27 @@
 
 namespace App\Models;
 
+use App\Traits\RestrictsToClientProjects;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ServiceDatabase extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, RestrictsToClientProjects, SoftDeletes;
 
     protected $guarded = [];
+
+    /**
+     * ServiceDatabase is two levels removed from a Project: it belongs to a
+     * Service which belongs to an Environment which belongs to a Project.
+     */
+    public function scopeAccessibleByClient(Builder $query, array $projectIds): Builder
+    {
+        return $query->whereHas('service.environment.project', function (Builder $q) use ($projectIds): void {
+            $q->whereIn('id', $projectIds);
+        });
+    }
 
     protected static function booted()
     {

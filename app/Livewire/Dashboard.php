@@ -18,6 +18,19 @@ class Dashboard extends Component
 
     public function mount()
     {
+        // Scoped client users see only their assigned projects, so the
+        // team-wide dashboard is meaningless for them — send them straight
+        // to the projects list instead. Initialize the typed collections
+        // first so render() will not blow up if Livewire still calls it.
+        if (auth()->check() && auth()->user()->isClient()) {
+            $this->privateKeys = collect();
+            $this->servers = collect();
+            $this->projects = collect();
+            $this->redirect(route('project.index'), navigate: true);
+
+            return;
+        }
+
         $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
         $this->servers = Server::ownedByCurrentTeamCached();
         $this->projects = Project::ownedByCurrentTeam()->with('environments')->get();

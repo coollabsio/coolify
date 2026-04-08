@@ -104,17 +104,19 @@
         <li class="flex-1 overflow-x-hidden">
             <ul role="list" class="flex flex-col h-full space-y-1.5">
                 @if (isSubscribed() || !isCloud())
-                    <li>
-                        <a title="Dashboard" href="/" {{ wireNavigate() }}
-                            class="{{ request()->is('/') ? 'menu-item-active menu-item' : 'menu-item' }}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="menu-item-icon" fill="none" viewBox="0 0 24 24"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                            </svg>
-                            <span class="menu-item-label">Dashboard</span>
-                        </a>
-                    </li>
+                    @if (! auth()->user()->isClient())
+                        <li>
+                            <a title="Dashboard" href="/" {{ wireNavigate() }}
+                                class="{{ request()->is('/') ? 'menu-item-active menu-item' : 'menu-item' }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="menu-item-icon" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                </svg>
+                                <span class="menu-item-label">Dashboard</span>
+                            </a>
+                        </li>
+                    @endif
                     <li>
                         <a title="Projects" {{ wireNavigate() }}
                             class="{{ request()->is('project/*') || request()->is('projects') ? 'menu-item menu-item-active' : 'menu-item' }}"
@@ -130,6 +132,7 @@
                             <span class="menu-item-label">Projects</span>
                         </a>
                     </li>
+                    @if (! auth()->user()->isClient())
                     <li>
                         <a title="Servers" {{ wireNavigate() }}
                             class="{{ request()->is('server/*') || request()->is('servers') ? 'menu-item menu-item-active' : 'menu-item' }}"
@@ -242,6 +245,7 @@
                             <span class="menu-item-label">Tags</span>
                         </a>
                     </li>
+                    @endif
                     @can('canAccessTerminal')
                         <li>
                             <a title="Terminal"
@@ -273,6 +277,7 @@
                             <span class="menu-item-label">Profile</span>
                         </a>
                     </li>
+                    @if (! auth()->user()->isClient())
                     <li>
                         <a title="Teams" {{ wireNavigate() }}
                             class="{{ request()->is('team*') ? 'menu-item-active menu-item' : 'menu-item' }}"
@@ -291,6 +296,25 @@
                             <span class="menu-item-label">Teams</span>
                         </a>
                     </li>
+                    @if (auth()->user()->isAdminFromSession())
+                        <li>
+                            <a title="Usuarios" {{ wireNavigate() }}
+                                class="{{ request()->is('users*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                                href="{{ route('users.index') }}">
+                                <svg class="menu-item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                    stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" />
+                                    <path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                                    <path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
+                                </svg>
+                                <span class="menu-item-label">Usuarios</span>
+                            </a>
+                        </li>
+                    @endif
+                    @endif
                     @if (isCloud() && auth()->user()->isAdmin())
                         <li>
                             <a title="Subscription" {{ wireNavigate() }}

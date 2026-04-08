@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\RestrictsToClientProjects;
+use Illuminate\Database\Eloquent\Builder;
 use OpenApi\Attributes as OA;
 use Visus\Cuid2\Cuid2;
 
@@ -21,8 +23,26 @@ class Project extends BaseModel
 {
     use ClearsGlobalSearchCache;
     use HasSafeStringAttribute;
+    use RestrictsToClientProjects;
 
     protected $guarded = [];
+
+    /**
+     * Override of the trait's default scope: Project has its own primary key
+     * (no environment.project chain), so we filter directly on id.
+     */
+    public function scopeAccessibleByClient(Builder $query, array $projectIds): Builder
+    {
+        return $query->whereIn($this->getTable().'.id', $projectIds);
+    }
+
+    /**
+     * Users that have explicit, scoped access to this project.
+     */
+    public function assignedUsers()
+    {
+        return $this->belongsToMany(User::class, 'project_user')->withTimestamps();
+    }
 
     /**
      * Get query builder for projects owned by current team.

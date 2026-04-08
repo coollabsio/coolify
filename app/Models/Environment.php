@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\RestrictsToClientProjects;
+use Illuminate\Database\Eloquent\Builder;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -22,8 +24,18 @@ class Environment extends BaseModel
 {
     use ClearsGlobalSearchCache;
     use HasSafeStringAttribute;
+    use RestrictsToClientProjects;
 
     protected $guarded = [];
+
+    /**
+     * Override of the trait's default scope: Environment relates to Project
+     * directly via project_id, not through environment.project.
+     */
+    public function scopeAccessibleByClient(Builder $query, array $projectIds): Builder
+    {
+        return $query->whereIn($this->getTable().'.project_id', $projectIds);
+    }
 
     protected static function booted()
     {

@@ -89,13 +89,16 @@ use App\Livewire\Team\AdminView as TeamAdminView;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
+use App\Livewire\User\Create as UserCreate;
+use App\Livewire\User\Edit as UserEdit;
+use App\Livewire\User\Index as UserIndex;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-Route::get('/admin', AdminIndex::class)->name('admin.index');
+Route::get('/admin', AdminIndex::class)->name('admin.index')->middleware(['auth', 'restrict.client']);
 
 Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot')->middleware('throttle:forgot-password');
 Route::get('/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
@@ -116,27 +119,31 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/force-password-reset', ForcePasswordReset::class)->name('auth.force-password-reset');
     });
 
+    // The dashboard shows team-wide stats. Clients are redirected from inside
+    // the Dashboard Livewire mount() method to their accessible projects list.
     Route::get('/', Dashboard::class)->name('dashboard');
-    Route::get('/onboarding', BoardingIndex::class)->name('onboarding');
+    Route::get('/onboarding', BoardingIndex::class)->name('onboarding')->middleware('restrict.client');
 
-    Route::get('/subscription', SubscriptionShow::class)->name('subscription.show');
-    Route::get('/subscription/new', SubscriptionIndex::class)->name('subscription.index');
+    Route::get('/subscription', SubscriptionShow::class)->name('subscription.show')->middleware('restrict.client');
+    Route::get('/subscription/new', SubscriptionIndex::class)->name('subscription.index')->middleware('restrict.client');
 
-    Route::get('/settings', SettingsIndex::class)->name('settings.index');
-    Route::get('/settings/advanced', SettingsAdvanced::class)->name('settings.advanced');
-    Route::get('/settings/updates', SettingsUpdates::class)->name('settings.updates');
+    Route::middleware('restrict.client')->group(function () {
+        Route::get('/settings', SettingsIndex::class)->name('settings.index');
+        Route::get('/settings/advanced', SettingsAdvanced::class)->name('settings.advanced');
+        Route::get('/settings/updates', SettingsUpdates::class)->name('settings.updates');
 
-    Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
-    Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
-    Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
+        Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
+        Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
+        Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
+    });
 
     Route::get('/profile', ProfileIndex::class)->name('profile');
 
-    Route::prefix('tags')->group(function () {
+    Route::prefix('tags')->middleware('restrict.client')->group(function () {
         Route::get('/{tagName?}', TagsShow::class)->name('tags.show');
     });
 
-    Route::prefix('notifications')->group(function () {
+    Route::prefix('notifications')->middleware('restrict.client')->group(function () {
         Route::get('/email', NotificationEmail::class)->name('notifications.email');
         Route::get('/telegram', NotificationTelegram::class)->name('notifications.telegram');
         Route::get('/discord', NotificationDiscord::class)->name('notifications.discord');
@@ -145,11 +152,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/webhook', NotificationWebhook::class)->name('notifications.webhook');
     });
 
-    Route::prefix('storages')->group(function () {
+    Route::prefix('storages')->middleware('restrict.client')->group(function () {
         Route::get('/', StorageIndex::class)->name('storage.index');
         Route::get('/{storage_uuid}', StorageShow::class)->name('storage.show');
     });
-    Route::prefix('shared-variables')->group(function () {
+    Route::prefix('shared-variables')->middleware('restrict.client')->group(function () {
         Route::get('/', SharedVariablesIndex::class)->name('shared-variables.index');
         Route::get('/team', TeamSharedVariablesIndex::class)->name('shared-variables.team.index');
         Route::get('/projects', ProjectSharedVariablesIndex::class)->name('shared-variables.project.index');
@@ -158,10 +165,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/environments/project/{project_uuid}/environment/{environment_uuid}', EnvironmentSharedVariablesShow::class)->name('shared-variables.environment.show');
     });
 
-    Route::prefix('team')->group(function () {
+    Route::prefix('team')->middleware('restrict.client')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
         Route::get('/admin', TeamAdminView::class)->name('team.admin-view');
+    });
+
+    Route::prefix('users')->middleware('restrict.client')->group(function () {
+        Route::get('/', UserIndex::class)->name('users.index');
+        Route::get('/new', UserCreate::class)->name('users.create');
+        Route::get('/{user}/edit', UserEdit::class)->name('users.edit')->whereNumber('user');
     });
 
     Route::get('/terminal', TerminalIndex::class)->name('terminal')->middleware('can.access.terminal');
@@ -268,10 +281,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.service.scheduled-tasks');
     });
 
-    Route::get('/servers', ServerIndex::class)->name('server.index');
+    Route::get('/servers', ServerIndex::class)->name('server.index')->middleware('restrict.client');
     // Route::get('/server/new', ServerCreate::class)->name('server.create');
 
-    Route::prefix('server/{server_uuid}')->group(function () {
+    Route::prefix('server/{server_uuid}')->middleware('restrict.client')->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
         Route::get('/advanced', ServerAdvanced::class)->name('server.advanced');
         Route::get('/swarm', ServerSwarm::class)->name('server.swarm');
@@ -294,20 +307,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/security/patches', Patches::class)->name('server.security.patches')->middleware('can.update.resource');
         Route::get('/security/terminal-access', TerminalAccess::class)->name('server.security.terminal-access')->middleware('can.update.resource');
     });
-    Route::get('/destinations', DestinationIndex::class)->name('destination.index');
-    Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');
+    Route::middleware('restrict.client')->group(function () {
+        Route::get('/destinations', DestinationIndex::class)->name('destination.index');
+        Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');
 
-    // Route::get('/security', fn () => view('security.index'))->name('security.index');
-    Route::get('/security/private-key', SecurityPrivateKeyIndex::class)->name('security.private-key.index');
-    // Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
-    Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
+        // Route::get('/security', fn () => view('security.index'))->name('security.index');
+        Route::get('/security/private-key', SecurityPrivateKeyIndex::class)->name('security.private-key.index');
+        // Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
+        Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
 
-    Route::get('/security/cloud-tokens', CloudTokens::class)->name('security.cloud-tokens');
-    Route::get('/security/cloud-init-scripts', CloudInitScripts::class)->name('security.cloud-init-scripts');
-    Route::get('/security/api-tokens', ApiTokens::class)->name('security.api-tokens');
+        Route::get('/security/cloud-tokens', CloudTokens::class)->name('security.cloud-tokens');
+        Route::get('/security/cloud-init-scripts', CloudInitScripts::class)->name('security.cloud-init-scripts');
+        Route::get('/security/api-tokens', ApiTokens::class)->name('security.api-tokens');
+    });
 });
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'restrict.client'])->group(function () {
     Route::get('/sources', function () {
         $sources = currentTeam()->sources();
 

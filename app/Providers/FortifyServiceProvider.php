@@ -92,10 +92,18 @@ class FortifyServiceProvider extends ServiceProvider
                     $user->currentTeam = $invitation->team;
                     $invitation->delete();
                 } else {
-                    // Normal login - use personal team
-                    $user->currentTeam = $user->teams->firstWhere('personal_team', true);
-                    if (! $user->currentTeam) {
-                        $user->currentTeam = $user->recreate_personal_team();
+                    // Client users do not have a personal team. They are
+                    // attached to one or more team(s) explicitly by an admin
+                    // and must land on one of those teams instead of getting
+                    // a personal team auto-created.
+                    if ($user->is_client) {
+                        $user->currentTeam = $user->teams->first();
+                    } else {
+                        // Normal login - use personal team
+                        $user->currentTeam = $user->teams->firstWhere('personal_team', true);
+                        if (! $user->currentTeam) {
+                            $user->currentTeam = $user->recreate_personal_team();
+                        }
                     }
                 }
                 session(['currentTeam' => $user->currentTeam]);
