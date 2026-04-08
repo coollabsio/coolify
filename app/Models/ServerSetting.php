@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ProxyTypes;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -98,6 +99,7 @@ class ServerSetting extends Model
         'is_terminal_enabled',
         'deployment_queue_limit',
         'disable_application_image_retention',
+        'is_master_domain_router_enabled',
     ];
 
     protected $casts = [
@@ -138,8 +140,34 @@ class ServerSetting extends Model
             }
         });
         static::saving(function ($setting) {
+            $setting->ensureMasterDomainRouterUsesTraefik();
             $setting->ensureSingleMasterDomainRouterEnabled();
         });
+    }
+
+    private function ensureMasterDomainRouterUsesTraefik(): void
+    {
+        if (! $this->is_master_domain_router_enabled || is_null($this->server_id)) {
+            return;
+        }
+
+        $server = $this->relationLoaded('server')
+            ? $this->getRelation('server')
+            : Server::query()->find($this->server_id);
+
+        if (! $server instanceof Server) {
+            return;
+        }
+
+        if ($server->proxyType() === ProxyTypes::TRAEFIK->value) {
+            return;
+        }
+
+        throw new \RuntimeException(sprintf(
+            'Master domain routing can only be enabled on Traefik servers. Server %d uses proxy type %s.',
+            $server->id,
+            strtolower((string) ($server->proxyType() ?? ProxyTypes::NONE->value))
+        ));
     }
 
     private function ensureSingleMasterDomainRouterEnabled(): void

@@ -28,12 +28,38 @@ trait ResolvesEdgeProxyServer
             ));
         }
 
-        return $edgeProxyServers->first();
+        $edgeProxyServer = $edgeProxyServers->first();
+        if (! $edgeProxyServer instanceof Server) {
+            return null;
+        }
+
+        if ($edgeProxyServer->proxyType() !== ProxyTypes::TRAEFIK->value) {
+            throw new \RuntimeException(sprintf(
+                'Invalid master domain router configured for team %d: server id %d uses proxy type %s. Master domain routing requires Traefik.',
+                $teamId,
+                $edgeProxyServer->id,
+                strtolower((string) ($edgeProxyServer->proxyType() ?? 'unknown'))
+            ));
+        }
+
+        return $edgeProxyServer;
     }
 
     protected function resolveEdgeProxyServerForTeamId(?int $teamId): ?Server
     {
         return $this->resolveEdgeProxyServerByTeamId($teamId);
+    }
+
+    protected function isMasterDomainRoutingEnabledForTeamId(?int $teamId): bool
+    {
+        if (is_null($teamId)) {
+            return false;
+        }
+
+        return Server::query()
+            ->where('team_id', $teamId)
+            ->whereRelation('settings', 'is_master_domain_router_enabled', true)
+            ->exists();
     }
 
     /**

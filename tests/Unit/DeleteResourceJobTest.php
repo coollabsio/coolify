@@ -5,16 +5,16 @@ use App\Models\Application;
 use App\Services\EdgeProxyRemotePortForwardService;
 use App\Services\EdgeProxyRemoteRouteService;
 
-it('does not force delete application when edge route cleanup fails', function () {
+it('force deletes application when edge route cleanup fails', function () {
     $application = Mockery::mock(Application::class)->makePartial();
     $application->uuid = 'application-cleanup-failure';
-    $application->shouldReceive('forceDelete')->never();
+    $application->shouldReceive('forceDelete')->once();
 
     $routeService = Mockery::mock(EdgeProxyRemoteRouteService::class);
     $routeService->shouldReceive('deleteApplication')->once()->with($application)->andThrow(new RuntimeException('application route cleanup failed'));
 
     $portForwardService = Mockery::mock(EdgeProxyRemotePortForwardService::class);
-    $portForwardService->shouldReceive('deleteApplication')->never();
+    $portForwardService->shouldReceive('deleteApplication')->once()->with($application);
 
     app()->instance(EdgeProxyRemoteRouteService::class, $routeService);
     app()->instance(EdgeProxyRemotePortForwardService::class, $portForwardService);
@@ -28,14 +28,13 @@ it('does not force delete application when edge route cleanup fails', function (
         protected function queueStuckedResourcesCleanup(): void {}
     };
 
-    expect(fn () => $job->handle())
-        ->toThrow(RuntimeException::class, 'application route cleanup failed');
+    $job->handle();
 });
 
-it('does not force delete application when edge port cleanup fails', function () {
+it('force deletes application when edge port cleanup fails', function () {
     $application = Mockery::mock(Application::class)->makePartial();
     $application->uuid = 'application-port-cleanup-failure';
-    $application->shouldReceive('forceDelete')->never();
+    $application->shouldReceive('forceDelete')->once();
 
     $routeService = Mockery::mock(EdgeProxyRemoteRouteService::class);
     $routeService->shouldReceive('deleteApplication')->once()->with($application);
@@ -55,8 +54,7 @@ it('does not force delete application when edge port cleanup fails', function ()
         protected function queueStuckedResourcesCleanup(): void {}
     };
 
-    expect(fn () => $job->handle())
-        ->toThrow(RuntimeException::class, 'application port cleanup failed');
+    $job->handle();
 });
 
 it('force deletes application after edge cleanup succeeds', function () {

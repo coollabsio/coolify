@@ -31,6 +31,10 @@ class EdgeProxyRemoteRouteService
             return [];
         }
 
+        if (! $this->isMasterDomainRoutingEnabledForTeamId($teamId)) {
+            return [];
+        }
+
         $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($teamId);
         if (! $edgeProxyServer instanceof Server) {
             $warning = $this->missingMasterDomainRouterWarning('service', $service->uuid, $teamId);
@@ -213,6 +217,10 @@ class EdgeProxyRemoteRouteService
             return [];
         }
 
+        if (! $this->isMasterDomainRoutingEnabledForTeamId($teamId)) {
+            return [];
+        }
+
         $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($teamId);
         if (! $edgeProxyServer instanceof Server) {
             $warning = $this->missingMasterDomainRouterWarning('application', $application->uuid, $teamId);
@@ -231,6 +239,10 @@ class EdgeProxyRemoteRouteService
     public function syncApplicationOnDeploymentServer(Application $application, Server $deploymentServer): array
     {
         $teamId = $this->extractApplicationTeamId($application);
+        if (! $this->isMasterDomainRoutingEnabledForTeamId($teamId)) {
+            return [];
+        }
+
         $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($teamId);
         if (! $edgeProxyServer instanceof Server) {
             $warning = $this->missingMasterDomainRouterWarning('application', $application->uuid, $teamId);

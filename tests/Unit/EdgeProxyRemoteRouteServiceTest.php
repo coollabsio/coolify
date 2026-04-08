@@ -100,9 +100,14 @@ it('adds an insecure transport when an edge route falls back to the deployment p
         ->and(data_get($config, 'http.serversTransports.edge-service-uuid-transport-1.insecureSkipVerify'))->toBeTrue();
 });
 
-it('returns warning when syncing service route without a master domain router', function () {
+it('does not warn when syncing service route without master domain routing enabled', function () {
     $manager = new class extends EdgeProxyRemoteRouteService
     {
+        protected function isMasterDomainRoutingEnabledForTeamId(?int $teamId): bool
+        {
+            return false;
+        }
+
         protected function resolveEdgeProxyServerByTeamId(?int $teamId): ?Server
         {
             return null;
@@ -123,13 +128,17 @@ it('returns warning when syncing service route without a master domain router', 
 
     $warnings = $manager->syncService($service);
 
-    expect($warnings)->toHaveCount(1)
-        ->and($warnings[0])->toContain('no master domain router is configured for team 42');
+    expect($warnings)->toBe([]);
 });
 
-it('returns warning when syncing application route without a master domain router', function () {
+it('does not warn when syncing application route without master domain routing enabled', function () {
     $manager = new class extends EdgeProxyRemoteRouteService
     {
+        protected function isMasterDomainRoutingEnabledForTeamId(?int $teamId): bool
+        {
+            return false;
+        }
+
         protected function resolveEdgeProxyServerByTeamId(?int $teamId): ?Server
         {
             return null;
@@ -149,8 +158,38 @@ it('returns warning when syncing application route without a master domain route
 
     $warnings = $manager->syncApplicationOnDeploymentServer($application, $deploymentServer);
 
+    expect($warnings)->toBe([]);
+});
+
+it('returns warning when syncing application route with master domain routing enabled but no router is configured', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        protected function isMasterDomainRoutingEnabledForTeamId(?int $teamId): bool
+        {
+            return true;
+        }
+
+        protected function resolveEdgeProxyServerByTeamId(?int $teamId): ?Server
+        {
+            return null;
+        }
+    };
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 12;
+
+    $application = new Application;
+    $application->uuid = 'application-missing-master-router';
+    $application->setRelation('environment', (object) [
+        'project' => (object) [
+            'team_id' => 53,
+        ],
+    ]);
+
+    $warnings = $manager->syncApplicationOnDeploymentServer($application, $deploymentServer);
+
     expect($warnings)->toHaveCount(1)
-        ->and($warnings[0])->toContain('no master domain router is configured for team 52');
+        ->and($warnings[0])->toContain('no master domain router is configured for team 53');
 });
 
 it('creates, updates, and deletes a stable edge route file per service uuid', function () {

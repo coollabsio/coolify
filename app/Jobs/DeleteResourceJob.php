@@ -128,18 +128,25 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         try {
             app(EdgeProxyRemoteRouteService::class)->deleteApplication($application);
         } catch (\Throwable $exception) {
-            \Log::warning('Failed to delete edge proxy route file for application '.$application->uuid.': '.$exception->getMessage());
-
-            throw $exception;
+            $this->logWarning('Failed to delete edge proxy route file for application '.$application->uuid.': '.$exception->getMessage());
         }
 
         try {
             app(EdgeProxyRemotePortForwardService::class)->deleteApplication($application);
         } catch (\Throwable $exception) {
-            \Log::warning('Failed to delete edge port proxy for application '.$application->uuid.': '.$exception->getMessage());
-
-            throw $exception;
+            $this->logWarning('Failed to delete edge port proxy for application '.$application->uuid.': '.$exception->getMessage());
         }
+    }
+
+    protected function logWarning(string $message): void
+    {
+        if (app()->bound('log')) {
+            app('log')->warning($message);
+
+            return;
+        }
+
+        error_log($message);
     }
 
     protected function dispatchDockerCleanupIfNeeded(): void

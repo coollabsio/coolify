@@ -6,20 +6,24 @@ use App\Models\Server;
 use App\Services\EdgeProxyRemotePortForwardService;
 use App\Services\EdgeProxyRemoteRouteService;
 
-it('does not force delete service when edge route cleanup fails', function () {
+it('force deletes service when edge route cleanup fails', function () {
     $server = Mockery::mock(Server::class)->makePartial();
     $server->id = 1;
 
     $service = Mockery::mock(Service::class)->makePartial();
     $service->uuid = 'service-cleanup-failure';
     $service->setRelation('server', $server);
-    $service->shouldReceive('forceDelete')->never();
+    $service->setRelation('scheduled_tasks', collect());
+    $service->shouldReceive('applications->get')->once()->andReturn(collect());
+    $service->shouldReceive('databases->get')->once()->andReturn(collect());
+    $service->shouldReceive('tags->detach')->once();
+    $service->shouldReceive('forceDelete')->once();
 
     $routeService = Mockery::mock(EdgeProxyRemoteRouteService::class);
     $routeService->shouldReceive('deleteService')->once()->with($service)->andThrow(new RuntimeException('route cleanup failed'));
 
     $portForwardService = Mockery::mock(EdgeProxyRemotePortForwardService::class);
-    $portForwardService->shouldReceive('deleteService')->never();
+    $portForwardService->shouldReceive('deleteService')->once()->with($service);
 
     app()->instance(EdgeProxyRemoteRouteService::class, $routeService);
     app()->instance(EdgeProxyRemotePortForwardService::class, $portForwardService);
@@ -32,18 +36,21 @@ it('does not force delete service when edge route cleanup fails', function () {
         }
     };
 
-    expect(fn () => $action->handle($service, false, false, false, false))
-        ->toThrow(RuntimeException::class, 'route cleanup failed');
+    $action->handle($service, false, false, false, false);
 });
 
-it('does not force delete service when edge port cleanup fails', function () {
+it('force deletes service when edge port cleanup fails', function () {
     $server = Mockery::mock(Server::class)->makePartial();
     $server->id = 3;
 
     $service = Mockery::mock(Service::class)->makePartial();
     $service->uuid = 'service-port-cleanup-failure';
     $service->setRelation('server', $server);
-    $service->shouldReceive('forceDelete')->never();
+    $service->setRelation('scheduled_tasks', collect());
+    $service->shouldReceive('applications->get')->once()->andReturn(collect());
+    $service->shouldReceive('databases->get')->once()->andReturn(collect());
+    $service->shouldReceive('tags->detach')->once();
+    $service->shouldReceive('forceDelete')->once();
 
     $routeService = Mockery::mock(EdgeProxyRemoteRouteService::class);
     $routeService->shouldReceive('deleteService')->once()->with($service);
@@ -62,8 +69,7 @@ it('does not force delete service when edge port cleanup fails', function () {
         }
     };
 
-    expect(fn () => $action->handle($service, false, false, false, false))
-        ->toThrow(RuntimeException::class, 'port cleanup failed');
+    $action->handle($service, false, false, false, false);
 });
 
 it('force deletes service after edge cleanup succeeds', function () {

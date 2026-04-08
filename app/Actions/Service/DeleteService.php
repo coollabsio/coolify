@@ -6,7 +6,6 @@ use App\Actions\Server\CleanupDocker;
 use App\Models\Service;
 use App\Services\EdgeProxyRemotePortForwardService;
 use App\Services\EdgeProxyRemoteRouteService;
-use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class DeleteService
@@ -91,23 +90,30 @@ class DeleteService
         try {
             app(EdgeProxyRemoteRouteService::class)->deleteService($service);
         } catch (\Throwable $exception) {
-            Log::warning('Failed to delete edge proxy route file for service.', [
+            $this->logWarning('Failed to delete edge proxy route file for service.', [
                 'service_uuid' => $service->uuid,
                 'error' => $exception->getMessage(),
             ]);
-
-            throw $exception;
         }
 
         try {
             app(EdgeProxyRemotePortForwardService::class)->deleteService($service);
         } catch (\Throwable $exception) {
-            Log::warning('Failed to delete edge port proxy for service.', [
+            $this->logWarning('Failed to delete edge port proxy for service.', [
                 'service_uuid' => $service->uuid,
                 'error' => $exception->getMessage(),
             ]);
-
-            throw $exception;
         }
+    }
+
+    protected function logWarning(string $message, array $context = []): void
+    {
+        if (app()->bound('log')) {
+            app('log')->warning($message, $context);
+
+            return;
+        }
+
+        error_log($message.($context === [] ? '' : ' '.json_encode($context)));
     }
 }

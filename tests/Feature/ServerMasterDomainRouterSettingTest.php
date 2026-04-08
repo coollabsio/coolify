@@ -13,8 +13,14 @@ it('allows only one master domain router server per team', function () {
     $user = User::factory()->create();
     $team = $user->teams()->first();
 
-    $firstServer = Server::factory()->create(['team_id' => $team->id]);
-    $secondServer = Server::factory()->create(['team_id' => $team->id]);
+    $firstServer = Server::factory()->create([
+        'team_id' => $team->id,
+        'proxy' => ['type' => ProxyTypes::TRAEFIK->value],
+    ]);
+    $secondServer = Server::factory()->create([
+        'team_id' => $team->id,
+        'proxy' => ['type' => ProxyTypes::TRAEFIK->value],
+    ]);
 
     $firstServer->settings->update(['is_master_domain_router_enabled' => true]);
 
@@ -31,14 +37,35 @@ it('does not disable master domain router setting on servers from other teams', 
     $teamOneUser = User::factory()->create();
     $teamTwoUser = User::factory()->create();
 
-    $teamOneServer = Server::factory()->create(['team_id' => $teamOneUser->teams()->first()->id]);
-    $teamTwoServer = Server::factory()->create(['team_id' => $teamTwoUser->teams()->first()->id]);
+    $teamOneServer = Server::factory()->create([
+        'team_id' => $teamOneUser->teams()->first()->id,
+        'proxy' => ['type' => ProxyTypes::TRAEFIK->value],
+    ]);
+    $teamTwoServer = Server::factory()->create([
+        'team_id' => $teamTwoUser->teams()->first()->id,
+        'proxy' => ['type' => ProxyTypes::TRAEFIK->value],
+    ]);
 
     $teamOneServer->settings->update(['is_master_domain_router_enabled' => true]);
     $teamTwoServer->settings->update(['is_master_domain_router_enabled' => true]);
 
     expect($teamOneServer->settings->fresh()->is_master_domain_router_enabled)->toBeTrue()
         ->and($teamTwoServer->settings->fresh()->is_master_domain_router_enabled)->toBeTrue();
+});
+
+it('rejects enabling master domain routing on non-traefik servers', function () {
+    $user = User::factory()->create();
+    $team = $user->teams()->first();
+
+    $server = Server::factory()->create([
+        'team_id' => $team->id,
+        'proxy' => ['type' => ProxyTypes::CADDY->value],
+    ]);
+
+    expect(fn () => $server->settings->update(['is_master_domain_router_enabled' => true]))
+        ->toThrow(\RuntimeException::class, "Master domain routing can only be enabled on Traefik servers. Server {$server->id} uses proxy type caddy.");
+
+    expect($server->settings->fresh()->is_master_domain_router_enabled)->toBeFalse();
 });
 
 it('locks master domain router toggle when another server in the same team is already selected', function () {
