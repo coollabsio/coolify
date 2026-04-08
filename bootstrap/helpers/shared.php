@@ -545,6 +545,81 @@ function get_service_templates(bool $force = false): Collection
     }
 }
 
+/**
+ * Returns the metadata for every local service template that must always
+ * exist in service-templates-latest.json, regardless of what upstream
+ * Coolify publishes. Each entry describes a compose file under
+ * templates/compose/ and the frontmatter used by the service catalog UI.
+ *
+ * @return array<string, array{compose_file: string, slogan: string, tags: array<int,string>, category: string, logo: string, documentation: string, minversion: string}>
+ */
+function protected_service_templates(): array
+{
+    return [
+        'laravel-rootkit' => [
+            'compose_file' => 'laravel-rootkit.yaml',
+            'slogan' => 'Laravel RootKit with GitHub deploy, Nginx, MariaDB and phpMyAdmin.',
+            'tags' => ['laravel', 'php', 'framework', 'web', 'application', 'mariadb', 'phpmyadmin', 'github', 'rootkit'],
+            'category' => 'framework',
+            'logo' => 'svgs/laravel.svg',
+            'documentation' => 'https://laravel.com/docs?utm_source=coolify.io',
+            'minversion' => '0.0.0',
+        ],
+    ];
+}
+
+/**
+ * Ensures the given services collection contains every protected template,
+ * re-reading the compose file from disk each call so the JSON catalog stays
+ * in sync with whatever is in templates/compose/. Returns the mutated
+ * collection for chaining.
+ */
+function ensure_protected_service_templates(Collection $services): Collection
+{
+    foreach (protected_service_templates() as $key => $meta) {
+        $composePath = base_path('templates/compose/'.$meta['compose_file']);
+        if (! File::exists($composePath)) {
+            continue;
+        }
+
+        $services->put($key, [
+            'name' => $key,
+            'documentation' => $meta['documentation'],
+            'slogan' => $meta['slogan'],
+            'compose' => base64_encode((string) File::get($composePath)),
+            'tags' => $meta['tags'],
+            'category' => $meta['category'],
+            'logo' => $meta['logo'],
+            'minversion' => $meta['minversion'],
+        ]);
+    }
+
+    return $services;
+}
+
+/**
+ * Persists the given services collection back to
+ * templates/service-templates-latest.json, after ensuring every protected
+ * template is present. Used by PullTemplatesFromCDN, Init and the service
+ * selector so that any write path going through the JSON catalog preserves
+ * the locally shipped templates.
+ */
+function persist_service_templates_catalog(Collection $services): void
+{
+    try {
+        $services = ensure_protected_service_templates($services);
+        $normalized = $services->sortKeys()->toArray();
+        $json = json_encode($normalized, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($json === false) {
+            return;
+        }
+
+        File::put(base_path('templates/'.config('constants.services.file_name')), $json.PHP_EOL);
+    } catch (\Throwable $e) {
+        report($e);
+    }
+}
+
 function getResourceByUuid(string $uuid, ?int $teamId = null)
 {
     if (is_null($teamId)) {

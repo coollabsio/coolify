@@ -8,7 +8,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
 class PullTemplatesFromCDN implements ShouldBeEncrypted, ShouldQueue
@@ -30,8 +29,11 @@ class PullTemplatesFromCDN implements ShouldBeEncrypted, ShouldQueue
             }
             $response = Http::retry(3, 1000)->get(config('constants.services.official'));
             if ($response->successful()) {
-                $services = $response->json();
-                File::put(base_path('templates/'.config('constants.services.file_name')), json_encode($services));
+                $services = collect($response->json() ?? []);
+                // persist_service_templates_catalog() re-injects any locally
+                // protected templates (e.g. laravel-rootkit) before writing
+                // so the scheduled CDN refresh never drops them.
+                persist_service_templates_catalog($services);
             } else {
                 send_internal_notification('PullTemplatesAndVersions failed with: '.$response->status().' '.$response->body());
             }

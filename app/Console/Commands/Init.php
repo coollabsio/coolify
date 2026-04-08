@@ -18,7 +18,6 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
 class Init extends Command
@@ -163,8 +162,10 @@ class Init extends Command
     {
         $response = Http::retry(3, 1000)->get(config('constants.services.official'));
         if ($response->successful()) {
-            $services = $response->json();
-            File::put(base_path('templates/'.config('constants.services.file_name')), json_encode($services));
+            // persist_service_templates_catalog() re-injects locally
+            // protected templates (e.g. laravel-rootkit) so the startup
+            // refresh never drops them.
+            persist_service_templates_catalog(collect($response->json() ?? []));
         }
     }
 

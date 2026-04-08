@@ -5,7 +5,6 @@ namespace App\Livewire\Project\New;
 use App\Models\Project;
 use App\Models\Server;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\File;
 use Livewire\Component;
 
 class Select extends Component
@@ -423,61 +422,16 @@ class Select extends Component
 
     private function persistServiceTemplates(Collection $services): void
     {
-        try {
-            $targetFile = base_path('templates/'.config('constants.services.file_name'));
-            $normalized = $services->sortKeys()->toArray();
-            $newJson = json_encode($normalized, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-
-            if ($newJson === false) {
-                return;
-            }
-
-            $currentJson = File::exists($targetFile) ? (string) File::get($targetFile) : '';
-            if (trim($currentJson) === trim($newJson)) {
-                return;
-            }
-
-            File::put($targetFile, $newJson);
-        } catch (\Throwable $e) {
-            report($e);
-        }
+        // Delegate to the shared helper so the CDN job, init command and the
+        // Livewire selector all go through the same write path, guaranteeing
+        // that locally protected templates (e.g. laravel-rootkit) survive
+        // every refresh.
+        persist_service_templates_catalog($services);
     }
 
     private function ensureProtectedTemplatesExist(Collection $services): Collection
     {
-        $this->upsertServiceTemplateFromCompose(
-            services: $services,
-            key: 'laravel-rootkit',
-            composeFile: 'laravel-rootkit.yaml',
-            slogan: 'Laravel RootKit with GitHub deploy, Nginx, MariaDB and phpMyAdmin.',
-            tags: ['laravel', 'php', 'framework', 'web', 'application', 'mariadb', 'phpmyadmin', 'github', 'rootkit']
-        );
-
-        return $services;
-    }
-
-    private function upsertServiceTemplateFromCompose(
-        Collection $services,
-        string $key,
-        string $composeFile,
-        string $slogan,
-        array $tags
-    ): void {
-        $composePath = base_path("templates/compose/{$composeFile}");
-        if (! File::exists($composePath)) {
-            return;
-        }
-
-        $services->put($key, [
-            'name' => $key,
-            'documentation' => 'https://laravel.com/docs?utm_source=coolify.io',
-            'slogan' => $slogan,
-            'compose' => base64_encode((string) File::get($composePath)),
-            'tags' => $tags,
-            'category' => 'framework',
-            'logo' => 'svgs/laravel.svg',
-            'minversion' => '0.0.0',
-        ]);
+        return ensure_protected_service_templates($services);
     }
 
     private function normalizeDuplicateLaravelTemplates(Collection $services): Collection
