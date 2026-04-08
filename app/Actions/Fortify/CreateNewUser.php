@@ -37,12 +37,16 @@ class CreateNewUser implements CreatesNewUsers
         if (User::count() == 0) {
             // If this is the first user, make them the root user
             // Team is already created in the database/seeders/ProductionSeeder.php
-            $user = User::create([
-                'id' => 0,
-                'name' => $input['name'],
-                'email' => $input['email'],
-                'password' => Hash::make($input['password']),
-            ]);
+            //
+            // id=0 must be assigned explicitly because User::$guarded blocks
+            // mass-assignment of the primary key; the root bootstrap is the
+            // one legitimate path that needs to set it.
+            $user = new User;
+            $user->id = 0;
+            $user->name = $input['name'];
+            $user->email = $input['email'];
+            $user->password = Hash::make($input['password']);
+            $user->save();
             $team = $user->teams()->first();
 
             // Disable registration after first user is created

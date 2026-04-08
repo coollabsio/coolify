@@ -45,12 +45,15 @@ class RootUserSeeder extends Seeder
             }
 
             try {
-                User::create([
-                    'id' => 0,
-                    'name' => env('ROOT_USERNAME', 'Root User'),
-                    'email' => env('ROOT_USER_EMAIL'),
-                    'password' => Hash::make(env('ROOT_USER_PASSWORD')),
-                ]);
+                // id=0 must be set explicitly because User::$guarded blocks
+                // mass-assignment of the primary key. This is the bootstrap
+                // path for the root user.
+                $rootUser = new User;
+                $rootUser->id = 0;
+                $rootUser->name = env('ROOT_USERNAME', 'Root User');
+                $rootUser->email = env('ROOT_USER_EMAIL');
+                $rootUser->password = Hash::make(env('ROOT_USER_PASSWORD'));
+                $rootUser->save();
                 echo "\n  SUCCESS  Root user created successfully.\n\n";
             } catch (\Exception $e) {
                 echo "\n  ERROR  Failed to create root user: {$e->getMessage()}\n\n";

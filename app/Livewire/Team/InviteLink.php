@@ -67,12 +67,16 @@ class InviteLink extends Component
 
             if (is_null($user)) {
                 $password = Str::password();
+                // force_password_reset is guarded on the User model, so it
+                // cannot ride in the mass-assignment array. Assign it
+                // explicitly after save().
                 $user = User::create([
                     'name' => str($this->email)->before('@'),
                     'email' => $this->email,
                     'password' => Hash::make($password),
-                    'force_password_reset' => true,
                 ]);
+                $user->force_password_reset = true;
+                $user->save();
                 $token = Crypt::encryptString("{$user->email}@@@$password");
                 $link = route('auth.link', ['token' => $token]);
             }

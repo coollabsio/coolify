@@ -240,10 +240,12 @@ class Controller extends BaseController
 
         if ($invitationValid) {
             if ($resetPassword) {
-                $user->update([
-                    'password' => Hash::make($invitationUuid),
-                    'force_password_reset' => true,
-                ]);
+                // force_password_reset is guarded on the User model; set it
+                // via direct property assignment so it is not silently
+                // dropped by the mass-assignment filter.
+                $user->password = Hash::make($invitationUuid);
+                $user->force_password_reset = true;
+                $user->save();
             }
             if ($user->teams()->where('team_id', $invitation->team->id)->exists()) {
                 $invitation->delete();
