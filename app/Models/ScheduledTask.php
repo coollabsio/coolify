@@ -3,14 +3,49 @@
 namespace App\Models;
 
 use App\Traits\HasSafeStringAttribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use OpenApi\Attributes as OA;
 
+#[OA\Schema(
+    description: 'Scheduled Task model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer', 'description' => 'The unique identifier of the scheduled task in the database.'],
+        'uuid' => ['type' => 'string', 'description' => 'The unique identifier of the scheduled task.'],
+        'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled.'],
+        'name' => ['type' => 'string', 'description' => 'The name of the scheduled task.'],
+        'command' => ['type' => 'string', 'description' => 'The command to execute.'],
+        'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
+        'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
+        'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.'],
+        'created_at' => ['type' => 'string', 'format' => 'date-time', 'description' => 'The date and time when the scheduled task was created.'],
+        'updated_at' => ['type' => 'string', 'format' => 'date-time', 'description' => 'The date and time when the scheduled task was last updated.'],
+    ],
+)]
 class ScheduledTask extends BaseModel
 {
+    use HasFactory;
     use HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'uuid',
+        'enabled',
+        'name',
+        'command',
+        'frequency',
+        'container',
+        'timeout',
+        'team_id',
+        'application_id',
+        'service_id',
+    ];
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return static::where('team_id', $teamId)->orderBy('created_at', 'desc');
+    }
 
     protected function casts(): array
     {

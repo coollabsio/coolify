@@ -40,7 +40,13 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 {
     use HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+        'personal_team',
+        'show_boarding',
+        'custom_server_limit',
+    ];
 
     protected $casts = [
         'personal_team' => 'boolean',
@@ -89,10 +95,13 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         });
     }
 
-    public static function serverLimitReached()
+    public static function serverLimitReached(?Team $team = null)
     {
-        $serverLimit = Team::serverLimit();
-        $team = currentTeam();
+        $team = $team ?? currentTeam();
+        if (! $team) {
+            return true;
+        }
+        $serverLimit = Team::serverLimit($team);
         $servers = $team->servers->count();
 
         return $servers >= $serverLimit;
@@ -109,19 +118,23 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     public function serverOverflow()
     {
-        if ($this->serverLimit() < $this->servers->count()) {
+        if (Team::serverLimit($this) < $this->servers->count()) {
             return true;
         }
 
         return false;
     }
 
-    public static function serverLimit()
+    public static function serverLimit(?Team $team = null)
     {
-        if (currentTeam()->id === 0 && isDev()) {
+        $team = $team ?? currentTeam();
+        if (! $team) {
+            return 0;
+        }
+        if ($team->id === 0 && isDev()) {
             return 9999999;
         }
-        $team = Team::find(currentTeam()->id);
+        $team = Team::find($team->id);
         if (! $team) {
             return 0;
         }
@@ -191,11 +204,16 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $this->getNotificationSettings('discord')?->isEnabled() ||
             $this->getNotificationSettings('slack')?->isEnabled() ||
             $this->getNotificationSettings('telegram')?->isEnabled() ||
-            $this->getNotificationSettings('pushover')?->isEnabled();
+            $this->getNotificationSettings('pushover')?->isEnabled() ||
+            $this->getNotificationSettings('webhook')?->isEnabled();
     }
 
     public function subscriptionEnded()
     {
+        if (! $this->subscription) {
+            return;
+        }
+
         $this->subscription->update([
             'stripe_subscription_id' => null,
             'stripe_cancel_at_period_end' => false,
@@ -214,7 +232,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     public function environment_variables()
     {
-        return $this->hasMany(SharedEnvironmentVariable::class)->whereNull('project_id')->whereNull('environment_id');
+        return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'team');
     }
 
     public function members()

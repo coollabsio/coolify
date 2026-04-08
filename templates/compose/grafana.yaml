@@ -11,7 +11,7 @@ services:
     environment:
       - SERVICE_URL_GRAFANA_3000
       - GF_SERVER_ROOT_URL=${SERVICE_URL_GRAFANA}
-      - GF_SERVER_DOMAIN=${SERVICE_URL_GRAFANA}
+      - GF_SERVER_DOMAIN=${SERVICE_FQDN_GRAFANA}
       - GF_SECURITY_ADMIN_PASSWORD=${SERVICE_PASSWORD_GRAFANA}
     volumes:
       - grafana-data:/var/lib/grafana

@@ -327,6 +327,12 @@ class GetContainersStatus
             if (str($exitedService->status)->startsWith('exited')) {
                 continue;
             }
+
+            // Only protection: If no containers at all, Docker query might have failed
+            if ($this->containers->isEmpty()) {
+                continue;
+            }
+
             $name = data_get($exitedService, 'name');
             $fqdn = data_get($exitedService, 'fqdn');
             if ($name) {
@@ -406,6 +412,12 @@ class GetContainersStatus
             if (str($database->status)->startsWith('exited')) {
                 continue;
             }
+
+            // Only protection: If no containers at all, Docker query might have failed
+            if ($this->containers->isEmpty()) {
+                continue;
+            }
+
             // Reset restart tracking when database exits completely
             $database->update([
                 'status' => 'exited',

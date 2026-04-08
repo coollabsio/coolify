@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Support\ValidationPatterns;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
@@ -234,7 +235,7 @@ class ProjectController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = Validator::make($request->all(), [
@@ -347,7 +348,7 @@ class ProjectController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = Validator::make($request->all(), [
@@ -600,7 +601,7 @@ class ProjectController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = Validator::make($request->all(), [

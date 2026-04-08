@@ -2,7 +2,10 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Models\Application;
+use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
+use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -49,7 +52,7 @@ class Storage extends Component
             $this->file_storage_directory_source = application_configuration_dir()."/{$this->resource->uuid}";
         }
 
-        if ($this->resource->getMorphClass() === \App\Models\Application::class) {
+        if ($this->resource->getMorphClass() === Application::class) {
             if ($this->resource->destination->server->isSwarm()) {
                 $this->isSwarm = true;
             }
@@ -101,10 +104,10 @@ class Storage extends Component
             $this->authorize('update', $this->resource);
 
             $this->validate([
-                'name' => 'required|string',
+                'name' => ValidationPatterns::volumeNameRules(),
                 'mount_path' => 'required|string',
                 'host_path' => $this->isSwarm ? 'required|string' : 'string|nullable',
-            ]);
+            ], ValidationPatterns::volumeNameMessages());
 
             $name = $this->resource->uuid.'-'.$this->name;
 
@@ -138,7 +141,10 @@ class Storage extends Component
             $this->file_storage_path = trim($this->file_storage_path);
             $this->file_storage_path = str($this->file_storage_path)->start('/')->value();
 
-            if ($this->resource->getMorphClass() === \App\Models\Application::class) {
+            // Validate path to prevent command injection
+            validateShellSafePath($this->file_storage_path, 'file storage path');
+
+            if ($this->resource->getMorphClass() === Application::class) {
                 $fs_path = application_configuration_dir().'/'.$this->resource->uuid.$this->file_storage_path;
             } elseif (str($this->resource->getMorphClass())->contains('Standalone')) {
                 $fs_path = database_configuration_dir().'/'.$this->resource->uuid.$this->file_storage_path;
@@ -146,7 +152,7 @@ class Storage extends Component
                 throw new \Exception('No valid resource type for file mount storage type!');
             }
 
-            \App\Models\LocalFileVolume::create([
+            LocalFileVolume::create([
                 'fs_path' => $fs_path,
                 'mount_path' => $this->file_storage_path,
                 'content' => $this->file_storage_content,
@@ -183,7 +189,7 @@ class Storage extends Component
             validateShellSafePath($this->file_storage_directory_source, 'storage source path');
             validateShellSafePath($this->file_storage_directory_destination, 'storage destination path');
 
-            \App\Models\LocalFileVolume::create([
+            LocalFileVolume::create([
                 'fs_path' => $this->file_storage_directory_source,
                 'mount_path' => $this->file_storage_directory_destination,
                 'is_directory' => true,

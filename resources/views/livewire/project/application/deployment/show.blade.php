@@ -330,7 +330,7 @@
                     <div id="logsContainer"
                         class="flex flex-col overflow-y-auto p-2 px-4 min-h-4 scrollbar"
                         :class="fullscreen ? 'flex-1' : 'max-h-[30rem]'">
-                        <div id="logs" class="flex flex-col font-mono">
+                        <div id="logs" class="flex flex-col font-logs">
                             <div x-show="searchQuery.trim() && matchCount === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
                                 No matches found.
@@ -356,7 +356,7 @@
                                         ])>{{ $lineContent }}</span>
                                 </div>
                             @empty
-                                <span class="font-mono text-neutral-400 mb-2">No logs yet.</span>
+                                <span class="font-logs text-neutral-400 mb-2">No logs yet.</span>
                             @endforelse
                         </div>
                     </div>

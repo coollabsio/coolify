@@ -8,6 +8,7 @@ on:
       - .github/workflows/coolify-helper-next.yml
       - .github/workflows/coolify-realtime.yml
       - .github/workflows/coolify-realtime-next.yml
+      - .github/workflows/pr-quality.yaml
       - docker/coolify-helper/Dockerfile
       - docker/coolify-realtime/Dockerfile
       - docker/testing-host/Dockerfile

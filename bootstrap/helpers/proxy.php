@@ -4,6 +4,7 @@ use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Server;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -108,18 +109,20 @@ function connectProxyToNetworks(Server $server)
     ['networks' => $networks] = collectDockerNetworksByServer($server);
     if ($server->isSwarm()) {
         $commands = $networks->map(function ($network) {
+            $safe = escapeshellarg($network);
             return [
-                "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --driver overlay --attachable $network >/dev/null",
-                "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
-                "echo 'Successfully connected coolify-proxy to $network network.'",
+                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --driver overlay --attachable {$safe} >/dev/null",
+                "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
+                "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
         });
     } else {
         $commands = $networks->map(function ($network) {
+            $safe = escapeshellarg($network);
             return [
-                "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --attachable $network >/dev/null",
-                "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
-                "echo 'Successfully connected coolify-proxy to $network network.'",
+                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --attachable {$safe} >/dev/null",
+                "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
+                "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
         });
     }
@@ -140,16 +143,18 @@ function ensureProxyNetworksExist(Server $server)
 
     if ($server->isSwarm()) {
         $commands = $networks->map(function ($network) {
+            $safe = escapeshellarg($network);
             return [
-                "echo 'Ensuring network $network exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable $network",
+                "echo 'Ensuring network {$safe} exists...'",
+                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable {$safe}",
             ];
         });
     } else {
         $commands = $networks->map(function ($network) {
+            $safe = escapeshellarg($network);
             return [
-                "echo 'Ensuring network $network exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable $network",
+                "echo 'Ensuring network {$safe} exists...'",
+                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable {$safe}",
             ];
         });
     }
@@ -215,6 +220,13 @@ function extractCustomProxyCommands(Server $server, string $existing_config): ar
 }
 function generateDefaultProxyConfiguration(Server $server, array $custom_commands = [])
 {
+    Log::info('Generating default proxy configuration', [
+        'server_id' => $server->id,
+        'server_name' => $server->name,
+        'custom_commands_count' => count($custom_commands),
+        'caller' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3)[1]['class'] ?? 'unknown',
+    ]);
+
     $proxy_path = $server->proxyPath();
     $proxy_type = $server->proxyType();
 

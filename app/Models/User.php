@@ -4,7 +4,9 @@ namespace App\Models;
 
 use App\Jobs\UpdateStripeCustomerEmailJob;
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\TransactionalEmails\EmailChangeVerification;
 use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
+use App\Services\ChangelogService;
 use App\Traits\DeletesUserSessions;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -41,7 +43,16 @@ class User extends Authenticatable implements SendsEmail
 {
     use DeletesUserSessions, HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+        'force_password_reset',
+        'marketing_emails',
+        'pending_email',
+        'email_change_code',
+        'email_change_code_expires_at',
+    ];
 
     protected $hidden = [
         'password',
@@ -87,7 +98,8 @@ class User extends Authenticatable implements SendsEmail
                 $team['id'] = 0;
                 $team['name'] = 'Root Team';
             }
-            $new_team = Team::create($team);
+            $new_team = (new Team)->forceFill($team);
+            $new_team->save();
             $user->teams()->attach($new_team, ['role' => 'owner']);
         });
 
@@ -190,7 +202,8 @@ class User extends Authenticatable implements SendsEmail
             $team['id'] = 0;
             $team['name'] = 'Root Team';
         }
-        $new_team = Team::create($team);
+        $new_team = (new Team)->forceFill($team);
+        $new_team->save();
         $this->teams()->attach($new_team, ['role' => 'owner']);
 
         return $new_team;
@@ -228,7 +241,7 @@ class User extends Authenticatable implements SendsEmail
 
     public function getUnreadChangelogCount(): int
     {
-        return app(\App\Services\ChangelogService::class)->getUnreadCountForUser($this);
+        return app(ChangelogService::class)->getUnreadCountForUser($this);
     }
 
     public function getRecipients(): array
@@ -239,7 +252,7 @@ class User extends Authenticatable implements SendsEmail
     public function sendVerificationEmail()
     {
         $mail = new MailMessage;
-        $url = Url::temporarySignedRoute(
+        $url = URL::temporarySignedRoute(
             'verify.verify',
             Carbon::now()->addMinutes(Config::get('auth.verification.expire', 60)),
             [
@@ -395,20 +408,20 @@ class User extends Authenticatable implements SendsEmail
     public function requestEmailChange(string $newEmail): void
     {
         // Generate 6-digit code
-        $code = sprintf('%06d', mt_rand(0, 999999));
+        $code = sprintf('%06d', random_int(0, 999999));
 
         // Set expiration using config value
         $expiryMinutes = config('constants.email_change.verification_code_expiry_minutes', 10);
         $expiresAt = Carbon::now()->addMinutes($expiryMinutes);
 
-        $this->update([
+        $this->fill([
             'pending_email' => $newEmail,
             'email_change_code' => $code,
             'email_change_code_expires_at' => $expiresAt,
-        ]);
+        ])->save();
 
         // Send verification email to new address
-        $this->notify(new \App\Notifications\TransactionalEmails\EmailChangeVerification($this, $code, $newEmail, $expiresAt));
+        $this->notify(new EmailChangeVerification($this, $code, $newEmail, $expiresAt));
     }
 
     public function isEmailChangeCodeValid(string $code): bool

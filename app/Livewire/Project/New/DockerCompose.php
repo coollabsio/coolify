@@ -41,8 +41,8 @@ class DockerCompose extends Component
             // Validate for command injection BEFORE saving to database
             validateDockerComposeForInjection($this->dockerComposeRaw);
 
-            $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-            $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
+            $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
+            $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
 
             $destination_uuid = $this->query['destination'];
             $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
@@ -63,10 +63,16 @@ class DockerCompose extends Component
             ]);
 
             $variables = parseEnvFormatToArray($this->envFile);
-            foreach ($variables as $key => $variable) {
+            foreach ($variables as $key => $data) {
+                // Extract value and comment from parsed data
+                // Handle both array format ['value' => ..., 'comment' => ...] and plain string values
+                $value = is_array($data) ? ($data['value'] ?? '') : $data;
+                $comment = is_array($data) ? ($data['comment'] ?? null) : null;
+
                 EnvironmentVariable::create([
                     'key' => $key,
-                    'value' => $variable,
+                    'value' => $value,
+                    'comment' => $comment,
                     'is_preview' => false,
                     'resourceable_id' => $service->id,
                     'resourceable_type' => $service->getMorphClass(),

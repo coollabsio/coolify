@@ -33,7 +33,8 @@ RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID && \
     docker-php-serversideup-set-file-permissions --owner $USER_ID:$GROUP_ID --service nginx
 
 # Install PostgreSQL repository and keys
-RUN apk add --no-cache gnupg && \
+RUN apk upgrade --no-cache && \
+    apk add --no-cache gnupg && \
     mkdir -p /usr/share/keyrings && \
     curl -fSsL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor > /usr/share/keyrings/postgresql.gpg
 
@@ -46,6 +47,9 @@ RUN apk add --no-cache \
     jq \
     lsof \
     vim
+
+# Install PHP extensions
+RUN install-php-extensions sockets
 
 # Configure shell aliases
 RUN echo "alias ll='ls -al'" >> /etc/profile && \

@@ -1,7 +1,9 @@
 <?php
-function getOldOrLocal($key, $localValue)
-{
-    return old($key) != '' ? old($key) : (app()->environment('local') ? $localValue : '');
+if (! function_exists('getOldOrLocal')) {
+    function getOldOrLocal($key, $localValue)
+    {
+        return old($key) != '' ? old($key) : (app()->environment('local') ? $localValue : '');
+    }
 }
 
 $name = getOldOrLocal('name', 'test3 normal user');

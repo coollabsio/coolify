@@ -56,7 +56,7 @@
                             required disabled />
                     </div>
                     <div x-cloak x-show="showPrivateKey">
-                        <x-forms.textarea canGate="update" :canResource="$private_key" rows="10" id="privateKeyValue" required />
+                        <x-forms.textarea canGate="update" :canResource="$private_key" rows="10" id="privateKeyValue" required monospace />
                     </div>
                 </div>
             </div>

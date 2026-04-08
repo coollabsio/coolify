@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Database\StartDatabase;
 use App\Actions\Service\StartService;
+use App\Enums\ApplicationDeploymentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\Tag;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 use Visus\Cuid2\Cuid2;
@@ -127,6 +130,10 @@ class DeployController extends Controller
         if (! $deployment) {
             return response()->json(['message' => 'Deployment not found.'], 404);
         }
+        $application = $deployment->application;
+        if (! $application || data_get($application->team(), 'id') !== (int) $teamId) {
+            return response()->json(['message' => 'Deployment not found.'], 404);
+        }
 
         return response()->json($this->removeSensitiveData($deployment));
     }
@@ -224,8 +231,8 @@ class DeployController extends Controller
 
         // Check if deployment can be cancelled (must be queued or in_progress)
         $cancellableStatuses = [
-            \App\Enums\ApplicationDeploymentStatus::QUEUED->value,
-            \App\Enums\ApplicationDeploymentStatus::IN_PROGRESS->value,
+            ApplicationDeploymentStatus::QUEUED->value,
+            ApplicationDeploymentStatus::IN_PROGRESS->value,
         ];
 
         if (! in_array($deployment->status, $cancellableStatuses)) {
@@ -242,11 +249,11 @@ class DeployController extends Controller
 
             // Mark deployment as cancelled
             $deployment->update([
-                'status' => \App\Enums\ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+                'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
             ]);
 
             // Get the server
-            $server = Server::find($build_server_id);
+            $server = Server::whereTeamId($teamId)->find($build_server_id);
 
             if ($server) {
                 // Add cancellation log entry
@@ -300,6 +307,8 @@ class DeployController extends Controller
             new OA\Parameter(name: 'uuid', in: 'query', description: 'Resource UUID(s). Comma separated list is also accepted.', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'force', in: 'query', description: 'Force rebuild (without cache)', schema: new OA\Schema(type: 'boolean')),
             new OA\Parameter(name: 'pr', in: 'query', description: 'Pull Request Id for deploying specific PR builds. Cannot be used with tag parameter.', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'pull_request_id', in: 'query', description: 'Preview deployment identifier. Alias of pr.', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'docker_tag', in: 'query', description: 'Docker image tag for Docker Image preview deployments. Requires pull_request_id.', schema: new OA\Schema(type: 'string')),
         ],
 
         responses: [
@@ -350,7 +359,9 @@ class DeployController extends Controller
         $uuids = $request->input('uuid');
         $tags = $request->input('tag');
         $force = $request->input('force') ?? false;
-        $pr = $request->input('pr') ? max((int) $request->input('pr'), 0) : 0;
+        $pullRequestId = $request->input('pull_request_id', $request->input('pr'));
+        $pr = $pullRequestId ? max((int) $pullRequestId, 0) : 0;
+        $dockerTag = $request->string('docker_tag')->trim()->value() ?: null;
 
         if ($uuids && $tags) {
             return response()->json(['message' => 'You can only use uuid or tag, not both.'], 400);
@@ -358,16 +369,22 @@ class DeployController extends Controller
         if ($tags && $pr) {
             return response()->json(['message' => 'You can only use tag or pr, not both.'], 400);
         }
+        if ($dockerTag && $pr === 0) {
+            return response()->json(['message' => 'docker_tag requires pull_request_id.'], 400);
+        }
+        if ($dockerTag && $tags) {
+            return response()->json(['message' => 'You can only use tag or docker_tag, not both.'], 400);
+        }
         if ($tags) {
             return $this->by_tags($tags, $teamId, $force);
         } elseif ($uuids) {
-            return $this->by_uuids($uuids, $teamId, $force, $pr);
+            return $this->by_uuids($uuids, $teamId, $force, $pr, $dockerTag);
         }
 
         return response()->json(['message' => 'You must provide uuid or tag.'], 400);
     }
 
-    private function by_uuids(string $uuid, int $teamId, bool $force = false, int $pr = 0)
+    private function by_uuids(string $uuid, int $teamId, bool $force = false, int $pr = 0, ?string $dockerTag = null)
     {
         $uuids = explode(',', $uuid);
         $uuids = collect(array_filter($uuids));
@@ -380,15 +397,22 @@ class DeployController extends Controller
         foreach ($uuids as $uuid) {
             $resource = getResourceByUuid($uuid, $teamId);
             if ($resource) {
+                $dockerTagForResource = $dockerTag;
                 if ($pr !== 0) {
-                    $preview = $resource->previews()->where('pull_request_id', $pr)->first();
+                    $preview = null;
+                    if ($resource instanceof Application && $resource->build_pack === 'dockerimage') {
+                        $preview = $this->upsertDockerImagePreview($resource, $pr, $dockerTag);
+                        $dockerTagForResource = $preview?->docker_registry_image_tag;
+                    } else {
+                        $preview = $resource->previews()->where('pull_request_id', $pr)->first();
+                    }
                     if (! $preview) {
                         $deployments->push(['message' => "Pull request {$pr} not found for this resource.", 'resource_uuid' => $uuid]);
 
                         continue;
                     }
                 }
-                $result = $this->deploy_resource($resource, $force, $pr);
+                $result = $this->deploy_resource($resource, $force, $pr, $dockerTagForResource);
                 if (isset($result['status']) && $result['status'] === 429) {
                     return response()->json(['message' => $result['message']], 429)->header('Retry-After', 60);
                 }
@@ -461,7 +485,7 @@ class DeployController extends Controller
         return response()->json(['message' => 'No resources found with this tag.'], 404);
     }
 
-    public function deploy_resource($resource, bool $force = false, int $pr = 0): array
+    public function deploy_resource($resource, bool $force = false, int $pr = 0, ?string $dockerTag = null): array
     {
         $message = null;
         $deployment_uuid = null;
@@ -473,8 +497,11 @@ class DeployController extends Controller
                 // Check authorization for application deployment
                 try {
                     $this->authorize('deploy', $resource);
-                } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                } catch (AuthorizationException $e) {
                     return ['message' => 'Unauthorized to deploy this application.', 'deployment_uuid' => null];
+                }
+                if ($dockerTag !== null && $resource->build_pack !== 'dockerimage') {
+                    return ['message' => 'docker_tag can only be used with Docker Image applications.', 'deployment_uuid' => null];
                 }
                 $deployment_uuid = new Cuid2;
                 $result = queue_application_deployment(
@@ -483,6 +510,7 @@ class DeployController extends Controller
                     force_rebuild: $force,
                     pull_request_id: $pr,
                     is_api: true,
+                    docker_registry_image_tag: $dockerTag,
                 );
                 if ($result['status'] === 'queue_full') {
                     return ['message' => $result['message'], 'deployment_uuid' => null, 'status' => 429];
@@ -496,7 +524,7 @@ class DeployController extends Controller
                 // Check authorization for service deployment
                 try {
                     $this->authorize('deploy', $resource);
-                } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                } catch (AuthorizationException $e) {
                     return ['message' => 'Unauthorized to deploy this service.', 'deployment_uuid' => null];
                 }
                 StartService::run($resource);
@@ -506,7 +534,7 @@ class DeployController extends Controller
                 // Database resource - check authorization
                 try {
                     $this->authorize('manage', $resource);
-                } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                } catch (AuthorizationException $e) {
                     return ['message' => 'Unauthorized to start this database.', 'deployment_uuid' => null];
                 }
                 StartDatabase::dispatch($resource);
@@ -519,6 +547,34 @@ class DeployController extends Controller
         }
 
         return ['message' => $message, 'deployment_uuid' => $deployment_uuid];
+    }
+
+    private function upsertDockerImagePreview(Application $application, int $pullRequestId, ?string $dockerTag): ?ApplicationPreview
+    {
+        $preview = $application->previews()->where('pull_request_id', $pullRequestId)->first();
+
+        if (! $preview && $dockerTag === null) {
+            return null;
+        }
+
+        if (! $preview) {
+            $preview = ApplicationPreview::create([
+                'application_id' => $application->id,
+                'pull_request_id' => $pullRequestId,
+                'pull_request_html_url' => '',
+                'docker_registry_image_tag' => $dockerTag,
+            ]);
+            $preview->generate_preview_fqdn();
+
+            return $preview;
+        }
+
+        if ($dockerTag !== null && $preview->docker_registry_image_tag !== $dockerTag) {
+            $preview->docker_registry_image_tag = $dockerTag;
+            $preview->save();
+        }
+
+        return $preview;
     }
 
     #[OA\Get(

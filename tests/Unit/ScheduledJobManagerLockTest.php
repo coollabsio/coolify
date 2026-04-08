@@ -24,7 +24,7 @@ it('uses WithoutOverlapping middleware with expireAfter to prevent stale locks',
     $expiresAfterProperty->setAccessible(true);
     $expiresAfter = $expiresAfterProperty->getValue($overlappingMiddleware);
 
-    expect($expiresAfter)->toBe(60)
+    expect($expiresAfter)->toBe(90)
         ->and($expiresAfter)->toBeGreaterThan(0, 'expireAfter must be set to prevent stale locks');
 
     // Check releaseAfter is NOT set (we use dontRelease)
