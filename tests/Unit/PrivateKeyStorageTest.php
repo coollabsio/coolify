@@ -220,6 +220,31 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     }
 
     /** @test */
+    public function it_successfully_overwrites_existing_key_file()
+    {
+        Storage::fake('ssh-keys');
+
+        $privateKey = PrivateKey::createAndStore([
+            'name' => 'Test Key',
+            'description' => 'Test Description',
+            'private_key' => $this->getValidPrivateKey(),
+            'team_id' => currentTeam()->id,
+        ]);
+
+        $filename = "ssh_key@{$privateKey->uuid}";
+        Storage::disk('ssh-keys')->assertExists($filename);
+
+        // Calling storeInFileSystem again should succeed (overwrite scenario)
+        $result = $privateKey->storeInFileSystem();
+        $this->assertNotNull($result);
+
+        // Verify file still exists with correct content
+        Storage::disk('ssh-keys')->assertExists($filename);
+        $storedContent = Storage::disk('ssh-keys')->get($filename);
+        $this->assertEquals($privateKey->private_key, $storedContent);
+    }
+
+    /** @test */
     public function it_successfully_deletes_private_key_from_filesystem()
     {
         Storage::fake('ssh-keys');
