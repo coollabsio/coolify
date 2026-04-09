@@ -105,3 +105,59 @@ it('force deletes service after edge cleanup succeeds', function () {
 
     $action->handle($service, false, false, false, false);
 });
+
+it('keeps service pending deletion when concrete edge route cleanup hits an ssh error', function () {
+    $server = Mockery::mock(Server::class)->makePartial();
+    $server->id = 11;
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 401;
+    $edgeProxyServer->name = 'edge-ssh-down';
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/edge-401');
+
+    $service = Mockery::mock(Service::class)->makePartial();
+    $service->uuid = 'service-concrete-ssh-cleanup-failure';
+    $service->setRelation('server', $server);
+    $service->setRelation('scheduled_tasks', collect());
+    $service->setRelation('environment', (object) [
+        'project' => (object) ['team_id' => 401],
+    ]);
+    $service->shouldReceive('forceDelete')->never();
+
+    $routeService = new class($edgeProxyServer) extends EdgeProxyRemoteRouteService
+    {
+        public function __construct(private Server $edgeProxyServer) {}
+
+        protected function resolveEdgeProxyServersByTeamId(?int $teamId): \Illuminate\Support\Collection
+        {
+            return collect([$this->edgeProxyServer]);
+        }
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            throw new RuntimeException('ssh: connect to host 10.10.10.10 port 22: No route to host');
+        }
+    };
+
+    $portForwardService = new class extends EdgeProxyRemotePortForwardService
+    {
+        protected function resolveEdgeProxyServersByTeamId(?int $teamId): \Illuminate\Support\Collection
+        {
+            return collect();
+        }
+    };
+
+    app()->instance(EdgeProxyRemoteRouteService::class, $routeService);
+    app()->instance(EdgeProxyRemotePortForwardService::class, $portForwardService);
+
+    $action = new class extends DeleteService
+    {
+        protected function runRemoteCommands(array $commands, $server, bool $throwError = true): ?string
+        {
+            return null;
+        }
+    };
+
+    expect(fn () => $action->handle($service, false, false, false, false))
+        ->toThrow(EdgeProxyCleanupPendingException::class, 'Edge cleanup pending for service service-concrete-ssh-cleanup-failure');
+});

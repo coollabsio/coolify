@@ -95,3 +95,56 @@ it('force deletes application after edge cleanup succeeds', function () {
 
     $job->handle();
 });
+
+it('keeps application pending deletion when concrete edge port cleanup hits an ssh error', function () {
+    $application = Mockery::mock(Application::class)->makePartial();
+    $application->uuid = 'application-concrete-port-ssh-failure';
+    $application->shouldReceive('trashed')->once()->andReturn(false);
+    $application->shouldReceive('delete')->once();
+    $application->shouldReceive('forceDelete')->never();
+    $application->setRelation('environment', (object) [
+        'project' => (object) ['team_id' => 402],
+    ]);
+
+    $routeService = new class extends EdgeProxyRemoteRouteService
+    {
+        protected function resolveEdgeProxyServersByTeamId(?int $teamId): \Illuminate\Support\Collection
+        {
+            return collect();
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(\App\Models\Server::class)->makePartial();
+    $edgeProxyServer->id = 402;
+    $edgeProxyServer->name = 'edge-port-timeout';
+
+    $portForwardService = new class($edgeProxyServer) extends EdgeProxyRemotePortForwardService
+    {
+        public function __construct(private \App\Models\Server $edgeProxyServer) {}
+
+        protected function resolveEdgeProxyServersByTeamId(?int $teamId): \Illuminate\Support\Collection
+        {
+            return collect([$this->edgeProxyServer]);
+        }
+
+        protected function runRemoteCommands(\App\Models\Server $server, array $commands, bool $throwError = true): ?string
+        {
+            throw new RuntimeException('ssh: connect to host 10.10.10.11 port 22: Connection timed out');
+        }
+    };
+
+    app()->instance(EdgeProxyRemoteRouteService::class, $routeService);
+    app()->instance(EdgeProxyRemotePortForwardService::class, $portForwardService);
+
+    $job = new class($application, false, false, false, false) extends DeleteResourceJob
+    {
+        protected function prepareResourceForDeletion(): void {}
+
+        protected function dispatchDockerCleanupIfNeeded(): void {}
+
+        protected function queueStuckedResourcesCleanup(): void {}
+    };
+
+    expect(fn () => $job->handle())
+        ->toThrow(EdgeProxyCleanupPendingException::class, 'Edge cleanup pending for application application-concrete-port-ssh-failure');
+});

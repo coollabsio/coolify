@@ -415,3 +415,66 @@ it('deletes application edge port proxy containers from all team traefik servers
         ->and($manager->calls[1]['server_id'])->toBe(72)
         ->and($manager->calls[1]['commands'][0])->toContain('application-application-delete-port-proxy-all-servers-edge-port-proxy');
 });
+
+it('returns cleanup failure details when deleting application edge port proxy hits an ssh error', function () {
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 81;
+    $edgeProxyServer->name = 'edge-proxy-81';
+
+    $application = new Application;
+    $application->uuid = 'application-delete-port-proxy-ssh-failure';
+    $application->setRelation('environment', (object) [
+        'project' => (object) ['team_id' => 81],
+    ]);
+
+    $manager = new class($edgeProxyServer) extends EdgeProxyRemotePortForwardService
+    {
+        public function __construct(private Server $edgeProxyServer) {}
+
+        protected function resolveEdgeProxyServersByTeamId(?int $teamId): \Illuminate\Support\Collection
+        {
+            return collect([$this->edgeProxyServer]);
+        }
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            throw new RuntimeException('ssh: connect to host 10.0.0.10 port 22: Connection timed out');
+        }
+    };
+
+    $failures = $manager->deleteApplication($application);
+
+    expect($failures)->toHaveCount(1)
+        ->and($failures[0])->toContain('Failed to delete edge port proxy for application application-delete-port-proxy-ssh-failure')
+        ->and($failures[0])->toContain('edge-proxy-81 (81)')
+        ->and($failures[0])->toContain('Connection timed out');
+});
+
+it('treats missing edge port proxy containers as already cleaned up', function () {
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 82;
+    $edgeProxyServer->name = 'edge-proxy-82';
+
+    $application = new Application;
+    $application->uuid = 'application-delete-missing-port-proxy';
+    $application->setRelation('environment', (object) [
+        'project' => (object) ['team_id' => 82],
+    ]);
+
+    $manager = new class($edgeProxyServer) extends EdgeProxyRemotePortForwardService
+    {
+        public function __construct(private Server $edgeProxyServer) {}
+
+        protected function resolveEdgeProxyServersByTeamId(?int $teamId): \Illuminate\Support\Collection
+        {
+            return collect([$this->edgeProxyServer]);
+        }
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            throw new RuntimeException('Error response from daemon: No such container: application-delete-missing-port-proxy-edge-port-proxy');
+        }
+    };
+
+    expect($manager->deleteApplication($application))->toBe([]);
+});

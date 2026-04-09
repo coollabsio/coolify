@@ -1580,3 +1580,38 @@ it('deletes application edge route files from all team traefik servers', functio
         ->and($manager->calls[1]['server_id'])->toBe(212)
         ->and($manager->calls[1]['commands'][0])->toContain('/tmp/edge-212/dynamic/application-remote-application-delete-all-edge-servers.yaml');
 });
+
+it('returns cleanup failure details when deleting service edge route files hits an ssh error', function () {
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 301;
+    $edgeProxyServer->name = 'edge-unreachable';
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/edge-301');
+
+    $manager = new class($edgeProxyServer) extends EdgeProxyRemoteRouteService
+    {
+        public function __construct(private Server $edgeProxyServer) {}
+
+        protected function resolveEdgeProxyServersByTeamId(?int $teamId): \Illuminate\Support\Collection
+        {
+            return collect([$this->edgeProxyServer]);
+        }
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            throw new RuntimeException('ssh: connect to host 10.0.0.9 port 22: No route to host');
+        }
+    };
+
+    $service = new Service;
+    $service->uuid = 'service-delete-ssh-failure';
+    $service->setRelation('environment', (object) [
+        'project' => (object) ['team_id' => 91],
+    ]);
+
+    $failures = $manager->deleteService($service);
+
+    expect($failures)->toHaveCount(1)
+        ->and($failures[0])->toContain('Failed to delete edge proxy route file for service service-delete-ssh-failure')
+        ->and($failures[0])->toContain('edge-unreachable (301)')
+        ->and($failures[0])->toContain('No route to host');
+});
