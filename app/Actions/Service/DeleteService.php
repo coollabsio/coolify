@@ -44,7 +44,7 @@ class DeleteService
                     foreach ($commands as $command) {
                         $result = $this->runRemoteCommands([$command], $server, false);
                         if ($result !== null && $result !== 0) {
-                            Log::error('Error deleting volumes: '.$result);
+                            $this->logError('Error deleting volumes: '.$result);
                         }
                     }
                 }
@@ -107,6 +107,17 @@ class DeleteService
     {
         if (app()->bound('log')) {
             app('log')->warning($message, $context);
+
+            return;
+        }
+
+        error_log($message.($context === [] ? '' : ' '.json_encode($context)));
+    }
+
+    protected function logError(string $message, array $context = []): void
+    {
+        if (app()->bound('log')) {
+            app('log')->error($message, $context);
 
             return;
         }

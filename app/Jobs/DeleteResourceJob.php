@@ -254,7 +254,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             }
         } catch (\Throwable $e) {
             // Log the error but don't fail the job
-            \Log::warning('Error stopping preview containers for application '.$application->uuid.', PR #'.$pull_request_id.': '.$e->getMessage());
+            $this->logWarning('Error stopping preview containers for application '.$application->uuid.', PR #'.$pull_request_id.': '.$e->getMessage());
         }
 
         // Finally, force delete to trigger resource cleanup
