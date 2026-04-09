@@ -38,7 +38,7 @@ class SendMasterUpdateReportJob implements ShouldBeEncrypted, ShouldQueue
                         continue;
                     }
 
-                    if (! $this->isDueToday($settings->master_update_report_frequency ?? 'weekly', $settings->master_update_report_day ?? 'monday', $now)) {
+                    if (! $this->isDueToday($settings->master_update_report_frequency ?? 'daily', $settings->master_update_report_day ?? 'monday', $now)) {
                         continue;
                     }
 
@@ -70,7 +70,7 @@ class SendMasterUpdateReportJob implements ShouldBeEncrypted, ShouldQueue
     protected function isDueToday(string $frequency, string $day, $now): bool
     {
         return match ($frequency) {
-            'daily' => true,
+            'daily', 'nightly' => true,
             'weekly' => strtolower($now->englishDayOfWeek) === strtolower($day),
             default => false,
         };

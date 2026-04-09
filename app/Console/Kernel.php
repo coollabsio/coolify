@@ -78,7 +78,7 @@ class Kernel extends ConsoleKernel
 
             $this->scheduleInstance->job(new RegenerateSslCertJob)->twiceDaily();
 
-            $this->scheduleInstance->job(new CheckTraefikVersionJob)->weekly()->sundays()->at('00:00')->timezone($this->instanceTimezone)->onOneServer();
+            $this->scheduleInstance->job(new CheckTraefikVersionJob)->dailyAt('00:00')->timezone($this->instanceTimezone)->onOneServer();
             $this->scheduleInstance->job(new SendMasterUpdateReportJob)->dailyAt('00:15')->timezone($this->instanceTimezone)->onOneServer();
 
             $this->scheduleInstance->command('cleanup:database --yes')->daily();

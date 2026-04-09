@@ -126,10 +126,10 @@
                     <x-forms.select canGate="update" :canResource="$settings" id="masterUpdateReportFrequency"
                         wire:change="saveModel"
                         label="Frequency">
-                        <option value="weekly">Weekly</option>
                         <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
                     </x-forms.select>
-                    @if ($masterUpdateReportFrequency !== 'daily')
+                    @if ($masterUpdateReportFrequency === 'weekly')
                         <x-forms.select canGate="update" :canResource="$settings" id="masterUpdateReportDay"
                             wire:change="saveModel"
                             label="Send Day" helper="Used for weekly reports.">

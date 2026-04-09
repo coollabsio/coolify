@@ -110,8 +110,8 @@ class Email extends Component
     #[Validate(['boolean'])]
     public bool $masterUpdateReportEmailNotifications = true;
 
-    #[Validate(['required', 'string', 'in:daily,weekly'])]
-    public string $masterUpdateReportFrequency = 'weekly';
+    #[Validate(['required', 'string', 'in:daily,weekly,nightly'])]
+    public string $masterUpdateReportFrequency = 'daily';
 
     #[Validate(['required', 'string', 'in:monday,tuesday,wednesday,thursday,friday,saturday,sunday'])]
     public string $masterUpdateReportDay = 'monday';
@@ -169,7 +169,9 @@ class Email extends Component
             $this->settings->server_patch_email_notifications = $this->serverPatchEmailNotifications;
             $this->settings->traefik_outdated_email_notifications = $this->traefikOutdatedEmailNotifications;
             $this->settings->master_update_report_email_notifications = $this->masterUpdateReportEmailNotifications;
-            $this->settings->master_update_report_frequency = $this->masterUpdateReportFrequency;
+            $this->settings->master_update_report_frequency = $this->masterUpdateReportFrequency === 'nightly'
+                ? 'daily'
+                : $this->masterUpdateReportFrequency;
             $this->settings->master_update_report_day = $this->masterUpdateReportDay;
             $this->settings->save();
 
@@ -205,7 +207,12 @@ class Email extends Component
             $this->serverPatchEmailNotifications = $this->settings->server_patch_email_notifications;
             $this->traefikOutdatedEmailNotifications = $this->settings->traefik_outdated_email_notifications;
             $this->masterUpdateReportEmailNotifications = $this->settings->master_update_report_email_notifications ?? true;
-            $this->masterUpdateReportFrequency = $this->settings->master_update_report_frequency ?? 'weekly';
+            $this->masterUpdateReportFrequency = match ($this->settings->master_update_report_frequency) {
+                'nightly' => 'daily',
+                'weekly' => 'weekly',
+                'daily' => 'daily',
+                default => 'daily',
+            };
             $this->masterUpdateReportDay = $this->settings->master_update_report_day ?? 'monday';
         }
     }

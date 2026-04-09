@@ -23,11 +23,11 @@ afterEach(function () {
     Mockery::close();
 });
 
-it('creates master update report settings with weekly monday defaults', function () {
+it('creates master update report settings with daily defaults', function () {
     $team = Team::factory()->create();
 
     expect($team->emailNotificationSettings->master_update_report_email_notifications)->toBeTrue()
-        ->and($team->emailNotificationSettings->master_update_report_frequency)->toBe('weekly')
+        ->and($team->emailNotificationSettings->master_update_report_frequency)->toBe('daily')
         ->and($team->emailNotificationSettings->master_update_report_day)->toBe('monday');
 });
 

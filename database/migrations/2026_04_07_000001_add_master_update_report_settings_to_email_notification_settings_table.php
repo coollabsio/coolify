@@ -13,7 +13,7 @@ return new class extends Migration
                 $table->boolean('master_update_report_email_notifications')->default(true);
             }
             if (! Schema::hasColumn('email_notification_settings', 'master_update_report_frequency')) {
-                $table->string('master_update_report_frequency')->default('weekly');
+                $table->string('master_update_report_frequency')->default('daily');
             }
             if (! Schema::hasColumn('email_notification_settings', 'master_update_report_day')) {
                 $table->string('master_update_report_day')->default('monday');
