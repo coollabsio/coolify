@@ -1,20 +1,25 @@
 <?php
 
+use App\Exceptions\EdgeProxyCleanupPendingException;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Services\EdgeProxyRemotePortForwardService;
 use App\Services\EdgeProxyRemoteRouteService;
 
-it('force deletes application when edge route cleanup fails', function () {
+it('keeps application pending deletion when edge route cleanup fails', function () {
     $application = Mockery::mock(Application::class)->makePartial();
     $application->uuid = 'application-cleanup-failure';
-    $application->shouldReceive('forceDelete')->once();
+    $application->shouldReceive('trashed')->once()->andReturn(false);
+    $application->shouldReceive('delete')->once();
+    $application->shouldReceive('forceDelete')->never();
 
     $routeService = Mockery::mock(EdgeProxyRemoteRouteService::class);
-    $routeService->shouldReceive('deleteApplication')->once()->with($application)->andThrow(new RuntimeException('application route cleanup failed'));
+    $routeService->shouldReceive('deleteApplication')->once()->with($application)->andReturn([
+        'Failed to delete edge proxy route file for application application-cleanup-failure on edge server edge-1 (101): application route cleanup failed',
+    ]);
 
     $portForwardService = Mockery::mock(EdgeProxyRemotePortForwardService::class);
-    $portForwardService->shouldReceive('deleteApplication')->once()->with($application);
+    $portForwardService->shouldReceive('deleteApplication')->once()->with($application)->andReturn([]);
 
     app()->instance(EdgeProxyRemoteRouteService::class, $routeService);
     app()->instance(EdgeProxyRemotePortForwardService::class, $portForwardService);
@@ -28,19 +33,24 @@ it('force deletes application when edge route cleanup fails', function () {
         protected function queueStuckedResourcesCleanup(): void {}
     };
 
-    $job->handle();
+    expect(fn () => $job->handle())
+        ->toThrow(EdgeProxyCleanupPendingException::class, 'Edge cleanup pending for application application-cleanup-failure');
 });
 
-it('force deletes application when edge port cleanup fails', function () {
+it('keeps application pending deletion when edge port cleanup fails', function () {
     $application = Mockery::mock(Application::class)->makePartial();
     $application->uuid = 'application-port-cleanup-failure';
-    $application->shouldReceive('forceDelete')->once();
+    $application->shouldReceive('trashed')->once()->andReturn(false);
+    $application->shouldReceive('delete')->once();
+    $application->shouldReceive('forceDelete')->never();
 
     $routeService = Mockery::mock(EdgeProxyRemoteRouteService::class);
-    $routeService->shouldReceive('deleteApplication')->once()->with($application);
+    $routeService->shouldReceive('deleteApplication')->once()->with($application)->andReturn([]);
 
     $portForwardService = Mockery::mock(EdgeProxyRemotePortForwardService::class);
-    $portForwardService->shouldReceive('deleteApplication')->once()->with($application)->andThrow(new RuntimeException('application port cleanup failed'));
+    $portForwardService->shouldReceive('deleteApplication')->once()->with($application)->andReturn([
+        'Failed to delete edge port proxy for application application-port-cleanup-failure on edge server edge-2 (202): application port cleanup failed',
+    ]);
 
     app()->instance(EdgeProxyRemoteRouteService::class, $routeService);
     app()->instance(EdgeProxyRemotePortForwardService::class, $portForwardService);
@@ -54,19 +64,22 @@ it('force deletes application when edge port cleanup fails', function () {
         protected function queueStuckedResourcesCleanup(): void {}
     };
 
-    $job->handle();
+    expect(fn () => $job->handle())
+        ->toThrow(EdgeProxyCleanupPendingException::class, 'Edge cleanup pending for application application-port-cleanup-failure');
 });
 
 it('force deletes application after edge cleanup succeeds', function () {
     $application = Mockery::mock(Application::class)->makePartial();
     $application->uuid = 'application-cleanup-success';
+    $application->shouldReceive('trashed')->once()->andReturn(false);
+    $application->shouldReceive('delete')->once();
     $application->shouldReceive('forceDelete')->once();
 
     $routeService = Mockery::mock(EdgeProxyRemoteRouteService::class);
-    $routeService->shouldReceive('deleteApplication')->once()->with($application);
+    $routeService->shouldReceive('deleteApplication')->once()->with($application)->andReturn([]);
 
     $portForwardService = Mockery::mock(EdgeProxyRemotePortForwardService::class);
-    $portForwardService->shouldReceive('deleteApplication')->once()->with($application);
+    $portForwardService->shouldReceive('deleteApplication')->once()->with($application)->andReturn([]);
 
     app()->instance(EdgeProxyRemoteRouteService::class, $routeService);
     app()->instance(EdgeProxyRemotePortForwardService::class, $portForwardService);

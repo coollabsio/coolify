@@ -3,6 +3,7 @@
 namespace App\Actions\Service;
 
 use App\Actions\Server\CleanupDocker;
+use App\Exceptions\EdgeProxyCleanupPendingException;
 use App\Models\Service;
 use App\Services\EdgeProxyRemotePortForwardService;
 use App\Services\EdgeProxyRemoteRouteService;
@@ -58,7 +59,10 @@ class DeleteService
             throw new \RuntimeException($exception->getMessage(), previous: $exception);
         }
 
-        $this->cleanupEdgeProxyState($service);
+        $edgeCleanupFailures = $this->cleanupEdgeProxyState($service);
+        if ($edgeCleanupFailures !== []) {
+            throw new EdgeProxyCleanupPendingException('service', $service->uuid, $edgeCleanupFailures);
+        }
 
         if ($deleteConfigurations) {
             $service->deleteConfigurations();
@@ -85,25 +89,18 @@ class DeleteService
         return instant_remote_process($commands, $server, $throwError);
     }
 
-    protected function cleanupEdgeProxyState(Service $service): void
+    protected function cleanupEdgeProxyState(Service $service): array
     {
-        try {
-            app(EdgeProxyRemoteRouteService::class)->deleteService($service);
-        } catch (\Throwable $exception) {
-            $this->logWarning('Failed to delete edge proxy route file for service.', [
-                'service_uuid' => $service->uuid,
-                'error' => $exception->getMessage(),
-            ]);
+        $failures = [
+            ...app(EdgeProxyRemoteRouteService::class)->deleteService($service),
+            ...app(EdgeProxyRemotePortForwardService::class)->deleteService($service),
+        ];
+
+        foreach ($failures as $failure) {
+            $this->logWarning($failure);
         }
 
-        try {
-            app(EdgeProxyRemotePortForwardService::class)->deleteService($service);
-        } catch (\Throwable $exception) {
-            $this->logWarning('Failed to delete edge port proxy for service.', [
-                'service_uuid' => $service->uuid,
-                'error' => $exception->getMessage(),
-            ]);
-        }
+        return $failures;
     }
 
     protected function logWarning(string $message, array $context = []): void

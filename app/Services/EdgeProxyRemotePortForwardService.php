@@ -74,26 +74,30 @@ class EdgeProxyRemotePortForwardService
         );
     }
 
-    public function deleteService(Service $service): void
+    public function deleteService(Service $service): array
     {
-        $this->resolveEdgeProxyServersByTeamId($this->extractServiceTeamId($service))
-            ->each(fn (Server $edgeProxyServer) => $this->deleteServiceWithServer($service, $edgeProxyServer));
+        return $this->resolveEdgeProxyServersByTeamId($this->extractServiceTeamId($service))
+            ->flatMap(fn (Server $edgeProxyServer) => $this->deleteServiceWithServer($service, $edgeProxyServer))
+            ->values()
+            ->all();
     }
 
-    public function deleteServiceWithServer(Service $service, Server $edgeProxyServer): void
+    public function deleteServiceWithServer(Service $service, Server $edgeProxyServer): array
     {
-        $this->deleteResourcePortProxy($edgeProxyServer, 'service', $service->uuid);
+        return $this->deleteResourcePortProxyWithResult($edgeProxyServer, 'service', $service->uuid);
     }
 
-    public function deleteApplication(Application $application): void
+    public function deleteApplication(Application $application): array
     {
-        $this->resolveEdgeProxyServersByTeamId($this->extractApplicationTeamId($application))
-            ->each(fn (Server $edgeProxyServer) => $this->deleteApplicationWithServer($application, $edgeProxyServer));
+        return $this->resolveEdgeProxyServersByTeamId($this->extractApplicationTeamId($application))
+            ->flatMap(fn (Server $edgeProxyServer) => $this->deleteApplicationWithServer($application, $edgeProxyServer))
+            ->values()
+            ->all();
     }
 
-    public function deleteApplicationWithServer(Application $application, Server $edgeProxyServer): void
+    public function deleteApplicationWithServer(Application $application, Server $edgeProxyServer): array
     {
-        $this->deleteResourcePortProxy($edgeProxyServer, 'application', $application->uuid);
+        return $this->deleteResourcePortProxyWithResult($edgeProxyServer, 'application', $application->uuid);
     }
 
     protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
@@ -342,13 +346,40 @@ class EdgeProxyRemotePortForwardService
         ]);
     }
 
-    private function deleteResourcePortProxy(Server $edgeProxyServer, string $resourceType, string $resourceUuid): void
+    private function deleteResourcePortProxy(Server $edgeProxyServer, string $resourceType, string $resourceUuid, bool $throwError = true): void
     {
         $escapedContainerName = escapeshellarg($this->proxyContainerName($resourceType, $resourceUuid));
 
         $this->runRemoteCommands($edgeProxyServer, [
             "docker rm -f $escapedContainerName",
-        ], false);
+        ], $throwError);
+    }
+
+    private function deleteResourcePortProxyWithResult(Server $edgeProxyServer, string $resourceType, string $resourceUuid): array
+    {
+        try {
+            $this->deleteResourcePortProxy($edgeProxyServer, $resourceType, $resourceUuid);
+
+            return [];
+        } catch (\Throwable $exception) {
+            if ($this->isMissingContainerError($exception)) {
+                return [];
+            }
+
+            return [sprintf(
+                'Failed to delete edge port proxy for %s %s on edge server %s (%d): %s',
+                $resourceType,
+                $resourceUuid,
+                $edgeProxyServer->name,
+                $edgeProxyServer->id,
+                $exception->getMessage()
+            )];
+        }
+    }
+
+    private function isMissingContainerError(\Throwable $exception): bool
+    {
+        return str_contains(strtolower($exception->getMessage()), 'no such container');
     }
 
     private function generateNginxStreamConfig(string $remoteHost, Collection $publishedPortMappings): string

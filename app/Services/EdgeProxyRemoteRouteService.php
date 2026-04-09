@@ -415,26 +415,54 @@ class EdgeProxyRemoteRouteService
         return $warnings;
     }
 
-    public function deleteService(Service $service): void
+    public function deleteService(Service $service): array
     {
-        $this->resolveEdgeProxyServersByTeamId($this->extractServiceTeamId($service))
-            ->each(fn (Server $edgeProxyServer) => $this->deleteServiceWithServer($service, $edgeProxyServer));
+        return $this->resolveEdgeProxyServersByTeamId($this->extractServiceTeamId($service))
+            ->flatMap(fn (Server $edgeProxyServer) => $this->deleteServiceWithServer($service, $edgeProxyServer))
+            ->values()
+            ->all();
     }
 
-    public function deleteServiceWithServer(Service $service, Server $edgeProxyServer): void
+    public function deleteServiceWithServer(Service $service, Server $edgeProxyServer): array
     {
-        $this->deleteRouteFile($edgeProxyServer, $service->uuid);
+        try {
+            $this->deleteRouteFile($edgeProxyServer, $service->uuid);
+
+            return [];
+        } catch (\Throwable $exception) {
+            return [sprintf(
+                'Failed to delete edge proxy route file for service %s on edge server %s (%d): %s',
+                $service->uuid,
+                $edgeProxyServer->name,
+                $edgeProxyServer->id,
+                $exception->getMessage()
+            )];
+        }
     }
 
-    public function deleteApplication(Application $application): void
+    public function deleteApplication(Application $application): array
     {
-        $this->resolveEdgeProxyServersByTeamId($this->extractApplicationTeamId($application))
-            ->each(fn (Server $edgeProxyServer) => $this->deleteApplicationWithServer($application, $edgeProxyServer));
+        return $this->resolveEdgeProxyServersByTeamId($this->extractApplicationTeamId($application))
+            ->flatMap(fn (Server $edgeProxyServer) => $this->deleteApplicationWithServer($application, $edgeProxyServer))
+            ->values()
+            ->all();
     }
 
-    public function deleteApplicationWithServer(Application $application, Server $edgeProxyServer): void
+    public function deleteApplicationWithServer(Application $application, Server $edgeProxyServer): array
     {
-        $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX);
+        try {
+            $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX);
+
+            return [];
+        } catch (\Throwable $exception) {
+            return [sprintf(
+                'Failed to delete edge proxy route file for application %s on edge server %s (%d): %s',
+                $application->uuid,
+                $edgeProxyServer->name,
+                $edgeProxyServer->id,
+                $exception->getMessage()
+            )];
+        }
     }
 
     public function generateTraefikConfig(string $serviceUuid, array $routes): array
@@ -561,7 +589,7 @@ class EdgeProxyRemoteRouteService
         ]);
     }
 
-    private function deleteRouteFile(Server $edgeProxyServer, string $resourceUuid, string $filePrefix = self::SERVICE_ROUTE_FILE_PREFIX): void
+    private function deleteRouteFile(Server $edgeProxyServer, string $resourceUuid, string $filePrefix = self::SERVICE_ROUTE_FILE_PREFIX, bool $throwError = true): void
     {
         $routeFilePath = $this->resourceRouteFilePath($edgeProxyServer, $filePrefix, $resourceUuid);
         $escapedFilePath = escapeshellarg($routeFilePath);
@@ -569,7 +597,7 @@ class EdgeProxyRemoteRouteService
 
         $this->runRemoteCommands($edgeProxyServer, [
             "rm -f $escapedFilePath $escapedTemporaryFilePath",
-        ], false);
+        ], $throwError);
     }
 
     private function buildTraefikRule(string $host, ?string $path): ?string

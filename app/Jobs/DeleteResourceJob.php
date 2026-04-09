@@ -7,6 +7,7 @@ use App\Actions\Database\StopDatabase;
 use App\Actions\Server\CleanupDocker;
 use App\Actions\Service\DeleteService;
 use App\Actions\Service\StopService;
+use App\Exceptions\EdgeProxyCleanupPendingException;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Service;
@@ -32,6 +33,8 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $tries = 10;
+
     public function __construct(
         public Application|ApplicationPreview|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
         public bool $deleteVolumes = true,
@@ -40,6 +43,11 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         public bool $dockerCleanup = true
     ) {
         $this->onQueue('high');
+    }
+
+    public function backoff(): array
+    {
+        return isDev() ? [1, 5, 15] : [60, 300, 900, 1800, 3600];
     }
 
     public function handle()
@@ -52,16 +60,26 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         if ($this->resource instanceof Service) {
+            $this->markResourcePendingDeletion();
             $this->stopAndDeleteServiceResource();
             $this->queueStuckedResourcesCleanup();
 
             return;
         }
 
+        if ($this->resource instanceof Application) {
+            $this->markResourcePendingDeletion();
+        }
+
         $this->prepareResourceForDeletion();
 
         if ($this->resource instanceof Application) {
-            $this->cleanupApplicationEdgeProxyState($this->resource);
+            $edgeCleanupFailures = $this->cleanupApplicationEdgeProxyState($this->resource);
+            if ($edgeCleanupFailures !== []) {
+                $this->queueStuckedResourcesCleanup();
+
+                throw new EdgeProxyCleanupPendingException('application', $this->resource->uuid, $edgeCleanupFailures);
+            }
         }
 
         $this->resource->forceDelete();
@@ -123,19 +141,18 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    protected function cleanupApplicationEdgeProxyState(Application $application): void
+    protected function cleanupApplicationEdgeProxyState(Application $application): array
     {
-        try {
-            app(EdgeProxyRemoteRouteService::class)->deleteApplication($application);
-        } catch (\Throwable $exception) {
-            $this->logWarning('Failed to delete edge proxy route file for application '.$application->uuid.': '.$exception->getMessage());
+        $failures = [
+            ...app(EdgeProxyRemoteRouteService::class)->deleteApplication($application),
+            ...app(EdgeProxyRemotePortForwardService::class)->deleteApplication($application),
+        ];
+
+        foreach ($failures as $failure) {
+            $this->logWarning($failure);
         }
 
-        try {
-            app(EdgeProxyRemotePortForwardService::class)->deleteApplication($application);
-        } catch (\Throwable $exception) {
-            $this->logWarning('Failed to delete edge port proxy for application '.$application->uuid.': '.$exception->getMessage());
-        }
+        return $failures;
     }
 
     protected function logWarning(string $message): void
@@ -164,6 +181,19 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
     protected function queueStuckedResourcesCleanup(): void
     {
         Artisan::queue('cleanup:stucked-resources');
+    }
+
+    protected function markResourcePendingDeletion(): void
+    {
+        if (! ($this->resource instanceof Application || $this->resource instanceof Service)) {
+            return;
+        }
+
+        if (! method_exists($this->resource, 'trashed') || $this->resource->trashed()) {
+            return;
+        }
+
+        $this->resource->delete();
     }
 
     private function deleteApplicationPreview()
