@@ -217,6 +217,12 @@ class PrivateKey extends BaseModel
                 throw new \Exception("Failed to acquire lock for SSH key: {$keyLocation}");
             }
 
+            // Delete existing file first — Flysystem's put() returns false
+            // when overwriting a file with 0600 permissions (cannot set visibility)
+            if ($disk->exists($filename)) {
+                $disk->delete($filename);
+            }
+
             // Attempt to store the private key
             $success = $disk->put($filename, $this->private_key);
 
