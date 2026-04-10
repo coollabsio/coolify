@@ -1,3 +1,30 @@
+import http from 'http';
+
+export function httpPost(url, headers) {
+    const parsed = new URL(url);
+    return new Promise((resolve, reject) => {
+        const req = http.request({
+            hostname: parsed.hostname,
+            port: parsed.port,
+            path: parsed.pathname,
+            method: 'POST',
+            headers,
+        }, (res) => {
+            let body = '';
+            res.on('data', (chunk) => body += chunk);
+            res.on('end', () => {
+                resolve({
+                    ok: res.statusCode >= 200 && res.statusCode < 300,
+                    status: res.statusCode,
+                    json: () => JSON.parse(body),
+                });
+            });
+        });
+        req.on('error', reject);
+        req.end();
+    });
+}
+
 export function extractTimeout(commandString) {
     const timeoutMatch = commandString.match(/timeout (\d+)/);
     return timeoutMatch ? parseInt(timeoutMatch[1], 10) : null;
