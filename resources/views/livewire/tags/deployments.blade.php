@@ -3,10 +3,10 @@
          <h4 class="py-4">{{ $server_name }}</h4>
          <div class="grid grid-cols-1 gap-2">
              @foreach ($deployments as $deployment)
-                 <a href="{{ data_get($deployment, 'deployment_url') }}" @class([
+                 <a {{ wireNavigate() }} href="{{ data_get($deployment, 'deployment_url') }}" @class([
                      'box-without-bg-without-border dark:bg-coolgray-100 bg-white gap-2 cursor-pointer group border-l-2',
                      'dark:border-coolgray-300' => data_get($deployment, 'status') === 'queued',
-                     'dark:border-yellow-500' =>
+                     'dark:border-warning-500' =>
                          data_get($deployment, 'status') === 'in_progress',
                  ])>
                      <div class="flex flex-col mx-6">

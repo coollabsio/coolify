@@ -30,6 +30,9 @@ services:
       - NEXT_PRIVATE_DIRECT_DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@database/${POSTGRES_DB:-documenso-db}?schema=public
       - NEXT_PRIVATE_SIGNING_LOCAL_FILE_PATH=/app/apps/remix/certs/certificate.p12
       - NEXT_PRIVATE_SIGNING_PASSPHRASE=${SERVICE_PASSWORD_DOCUMENSO}
+      - NEXT_PRIVATE_SIGNING_TRANSPORT=local
+      - NEXT_PRIVATE_SIGNING_LOCAL_FILE_PATH=/app/certs/cert.p12
+      - NEXT_PRIVATE_SIGNING_LOCAL_FILE_PASSPHRASE=${SERVICE_PASSWORD_DOCUMENSO}
       - CERT_VALID_DAYS=${CERT_VALID_DAYS:-365}
       - CERT_INFO_COUNTRY_NAME=${CERT_INFO_COUNTRY_NAME:-DO}
       - CERT_INFO_STATE_OR_PROVIDENCE=${CERT_INFO_STATE_OR_PROVIDENCE:-Santiago}
@@ -38,6 +41,7 @@ services:
       - CERT_INFO_ORGANIZATIONAL_UNIT=${CERT_INFO_ORGANIZATIONAL_UNIT:-IT Department}
       - CERT_INFO_EMAIL=${CERT_INFO_EMAIL:-example@gmail.com}
       - NEXT_PUBLIC_DISABLE_SIGNUP=${DISABLE_LOGIN:-false}
+      - SERVICE_PASSWORD_DOCUMENSO=${SERVICE_PASSWORD_DOCUMENSO:-}
     healthcheck:
       test:
         - CMD-SHELL
@@ -49,10 +53,35 @@ services:
       - /bin/sh
       - -c
       - |
-        echo "./certs" > /tmp/certs_dir_path
-        echo "./make-certs.sh" > /tmp/cert_script_path
-        echo "${SERVICE_PASSWORD_DOCUMENSO}" > /tmp/cert_pass
-
+        CERT_PASSPHRASE="$${NEXT_PRIVATE_SIGNING_LOCAL_FILE_PASSPHRASE}"
+        PASSPHRASE_FILE="/tmp/cert_passphrase"
+        
+        # Save original working directory
+        ORIGINAL_DIR="$$(pwd)"
+        
+        # Find openssl binary (should be available in v1.12.10+)
+        OPENSSL_CMD="$$(which openssl 2>/dev/null || command -v openssl 2>/dev/null || echo '/usr/bin/openssl')"
+        
+        # Verify openssl is available
+        if ! $$OPENSSL_CMD version >/dev/null 2>&1; then
+          echo "Error: OpenSSL not found. Please use Documenso image v1.12.10 or later."
+          exit 1
+        fi
+        
+        # Create certificate directory - use /app/certs (writable by user 1001)
+        CERT_DIR="/app/certs"
+        mkdir -p "$$CERT_DIR" || {
+          # Fallback to tmp if app directory not writable
+          CERT_DIR="/tmp/certs"
+          mkdir -p "$$CERT_DIR"
+          echo "Warning: Using fallback directory: $$CERT_DIR"
+        }
+        
+        # Create passphrase file for secure handling (prevents exposure in process list)
+        # This avoids shell word-splitting issues and prevents passphrase from appearing in ps/process list
+        echo -n "$$CERT_PASSPHRASE" > "$$PASSPHRASE_FILE"
+        chmod 600 "$$PASSPHRASE_FILE"
+        
         touch /tmp/cert_info_path
         cat <<EOF > /tmp/cert_info_path
         [ req ]
@@ -68,31 +97,43 @@ services:
         emailAddress = ${CERT_INFO_EMAIL}
         EOF
 
-        cat <<EOF > "$(cat /tmp/cert_script_path)"
-        mkdir -p "$(cat /tmp/certs_dir_path)" && cd "$(cat /tmp/certs_dir_path)"
-
-        openssl genrsa -out private.key 2048
-
-        openssl req \
+        cd "$$CERT_DIR"
+        
+        $$OPENSSL_CMD genrsa -out private.key 2048
+        
+        $$OPENSSL_CMD req \
           -new \
           -x509 \
           -key private.key \
           -out certificate.crt \
-          -days ${CERT_VALID_DAYS} \
+          -days $${CERT_VALID_DAYS} \
           -config /tmp/cert_info_path
-
-        openssl pkcs12 \
+        
+        # Create P12 certificate using file-based passphrase (prevents exposure in process list)
+        # Private key is not encrypted, so we only need -passout (not -passin)
+        $$OPENSSL_CMD pkcs12 \
           -export \
-          -out certificate.p12 \
+          -out cert.p12 \
           -inkey private.key \
           -in certificate.crt \
           -legacy \
-          -password file:/tmp/cert_pass
-        EOF
-        chmod +x "$(cat /tmp/cert_script_path)"
-
-        sh "$(cat /tmp/cert_script_path)"
-
+          -passout file:"$$PASSPHRASE_FILE"
+        
+        # Clean up passphrase file immediately after use
+        rm -f "$$PASSPHRASE_FILE"
+        
+        # Set permissions (may fail if not root, but will work in Coolify)
+        chown 1001:1001 cert.p12 private.key certificate.crt 2>/dev/null || true
+        chmod 400 cert.p12 private.key certificate.crt
+        
+        # Update environment variable if directory changed
+        if [ "$$CERT_DIR" != "/app/certs" ]; then
+          export NEXT_PRIVATE_SIGNING_LOCAL_FILE_PATH="$$CERT_DIR/cert.p12"
+        fi
+        
+        # Return to original directory before starting application
+        cd "$$ORIGINAL_DIR"
+        
         ./start.sh
 
   database:

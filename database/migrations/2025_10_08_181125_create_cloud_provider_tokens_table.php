@@ -11,16 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('cloud_provider_tokens', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('team_id')->constrained()->onDelete('cascade');
-            $table->string('provider');
-            $table->text('token');
-            $table->string('name')->nullable();
-            $table->timestamps();
+        if (! Schema::hasTable('cloud_provider_tokens')) {
+            Schema::create('cloud_provider_tokens', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('team_id')->constrained()->onDelete('cascade');
+                $table->string('provider');
+                $table->text('token');
+                $table->string('name')->nullable();
+                $table->timestamps();
 
-            $table->index(['team_id', 'provider']);
-        });
+                $table->index(['team_id', 'provider']);
+            });
+        }
     }
 
     /**

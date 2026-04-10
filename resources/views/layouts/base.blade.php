@@ -83,7 +83,7 @@
             if (!html) return '';
             const URL_RE = /^(https?:|mailto:)/i;
             const config = {
-                ALLOWED_TAGS: ['a', 'b', 'br', 'code', 'del', 'div', 'em', 'i', 'p', 'pre', 's', 'span', 'strong',
+                ALLOWED_TAGS: ['a', 'b', 'br', 'code', 'del', 'div', 'em', 'i', 'mark', 'p', 'pre', 's', 'span', 'strong',
                     'u'
                 ],
                 ALLOWED_ATTR: ['class', 'href', 'target', 'title', 'rel'],
@@ -202,30 +202,6 @@
         @endauth
         let checkHealthInterval = null;
         let checkIfIamDeadInterval = null;
-
-        function changePasswordFieldType(event) {
-            let element = event.target
-            for (let i = 0; i < 10; i++) {
-                if (element.className === "relative") {
-                    break;
-                }
-                element = element.parentElement;
-            }
-            element = element.children[1];
-            if (element.nodeName === 'INPUT' || element.nodeName === 'TEXTAREA') {
-                if (element.type === 'password') {
-                    element.type = 'text';
-                    if (element.disabled) return;
-                    element.classList.add('truncate');
-                    this.type = 'text';
-                } else {
-                    element.type = 'password';
-                    if (element.disabled) return;
-                    element.classList.remove('truncate');
-                    this.type = 'password';
-                }
-            }
-        }
 
         function copyToClipboard(text) {
             navigator?.clipboard?.writeText(text) && window.Livewire.dispatch('success', 'Copied to clipboard.');

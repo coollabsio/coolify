@@ -1,0 +1,31 @@
+# documentation: https://www.beszel.dev/guide/agent-installation
+# slogan: Monitoring agent for Beszel
+# category: monitoring
+# tags: beszel,monitoring,server,stats,alerts
+# logo: svgs/beszel.svg
+
+services:
+  beszel-agent:
+    image: 'henrygd/beszel-agent:0.18.4' # Released on 21 Feb 2026
+    network_mode: host # Network stats graphs won't work if agent cannot access host system network stack
+    environment:
+      # Required
+      - LISTEN=/beszel_socket/beszel.sock
+      - HUB_URL=$SERVICE_URL_BESZEL
+      - TOKEN=${TOKEN}            # From hub token settings
+      - KEY=${KEY}                # SSH public key(s) from hub
+      # Optional
+      - DISABLE_SSH=${DISABLE_SSH:-false}        # Disable SSH
+      - LOG_LEVEL=${LOG_LEVEL:-warn}              # Logging level
+      - SKIP_GPU=${SKIP_GPU:-false}               # Skip GPU monitoring
+      - SYSTEM_NAME=${SYSTEM_NAME}                # Custom system name
+    volumes:
+      - beszel_agent_data:/var/lib/beszel-agent
+      - beszel_socket:/beszel_socket
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+    healthcheck:
+      test: ['CMD', '/agent', 'health']
+      interval: 60s
+      timeout: 20s
+      retries: 10
+      start_period: 5s

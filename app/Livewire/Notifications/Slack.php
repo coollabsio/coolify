@@ -5,6 +5,7 @@ namespace App\Livewire\Notifications;
 use App\Models\SlackNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
+use App\Rules\SafeWebhookUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -25,7 +26,7 @@ class Slack extends Component
     #[Validate(['boolean'])]
     public bool $slackEnabled = false;
 
-    #[Validate(['url', 'nullable'])]
+    #[Validate(['nullable', new SafeWebhookUrl])]
     public ?string $slackWebhookUrl = null;
 
     #[Validate(['boolean'])]
@@ -67,6 +68,9 @@ class Slack extends Component
     #[Validate(['boolean'])]
     public bool $serverPatchSlackNotifications = false;
 
+    #[Validate(['boolean'])]
+    public bool $traefikOutdatedSlackNotifications = true;
+
     public function mount()
     {
         try {
@@ -100,6 +104,7 @@ class Slack extends Component
             $this->settings->server_reachable_slack_notifications = $this->serverReachableSlackNotifications;
             $this->settings->server_unreachable_slack_notifications = $this->serverUnreachableSlackNotifications;
             $this->settings->server_patch_slack_notifications = $this->serverPatchSlackNotifications;
+            $this->settings->traefik_outdated_slack_notifications = $this->traefikOutdatedSlackNotifications;
 
             $this->settings->save();
             refreshSession();
@@ -120,6 +125,7 @@ class Slack extends Component
             $this->serverReachableSlackNotifications = $this->settings->server_reachable_slack_notifications;
             $this->serverUnreachableSlackNotifications = $this->settings->server_unreachable_slack_notifications;
             $this->serverPatchSlackNotifications = $this->settings->server_patch_slack_notifications;
+            $this->traefikOutdatedSlackNotifications = $this->settings->traefik_outdated_slack_notifications;
         }
     }
 

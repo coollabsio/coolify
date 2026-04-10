@@ -12,7 +12,7 @@ class Index extends Component
 
     public function mount()
     {
-        $this->servers = Server::ownedByCurrentTeam()->get();
+        $this->servers = Server::ownedByCurrentTeamCached();
     }
 
     public function render()

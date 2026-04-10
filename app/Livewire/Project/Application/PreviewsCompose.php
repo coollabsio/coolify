@@ -96,8 +96,7 @@ class PreviewsCompose extends Component
                     $preview_fqdn = str_replace('{{random}}', $random, $template);
                     $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
                     $preview_fqdn = str_replace('{{pr_id}}', $this->preview->pull_request_id, $preview_fqdn);
-                    $preview_fqdn = str_replace('{{port}}', $port, $preview_fqdn);
-                    $preview_fqdns[] = "$schema://$preview_fqdn";
+                    $preview_fqdns[] = "$schema://$preview_fqdn{$port}";
                 }
 
                 $preview_fqdn = implode(',', $preview_fqdns);

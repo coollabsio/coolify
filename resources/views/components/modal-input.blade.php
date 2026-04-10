@@ -7,9 +7,13 @@
     'action' => 'delete',
     'content' => null,
     'closeOutside' => true,
-    'minWidth' => '36rem',
     'isFullWidth' => false,
 ])
+
+@php
+    $modalId = 'modal-' . uniqid();
+@endphp
+
 <div x-data="{ modalOpen: false }"
     x-init="$watch('modalOpen', value => { if (!value) { $wire.dispatch('modalClosed') } })"
     :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
@@ -38,14 +42,14 @@
                 x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
                 @if ($closeOutside) @click="modalOpen=false" @endif
                 class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
-            <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
+            <div id="{{ $modalId }}" x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
                 x-transition:enter="ease-out duration-100"
                 x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                class="relative w-full border rounded-sm drop-shadow-sm min-w-full lg:min-w-[{{ $minWidth }}] max-w-fit max-h-[calc(100vh-2rem)] bg-white border-neutral-200 dark:bg-base dark:border-coolgray-300 flex flex-col">
+                class="relative w-full lg:w-auto lg:min-w-2xl lg:max-w-4xl border rounded-sm drop-shadow-sm bg-white border-neutral-200 dark:bg-base dark:border-coolgray-300 flex flex-col">
                 <div class="flex items-center justify-between py-6 px-6 shrink-0">
                     <h3 class="text-2xl font-bold">{{ $title }}</h3>
                     <button @click="modalOpen=false"
@@ -56,7 +60,7 @@
                         </svg>
                     </button>
                 </div>
-                <div class="relative flex items-center justify-center w-auto overflow-y-auto px-6 pb-6" style="-webkit-overflow-scrolling: touch;">
+                <div class="relative flex items-center justify-center w-auto px-6 pb-6">
                     {{ $slot }}
                 </div>
             </div>

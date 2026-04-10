@@ -28,7 +28,7 @@
             </div>
         @endif
         <x-forms.input
-            helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
+            helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
             placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
             id="customDockerRunOptions" label="Custom Docker Options" canGate="update" :canResource="$database" />
         <div class="flex flex-col gap-2">
@@ -103,7 +103,7 @@
                             <x-slot:title>Proxy Logs</x-slot:title>
                             <x-slot:content>
                                 <livewire:project.shared.get-logs :server="$server" :resource="$database"
-                                    container="{{ data_get($database, 'uuid') }}-proxy" lazy />
+                                    container="{{ data_get($database, 'uuid') }}-proxy" :collapsible="false" lazy />
                             </x-slot:content>
                             <x-forms.button disabled="{{ !$isPublic }}"
                                 @click="slideOverOpen=true">Logs</x-forms.button>
@@ -113,8 +113,10 @@
                 <x-forms.checkbox instantSave id="isPublic" label="Make it publicly available" canGate="update"
                     :canResource="$database" />
             </div>
-            <x-forms.input placeholder="5432" disabled="{{ $isPublic }}" id="publicPort" label="Public Port"
+            <x-forms.input type="number" placeholder="5432" disabled="{{ $isPublic }}" id="publicPort" label="Public Port"
                 canGate="update" :canResource="$database" />
+            <x-forms.input type="number" placeholder="3600" disabled="{{ $isPublic }}" id="publicPortTimeout"
+                label="Proxy Timeout (seconds)" helper="Timeout for the public TCP proxy connection in seconds. Default: 3600 (1 hour)." canGate="update" :canResource="$database" />
         </div>
         <x-forms.textarea
             helper="<a target='_blank' class='underline dark:text-white' href='https://raw.githubusercontent.com/Snapchat/KeyDB/unstable/keydb.conf'>KeyDB Default Configuration</a>"

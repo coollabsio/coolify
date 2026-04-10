@@ -83,6 +83,8 @@
                     id="serverUnreachableWebhookNotifications" label="Server Unreachable" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel"
                     id="serverPatchWebhookNotifications" label="Server Patching" />
+                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel"
+                    id="traefikOutdatedWebhookNotifications" label="Traefik Proxy Outdated" />
             </div>
         </div>
     </div>

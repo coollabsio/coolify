@@ -1,7 +1,9 @@
 <?php
-function getOldOrLocal($key, $localValue)
-{
-    return old($key) != '' ? old($key) : (app()->environment('local') ? $localValue : '');
+if (! function_exists('getOldOrLocal')) {
+    function getOldOrLocal($key, $localValue)
+    {
+        return old($key) != '' ? old($key) : (app()->environment('local') ? $localValue : '');
+    }
 }
 
 $name = getOldOrLocal('name', 'test3 normal user');
@@ -73,21 +75,23 @@ $email = getOldOrLocal('email', 'test3@example.com');
                         </x-forms.button>
                     </form>
 
-                    <div class="relative my-6">
-                        <div class="absolute inset-0 flex items-center">
-                            <div class="w-full border-t border-neutral-300 dark:border-coolgray-400"></div>
+                    @if (!$isFirstUser)
+                        <div class="relative my-6">
+                            <div class="absolute inset-0 flex items-center">
+                                <div class="w-full border-t border-neutral-300 dark:border-coolgray-400"></div>
+                            </div>
+                            <div class="relative flex justify-center text-sm">
+                                <span class="px-2 bg-gray-50 dark:bg-base text-neutral-500 dark:text-neutral-400">
+                                    Already have an account?
+                                </span>
+                            </div>
                         </div>
-                        <div class="relative flex justify-center text-sm">
-                            <span class="px-2 bg-gray-50 dark:bg-base text-neutral-500 dark:text-neutral-400">
-                                Already have an account?
-                            </span>
-                        </div>
-                    </div>
 
-                    <a href="/login"
-                        class="block w-full text-center py-3 px-4 rounded-lg border border-neutral-300 dark:border-coolgray-400 font-medium hover:border-coollabs dark:hover:border-warning transition-colors">
-                        {{ __('auth.already_registered') }}
-                    </a>
+                        <a href="{{ route('login') }}"
+                            class="block w-full text-center py-3 px-4 rounded-lg border border-neutral-300 dark:border-coolgray-400 font-medium hover:border-coollabs dark:hover:border-warning transition-colors">
+                            {{ __('auth.already_registered') }}
+                        </a>
+                    @endif
                 </div>
             </div>
         </div>

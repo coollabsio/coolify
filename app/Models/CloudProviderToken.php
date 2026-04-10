@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-
-class CloudProviderToken extends Model
+class CloudProviderToken extends BaseModel
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'team_id',
+        'provider',
+        'token',
+        'name',
+    ];
 
     protected $casts = [
         'token' => 'encrypted',

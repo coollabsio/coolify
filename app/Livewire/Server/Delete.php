@@ -3,11 +3,9 @@
 namespace App\Livewire\Server;
 
 use App\Actions\Server\DeleteServer;
-use App\Models\InstanceSettings;
+use App\Jobs\DeleteResourceJob;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class Delete extends Component
@@ -18,6 +16,8 @@ class Delete extends Component
 
     public bool $delete_from_hetzner = false;
 
+    public bool $force_delete_resources = false;
+
     public function mount(string $server_uuid)
     {
         try {
@@ -27,21 +27,28 @@ class Delete extends Component
         }
     }
 
-    public function delete($password)
+    public function delete($password, $selectedActions = [])
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
+        }
 
-                return;
-            }
+        if (! empty($selectedActions)) {
+            $this->delete_from_hetzner = in_array('delete_from_hetzner', $selectedActions);
+            $this->force_delete_resources = in_array('force_delete_resources', $selectedActions);
         }
         try {
             $this->authorize('delete', $this->server);
-            if ($this->server->hasDefinedResources()) {
-                $this->dispatch('error', 'Server has defined resources. Please delete them first.');
+            if ($this->server->hasDefinedResources() && ! $this->force_delete_resources) {
+                $this->dispatch('error', 'Server has defined resources. Please delete them first or select "Delete all resources".');
 
                 return;
+            }
+
+            if ($this->force_delete_resources) {
+                foreach ($this->server->definedResources() as $resource) {
+                    DeleteResourceJob::dispatch($resource);
+                }
             }
 
             $this->server->delete();
@@ -53,7 +60,7 @@ class Delete extends Component
                 $this->server->team_id
             );
 
-            return redirect()->route('server.index');
+            return redirectRoute($this, 'server.index');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -62,6 +69,15 @@ class Delete extends Component
     public function render()
     {
         $checkboxes = [];
+
+        if ($this->server->hasDefinedResources()) {
+            $resourceCount = $this->server->definedResources()->count();
+            $checkboxes[] = [
+                'id' => 'force_delete_resources',
+                'label' => "Delete all resources ({$resourceCount} total)",
+                'default_warning' => 'Server cannot be deleted while it has resources.',
+            ];
+        }
 
         if ($this->server->hetzner_server_id) {
             $checkboxes[] = [

@@ -1,9 +1,10 @@
 <?php
 
-use App\Actions\CoolifyTask\PrepareCoolifyTask;
-use App\Data\CoolifyTaskArgs;
 use App\Enums\ActivityTypes;
+use App\Enums\ProcessStatus;
 use App\Helpers\SshMultiplexingHelper;
+use App\Helpers\SshRetryHandler;
+use App\Jobs\CoolifyTask;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\PrivateKey;
@@ -38,29 +39,46 @@ function remote_process(
     if (Auth::check()) {
         $teams = Auth::user()->teams->pluck('id');
         if (! $teams->contains($server->team_id) && ! $teams->contains(0)) {
-            throw new \Exception('User is not part of the team that owns this server');
+            throw new Exception('User is not part of the team that owns this server');
         }
     }
 
     SshMultiplexingHelper::ensureMultiplexedConnection($server);
 
-    return resolve(PrepareCoolifyTask::class, [
-        'remoteProcessArgs' => new CoolifyTaskArgs(
-            server_uuid: $server->uuid,
-            command: $command_string,
-            type: $type,
-            type_uuid: $type_uuid,
-            model: $model,
-            ignore_errors: $ignore_errors,
-            call_event_on_finish: $callEventOnFinish,
-            call_event_data: $callEventData,
-        ),
-    ])();
+    $properties = [
+        'server_uuid' => $server->uuid,
+        'command' => $command_string,
+        'type' => $type,
+        'type_uuid' => $type_uuid,
+        'status' => ProcessStatus::QUEUED->value,
+        'team_id' => $server->team_id,
+    ];
+
+    $activityLog = activity()
+        ->withProperties($properties)
+        ->event($type);
+
+    if ($model) {
+        $activityLog->performedOn($model);
+    }
+
+    $activity = $activityLog->log('[]');
+
+    dispatch(new CoolifyTask(
+        activity: $activity,
+        ignore_errors: $ignore_errors,
+        call_event_on_finish: $callEventOnFinish,
+        call_event_data: $callEventData,
+    ));
+
+    $activity->refresh();
+
+    return $activity;
 }
 
 function instant_scp(string $source, string $dest, Server $server, $throwError = true)
 {
-    return \App\Helpers\SshRetryHandler::retry(
+    return SshRetryHandler::retry(
         function () use ($source, $dest, $server) {
             $scp_command = SshMultiplexingHelper::generateScpCommand($server, $source, $dest);
             $process = Process::timeout(config('constants.ssh.command_timeout'))->run($scp_command);
@@ -92,7 +110,7 @@ function instant_remote_process_with_timeout(Collection|array $command, Server $
     }
     $command_string = implode("\n", $command);
 
-    return \App\Helpers\SshRetryHandler::retry(
+    return SshRetryHandler::retry(
         function () use ($server, $command_string) {
             $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
             $process = Process::timeout(30)->run($sshCommand);
@@ -118,7 +136,7 @@ function instant_remote_process_with_timeout(Collection|array $command, Server $
     );
 }
 
-function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
+function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false, ?int $timeout = null, bool $disableMultiplexing = false): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
 
@@ -126,11 +144,12 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
         $command = parseCommandsByLineForSudo(collect($command), $server);
     }
     $command_string = implode("\n", $command);
+    $effectiveTimeout = $timeout ?? config('constants.ssh.command_timeout');
 
-    return \App\Helpers\SshRetryHandler::retry(
-        function () use ($server, $command_string) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
-            $process = Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand);
+    return SshRetryHandler::retry(
+        function () use ($server, $command_string, $effectiveTimeout, $disableMultiplexing) {
+            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing);
+            $process = Process::timeout($effectiveTimeout)->run($sshCommand);
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -169,12 +188,12 @@ function excludeCertainErrors(string $errorOutput, ?int $exitCode = null)
 
     if ($ignored) {
         // TODO: Create new exception and disable in sentry
-        throw new \RuntimeException($errorMessage, $exitCode);
+        throw new RuntimeException($errorMessage, $exitCode);
     }
-    throw new \RuntimeException($errorMessage, $exitCode);
+    throw new RuntimeException($errorMessage, $exitCode);
 }
 
-function decode_remote_command_output(?ApplicationDeploymentQueue $application_deployment_queue = null): Collection
+function decode_remote_command_output(?ApplicationDeploymentQueue $application_deployment_queue = null, bool $includeAll = false): Collection
 {
     if (is_null($application_deployment_queue)) {
         return collect([]);
@@ -193,7 +212,7 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
             associative: true,
             flags: JSON_THROW_ON_ERROR
         );
-    } catch (\JsonException $e) {
+    } catch (JsonException $e) {
         // If JSON decoding fails, try to clean up the logs and retry
         try {
             // Ensure valid UTF-8 encoding
@@ -203,7 +222,7 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
                 associative: true,
                 flags: JSON_THROW_ON_ERROR
             );
-        } catch (\JsonException $e) {
+        } catch (JsonException $e) {
             // If it still fails, return empty collection to prevent crashes
             return collect([]);
         }
@@ -215,7 +234,7 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
 
     $seenCommands = collect();
     $formatted = collect($decoded);
-    if (! $is_debug_enabled) {
+    if (! $is_debug_enabled && ! $includeAll) {
         $formatted = $formatted->filter(fn ($i) => $i['hidden'] === false ?? false);
     }
 
@@ -268,9 +287,41 @@ function remove_iip($text)
     // Ensure the input is valid UTF-8 before processing
     $text = sanitize_utf8_text($text);
 
+    // Git access tokens
     $text = preg_replace('/x-access-token:.*?(?=@)/', 'x-access-token:'.REDACTED, $text);
 
-    return preg_replace('/\x1b\[[0-9;]*m/', '', $text);
+    // ANSI color codes
+    $text = preg_replace('/\x1b\[[0-9;]*m/', '', $text);
+
+    // Generic URLs with passwords (covers database URLs, ftp, amqp, ssh, git basic auth, etc.)
+    // (protocol://user:password@host → protocol://user:<REDACTED>@host)
+    $text = preg_replace('/((?:https?|postgres|mysql|mongodb|rediss?|mariadb|ftp|sftp|ssh|amqp|amqps|ldap|ldaps|s3):\/\/[^:]+:)[^@]+(@)/i', '$1'.REDACTED.'$2', $text);
+
+    // Email addresses
+    $text = preg_replace('/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/', REDACTED, $text);
+
+    // Bearer/JWT tokens
+    $text = preg_replace('/Bearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/i', 'Bearer '.REDACTED, $text);
+
+    // GitHub tokens (ghp_ = personal, gho_ = OAuth, ghu_ = user-to-server, ghs_ = server-to-server, ghr_ = refresh)
+    $text = preg_replace('/\b(gh[pousr]_[A-Za-z0-9_]{36,})\b/', REDACTED, $text);
+
+    // GitLab tokens (glpat- = personal access token, glcbt- = CI build token, glrt- = runner token)
+    $text = preg_replace('/\b(gl(?:pat|cbt|rt)-[A-Za-z0-9\-_]{20,})\b/', REDACTED, $text);
+
+    // AWS credentials (Access Key ID starts with AKIA, ABIA, ACCA, ASIA)
+    $text = preg_replace('/\b(A(?:KIA|BIA|CCA|SIA)[A-Z0-9]{16})\b/', REDACTED, $text);
+
+    // AWS Secret Access Key (40 character base64-ish string, typically follows access key)
+    $text = preg_replace('/(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)[=:]\s*[\'"]?([A-Za-z0-9\/+=]{40})[\'"]?/i', '$1='.REDACTED, $text);
+
+    // API keys (common patterns)
+    $text = preg_replace('/(api[_-]?key|apikey|api[_-]?secret|secret[_-]?key)[=:]\s*[\'"]?[A-Za-z0-9\-_]{16,}[\'"]?/i', '$1='.REDACTED, $text);
+
+    // Private key blocks
+    $text = preg_replace('/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/', REDACTED, $text);
+
+    return $text;
 }
 
 /**
@@ -320,7 +371,7 @@ function checkRequiredCommands(Server $server)
         }
         try {
             instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'apt update && apt install -y {$command}'"], $server);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             break;
         }
         $commandFound = instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'command -v {$command}'"], $server, false);

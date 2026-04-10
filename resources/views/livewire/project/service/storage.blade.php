@@ -275,15 +275,9 @@
             </div>
             <div>Persistent storage to preserve data between deployments.</div>
         </div>
-        @if ($resource?->build_pack === 'dockercompose')
-            <div class="dark:text-warning text-coollabs">Please modify storage layout in your Docker Compose
-                file or reload the compose file to reread the storage layout.</div>
-        @else
-            @if ($resource->persistentStorages()->get()->count() === 0 && $fileStorage->count() == 0)
-                <div>No storage found.</div>
-            @endif
+        @if ($resource->persistentStorages()->get()->count() === 0 && $fileStorage->count() == 0)
+            <div>No storage found.</div>
         @endif
-
         @php
             $hasVolumes = $this->volumeCount > 0;
             $hasFiles = $this->fileCount > 0;
@@ -370,7 +364,6 @@
                     <h2>{{ Str::headline($resource->name) }}</h2>
                 </div>
             </div>
-
             @if ($resource->persistentStorages()->get()->count() === 0 && $fileStorage->count() == 0)
                 <div>No storage found.</div>
             @endif

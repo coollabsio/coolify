@@ -21,7 +21,7 @@ class ResetUserPassword implements ResetsUserPasswords
             'password' => ['required', Password::defaults(), 'confirmed'],
         ])->validate();
 
-        $user->forceFill([
+        $user->fill([
             'password' => Hash::make($input['password']),
         ])->save();
         $user->deleteAllSessions();

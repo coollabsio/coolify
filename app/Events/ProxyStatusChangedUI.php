@@ -14,12 +14,15 @@ class ProxyStatusChangedUI implements ShouldBroadcast
 
     public ?int $teamId = null;
 
-    public function __construct(?int $teamId = null)
+    public ?int $activityId = null;
+
+    public function __construct(?int $teamId = null, ?int $activityId = null)
     {
         if (is_null($teamId) && auth()->check() && auth()->user()->currentTeam()) {
             $teamId = auth()->user()->currentTeam()->id;
         }
         $this->teamId = $teamId;
+        $this->activityId = $activityId;
     }
 
     public function broadcastOn(): array

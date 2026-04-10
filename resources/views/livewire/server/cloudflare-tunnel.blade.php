@@ -74,7 +74,7 @@
                     <div class="flex  flex-col pb-2">
                         <h3>Automated </h3>
                         <a href="https://coolify.io/docs/knowledge-base/cloudflare/tunnels/server-ssh" target="_blank"
-                            class="text-xs underline hover:text-yellow-600 dark:hover:text-yellow-200">Docs<x-external-link /></a>
+                            class="text-xs underline hover:text-warning-600 dark:hover:text-warning-200">Docs<x-external-link /></a>
                     </div>
                     <div class="flex gap-2">
                         <x-slide-over @automated.window="slideOverOpen = true" fullScreen>

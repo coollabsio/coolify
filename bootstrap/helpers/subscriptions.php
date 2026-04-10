@@ -5,39 +5,48 @@ use Stripe\Stripe;
 
 function isSubscriptionActive()
 {
-    if (! isCloud()) {
-        return false;
-    }
-    $team = currentTeam();
-    if (! $team) {
-        return false;
-    }
-    $subscription = $team?->subscription;
+    return once(function () {
+        if (! isCloud()) {
+            return false;
+        }
+        $team = currentTeam();
+        if (! $team) {
+            return false;
+        }
+        // Root team (id=0) doesn't require subscription
+        if ($team->id === 0) {
+            return true;
+        }
+        $subscription = $team?->subscription;
 
-    if (is_null($subscription)) {
-        return false;
-    }
-    if (isStripe()) {
-        return $subscription->stripe_invoice_paid === true;
-    }
+        if (is_null($subscription)) {
+            return false;
+        }
+        if (isStripe()) {
+            return $subscription->stripe_invoice_paid === true;
+        }
 
-    return false;
+        return false;
+    });
 }
+
 function isSubscriptionOnGracePeriod()
 {
-    $team = currentTeam();
-    if (! $team) {
-        return false;
-    }
-    $subscription = $team?->subscription;
-    if (! $subscription) {
-        return false;
-    }
-    if (isStripe()) {
-        return $subscription->stripe_cancel_at_period_end;
-    }
+    return once(function () {
+        $team = currentTeam();
+        if (! $team) {
+            return false;
+        }
+        $subscription = $team?->subscription;
+        if (! $subscription) {
+            return false;
+        }
+        if (isStripe()) {
+            return $subscription->stripe_cancel_at_period_end;
+        }
 
-    return false;
+        return false;
+    });
 }
 function subscriptionProvider()
 {
@@ -68,6 +77,7 @@ function allowedPathsForUnsubscribedAccounts()
         'login',
         'logout',
         'force-password-reset',
+        'two-factor-challenge',
         'livewire/update',
         'admin',
     ];
@@ -86,6 +96,7 @@ function allowedPathsForInvalidAccounts()
         'logout',
         'verify',
         'force-password-reset',
+        'two-factor-challenge',
         'livewire/update',
     ];
 }

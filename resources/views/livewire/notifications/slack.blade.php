@@ -74,6 +74,7 @@
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverUnreachableSlackNotifications"
                     label="Server Unreachable" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverPatchSlackNotifications" label="Server Patching" />
+                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="traefikOutdatedSlackNotifications" label="Traefik Proxy Outdated" />
             </div>
         </div>
     </div>

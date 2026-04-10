@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Events\FileStorageChanged;
+use App\Jobs\ServerStorageSaveJob;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Symfony\Component\Yaml\Yaml;
@@ -14,11 +15,23 @@ class LocalFileVolume extends BaseModel
         // 'mount_path' => 'encrypted',
         'content' => 'encrypted',
         'is_directory' => 'boolean',
+        'is_preview_suffix_enabled' => 'boolean',
     ];
 
     use HasFactory;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'fs_path',
+        'mount_path',
+        'content',
+        'resource_type',
+        'resource_id',
+        'is_directory',
+        'chown',
+        'chmod',
+        'is_based_on_git',
+        'is_preview_suffix_enabled',
+    ];
 
     public $appends = ['is_binary'];
 
@@ -26,7 +39,7 @@ class LocalFileVolume extends BaseModel
     {
         static::created(function (LocalFileVolume $fileVolume) {
             $fileVolume->load(['service']);
-            dispatch(new \App\Jobs\ServerStorageSaveJob($fileVolume));
+            dispatch(new ServerStorageSaveJob($fileVolume));
         });
     }
 
@@ -61,9 +74,14 @@ class LocalFileVolume extends BaseModel
             $path = $path->after('.');
             $path = $workdir.$path;
         }
-        $isFile = instant_remote_process(["test -f $path && echo OK || echo NOK"], $server);
+
+        // Validate and escape path to prevent command injection
+        validateShellSafePath($path, 'storage path');
+        $escapedPath = escapeshellarg($path);
+
+        $isFile = instant_remote_process(["test -f {$escapedPath} && echo OK || echo NOK"], $server);
         if ($isFile === 'OK') {
-            $content = instant_remote_process(["cat $path"], $server, false);
+            $content = instant_remote_process(["cat {$escapedPath}"], $server, false);
             // Check if content contains binary data by looking for null bytes or non-printable characters
             if (str_contains($content, "\0") || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $content)) {
                 $content = '[binary file]';
@@ -91,14 +109,19 @@ class LocalFileVolume extends BaseModel
             $path = $path->after('.');
             $path = $workdir.$path;
         }
-        $isFile = instant_remote_process(["test -f $path && echo OK || echo NOK"], $server);
-        $isDir = instant_remote_process(["test -d $path && echo OK || echo NOK"], $server);
+
+        // Validate and escape path to prevent command injection
+        validateShellSafePath($path, 'storage path');
+        $escapedPath = escapeshellarg($path);
+
+        $isFile = instant_remote_process(["test -f {$escapedPath} && echo OK || echo NOK"], $server);
+        $isDir = instant_remote_process(["test -d {$escapedPath} && echo OK || echo NOK"], $server);
         if ($path && $path != '/' && $path != '.' && $path != '..') {
             if ($isFile === 'OK') {
-                $commands->push("rm -rf $path > /dev/null 2>&1 || true");
+                $commands->push("rm -rf {$escapedPath} > /dev/null 2>&1 || true");
             } elseif ($isDir === 'OK') {
-                $commands->push("rm -rf $path > /dev/null 2>&1 || true");
-                $commands->push("rmdir $path > /dev/null 2>&1 || true");
+                $commands->push("rm -rf {$escapedPath} > /dev/null 2>&1 || true");
+                $commands->push("rmdir {$escapedPath} > /dev/null 2>&1 || true");
             }
         }
         if ($commands->count() > 0) {
@@ -118,15 +141,22 @@ class LocalFileVolume extends BaseModel
             $server = $this->resource->destination->server;
         }
         $commands = collect([]);
+
+        // Validate fs_path early before any shell interpolation
+        validateShellSafePath($this->fs_path, 'storage path');
+        $escapedFsPath = escapeshellarg($this->fs_path);
+        $escapedWorkdir = escapeshellarg($workdir);
+
         if ($this->is_directory) {
-            $commands->push("mkdir -p $this->fs_path > /dev/null 2>&1 || true");
-            $commands->push("mkdir -p $workdir > /dev/null 2>&1 || true");
-            $commands->push("cd $workdir");
+            $commands->push("mkdir -p {$escapedFsPath} > /dev/null 2>&1 || true");
+            $commands->push("mkdir -p {$escapedWorkdir} > /dev/null 2>&1 || true");
+            $commands->push("cd {$escapedWorkdir}");
         }
         if (str($this->fs_path)->startsWith('.') || str($this->fs_path)->startsWith('/') || str($this->fs_path)->startsWith('~')) {
             $parent_dir = str($this->fs_path)->beforeLast('/');
             if ($parent_dir != '') {
-                $commands->push("mkdir -p $parent_dir > /dev/null 2>&1 || true");
+                $escapedParentDir = escapeshellarg($parent_dir);
+                $commands->push("mkdir -p {$escapedParentDir} > /dev/null 2>&1 || true");
             }
         }
         $path = data_get_str($this, 'fs_path');
@@ -135,10 +165,15 @@ class LocalFileVolume extends BaseModel
             $path = $path->after('.');
             $path = $workdir.$path;
         }
-        $isFile = instant_remote_process(["test -f $path && echo OK || echo NOK"], $server);
-        $isDir = instant_remote_process(["test -d $path && echo OK || echo NOK"], $server);
+
+        // Validate and escape resolved path (may differ from fs_path if relative)
+        validateShellSafePath($path, 'storage path');
+        $escapedPath = escapeshellarg($path);
+
+        $isFile = instant_remote_process(["test -f {$escapedPath} && echo OK || echo NOK"], $server);
+        $isDir = instant_remote_process(["test -d {$escapedPath} && echo OK || echo NOK"], $server);
         if ($isFile === 'OK' && $this->is_directory) {
-            $content = instant_remote_process(["cat $path"], $server, false);
+            $content = instant_remote_process(["cat {$escapedPath}"], $server, false);
             $this->is_directory = false;
             $this->content = $content;
             $this->save();
@@ -151,8 +186,8 @@ class LocalFileVolume extends BaseModel
                 throw new \Exception('The following file is a directory on the server, but you are trying to mark it as a file. <br><br>Please delete the directory on the server or mark it as directory.');
             }
             instant_remote_process([
-                "rm -fr $path",
-                "touch $path",
+                "rm -fr {$escapedPath}",
+                "touch {$escapedPath}",
             ], $server, false);
             FileStorageChanged::dispatch(data_get($server, 'team_id'));
         }
@@ -161,19 +196,19 @@ class LocalFileVolume extends BaseModel
             $chown = data_get($this, 'chown');
             if ($content) {
                 $content = base64_encode($content);
-                $commands->push("echo '$content' | base64 -d | tee $path > /dev/null");
+                $commands->push("echo '$content' | base64 -d | tee {$escapedPath} > /dev/null");
             } else {
-                $commands->push("touch $path");
+                $commands->push("touch {$escapedPath}");
             }
-            $commands->push("chmod +x $path");
+            $commands->push("chmod +x {$escapedPath}");
             if ($chown) {
-                $commands->push("chown $chown $path");
+                $commands->push("chown $chown {$escapedPath}");
             }
             if ($chmod) {
-                $commands->push("chmod $chmod $path");
+                $commands->push("chmod $chmod {$escapedPath}");
             }
         } elseif ($isDir === 'NOK' && $this->is_directory) {
-            $commands->push("mkdir -p $path > /dev/null 2>&1 || true");
+            $commands->push("mkdir -p {$escapedPath} > /dev/null 2>&1 || true");
         }
 
         return instant_remote_process($commands, $server);
@@ -192,6 +227,23 @@ class LocalFileVolume extends BaseModel
     public function scopeWherePlainMountPath($query, $path)
     {
         return $query->get()->where('plain_mount_path', $path);
+    }
+
+    // Check if this volume belongs to a service resource
+    public function isServiceResource(): bool
+    {
+        return in_array($this->resource_type, [
+            'App\Models\ServiceApplication',
+            'App\Models\ServiceDatabase',
+        ]);
+    }
+
+    // Determine if this volume should be read-only in the UI
+    // File/directory mounts can be edited even for services
+    public function shouldBeReadOnlyInUI(): bool
+    {
+        // Check for explicit :ro flag in compose (existing logic)
+        return $this->isReadOnlyVolume();
     }
 
     // Check if this volume is read-only by parsing the docker-compose content
@@ -224,21 +276,39 @@ class LocalFileVolume extends BaseModel
             $volumes = $compose['services'][$serviceName]['volumes'];
 
             // Check each volume to find a match
+            // Note: We match on mount_path (container path) only, since fs_path gets transformed
+            // from relative (./file) to absolute (/data/coolify/services/uuid/file) during parsing
             foreach ($volumes as $volume) {
                 // Volume can be string like "host:container:ro" or "host:container"
                 if (is_string($volume)) {
                     $parts = explode(':', $volume);
 
-                    // Check if this volume matches our fs_path and mount_path
+                    // Check if this volume matches our mount_path
                     if (count($parts) >= 2) {
-                        $hostPath = $parts[0];
                         $containerPath = $parts[1];
                         $options = $parts[2] ?? null;
 
-                        // Match based on fs_path and mount_path
-                        if ($hostPath === $this->fs_path && $containerPath === $this->mount_path) {
+                        // Match based on mount_path
+                        // Remove leading slash from mount_path if present for comparison
+                        $mountPath = str($this->mount_path)->ltrim('/')->toString();
+                        $containerPathClean = str($containerPath)->ltrim('/')->toString();
+
+                        if ($mountPath === $containerPathClean || $this->mount_path === $containerPath) {
                             return $options === 'ro';
                         }
+                    }
+                } elseif (is_array($volume)) {
+                    // Long-form syntax: { type: bind, source: ..., target: ..., read_only: true }
+                    $containerPath = data_get($volume, 'target');
+                    $readOnly = data_get($volume, 'read_only', false);
+
+                    // Match based on mount_path
+                    // Remove leading slash from mount_path if present for comparison
+                    $mountPath = str($this->mount_path)->ltrim('/')->toString();
+                    $containerPathClean = str($containerPath)->ltrim('/')->toString();
+
+                    if ($mountPath === $containerPathClean || $this->mount_path === $containerPath) {
+                        return $readOnly === true;
                     }
                 }
             }

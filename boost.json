@@ -1,0 +1,28 @@
+{
+    "agents": [
+        "cursor",
+        "claude_code",
+        "codex",
+        "opencode"
+    ],
+    "guidelines": true,
+    "mcp": true,
+    "nightwatch_mcp": false,
+    "packages": [
+        "laravel/fortify",
+        "spatie/laravel-ray",
+        "lorisleiva/laravel-actions"
+    ],
+    "sail": false,
+    "skills": [
+        "laravel-best-practices",
+        "configuring-horizon",
+        "socialite-development",
+        "livewire-development",
+        "pest-testing",
+        "tailwindcss-development",
+        "fortify-development",
+        "laravel-actions",
+        "debugging-output-and-previewing-html-using-ray"
+    ]
+}

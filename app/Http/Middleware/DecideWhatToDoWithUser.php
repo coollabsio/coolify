@@ -18,12 +18,19 @@ class DecideWhatToDoWithUser
         }
         if (auth()?->user()?->currentTeam()) {
             refreshSession(auth()->user()->currentTeam());
+        } elseif (auth()?->user()?->teams?->count() > 0) {
+            // User's session team is invalid (e.g., removed from team), switch to first available team
+            refreshSession(auth()->user()->teams->first());
         }
-        if (! auth()->user() || ! isCloud() || isInstanceAdmin()) {
+        if (! auth()->user() || ! isCloud()) {
             if (! isCloud() && showBoarding() && ! in_array($request->path(), allowedPathsForBoardingAccounts())) {
                 return redirect()->route('onboarding');
             }
 
+            return $next($request);
+        }
+        // Instance admins can access settings and admin routes regardless of subscription
+        if (isInstanceAdmin() && ($request->routeIs('settings.*') || $request->path() === 'admin')) {
             return $next($request);
         }
         if (! auth()->user()->hasVerifiedEmail()) {

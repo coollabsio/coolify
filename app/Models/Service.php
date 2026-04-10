@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ProcessStatus;
+use App\Services\ContainerStatusAggregator;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Url\Url;
+use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
@@ -46,7 +48,22 @@ class Service extends BaseModel
 
     private static $parserVersion = '5';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'uuid',
+        'name',
+        'description',
+        'docker_compose_raw',
+        'docker_compose',
+        'connect_to_docker_network',
+        'service_type',
+        'config_hash',
+        'compose_parsing_version',
+        'is_container_label_escape_enabled',
+        'environment_id',
+        'server_id',
+        'destination_id',
+        'destination_type',
+    ];
 
     protected $appends = ['server_status', 'status'];
 
@@ -152,9 +169,23 @@ class Service extends BaseModel
         return $this->morphToMany(Tag::class, 'taggable');
     }
 
+    /**
+     * Get query builder for services owned by current team.
+     * If you need all services without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return Service::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all services owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return Service::ownedByCurrentTeam()->get();
+        });
     }
 
     public function deleteConfigurations()
@@ -173,6 +204,21 @@ class Service extends BaseModel
         instant_remote_process(["docker network rm {$this->uuid}"], $server, false);
     }
 
+    /**
+     * Calculate the service's aggregate status from its applications and databases.
+     *
+     * This method aggregates status from Eloquent model relationships (not Docker containers).
+     * It differs from the CalculatesExcludedStatus trait which works with Docker container objects
+     * during container inspection. This accessor runs on-demand for UI display and works with
+     * already-stored status strings from the database.
+     *
+     * Status format: "{status}:{health}" or "{status}:{health}:excluded"
+     * - Status values: running, exited, degraded, starting, paused, restarting
+     * - Health values: healthy, unhealthy, unknown
+     * - :excluded suffix: Indicates all containers are excluded from health monitoring
+     *
+     * @return string The aggregate status in format "status:health" or "status:health:excluded"
+     */
     public function getStatusAttribute()
     {
         if ($this->isStarting()) {
@@ -182,69 +228,100 @@ class Service extends BaseModel
         $applications = $this->applications;
         $databases = $this->databases;
 
-        $complexStatus = null;
-        $complexHealth = null;
+        [$complexStatus, $complexHealth, $hasNonExcluded] = $this->aggregateResourceStatuses(
+            $applications,
+            $databases,
+            excludedOnly: false
+        );
 
-        foreach ($applications as $application) {
-            if ($application->exclude_from_status) {
-                continue;
+        // If all services are excluded from status checks, calculate status from excluded containers
+        // but mark it with :excluded to indicate monitoring is disabled
+        if (! $hasNonExcluded && ($complexStatus === null && $complexHealth === null)) {
+            [$excludedStatus, $excludedHealth] = $this->aggregateResourceStatuses(
+                $applications,
+                $databases,
+                excludedOnly: true
+            );
+
+            // Return status with :excluded suffix to indicate monitoring is disabled
+            if ($excludedStatus && $excludedHealth) {
+                return "{$excludedStatus}:{$excludedHealth}:excluded";
             }
-            $status = str($application->status)->before('(')->trim();
-            $health = str($application->status)->between('(', ')')->trim();
-            if ($complexStatus === 'degraded') {
-                continue;
+
+            // If no status was calculated at all (no containers exist), return unknown
+            if ($excludedStatus === null && $excludedHealth === null) {
+                return 'unknown:unknown:excluded';
             }
-            if ($status->startsWith('running')) {
-                if ($complexStatus === 'exited') {
-                    $complexStatus = 'degraded';
-                } else {
-                    $complexStatus = 'running';
-                }
-            } elseif ($status->startsWith('restarting')) {
-                $complexStatus = 'degraded';
-            } elseif ($status->startsWith('exited')) {
-                $complexStatus = 'exited';
-            }
-            if ($health->value() === 'healthy') {
-                if ($complexHealth === 'unhealthy') {
-                    continue;
-                }
-                $complexHealth = 'healthy';
-            } else {
-                $complexHealth = 'unhealthy';
-            }
+
+            return 'exited';
         }
-        foreach ($databases as $database) {
-            if ($database->exclude_from_status) {
-                continue;
-            }
-            $status = str($database->status)->before('(')->trim();
-            $health = str($database->status)->between('(', ')')->trim();
-            if ($complexStatus === 'degraded') {
-                continue;
-            }
-            if ($status->startsWith('running')) {
-                if ($complexStatus === 'exited') {
-                    $complexStatus = 'degraded';
-                } else {
-                    $complexStatus = 'running';
-                }
-            } elseif ($status->startsWith('restarting')) {
-                $complexStatus = 'degraded';
-            } elseif ($status->startsWith('exited')) {
-                $complexStatus = 'exited';
-            }
-            if ($health->value() === 'healthy') {
-                if ($complexHealth === 'unhealthy') {
-                    continue;
-                }
-                $complexHealth = 'healthy';
-            } else {
-                $complexHealth = 'unhealthy';
-            }
+
+        // If health is null/empty, return just the status without trailing colon
+        if ($complexHealth === null || $complexHealth === '') {
+            return $complexStatus;
         }
 
         return "{$complexStatus}:{$complexHealth}";
+    }
+
+    /**
+     * Aggregate status and health from collections of applications and databases.
+     *
+     * This helper method consolidates status aggregation logic using ContainerStatusAggregator.
+     * It processes container status strings stored in the database (not live Docker data).
+     *
+     * @param  \Illuminate\Database\Eloquent\Collection  $applications  Collection of Application models
+     * @param  \Illuminate\Database\Eloquent\Collection  $databases  Collection of Database models
+     * @param  bool  $excludedOnly  If true, only process excluded containers; if false, only process non-excluded
+     * @return array{0: string|null, 1: string|null, 2?: bool} [status, health, hasNonExcluded (only when excludedOnly=false)]
+     */
+    private function aggregateResourceStatuses($applications, $databases, bool $excludedOnly = false): array
+    {
+        $hasNonExcluded = false;
+        $statusStrings = collect();
+
+        // Process both applications and databases using the same logic
+        $resources = $applications->concat($databases);
+
+        foreach ($resources as $resource) {
+            $isExcluded = $resource->exclude_from_status || str($resource->status)->contains(':excluded');
+
+            // Filter based on excludedOnly flag
+            if ($excludedOnly && ! $isExcluded) {
+                continue;
+            }
+            if (! $excludedOnly && $isExcluded) {
+                continue;
+            }
+
+            if (! $excludedOnly) {
+                $hasNonExcluded = true;
+            }
+
+            // Strip :excluded suffix before aggregation (it's in the 3rd part of "status:health:excluded")
+            $status = str($resource->status)->before(':excluded')->toString();
+            $statusStrings->push($status);
+        }
+
+        // If no status strings collected, return nulls
+        if ($statusStrings->isEmpty()) {
+            return $excludedOnly ? [null, null] : [null, null, $hasNonExcluded];
+        }
+
+        // Use ContainerStatusAggregator service for state machine logic
+        $aggregator = new ContainerStatusAggregator;
+        $aggregatedStatus = $aggregator->aggregateFromStrings($statusStrings);
+
+        // Parse the aggregated "status:health" string
+        $parts = explode(':', $aggregatedStatus);
+        $status = $parts[0] ?? null;
+        $health = $parts[1] ?? null;
+
+        if ($excludedOnly) {
+            return [$status, $health];
+        }
+
+        return [$status, $health, $hasNonExcluded];
     }
 
     public function extraFields()
@@ -453,6 +530,31 @@ class Service extends BaseModel
                         ]);
                     }
                     $fields->put('RabbitMQ', $data->toArray());
+                    break;
+                case $image->is('registry'):
+                    $data = collect([]);
+                    $registry_user = $this->environment_variables()->where('key', 'SERVICE_USER_REGISTRY')->first();
+                    $registry_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_REGISTRY')->first();
+                    if ($registry_user) {
+                        $data = $data->merge([
+                            'Registry User' => [
+                                'key' => data_get($registry_user, 'key'),
+                                'value' => data_get($registry_user, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($registry_password) {
+                        $data = $data->merge([
+                            'Registry Password' => [
+                                'key' => data_get($registry_password, 'key'),
+                                'value' => data_get($registry_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Docker Registry', $data->toArray());
                     break;
                 case $image->contains('tolgee'):
                     $data = collect([]);
@@ -665,6 +767,84 @@ class Service extends BaseModel
 
                     $fields->put('MinIO', $data->toArray());
                     break;
+                case $image->contains('garage'):
+                    $data = collect([]);
+                    $s3_api_url = $this->environment_variables()->where('key', 'GARAGE_S3_API_URL')->first();
+                    $web_url = $this->environment_variables()->where('key', 'GARAGE_WEB_URL')->first();
+                    $admin_url = $this->environment_variables()->where('key', 'GARAGE_ADMIN_URL')->first();
+                    $admin_token = $this->environment_variables()->where('key', 'GARAGE_ADMIN_TOKEN')->first();
+                    if (is_null($admin_token)) {
+                        $admin_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GARAGE')->first();
+                    }
+                    $rpc_secret = $this->environment_variables()->where('key', 'GARAGE_RPC_SECRET')->first();
+                    if (is_null($rpc_secret)) {
+                        $rpc_secret = $this->environment_variables()->where('key', 'SERVICE_HEX_32_RPCSECRET')->first();
+                    }
+                    $metrics_token = $this->environment_variables()->where('key', 'GARAGE_METRICS_TOKEN')->first();
+                    if (is_null($metrics_token)) {
+                        $metrics_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GARAGEMETRICS')->first();
+                    }
+
+                    if ($s3_api_url) {
+                        $data = $data->merge([
+                            'S3 API URL' => [
+                                'key' => data_get($s3_api_url, 'key'),
+                                'value' => data_get($s3_api_url, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    if ($web_url) {
+                        $data = $data->merge([
+                            'Web URL' => [
+                                'key' => data_get($web_url, 'key'),
+                                'value' => data_get($web_url, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    if ($admin_url) {
+                        $data = $data->merge([
+                            'Admin URL' => [
+                                'key' => data_get($admin_url, 'key'),
+                                'value' => data_get($admin_url, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    if ($admin_token) {
+                        $data = $data->merge([
+                            'Admin Token' => [
+                                'key' => data_get($admin_token, 'key'),
+                                'value' => data_get($admin_token, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($rpc_secret) {
+                        $data = $data->merge([
+                            'RPC Secret' => [
+                                'key' => data_get($rpc_secret, 'key'),
+                                'value' => data_get($rpc_secret, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($metrics_token) {
+                        $data = $data->merge([
+                            'Metrics Token' => [
+                                'key' => data_get($metrics_token, 'key'),
+                                'value' => data_get($metrics_token, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+
+                    $fields->put('Garage', $data->toArray());
+                    break;
                 case $image->contains('weblate'):
                     $data = collect([]);
                     $admin_email = $this->environment_variables()->where('key', 'WEBLATE_ADMIN_EMAIL')->first();
@@ -704,6 +884,30 @@ class Service extends BaseModel
                         ]);
                     }
                     $fields->put('Meilisearch', $data->toArray());
+                    break;
+                case $image->contains('linkding'):
+                    $data = collect([]);
+                    $SERVICE_USER_LINKDING = $this->environment_variables()->where('key', 'SERVICE_USER_LINKDING')->first();
+                    $SERVICE_PASSWORD_LINKDING = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_LINKDING')->first();
+                    if ($SERVICE_USER_LINKDING) {
+                        $data = $data->merge([
+                            'Superuser Name' => [
+                                'key' => data_get($SERVICE_USER_LINKDING, 'key'),
+                                'value' => data_get($SERVICE_USER_LINKDING, 'value'),
+                            ],
+                        ]);
+                    }
+                    if ($SERVICE_PASSWORD_LINKDING) {
+                        $data = $data->merge([
+                            'Superuser Password' => [
+                                'key' => data_get($SERVICE_PASSWORD_LINKDING, 'key'),
+                                'value' => data_get($SERVICE_PASSWORD_LINKDING, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+
+                    $fields->put('Linkding', $data->toArray());
                     break;
                 case $image->contains('ghost'):
                     $data = collect([]);
@@ -904,6 +1108,65 @@ class Service extends BaseModel
                     }
 
                     $fields->put('Strapi', $data->toArray());
+                    break;
+                case $image->contains('marckohlbrugge/sessy'):
+                    $data = collect([]);
+                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_SESSY')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_SESSY')->first();
+                    if ($username) {
+                        $data = $data->merge([
+                            'HTTP Auth Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'HTTP Auth Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Sessy', $data->toArray());
+                    break;
+                case $image->contains('coollabsio/openclaw'):
+                    $data = collect([]);
+                    $username = $this->environment_variables()->where('key', 'AUTH_USERNAME')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_OPENCLAW')->first();
+                    $gateway_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_GATEWAYTOKEN')->first();
+                    if ($username) {
+                        $data = $data->merge([
+                            'Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'readonly' => true,
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($gateway_token) {
+                        $data = $data->merge([
+                            'Gateway Token' => [
+                                'key' => data_get($gateway_token, 'key'),
+                                'value' => data_get($gateway_token, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Openclaw', $data->toArray());
                     break;
                 default:
                     $data = collect([]);
@@ -1269,15 +1532,7 @@ class Service extends BaseModel
 
     public function environment_variables()
     {
-        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->orderByRaw("
-                CASE
-                    WHEN is_required = true THEN 1
-                    WHEN LOWER(key) LIKE 'service_%' THEN 2
-                    ELSE 3
-                END,
-                LOWER(key) ASC
-            ");
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
     }
 
     public function workdir()
@@ -1287,6 +1542,11 @@ class Service extends BaseModel
 
     public function saveComposeConfigs()
     {
+        // Guard against null or empty docker_compose
+        if (! $this->docker_compose) {
+            return;
+        }
+
         $workdir = $this->workdir();
 
         instant_remote_process([
@@ -1308,7 +1568,7 @@ class Service extends BaseModel
         // Generate SERVICE_NAME_* environment variables from docker-compose services
         if ($this->docker_compose) {
             try {
-                $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($this->docker_compose);
+                $dockerCompose = Yaml::parse($this->docker_compose);
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
                     $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);

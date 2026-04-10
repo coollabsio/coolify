@@ -2,9 +2,24 @@
 
 namespace App\Models;
 
+use App\Support\ValidationPatterns;
+
 class SwarmDocker extends BaseModel
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'server_id',
+        'name',
+        'network',
+    ];
+
+    public function setNetworkAttribute(string $value): void
+    {
+        if (! ValidationPatterns::isValidDockerNetwork($value)) {
+            throw new \InvalidArgumentException('Invalid Docker network name. Must start with alphanumeric and contain only alphanumeric characters, dots, hyphens, and underscores.');
+        }
+
+        $this->attributes['network'] = $value;
+    }
 
     public function applications()
     {
@@ -54,6 +69,28 @@ class SwarmDocker extends BaseModel
     public function server()
     {
         return $this->belongsTo(Server::class);
+    }
+
+    /**
+     * Get the server attribute using identity map caching.
+     * This intercepts lazy-loading to use cached Server lookups.
+     */
+    public function getServerAttribute(): ?Server
+    {
+        // Use eager loaded data if available
+        if ($this->relationLoaded('server')) {
+            return $this->getRelation('server');
+        }
+
+        // Use identity map for lazy loading
+        $server = Server::findCached($this->server_id);
+
+        // Cache in relation for future access on this instance
+        if ($server) {
+            $this->setRelation('server', $server);
+        }
+
+        return $server;
     }
 
     public function services()

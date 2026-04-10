@@ -5,12 +5,31 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Symfony\Component\Yaml\Yaml;
 
 class ServiceApplication extends BaseModel
 {
     use HasFactory, SoftDeletes;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'service_id',
+        'name',
+        'human_name',
+        'description',
+        'fqdn',
+        'ports',
+        'exposes',
+        'status',
+        'exclude_from_status',
+        'required_fqdn',
+        'image',
+        'is_log_drain_enabled',
+        'is_include_timestamps',
+        'is_gzip_enabled',
+        'is_stripprefix_enabled',
+        'last_online_at',
+        'is_migrated',
+    ];
 
     protected static function booted()
     {
@@ -21,7 +40,7 @@ class ServiceApplication extends BaseModel
         });
         static::saving(function ($service) {
             if ($service->isDirty('status')) {
-                $service->forceFill(['last_online_at' => now()]);
+                $service->last_online_at = now();
             }
         });
     }
@@ -37,9 +56,23 @@ class ServiceApplication extends BaseModel
         return ServiceApplication::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
     }
 
+    /**
+     * Get query builder for service applications owned by current team.
+     * If you need all service applications without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return ServiceApplication::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all service applications owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return ServiceApplication::ownedByCurrentTeam()->get();
+        });
     }
 
     public function isRunning()
@@ -74,7 +107,7 @@ class ServiceApplication extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'environment.project.team');
+        return data_get($this, 'service.environment.project.team');
     }
 
     public function workdir()
@@ -107,6 +140,11 @@ class ServiceApplication extends BaseModel
     public function fileStorages()
     {
         return $this->morphMany(LocalFileVolume::class, 'resource');
+    }
+
+    public function environment_variables()
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
     }
 
     public function fqdns(): Attribute
@@ -173,5 +211,79 @@ class ServiceApplication extends BaseModel
     public function isBackupSolutionAvailable()
     {
         return false;
+    }
+
+    /**
+     * Get the required port for this service application.
+     * Extracts port from SERVICE_URL_* or SERVICE_FQDN_* environment variables
+     * stored at the Service level, filtering by normalized container name.
+     * Falls back to service-level port if no port-specific variable is found.
+     */
+    public function getRequiredPort(): ?int
+    {
+        try {
+            // Parse the Docker Compose to find SERVICE_URL/SERVICE_FQDN variables DIRECTLY DECLARED
+            // for this specific service container (not just referenced from other containers)
+            $dockerComposeRaw = data_get($this->service, 'docker_compose_raw');
+            if (! $dockerComposeRaw) {
+                // Fall back to service-level port if no compose file
+                return $this->service->getRequiredPort();
+            }
+
+            $dockerCompose = Yaml::parse($dockerComposeRaw);
+            $serviceConfig = data_get($dockerCompose, "services.{$this->name}");
+            if (! $serviceConfig) {
+                return $this->service->getRequiredPort();
+            }
+
+            $environment = data_get($serviceConfig, 'environment', []);
+
+            // Extract SERVICE_URL and SERVICE_FQDN variables DIRECTLY DECLARED in this service's environment
+            // (not variables that are merely referenced with ${VAR} syntax)
+            $portFound = null;
+            foreach ($environment as $key => $value) {
+                if (is_int($key) && is_string($value)) {
+                    // List-style: "- SERVICE_URL_APP_3000" or "- SERVICE_URL_APP_3000=value"
+                    // Extract variable name (before '=' if present)
+                    $envVarName = str($value)->before('=')->trim();
+
+                    // Only process direct declarations
+                    if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                        // Parse to check if it has a port suffix
+                        $parsed = parseServiceEnvironmentVariable($envVarName->value());
+                        if ($parsed['has_port'] && $parsed['port']) {
+                            // Found a port-specific variable for this service
+                            $portFound = (int) $parsed['port'];
+                            break;
+                        }
+                    }
+                } elseif (is_string($key)) {
+                    // Map-style: "SERVICE_URL_APP_3000: value" or "SERVICE_FQDN_DB: localhost"
+                    $envVarName = str($key);
+
+                    // Only process direct declarations
+                    if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                        // Parse to check if it has a port suffix
+                        $parsed = parseServiceEnvironmentVariable($envVarName->value());
+                        if ($parsed['has_port'] && $parsed['port']) {
+                            // Found a port-specific variable for this service
+                            $portFound = (int) $parsed['port'];
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // If a port was found in the template, return it
+            if ($portFound !== null) {
+                return $portFound;
+            }
+
+            // No port-specific variables found for this service, return null
+            // (DO NOT fall back to service-level port, as that applies to all services)
+            return null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 }

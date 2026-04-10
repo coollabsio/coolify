@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\HasSafeStringAttribute;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Storage;
@@ -11,13 +12,52 @@ class S3Storage extends BaseModel
 {
     use HasFactory, HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+        'region',
+        'key',
+        'secret',
+        'bucket',
+        'endpoint',
+        'is_usable',
+        'unusable_email_sent',
+    ];
 
     protected $casts = [
         'is_usable' => 'boolean',
         'key' => 'encrypted',
         'secret' => 'encrypted',
     ];
+
+    /**
+     * Boot the model and register event listeners.
+     */
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        // Trim whitespace from credentials before saving to prevent
+        // "Malformed Access Key Id" errors from accidental whitespace in pasted values.
+        // Note: We use the saving event instead of Attribute mutators because key/secret
+        // use Laravel's 'encrypted' cast. Attribute mutators fire before casts, which
+        // would cause issues with the encryption/decryption cycle.
+        static::saving(function (S3Storage $storage) {
+            if ($storage->key !== null) {
+                $storage->key = trim($storage->key);
+            }
+            if ($storage->secret !== null) {
+                $storage->secret = trim($storage->secret);
+            }
+        });
+
+        static::deleting(function (S3Storage $storage) {
+            ScheduledDatabaseBackup::where('s3_storage_id', $storage->id)->update([
+                'save_s3' => false,
+                's3_storage_id' => null,
+            ]);
+        });
+    }
 
     public static function ownedByCurrentTeam(array $select = ['*'])
     {
@@ -36,9 +76,57 @@ class S3Storage extends BaseModel
         return $this->belongsTo(Team::class);
     }
 
+    public function scheduledBackups()
+    {
+        return $this->hasMany(ScheduledDatabaseBackup::class, 's3_storage_id');
+    }
+
     public function awsUrl()
     {
         return "{$this->endpoint}/{$this->bucket}";
+    }
+
+    protected function path(): Attribute
+    {
+        return Attribute::make(
+            set: function (?string $value) {
+                if ($value === null || $value === '') {
+                    return null;
+                }
+
+                return str($value)->trim()->start('/')->value();
+            }
+        );
+    }
+
+    /**
+     * Trim whitespace from endpoint to prevent malformed URLs.
+     */
+    protected function endpoint(): Attribute
+    {
+        return Attribute::make(
+            set: fn (?string $value) => $value ? trim($value) : null,
+        );
+    }
+
+    /**
+     * Trim whitespace from bucket name to prevent connection errors.
+     */
+    protected function bucket(): Attribute
+    {
+        return Attribute::make(
+            set: fn (?string $value) => $value ? trim($value) : null,
+        );
+    }
+
+    /**
+     * Trim whitespace from region to prevent connection errors.
+     */
+    protected function region(): Attribute
+    {
+        return Attribute::make(
+            set: fn (?string $value) => $value ? trim($value) : null,
+        );
     }
 
     public function testConnection(bool $shouldSave = false)

@@ -5,7 +5,6 @@ namespace App\Actions\Database;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandaloneKeydb;
-use Illuminate\Support\Facades\Storage;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -208,7 +207,10 @@ class StartKeydb
         if ($this->database->enable_ssl) {
             $this->commands[] = "chown -R 999:999 $this->configuration_dir/ssl/server.key $this->configuration_dir/ssl/server.crt";
         }
-        $this->commands[] = "docker stop --time=10 $container_name 2>/dev/null || true";
+        if (! is_null($this->database->keydb_conf) && ! empty($this->database->keydb_conf)) {
+            $this->commands[] = "chown 999:999 $this->configuration_dir/keydb.conf";
+        }
+        $this->commands[] = "docker stop -t 10 $container_name 2>/dev/null || true";
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
@@ -270,10 +272,9 @@ class StartKeydb
             return;
         }
         $filename = 'keydb.conf';
-        Storage::disk('local')->put("tmp/keydb.conf_{$this->database->uuid}", $this->database->keydb_conf);
-        $path = Storage::path("tmp/keydb.conf_{$this->database->uuid}");
-        instant_scp($path, "{$this->configuration_dir}/{$filename}", $this->database->destination->server);
-        Storage::disk('local')->delete("tmp/keydb.conf_{$this->database->uuid}");
+        $content = $this->database->keydb_conf;
+        $content_base64 = base64_encode($content);
+        $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
     }
 
     private function buildStartCommand(): string

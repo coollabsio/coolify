@@ -47,6 +47,10 @@ const DATABASE_DOCKER_IMAGES = [
     'neo4j',
     'influxdb',
     'clickhouse/clickhouse-server',
+    'timescaledb/timescaledb',
+    'timescaledb',  // Matches timescale/timescaledb
+    'timescaledb-ha',  // Matches timescale/timescaledb-ha
+    'pgvector/pgvector',
 ];
 const SPECIFIC_SERVICES = [
     'quay.io/minio/minio',
@@ -54,6 +58,7 @@ const SPECIFIC_SERVICES = [
     'ghcr.io/coollabsio/minio',
     'coollabsio/minio',
     'svhd/logto',
+    'dxflrs/garage',
 ];
 
 // Based on /etc/os-release
@@ -65,4 +70,15 @@ const SUPPORTED_OS = [
     'alpine',
 ];
 
-const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment'];
+const NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK = [
+    'pgadmin',
+    'databasus',
+    'redis-insight',
+];
+const NEEDS_TO_DISABLE_GZIP = [
+    'beszel' => ['beszel'],
+];
+const NEEDS_TO_DISABLE_STRIPPREFIX = [
+    'appwrite' => ['appwrite', 'appwrite-console', 'appwrite-realtime'],
+];
+const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment', 'server'];

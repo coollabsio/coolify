@@ -1,0 +1,35 @@
+# ignore: true
+# documentation: https://docs.rustfs.com/installation/docker/
+# slogan: RustFS is a high-performance distributed storage system built with Rust, compatible with Amazon S3 APIs.
+# category: storage
+# tags: object, storage, server, s3, api, rust
+# logo: svgs/rustfs.png
+
+services:
+  rustfs:
+    image: rustfs/rustfs:latest
+    command: /data
+    environment:
+      - RUSTFS_SERVER_URL=$RUSTFS_SERVER_URL
+      - RUSTFS_BROWSER_REDIRECT_URL=$RUSTFS_BROWSER_REDIRECT_URL
+      - RUSTFS_ADDRESS=${RUSTFS_ADDRESS:-0.0.0.0:9000}
+      - RUSTFS_CONSOLE_ADDRESS=${RUSTFS_CONSOLE_ADDRESS:-0.0.0.0:9001}
+      - RUSTFS_CORS_ALLOWED_ORIGINS=${RUSTFS_CORS_ALLOWED_ORIGINS:-*}
+      - RUSTFS_CONSOLE_CORS_ALLOWED_ORIGINS=${RUSTFS_CONSOLE_CORS_ALLOWED_ORIGINS:-*}
+      - RUSTFS_ACCESS_KEY=$SERVICE_USER_RUSTFS
+      - RUSTFS_SECRET_KEY=$SERVICE_PASSWORD_RUSTFS
+      - RUSTFS_CONSOLE_ENABLE=${RUSTFS_CONSOLE_ENABLE:-true}
+      - RUSTFS_SERVER_DOMAINS=${RUSTFS_SERVER_DOMAINS}
+      - RUSTFS_EXTERNAL_ADDRESS=${RUSTFS_EXTERNAL_ADDRESS}
+    volumes:
+      - rustfs-data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "sh", "-c",
+          "curl -f http://127.0.0.1:9000/health && curl -f http://127.0.0.1:9001/rustfs/console/health"
+        ]
+      interval: 5s
+      timeout: 20s
+      retries: 10

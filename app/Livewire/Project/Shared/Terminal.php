@@ -4,26 +4,13 @@ namespace App\Livewire\Project\Shared;
 
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
+use App\Support\ValidationPatterns;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Terminal extends Component
 {
     public bool $hasShell = true;
-
-    public function getListeners()
-    {
-        $teamId = auth()->user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},ApplicationStatusChanged" => 'closeTerminal',
-        ];
-    }
-
-    public function closeTerminal()
-    {
-        $this->dispatch('reloadWindow');
-    }
 
     private function checkShellAvailability(Server $server, string $container): bool
     {
@@ -50,7 +37,7 @@ class Terminal extends Component
 
         if ($isContainer) {
             // Validate container identifier format (alphanumeric, dashes, and underscores only)
-            if (! preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/', $identifier)) {
+            if (! ValidationPatterns::isValidContainerName($identifier)) {
                 throw new \InvalidArgumentException('Invalid container identifier format');
             }
 
@@ -71,7 +58,14 @@ class Terminal extends Component
             $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
                             'if [ -f ~/.profile ]; then . ~/.profile; fi && '.
                             'if [ -n "$SHELL" ] && [ -x "$SHELL" ]; then exec $SHELL; else sh; fi';
-            $command = SshMultiplexingHelper::generateSshCommand($server, "docker exec -it {$escapedIdentifier} sh -c '{$shellCommand}'");
+
+            // Add sudo for non-root users to access Docker socket
+            $dockerCommand = "docker exec -it {$escapedIdentifier} sh -c '{$shellCommand}'";
+            if ($server->isNonRoot()) {
+                $dockerCommand = "sudo {$dockerCommand}";
+            }
+
+            $command = SshMultiplexingHelper::generateSshCommand($server, $dockerCommand);
         } else {
             $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
                             'if [ -f ~/.profile ]; then . ~/.profile; fi && '.

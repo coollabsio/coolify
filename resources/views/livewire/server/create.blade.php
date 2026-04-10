@@ -4,7 +4,7 @@
             <div>
                 <x-modal-input title="Connect a Hetzner Server">
                     <x-slot:content>
-                        <div class="relative gap-2 cursor-pointer box group">
+                        <div class="relative gap-2 cursor-pointer coolbox group">
                             <div class="flex items-center gap-4 mx-6">
                                 <svg class="w-10 h-10 flex-shrink-0" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
                                     <rect width="200" height="200" fill="#D50C2D" rx="8" />

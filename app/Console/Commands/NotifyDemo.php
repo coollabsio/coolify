@@ -56,7 +56,7 @@ class NotifyDemo extends Command
               php artisan app:demo-notify {channel}
             </p>
             <div class="my-1">
-                <div class="text-yellow-500"> Channels: </div>
+                <div class="text-warning-500"> Channels: </div>
                 <ul class="text-coolify">
                     <li>email</li>
                     <li>discord</li>

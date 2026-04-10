@@ -17,7 +17,7 @@ class Create extends Component
 
     public function mount()
     {
-        $this->private_keys = PrivateKey::ownedByCurrentTeam()->get();
+        $this->private_keys = PrivateKey::ownedByCurrentTeamCached();
         if (! isCloud()) {
             $this->limit_reached = false;
 

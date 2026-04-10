@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server;
 
+use App\Jobs\ConnectProxyToNetworksJob;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -29,8 +30,7 @@ class Destinations extends Component
 
     private function createNetworkAndAttachToProxy()
     {
-        $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
-        instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
+        ConnectProxyToNetworksJob::dispatchSync($this->server);
     }
 
     public function add($name)

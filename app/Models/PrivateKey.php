@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\HasSafeStringAttribute;
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
@@ -65,6 +66,20 @@ class PrivateKey extends BaseModel
             }
         });
 
+        static::saved(function ($key) {
+            if ($key->wasChanged('private_key')) {
+                try {
+                    $key->storeInFileSystem();
+                    refresh_server_connection($key);
+                } catch (\Exception $e) {
+                    Log::error('Failed to resync SSH key after update', [
+                        'key_uuid' => $key->uuid,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        });
+
         static::deleted(function ($key) {
             self::deleteFromStorage($key);
         });
@@ -80,12 +95,26 @@ class PrivateKey extends BaseModel
         return self::extractPublicKeyFromPrivate($this->private_key) ?? 'Error loading private key';
     }
 
+    /**
+     * Get query builder for private keys owned by current team.
+     * If you need all private keys without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam(array $select = ['*'])
     {
         $teamId = currentTeam()->id;
         $selectArray = collect($select)->concat(['id']);
 
         return self::whereTeamId($teamId)->select($selectArray->all());
+    }
+
+    /**
+     * Get all private keys owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return PrivateKey::ownedByCurrentTeam()->get();
+        });
     }
 
     public static function ownedAndOnlySShKeys(array $select = ['*'])
@@ -171,29 +200,54 @@ class PrivateKey extends BaseModel
     {
         $filename = "ssh_key@{$this->uuid}";
         $disk = Storage::disk('ssh-keys');
+        $keyLocation = $this->getKeyLocation();
+        $lockFile = $keyLocation.'.lock';
 
         // Ensure the storage directory exists and is writable
         $this->ensureStorageDirectoryExists();
 
-        // Attempt to store the private key
-        $success = $disk->put($filename, $this->private_key);
-
-        if (! $success) {
-            throw new \Exception("Failed to write SSH key to filesystem. Check disk space and permissions for: {$this->getKeyLocation()}");
+        // Use file locking to prevent concurrent writes from corrupting the key
+        $lockHandle = fopen($lockFile, 'c');
+        if ($lockHandle === false) {
+            throw new \Exception("Failed to open lock file for SSH key: {$lockFile}");
         }
 
-        // Verify the file was actually created and has content
-        if (! $disk->exists($filename)) {
-            throw new \Exception("SSH key file was not created: {$this->getKeyLocation()}");
-        }
+        try {
+            if (! flock($lockHandle, LOCK_EX)) {
+                throw new \Exception("Failed to acquire lock for SSH key: {$keyLocation}");
+            }
 
-        $storedContent = $disk->get($filename);
-        if (empty($storedContent) || $storedContent !== $this->private_key) {
-            $disk->delete($filename); // Clean up the bad file
-            throw new \Exception("SSH key file content verification failed: {$this->getKeyLocation()}");
-        }
+            // Attempt to store the private key
+            $success = $disk->put($filename, $this->private_key);
 
-        return $this->getKeyLocation();
+            if (! $success) {
+                throw new \Exception("Failed to write SSH key to filesystem. Check disk space and permissions for: {$keyLocation}");
+            }
+
+            // Verify the file was actually created and has content
+            if (! $disk->exists($filename)) {
+                throw new \Exception("SSH key file was not created: {$keyLocation}");
+            }
+
+            $storedContent = $disk->get($filename);
+            if (empty($storedContent) || $storedContent !== $this->private_key) {
+                $disk->delete($filename); // Clean up the bad file
+                throw new \Exception("SSH key file content verification failed: {$keyLocation}");
+            }
+
+            // Ensure correct permissions for SSH (0600 required)
+            if (file_exists($keyLocation) && ! chmod($keyLocation, 0600)) {
+                Log::warning('Failed to set SSH key file permissions to 0600', [
+                    'key_uuid' => $this->uuid,
+                    'path' => $keyLocation,
+                ]);
+            }
+
+            return $keyLocation;
+        } finally {
+            flock($lockHandle, LOCK_UN);
+            fclose($lockHandle);
+        }
     }
 
     public static function deleteFromStorage(self $privateKey)
@@ -223,7 +277,7 @@ class PrivateKey extends BaseModel
         $testSuccess = $disk->put($testFilename, 'test');
 
         if (! $testSuccess) {
-            throw new \Exception('SSH keys storage directory is not writable');
+            throw new \Exception('SSH keys storage directory is not writable. Run on the host: sudo chown -R 9999 /data/coolify/ssh && sudo chmod -R 700 /data/coolify/ssh && docker restart coolify');
         }
 
         // Clean up test file
@@ -239,12 +293,6 @@ class PrivateKey extends BaseModel
     {
         return DB::transaction(function () use ($data) {
             $this->update($data);
-
-            try {
-                $this->storeInFileSystem();
-            } catch (\Exception $e) {
-                throw new \Exception('Failed to update SSH key: '.$e->getMessage());
-            }
 
             return $this;
         });

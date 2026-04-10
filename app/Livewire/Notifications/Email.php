@@ -42,7 +42,7 @@ class Email extends Component
     public ?string $smtpHost = null;
 
     #[Validate(['nullable', 'numeric', 'min:1', 'max:65535'])]
-    public ?int $smtpPort = null;
+    public ?string $smtpPort = null;
 
     #[Validate(['nullable', 'string', 'in:starttls,tls,none'])]
     public ?string $smtpEncryption = null;
@@ -54,7 +54,7 @@ class Email extends Component
     public ?string $smtpPassword = null;
 
     #[Validate(['nullable', 'numeric'])]
-    public ?int $smtpTimeout = null;
+    public ?string $smtpTimeout = null;
 
     #[Validate(['boolean'])]
     public bool $resendEnabled = false;
@@ -103,6 +103,9 @@ class Email extends Component
 
     #[Validate(['boolean'])]
     public bool $serverPatchEmailNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $traefikOutdatedEmailNotifications = true;
 
     #[Validate(['nullable', 'email'])]
     public ?string $testEmailAddress = null;
@@ -155,6 +158,7 @@ class Email extends Component
             $this->settings->server_reachable_email_notifications = $this->serverReachableEmailNotifications;
             $this->settings->server_unreachable_email_notifications = $this->serverUnreachableEmailNotifications;
             $this->settings->server_patch_email_notifications = $this->serverPatchEmailNotifications;
+            $this->settings->traefik_outdated_email_notifications = $this->traefikOutdatedEmailNotifications;
             $this->settings->save();
 
         } else {
@@ -187,6 +191,7 @@ class Email extends Component
             $this->serverReachableEmailNotifications = $this->settings->server_reachable_email_notifications;
             $this->serverUnreachableEmailNotifications = $this->settings->server_unreachable_email_notifications;
             $this->serverPatchEmailNotifications = $this->settings->server_patch_email_notifications;
+            $this->traefikOutdatedEmailNotifications = $this->settings->traefik_outdated_email_notifications;
         }
     }
 

@@ -21,6 +21,8 @@ it('accepts valid RFC 1123 hostnames', function (string $hostname) {
     'subdomain' => 'web.app.example.com',
     'max label length' => str_repeat('a', 63),
     'max total length' => str_repeat('a', 63).'.'.str_repeat('b', 63).'.'.str_repeat('c', 63).'.'.str_repeat('d', 59),
+    'uppercase hostname' => 'MyServer',
+    'mixed case fqdn' => 'MyServer.Example.COM',
 ]);
 
 it('rejects invalid RFC 1123 hostnames', function (string $hostname, string $expectedError) {
@@ -36,8 +38,7 @@ it('rejects invalid RFC 1123 hostnames', function (string $hostname, string $exp
     expect($failCalled)->toBeTrue();
     expect($errorMessage)->toContain($expectedError);
 })->with([
-    'uppercase letters' => ['MyServer', 'lowercase letters (a-z), numbers (0-9), hyphens (-), and dots (.)'],
-    'underscore' => ['my_server', 'lowercase letters (a-z), numbers (0-9), hyphens (-), and dots (.)'],
+    'underscore' => ['my_server', 'letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.)'],
     'starts with hyphen' => ['-myserver', 'cannot start or end with a hyphen'],
     'ends with hyphen' => ['myserver-', 'cannot start or end with a hyphen'],
     'starts with dot' => ['.myserver', 'cannot start or end with a dot'],
@@ -46,9 +47,9 @@ it('rejects invalid RFC 1123 hostnames', function (string $hostname, string $exp
     'too long total' => [str_repeat('a', 254), 'must not exceed 253 characters'],
     'label too long' => [str_repeat('a', 64), 'must be 1-63 characters'],
     'empty label' => ['my..server', 'consecutive dots'],
-    'special characters' => ['my@server', 'lowercase letters (a-z), numbers (0-9), hyphens (-), and dots (.)'],
-    'space' => ['my server', 'lowercase letters (a-z), numbers (0-9), hyphens (-), and dots (.)'],
-    'shell metacharacters' => ['my;server', 'lowercase letters (a-z), numbers (0-9), hyphens (-), and dots (.)'],
+    'special characters' => ['my@server', 'letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.)'],
+    'space' => ['my server', 'letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.)'],
+    'shell metacharacters' => ['my;server', 'letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.)'],
 ]);
 
 it('accepts empty hostname', function () {

@@ -39,7 +39,7 @@ class DeleteEnvironment extends Component
         if ($environment->isEmpty()) {
             $environment->delete();
 
-            return redirect()->route('project.show', parameters: ['project_uuid' => $this->parameters['project_uuid']]);
+            return redirectRoute($this, 'project.show', ['project_uuid' => $this->parameters['project_uuid']]);
         }
 
         return $this->dispatch('error', "<strong>Environment {$environment->name}</strong> has defined resources, please delete them first.");

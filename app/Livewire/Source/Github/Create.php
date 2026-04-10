@@ -3,6 +3,7 @@
 namespace App\Livewire\Source\Github;
 
 use App\Models\GithubApp;
+use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -37,8 +38,8 @@ class Create extends Component
             $this->validate([
                 'name' => 'required|string',
                 'organization' => 'nullable|string',
-                'api_url' => 'required|string',
-                'html_url' => 'required|string',
+                'api_url' => ['required', 'string', 'url', new SafeExternalUrl],
+                'html_url' => ['required', 'string', 'url', new SafeExternalUrl],
                 'custom_user' => 'required|string',
                 'custom_port' => 'required|int',
                 'is_system_wide' => 'required|bool',
@@ -58,7 +59,7 @@ class Create extends Component
                 session(['from' => session('from') + ['source_id' => $github_app->id]]);
             }
 
-            return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
+            return redirectRoute($this, 'source.github.show', ['github_app_uuid' => $github_app->uuid]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

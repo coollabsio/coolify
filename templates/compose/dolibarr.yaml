@@ -1,6 +1,6 @@
 # documentation: https://www.dolibarr.org/documentation-home.php
 # slogan: Dolibarr is a modern software package to manage your organization's activity (contacts, quotes, invoices, orders, stocks, agenda, hr, expense reports, accountancy, ecm, manufacturing, ...).
-# category: cms
+# category: productivity
 # tags: crm,ERP
 # logo: svgs/dolibarr.png
 # port: 80
@@ -22,6 +22,9 @@ services:
       - DOLI_CRON=${DOLI_CRON:-0}
       - DOLI_INIT_DEMO=${DOLI_INIT_DEMO:-0}
       - DOLI_COMPANY_NAME=${DOLI_COMPANY_NAME:-MyBigCompany}
+    volumes:
+      - dolibarr_docs:/var/www/documents
+      - dolibarr_custom:/var/www/html/custom
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
       interval: 2s

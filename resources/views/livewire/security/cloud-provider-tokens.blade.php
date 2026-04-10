@@ -23,12 +23,12 @@
                 <div class="flex gap-2 pt-2">
                     @can('view', $savedToken)
                         <x-forms.button wire:click="validateToken({{ $savedToken->id }})" type="button">
-                            Validate Token
+                            Validate
                         </x-forms.button>
                     @endcan
 
                     @can('delete', $savedToken)
-                        <x-modal-confirmation title="Confirm Token Deletion?" isErrorButton buttonTitle="Delete Token"
+                        <x-modal-confirmation title="Confirm Token Deletion?" isErrorButton buttonTitle="Delete"
                             submitAction="deleteToken({{ $savedToken->id }})" :actions="[
                                 'This cloud provider token will be permanently deleted.',
                                 'Any servers using this token will need to be reconfigured.',

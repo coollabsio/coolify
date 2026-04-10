@@ -24,11 +24,13 @@ class DiscordNotificationSettings extends Model
         'backup_failure_discord_notifications',
         'scheduled_task_success_discord_notifications',
         'scheduled_task_failure_discord_notifications',
-        'docker_cleanup_discord_notifications',
+        'docker_cleanup_success_discord_notifications',
+        'docker_cleanup_failure_discord_notifications',
         'server_disk_usage_discord_notifications',
         'server_reachable_discord_notifications',
         'server_unreachable_discord_notifications',
         'server_patch_discord_notifications',
+        'traefik_outdated_discord_notifications',
         'discord_ping_enabled',
     ];
 
@@ -48,6 +50,7 @@ class DiscordNotificationSettings extends Model
         'server_reachable_discord_notifications' => 'boolean',
         'server_unreachable_discord_notifications' => 'boolean',
         'server_patch_discord_notifications' => 'boolean',
+        'traefik_outdated_discord_notifications' => 'boolean',
         'discord_ping_enabled' => 'boolean',
     ];
 

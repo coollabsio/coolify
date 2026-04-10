@@ -2,25 +2,42 @@
 
 namespace App\Models;
 
+use App\Jobs\ConnectProxyToNetworksJob;
+use App\Support\ValidationPatterns;
 use App\Traits\HasSafeStringAttribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class StandaloneDocker extends BaseModel
 {
+    use HasFactory;
     use HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'server_id',
+        'name',
+        'network',
+    ];
 
     protected static function boot()
     {
         parent::boot();
         static::created(function ($newStandaloneDocker) {
             $server = $newStandaloneDocker->server;
+            $safeNetwork = escapeshellarg($newStandaloneDocker->network);
             instant_remote_process([
-                "docker network inspect $newStandaloneDocker->network >/dev/null 2>&1 || docker network create --driver overlay --attachable $newStandaloneDocker->network >/dev/null",
+                "docker network inspect {$safeNetwork} >/dev/null 2>&1 || docker network create --driver overlay --attachable {$safeNetwork} >/dev/null",
             ], $server, false);
-            $connectProxyToDockerNetworks = connectProxyToNetworks($server);
-            instant_remote_process($connectProxyToDockerNetworks, $server, false);
+            ConnectProxyToNetworksJob::dispatchSync($server);
         });
+    }
+
+    public function setNetworkAttribute(string $value): void
+    {
+        if (! ValidationPatterns::isValidDockerNetwork($value)) {
+            throw new \InvalidArgumentException('Invalid Docker network name. Must start with alphanumeric and contain only alphanumeric characters, dots, hyphens, and underscores.');
+        }
+
+        $this->attributes['network'] = $value;
     }
 
     public function applications()
@@ -71,6 +88,28 @@ class StandaloneDocker extends BaseModel
     public function server()
     {
         return $this->belongsTo(Server::class);
+    }
+
+    /**
+     * Get the server attribute using identity map caching.
+     * This intercepts lazy-loading to use cached Server lookups.
+     */
+    public function getServerAttribute(): ?Server
+    {
+        // Use eager loaded data if available
+        if ($this->relationLoaded('server')) {
+            return $this->getRelation('server');
+        }
+
+        // Use identity map for lazy loading
+        $server = Server::findCached($this->server_id);
+
+        // Cache in relation for future access on this instance
+        if ($server) {
+            $this->setRelation('server', $server);
+        }
+
+        return $server;
     }
 
     public function services()

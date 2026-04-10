@@ -546,6 +546,13 @@
                                 </div>
                             </div>
 
+                            @if ($prerequisiteInstallAttempts > 0)
+                                <div class="p-6 bg-neutral-50 dark:bg-coolgray-200 rounded-lg border border-neutral-200 dark:border-coolgray-400">
+                                    <h3 class="font-bold text-black dark:text-white mb-4">Installing Prerequisites</h3>
+                                    <livewire:activity-monitor header="Prerequisites Installation Logs" :showWaiting="false" />
+                                </div>
+                            @endif
+
                             <x-slide-over closeWithX fullScreen>
                                 <x-slot:title>Server Validation</x-slot:title>
                                 <x-slot:content>

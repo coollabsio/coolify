@@ -1,0 +1,26 @@
+# documentation: https://github.com/hexlo/terraria-server-docker
+# slogan: Docker multi-arch Image for Terraria Server.
+# category: games
+# tags: terraria
+# logo: svgs/terraria.svg
+# port: 7777
+
+services:
+  terraria-server:
+    image: 'hexlo/terraria-server-docker:1.4.4.9'
+    stdin_open: true
+    tty: true
+    ports:
+      - '7777:7777'
+    volumes:
+      - 'terraria-server:/root/.local/share/Terraria/Worlds'
+    environment:
+      - 'WORLD=${WORLD:-/root/.local/share/Terraria/Worlds/world1.wld}'
+      - 'AUTOCREATE=${AUTOCREATE:-2}'
+      - 'WORLDNAME=${WORLDNAME:-world1}'
+      - 'DIFFICULTY=${DIFFICULTY:-1}'
+      - 'MAXPLAYERS=${MAXPLAYERS:-8}'
+      - 'PASSWORD=${PASSWORD:-mypassword}'
+      - 'MOTD=${MOTD:-Welcome to the server!}'
+      - 'LANGUAGE=${LANGUAGE:-en/US}'
+      - 'SECURE=${SECURE:-1}'

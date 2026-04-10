@@ -5,8 +5,8 @@ namespace App\Jobs;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
-use Cron\CronExpression;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -15,7 +15,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
-class ServerManagerJob implements ShouldQueue
+class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -64,11 +64,11 @@ class ServerManagerJob implements ShouldQueue
 
     private function getServers(): Collection
     {
-        $allServers = Server::where('ip', '!=', '1.2.3.4');
+        $allServers = Server::with('settings')->where('ip', '!=', '1.2.3.4');
 
         if (isCloud()) {
             $servers = $allServers->whereRelation('team.subscription', 'stripe_invoice_paid', true)->get();
-            $own = Team::find(0)->servers;
+            $own = Team::find(0)->servers()->with('settings')->get();
 
             return $servers->merge($own);
         } else {
@@ -79,15 +79,22 @@ class ServerManagerJob implements ShouldQueue
     private function dispatchConnectionChecks(Collection $servers): void
     {
 
-        if ($this->shouldRunNow($this->checkFrequency)) {
+        if (shouldRunCronNow($this->checkFrequency, $this->instanceTimezone, 'server-connection-checks', $this->executionTime)) {
             $servers->each(function (Server $server) {
                 try {
+                    // Skip SSH connection check if Sentinel is healthy — its heartbeat already proves connectivity
+                    if ($server->isSentinelEnabled() && $server->isSentinelLive()) {
+                        return;
+                    }
+                    if ($this->shouldSkipDueToBackoff($server)) {
+                        return;
+                    }
                     ServerConnectionCheckJob::dispatch($server);
                 } catch (\Exception $e) {
                     Log::channel('scheduled-errors')->error('Failed to dispatch ServerConnectionCheck', [
                         'server_id' => $server->id,
                         'server_name' => $server->name,
-                        'error' => $e->getMessage(),
+                        'error' => get_class($e).': '.$e->getMessage(),
                     ]);
                 }
             });
@@ -103,7 +110,7 @@ class ServerManagerJob implements ShouldQueue
                 Log::channel('scheduled-errors')->error('Error processing server tasks', [
                     'server_id' => $server->id,
                     'server_name' => $server->name,
-                    'error' => $e->getMessage(),
+                    'error' => get_class($e).': '.$e->getMessage(),
                 ]);
             }
         }
@@ -111,60 +118,91 @@ class ServerManagerJob implements ShouldQueue
 
     private function processServerTasks(Server $server): void
     {
+        // Get server timezone (used for all scheduled tasks)
+        $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
+        if (validate_timezone($serverTimezone) === false) {
+            $serverTimezone = config('app.timezone');
+        }
+
         // Check if we should run sentinel-based checks
         $lastSentinelUpdate = $server->sentinel_updated_at;
         $waitTime = $server->waitBeforeDoingSshCheck();
-        $sentinelOutOfSync = Carbon::parse($lastSentinelUpdate)->isBefore($this->executionTime->subSeconds($waitTime));
+        $sentinelOutOfSync = Carbon::parse($lastSentinelUpdate)->isBefore($this->executionTime->copy()->subSeconds($waitTime));
 
         if ($sentinelOutOfSync) {
-            // Dispatch jobs if Sentinel is out of sync
-            if ($this->shouldRunNow($this->checkFrequency)) {
-                ServerCheckJob::dispatch($server);
+            // Dispatch ServerCheckJob if Sentinel is out of sync
+            if (shouldRunCronNow($this->checkFrequency, $serverTimezone, "server-check:{$server->id}", $this->executionTime)) {
+                if (! $this->shouldSkipDueToBackoff($server)) {
+                    ServerCheckJob::dispatch($server);
+                }
             }
+        }
 
-            // Dispatch ServerStorageCheckJob if due
-            $serverDiskUsageCheckFrequency = data_get($server->settings, 'server_disk_usage_check_frequency', '0 * * * *');
+        $isSentinelEnabled = $server->isSentinelEnabled();
+        $shouldRestartSentinel = $isSentinelEnabled && shouldRunCronNow('0 0 * * *', $serverTimezone, "sentinel-restart:{$server->id}", $this->executionTime);
+        // Dispatch Sentinel restart if due (daily for Sentinel-enabled servers)
+
+        if ($shouldRestartSentinel) {
+            CheckAndStartSentinelJob::dispatch($server);
+        }
+
+        // Dispatch ServerStorageCheckJob if due (only when Sentinel is out of sync or disabled)
+        // When Sentinel is active, PushServerUpdateJob handles storage checks with real-time data
+        if ($sentinelOutOfSync) {
+            $serverDiskUsageCheckFrequency = data_get($server->settings, 'server_disk_usage_check_frequency', '0 23 * * *');
             if (isset(VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency])) {
                 $serverDiskUsageCheckFrequency = VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency];
             }
-            $shouldRunStorageCheck = $this->shouldRunNow($serverDiskUsageCheckFrequency);
+            $shouldRunStorageCheck = shouldRunCronNow($serverDiskUsageCheckFrequency, $serverTimezone, "server-storage-check:{$server->id}", $this->executionTime);
 
             if ($shouldRunStorageCheck) {
                 ServerStorageCheckJob::dispatch($server);
             }
         }
 
-        $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
-        if (validate_timezone($serverTimezone) === false) {
-            $serverTimezone = config('app.timezone');
-        }
-
         // Dispatch ServerPatchCheckJob if due (weekly)
-        $shouldRunPatchCheck = $this->shouldRunNow('0 0 * * 0', $serverTimezone);
+        $shouldRunPatchCheck = shouldRunCronNow('0 0 * * 0', $serverTimezone, "server-patch-check:{$server->id}", $this->executionTime);
 
         if ($shouldRunPatchCheck) { // Weekly on Sunday at midnight
             ServerPatchCheckJob::dispatch($server);
         }
 
-        // Dispatch Sentinel restart if due (daily for Sentinel-enabled servers)
-        $isSentinelEnabled = $server->isSentinelEnabled();
-        $shouldRestartSentinel = $isSentinelEnabled && $this->shouldRunNow('0 0 * * *', $serverTimezone);
-
-        if ($shouldRestartSentinel) {
-            dispatch(function () use ($server) {
-                $server->restartContainer('coolify-sentinel');
-            });
-        }
+        // Note: CheckAndStartSentinelJob is only dispatched daily (line above) for version updates.
+        // Crash recovery is handled by sentinelOutOfSync → ServerCheckJob → CheckAndStartSentinelJob.
     }
 
-    private function shouldRunNow(string $frequency, ?string $timezone = null): bool
+    /**
+     * Determine the backoff cycle interval based on how many consecutive times a server has been unreachable.
+     * Higher counts → less frequent checks (based on 5-min cloud cycle):
+     *   0-2: every cycle, 3-5: ~15 min, 6-11: ~30 min, 12+: ~60 min
+     */
+    private function getBackoffCycleInterval(int $unreachableCount): int
     {
-        $cron = new CronExpression($frequency);
+        return match (true) {
+            $unreachableCount <= 2 => 1,
+            $unreachableCount <= 5 => 3,
+            $unreachableCount <= 11 => 6,
+            default => 12,
+        };
+    }
 
-        // Use the frozen execution time, not the current time
-        $baseTime = $this->executionTime ?? Carbon::now();
-        $executionTime = $baseTime->copy()->setTimezone($timezone ?? config('app.timezone'));
+    /**
+     * Check if a server should be skipped this cycle due to unreachable backoff.
+     * Uses server ID hash to distribute checks across cycles (avoid thundering herd).
+     */
+    private function shouldSkipDueToBackoff(Server $server): bool
+    {
+        $unreachableCount = $server->unreachable_count ?? 0;
+        $interval = $this->getBackoffCycleInterval($unreachableCount);
 
-        return $cron->isDue($executionTime);
+        if ($interval <= 1) {
+            return false;
+        }
+
+        $cyclePeriodMinutes = isCloud() ? 5 : 1;
+        $cycleIndex = intdiv($this->executionTime->minute, $cyclePeriodMinutes);
+        $serverHash = abs(crc32((string) $server->id));
+
+        return ($cycleIndex + $serverHash) % $interval !== 0;
     }
 }

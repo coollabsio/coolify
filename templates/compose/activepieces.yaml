@@ -7,7 +7,7 @@
 
 services:
   activepieces:
-    image: "ghcr.io/activepieces/activepieces:0.21.0" # Released on March 13 2024
+    image: ghcr.io/activepieces/activepieces:0.75.0
     environment:
       - SERVICE_URL_ACTIVEPIECES
       - AP_API_KEY=$SERVICE_PASSWORD_64_APIKEY
@@ -28,6 +28,7 @@ services:
       - AP_TELEMETRY_ENABLED=${AP_TELEMETRY_ENABLED:-false}
       - AP_TEMPLATES_SOURCE_URL=${AP_TEMPLATES_SOURCE_URL:-https://cloud.activepieces.com/api/v1/flow-templates}
       - AP_TRIGGER_DEFAULT_POLL_INTERVAL=${AP_TRIGGER_DEFAULT_POLL_INTERVAL:-5}
+      - AP_SIGN_UP_ENABLED=${AP_SIGN_UP_ENABLED:-true}
       - AP_WEBHOOK_TIMEOUT_SECONDS=${AP_WEBHOOK_TIMEOUT_SECONDS:-30}
     depends_on:
       postgres:
@@ -40,21 +41,21 @@ services:
       timeout: 20s
       retries: 10
   postgres:
-    image: 'postgres:14.4'
+    image: postgres:18-alpine
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-activepieces}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
     volumes:
-      - "pg-data:/var/lib/postgresql/data"
+      - 'pg-data:/var/lib/postgresql'
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 20s
       retries: 10
   redis:
-    image: 'redis:7.0.7'
+    image: redis:7-alpine
     volumes:
       - "redis_data:/data"
     healthcheck:

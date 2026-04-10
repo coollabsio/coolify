@@ -4,7 +4,22 @@ use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Server;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\Yaml\Yaml;
+
+/**
+ * Check if a network name is a Docker predefined system network.
+ * These networks cannot be created, modified, or managed by docker network commands.
+ *
+ * @param  string  $network  Network name to check
+ * @return bool True if it's a predefined network that should be skipped
+ */
+function isDockerPredefinedNetwork(string $network): bool
+{
+    // Only filter 'default' and 'host' to match existing codebase patterns
+    // See: bootstrap/helpers/parsers.php:891, bootstrap/helpers/shared.php:689,748
+    return in_array($network, ['default', 'host'], true);
+}
 
 function collectProxyDockerNetworksByServer(Server $server)
 {
@@ -66,8 +81,12 @@ function collectDockerNetworksByServer(Server $server)
         $networks->push($network);
         $allNetworks->push($network);
     }
-    $networks = collect($networks)->flatten()->unique();
-    $allNetworks = $allNetworks->flatten()->unique();
+    $networks = collect($networks)->flatten()->unique()->filter(function ($network) {
+        return ! isDockerPredefinedNetwork($network);
+    });
+    $allNetworks = $allNetworks->flatten()->unique()->filter(function ($network) {
+        return ! isDockerPredefinedNetwork($network);
+    });
     if ($server->isSwarm()) {
         if ($networks->count() === 0) {
             $networks = collect(['coolify-overlay']);
@@ -90,24 +109,59 @@ function connectProxyToNetworks(Server $server)
     ['networks' => $networks] = collectDockerNetworksByServer($server);
     if ($server->isSwarm()) {
         $commands = $networks->map(function ($network) {
+            $safe = escapeshellarg($network);
             return [
-                "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --driver overlay --attachable $network >/dev/null",
-                "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
-                "echo 'Successfully connected coolify-proxy to $network network.'",
+                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --driver overlay --attachable {$safe} >/dev/null",
+                "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
+                "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
         });
     } else {
         $commands = $networks->map(function ($network) {
+            $safe = escapeshellarg($network);
             return [
-                "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --attachable $network >/dev/null",
-                "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
-                "echo 'Successfully connected coolify-proxy to $network network.'",
+                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --attachable {$safe} >/dev/null",
+                "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
+                "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
         });
     }
 
     return $commands->flatten();
 }
+
+/**
+ * Ensures all required networks exist before docker compose up.
+ * This must be called BEFORE docker compose up since the compose file declares networks as external.
+ *
+ * @param  Server  $server  The server to ensure networks on
+ * @return \Illuminate\Support\Collection Commands to create networks if they don't exist
+ */
+function ensureProxyNetworksExist(Server $server)
+{
+    ['allNetworks' => $networks] = collectDockerNetworksByServer($server);
+
+    if ($server->isSwarm()) {
+        $commands = $networks->map(function ($network) {
+            $safe = escapeshellarg($network);
+            return [
+                "echo 'Ensuring network {$safe} exists...'",
+                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable {$safe}",
+            ];
+        });
+    } else {
+        $commands = $networks->map(function ($network) {
+            $safe = escapeshellarg($network);
+            return [
+                "echo 'Ensuring network {$safe} exists...'",
+                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable {$safe}",
+            ];
+        });
+    }
+
+    return $commands->flatten();
+}
+
 function extractCustomProxyCommands(Server $server, string $existing_config): array
 {
     $custom_commands = [];
@@ -166,6 +220,13 @@ function extractCustomProxyCommands(Server $server, string $existing_config): ar
 }
 function generateDefaultProxyConfiguration(Server $server, array $custom_commands = [])
 {
+    Log::info('Generating default proxy configuration', [
+        'server_id' => $server->id,
+        'server_name' => $server->name,
+        'custom_commands_count' => count($custom_commands),
+        'caller' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3)[1]['class'] ?? 'unknown',
+    ]);
+
     $proxy_path = $server->proxyPath();
     $proxy_type = $server->proxyType();
 
@@ -188,8 +249,8 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
     $array_of_networks = collect([]);
     $filtered_networks = collect([]);
     $networks->map(function ($network) use ($array_of_networks, $filtered_networks) {
-        if ($network === 'host') {
-            return; // network-scoped alias is supported only for containers in user defined networks
+        if (isDockerPredefinedNetwork($network)) {
+            return; // Predefined networks cannot be used in network configuration
         }
 
         $array_of_networks[$network] = [
@@ -212,7 +273,7 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
             'services' => [
                 'traefik' => [
                     'container_name' => 'coolify-proxy',
-                    'image' => 'traefik:v3.1',
+                    'image' => 'traefik:v3.6',
                     'restart' => RESTART_MODE,
                     'extra_hosts' => [
                         'host.docker.internal:host-gateway',
@@ -333,4 +394,94 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
     SaveProxyConfiguration::run($server, $config);
 
     return $config;
+}
+
+function getExactTraefikVersionFromContainer(Server $server): ?string
+{
+    try {
+        Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Checking for exact version");
+
+        // Method A: Execute traefik version command (most reliable)
+        $versionCommand = "docker exec coolify-proxy traefik version 2>/dev/null | grep -oP 'Version:\s+\K\d+\.\d+\.\d+'";
+        Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Running: {$versionCommand}");
+
+        $output = instant_remote_process([$versionCommand], $server, false);
+
+        if (! empty(trim($output))) {
+            $version = trim($output);
+            Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Detected exact version from command: {$version}");
+
+            return $version;
+        }
+
+        // Method B: Try OCI label as fallback
+        $labelCommand = "docker inspect coolify-proxy --format '{{index .Config.Labels \"org.opencontainers.image.version\"}}' 2>/dev/null";
+        Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Trying OCI label");
+
+        $label = instant_remote_process([$labelCommand], $server, false);
+
+        if (! empty(trim($label))) {
+            // Extract version number from label (might have 'v' prefix)
+            if (preg_match('/(\d+\.\d+\.\d+)/', trim($label), $matches)) {
+                Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Detected from OCI label: {$matches[1]}");
+
+                return $matches[1];
+            }
+        }
+
+        Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Could not detect exact version");
+
+        return null;
+    } catch (\Exception $e) {
+        Log::error("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Error: ".$e->getMessage());
+
+        return null;
+    }
+}
+
+function getTraefikVersionFromDockerCompose(Server $server): ?string
+{
+    try {
+        Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Starting version detection");
+
+        // Try to get exact version from running container (e.g., "3.6.0")
+        $exactVersion = getExactTraefikVersionFromContainer($server);
+        if ($exactVersion) {
+            Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Using exact version: {$exactVersion}");
+
+            return $exactVersion;
+        }
+
+        // Fallback: Check image tag (current method)
+        Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Falling back to image tag detection");
+
+        $containerName = 'coolify-proxy';
+        $inspectCommand = "docker inspect {$containerName} --format '{{.Config.Image}}' 2>/dev/null";
+
+        $image = instant_remote_process([$inspectCommand], $server, false);
+
+        if (empty(trim($image))) {
+            Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Container '{$containerName}' not found or not running");
+
+            return null;
+        }
+
+        $image = trim($image);
+        Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Running container image: {$image}");
+
+        // Extract version from image string (e.g., "traefik:v3.6" or "traefik:3.6.0" or "traefik:latest")
+        if (preg_match('/traefik:(v?\d+\.\d+(?:\.\d+)?|latest)/i', $image, $matches)) {
+            Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Extracted version from image tag: {$matches[1]}");
+
+            return $matches[1];
+        }
+
+        Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Image format doesn't match expected pattern: {$image}");
+
+        return null;
+    } catch (\Exception $e) {
+        Log::error("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Error: ".$e->getMessage());
+
+        return null;
+    }
 }

@@ -9,10 +9,13 @@ use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\StartLogDrain;
 use App\Actions\Shared\ComplexStatusCheck;
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Notifications\Container\ContainerRestarted;
+use App\Services\ContainerStatusAggregator;
+use App\Traits\CalculatesExcludedStatus;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -21,10 +24,12 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Horizon\Contracts\Silenced;
 
 class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 {
+    use CalculatesExcludedStatus;
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 1;
@@ -67,6 +72,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     public Collection $applicationContainerStatuses;
 
+    public Collection $serviceContainerStatuses;
+
     public bool $foundProxy = false;
 
     public bool $foundLogDrainContainer = false;
@@ -90,6 +97,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         $this->foundApplicationPreviewsIds = collect();
         $this->foundServiceDatabaseIds = collect();
         $this->applicationContainerStatuses = collect();
+        $this->serviceContainerStatuses = collect();
         $this->allApplicationIds = collect();
         $this->allDatabaseUuids = collect();
         $this->allTcpProxyUuids = collect();
@@ -99,6 +107,20 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     public function handle()
     {
+        // Defensive initialization for Collection properties to handle queue deserialization edge cases
+        $this->serviceContainerStatuses ??= collect();
+        $this->applicationContainerStatuses ??= collect();
+        $this->foundApplicationIds ??= collect();
+        $this->foundDatabaseUuids ??= collect();
+        $this->foundServiceApplicationIds ??= collect();
+        $this->foundApplicationPreviewsIds ??= collect();
+        $this->foundServiceDatabaseIds ??= collect();
+        $this->allApplicationIds ??= collect();
+        $this->allDatabaseUuids ??= collect();
+        $this->allTcpProxyUuids ??= collect();
+        $this->allServiceApplicationIds ??= collect();
+        $this->allServiceDatabaseIds ??= collect();
+
         // TODO: Swarm is not supported yet
         if (! $this->data) {
             throw new \Exception('No data provided');
@@ -108,98 +130,131 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         $this->server->sentinelHeartbeat();
 
         $this->containers = collect(data_get($data, 'containers'));
-
         $filesystemUsageRoot = data_get($data, 'filesystem_usage_root.used_percentage');
-        ServerStorageCheckJob::dispatch($this->server, $filesystemUsageRoot);
+
+        // Only dispatch storage check when disk percentage actually changes
+        $storageCacheKey = 'storage-check:'.$this->server->id;
+        $lastPercentage = Cache::get($storageCacheKey);
+        if ($lastPercentage === null || (string) $lastPercentage !== (string) $filesystemUsageRoot) {
+            Cache::put($storageCacheKey, $filesystemUsageRoot, 600);
+            ServerStorageCheckJob::dispatch($this->server, $filesystemUsageRoot);
+        }
 
         if ($this->containers->isEmpty()) {
             return;
         }
+
         $this->applications = $this->server->applications();
         $this->databases = $this->server->databases();
         $this->previews = $this->server->previews();
-        $this->services = $this->server->services()->get();
+        // Eager load service applications and databases to avoid N+1 queries
+        $this->services = $this->server->services()
+            ->with(['applications:id,service_id', 'databases:id,service_id'])
+            ->get();
+
         $this->allApplicationIds = $this->applications->filter(function ($application) {
-            return $application->additional_servers->count() === 0;
+            return $application->additional_servers_count === 0;
         })->pluck('id');
         $this->allApplicationsWithAdditionalServers = $this->applications->filter(function ($application) {
-            return $application->additional_servers->count() > 0;
+            return $application->additional_servers_count > 0;
         });
         $this->allApplicationPreviewsIds = $this->previews->map(function ($preview) {
             return $preview->application_id.':'.$preview->pull_request_id;
         });
         $this->allDatabaseUuids = $this->databases->pluck('uuid');
         $this->allTcpProxyUuids = $this->databases->where('is_public', true)->pluck('uuid');
-        $this->services->each(function ($service) {
-            $service->applications()->pluck('id')->each(function ($applicationId) {
-                $this->allServiceApplicationIds->push($applicationId);
-            });
-            $service->databases()->pluck('id')->each(function ($databaseId) {
-                $this->allServiceDatabaseIds->push($databaseId);
-            });
-        });
+        // Use eager-loaded relationships instead of querying in loop
+        $this->allServiceApplicationIds = $this->services->flatMap(fn ($service) => $service->applications->pluck('id'));
+        $this->allServiceDatabaseIds = $this->services->flatMap(fn ($service) => $service->databases->pluck('id'));
 
         foreach ($this->containers as $container) {
             $containerStatus = data_get($container, 'state', 'exited');
-            $containerHealth = data_get($container, 'health_status', 'unhealthy');
-            $containerStatus = "$containerStatus ($containerHealth)";
+            $rawHealthStatus = data_get($container, 'health_status');
+            $containerHealth = $rawHealthStatus ?? 'unknown';
+            // Only append health status if container is not exited
+            if ($containerStatus !== 'exited') {
+                $containerStatus = "$containerStatus:$containerHealth";
+            }
             $labels = collect(data_get($container, 'labels'));
             $coolify_managed = $labels->has('coolify.managed');
-            if ($coolify_managed) {
-                $name = data_get($container, 'name');
-                if ($name === 'coolify-log-drain' && $this->isRunning($containerStatus)) {
-                    $this->foundLogDrainContainer = true;
-                }
-                if ($labels->has('coolify.applicationId')) {
-                    $applicationId = $labels->get('coolify.applicationId');
-                    $pullRequestId = $labels->get('coolify.pullRequestId', '0');
-                    try {
-                        if ($pullRequestId === '0') {
-                            if ($this->allApplicationIds->contains($applicationId) && $this->isRunning($containerStatus)) {
-                                $this->foundApplicationIds->push($applicationId);
-                            }
-                            // Store container status for aggregation
-                            if (! $this->applicationContainerStatuses->has($applicationId)) {
-                                $this->applicationContainerStatuses->put($applicationId, collect());
-                            }
-                            $containerName = $labels->get('com.docker.compose.service');
-                            if ($containerName) {
-                                $this->applicationContainerStatuses->get($applicationId)->put($containerName, $containerStatus);
-                            }
-                        } else {
-                            $previewKey = $applicationId.':'.$pullRequestId;
-                            if ($this->allApplicationPreviewsIds->contains($previewKey) && $this->isRunning($containerStatus)) {
-                                $this->foundApplicationPreviewsIds->push($previewKey);
-                            }
-                            $this->updateApplicationPreviewStatus($applicationId, $pullRequestId, $containerStatus);
+
+            if (! $coolify_managed) {
+                continue;
+            }
+
+            $name = data_get($container, 'name');
+            if ($name === 'coolify-log-drain' && $this->isRunning($containerStatus)) {
+                $this->foundLogDrainContainer = true;
+            }
+            if ($labels->has('coolify.applicationId')) {
+                $applicationId = $labels->get('coolify.applicationId');
+                $pullRequestId = $labels->get('coolify.pullRequestId', '0');
+                try {
+                    if ($pullRequestId === '0') {
+                        if ($this->allApplicationIds->contains($applicationId)) {
+                            $this->foundApplicationIds->push($applicationId);
                         }
-                    } catch (\Exception $e) {
-                    }
-                } elseif ($labels->has('coolify.serviceId')) {
-                    $serviceId = $labels->get('coolify.serviceId');
-                    $subType = $labels->get('coolify.service.subType');
-                    $subId = $labels->get('coolify.service.subId');
-                    if ($subType === 'application' && $this->isRunning($containerStatus)) {
-                        $this->foundServiceApplicationIds->push($subId);
-                        $this->updateServiceSubStatus($serviceId, $subType, $subId, $containerStatus);
-                    } elseif ($subType === 'database' && $this->isRunning($containerStatus)) {
-                        $this->foundServiceDatabaseIds->push($subId);
-                        $this->updateServiceSubStatus($serviceId, $subType, $subId, $containerStatus);
-                    }
-                } else {
-                    $uuid = $labels->get('com.docker.compose.service');
-                    $type = $labels->get('coolify.type');
-                    if ($name === 'coolify-proxy' && $this->isRunning($containerStatus)) {
-                        $this->foundProxy = true;
-                    } elseif ($type === 'service' && $this->isRunning($containerStatus)) {
+                        // Store container status for aggregation
+                        if (! $this->applicationContainerStatuses->has($applicationId)) {
+                            $this->applicationContainerStatuses->put($applicationId, collect());
+                        }
+                        $containerName = $labels->get('com.docker.compose.service');
+                        if ($containerName) {
+                            $this->applicationContainerStatuses->get($applicationId)->put($containerName, $containerStatus);
+                        }
                     } else {
-                        if ($this->allDatabaseUuids->contains($uuid) && $this->isRunning($containerStatus)) {
-                            $this->foundDatabaseUuids->push($uuid);
-                            if ($this->allTcpProxyUuids->contains($uuid) && $this->isRunning($containerStatus)) {
-                                $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: true);
-                            } else {
-                                $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: false);
-                            }
+                        $previewKey = $applicationId.':'.$pullRequestId;
+                        if ($this->allApplicationPreviewsIds->contains($previewKey)) {
+                            $this->foundApplicationPreviewsIds->push($previewKey);
+                        }
+                        $this->updateApplicationPreviewStatus($applicationId, $pullRequestId, $containerStatus);
+                    }
+                } catch (\Exception $e) {
+                }
+            } elseif ($labels->has('coolify.serviceId')) {
+                $serviceId = $labels->get('coolify.serviceId');
+                $subType = $labels->get('coolify.service.subType');
+                $subId = $labels->get('coolify.service.subId');
+                if (empty(trim((string) $subId))) {
+                    continue;
+                }
+                if ($subType === 'application') {
+                    $this->foundServiceApplicationIds->push($subId);
+                    // Store container status for aggregation
+                    $key = $serviceId.':'.$subType.':'.$subId;
+                    if (! $this->serviceContainerStatuses->has($key)) {
+                        $this->serviceContainerStatuses->put($key, collect());
+                    }
+                    $containerName = $labels->get('com.docker.compose.service');
+                    if ($containerName) {
+                        $this->serviceContainerStatuses->get($key)->put($containerName, $containerStatus);
+                    }
+                } elseif ($subType === 'database') {
+                    $this->foundServiceDatabaseIds->push($subId);
+                    // Store container status for aggregation
+                    $key = $serviceId.':'.$subType.':'.$subId;
+                    if (! $this->serviceContainerStatuses->has($key)) {
+                        $this->serviceContainerStatuses->put($key, collect());
+                    }
+                    $containerName = $labels->get('com.docker.compose.service');
+                    if ($containerName) {
+                        $this->serviceContainerStatuses->get($key)->put($containerName, $containerStatus);
+                    }
+                }
+            } else {
+                $uuid = $labels->get('com.docker.compose.service');
+                $type = $labels->get('coolify.type');
+                if ($name === 'coolify-proxy' && $this->isRunning($containerStatus)) {
+                    $this->foundProxy = true;
+                } elseif ($type === 'service' && $this->isRunning($containerStatus)) {
+                } else {
+                    if ($this->allDatabaseUuids->contains($uuid) && $this->isActiveOrTransient($containerStatus)) {
+                        $this->foundDatabaseUuids->push($uuid);
+                        // TCP proxy should only be started/managed when database is actually running
+                        if ($this->allTcpProxyUuids->contains($uuid) && $this->isRunning($containerStatus)) {
+                            $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: true);
+                        } else {
+                            $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: false);
                         }
                     }
                 }
@@ -218,6 +273,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         // Aggregate multi-container application statuses
         $this->aggregateMultiContainerStatuses();
 
+        // Aggregate multi-container service statuses
+        $this->aggregateServiceContainerStatuses();
+
         $this->checkLogDrainContainer();
     }
 
@@ -235,62 +293,107 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
             // Parse docker compose to check for excluded containers
             $dockerComposeRaw = data_get($application, 'docker_compose_raw');
-            $excludedContainers = collect();
-
-            if ($dockerComposeRaw) {
-                try {
-                    $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($dockerComposeRaw);
-                    $services = data_get($dockerCompose, 'services', []);
-
-                    foreach ($services as $serviceName => $serviceConfig) {
-                        // Check if container should be excluded
-                        $excludeFromHc = data_get($serviceConfig, 'exclude_from_hc', false);
-                        $restartPolicy = data_get($serviceConfig, 'restart', 'always');
-
-                        if ($excludeFromHc || $restartPolicy === 'no') {
-                            $excludedContainers->push($serviceName);
-                        }
-                    }
-                } catch (\Exception $e) {
-                    // If we can't parse, treat all containers as included
-                }
-            }
+            $excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);
 
             // Filter out excluded containers
             $relevantStatuses = $containerStatuses->filter(function ($status, $containerName) use ($excludedContainers) {
                 return ! $excludedContainers->contains($containerName);
             });
 
-            // If all containers are excluded, don't update status
+            // If all containers are excluded, calculate status from excluded containers
             if ($relevantStatuses->isEmpty()) {
+                $aggregatedStatus = $this->calculateExcludedStatusFromStrings($containerStatuses);
+
+                if ($aggregatedStatus && $application->status !== $aggregatedStatus) {
+                    $application->status = $aggregatedStatus;
+                    $application->save();
+                } elseif ($aggregatedStatus) {
+                    $application->update(['last_online_at' => now()]);
+                }
+
                 continue;
             }
 
-            // Aggregate status: if any container is running, app is running
-            $hasRunning = false;
-            $hasUnhealthy = false;
-
-            foreach ($relevantStatuses as $status) {
-                if (str($status)->contains('running')) {
-                    $hasRunning = true;
-                    if (str($status)->contains('unhealthy')) {
-                        $hasUnhealthy = true;
-                    }
-                }
-            }
-
-            $aggregatedStatus = null;
-            if ($hasRunning) {
-                $aggregatedStatus = $hasUnhealthy ? 'running (unhealthy)' : 'running (healthy)';
-            } else {
-                // All containers are exited
-                $aggregatedStatus = 'exited (unhealthy)';
-            }
+            // Use ContainerStatusAggregator service for state machine logic
+            // Use preserveRestarting: true so applications show "Restarting" instead of "Degraded"
+            $aggregator = new ContainerStatusAggregator;
+            $aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses, 0, preserveRestarting: true);
 
             // Update application status with aggregated result
             if ($aggregatedStatus && $application->status !== $aggregatedStatus) {
                 $application->status = $aggregatedStatus;
                 $application->save();
+            } elseif ($aggregatedStatus) {
+                $application->update(['last_online_at' => now()]);
+            }
+        }
+    }
+
+    private function aggregateServiceContainerStatuses()
+    {
+        if ($this->serviceContainerStatuses->isEmpty()) {
+            return;
+        }
+
+        foreach ($this->serviceContainerStatuses as $key => $containerStatuses) {
+            // Parse key: serviceId:subType:subId
+            [$serviceId, $subType, $subId] = explode(':', $key);
+
+            if (empty($subId)) {
+                continue;
+            }
+
+            $service = $this->services->where('id', $serviceId)->first();
+            if (! $service) {
+                continue;
+            }
+
+            // Get the service sub-resource (ServiceApplication or ServiceDatabase)
+            $subResource = null;
+            if ($subType === 'application') {
+                $subResource = $service->applications->where('id', $subId)->first();
+            } elseif ($subType === 'database') {
+                $subResource = $service->databases->where('id', $subId)->first();
+            }
+
+            if (! $subResource) {
+                continue;
+            }
+
+            // Parse docker compose from service to check for excluded containers
+            $dockerComposeRaw = data_get($service, 'docker_compose_raw');
+            $excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);
+
+            // Filter out excluded containers
+            $relevantStatuses = $containerStatuses->filter(function ($status, $containerName) use ($excludedContainers) {
+                return ! $excludedContainers->contains($containerName);
+            });
+
+            // If all containers are excluded, calculate status from excluded containers
+            if ($relevantStatuses->isEmpty()) {
+                $aggregatedStatus = $this->calculateExcludedStatusFromStrings($containerStatuses);
+                if ($aggregatedStatus && $subResource->status !== $aggregatedStatus) {
+                    $subResource->status = $aggregatedStatus;
+                    $subResource->save();
+                } elseif ($aggregatedStatus) {
+                    $subResource->update(['last_online_at' => now()]);
+                }
+
+                continue;
+            }
+
+            // Use ContainerStatusAggregator service for state machine logic
+            // NOTE: Sentinel does NOT provide restart count data, so maxRestartCount is always 0
+            // Use preserveRestarting: true so individual sub-resources show "Restarting" instead of "Degraded"
+            $aggregator = new ContainerStatusAggregator;
+            $aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses, 0, preserveRestarting: true);
+
+            // Update service sub-resource status with aggregated result
+            if ($aggregatedStatus && $subResource->status !== $aggregatedStatus) {
+                $subResource->status = $aggregatedStatus;
+                $subResource->save();
+            } elseif ($aggregatedStatus) {
+                $subResource->update(['last_online_at' => now()]);
             }
         }
     }
@@ -304,6 +407,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         if ($application->status !== $containerStatus) {
             $application->status = $containerStatus;
             $application->save();
+        } else {
+            $application->update(['last_online_at' => now()]);
         }
     }
 
@@ -318,72 +423,67 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         if ($application->status !== $containerStatus) {
             $application->status = $containerStatus;
             $application->save();
+        } else {
+            $application->update(['last_online_at' => now()]);
         }
     }
 
     private function updateNotFoundApplicationStatus()
     {
         $notFoundApplicationIds = $this->allApplicationIds->diff($this->foundApplicationIds);
-        if ($notFoundApplicationIds->isNotEmpty()) {
-            $notFoundApplicationIds->each(function ($applicationId) {
-                $application = Application::find($applicationId);
-                if ($application) {
-                    // Don't mark as exited if already exited
-                    if (str($application->status)->startsWith('exited')) {
-                        return;
-                    }
-
-                    // Only protection: Verify we received any container data at all
-                    // If containers collection is completely empty, Sentinel might have failed
-                    if ($this->containers->isEmpty()) {
-                        return;
-                    }
-
-                    if ($application->status !== 'exited') {
-                        $application->status = 'exited';
-                        $application->save();
-                    }
-                }
-            });
+        if ($notFoundApplicationIds->isEmpty()) {
+            return;
         }
+
+        // Only protection: Verify we received any container data at all
+        // If containers collection is completely empty, Sentinel might have failed
+        if ($this->containers->isEmpty()) {
+            return;
+        }
+
+        // Batch update: mark all not-found applications as exited (excluding already exited ones)
+        Application::whereIn('id', $notFoundApplicationIds)
+            ->where('status', 'not like', 'exited%')
+            ->update(['status' => 'exited']);
     }
 
     private function updateNotFoundApplicationPreviewStatus()
     {
         $notFoundApplicationPreviewsIds = $this->allApplicationPreviewsIds->diff($this->foundApplicationPreviewsIds);
-        if ($notFoundApplicationPreviewsIds->isNotEmpty()) {
-            $notFoundApplicationPreviewsIds->each(function ($previewKey) {
-                // Parse the previewKey format "application_id:pull_request_id"
-                $parts = explode(':', $previewKey);
-                if (count($parts) !== 2) {
-                    return;
-                }
+        if ($notFoundApplicationPreviewsIds->isEmpty()) {
+            return;
+        }
 
-                $applicationId = $parts[0];
-                $pullRequestId = $parts[1];
+        // Only protection: Verify we received any container data at all
+        // If containers collection is completely empty, Sentinel might have failed
+        if ($this->containers->isEmpty()) {
+            return;
+        }
 
-                $applicationPreview = $this->previews->where('application_id', $applicationId)
-                    ->where('pull_request_id', $pullRequestId)
-                    ->first();
+        // Collect IDs of previews that need to be marked as exited
+        $previewIdsToUpdate = collect();
+        foreach ($notFoundApplicationPreviewsIds as $previewKey) {
+            // Parse the previewKey format "application_id:pull_request_id"
+            $parts = explode(':', $previewKey);
+            if (count($parts) !== 2) {
+                continue;
+            }
 
-                if ($applicationPreview) {
-                    // Don't mark as exited if already exited
-                    if (str($applicationPreview->status)->startsWith('exited')) {
-                        return;
-                    }
+            $applicationId = $parts[0];
+            $pullRequestId = $parts[1];
 
-                    // Only protection: Verify we received any container data at all
-                    // If containers collection is completely empty, Sentinel might have failed
-                    if ($this->containers->isEmpty()) {
+            $applicationPreview = $this->previews->where('application_id', $applicationId)
+                ->where('pull_request_id', $pullRequestId)
+                ->first();
 
-                        return;
-                    }
-                    if ($applicationPreview->status !== 'exited') {
-                        $applicationPreview->status = 'exited';
-                        $applicationPreview->save();
-                    }
-                }
-            });
+            if ($applicationPreview && ! str($applicationPreview->status)->startsWith('exited')) {
+                $previewIdsToUpdate->push($applicationPreview->id);
+            }
+        }
+
+        // Batch update all collected preview IDs
+        if ($previewIdsToUpdate->isNotEmpty()) {
+            ApplicationPreview::whereIn('id', $previewIdsToUpdate)->update(['status' => 'exited']);
         }
     }
 
@@ -400,8 +500,13 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 } catch (\Throwable $e) {
                 }
             } else {
-                $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
-                instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
+                // Connect proxy to networks periodically (every 10 min) to avoid excessive job dispatches.
+                // On-demand triggers (new network, service deploy) use dispatchSync() and bypass this.
+                $proxyCacheKey = 'connect-proxy:'.$this->server->id;
+                if (! Cache::has($proxyCacheKey)) {
+                    Cache::put($proxyCacheKey, true, 600);
+                    ConnectProxyToNetworksJob::dispatch($this->server);
+                }
             }
         }
     }
@@ -415,6 +520,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         if ($database->status !== $containerStatus) {
             $database->status = $containerStatus;
             $database->save();
+        } else {
+            $database->update(['last_online_at' => now()]);
         }
         if ($this->isRunning($containerStatus) && $tcpProxy) {
             $tcpProxyContainerFound = $this->containers->filter(function ($value, $key) use ($databaseUuid) {
@@ -423,7 +530,14 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             if (! $tcpProxyContainerFound) {
                 StartDatabaseProxy::dispatch($database);
                 $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
-            } else {
+            }
+        } elseif ($this->isRunning($containerStatus) && ! $tcpProxy) {
+            // Clean up orphaned proxy containers when is_public=false
+            $orphanedProxy = $this->containers->filter(function ($value, $key) use ($databaseUuid) {
+                return data_get($value, 'name') === "$databaseUuid-proxy" && data_get($value, 'state') === 'running';
+            })->first();
+            if ($orphanedProxy) {
+                StopDatabaseProxy::dispatch($database);
             }
         }
     }
@@ -431,72 +545,51 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
     private function updateNotFoundDatabaseStatus()
     {
         $notFoundDatabaseUuids = $this->allDatabaseUuids->diff($this->foundDatabaseUuids);
-        if ($notFoundDatabaseUuids->isNotEmpty()) {
-            $notFoundDatabaseUuids->each(function ($databaseUuid) {
-                $database = $this->databases->where('uuid', $databaseUuid)->first();
-                if ($database) {
-                    if ($database->status !== 'exited') {
-                        $database->status = 'exited';
-                        $database->save();
-                    }
-                    if ($database->is_public) {
-                        StopDatabaseProxy::dispatch($database);
-                    }
-                }
-            });
-        }
-    }
-
-    private function updateServiceSubStatus(string $serviceId, string $subType, string $subId, string $containerStatus)
-    {
-        $service = $this->services->where('id', $serviceId)->first();
-        if (! $service) {
+        if ($notFoundDatabaseUuids->isEmpty()) {
             return;
         }
-        if ($subType === 'application') {
-            $application = $service->applications()->where('id', $subId)->first();
-            if ($application) {
-                if ($application->status !== $containerStatus) {
-                    $application->status = $containerStatus;
-                    $application->save();
-                }
-            }
-        } elseif ($subType === 'database') {
-            $database = $service->databases()->where('id', $subId)->first();
-            if ($database) {
-                if ($database->status !== $containerStatus) {
-                    $database->status = $containerStatus;
-                    $database->save();
-                }
-            }
+
+        // Only protection: Verify we received any container data at all
+        // If containers collection is completely empty, Sentinel might have failed
+        if ($this->containers->isEmpty()) {
+            return;
         }
+
+        $notFoundDatabaseUuids->each(function ($databaseUuid) {
+            $database = $this->databases->where('uuid', $databaseUuid)->first();
+            if ($database) {
+                if (! str($database->status)->startsWith('exited')) {
+                    $database->update([
+                        'status' => 'exited',
+                        'restart_count' => 0,
+                        'last_restart_at' => null,
+                        'last_restart_type' => null,
+                    ]);
+                }
+                if ($database->is_public) {
+                    StopDatabaseProxy::dispatch($database);
+                }
+            }
+        });
     }
 
     private function updateNotFoundServiceStatus()
     {
         $notFoundServiceApplicationIds = $this->allServiceApplicationIds->diff($this->foundServiceApplicationIds);
         $notFoundServiceDatabaseIds = $this->allServiceDatabaseIds->diff($this->foundServiceDatabaseIds);
+
+        // Batch update service applications
         if ($notFoundServiceApplicationIds->isNotEmpty()) {
-            $notFoundServiceApplicationIds->each(function ($serviceApplicationId) {
-                $application = ServiceApplication::find($serviceApplicationId);
-                if ($application) {
-                    if ($application->status !== 'exited') {
-                        $application->status = 'exited';
-                        $application->save();
-                    }
-                }
-            });
+            ServiceApplication::whereIn('id', $notFoundServiceApplicationIds)
+                ->where('status', '!=', 'exited')
+                ->update(['status' => 'exited']);
         }
+
+        // Batch update service databases
         if ($notFoundServiceDatabaseIds->isNotEmpty()) {
-            $notFoundServiceDatabaseIds->each(function ($serviceDatabaseId) {
-                $database = ServiceDatabase::find($serviceDatabaseId);
-                if ($database) {
-                    if ($database->status !== 'exited') {
-                        $database->status = 'exited';
-                        $database->save();
-                    }
-                }
-            });
+            ServiceDatabase::whereIn('id', $notFoundServiceDatabaseIds)
+                ->where('status', '!=', 'exited')
+                ->update(['status' => 'exited']);
         }
     }
 
@@ -510,6 +603,23 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
     private function isRunning(string $containerStatus)
     {
         return str($containerStatus)->contains('running');
+    }
+
+    /**
+     * Check if container is in an active or transient state.
+     * Active states: running
+     * Transient states: restarting, starting, created, paused
+     *
+     * These states indicate the container exists and should be tracked.
+     * Terminal states (exited, dead, removing) should NOT be tracked.
+     */
+    private function isActiveOrTransient(string $containerStatus): bool
+    {
+        return str($containerStatus)->contains('running') ||
+               str($containerStatus)->contains('restarting') ||
+               str($containerStatus)->contains('starting') ||
+               str($containerStatus)->contains('created') ||
+               str($containerStatus)->contains('paused');
     }
 
     private function checkLogDrainContainer()

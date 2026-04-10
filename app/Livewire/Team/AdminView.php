@@ -2,10 +2,7 @@
 
 namespace App\Livewire\Team;
 
-use App\Models\InstanceSettings;
 use App\Models\User;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class AdminView extends Component
@@ -52,18 +49,14 @@ class AdminView extends Component
         }
     }
 
-    public function delete($id, $password)
+    public function delete($id, $password, $selectedActions = [])
     {
         if (! isInstanceAdmin()) {
             return redirect()->route('dashboard');
         }
 
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
-
-                return;
-            }
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
         }
 
         if (! auth()->user()->isInstanceAdmin()) {
@@ -78,6 +71,8 @@ class AdminView extends Component
         try {
             $user->delete();
             $this->getUsers();
+
+            return true;
         } catch (\Exception $e) {
             return $this->dispatch('error', $e->getMessage());
         }

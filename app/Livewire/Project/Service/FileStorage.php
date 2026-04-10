@@ -3,7 +3,6 @@
 namespace App\Livewire\Project\Service;
 
 use App\Models\Application;
-use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -16,8 +15,6 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -43,12 +40,16 @@ class FileStorage extends Component
     #[Validate(['required', 'boolean'])]
     public bool $isBasedOnGit = false;
 
+    #[Validate(['required', 'boolean'])]
+    public bool $isPreviewSuffixEnabled = true;
+
     protected $rules = [
         'fileStorage.is_directory' => 'required',
         'fileStorage.fs_path' => 'required',
         'fileStorage.mount_path' => 'required',
         'content' => 'nullable',
         'isBasedOnGit' => 'required|boolean',
+        'isPreviewSuffixEnabled' => 'required|boolean',
     ];
 
     public function mount()
@@ -62,7 +63,7 @@ class FileStorage extends Component
             $this->fs_path = $this->fileStorage->fs_path;
         }
 
-        $this->isReadOnly = $this->fileStorage->isReadOnlyVolume();
+        $this->isReadOnly = $this->fileStorage->shouldBeReadOnlyInUI();
         $this->syncData();
     }
 
@@ -74,12 +75,14 @@ class FileStorage extends Component
             // Sync to model
             $this->fileStorage->content = $this->content;
             $this->fileStorage->is_based_on_git = $this->isBasedOnGit;
+            $this->fileStorage->is_preview_suffix_enabled = $this->isPreviewSuffixEnabled;
 
             $this->fileStorage->save();
         } else {
             // Sync from model
             $this->content = $this->fileStorage->content;
             $this->isBasedOnGit = $this->fileStorage->is_based_on_git;
+            $this->isPreviewSuffixEnabled = $this->fileStorage->is_preview_suffix_enabled ?? true;
         }
     }
 
@@ -104,7 +107,8 @@ class FileStorage extends Component
     public function loadStorageOnServer()
     {
         try {
-            $this->authorize('update', $this->resource);
+            // Loading content is a read operation, so we use 'view' permission
+            $this->authorize('view', $this->resource);
 
             $this->fileStorage->loadStorageOnServer();
             $this->syncData();
@@ -136,16 +140,12 @@ class FileStorage extends Component
         }
     }
 
-    public function delete($password)
+    public function delete($password, $selectedActions = [])
     {
         $this->authorize('update', $this->resource);
 
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
-
-                return;
-            }
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
         }
 
         try {
@@ -164,6 +164,8 @@ class FileStorage extends Component
         } finally {
             $this->dispatch('refreshStorages');
         }
+
+        return true;
     }
 
     public function submit()
@@ -179,6 +181,7 @@ class FileStorage extends Component
             // Sync component properties to model
             $this->fileStorage->content = $this->content;
             $this->fileStorage->is_based_on_git = $this->isBasedOnGit;
+            $this->fileStorage->is_preview_suffix_enabled = $this->isPreviewSuffixEnabled;
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
             $this->dispatch('success', 'File updated.');
@@ -191,9 +194,11 @@ class FileStorage extends Component
         }
     }
 
-    public function instantSave()
+    public function instantSave(): void
     {
-        $this->submit();
+        $this->authorize('update', $this->resource);
+        $this->syncData(true);
+        $this->dispatch('success', 'File updated.');
     }
 
     public function render()

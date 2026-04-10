@@ -1,9 +1,11 @@
 <div>
     <form wire:submit='submit' class="flex flex-col items-center gap-4 p-4 bg-white border lg:items-start dark:bg-base dark:border-coolgray-300 border-neutral-200">
         @if ($isReadOnly)
-            <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
-                This volume is mounted as read-only and cannot be modified from the UI.
-            </div>
+            @if (!$storage->isServiceResource() && !$storage->isDockerComposeResource())
+                <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
+                    This volume is mounted as read-only and cannot be modified from the UI.
+                </div>
+            @endif
             @if ($isFirst)
                 <div class="flex gap-2 items-end w-full  md:flex-row flex-col">
                     @if (
@@ -36,6 +38,15 @@
                     <x-forms.input id="mountPath" required readonly />
                 </div>
             @endif
+            @if (!$isService)
+                @can('update', $resource)
+                    <div class="w-full sm:w-96">
+                        <x-forms.checkbox instantSave canGate="update" :canResource="$resource" label="Add suffix for PR deployments"
+                            id="isPreviewSuffixEnabled"
+                            helper="When enabled, a -pr-N suffix is added to this volume's name for preview deployments (e.g. myvolume becomes myvolume-pr-1). Disable this for volumes that should be shared between the main and preview deployments."></x-forms.checkbox>
+                    </div>
+                @endcan
+            @endif
         @else
             @can('update', $resource)
                 @if ($isFirst)
@@ -50,6 +61,13 @@
                         <x-forms.input id="name" required />
                         <x-forms.input id="hostPath" />
                         <x-forms.input id="mountPath" required />
+                    </div>
+                @endif
+                @if (!$isService)
+                    <div class="w-full sm:w-96">
+                        <x-forms.checkbox instantSave canGate="update" :canResource="$resource" label="Add suffix for PR deployments"
+                            id="isPreviewSuffixEnabled"
+                            helper="When enabled, a -pr-N suffix is added to this volume's name for preview deployments (e.g. myvolume becomes myvolume-pr-1). Disable this for volumes that should be shared between the main and preview deployments."></x-forms.checkbox>
                     </div>
                 @endif
                 <div class="flex gap-2">

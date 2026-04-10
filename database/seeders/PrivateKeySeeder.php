@@ -13,6 +13,7 @@ class PrivateKeySeeder extends Seeder
     public function run(): void
     {
         PrivateKey::create([
+            'uuid' => 'ssh',
             'team_id' => 0,
             'name' => 'Testing Host Key',
             'description' => 'This is a test docker container',
@@ -27,6 +28,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         ]);
 
         PrivateKey::create([
+            'uuid' => 'github-key',
             'team_id' => 0,
             'name' => 'development-github-app',
             'description' => 'This is the key for using the development GitHub app',

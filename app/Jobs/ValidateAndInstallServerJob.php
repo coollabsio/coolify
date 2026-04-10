@@ -8,13 +8,14 @@ use App\Events\ServerReachabilityChanged;
 use App\Events\ServerValidated;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class ValidateAndInstallServerJob implements ShouldQueue
+class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -44,7 +45,8 @@ class ValidateAndInstallServerJob implements ShouldQueue
             // Validate connection
             ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection();
             if (! $uptime) {
-                $errorMessage = 'Server is not reachable. Please validate your configuration and connection.<br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error;
+                $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');
+                $errorMessage = 'Server is not reachable. Please validate your configuration and connection.<br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$sanitizedError;
                 $this->server->update([
                     'validation_logs' => $errorMessage,
                     'is_validating' => false,
@@ -68,6 +70,42 @@ class ValidateAndInstallServerJob implements ShouldQueue
                 Log::error('ValidateAndInstallServer: OS not supported', [
                     'server_id' => $this->server->id,
                 ]);
+
+                return;
+            }
+
+            // Check and install prerequisites
+            $validationResult = $this->server->validatePrerequisites();
+            if (! $validationResult['success']) {
+                if ($this->numberOfTries >= $this->maxTries) {
+                    $missingCommands = implode(', ', $validationResult['missing']);
+                    $errorMessage = "Prerequisites ({$missingCommands}) could not be installed after {$this->maxTries} attempts. Please install them manually before continuing.";
+                    $this->server->update([
+                        'validation_logs' => $errorMessage,
+                        'is_validating' => false,
+                    ]);
+                    Log::error('ValidateAndInstallServer: Prerequisites installation failed after max tries', [
+                        'server_id' => $this->server->id,
+                        'attempts' => $this->numberOfTries,
+                        'missing_commands' => $validationResult['missing'],
+                        'found_commands' => $validationResult['found'],
+                    ]);
+
+                    return;
+                }
+
+                Log::info('ValidateAndInstallServer: Installing prerequisites', [
+                    'server_id' => $this->server->id,
+                    'attempt' => $this->numberOfTries + 1,
+                    'missing_commands' => $validationResult['missing'],
+                    'found_commands' => $validationResult['found'],
+                ]);
+
+                // Install prerequisites
+                $this->server->installPrerequisites();
+
+                // Retry validation after installation
+                self::dispatch($this->server, $this->numberOfTries + 1)->delay(now()->addSeconds(30));
 
                 return;
             }
@@ -132,12 +170,18 @@ class ValidateAndInstallServerJob implements ShouldQueue
             if (! $this->server->isBuildServer()) {
                 $proxyShouldRun = CheckProxy::run($this->server, true);
                 if ($proxyShouldRun) {
+                    // Ensure networks exist BEFORE dispatching async proxy startup
+                    // This prevents race condition where proxy tries to start before networks are created
+                    instant_remote_process(ensureProxyNetworksExist($this->server)->toArray(), $this->server, false);
                     StartProxy::dispatch($this->server);
                 }
             }
 
             // Mark validation as complete
             $this->server->update(['is_validating' => false]);
+
+            // Auto-fetch server details now that validation passed
+            $this->server->gatherServerMetadata();
 
             // Refresh server to get latest state
             $this->server->refresh();
@@ -154,7 +198,7 @@ class ValidateAndInstallServerJob implements ShouldQueue
             ]);
 
             $this->server->update([
-                'validation_logs' => 'An error occurred during validation: '.$e->getMessage(),
+                'validation_logs' => 'An error occurred during validation: '.htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'),
                 'is_validating' => false,
             ]);
         }

@@ -17,9 +17,9 @@ class Index extends Component
 
     public function mount()
     {
-        $this->private_keys = PrivateKey::ownedByCurrentTeam()->get();
-        $this->projects = Project::ownedByCurrentTeam()->get();
-        $this->servers = Server::ownedByCurrentTeam()->count();
+        $this->private_keys = PrivateKey::ownedByCurrentTeamCached();
+        $this->projects = Project::ownedByCurrentTeamCached();
+        $this->servers = Server::ownedByCurrentTeamCached();
     }
 
     public function render()

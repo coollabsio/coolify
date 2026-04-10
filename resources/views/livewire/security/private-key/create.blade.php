@@ -13,7 +13,7 @@
             <x-forms.input id="name" label="Name" required />
             <x-forms.input id="description" label="Description" />
         </div>
-        <x-forms.textarea realtimeValidation id="value" rows="10"
+        <x-forms.textarea realtimeValidation id="value" rows="10" monospace
             placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" label="Private Key" required />
         <x-forms.input id="publicKey" readonly label="Public Key" />
         <span class="pt-2 pb-4 font-bold dark:text-warning">ACTION REQUIRED: Copy the 'Public Key' to your server's

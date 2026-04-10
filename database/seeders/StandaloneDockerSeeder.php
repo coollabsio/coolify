@@ -15,6 +15,7 @@ class StandaloneDockerSeeder extends Seeder
         if (StandaloneDocker::find(0) == null) {
             StandaloneDocker::create([
                 'id' => 0,
+                'uuid' => 'docker',
                 'name' => 'Standalone Docker 1',
                 'network' => 'coolify',
                 'server_id' => 0,

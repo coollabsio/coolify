@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Webhook;
 
+use App\Actions\Application\CleanupPreviewDeployment;
 use App\Http\Controllers\Controller;
-use App\Livewire\Project\Service\Storage;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Exception;
@@ -15,23 +15,6 @@ class Bitbucket extends Controller
     public function manual(Request $request)
     {
         try {
-            if (app()->isDownForMaintenance()) {
-                $epoch = now()->valueOf();
-                $data = [
-                    'attributes' => $request->attributes->all(),
-                    'request' => $request->request->all(),
-                    'query' => $request->query->all(),
-                    'server' => $request->server->all(),
-                    'files' => $request->files->all(),
-                    'cookies' => $request->cookies->all(),
-                    'headers' => $request->headers->all(),
-                    'content' => $request->getContent(),
-                ];
-                $json = json_encode($data);
-                Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Bitbicket::manual_bitbucket", $json);
-
-                return;
-            }
             $return_payloads = collect([]);
             $payload = $request->collect();
             $headers = $request->headers->all();
@@ -107,7 +90,9 @@ class Bitbucket extends Controller
                             force_rebuild: false,
                             is_webhook: true
                         );
-                        if ($result['status'] === 'skipped') {
+                        if ($result['status'] === 'queue_full') {
+                            return response($result['message'], 429)->header('Retry-After', 60);
+                        } elseif ($result['status'] === 'skipped') {
                             $return_payloads->push([
                                 'application' => $application->name,
                                 'status' => 'skipped',
@@ -161,7 +146,9 @@ class Bitbucket extends Controller
                             is_webhook: true,
                             git_type: 'bitbucket'
                         );
-                        if ($result['status'] === 'skipped') {
+                        if ($result['status'] === 'queue_full') {
+                            return response($result['message'], 429)->header('Retry-After', 60);
+                        } elseif ($result['status'] === 'skipped') {
                             $return_payloads->push([
                                 'application' => $application->name,
                                 'status' => 'skipped',
@@ -185,9 +172,10 @@ class Bitbucket extends Controller
                 if ($x_bitbucket_event === 'pullrequest:rejected' || $x_bitbucket_event === 'pullrequest:fulfilled') {
                     $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                     if ($found) {
-                        $found->delete();
-                        $container_name = generateApplicationContainerName($application, $pull_request_id);
-                        instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
+                        // Use comprehensive cleanup that cancels active deployments,
+                        // kills helper containers, and removes all PR containers
+                        CleanupPreviewDeployment::run($application, $pull_request_id, $found);
+
                         $return_payloads->push([
                             'application' => $application->name,
                             'status' => 'success',

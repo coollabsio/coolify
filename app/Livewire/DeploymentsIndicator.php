@@ -14,7 +14,7 @@ class DeploymentsIndicator extends Component
     #[Computed]
     public function deployments()
     {
-        $servers = Server::ownedByCurrentTeam()->get();
+        $servers = Server::ownedByCurrentTeamCached();
 
         return ApplicationDeploymentQueue::with(['application.environment.project'])
             ->whereIn('status', ['in_progress', 'queued'])
@@ -36,6 +36,12 @@ class DeploymentsIndicator extends Component
     public function deploymentCount()
     {
         return $this->deployments->count();
+    }
+
+    #[Computed]
+    public function shouldReduceOpacity(): bool
+    {
+        return request()->routeIs('project.application.deployment.*');
     }
 
     public function toggleExpanded()
