@@ -18,6 +18,8 @@ class Index extends Component
 
     public bool $showImportModal = false;
 
+    public int $importModalIteration = 0;
+
     public function mount()
     {
         $this->servers = Server::isReachable()->get()->filter(function ($server) {
@@ -64,9 +66,9 @@ class Index extends Component
     public function updatedSelectedUuid()
     {
         if ($this->selected_uuid === 'default') {
-            // When cleared to default, do nothing (no error message)
             return;
         }
+
         $this->connectToContainer();
     }
 
@@ -78,62 +80,23 @@ class Index extends Component
 
             return;
         }
+
         $container = collect($this->containers)->firstWhere('uuid', $this->selected_uuid);
-        $this->dispatch('send-terminal-command',
+        $this->dispatch(
+            'send-terminal-command',
             isset($container),
             $container['connection_name'] ?? $this->selected_uuid,
             $container['server_uuid'] ?? $this->selected_uuid
         );
     }
 
-    public function getTargetName()
+    public function openImportModal(): void
     {
-        if ($this->selected_uuid === 'default') {
-            return '';
-        }
-
-        // Check if it's a server
-        $server = collect($this->servers)->firstWhere('uuid', $this->selected_uuid);
-        if ($server) {
-            return $server->name.' (Server)';
-        }
-
-        // Otherwise it's a container
-        $container = collect($this->containers)->firstWhere('uuid', $this->selected_uuid);
-        if ($container) {
-            return $container['name'];
-        }
-
-        return '';
-    }
-
-    public function getServerUuid()
-    {
-        if ($this->selected_uuid === 'default') {
-            return null;
-        }
-
-        // Check if it's a server
-        $server = collect($this->servers)->firstWhere('uuid', $this->selected_uuid);
-        if ($server) {
-            return $server->uuid;
-        }
-
-        // Otherwise it's a container, get its server
-        $container = collect($this->containers)->firstWhere('uuid', $this->selected_uuid);
-        if ($container) {
-            return $container['server_uuid'];
-        }
-
-        return null;
-    }
-
-    public function openImportModal()
-    {
+        $this->importModalIteration++;
         $this->showImportModal = true;
     }
 
-    public function closeImportModal()
+    public function closeImportModal(): void
     {
         $this->showImportModal = false;
     }

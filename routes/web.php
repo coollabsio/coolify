@@ -33,7 +33,6 @@ use App\Livewire\Project\Service\DatabaseBackups as ServiceDatabaseBackups;
 use App\Livewire\Project\Service\Index as ServiceIndex;
 use App\Livewire\Project\Shared\ExecuteContainerCommand;
 use App\Livewire\Project\Shared\Logs;
-use App\Livewire\Project\Shared\ScheduledTask\Show as ScheduledTaskShow;
 use App\Livewire\Project\Show as ProjectShow;
 use App\Livewire\Security\ApiTokens;
 use App\Livewire\Security\CloudInitScripts;
@@ -60,6 +59,7 @@ use App\Livewire\Server\Security\TerminalAccess;
 use App\Livewire\Server\Sentinel as ServerSentinel;
 use App\Livewire\Server\Show as ServerShow;
 use App\Livewire\Server\Swarm as ServerSwarm;
+use App\Livewire\Server\Upload as ServerUpload;
 use App\Livewire\Settings\Advanced as SettingsAdvanced;
 use App\Livewire\Settings\Index as SettingsIndex;
 use App\Livewire\Settings\ScheduledJobs as SettingsScheduledJobs;
@@ -291,6 +291,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/proxy', ProxyShow::class)->name('server.proxy');
         Route::get('/proxy/dynamic', ProxyDynamicConfigurations::class)->name('server.proxy.dynamic-confs');
         Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
+        Route::get('/upload', ServerUpload::class)->name('server.upload')->middleware('can.access.terminal');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command')->middleware('can.access.terminal');
         Route::get('/docker-cleanup', DockerCleanup::class)->name('server.docker-cleanup');
         Route::get('/security', fn () => redirect(route('dashboard')))->name('server.security')->middleware('can.update.resource');
@@ -323,7 +324,7 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
-    Route::post('/upload/terminal', [UploadController::class, 'uploadTerminalFile'])->name('upload.terminal');
+    Route::post('/upload/terminal', [UploadController::class, 'uploadTerminalFile'])->middleware('can.access.terminal')->name('upload.terminal');
     Route::get('/download/backup/{executionId}', function () {
         try {
             $user = auth()->user();

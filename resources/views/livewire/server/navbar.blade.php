@@ -93,6 +93,11 @@
                 ]) }}">
                             Terminal
                         </a>
+                        <a class="{{ request()->routeIs('server.upload') ? 'dark:text-white' : '' }}" href="{{ route('server.upload', [
+                    'server_uuid' => data_get($server, 'uuid'),
+                ]) }}" {{ wireNavigate() }}>
+                            Upload
+                        </a>
             @endcan
             @can('update', $server)
                         <a class="{{ request()->routeIs('server.security.patches') ? 'dark:text-white' : '' }}" href="{{ route('server.security.patches', [

@@ -2,28 +2,29 @@
 
 namespace App\Livewire\Terminal;
 
+use App\Actions\Terminal\DeleteTerminalUploadedFile;
+use App\Enums\TerminalUploadedFileStatus;
 use App\Helpers\TerminalFileHelper;
-use App\Jobs\CleanupExpiredTerminalFilesJob;
 use App\Models\Server;
+use App\Models\TerminalUploadedFile;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
-use Livewire\WithFileUploads;
 
 class FileImport extends Component
 {
     use AuthorizesRequests;
-    use WithFileUploads;
 
-    public string $selectedUuid;
+    public string $selectedUuid = 'default';
 
-    public ?string $selectedServerUuid = null;
+    #[Locked]
+    public array $servers = [];
 
-    public ?string $targetName = null;
-
-    public $uploadedFile;
+    #[Locked]
+    public array $containers = [];
 
     public ?string $filename = null;
 
@@ -37,25 +38,28 @@ class FileImport extends Component
 
     public bool $error = false;
 
-    public int $expirationMinutes = 60; // Default: 1 hour
+    public int $expirationMinutes = 60;
 
-    public function updatedUploadedFile()
+    public bool $hasPendingUpload = false;
+
+    public ?string $pendingUploadUuid = null;
+
+    public ?string $pendingDeleteFileUuid = null;
+
+    public function mount(array $servers, array $containers, string $selectedUuid = 'default'): void
     {
-        $this->validate([
-            'uploadedFile' => 'required|file|max:10485760', // 10GB in KB
-        ]);
+        $this->authorizeTerminalAccess();
 
-        $this->filename = $this->uploadedFile->getClientOriginalName();
-        $this->filesize = number_format($this->uploadedFile->getSize() / 1024 / 1024, 2) . ' MB';
-        $this->isUploading = false;
-
-        $this->dispatch('success', 'File uploaded successfully!');
+        $this->servers = $servers;
+        $this->containers = $containers;
+        $this->selectedUuid = $this->isSelectableTarget($selectedUuid) ? $selectedUuid : 'default';
     }
 
     #[Computed]
-    public function expirationOptions()
+    public function expirationOptions(): array
     {
         return [
+            1 => '1 minute',
             5 => '5 minutes',
             15 => '15 minutes',
             30 => '30 minutes',
@@ -68,276 +72,269 @@ class FileImport extends Component
     }
 
     #[Computed]
-    public function uploadedFiles()
+    public function uploadedFiles(): array
     {
-        $files = [];
-        $baseDir = storage_path('app/terminal-uploads');
-        $currentUserId = Auth::id();
-
-        if (! is_dir($baseDir)) {
-            return $files;
-        }
-
-        // Scan subdirectories for current user's uploaded files
-        $directories = glob($baseDir . '/user_' . $currentUserId . '_*', GLOB_ONLYDIR);
-
-        // Collect all server IDs to load them in bulk
-        $serverIds = [];
-        $filesData = [];
-
-        foreach ($directories as $dir) {
-            $dirFiles = glob($dir . '/*');
-            foreach ($dirFiles as $filePath) {
-                if (is_file($filePath)) {
-                    $filename = basename($filePath);
-
-                    // Parse metadata from filename
-                    $metadata = TerminalFileHelper::parseFilename($filename);
-
-                    if (!$metadata) {
-                        // Skip files that don't match our format
-                        continue;
-                    }
-
-                    $serverIds[] = $metadata['server_id'];
-                    $filesData[] = [
-                        'filename' => $filename,
-                        'display_name' => TerminalFileHelper::getDisplayName($filename),
-                        'directory' => basename($dir),
-                        'size' => filesize($filePath),
-                        'uploaded_at' => $metadata['uploaded_at'],
-                        'expires_at' => $metadata['expires_at'],
-                        'server_id' => $metadata['server_id'],
-                        'container_uuid' => $metadata['container_uuid'],
-                    ];
-                }
-            }
-        }
-
-        // Load all servers in one query
-        $servers = Server::whereIn('id', array_unique($serverIds))->get()->keyBy('id');
-
-        // Add server name to each file
-        foreach ($filesData as $fileData) {
-            $server = $servers->get($fileData['server_id']);
-            $fileData['server_name'] = $server ? $server->name : 'Unknown';
-            $files[] = $fileData;
-        }
-
-        // Sort by upload date (newest first)
-        usort($files, function ($a, $b) {
-            return $b['uploaded_at'] <=> $a['uploaded_at'];
-        });
-
-        return $files;
+        return TerminalUploadedFile::query()
+            ->ownedByCurrentUserAndTeam()
+            ->visible()
+            ->with('server:id,name')
+            ->orderByDesc('uploaded_at')
+            ->get()
+            ->map(function (TerminalUploadedFile $terminalUploadedFile): array {
+                return [
+                    'uuid' => $terminalUploadedFile->uuid,
+                    'filename' => $terminalUploadedFile->stored_filename,
+                    'display_name' => $terminalUploadedFile->original_name ?: TerminalFileHelper::getDisplayName($terminalUploadedFile->stored_filename),
+                    'size' => $terminalUploadedFile->size_bytes,
+                    'uploaded_at' => $terminalUploadedFile->uploaded_at?->timestamp,
+                    'expires_at' => $terminalUploadedFile->expires_at?->timestamp,
+                    'server_name' => $terminalUploadedFile->server?->name ?? 'Unknown',
+                    'container_uuid' => $terminalUploadedFile->container_uuid,
+                    'path' => $terminalUploadedFile->container_path ?: $terminalUploadedFile->server_path,
+                ];
+            })
+            ->all();
     }
 
-    public function copyPath(string $directory, string $filename)
+    #[Computed]
+    public function targetName(): ?string
     {
-        // Security: validate inputs to prevent path traversal
-        if (strpos($filename, '..') !== false || strpos($filename, '/') !== false ||
-            strpos($directory, '..') !== false || strpos($directory, '/') !== false) {
-            $this->dispatch('error', 'Invalid filename or directory');
+        return data_get($this->resolveSelectedTarget(), 'label');
+    }
+
+    public function updatedSelectedUuid(string $value): void
+    {
+        $this->authorizeTerminalAccess();
+
+        if ($value === 'default') {
+            $this->filePath = null;
+            $this->error = false;
+
             return;
         }
 
-        // Security: verify directory belongs to current user
-        $currentUserId = Auth::id();
-        if (! str_starts_with($directory, 'user_' . $currentUserId . '_')) {
-            $this->dispatch('error', 'Unauthorized access');
+        if (! $this->isSelectableTarget($value)) {
+            $this->selectedUuid = 'default';
+            $this->dispatchError('Invalid target selected.');
+
             return;
         }
 
-        // Parse metadata from filename
-        $metadata = TerminalFileHelper::parseFilename($filename);
+        $this->filePath = null;
+        $this->error = false;
+    }
 
-        if (!$metadata) {
-            $this->dispatch('error', 'Invalid file format');
+    public function registerUploadedFile(string $fileUuid, string $originalName, int $size): void
+    {
+        $this->authorizeTerminalAccess();
+
+        $terminalUploadedFile = $this->findPendingUploadForCurrentUser($fileUuid);
+
+        if (! $terminalUploadedFile) {
+            $this->dispatchError('Uploaded file not found. Please try again.');
+
             return;
         }
 
-        // Generate server path
-        $serverPath = TerminalFileHelper::generateServerPath($filename);
+        $this->error = false;
+        $this->pendingUploadUuid = $terminalUploadedFile->uuid;
+        $this->filename = basename($originalName);
+        $this->filesize = formatBytes($size);
+        $this->filePath = null;
+        $this->hasPendingUpload = true;
+        $this->isUploading = false;
+        $this->progress = 100;
 
-        // Return the actual server path
-        $this->dispatch('path-copied', path: $serverPath);
-        $this->dispatch('success', 'Path copied to clipboard!');
-    }
-
-    public function deleteFile(string $directory, string $filename)
-    {
-        // Security: validate inputs to prevent path traversal
-        if (strpos($filename, '..') !== false || strpos($filename, '/') !== false ||
-            strpos($directory, '..') !== false || strpos($directory, '/') !== false) {
-            $this->dispatch('error', 'Invalid filename or directory');
-            return;
-        }
-
-        // Security: verify directory belongs to current user
-        $currentUserId = Auth::id();
-        if (! str_starts_with($directory, 'user_' . $currentUserId . '_')) {
-            $this->dispatch('error', 'Unauthorized access');
-            return;
-        }
-
-        try {
-            // Parse metadata from filename
-            $metadata = TerminalFileHelper::parseFilename($filename);
-
-            if (!$metadata) {
-                $this->dispatch('error', 'Invalid file format');
-                return;
-            }
-
-            // Find and delete the file
-            $baseDir = storage_path('app/terminal-uploads');
-            $dir = $baseDir . '/' . $directory;
-            $filePath = $dir . '/' . $filename;
-
-            if (! file_exists($filePath)) {
-                $this->dispatch('error', 'File not found');
-                return;
-            }
-
-            // Security: double-check the full path contains user ID
-            $realPath = realpath($filePath);
-            $realBaseDir = realpath($baseDir);
-
-            if ($realPath === false || $realBaseDir === false ||
-                ! str_starts_with($realPath, $realBaseDir . '/user_' . $currentUserId . '_')) {
-                $this->dispatch('error', 'Unauthorized access');
-                return;
-            }
-
-            // Delete local file
-            unlink($filePath);
-
-            // Delete remote files if server exists
-            $server = Server::find($metadata['server_id']);
-
-            if ($server) {
-                // Generate server path
-                $serverPath = TerminalFileHelper::generateServerPath($filename);
-                $escapedServerPath = escapeshellarg($serverPath);
-
-                instant_remote_process([
-                    "rm -f {$escapedServerPath}"
-                ], $server, throwError: false);
-
-                // Delete from container if applicable
-                if ($metadata['container_uuid']) {
-                    $escapedContainerUuid = escapeshellarg($metadata['container_uuid']);
-                    $containerPath = TerminalFileHelper::generateContainerPath($filename);
-                    $escapedContainerPath = escapeshellarg($containerPath);
-
-                    instant_remote_process([
-                        "docker exec {$escapedContainerUuid} rm -f {$escapedContainerPath} 2>/dev/null || true"
-                    ], $server, throwError: false);
-                }
-            }
-
-            // Try to delete the empty directory
-            $files = scandir($dir);
-            if (count($files) === 2) { // Only . and ..
-                rmdir($dir);
-            }
-
-            $this->dispatch('success', 'File deleted successfully!');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function getListeners()
-    {
-        $userId = Auth::id();
-
-        return [
-            "echo-private:user.{$userId},FileUploadCompleted" => 'handleUploadCompleted',
-        ];
-    }
-
-    public function mount(string $selectedUuid, string $targetName, ?string $selectedServerUuid = null)
-    {
-        $this->selectedUuid = $selectedUuid;
-        $this->targetName = $targetName;
-        $this->selectedServerUuid = $selectedServerUuid;
-    }
-
-    public function handleUploadCompleted()
-    {
-        // Refresh the component after upload
         $this->dispatch('success', 'File uploaded successfully!');
     }
 
-    public function generateFilePath()
+    public function resetPendingUpload(): void
     {
-        if (empty($this->filename)) {
-            $this->dispatch('error', 'No file uploaded yet.');
+        $this->authorizeTerminalAccess();
+
+        $terminalUploadedFile = $this->findPendingUploadForCurrentUser($this->pendingUploadUuid);
+        if ($terminalUploadedFile) {
+            app(DeleteTerminalUploadedFile::class)($terminalUploadedFile);
+        }
+
+        $this->clearUploadState();
+    }
+
+    public function handleUploadError(string $message): void
+    {
+        $this->authorizeTerminalAccess();
+        $this->dispatchError($message);
+    }
+
+    public function copyPath(string $fileUuid): void
+    {
+        $this->authorizeTerminalAccess();
+
+        $terminalUploadedFile = $this->findVisibleFileForCurrentUser($fileUuid);
+
+        if (! $terminalUploadedFile) {
+            $this->dispatchError('File not found.');
+
+            return;
+        }
+
+        $path = $terminalUploadedFile->container_path ?: $terminalUploadedFile->server_path;
+
+        if (blank($path)) {
+            $this->dispatchError('File path is unavailable.');
+
+            return;
+        }
+
+        $this->dispatch('path-copied', path: $path);
+        $this->dispatch('success', 'Path copied to clipboard!');
+    }
+
+    public function prepareFileDeletion(string $fileUuid): void
+    {
+        $this->authorizeTerminalAccess();
+
+        $terminalUploadedFile = $this->findVisibleFileForCurrentUser($fileUuid);
+
+        if (! $terminalUploadedFile) {
+            $this->pendingDeleteFileUuid = null;
+            $this->dispatchError('File not found.');
+
+            return;
+        }
+
+        $this->pendingDeleteFileUuid = $terminalUploadedFile->uuid;
+    }
+
+    public function confirmDeleteFile(): void
+    {
+        $this->authorizeTerminalAccess();
+
+        $terminalUploadedFile = $this->findVisibleFileForCurrentUser((string) $this->pendingDeleteFileUuid);
+
+        if (! $terminalUploadedFile) {
+            $this->pendingDeleteFileUuid = null;
+            $this->dispatchError('File not found.');
+
+            return;
+        }
+
+        $this->deleteTerminalUploadedFile($terminalUploadedFile);
+        $this->pendingDeleteFileUuid = null;
+    }
+
+    public function deleteFile(string $fileUuid): void
+    {
+        $this->authorizeTerminalAccess();
+
+        $terminalUploadedFile = $this->findVisibleFileForCurrentUser($fileUuid);
+
+        if (! $terminalUploadedFile) {
+            $this->dispatchError('File not found.');
+
+            return;
+        }
+
+        $this->deleteTerminalUploadedFile($terminalUploadedFile);
+    }
+
+    private function deleteTerminalUploadedFile(TerminalUploadedFile $terminalUploadedFile): void
+    {
+        try {
+            app(DeleteTerminalUploadedFile::class)($terminalUploadedFile);
+            $this->error = false;
+            $this->dispatch('success', 'File deleted successfully!');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function generateFilePath(): void
+    {
+        $this->authorizeTerminalAccess();
+
+        $target = $this->resolveSelectedTarget();
+        if (! $target) {
+            $this->dispatchError('Please select a server or container.');
+
+            return;
+        }
+
+        $pendingUpload = $this->findPendingUploadForCurrentUser($this->pendingUploadUuid);
+
+        if (! $pendingUpload || blank($this->filename)) {
+            $this->dispatchError('No file uploaded yet.');
 
             return;
         }
 
         try {
-            // Determine server UUID
-            $serverUuid = $this->selectedServerUuid ?? $this->selectedUuid;
-            $server = Server::ownedByCurrentTeam()->whereUuid($serverUuid)->first();
+            $server = Server::ownedByCurrentTeam()->whereUuid($target['server_uuid'])->first();
 
             if (! $server) {
-                $this->dispatch('error', 'Server not found.');
+                $this->dispatchError('Server not found.');
 
                 return;
             }
 
-            $isContainer = ($this->selectedServerUuid && $this->selectedUuid !== $this->selectedServerUuid);
+            if (! is_file($pendingUpload->local_path)) {
+                $this->dispatchError('Uploaded file not found. Please upload it again.');
 
-            // Generate unique file identifier
-            $uploadId = uniqid('terminal_', true);
-            $originalFilename = basename($this->filename);
-            $userId = Auth::id();
+                return;
+            }
 
-            // Calculate expiration timestamp
-            $expiresAt = now()->addMinutes($this->expirationMinutes)->timestamp;
+            $realPendingPath = realpath($pendingUpload->local_path);
+            $realPendingBaseDir = realpath($this->pendingUploadsBaseDirectory());
 
-            // Generate filename with embedded metadata
+            if ($realPendingPath === false || $realPendingBaseDir === false || ! str_starts_with($realPendingPath, $realPendingBaseDir)) {
+                $this->dispatchError('Unauthorized upload path.');
+
+                return;
+            }
+
+            $isContainer = $target['is_container'];
+            $expiresAt = now()->addMinutes($this->expirationMinutes);
             $sanitizedFilename = TerminalFileHelper::generateFilename(
-                $originalFilename,
-                $expiresAt,
+                $pendingUpload->original_name,
+                $expiresAt->timestamp,
                 $server->id,
-                $isContainer ? $this->selectedUuid : null
+                $isContainer ? $target['uuid'] : null,
             );
 
-            $storageDir = "terminal-uploads/user_{$userId}_{$uploadId}";
+            $storageDir = sprintf('terminal-uploads/user_%d_%s', Auth::id(), $pendingUpload->upload_token);
             $storagePath = storage_path("app/{$storageDir}");
 
-            // Get the uploaded file from Livewire
-            if (! $this->uploadedFile) {
-                $this->dispatch('error', 'Uploaded file not found. Please try uploading again.');
-
-                return;
-            }
-
-            // Create directory and store file
-            if (! file_exists($storagePath)) {
+            if (! is_dir($storagePath)) {
                 mkdir($storagePath, 0755, true);
             }
 
             $finalPath = "{$storagePath}/{$sanitizedFilename}";
-            $this->uploadedFile->storeAs($storageDir, $sanitizedFilename);
-
-            // Generate server path
             $serverTmpPath = TerminalFileHelper::generateServerPath($sanitizedFilename);
             $safeServerTmpPath = escapeshellarg($serverTmpPath);
-            instant_scp($finalPath, $safeServerTmpPath, $server);
 
-            // If it's a container, copy to container
+            if (! rename($pendingUpload->local_path, $finalPath)) {
+                $this->dispatchError('Failed to finalize uploaded file. Please try again.');
+
+                return;
+            }
+
+            $this->cleanupDirectoryIfEmpty(dirname($pendingUpload->local_path));
+            $this->cleanupDirectoryIfEmpty($this->pendingUploadsBaseDirectory());
+
+            instant_scp($finalPath, $safeServerTmpPath, $server);
+            instant_remote_process([
+                "chmod 600 {$safeServerTmpPath}",
+            ], $server);
+
+            $containerPath = null;
             if ($isContainer) {
                 $containerPath = TerminalFileHelper::generateContainerPath($sanitizedFilename);
-                $safeContainer = escapeshellarg($this->selectedUuid);
+                $safeContainer = escapeshellarg($target['uuid']);
                 $safeContainerPath = escapeshellarg($containerPath);
 
                 instant_remote_process([
                     "docker cp {$safeServerTmpPath} {$safeContainer}:{$safeContainerPath}",
+                    "docker exec -u 0 {$safeContainer} chmod 600 {$safeContainerPath}",
                 ], $server);
 
                 $this->filePath = $containerPath;
@@ -345,18 +342,25 @@ class FileImport extends Component
                 $this->filePath = $serverTmpPath;
             }
 
-            // Schedule cleanup job
-            CleanupExpiredTerminalFilesJob::dispatch(
-                $finalPath,
-                $serverTmpPath,
-                $server->id,
-                $isContainer ? $this->selectedUuid : null,
-                $sanitizedFilename
-            )->delay(now()->addMinutes($this->expirationMinutes));
+            $pendingUpload->forceFill([
+                'server_id' => $server->id,
+                'container_uuid' => $isContainer ? $target['uuid'] : null,
+                'stored_filename' => $sanitizedFilename,
+                'local_path' => $finalPath,
+                'server_path' => $serverTmpPath,
+                'container_path' => $containerPath,
+                'status' => TerminalUploadedFileStatus::Active,
+                'expires_at' => $expiresAt,
+                'finalized_at' => now(),
+                'last_cleanup_error' => null,
+            ])->save();
 
+            $this->pendingUploadUuid = null;
+            $this->hasPendingUpload = false;
+            $this->error = false;
             $this->dispatch('success', "File ready! Path: {$this->filePath}");
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            handleError($e, $this);
         }
     }
 
@@ -365,16 +369,112 @@ class FileImport extends Component
         return view('livewire.terminal.file-import');
     }
 
-    /**
-     * Workaround for Livewire toJSON serialization issue
-     * This prevents "Public method [toJSON] not found" errors
-     */
-    public function toJSON()
+    private function authorizeTerminalAccess(): void
     {
-        return json_encode([
-            'selectedUuid' => $this->selectedUuid,
-            'targetName' => $this->targetName,
-            'selectedServerUuid' => $this->selectedServerUuid,
-        ]);
+        Gate::authorize('canAccessTerminal');
+    }
+
+    private function pendingUploadsBaseDirectory(): string
+    {
+        return storage_path('app/terminal-uploads-pending/user_'.Auth::id());
+    }
+
+    private function cleanupDirectoryIfEmpty(string $directory): void
+    {
+        if (! is_dir($directory)) {
+            return;
+        }
+
+        $contents = scandir($directory);
+        if ($contents !== false && count($contents) === 2) {
+            rmdir($directory);
+        }
+    }
+
+    private function clearUploadState(bool $resetProgress = true): void
+    {
+        $this->hasPendingUpload = false;
+        $this->pendingUploadUuid = null;
+        $this->filePath = null;
+        $this->isUploading = false;
+        $this->error = false;
+
+        if ($resetProgress) {
+            $this->progress = 0;
+        }
+    }
+
+    private function dispatchError(string $message): void
+    {
+        $this->error = true;
+        $this->isUploading = false;
+        $this->dispatch('error', $message);
+    }
+
+    private function isSelectableTarget(string $uuid): bool
+    {
+        return $this->resolveTargetByUuid($uuid) !== null;
+    }
+
+    private function findPendingUploadForCurrentUser(?string $fileUuid): ?TerminalUploadedFile
+    {
+        if (blank($fileUuid)) {
+            return null;
+        }
+
+        return TerminalUploadedFile::query()
+            ->ownedByCurrentUserAndTeam()
+            ->where('uuid', $fileUuid)
+            ->whereNull('deleted_at')
+            ->whereNull('finalized_at')
+            ->where('status', TerminalUploadedFileStatus::Pending)
+            ->first();
+    }
+
+    private function findVisibleFileForCurrentUser(string $fileUuid): ?TerminalUploadedFile
+    {
+        return TerminalUploadedFile::query()
+            ->ownedByCurrentUserAndTeam()
+            ->visible()
+            ->where('uuid', $fileUuid)
+            ->first();
+    }
+
+    /**
+     * @return array{uuid:string,server_uuid:string,label:string,is_container:bool}|null
+     */
+    private function resolveSelectedTarget(): ?array
+    {
+        return $this->resolveTargetByUuid($this->selectedUuid);
+    }
+
+    /**
+     * @return array{uuid:string,server_uuid:string,label:string,is_container:bool}|null
+     */
+    private function resolveTargetByUuid(string $uuid): ?array
+    {
+        foreach ($this->servers as $server) {
+            if (($server['uuid'] ?? null) === $uuid) {
+                return [
+                    'uuid' => $uuid,
+                    'server_uuid' => $uuid,
+                    'label' => sprintf('%s (Server)', $server['name']),
+                    'is_container' => false,
+                ];
+            }
+        }
+
+        foreach ($this->containers as $container) {
+            if (($container['uuid'] ?? null) === $uuid && filled($container['server_uuid'] ?? null)) {
+                return [
+                    'uuid' => $uuid,
+                    'server_uuid' => $container['server_uuid'],
+                    'label' => $container['name'] ?? $uuid,
+                    'is_container' => true,
+                ];
+            }
+        }
+
+        return null;
     }
 }

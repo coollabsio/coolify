@@ -41,6 +41,7 @@ class Kernel extends ConsoleKernel
 
         // $this->scheduleInstance->job(new CleanupStaleMultiplexedConnections)->hourly();
         $this->scheduleInstance->command('cleanup:redis --clear-locks')->daily();
+        $this->scheduleInstance->command('cleanup:terminal-uploads')->hourly()->withoutOverlapping()->onOneServer();
 
         if (isDev()) {
             // Instance Jobs

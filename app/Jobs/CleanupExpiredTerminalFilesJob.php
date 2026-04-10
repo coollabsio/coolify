@@ -9,7 +9,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 class CleanupExpiredTerminalFilesJob implements ShouldQueue
 {
@@ -26,8 +25,7 @@ class CleanupExpiredTerminalFilesJob implements ShouldQueue
         public int $serverId,
         public ?string $containerUuid,
         public string $filename
-    ) {
-    }
+    ) {}
 
     public function handle(): void
     {
@@ -43,25 +41,35 @@ class CleanupExpiredTerminalFilesJob implements ShouldQueue
             if ($server) {
                 // Remove from server - escape shell arguments to prevent injection
                 $escapedServerPath = escapeshellarg($this->serverPath);
-                $result = instant_remote_process([
-                    "rm -f {$escapedServerPath}"
+                instant_remote_process([
+                    "rm -f -- {$escapedServerPath}",
                 ], $server, throwError: false);
 
-                if ($result) {
+                $remoteStillExists = instant_remote_process([
+                    "if [ -e {$escapedServerPath} ]; then echo exists; fi",
+                ], $server, throwError: false);
+
+                if ($remoteStillExists !== 'exists') {
                     Log::info("Cleaned up server terminal file: {$this->serverPath}");
                 }
 
                 // If container was specified, remove from container as well
                 if ($this->containerUuid) {
                     $escapedContainerUuid = escapeshellarg($this->containerUuid);
-                    $escapedFilename = escapeshellarg($this->filename);
                     $containerPath = "/tmp/{$this->filename}"; // For logging only
+                    $escapedContainerPath = escapeshellarg($containerPath);
 
                     instant_remote_process([
-                        "docker exec {$escapedContainerUuid} rm -f /tmp/{$escapedFilename} 2>/dev/null || true"
+                        "docker exec -u 0 {$escapedContainerUuid} rm -f -- {$escapedContainerPath} 2>/dev/null || true",
                     ], $server, throwError: false);
 
-                    Log::info("Cleaned up container terminal file: {$containerPath}");
+                    $containerStillExists = instant_remote_process([
+                        "docker exec -u 0 {$escapedContainerUuid} test ! -e {$escapedContainerPath} 2>/dev/null && echo deleted || echo exists",
+                    ], $server, throwError: false);
+
+                    if ($containerStillExists === 'deleted') {
+                        Log::info("Cleaned up container terminal file: {$containerPath}");
+                    }
                 }
             }
 

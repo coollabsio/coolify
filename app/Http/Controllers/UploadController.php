@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\TerminalUploadedFileStatus;
+use App\Models\TerminalUploadedFile;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Pion\Laravel\ChunkUpload\Exceptions\UploadMissingFileException;
 use Pion\Laravel\ChunkUpload\Handler\HandlerFactory;
@@ -13,7 +17,7 @@ use Pion\Laravel\ChunkUpload\Receiver\FileReceiver;
 
 class UploadController extends BaseController
 {
-    public function upload(Request $request)
+    public function upload(Request $request): JsonResponse
     {
         $databaseIdentifier = request()->route('databaseUuid');
         $resource = getResourceByUuid($databaseIdentifier, data_get(auth()->user()->currentTeam(), 'id'));
@@ -23,15 +27,12 @@ class UploadController extends BaseController
         $receiver = new FileReceiver('file', $request, HandlerFactory::classFromRequest($request));
 
         if ($receiver->isUploaded() === false) {
-            throw new UploadMissingFileException();
+            throw new UploadMissingFileException;
         }
 
         $save = $receiver->receive();
 
         if ($save->isFinished()) {
-            // Use the original identifier from the route to maintain path consistency
-            // For ServiceDatabase: {name}-{service_uuid}
-            // For standalone databases: {uuid}
             return $this->saveFile($save->getFile(), $databaseIdentifier);
         }
 
@@ -42,30 +43,10 @@ class UploadController extends BaseController
             'status' => true,
         ]);
     }
-    // protected function saveFileToS3($file)
-    // {
-    //     $fileName = $this->createFilename($file);
 
-    //     $disk = Storage::disk('s3');
-    //     // It's better to use streaming Streaming (laravel 5.4+)
-    //     $disk->putFileAs('photos', $file, $fileName);
-
-    //     // for older laravel
-    //     // $disk->put($fileName, file_get_contents($file), 'public');
-    //     $mime = str_replace('/', '-', $file->getMimeType());
-
-    //     // We need to delete the file when uploaded to s3
-    //     unlink($file->getPathname());
-
-    //     return response()->json([
-    //         'path' => $disk->url($fileName),
-    //         'name' => $fileName,
-    //         'mime_type' => $mime
-    //     ]);
-    // }
-    protected function saveFile(UploadedFile $file, string $resourceIdentifier)
+    protected function saveFile(UploadedFile $file, string $resourceIdentifier): JsonResponse
     {
-        $mime = str_replace('/', '-', $file->getMimeType());
+        $mime = str_replace('/', '-', (string) $file->getMimeType());
         $filePath = "upload/{$resourceIdentifier}";
         $finalPath = storage_path('app/'.$filePath);
         $file->move($finalPath, 'restore');
@@ -75,29 +56,24 @@ class UploadController extends BaseController
         ]);
     }
 
-    public function uploadTerminalFile(Request $request)
+    public function uploadTerminalFile(Request $request): JsonResponse
     {
-        // Security: Verify user has permission to upload terminal files
         if (! Auth::check()) {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
-        // Check if user is admin or has terminal access
-        $user = Auth::user();
-        if (! $user->isAdmin() && ! $user->isInstanceAdmin()) {
-            return response()->json(['error' => 'You do not have permission to upload terminal files'], 403);
-        }
+        Gate::authorize('canAccessTerminal');
 
         $receiver = new FileReceiver('file', $request, HandlerFactory::classFromRequest($request));
 
         if ($receiver->isUploaded() === false) {
-            throw new UploadMissingFileException();
+            throw new UploadMissingFileException;
         }
 
         $save = $receiver->receive();
 
         if ($save->isFinished()) {
-            return $this->saveTerminalFile($save->getFile());
+            return $this->saveTerminalFile($save->getFile(), $request);
         }
 
         $handler = $save->handler();
@@ -108,39 +84,75 @@ class UploadController extends BaseController
         ]);
     }
 
-    protected function saveTerminalFile(UploadedFile $file)
+    protected function saveTerminalFile(UploadedFile $file, Request $request): JsonResponse
     {
-        $mime = str_replace('/', '-', $file->getMimeType());
-        $filePath = 'terminal-uploads/temp';
+        $user = Auth::user();
+        $teamId = data_get($user?->currentTeam(), 'id');
+
+        if (blank($teamId)) {
+            return response()->json(['error' => 'No active team found.'], 422);
+        }
+
+        $mime = str_replace('/', '-', (string) $file->getMimeType());
+        $size = (int) $file->getSize();
+        $originalName = $file->getClientOriginalName();
+        $extension = $file->getClientOriginalExtension();
+
+        $uploadToken = (string) $request->input('resumableIdentifier', Str::uuid()->toString());
+        $uploadToken = preg_replace('/[^a-zA-Z0-9_-]/', '', $uploadToken) ?: Str::uuid()->toString();
+
+        $filePath = sprintf('terminal-uploads-pending/user_%d/%s', $user->id, $uploadToken);
         $finalPath = storage_path('app/'.$filePath);
 
-        // Create directory if it doesn't exist
         if (! is_dir($finalPath)) {
             mkdir($finalPath, 0755, true);
         }
 
-        // Security: Generate safe filename server-side to prevent path traversal
-        $originalName = $file->getClientOriginalName();
-        $extension = $file->getClientOriginalExtension();
-
-        // Create a safe slug from original filename (without extension)
         $nameWithoutExt = pathinfo($originalName, PATHINFO_FILENAME);
-        $safeSlug = Str::slug($nameWithoutExt); // Converts to lowercase, replaces special chars with dashes
-        $safeSlug = substr($safeSlug, 0, 50); // Limit length
-
-        // Sanitize extension (only allow alphanumeric)
+        $safeSlug = Str::slug($nameWithoutExt);
+        $safeSlug = substr($safeSlug, 0, 50);
         $safeExtension = preg_replace('/[^a-zA-Z0-9]/', '', $extension);
-
-        // Generate safe filename: timestamp_slug_randomhash.ext
         $randomHash = Str::random(16);
         $safeFilename = time().'_'.$safeSlug.'_'.$randomHash.($safeExtension ? '.'.$safeExtension : '');
 
         $file->move($finalPath, $safeFilename);
 
+        $localPath = $finalPath.'/'.$safeFilename;
+
+        $terminalUploadedFile = TerminalUploadedFile::query()->updateOrCreate(
+            [
+                'user_id' => $user->id,
+                'team_id' => $teamId,
+                'upload_token' => $uploadToken,
+            ],
+            [
+                'original_name' => $originalName,
+                'stored_filename' => $safeFilename,
+                'mime_type' => $mime,
+                'size_bytes' => $size,
+                'local_path' => $localPath,
+                'server_id' => null,
+                'server_path' => null,
+                'container_uuid' => null,
+                'container_path' => null,
+                'status' => TerminalUploadedFileStatus::Pending,
+                'uploaded_at' => now(),
+                'expires_at' => null,
+                'finalized_at' => null,
+                'deleted_at' => null,
+                'last_cleanup_error' => null,
+            ],
+        );
+
         return response()->json([
+            'done' => 100,
+            'status' => true,
+            'file_uuid' => $terminalUploadedFile->uuid,
             'mime_type' => $mime,
-            'filename' => $safeFilename,
-            'original_name' => $originalName, // Keep original name for reference
+            'size' => $size,
+            'upload_token' => $uploadToken,
+            'stored_filename' => $safeFilename,
+            'original_name' => $originalName,
         ]);
     }
 }
