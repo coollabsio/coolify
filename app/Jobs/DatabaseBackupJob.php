@@ -324,8 +324,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 // Step 1: Create local backup
                 try {
                     if (str($databaseType)->contains('postgres')) {
+                        $shouldDumpAll = $this->shouldUseDumpAll();
+
                         $this->backup_file = "/pg-dump-$database-".Carbon::now()->timestamp.'.dmp';
-                        if ($this->backup->dump_all) {
+                        if ($shouldDumpAll) {
                             $this->backup_file = '/pg-dump-all-'.Carbon::now()->timestamp.'.gz';
                         }
                         $this->backup_location = $this->backup_dir.$this->backup_file;
@@ -573,7 +575,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $backupCommand .= ' -e PGPASSWORD='.escapeshellarg($this->postgres_password);
             }
             $escapedUsername = escapeshellarg($this->database->postgres_user);
-            if ($this->backup->dump_all) {
+            if ($this->shouldUseDumpAll()) {
                 $backupCommand .= " $this->container_name pg_dumpall --username $escapedUsername | gzip > $this->backup_location";
             } else {
                 // Validate and escape database name to prevent command injection
@@ -805,5 +807,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 ]);
             }
         }
+    }
+
+    private function shouldUseDumpAll(): bool
+    {
+        // coolify-db backups are used for instance migration/restore flows.
+        // pg_dumpall includes global role changes that can override the target DB password.
+        return $this->backup->dump_all && $this->container_name !== 'coolify-db';
     }
 }
