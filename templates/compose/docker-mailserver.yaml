@@ -1,0 +1,67 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: A fullstack but simple mail server (SMTP, IMAP, LDAP, Antispam, Antivirus, etc.) using Docker.
+# category: infrastructure
+# tags: mail,email,smtp,imap,postfix,dovecot,spamassassin,opendkim,dmarc,dkim
+# logo: svgs/docker-mailserver.png
+# port: 25,110,143,465,587,993,995
+
+services:
+  docker-mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: mail
+    domainname: ${DOMAIN}
+    container_name: mail
+    environment:
+      - DMS_GID=5000
+      - DMS_UID=5000
+      - ONE_DIR=1
+      - ENABLE_CLAMAV=1
+      - ENABLE_SPAMASSASSIN=1
+      - ENABLE_POSTFIX_VIRTUAL_TRANSPORT=1
+      - ENABLE_QUOTAS=1
+      - ENABLE_MANAGESIEVE=1
+      - SSL_TYPE=${SSL_TYPE:-letsencrypt}
+      - SSL_CERT_PATH=/etc/ssl/certs/ssl-cert-snakeoil.pem
+      - SSL_KEY_PATH=/etc/ssl/private/ssl-cert-snakeoil.key
+      - POSTFIX_SMTP_AUTH=${POSTFIX_SMTP_AUTH:-yes}
+      - POSTFIX_SMTP_AUTH_NON_SMTP=force_tls
+      - SASL_PASSWD=${SASL_PASSWD}
+      - VIRTUAL_HOST=${SERVICE_URL_DOCKER-MAILSERVER}
+      - FAIL2BAN_BLOCKTYPE=drop
+      - MOVE_SPAM_TO_JUNK=1
+      - UPDATE_CHECK_INTERVAL=1d
+      - POSTFIX_MAILNAME=/etc/mailname
+      - OVPERYLAY_SCORE=${OVPERYLAY_SCORE:-5}
+    volumes:
+      - docker-mailserver-data:/var/mail
+      - docker-mailserver-state:/var/mail-state
+      - docker-mailserver-log:/var/log/mail
+      - docker-mailserver-config:/tmp/docker-mailserver
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "25:25"
+      - "110:110"
+      - "143:143"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+      - "995:995"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/healthcheck"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    restart: always
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+
+volumes:
+  docker-mailserver-data:
+    driver: local
+  docker-mailserver-state:
+    driver: local
+  docker-mailserver-log:
+    driver: local
+  docker-mailserver-config:
+    driver: local
