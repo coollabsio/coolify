@@ -1,0 +1,178 @@
+# documentation: https://docs.openreplay.com/
+# slogan: Session replay, co-browsing and product analytics you can self-host
+# category: analytics
+# tags: analytics,session-replay,monitoring,user-tracking
+# logo: svgs/openreplay.svg
+# port: 8080
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-openreplay}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SERVICE_USER_POSTGRES}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23-alpine
+    environment:
+      - CLICKHOUSE_DB=${CLICKHOUSE_DB:-openreplay}
+      - CLICKHOUSE_USER=${SERVICE_USER_CLICKHOUSE}
+      - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_CLICKHOUSE}
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  frontend:
+    image: public.ecr.aws/p1t3u8a3/frontend:latest
+    environment:
+      - SERVICE_URL_OPENREPLAY_8080
+      - API_URL=http://http:8080
+    depends_on:
+      http:
+        condition: service_started
+
+  http:
+    image: public.ecr.aws/p1t3u8a3/http:latest
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-openreplay}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+      - JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
+      - DOMAIN_NAME=${SERVICE_FQDN_OPENREPLAY}
+    volumes:
+      - shared-volume:/mnt/efs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  sink:
+    image: public.ecr.aws/p1t3u8a3/sink:latest
+    environment:
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=9000
+      - CLICKHOUSE_DB=${CLICKHOUSE_DB:-openreplay}
+      - CLICKHOUSE_USER=${SERVICE_USER_CLICKHOUSE}
+      - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_CLICKHOUSE}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+    depends_on:
+      clickhouse:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  api:
+    image: public.ecr.aws/p1t3u8a3/api:latest
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-openreplay}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=9000
+      - CLICKHOUSE_DB=${CLICKHOUSE_DB:-openreplay}
+      - CLICKHOUSE_USER=${SERVICE_USER_CLICKHOUSE}
+      - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_CLICKHOUSE}
+      - STORAGE_HOST=minio
+      - STORAGE_PORT=9000
+      - STORAGE_BUCKET=openreplay
+      - STORAGE_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - STORAGE_ACCESS_SECRET=${SERVICE_PASSWORD_MINIO}
+      - DOMAIN_NAME=${SERVICE_FQDN_OPENREPLAY}
+    volumes:
+      - shared-volume:/mnt/efs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_started
+      minio:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  storage:
+    image: public.ecr.aws/p1t3u8a3/storage:latest
+    environment:
+      - STORAGE_HOST=minio
+      - STORAGE_PORT=9000
+      - STORAGE_BUCKET=openreplay
+      - STORAGE_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - STORAGE_ACCESS_SECRET=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      minio:
+        condition: service_started
+
+  images:
+    image: public.ecr.aws/p1t3u8a3/images:latest
+    environment:
+      - STORAGE_HOST=minio
+      - STORAGE_PORT=9000
+      - STORAGE_BUCKET=openreplay
+      - STORAGE_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - STORAGE_ACCESS_SECRET=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      minio:
+        condition: service_started
+
+  tracker:
+    image: public.ecr.aws/p1t3u8a3/tracker:latest
+    environment:
+      - API_URL=http://http:8080
+    depends_on:
+      http:
+        condition: service_started
