@@ -1,0 +1,290 @@
+# documentation: https://docs.openreplay.com/
+# slogan: OpenReplay is an open-source session replay platform for developers.
+# category: analytics
+# tags: analytics,session-replay,openreplay,ux,user-behavior,funnel-analysis
+# port: 80
+
+services:
+  postgresql:
+    image: ghcr.io/openreplay/postgres:${POSTGRES_VERSION:-16.4.0}
+    container_name: postgres
+    volumes:
+      - pgdata:/bitnami/postgresql
+    networks:
+      - openreplay-net
+    environment:
+      POSTGRESQL_PASSWORD: "${COMMON_PG_PASSWORD}"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-24.8.4}
+    container_name: clickhouse
+    volumes:
+      - clickhouse:/var/lib/clickhouse
+    networks:
+      - openreplay-net
+    environment:
+      CLICKHOUSE_USER: "default"
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: ghcr.io/openreplay/valkey:${REDIS_VERSION:-8.0.0}
+    container_name: redis
+    volumes:
+      - redisdata:/data
+    networks:
+      - openreplay-net
+    environment:
+      ALLOW_EMPTY_PASSWORD: "yes"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: ghcr.io/openreplay/minio:${MINIO_VERSION:-0.0.4}
+    container_name: minio
+    volumes:
+      - miniodata:/bitnami/minio/data
+    networks:
+      - openreplay-net
+    ports:
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: "${COMMON_S3_KEY}"
+      MINIO_ROOT_PASSWORD: "${COMMON_S3_SECRET}"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  alerts-openreplay:
+    image: public.ecr.aws/p1t3u8a3/alerts:${COMMON_VERSION:-1.40.0}
+    container_name: alerts
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/alerts.env
+    restart: unless-stopped
+
+  api-openreplay:
+    image: public.ecr.aws/p1t3u8a3/api:${COMMON_VERSION:-1.40.0}
+    container_name: api
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/api.env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  http-openreplay:
+    image: public.ecr.aws/p1t3u8a3/http:${COMMON_VERSION:-1.40.0}
+    container_name: http
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/http.env
+    restart: unless-stopped
+
+  images-openreplay:
+    image: public.ecr.aws/p1t3u8a3/images:${COMMON_VERSION:-1.40.0}
+    container_name: images
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/images.env
+    restart: unless-stopped
+
+  integrations-openreplay:
+    image: public.ecr.aws/p1t3u8a3/integrations:${COMMON_VERSION:-1.40.0}
+    container_name: integrations
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/integrations.env
+    restart: unless-stopped
+
+  sink-openreplay:
+    image: public.ecr.aws/p1t3u8a3/sink:${COMMON_VERSION:-1.40.0}
+    container_name: sink
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/sink.env
+    restart: unless-stopped
+
+  sourcemapreader-openreplay:
+    image: public.ecr.aws/p1t3u8a3/sourcemapreader:${COMMON_VERSION:-1.40.0}
+    container_name: sourcemapreader
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/sourcemapreader.env
+    restart: unless-stopped
+
+  spot-openreplay:
+    image: public.ecr.aws/p1t3u8a3/spot:${COMMON_VERSION:-1.40.0}
+    container_name: spot
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/spot.env
+    restart: unless-stopped
+
+  storage-openreplay:
+    image: public.ecr.aws/p1t3u8a3/storage:${COMMON_VERSION:-1.40.0}
+    container_name: storage
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/storage.env
+    restart: unless-stopped
+
+  assets-openreplay:
+    image: public.ecr.aws/p1t3u8a3/assets:${COMMON_VERSION:-1.40.0}
+    container_name: assets
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/assets.env
+    restart: unless-stopped
+
+  assist-openreplay:
+    image: public.ecr.aws/p1t3u8a3/assist:${COMMON_VERSION:-1.40.0}
+    container_name: assist
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/assist.env
+    restart: unless-stopped
+
+  canvases-openreplay:
+    image: public.ecr.aws/p1t3u8a3/canvases:${COMMON_VERSION:-1.40.0}
+    container_name: canvases
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/canvases.env
+    restart: unless-stopped
+
+  chalice-openreplay:
+    image: public.ecr.aws/p1t3u8a3/chalice:${COMMON_VERSION:-1.40.0}
+    container_name: chalice
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/chalice.env
+    restart: unless-stopped
+
+  db-openreplay:
+    image: public.ecr.aws/p1t3u8a3/db:${COMMON_VERSION:-1.40.0}
+    container_name: db
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/db.env
+    restart: unless-stopped
+
+  ender-openreplay:
+    image: public.ecr.aws/p1t3u8a3/ender:${COMMON_VERSION:-1.40.0}
+    container_name: ender
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/ender.env
+    restart: unless-stopped
+
+  frontend-openreplay:
+    image: public.ecr.aws/p1t3u8a3/frontend:${COMMON_VERSION:-1.40.0}
+    container_name: frontend
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/frontend.env
+    restart: unless-stopped
+
+  heuristics-openreplay:
+    image: public.ecr.aws/p1t3u8a3/heuristics:${COMMON_VERSION:-1.40.0}
+    container_name: heuristics
+    networks:
+      - openreplay-net
+    volumes:
+      - shared-volume:/mnt/efs
+    env_file:
+      - docker-envs/heuristics.env
+    restart: unless-stopped
+
+  nginx-openreplay:
+    image: nginx:latest
+    container_name: nginx
+    networks:
+      - openreplay-net
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    restart: unless-stopped
+    depends_on:
+      - frontend-openreplay
+      - api-openreplay
+
+volumes:
+  pgdata:
+  clickhouse:
+  redisdata:
+  miniodata:
+  shared-volume:
+
+networks:
+  openreplay-net:
