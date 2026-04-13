@@ -19,24 +19,23 @@ class OauthController extends Controller
     {
         try {
             $oauthUser = get_socialite_provider($provider)->user();
-            $user = User::whereEmail($oauthUser->email)->first();
+            $email = \Str::lower(trim($oauthUser->email));
+    
+            $user = User::whereEmail($email)->first();
             if (! $user) {
                 $settings = instanceSettings();
                 if (! $settings->is_registration_enabled) {
                     abort(403, 'Registration is disabled');
                 }
-
                 $user = User::create([
                     'name' => $oauthUser->name,
-                    'email' => $oauthUser->email,
+                    'email' => $email,
                 ]);
             }
             Auth::login($user);
-
             return redirect('/');
         } catch (\Exception $e) {
             $errorCode = $e instanceof HttpException ? 'auth.failed' : 'auth.failed.callback';
-
             return redirect()->route('login')->withErrors([__($errorCode)]);
         }
     }
