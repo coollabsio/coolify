@@ -63,10 +63,20 @@
             @if ($isConsistentContainerNameEnabled === false)
                 <form class="flex items-end gap-2 " wire:submit.prevent='saveCustomName'>
                     <x-forms.input
-                        helper="You can add a custom name for your container.<br><br>The name will be converted to slug format when you save it. <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
-                        instantSave id="customInternalName" label="Custom Container Name" canGate="update"
-                        :canResource="$application" />
-                    <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
+                        helper="You can add a custom name for your container.<br><br>The name will be converted to slug format when you save it. <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span><br><br><span class='dark:text-red-500 text-red-600'>Cannot be used together with Custom Container Name Prefix.</span>"
+                        id="customInternalName" label="Custom Container Name" canGate="update"
+                        :canResource="$application" :disabled="!empty($customContainerNamePrefix)" />
+                    <x-forms.button canGate="update" :canResource="$application" type="submit"
+                        :disabled="!empty($customContainerNamePrefix)">Save</x-forms.button>
+                </form>
+                <form class="flex items-end gap-2 " wire:submit.prevent='saveCustomNamePrefix'>
+                    <x-forms.input
+                        helper="Set a custom prefix for your container name. The final name will be: <span class='font-bold'>your-prefix-timestamp</span>.<br><br>The name will be converted to slug format when you save it.<br><br>This option <span class='font-bold dark:text-success'>keeps rolling updates working!</span><br><br><span class='dark:text-red-500 text-red-600'>Cannot be used together with Custom Container Name.</span>"
+                        id="customContainerNamePrefix" label="Custom Container Name Prefix" canGate="update"
+                        :canResource="$application" placeholder="e.g. my-nextjs-app"
+                        :disabled="!empty($customInternalName)" />
+                    <x-forms.button canGate="update" :canResource="$application" type="submit"
+                        :disabled="!empty($customInternalName)">Save</x-forms.button>
                 </form>
             @endif
             @if ($application->build_pack === 'dockercompose')
