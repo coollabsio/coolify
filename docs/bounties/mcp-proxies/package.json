@@ -1,0 +1,19 @@
+{
+  "name": "supabase-mcp-proxy",
+  "version": "1.0.0",
+  "description": "Proxy server for connecting MCP clients to Supabase MCP endpoint",
+  "main": "mcp-supabase-proxy.js",
+  "scripts": {
+    "start": "node mcp-supabase-proxy.js",
+    "start:prod": "SUPABASE_URL=http://localhost:8000/mcp SUPABASE_ANON_KEY=$PROD_ANON_KEY node mcp-supabase-proxy.js",
+    "start:staging": "SUPABASE_URL=http://localhost:8000/mcp-staging SUPABASE_ANON_KEY=$STAGING_ANON_KEY PROXY_PORT=3001 node mcp-supabase-proxy.js",
+    "start:dev": "SUPABASE_URL=http://localhost:8000/mcp-dev SUPABASE_ANON_KEY=$DEV_ANON_KEY PROXY_PORT=3002 node mcp-supabase-proxy.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
