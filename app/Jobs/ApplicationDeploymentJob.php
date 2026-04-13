@@ -592,6 +592,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function deploy_docker_compose_buildpack()
     {
+        // Compose deployments also prepare and reuse the helper container for
+        // repository checkout and workdir creation. When a build server is
+        // enabled, those helper-container operations must start on the build
+        // server so later docker exec calls target the same host.
+        $this->switchToBuildServerIfNeeded();
         if (data_get($this->application, 'docker_compose_location')) {
             $this->docker_compose_location = $this->validatePathField($this->application->docker_compose_location, 'docker_compose_location');
         }
@@ -2018,6 +2023,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     'command' => "mkdir -p {$this->configuration_dir}",
                 ],
             );
+        }
+    }
+
+    private function switchToBuildServerIfNeeded(): void
+    {
+        if ($this->use_build_server) {
+            $this->server = $this->build_server;
         }
     }
 
