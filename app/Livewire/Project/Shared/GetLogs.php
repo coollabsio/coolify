@@ -57,6 +57,12 @@ class GetLogs extends Component
 
     public bool $collapsible = true;
 
+    public bool $showHealthcheckLogs = false;
+
+    public string $healthcheckOutputs = '';
+
+    public ?string $healthcheckStatus = null;
+
     public function mount()
     {
         if (! is_null($this->resource)) {
@@ -285,6 +291,102 @@ class GetLogs extends Component
         }
 
         return sanitizeLogsForExport($allLogs);
+    }
+
+    public function toggleHealthcheckLogs(): void
+    {
+        $this->showHealthcheckLogs = ! $this->showHealthcheckLogs;
+        if ($this->showHealthcheckLogs) {
+            $this->getHealthcheckLogs();
+        }
+    }
+
+    public function getHealthcheckLogs(): void
+    {
+        if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists()) {
+            $this->healthcheckOutputs = 'Unauthorized.';
+
+            return;
+        }
+        if (! $this->server->isFunctional()) {
+            return;
+        }
+        if ($this->container && ! ValidationPatterns::isValidContainerName($this->container)) {
+            $this->healthcheckOutputs = 'Invalid container name.';
+
+            return;
+        }
+        if (! $this->container) {
+            return;
+        }
+
+        $command = "docker inspect --format='{{json .State.Health}}' {$this->container}";
+        if ($this->server->isNonRoot()) {
+            $command = parseCommandsByLineForSudo(collect($command), $this->server);
+            $command = $command[0];
+        }
+        $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
+
+        $rawOutput = '';
+        Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand, function (string $type, string $output) use (&$rawOutput) {
+            $rawOutput .= $output;
+        });
+
+        $rawOutput = trim($rawOutput);
+
+        if (empty($rawOutput) || $rawOutput === 'null' || $rawOutput === '<nil>' || $rawOutput === "'null'") {
+            $this->healthcheckOutputs = 'No healthcheck configured for this container.';
+            $this->healthcheckStatus = null;
+
+            return;
+        }
+
+        // Strip surrounding single quotes if present (docker format output)
+        $rawOutput = trim($rawOutput, "'");
+
+        $health = json_decode($rawOutput, true);
+        if (! is_array($health)) {
+            $this->healthcheckOutputs = 'No healthcheck configured for this container.';
+            $this->healthcheckStatus = null;
+
+            return;
+        }
+
+        $this->healthcheckStatus = data_get($health, 'Status', 'unknown');
+        $failingStreak = data_get($health, 'FailingStreak', 0);
+        $logs = data_get($health, 'Log', []);
+
+        $lines = [];
+        $lines[] = "Status: {$this->healthcheckStatus} | Failing streak: {$failingStreak}";
+        $lines[] = '----------------------------------------';
+
+        if (empty($logs)) {
+            $lines[] = 'No healthcheck log entries yet.';
+        } else {
+            foreach (array_reverse($logs) as $entry) {
+                $start = data_get($entry, 'Start', '');
+                $exitCode = data_get($entry, 'ExitCode', '?');
+                $output = trim(data_get($entry, 'Output', ''));
+
+                $timestamp = $start;
+                if (! empty($start)) {
+                    try {
+                        $dt = new \DateTime($start);
+                        $timestamp = $dt->format('Y-m-d H:i:s');
+                    } catch (\Exception) {
+                    }
+                }
+
+                $statusIcon = $exitCode === 0 ? 'PASS' : 'FAIL';
+                $line = "[{$timestamp}] {$statusIcon} (exit {$exitCode})";
+                if (! empty($output)) {
+                    $line .= " — {$output}";
+                }
+                $lines[] = $line;
+            }
+        }
+
+        $this->healthcheckOutputs = implode("\n", $lines);
     }
 
     public function render()
