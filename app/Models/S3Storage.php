@@ -94,7 +94,11 @@ class S3Storage extends BaseModel
                     return null;
                 }
 
-                return str($value)->trim()->start('/')->value();
+                // Trim whitespace and normalize: add leading slash, remove trailing slash
+                $path = str($value)->trim()->start('/')->rtrim('/')->value();
+
+                // Return null if only slashes remain after trimming
+                return $path === '/' ? null : $path;
             }
         );
     }

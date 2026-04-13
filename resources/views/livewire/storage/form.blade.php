@@ -10,6 +10,11 @@
             <x-forms.input canGate="update" :canResource="$storage" required label="Region" id="region" />
         </div>
         <div class="flex gap-2">
+            <x-forms.input canGate="update" :canResource="$storage" label="Path Prefix" id="path"
+                placeholder="e.g., production or instance-1"
+                helper="Optional prefix added before the standard backup path (/data/coolify/backups/...). Useful for separating multiple Coolify instances in a single bucket." />
+        </div>
+        <div class="flex gap-2">
             <x-forms.input canGate="update" :canResource="$storage" required type="password" label="Access Key"
                 id="key" />
             <x-forms.input canGate="update" :canResource="$storage" required type="password" label="Secret Key"

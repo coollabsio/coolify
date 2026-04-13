@@ -30,6 +30,8 @@ class Form extends Component
 
     public string $secret;
 
+    public ?string $path = null;
+
     public ?bool $isUsable = null;
 
     protected function rules(): array
@@ -43,6 +45,7 @@ class Form extends Component
             'secret' => 'required|max:255',
             'bucket' => 'required|max:255',
             'endpoint' => 'required|url|max:255',
+            'path' => ['nullable', 'max:255', 'regex:/^[a-zA-Z0-9\/\-_\.]*$/', 'not_regex:/\.\./'],
         ];
     }
 
@@ -62,6 +65,9 @@ class Form extends Component
                 'endpoint.required' => 'The Endpoint field is required.',
                 'endpoint.url' => 'The Endpoint must be a valid URL.',
                 'endpoint.max' => 'The Endpoint may not be greater than 255 characters.',
+                'path.max' => 'The Path Prefix may not be greater than 255 characters.',
+                'path.regex' => 'The Path Prefix may only contain letters, numbers, slashes (/), dashes (-), underscores (_), and dots (.).',
+                'path.not_regex' => 'The Path Prefix may not contain directory traversal sequences (..).',
             ]
         );
     }
@@ -75,6 +81,7 @@ class Form extends Component
         'secret' => 'Secret',
         'bucket' => 'Bucket',
         'endpoint' => 'Endpoint',
+        'path' => 'Path Prefix',
     ];
 
     /**
@@ -93,6 +100,7 @@ class Form extends Component
             $this->storage->region = $this->region;
             $this->storage->key = $this->key;
             $this->storage->secret = $this->secret;
+            $this->storage->path = $this->path;
             $this->storage->is_usable = $this->isUsable;
         } else {
             // Sync FROM model (on load/refresh)
@@ -103,6 +111,7 @@ class Form extends Component
             $this->region = $this->storage->region;
             $this->key = $this->storage->key;
             $this->secret = $this->storage->secret;
+            $this->path = $this->storage->path;
             $this->isUsable = $this->storage->is_usable;
         }
     }
