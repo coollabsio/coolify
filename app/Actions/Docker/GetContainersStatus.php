@@ -9,6 +9,8 @@ use App\Events\ServiceChecked;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
+use App\Services\EdgeProxyRemotePortForwardService;
+use App\Services\EdgeProxyRemoteRouteService;
 use App\Services\ContainerStatusAggregator;
 use App\Traits\CalculatesExcludedStatus;
 use Illuminate\Support\Arr;
@@ -95,6 +97,7 @@ class GetContainersStatus
         $foundApplicationPreviews = [];
         $foundDatabases = [];
         $foundServices = [];
+        $applicationsToResync = collect([]);
 
         foreach ($this->containers as $container) {
             if ($this->server->isSwarm()) {
@@ -463,9 +466,11 @@ class GetContainersStatus
                     $maxRestartCount = $containerRestartCounts->max() ?? 0;
                 }
 
+                $previousRestartCount = $application->restart_count ?? 0;
+                $shouldResyncEdgeProxy = $maxRestartCount > $previousRestartCount;
+
                 // Wrap all database updates in a transaction to ensure consistency
-                DB::transaction(function () use ($application, $maxRestartCount, $containerStatuses) {
-                    $previousRestartCount = $application->restart_count ?? 0;
+                DB::transaction(function () use ($application, $maxRestartCount, $containerStatuses, $previousRestartCount) {
 
                     if ($maxRestartCount > $previousRestartCount) {
                         // Restart count increased - this is a crash restart
@@ -499,7 +504,28 @@ class GetContainersStatus
                         }
                     }
                 });
+
+                if ($shouldResyncEdgeProxy) {
+                    $applicationsToResync->push($applicationId);
+                }
             }
+        }
+
+        if ($applicationsToResync->isNotEmpty()) {
+            $applicationsToResync
+                ->unique()
+                ->each(function (int $applicationId) {
+                    $application = $this->applications->where('id', $applicationId)->first();
+                    if (! $application) {
+                        return;
+                    }
+                    try {
+                        app(EdgeProxyRemoteRouteService::class)->syncApplication($application);
+                        app(EdgeProxyRemotePortForwardService::class)->syncApplication($application);
+                    } catch (\Throwable) {
+                        // Avoid failing status checks if edge proxy sync fails.
+                    }
+                });
         }
 
         // Aggregate multi-container service statuses

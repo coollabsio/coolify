@@ -1321,6 +1321,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $shouldGenerateLabelsExactly = $resource->destination->server->settings->generate_exact_labels;
             $labelUuid = $resource->uuid;
             $labelNetwork = data_get($resource, 'destination.network');
+            $usePublicCertResolver = shouldUsePublicCertResolver($server);
             if ($isPullRequest) {
                 $labelUuid = "{$resource->uuid}-{$pullRequestId}";
             }
@@ -1338,7 +1339,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
-                            image: $image
+                            image: $image,
+                            use_public_cert_resolver: $usePublicCertResolver
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -1365,7 +1367,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
-                    image: $image
+                    image: $image,
+                    use_public_cert_resolver: $usePublicCertResolver
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $labelNetwork,
