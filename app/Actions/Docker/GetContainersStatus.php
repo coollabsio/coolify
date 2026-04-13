@@ -466,11 +466,14 @@ class GetContainersStatus
                     $maxRestartCount = $containerRestartCounts->max() ?? 0;
                 }
 
+                $aggregatedStatus = $this->aggregateApplicationStatus($application, $containerStatuses, $maxRestartCount);
                 $previousRestartCount = $application->restart_count ?? 0;
-                $shouldResyncEdgeProxy = $maxRestartCount > $previousRestartCount;
+                $wasRunning = str($application->status)->startsWith('running');
+                $isRunningNow = is_string($aggregatedStatus) && str($aggregatedStatus)->startsWith('running');
+                $shouldResyncEdgeProxy = $maxRestartCount > $previousRestartCount || ($isRunningNow && ! $wasRunning);
 
                 // Wrap all database updates in a transaction to ensure consistency
-                DB::transaction(function () use ($application, $maxRestartCount, $containerStatuses, $previousRestartCount) {
+                DB::transaction(function () use ($application, $maxRestartCount, $containerStatuses, $previousRestartCount, $aggregatedStatus) {
 
                     if ($maxRestartCount > $previousRestartCount) {
                         // Restart count increased - this is a crash restart
@@ -493,8 +496,6 @@ class GetContainersStatus
                         }
                     }
 
-                    // Aggregate status after tracking restart counts
-                    $aggregatedStatus = $this->aggregateApplicationStatus($application, $containerStatuses, $maxRestartCount);
                     if ($aggregatedStatus) {
                         $statusFromDb = $application->status;
                         if ($statusFromDb !== $aggregatedStatus) {
@@ -529,7 +530,24 @@ class GetContainersStatus
         }
 
         // Aggregate multi-container service statuses
-        $this->aggregateServiceContainerStatuses($services);
+        $servicesToResync = $this->aggregateServiceContainerStatuses($services);
+        if ($servicesToResync->isNotEmpty()) {
+            $servicesToResync
+                ->unique()
+                ->each(function (int $serviceId) use ($services) {
+                    $service = $services->where('id', $serviceId)->first();
+                    if (! $service) {
+                        return;
+                    }
+
+                    try {
+                        app(EdgeProxyRemoteRouteService::class)->syncService($service);
+                        app(EdgeProxyRemotePortForwardService::class)->syncService($service);
+                    } catch (\Throwable) {
+                        // Avoid failing status checks if edge proxy sync fails.
+                    }
+                });
+        }
 
         ServiceChecked::dispatch($this->server->team->id);
     }
@@ -557,11 +575,13 @@ class GetContainersStatus
         return $aggregator->aggregateFromStrings($relevantStatuses, $maxRestartCount, preserveRestarting: true);
     }
 
-    private function aggregateServiceContainerStatuses($services)
+    private function aggregateServiceContainerStatuses($services): Collection
     {
         if (! isset($this->serviceContainerStatuses) || $this->serviceContainerStatuses->isEmpty()) {
-            return;
+            return collect([]);
         }
+
+        $servicesToResync = collect([]);
 
         foreach ($this->serviceContainerStatuses as $key => $containerStatuses) {
             // Parse key: serviceId:subType:subId
@@ -598,6 +618,9 @@ class GetContainersStatus
                 $aggregatedStatus = $this->calculateExcludedStatusFromStrings($containerStatuses);
                 if ($aggregatedStatus) {
                     $statusFromDb = $subResource->status;
+                    if (! str($statusFromDb)->startsWith('running') && str($aggregatedStatus)->startsWith('running')) {
+                        $servicesToResync->push((int) $service->id);
+                    }
                     if ($statusFromDb !== $aggregatedStatus) {
                         $subResource->update(['status' => $aggregatedStatus]);
                     } else {
@@ -616,6 +639,9 @@ class GetContainersStatus
             // Update service sub-resource status with aggregated result
             if ($aggregatedStatus) {
                 $statusFromDb = $subResource->status;
+                if (! str($statusFromDb)->startsWith('running') && str($aggregatedStatus)->startsWith('running')) {
+                    $servicesToResync->push((int) $service->id);
+                }
                 if ($statusFromDb !== $aggregatedStatus) {
                     $subResource->update(['status' => $aggregatedStatus]);
                 } else {
@@ -623,5 +649,7 @@ class GetContainersStatus
                 }
             }
         }
+
+        return $servicesToResync->unique()->values();
     }
 }

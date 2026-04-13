@@ -6,6 +6,7 @@ use App\Enums\ActivityTypes;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\CheckHelperImageJob;
 use App\Jobs\PullChangelog;
+use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -13,13 +14,17 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\ScheduledTaskExecution;
 use App\Models\Server;
+use App\Models\Service;
 use App\Models\StandalonePostgresql;
 use App\Models\User;
+use App\Services\EdgeProxyRemotePortForwardService;
+use App\Services\EdgeProxyRemoteRouteService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Collection;
 
 class Init extends Command
 {
@@ -143,6 +148,12 @@ class Init extends Command
             echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
         }
 
+        try {
+            $this->rebuildRemoteProxyConfigurations();
+        } catch (\Throwable $e) {
+            echo "Could not rebuild remote proxy configurations: {$e->getMessage()}\n";
+        }
+
         if (! is_null(config('constants.coolify.autoupdate', null))) {
             if (config('constants.coolify.autoupdate') == true) {
                 echo "Enabling auto-update\n";
@@ -236,6 +247,38 @@ class Init extends Command
                 echo "Error in cleaning up unused networks from coolify proxy: {$e->getMessage()}\n";
             }
         }
+    }
+
+    private function rebuildRemoteProxyConfigurations(): void
+    {
+        $routeService = app(EdgeProxyRemoteRouteService::class);
+        $portForwardService = app(EdgeProxyRemotePortForwardService::class);
+
+        Application::query()
+            ->with(['destination.server', 'environment.project'])
+            ->chunkById(100, function (Collection $applications) use ($routeService, $portForwardService) {
+                foreach ($applications as $application) {
+                    try {
+                        $routeService->syncApplication($application);
+                        $portForwardService->syncApplication($application);
+                    } catch (\Throwable $e) {
+                        echo "Could not rebuild remote proxy configuration for application {$application->uuid}: {$e->getMessage()}\n";
+                    }
+                }
+            });
+
+        Service::query()
+            ->with(['destination.server', 'environment.project', 'server', 'applications'])
+            ->chunkById(100, function (Collection $services) use ($routeService, $portForwardService) {
+                foreach ($services as $service) {
+                    try {
+                        $routeService->syncService($service);
+                        $portForwardService->syncService($service);
+                    } catch (\Throwable $e) {
+                        echo "Could not rebuild remote proxy configuration for service {$service->uuid}: {$e->getMessage()}\n";
+                    }
+                }
+            });
     }
 
     private function restoreCoolifyDbBackup()

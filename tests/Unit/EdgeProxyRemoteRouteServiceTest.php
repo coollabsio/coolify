@@ -43,6 +43,89 @@ it('generates edge traefik config for a remote domain route', function () {
         ->and(data_get($config, 'http.services.edge-service-uuid-svc-1.loadBalancer.servers.0.url'))->toBe('http://10.8.0.15:9010');
 });
 
+it('names edge route files with the deployment server uuid when available', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public function serviceRoutePath(Server $edgeProxyServer, string $serviceUuid, ?Server $deploymentServer = null): string
+        {
+            return $this->routeFilePath($edgeProxyServer, $serviceUuid, $deploymentServer);
+        }
+
+        public function applicationRoutePath(Server $edgeProxyServer, string $applicationUuid, ?Server $deploymentServer = null): string
+        {
+            return $this->applicationRouteFilePath($edgeProxyServer, $applicationUuid, $deploymentServer);
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->uuid = 'deployment-test-uuid';
+
+    expect($manager->serviceRoutePath($edgeProxyServer, 'service-test-uuid', $deploymentServer))
+        ->toBe('/tmp/proxy/dynamic/service-remote-from-deployment-test-uuid-service-test-uuid.yaml')
+        ->and($manager->applicationRoutePath($edgeProxyServer, 'application-test-uuid', $deploymentServer))
+        ->toBe('/tmp/proxy/dynamic/application-remote-from-deployment-test-uuid-application-test-uuid.yaml');
+});
+
+it('cleans stale edge route file variants when a deployment server uuid is available', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'server_id' => $server->id,
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 99;
+    $deploymentServer->uuid = 'deployment-test-uuid';
+    $deploymentServer->ip = '10.8.0.99';
+    $deploymentServer->proxy = ['type' => 'NONE'];
+
+    $service = new Service;
+    $service->uuid = 'service-test-uuid';
+    $service->docker_compose_raw = <<<'YAML'
+services:
+  app:
+    ports:
+      - "9010:3000"
+YAML;
+
+    $application = new ServiceApplication;
+    $application->name = 'app';
+    $application->fqdn = 'https://demo.example.com:3000';
+
+    $service->setRelation('applications', collect([$application]));
+    $application->setRelation('service', $service);
+
+    $manager->syncServiceWithServers($service, $edgeProxyServer, $deploymentServer);
+
+    expect($manager->calls)->toHaveCount(1);
+
+    $commands = implode("\n", $manager->calls[0]['commands']);
+    expect($commands)
+        ->toContain("service-remote-from-deployment-test-uuid-service-test-uuid.yaml")
+        ->toContain("find '/tmp/proxy/dynamic' -maxdepth 1 -type f")
+        ->toContain('service-remote-*service-test-uuid.yaml')
+        ->toContain('service-remote-*service-test-uuid.yaml.tmp')
+        ->toContain('-delete');
+});
+
 it('uses configured traefik entrypoints and cert resolver for remote routes', function () {
     $container = Container::getInstance();
     $hadOriginalConfig = $container->bound('config');
