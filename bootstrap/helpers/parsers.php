@@ -2598,6 +2598,7 @@ function serviceParser(Service $resource): Collection
             }
         }
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
+            $usePublicCertResolver = shouldUsePublicCertResolver($server);
             $shouldGenerateLabelsExactly = $resource->server->settings->generate_exact_labels;
             $uuid = $resource->uuid;
             $network = data_get($resource, 'destination.network');
@@ -2612,7 +2613,8 @@ function serviceParser(Service $resource): Collection
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
-                            image: $image
+                            image: $image,
+                            use_public_cert_resolver: $usePublicCertResolver
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -2639,7 +2641,8 @@ function serviceParser(Service $resource): Collection
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
-                    image: $image
+                    image: $image,
+                    use_public_cert_resolver: $usePublicCertResolver
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $network,

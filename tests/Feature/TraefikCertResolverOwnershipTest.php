@@ -40,3 +40,10 @@ it('uses public cert resolver only on the master domain router', function () {
     expect(shouldUsePublicCertResolver($masterServer))->toBeTrue();
     expect(shouldUsePublicCertResolver($otherServer))->toBeFalse();
 });
+
+it('passes public cert resolver ownership through both parser paths', function () {
+    $parsersFile = file_get_contents(__DIR__.'/../../bootstrap/helpers/parsers.php');
+
+    expect(substr_count($parsersFile, 'use_public_cert_resolver: $usePublicCertResolver'))
+        ->toBe(4);
+});
