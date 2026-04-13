@@ -865,7 +865,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        $this->application_deployment_queue->addLogEntry('New container started.');
+        $this->application_deployment_queue->addLogEntry('New containers started.');
+        $this->health_check_compose();
     }
 
     private function deploy_dockerfile_buildpack()
@@ -1947,6 +1948,166 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ],
         );
         $this->application_deployment_queue->addLogEntry('----------------------------------------');
+    }
+
+    private function health_check_compose(): void
+    {
+        try {
+            if ($this->server->isSwarm()) {
+                return;
+            }
+
+            $projectName = $this->application->uuid;
+
+            $this->execute_remote_command(
+                [
+                    'command' => "docker ps -a --filter 'label=com.docker.compose.project={$projectName}' --format '{{.Names}}|{{.Label \"com.docker.compose.service\"}}'",
+                    'hidden' => true,
+                    'save' => 'compose_containers',
+                    'append' => false,
+                ],
+            );
+
+            $containerOutput = $this->saved_outputs->get('compose_containers');
+            if (empty($containerOutput)) {
+                return;
+            }
+
+            $containers = collect(explode("\n", trim($containerOutput)))
+                ->filter()
+                ->map(function ($line) {
+                    $parts = explode('|', $line, 2);
+
+                    return [
+                        'name' => trim($parts[0]),
+                        'service' => trim($parts[1] ?? $parts[0]),
+                    ];
+                });
+
+            if ($containers->isEmpty()) {
+                return;
+            }
+
+            $healthcheckedContainers = collect();
+            foreach ($containers as $container) {
+                $this->execute_remote_command(
+                    [
+                        'command' => "docker inspect --format='{{if .State.Health}}true{{else}}false{{end}}' {$container['name']}",
+                        'hidden' => true,
+                        'save' => 'has_healthcheck',
+                        'append' => false,
+                        'ignore_errors' => true,
+                    ],
+                );
+
+                if (str($this->saved_outputs->get('has_healthcheck'))->trim()->replace("'", '')->value() === 'true') {
+                    $healthcheckedContainers->push($container);
+                }
+            }
+
+            if ($healthcheckedContainers->isEmpty()) {
+                $this->application_deployment_queue->addLogEntry('No healthchecks defined in compose services.');
+
+                return;
+            }
+
+            $serviceNames = $healthcheckedContainers->pluck('service')->implode(', ');
+            $this->application_deployment_queue->addLogEntry("Waiting for healthchecks to pass: {$serviceNames}");
+
+            $startPeriod = (int) $this->application->health_check_start_period;
+            if ($startPeriod > 0) {
+                $this->application_deployment_queue->addLogEntry("Waiting for start period ({$startPeriod} seconds) before checking healthchecks.");
+                $sleeptime = 0;
+                while ($sleeptime < $startPeriod) {
+                    Sleep::for(1)->seconds();
+                    $sleeptime++;
+                }
+            }
+
+            $maxRetries = max((int) $this->application->health_check_retries, 1);
+            $interval = max((int) $this->application->health_check_interval, 5);
+            $pending = $healthcheckedContainers->keyBy('name');
+            $unhealthyContainers = collect();
+            $counter = 1;
+
+            while ($counter <= $maxRetries && $pending->isNotEmpty()) {
+                foreach ($pending as $containerName => $container) {
+                    $this->execute_remote_command(
+                        [
+                            'command' => "docker inspect --format='{{json .State.Health.Status}}' {$containerName}",
+                            'hidden' => true,
+                            'save' => 'compose_hc_status',
+                            'append' => false,
+                            'ignore_errors' => true,
+                        ],
+                        [
+                            'command' => "docker inspect --format='{{json .State.Health.Log}}' {$containerName}",
+                            'hidden' => true,
+                            'save' => 'compose_hc_logs',
+                            'append' => false,
+                            'ignore_errors' => true,
+                        ],
+                    );
+
+                    $status = str($this->saved_outputs->get('compose_hc_status'))->trim()->replace('"', '')->value();
+                    $healthLogs = str($this->saved_outputs->get('compose_hc_logs'))->trim()->replaceMatches("/^'|'$/", '')->value();
+                    $lastLog = collect(json_decode($healthLogs, true))->last();
+                    $logOutput = trim(data_get($lastLog, 'Output', ''));
+                    $exitCode = data_get($lastLog, 'ExitCode');
+
+                    $statusLine = "Healthcheck Attempt {$counter}/{$maxRetries} | Service {$container['service']}: {$status}";
+                    if ($exitCode !== null) {
+                        $statusLine .= " (exit {$exitCode})";
+                    }
+                    if (! empty($logOutput)) {
+                        $statusLine .= " — {$logOutput}";
+                    }
+                    $logType = ($exitCode !== null && $exitCode !== 0) ? 'error' : 'info';
+                    $this->application_deployment_queue->addLogEntry($statusLine, type: $logType);
+
+                    if ($status === 'healthy') {
+                        $pending->forget($containerName);
+                    } elseif ($status === 'unhealthy') {
+                        $unhealthyContainers->push($container);
+                        $pending->forget($containerName);
+                    }
+                }
+
+                if ($pending->isNotEmpty()) {
+                    $counter++;
+                    $sleeptime = 0;
+                    while ($sleeptime < $interval) {
+                        Sleep::for(1)->seconds();
+                        $sleeptime++;
+                    }
+                }
+            }
+
+            foreach ($pending as $containerName => $container) {
+                $this->application_deployment_queue->addLogEntry("Service {$container['service']}: healthcheck did not resolve within retry limit.", type: 'warning');
+            }
+
+            if ($unhealthyContainers->isNotEmpty()) {
+                foreach ($unhealthyContainers as $container) {
+                    $this->application_deployment_queue->addLogEntry('----------------------------------------');
+                    $this->application_deployment_queue->addLogEntry("Container logs for {$container['service']}:");
+                    $this->execute_remote_command(
+                        [
+                            'command' => "docker logs -n 100 {$container['name']}",
+                            'type' => 'stderr',
+                            'ignore_errors' => true,
+                        ],
+                    );
+                }
+                $this->application_deployment_queue->addLogEntry('----------------------------------------');
+            }
+
+            if ($unhealthyContainers->isEmpty() && $pending->isEmpty()) {
+                $this->application_deployment_queue->addLogEntry('All compose services are healthy.');
+            }
+        } catch (Exception $e) {
+            $this->application_deployment_queue->addLogEntry("Healthcheck polling failed: {$e->getMessage()}", type: 'warning');
+        }
     }
 
     private function deploy_pull_request()
