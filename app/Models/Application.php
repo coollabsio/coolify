@@ -1434,9 +1434,14 @@ class Application extends BaseModel
             }
         }
 
-        $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} -b {$escapedBranch}";
+        // Pre-clone HTTP config to prevent failures on large repositories.
+        // HTTP/2 stream resets (curl 92) cause clones to abort mid-transfer;
+        // forcing HTTP/1.1 and a generous post buffer avoids the issue.
+        $gitHttpConfig = 'git -c http.postBuffer=524288000 -c http.version=HTTP/1.1';
+
+        $git_clone_command = "{$gitHttpConfig} clone{$depthFlag}{$submoduleFlags} -b {$escapedBranch}";
         if ($only_checkout) {
-            $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} --no-checkout -b {$escapedBranch}";
+            $git_clone_command = "{$gitHttpConfig} clone{$depthFlag}{$submoduleFlags} --no-checkout -b {$escapedBranch}";
         }
         if ($pull_request_id !== 0) {
             $pr_branch_name = "pr-{$pull_request_id}-coolify";
