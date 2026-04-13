@@ -1,0 +1,31 @@
+# documentation: https://hermes-agent.nousresearch.com/docs/
+# slogan: The self-improving AI agent with built-in learning loop, skills, and multi-platform messaging gateway.
+# category: ai
+# tags: ai,agent,llm,openai,anthropic,openrouter,telegram,discord,memory,self-improving
+# logo: svgs/hermes-agent.svg
+# port: 9119
+
+services:
+  hermes-agent:
+    image: nousresearch/hermes-agent:latest
+    command: dashboard --host 0.0.0.0 --port 9119 --no-open
+    environment:
+      - SERVICE_URL_HERMESAGENT_9119
+      # At least one LLM provider key is required (configure via Web UI after start)
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - HERMES_UID=${HERMES_UID:-10000}
+      - HERMES_GID=${HERMES_GID:-10000}
+    volumes:
+      - hermes-data:/opt/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9119"]
+      interval: 10s
+      timeout: 30s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  hermes-data: null
