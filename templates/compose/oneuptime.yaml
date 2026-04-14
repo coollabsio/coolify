@@ -1,0 +1,155 @@
+# documentation: https://oneuptime.com/docs
+# slogan: OneUptime is a complete open-source observability platform — monitoring, status pages, incident management, on-call, logs, traces, and more. Replaces Datadog, PagerDuty, and StatusPage.io.
+# category: monitoring
+# tags: monitoring, observability, status-page, incident-management, on-call, apm, logs, traces, uptime, open-source
+# logo: svgs/oneuptime.svg
+# port: 80
+# minversion: 4.0.0
+
+services:
+  oneuptime-app:
+    image: oneuptime/app:release
+    environment:
+      - SERVICE_URL_ONEUPTIME_80
+      - HOST=${SERVICE_FQDN_ONEUPTIME}
+      - HTTP_PROTOCOL=https
+      - ONEUPTIME_SECRET=$SERVICE_PASSWORD_ONEUPTIME
+      - REGISTER_PROBE_KEY=$SERVICE_PASSWORD_64_PROBEKEY
+      - ENCRYPTION_SECRET=$SERVICE_PASSWORD_64_ENCRYPTION
+      - NODE_ENV=production
+      - BILLING_ENABLED=false
+      - IS_ENTERPRISE_EDITION=false
+      - PROVISION_SSL=false
+      - APP_PORT=3002
+      - HOME_PORT=1444
+      - SERVER_APP_HOSTNAME=oneuptime-app
+      - SERVER_HOME_HOSTNAME=oneuptime-app
+      - DATABASE_HOST=oneuptime-postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USERNAME=$SERVICE_USER_POSTGRES
+      - DATABASE_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - DATABASE_NAME=oneuptimedb
+      - REDIS_HOST=oneuptime-redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=$SERVICE_PASSWORD_REDIS
+      - REDIS_DB=0
+      - REDIS_USERNAME=default
+      - CLICKHOUSE_HOST=oneuptime-clickhouse
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=$SERVICE_PASSWORD_CLICKHOUSE
+      - CLICKHOUSE_DATABASE=oneuptime
+      - LOG_LEVEL=ERROR
+      - DISABLE_AUTOMATIC_INCIDENT_CREATION=false
+      - DISABLE_AUTOMATIC_ALERT_CREATION=false
+      - ALLOWED_ACTIVE_MONITOR_COUNT_IN_FREE_PLAN=100
+      - WORKFLOW_SCRIPT_TIMEOUT_IN_MS=5000
+      - WORKFLOW_TIMEOUT_IN_MS=5000
+      - TELEMETRY_CONCURRENCY=100
+      - WORKER_CONCURRENCY=100
+    volumes:
+      - oneuptime-app-data:/app/data
+    depends_on:
+      oneuptime-postgres:
+        condition: service_healthy
+      oneuptime-redis:
+        condition: service_healthy
+      oneuptime-clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3002/api/status || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  oneuptime-probe:
+    image: oneuptime/probe:release
+    environment:
+      - ONEUPTIME_URL=http://oneuptime-ingress
+      - REGISTER_PROBE_KEY=$SERVICE_PASSWORD_64_PROBEKEY
+      - PROBE_NAME=Probe-1
+      - PROBE_DESCRIPTION=Default monitoring probe
+      - PROBE_MONITORING_WORKERS=5
+      - PROBE_MONITOR_FETCH_LIMIT=10
+      - PROBE_KEY=$SERVICE_PASSWORD_64_PROBE1
+      - PROBE_SYNTHETIC_MONITOR_SCRIPT_TIMEOUT_IN_MS=60000
+      - PROBE_CUSTOM_CODE_MONITOR_SCRIPT_TIMEOUT_IN_MS=60000
+      - PORT=3874
+      - NODE_ENV=production
+      - LOG_LEVEL=ERROR
+    depends_on:
+      oneuptime-app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3874/status || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  oneuptime-ingress:
+    image: oneuptime/nginx:release
+    environment:
+      - SERVICE_URL_ONEUPTIME_80
+      - HOST=${SERVICE_FQDN_ONEUPTIME}
+      - HTTP_PROTOCOL=https
+      - ONEUPTIME_SECRET=$SERVICE_PASSWORD_ONEUPTIME
+      - ONEUPTIME_HTTP_PORT=80
+      - APP_PORT=3002
+      - HOME_PORT=1444
+      - SERVER_APP_HOSTNAME=oneuptime-app
+      - NODE_ENV=production
+      - PROVISION_SSL=false
+    depends_on:
+      oneuptime-app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  oneuptime-postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=oneuptimedb
+    volumes:
+      - oneuptime-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d oneuptimedb"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  oneuptime-redis:
+    image: redis:7.0.12
+    command: redis-server --requirepass "$SERVICE_PASSWORD_REDIS" --save "" --appendonly no
+    environment:
+      - REDIS_PASSWORD=$SERVICE_PASSWORD_REDIS
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "$SERVICE_PASSWORD_REDIS", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  oneuptime-clickhouse:
+    image: clickhouse/clickhouse-server:25.7
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=$SERVICE_PASSWORD_CLICKHOUSE
+      - CLICKHOUSE_DB=oneuptime
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - oneuptime-clickhouse-data:/var/lib/clickhouse/
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
