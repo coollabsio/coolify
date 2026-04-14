@@ -1,0 +1,29 @@
+# documentation: https://sockudo.io/docs
+# slogan: Simple, fast, and secure WebSocket server for real-time applications built in Rust.
+# category: messaging
+# tags: websockets,realtime,rust,pusher,open-source
+# logo: svgs/sockudo.svg
+# port: 6001
+
+services:
+  sockudo:
+    image: "ghcr.io/sockudo/sockudo:latest"
+    environment:
+      - SERVICE_FQDN_SOCKUDO_6001
+      - HOST=0.0.0.0
+      - PORT=6001
+      - ADAPTER_DRIVER=${ADAPTER_DRIVER:-memory}
+      - CACHE_DRIVER=${CACHE_DRIVER:-memory}
+      - QUEUE_DRIVER=${QUEUE_DRIVER:-memory}
+      - APP_MANAGER_DRIVER=${APP_MANAGER_DRIVER:-memory}
+      - SOCKUDO_DEFAULT_APP_ID=${SERVICE_USER_SOCKUDO}
+      - SOCKUDO_DEFAULT_APP_KEY=${SERVICE_REALBASE64_64_SOCKUDOKEY}
+      - SOCKUDO_DEFAULT_APP_SECRET=${SERVICE_REALBASE64_64_SOCKUDOSECRET}
+      - SOCKUDO_DEFAULT_APP_ENABLED=${SOCKUDO_DEFAULT_APP_ENABLED:-true}
+      - SOCKUDO_ENABLE_CLIENT_MESSAGES=${SOCKUDO_ENABLE_CLIENT_MESSAGES:-true}
+      - DEBUG=${DEBUG:-false}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6001' || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 3
