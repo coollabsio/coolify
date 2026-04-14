@@ -1,6 +1,6 @@
 # documentation: https://redis.io/docs/latest/operate/redisinsight/
 # slogan: Redis Insight lets you do both GUI- and CLI-based interactions in a fully-featured desktop GUI client.
-# category: database,observability,developer-tools
+# category: devtools
 # tags: redis,gui,database,monitoring,analytics
 # logo: svgs/redisinsight.png
 # port: 5540
@@ -28,4 +28,3 @@ services:
       retries: 3
       timeout: 10s
       start_period: 10s
-

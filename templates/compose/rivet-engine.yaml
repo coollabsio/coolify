@@ -1,6 +1,6 @@
 # documentation: https://www.rivet.dev/docs
 # slogan: Build and scale stateful workloads with long-lived processes
-# category: development
+# category: devtools
 # tags: stateful, actors, realtime, backend, serverless, postgresql
 # logo: svgs/rivet.svg
 # port: 6420
