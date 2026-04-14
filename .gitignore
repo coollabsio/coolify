@@ -40,3 +40,7 @@ CHANGELOG.md
 /.workspaces
 tests/Browser/Screenshots
 tests/v4/Browser/Screenshots
+
+# bounty-hunter pipeline artifacts
+.cheetahclaws/
+BOUNTY_*.md
