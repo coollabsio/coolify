@@ -1,103 +1,91 @@
 <?php
 
-it('has health_check_compose method in ApplicationDeploymentJob', function () {
-    $deploymentJobFile = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
+beforeEach(function () {
+    $this->deploymentJobFile = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
 
-    expect($deploymentJobFile)
+    $methodStart = strpos($this->deploymentJobFile, 'private function health_check_compose(): void');
+    $this->methodBody = substr($this->deploymentJobFile, $methodStart, 12000);
+});
+
+it('has health_check_compose method in ApplicationDeploymentJob', function () {
+    expect($this->deploymentJobFile)
         ->toContain('private function health_check_compose(): void');
 });
 
 it('calls health_check_compose from deploy_docker_compose_buildpack', function () {
-    $deploymentJobFile = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-
-    expect($deploymentJobFile)
+    expect($this->deploymentJobFile)
         ->toContain('$this->health_check_compose();')
         ->toContain("addLogEntry('New containers started.')");
 });
 
 it('skips healthcheck polling for swarm mode', function () {
-    $deploymentJobFile = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-
-    $methodStart = strpos($deploymentJobFile, 'private function health_check_compose(): void');
-    $methodBody = substr($deploymentJobFile, $methodStart, 3000);
-
-    expect($methodBody)
+    expect($this->methodBody)
         ->toContain('$this->server->isSwarm()')
         ->toContain('return;');
 });
 
 it('uses docker ps to enumerate compose containers', function () {
-    $deploymentJobFile = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-
-    $methodStart = strpos($deploymentJobFile, 'private function health_check_compose(): void');
-    $methodBody = substr($deploymentJobFile, $methodStart, 5000);
-
-    expect($methodBody)
+    expect($this->methodBody)
         ->toContain("docker ps -a --filter 'label=com.docker.compose.project=")
         ->toContain('com.docker.compose.service');
 });
 
 it('checks each container for healthcheck configuration before polling', function () {
-    $deploymentJobFile = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-
-    $methodStart = strpos($deploymentJobFile, 'private function health_check_compose(): void');
-    $methodBody = substr($deploymentJobFile, $methodStart, 5000);
-
-    expect($methodBody)
+    expect($this->methodBody)
         ->toContain('docker inspect')
         ->toContain('.State.Health')
         ->toContain('has_healthcheck');
 });
 
 it('logs when no healthchecks are defined in compose services', function () {
-    $deploymentJobFile = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-
-    $methodStart = strpos($deploymentJobFile, 'private function health_check_compose(): void');
-    $methodBody = substr($deploymentJobFile, $methodStart, 5000);
-
-    expect($methodBody)
+    expect($this->methodBody)
         ->toContain('No healthchecks defined in compose services.');
 });
 
 it('inspects health status and logs for each container during polling', function () {
-    $deploymentJobFile = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-
-    $methodStart = strpos($deploymentJobFile, 'private function health_check_compose(): void');
-    $methodBody = substr($deploymentJobFile, $methodStart, 5000);
-
-    expect($methodBody)
+    expect($this->methodBody)
         ->toContain("docker inspect --format='{{json .State.Health.Status}}'")
         ->toContain("docker inspect --format='{{json .State.Health.Log}}'");
 });
 
 it('logs container output for unhealthy services', function () {
-    $deploymentJobFile = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-
-    $methodStart = strpos($deploymentJobFile, 'private function health_check_compose(): void');
-    $methodBody = substr($deploymentJobFile, $methodStart, 8000);
-
-    expect($methodBody)
+    expect($this->methodBody)
         ->toContain('unhealthyContainers')
         ->toContain('docker logs -n 100');
 });
 
 it('logs success when all compose services are healthy', function () {
-    $deploymentJobFile = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-
-    $methodStart = strpos($deploymentJobFile, 'private function health_check_compose(): void');
-    $methodBody = substr($deploymentJobFile, $methodStart, 8000);
-
-    expect($methodBody)
+    expect($this->methodBody)
         ->toContain('All compose services are healthy.');
 });
 
 it('wraps health_check_compose in try-catch to avoid blocking deployment', function () {
-    $deploymentJobFile = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-
-    $methodStart = strpos($deploymentJobFile, 'private function health_check_compose(): void');
-    $methodBody = substr($deploymentJobFile, $methodStart, 8000);
-
-    expect($methodBody)
+    expect($this->methodBody)
         ->toContain('catch (Exception $e)')
         ->toContain('Healthcheck polling failed:');
+});
+
+it('uses --remove-orphans flag on all docker compose up commands', function () {
+    $composeMethodStart = strpos($this->deploymentJobFile, 'private function deploy_docker_compose_buildpack()');
+    $composeMethodBody = substr($this->deploymentJobFile, $composeMethodStart, 16000);
+
+    $upDOccurrences = preg_match_all('/up -d/', $composeMethodBody, $matches, PREG_OFFSET_CAPTURE);
+    $removeOrphansOccurrences = preg_match_all('/up -d --remove-orphans/', $composeMethodBody, $matches2);
+
+    expect($upDOccurrences)->toBeGreaterThan(0);
+    expect($removeOrphansOccurrences)->toBe($upDOccurrences);
+});
+
+it('derives healthcheck timings from container Docker config instead of Application model', function () {
+    expect($this->methodBody)
+        ->toContain("docker inspect --format='{{json .Config.Healthcheck}}'")
+        ->toContain('StartPeriod')
+        ->toContain('Interval')
+        ->toContain('Retries')
+        ->toContain('1_000_000_000');
+
+    expect($this->methodBody)
+        ->not->toContain('$this->application->health_check_start_period')
+        ->not->toContain('$this->application->health_check_retries')
+        ->not->toContain('$this->application->health_check_interval');
 });
