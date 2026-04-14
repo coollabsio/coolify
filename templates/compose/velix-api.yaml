@@ -1,0 +1,59 @@
+# documentation: https://github.com/paulolinder/velix-api
+# slogan: Self-hosted WhatsApp API with multi-instance support, webhooks, n8n node, and Chatwoot integration.
+# category: communication
+# tags: whatsapp, api, messaging, chatbot, automation, n8n, chatwoot
+# logo: svgs/velix-api.svg
+# port: 8080
+
+services:
+  velix-api:
+    image: ghcr.io/paulolinder/velix-api:0.1.0
+    environment:
+      - SERVICE_FQDN_VELIXAPI_8080
+      - DATABASE_URL=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/velix?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${SERVICE_BASE64_64_JWTSECRET}
+      - HTTP_PORT=8080
+      - APP_ENV=production
+      - LOG_LEVEL=info
+      - MEDIA_STORAGE_PATH=/data/media
+      - ENGINE_STORE_PATH=/data/instances
+      - ENGINE_AUTO_RECONNECT=true
+      - ENGINE_MAX_INSTANCES=200
+      - REGISTRATION_ENABLED=true
+    volumes:
+      - velix-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=velix
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

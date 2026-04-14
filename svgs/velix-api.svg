@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <!-- Background: rounded square with gradient -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#15803d"/>
+    </linearGradient>
+    <linearGradient id="bubble" x1="20" y1="20" x2="108" y2="108" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.25)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0.08)"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Base rounded rect -->
+  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+
+  <!-- Chat bubble shape (subtle background element) -->
+  <path d="M30 36 C30 28, 36 22, 44 22 L84 22 C92 22, 98 28, 98 36 L98 72 C98 80, 92 86, 84 86 L52 86 L38 98 L38 86 L44 86 C36 86, 30 80, 30 72 Z"
+        fill="url(#bubble)"/>
+
+  <!-- Stylized V mark — bold, modern -->
+  <path d="M42 38 L58 82 C59 84.5, 61 86, 64 86 C67 86, 69 84.5, 70 82 L86 38"
+        stroke="white" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- Small checkmark accent at the bottom of V — indicates "delivered/verified" -->
+  <path d="M56 92 L62 98 L76 84"
+        stroke="rgba(255,255,255,0.6)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
