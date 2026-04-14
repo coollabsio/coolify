@@ -30,6 +30,11 @@ it('uses docker ps to enumerate compose containers', function () {
         ->toContain('com.docker.compose.service');
 });
 
+it('validates container names from docker ps output before using them', function () {
+    expect($this->methodBody)
+        ->toContain('ValidationPatterns::isValidContainerName');
+});
+
 it('checks each container for healthcheck configuration before polling', function () {
     expect($this->methodBody)
         ->toContain('docker inspect')

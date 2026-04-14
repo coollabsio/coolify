@@ -1985,7 +1985,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         'name' => trim($parts[0]),
                         'service' => trim($parts[1] ?? $parts[0]),
                     ];
-                });
+                })
+                ->filter(fn (array $container) => ValidationPatterns::isValidContainerName($container['name']));
 
             if ($containers->isEmpty()) {
                 $this->application_deployment_queue->addLogEntry('No compose containers found for healthcheck polling.');
