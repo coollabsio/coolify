@@ -21,14 +21,12 @@ class OauthController extends Controller
             $oauthUser = get_socialite_provider($provider)->user();
             $user = User::whereEmail($oauthUser->email)->first();
             if (! $user) {
-                $settings = instanceSettings();
-                if (! $settings->is_registration_enabled) {
-                    abort(403, 'Registration is disabled');
-                }
-
+                // Allow OAuth users to self-register even when general registration is disabled.
+                // If an admin has configured OAuth providers, they expect those users to be able to log in.
                 $user = User::create([
                     'name' => $oauthUser->name,
                     'email' => $oauthUser->email,
+                    'oauth_provider' => $provider,
                 ]);
             }
             Auth::login($user);
