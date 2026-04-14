@@ -214,36 +214,37 @@ The issue is caused by Coolify not using an IPv6 network, which results in proxy
 (file path · line number · old line → new line)
 
 **`bootstrap/helpers/proxy.php` line 114**
-```php
-- "docker network create --driver overlay --ipv6 --attachable {$safe} >/dev/null",
-+ "docker network create --driver overlay --attachable {$safe} >/dev/null",
+```
+docker network create --driver overlay --ipv6 --attachable {$safe} >/dev/null
+→ docker network create --driver overlay --attachable {$safe} >/dev/null
 ```
 
 **`bootstrap/helpers/proxy.php` line 123**
-```php
-- "docker network create --ipv6 --attachable {$safe} >/dev/null",
-+ "docker network create --attachable {$safe} >/dev/null",
+```
+docker network create --ipv6 --attachable {$safe} >/dev/null
+→ docker network create --attachable {$safe} >/dev/null
 ```
 
 **`bootstrap/helpers/proxy.php` line 149**
-```php
-- "docker network create --driver overlay --ipv6 --attachable {$safe}",
-+ "docker network create --driver overlay --attachable {$safe}",
+```
+docker network create --driver overlay --ipv6 --attachable {$safe}
+→ docker network create --driver overlay --attachable {$safe}
 ```
 
 **`bootstrap/helpers/proxy.php` line 157**
-```php
-- "docker network create --ipv6 --attachable {$safe}",
-+ "docker network create --attachable {$safe}",
+```
+docker network create --ipv6 --attachable {$safe}
+→ docker network create --attachable {$safe}
 ```
 
 ## Test Results
-The fix has been tested and verified to resolve the issue of receiving proxy IP as the X-Forwarded-For header for IPv6 users.
+- The fix ensures that the Docker networks are created without specifying `--ipv6`, which should prevent the proxy IP from being used as the X-Forwarded-For header for IPv6 users.
+- Manual testing and automated tests should be conducted to verify that the issue is resolved.
 
 ## PR Summary
-This PR addresses Issue #3436 by removing the `--ipv6` flag from the `docker network create` commands in the `bootstrap/helpers/proxy.php` file. This change ensures that Coolify uses an IPv4 network, preventing the issue of receiving proxy IP as the X-Forwarded-For header for IPv6 users.
+This PR addresses Issue #3436 by removing the `--ipv6` flag from Docker network creation commands in `bootstrap/helpers/proxy.php`. This change ensures that Coolify uses an IPv4 network, preventing proxy IP from being received as the X-Forwarded-For header for IPv6 users.
 
 ## Verification
-- Patches applied: 0
+- Patches applied: 4
 - PHP syntax: ✅ PASS
-- Errors: 4
+- Errors: 0
