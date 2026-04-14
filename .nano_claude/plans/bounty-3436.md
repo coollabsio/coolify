@@ -1,0 +1,2 @@
+# Plan: Fix the issue where proxy IP is received as X-Forwarded-For header for IPv6 users. The issue is caused by Coolify not using an IPv6 network, causing Traefik/Caddy to forward the proxy's IPv6 address as the client IP when the user is on IPv6. The goal is to ensure the proxy network supports IPv6 or that the configuration is adjusted to handle this correctly. Based on the issue description, the fix involves ensuring the Docker network used by the proxy includes IPv6 support or configuring the proxy to correctly handle the forwarded headers.
+

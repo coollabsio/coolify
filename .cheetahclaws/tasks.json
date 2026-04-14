@@ -1,0 +1,17 @@
+{
+  "tasks": [
+    {
+      "id": "1",
+      "subject": "Fix X-Forwarded-For header containing proxy IP for IPv6 users",
+      "description": "Fix the issue where proxy IP is received as X-Forwarded-For header for IPv6 users due to Coolify not using an IPv6 network.",
+      "status": "pending",
+      "active_form": "",
+      "owner": "",
+      "blocks": [],
+      "blocked_by": [],
+      "metadata": {},
+      "created_at": "2026-04-14T16:13:48.468327",
+      "updated_at": "2026-04-14T16:13:48.469320"
+    }
+  ]
+}
