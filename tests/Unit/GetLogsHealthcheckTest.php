@@ -118,3 +118,34 @@ it('copyLogs returns healthcheck outputs when in healthcheck mode', function () 
         ->toContain('$this->showHealthcheckLogs')
         ->toContain('$this->healthcheckOutputs');
 });
+
+it('wraps getHealthcheckLogs in try-catch to handle polling errors gracefully', function () {
+    expect($this->getLogsFile)
+        ->toContain('catch (\\Throwable $e)')
+        ->toContain('Failed to retrieve healthcheck data:');
+});
+
+it('sets informative message when server is not functional', function () {
+    expect($this->methodBody)
+        ->toContain('Server is not reachable.');
+});
+
+it('sets informative message when no container is selected', function () {
+    expect($this->methodBody)
+        ->toContain('No container selected.');
+});
+
+it('logs failed DateTime parsing instead of swallowing the exception', function () {
+    expect($this->methodBody)
+        ->toContain('Log::debug')
+        ->toContain('Failed to parse healthcheck timestamp');
+});
+
+it('downloadAllLogs returns healthcheck outputs when in healthcheck mode', function () {
+    $downloadMethodStart = strpos($this->getLogsFile, 'public function downloadAllLogs(): string');
+    $downloadMethodBody = substr($this->getLogsFile, $downloadMethodStart, 500);
+
+    expect($downloadMethodBody)
+        ->toContain('$this->showHealthcheckLogs')
+        ->toContain('$this->healthcheckOutputs');
+});

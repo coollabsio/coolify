@@ -1965,11 +1965,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     'hidden' => true,
                     'save' => 'compose_containers',
                     'append' => false,
+                    'ignore_errors' => true,
                 ],
             );
 
             $containerOutput = $this->saved_outputs->get('compose_containers');
             if (empty($containerOutput)) {
+                $this->application_deployment_queue->addLogEntry('No compose containers found for healthcheck polling.');
+
                 return;
             }
 
@@ -1985,6 +1988,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 });
 
             if ($containers->isEmpty()) {
+                $this->application_deployment_queue->addLogEntry('No compose containers found for healthcheck polling.');
+
                 return;
             }
 
@@ -2040,18 +2045,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
 
+            // Cap values to prevent unbounded deployment blocking
+            $maxStartPeriod = min($maxStartPeriod, 300);
+            $interval = min(max($maxInterval, 5), 60);
+            $maxRetries = min(max($maxRetries + 2, 3), 30);
+
             if ($maxStartPeriod > 0) {
                 $this->application_deployment_queue->addLogEntry("Waiting for start period ({$maxStartPeriod} seconds) before checking healthchecks.");
                 $sleeptime = 0;
                 while ($sleeptime < $maxStartPeriod) {
+                    $this->checkForCancellation();
                     Sleep::for(1)->seconds();
                     $sleeptime++;
                 }
             }
-
-            $interval = max($maxInterval, 5);
-            // Allow extra retries beyond Docker's own limit so we can observe the final state
-            $maxRetries = max($maxRetries + 2, 3);
             $pending = $healthcheckedContainers->keyBy('name');
             $unhealthyContainers = collect();
             $counter = 1;
@@ -2076,6 +2083,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     );
 
                     $status = str($this->saved_outputs->get('compose_hc_status'))->trim()->replace('"', '')->value();
+
+                    if (empty($status)) {
+                        $this->application_deployment_queue->addLogEntry("Could not retrieve healthcheck status for {$container['service']}. Container may have stopped.", type: 'warning');
+                        $pending->forget($containerName);
+
+                        continue;
+                    }
+
                     $healthLogs = str($this->saved_outputs->get('compose_hc_logs'))->trim()->replaceMatches("/^'|'$/", '')->value();
                     $lastLog = collect(json_decode($healthLogs, true))->last();
                     $logOutput = trim(data_get($lastLog, 'Output', ''));
@@ -2103,6 +2118,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $counter++;
                     $sleeptime = 0;
                     while ($sleeptime < $interval) {
+                        $this->checkForCancellation();
                         Sleep::for(1)->seconds();
                         $sleeptime++;
                     }

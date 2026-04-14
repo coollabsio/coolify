@@ -89,3 +89,35 @@ it('derives healthcheck timings from container Docker config instead of Applicat
         ->not->toContain('$this->application->health_check_retries')
         ->not->toContain('$this->application->health_check_interval');
 });
+
+it('caps healthcheck wait times to prevent unbounded deployment blocking', function () {
+    expect($this->methodBody)
+        ->toContain('min($maxStartPeriod, 300)')
+        ->toContain('min(max($maxInterval, 5), 60)')
+        ->toContain('min(max($maxRetries + 2, 3), 30)');
+});
+
+it('checks for deployment cancellation during healthcheck sleep loops', function () {
+    expect($this->methodBody)
+        ->toContain('$this->checkForCancellation()');
+});
+
+it('uses ignore_errors on docker ps command for container enumeration', function () {
+    // The docker ps command block should include ignore_errors
+    $dockerPsStart = strpos($this->methodBody, 'docker ps -a');
+    $dockerPsBlock = substr($this->methodBody, $dockerPsStart, 400);
+
+    expect($dockerPsBlock)
+        ->toContain("'ignore_errors' => true");
+});
+
+it('logs a message when no containers are found for healthcheck polling', function () {
+    expect($this->methodBody)
+        ->toContain('No compose containers found for healthcheck polling.');
+});
+
+it('handles empty docker inspect status by skipping the container', function () {
+    expect($this->methodBody)
+        ->toContain('Could not retrieve healthcheck status for')
+        ->toContain('Container may have stopped.');
+});
