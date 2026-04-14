@@ -816,7 +816,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $command = "{$this->coolify_variables} docker compose";
                 // Always use .env file
                 $command .= " --env-file {$server_workdir}/.env";
-                $command .= " --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d";
+                $command .= " --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d --remove-orphans";
                 $this->execute_remote_command(
                     ['command' => $command, 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
                 );
@@ -847,7 +847,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if ($this->preserveRepository) {
                     // Always use .env file
                     $command .= " --env-file {$server_workdir}/.env";
-                    $command .= " --project-name {$this->application->uuid} --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d";
+                    $command .= " --project-name {$this->application->uuid} --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d --remove-orphans";
                     $this->write_deployment_configurations();
 
                     $this->execute_remote_command(
@@ -856,7 +856,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 } else {
                     // Always use .env file
                     $command .= " --env-file {$this->workdir}/.env";
-                    $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d";
+                    $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d --remove-orphans";
                     $this->execute_remote_command(
                         [executeInDocker($this->deployment_uuid, $command), 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
                     );
@@ -1988,8 +1988,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
-            $healthcheckedContainers = collect();
-            foreach ($containers as $container) {
+            $healthcheckedContainers = $containers->filter(function (array $container): bool {
                 $this->execute_remote_command(
                     [
                         'command' => "docker inspect --format='{{if .State.Health}}true{{else}}false{{end}}' {$container['name']}",
@@ -2000,10 +1999,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     ],
                 );
 
-                if (str($this->saved_outputs->get('has_healthcheck'))->trim()->replace("'", '')->value() === 'true') {
-                    $healthcheckedContainers->push($container);
-                }
-            }
+                return str($this->saved_outputs->get('has_healthcheck'))->trim()->replace("'", '')->value() === 'true';
+            })->values();
 
             if ($healthcheckedContainers->isEmpty()) {
                 $this->application_deployment_queue->addLogEntry('No healthchecks defined in compose services.');
@@ -2014,18 +2011,47 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $serviceNames = $healthcheckedContainers->pluck('service')->implode(', ');
             $this->application_deployment_queue->addLogEntry("Waiting for healthchecks to pass: {$serviceNames}");
 
-            $startPeriod = (int) $this->application->health_check_start_period;
-            if ($startPeriod > 0) {
-                $this->application_deployment_queue->addLogEntry("Waiting for start period ({$startPeriod} seconds) before checking healthchecks.");
+            // Derive timing from the containers' actual Docker healthcheck config
+            // rather than using Application model defaults which come from Dockerfile parsing
+            $maxStartPeriod = 0;
+            $maxInterval = 5;
+            $maxRetries = 1;
+            foreach ($healthcheckedContainers as $container) {
+                $this->execute_remote_command(
+                    [
+                        'command' => "docker inspect --format='{{json .Config.Healthcheck}}' {$container['name']}",
+                        'hidden' => true,
+                        'save' => 'hc_config',
+                        'append' => false,
+                        'ignore_errors' => true,
+                    ],
+                );
+                $rawConfig = str($this->saved_outputs->get('hc_config'))->trim()->replace("'", '')->value();
+                $hcConfig = json_decode($rawConfig, true);
+                if (is_array($hcConfig)) {
+                    // Docker stores durations in nanoseconds
+                    $startPeriodNs = data_get($hcConfig, 'StartPeriod', 0);
+                    $intervalNs = data_get($hcConfig, 'Interval', 0);
+                    $retriesVal = data_get($hcConfig, 'Retries', 0);
+
+                    $maxStartPeriod = max($maxStartPeriod, (int) ($startPeriodNs / 1_000_000_000));
+                    $maxInterval = max($maxInterval, (int) ($intervalNs / 1_000_000_000));
+                    $maxRetries = max($maxRetries, (int) $retriesVal);
+                }
+            }
+
+            if ($maxStartPeriod > 0) {
+                $this->application_deployment_queue->addLogEntry("Waiting for start period ({$maxStartPeriod} seconds) before checking healthchecks.");
                 $sleeptime = 0;
-                while ($sleeptime < $startPeriod) {
+                while ($sleeptime < $maxStartPeriod) {
                     Sleep::for(1)->seconds();
                     $sleeptime++;
                 }
             }
 
-            $maxRetries = max((int) $this->application->health_check_retries, 1);
-            $interval = max((int) $this->application->health_check_interval, 5);
+            $interval = max($maxInterval, 5);
+            // Allow extra retries beyond Docker's own limit so we can observe the final state
+            $maxRetries = max($maxRetries + 2, 3);
             $pending = $healthcheckedContainers->keyBy('name');
             $unhealthyContainers = collect();
             $counter = 1;

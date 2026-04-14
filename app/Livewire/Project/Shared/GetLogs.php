@@ -211,6 +211,10 @@ class GetLogs extends Component
 
     public function copyLogs(): string
     {
+        if ($this->showHealthcheckLogs) {
+            return sanitizeLogsForExport($this->healthcheckOutputs);
+        }
+
         return sanitizeLogsForExport($this->outputs);
     }
 
@@ -311,12 +315,12 @@ class GetLogs extends Component
         if (! $this->server->isFunctional()) {
             return;
         }
-        if ($this->container && ! ValidationPatterns::isValidContainerName($this->container)) {
-            $this->healthcheckOutputs = 'Invalid container name.';
-
+        if (! $this->container) {
             return;
         }
-        if (! $this->container) {
+        if (! ValidationPatterns::isValidContainerName($this->container)) {
+            $this->healthcheckOutputs = 'Invalid container name.';
+
             return;
         }
 
@@ -332,16 +336,7 @@ class GetLogs extends Component
             $rawOutput .= $output;
         });
 
-        $rawOutput = trim($rawOutput);
-
-        if (empty($rawOutput) || $rawOutput === 'null' || $rawOutput === '<nil>' || $rawOutput === "'null'") {
-            $this->healthcheckOutputs = 'No healthcheck configured for this container.';
-            $this->healthcheckStatus = null;
-
-            return;
-        }
-
-        $rawOutput = trim($rawOutput, "'");
+        $rawOutput = trim(trim($rawOutput), "'");
 
         $health = json_decode($rawOutput, true);
         if (! is_array($health)) {
@@ -355,9 +350,10 @@ class GetLogs extends Component
         $failingStreak = data_get($health, 'FailingStreak', 0);
         $logs = data_get($health, 'Log', []);
 
-        $lines = [];
-        $lines[] = "Status: {$this->healthcheckStatus} | Failing streak: {$failingStreak}";
-        $lines[] = '----------------------------------------';
+        $lines = [
+            "Status: {$this->healthcheckStatus} | Failing streak: {$failingStreak}",
+            '----------------------------------------',
+        ];
 
         if (empty($logs)) {
             $lines[] = 'No healthcheck log entries yet.';
