@@ -1,0 +1,25 @@
+# documentation: https://github.com/stackryze/atom-homepage
+# slogan: A modern, self-hosted dashboard for monitoring services, Docker containers, and system resources
+# category: productivity
+# tags: dashboard,monitoring,docker,self-hosted,homepage,status,widgets
+# logo: svgs/atom.svg
+# port: 3000
+
+services:
+  atom:
+    image: sudheerbhuvana25/atom-homepage:latest
+    environment:
+      - SERVICE_FQDN_ATOM_3000
+      - NODE_ENV=production
+      - PORT=3000
+      - DATA_DIR=/app/data
+      - COOKIE_SECURE=${COOKIE_SECURE:-true}
+    volumes:
+      - atom-data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 15s
+      retries: 3
