@@ -121,6 +121,19 @@ it('logs a message when no containers are found for healthcheck polling', functi
         ->toContain('No compose containers found for healthcheck polling.');
 });
 
+it('rethrows DeploymentException from catch block so cancellation is not swallowed', function () {
+    // The catch block must rethrow DeploymentException before the generic Exception catch
+    $catchBlockStart = strpos($this->methodBody, 'catch (DeploymentException');
+    $genericCatchStart = strpos($this->methodBody, 'catch (Exception $e)');
+
+    expect($catchBlockStart)->not->toBeFalse('DeploymentException catch block must exist');
+    expect($catchBlockStart)->toBeLessThan($genericCatchStart, 'DeploymentException catch must come before generic Exception catch');
+
+    // Extract the DeploymentException catch body and verify it rethrows
+    $deploymentCatchBody = substr($this->methodBody, $catchBlockStart, $genericCatchStart - $catchBlockStart);
+    expect($deploymentCatchBody)->toContain('throw $e');
+});
+
 it('handles empty docker inspect status by skipping the container', function () {
     expect($this->methodBody)
         ->toContain('Could not retrieve healthcheck status for')

@@ -2148,6 +2148,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($unhealthyContainers->isEmpty() && $pending->isEmpty()) {
                 $this->application_deployment_queue->addLogEntry('All compose services are healthy.');
             }
+        } catch (DeploymentException $e) {
+            throw $e;
         } catch (Exception $e) {
             $this->application_deployment_queue->addLogEntry("Healthcheck polling failed: {$e->getMessage()}", type: 'warning');
         }
