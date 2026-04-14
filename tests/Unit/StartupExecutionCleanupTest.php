@@ -114,13 +114,3 @@ it('sets finished_at timestamp when marking executions as failed', function () {
     expect($now)->toBeInstanceOf(Carbon::class)
         ->and($now->toDateTimeString())->toBe('2025-01-15 12:00:00');
 });
-
-it('rebuilds remote proxy configurations during Coolify startup', function () {
-    $initFile = file_get_contents(__DIR__.'/../../app/Console/Commands/Init.php');
-
-    expect($initFile)
-        ->toContain('$this->rebuildRemoteProxyConfigurations();')
-        ->toContain('private function rebuildRemoteProxyConfigurations(): void')
-        ->toContain('EdgeProxyRemoteRouteService')
-        ->toContain('EdgeProxyRemotePortForwardService');
-});

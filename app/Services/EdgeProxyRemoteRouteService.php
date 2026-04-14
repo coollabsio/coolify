@@ -57,14 +57,14 @@ class EdgeProxyRemoteRouteService
         }
 
         if ($deploymentServer->id === $edgeProxyServer->id) {
-            $this->deleteRouteFile($edgeProxyServer, $service->uuid, self::SERVICE_ROUTE_FILE_PREFIX, true, $deploymentServer);
+            $this->deleteRouteFile($edgeProxyServer, $service->uuid);
 
             return [];
         }
 
         $applications = $this->getServiceApplicationsWithDomains($service);
         if ($applications->isEmpty()) {
-            $this->deleteRouteFile($edgeProxyServer, $service->uuid, self::SERVICE_ROUTE_FILE_PREFIX, true, $deploymentServer);
+            $this->deleteRouteFile($edgeProxyServer, $service->uuid);
 
             return [];
         }
@@ -77,7 +77,7 @@ class EdgeProxyRemoteRouteService
             );
 
             $this->logWarning($warning);
-            $this->deleteRouteFile($edgeProxyServer, $service->uuid, self::SERVICE_ROUTE_FILE_PREFIX, true, $deploymentServer);
+            $this->deleteRouteFile($edgeProxyServer, $service->uuid);
 
             return [$warning];
         }
@@ -187,14 +187,14 @@ class EdgeProxyRemoteRouteService
         }
 
         if (empty($routes)) {
-            $this->deleteRouteFile($edgeProxyServer, $service->uuid, self::SERVICE_ROUTE_FILE_PREFIX, true, $deploymentServer);
+            $this->deleteRouteFile($edgeProxyServer, $service->uuid);
 
             return $warnings;
         }
 
         $config = $this->generateTraefikConfig($service->uuid, $routes);
         try {
-            $this->writeRouteFile($edgeProxyServer, $service->uuid, $config, self::SERVICE_ROUTE_FILE_PREFIX, $deploymentServer);
+            $this->writeRouteFile($edgeProxyServer, $service->uuid, $config);
         } catch (\Throwable $exception) {
             $warning = sprintf(
                 'Edge proxy route partially applied for service %s: failed to write dynamic route configuration on edge proxy (%s).',
@@ -265,14 +265,14 @@ class EdgeProxyRemoteRouteService
         }
 
         if ($deploymentServer->id === $edgeProxyServer->id) {
-            $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX, true, $deploymentServer);
+            $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX);
 
             return [];
         }
 
         $domains = $this->getApplicationDomains($application);
         if ($domains->isEmpty()) {
-            $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX, true, $deploymentServer);
+            $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX);
 
             return [];
         }
@@ -285,7 +285,7 @@ class EdgeProxyRemoteRouteService
             );
 
             $this->logWarning($warning);
-            $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX, true, $deploymentServer);
+            $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX);
 
             return [$warning];
         }
@@ -394,14 +394,14 @@ class EdgeProxyRemoteRouteService
         }
 
         if (empty($routes)) {
-            $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX, true, $deploymentServer);
+            $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX);
 
             return $warnings;
         }
 
         $config = $this->generateTraefikConfig($application->uuid, $routes);
         try {
-            $this->writeRouteFile($edgeProxyServer, $application->uuid, $config, self::APPLICATION_ROUTE_FILE_PREFIX, $deploymentServer);
+            $this->writeRouteFile($edgeProxyServer, $application->uuid, $config, self::APPLICATION_ROUTE_FILE_PREFIX);
         } catch (\Throwable $exception) {
             $warning = sprintf(
                 'Edge proxy route partially applied for application %s: failed to write dynamic route configuration on edge proxy (%s).',
@@ -417,18 +417,16 @@ class EdgeProxyRemoteRouteService
 
     public function deleteService(Service $service): array
     {
-        $deploymentServer = $this->resolveDeploymentServer($service);
-
         return $this->resolveEdgeProxyServersByTeamId($this->extractServiceTeamId($service))
-            ->flatMap(fn (Server $edgeProxyServer) => $this->deleteServiceWithServer($service, $edgeProxyServer, $deploymentServer))
+            ->flatMap(fn (Server $edgeProxyServer) => $this->deleteServiceWithServer($service, $edgeProxyServer))
             ->values()
             ->all();
     }
 
-    public function deleteServiceWithServer(Service $service, Server $edgeProxyServer, ?Server $deploymentServer = null): array
+    public function deleteServiceWithServer(Service $service, Server $edgeProxyServer): array
     {
         try {
-            $this->deleteRouteFile($edgeProxyServer, $service->uuid, self::SERVICE_ROUTE_FILE_PREFIX, true, $deploymentServer);
+            $this->deleteRouteFile($edgeProxyServer, $service->uuid);
 
             return [];
         } catch (\Throwable $exception) {
@@ -444,18 +442,16 @@ class EdgeProxyRemoteRouteService
 
     public function deleteApplication(Application $application): array
     {
-        $deploymentServer = $this->resolveApplicationDeploymentServer($application);
-
         return $this->resolveEdgeProxyServersByTeamId($this->extractApplicationTeamId($application))
-            ->flatMap(fn (Server $edgeProxyServer) => $this->deleteApplicationWithServer($application, $edgeProxyServer, $deploymentServer))
+            ->flatMap(fn (Server $edgeProxyServer) => $this->deleteApplicationWithServer($application, $edgeProxyServer))
             ->values()
             ->all();
     }
 
-    public function deleteApplicationWithServer(Application $application, Server $edgeProxyServer, ?Server $deploymentServer = null): array
+    public function deleteApplicationWithServer(Application $application, Server $edgeProxyServer): array
     {
         try {
-            $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX, true, $deploymentServer);
+            $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX);
 
             return [];
         } catch (\Throwable $exception) {
@@ -543,33 +539,24 @@ class EdgeProxyRemoteRouteService
         return $config;
     }
 
-    public function routeFilePath(Server $edgeProxyServer, string $serviceUuid, ?Server $deploymentServer = null): string
+    public function routeFilePath(Server $edgeProxyServer, string $serviceUuid): string
     {
-        return $this->resourceRouteFilePath($edgeProxyServer, self::SERVICE_ROUTE_FILE_PREFIX, $serviceUuid, $deploymentServer);
+        return $this->resourceRouteFilePath($edgeProxyServer, self::SERVICE_ROUTE_FILE_PREFIX, $serviceUuid);
     }
 
-    public function applicationRouteFilePath(Server $edgeProxyServer, string $applicationUuid, ?Server $deploymentServer = null): string
+    public function applicationRouteFilePath(Server $edgeProxyServer, string $applicationUuid): string
     {
-        return $this->resourceRouteFilePath($edgeProxyServer, self::APPLICATION_ROUTE_FILE_PREFIX, $applicationUuid, $deploymentServer);
+        return $this->resourceRouteFilePath($edgeProxyServer, self::APPLICATION_ROUTE_FILE_PREFIX, $applicationUuid);
     }
 
-    private function resourceRouteFilePath(Server $edgeProxyServer, string $prefix, string $resourceUuid, ?Server $deploymentServer = null): string
+    private function resourceRouteFilePath(Server $edgeProxyServer, string $prefix, string $resourceUuid): string
     {
         return sprintf(
             '%s/%s%s.yaml',
             $this->routeDirectoryPath($edgeProxyServer),
-            $this->resourceRouteFileName($prefix, $resourceUuid, $deploymentServer)
+            $prefix,
+            $resourceUuid
         );
-    }
-
-    private function resourceRouteFileName(string $prefix, string $resourceUuid, ?Server $deploymentServer = null): string
-    {
-        $deploymentServerUuid = data_get($deploymentServer, 'uuid');
-        if ($deploymentServer instanceof Server && ! blank($deploymentServerUuid)) {
-            return sprintf('%sfrom-%s-%s.yaml', $prefix, $deploymentServerUuid, $resourceUuid);
-        }
-
-        return sprintf('%s%s.yaml', $prefix, $resourceUuid);
     }
 
     protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
@@ -582,13 +569,13 @@ class EdgeProxyRemoteRouteService
         return rtrim($edgeProxyServer->proxyPath(), '/').'/dynamic';
     }
 
-    private function writeRouteFile(Server $edgeProxyServer, string $resourceUuid, array $config, string $filePrefix = self::SERVICE_ROUTE_FILE_PREFIX, ?Server $deploymentServer = null): void
+    private function writeRouteFile(Server $edgeProxyServer, string $resourceUuid, array $config, string $filePrefix = self::SERVICE_ROUTE_FILE_PREFIX): void
     {
         $yaml = Yaml::dump($config, 12, 2);
         $banner = "# This file is generated by Coolify, do not edit it manually.\n\n";
         $payload = base64_encode($banner.$yaml);
 
-        $routeFilePath = $this->resourceRouteFilePath($edgeProxyServer, $filePrefix, $resourceUuid, $deploymentServer);
+        $routeFilePath = $this->resourceRouteFilePath($edgeProxyServer, $filePrefix, $resourceUuid);
         $temporaryRouteFilePath = $routeFilePath.'.tmp';
 
         $escapedDirectory = escapeshellarg($this->routeDirectoryPath($edgeProxyServer));
@@ -599,50 +586,18 @@ class EdgeProxyRemoteRouteService
             "mkdir -p $escapedDirectory",
             "echo '$payload' | base64 -d | tee $escapedTemporaryFilePath > /dev/null",
             "mv $escapedTemporaryFilePath $escapedFilePath",
-            $this->cleanupRouteFilesCommand($edgeProxyServer, $resourceUuid, $filePrefix, $deploymentServer, basename($routeFilePath)),
         ]);
     }
 
-    private function deleteRouteFile(Server $edgeProxyServer, string $resourceUuid, string $filePrefix = self::SERVICE_ROUTE_FILE_PREFIX, bool $throwError = true, ?Server $deploymentServer = null): void
+    private function deleteRouteFile(Server $edgeProxyServer, string $resourceUuid, string $filePrefix = self::SERVICE_ROUTE_FILE_PREFIX, bool $throwError = true): void
     {
-        $this->deleteRouteFilesMatching($edgeProxyServer, $resourceUuid, $filePrefix, $deploymentServer, null, $throwError);
-    }
+        $routeFilePath = $this->resourceRouteFilePath($edgeProxyServer, $filePrefix, $resourceUuid);
+        $escapedFilePath = escapeshellarg($routeFilePath);
+        $escapedTemporaryFilePath = escapeshellarg($routeFilePath.'.tmp');
 
-    private function deleteRouteFilesMatching(Server $edgeProxyServer, string $resourceUuid, string $filePrefix, ?Server $deploymentServer = null, ?string $preserveRouteFileName = null, bool $throwError = true): void
-    {
-        if (! $deploymentServer instanceof Server || blank(data_get($deploymentServer, 'uuid'))) {
-            $routeFilePath = $this->resourceRouteFilePath($edgeProxyServer, $filePrefix, $resourceUuid);
-            $escapedFilePath = escapeshellarg($routeFilePath);
-            $escapedTemporaryFilePath = escapeshellarg($routeFilePath.'.tmp');
-
-            $this->runRemoteCommands($edgeProxyServer, [
-                "rm -f $escapedFilePath $escapedTemporaryFilePath",
-            ], $throwError);
-
-            return;
-        }
-
-        $command = $this->cleanupRouteFilesCommand($edgeProxyServer, $resourceUuid, $filePrefix, $deploymentServer, $preserveRouteFileName);
-
-        $this->runRemoteCommands($edgeProxyServer, [$command], $throwError);
-    }
-
-    private function cleanupRouteFilesCommand(Server $edgeProxyServer, string $resourceUuid, string $filePrefix, ?Server $deploymentServer = null, ?string $preserveRouteFileName = null): string
-    {
-        if (! $deploymentServer instanceof Server || blank(data_get($deploymentServer, 'uuid'))) {
-            return 'true';
-        }
-
-        $escapedDirectory = escapeshellarg($this->routeDirectoryPath($edgeProxyServer));
-        $resourcePattern = escapeshellarg("{$filePrefix}*{$resourceUuid}.yaml");
-        $resourceTempPattern = escapeshellarg("{$filePrefix}*{$resourceUuid}.yaml.tmp");
-
-        $command = "find $escapedDirectory -maxdepth 1 -type f \\( -name $resourcePattern -o -name $resourceTempPattern \\)";
-        if (! is_null($preserveRouteFileName)) {
-            $command .= ' ! -name '.escapeshellarg($preserveRouteFileName);
-        }
-
-        return $command.' -delete';
+        $this->runRemoteCommands($edgeProxyServer, [
+            "rm -f $escapedFilePath $escapedTemporaryFilePath",
+        ], $throwError);
     }
 
     private function buildTraefikRule(string $host, ?string $path): ?string
