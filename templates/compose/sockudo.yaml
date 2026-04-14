@@ -12,18 +12,36 @@ services:
       - SERVICE_FQDN_SOCKUDO_6001
       - HOST=0.0.0.0
       - PORT=6001
-      - ADAPTER_DRIVER=${ADAPTER_DRIVER:-memory}
-      - CACHE_DRIVER=${CACHE_DRIVER:-memory}
-      - QUEUE_DRIVER=${QUEUE_DRIVER:-memory}
+      - ADAPTER_DRIVER=${ADAPTER_DRIVER:-redis}
+      - CACHE_DRIVER=${CACHE_DRIVER:-redis}
+      - QUEUE_DRIVER=${QUEUE_DRIVER:-redis}
       - APP_MANAGER_DRIVER=${APP_MANAGER_DRIVER:-memory}
+      - DATABASE_REDIS_HOST=redis
+      - DATABASE_REDIS_PORT=6379
+      - DATABASE_REDIS_DB=${REDIS_DB:-0}
       - SOCKUDO_DEFAULT_APP_ID=${SERVICE_USER_SOCKUDO}
       - SOCKUDO_DEFAULT_APP_KEY=${SERVICE_REALBASE64_64_SOCKUDOKEY}
       - SOCKUDO_DEFAULT_APP_SECRET=${SERVICE_REALBASE64_64_SOCKUDOSECRET}
       - SOCKUDO_DEFAULT_APP_ENABLED=${SOCKUDO_DEFAULT_APP_ENABLED:-true}
       - SOCKUDO_ENABLE_CLIENT_MESSAGES=${SOCKUDO_ENABLE_CLIENT_MESSAGES:-true}
+      - METRICS_ENABLED=${METRICS_ENABLED:-false}
+      - METRICS_HOST=0.0.0.0
+      - METRICS_PORT=9601
       - DEBUG=${DEBUG:-false}
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6001' || exit 1"]
       interval: 5s
       timeout: 20s
       retries: 3
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
