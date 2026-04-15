@@ -251,7 +251,7 @@ class Change extends Component
             if (isCloud() && ! isDev()) {
                 $this->webhook_endpoint = config('app.url');
             } else {
-                $this->webhook_endpoint = $this->fqdn ?? $this->ipv4 ?? '';
+                $this->webhook_endpoint = $this->fqdn ?: $this->ipv4 ?: config('app.url') ?: '';
                 $this->is_system_wide = $this->github_app->is_system_wide;
             }
         } catch (\Throwable $e) {

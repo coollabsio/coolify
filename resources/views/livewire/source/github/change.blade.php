@@ -259,7 +259,7 @@
                                     @endif
                                 </x-forms.select>
                                 <x-forms.button isHighlighted
-                                    x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}','{{ $deployment_statuses_permissions }}',{{ $administration }})">
+                                    x-on:click.prevent="createGithubApp($wire.webhook_endpoint, $wire.preview_deployment_permissions, $wire.deployment_statuses_permissions, $wire.administration)">
                                     Register Now
                                 </x-forms.button>
                             </div>
@@ -267,7 +267,7 @@
                             <div class="flex flex-col sm:flex-row gap-2">
                                 <h2>Register a GitHub App</h2>
                                 <x-forms.button isHighlighted
-                                    x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}','{{ $deployment_statuses_permissions }}',{{ $administration }})">
+                                    x-on:click.prevent="createGithubApp($wire.webhook_endpoint, $wire.preview_deployment_permissions, $wire.deployment_statuses_permissions, $wire.administration)">
                                     Register Now
                                 </x-forms.button>
                             </div>
@@ -310,6 +310,7 @@
                     if (isDev && devWebhook) {
                         baseUrl = devWebhook;
                     }
+                    baseUrl = baseUrl.replace(/\/+$/, '');
                     const webhookBaseUrl = `${baseUrl}/webhooks`;
                     const path = organization ? `organizations/${organization}/settings/apps/new` : 'settings/apps/new';
                     const default_permissions = {
@@ -338,7 +339,6 @@
                             active: true,
                         },
                         redirect_url: `${webhookBaseUrl}/source/github/redirect`,
-                        callback_urls: [`${baseUrl}/login/github/app`],
                         public: false,
                         request_oauth_on_install: false,
                         setup_url: `${webhookBaseUrl}/source/github/install?source=${uuid}`,

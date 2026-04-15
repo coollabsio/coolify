@@ -4359,15 +4359,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function resolveGitHubDeploymentRef(): string
     {
-        if ($this->commit && $this->commit !== 'HEAD') {
-            return $this->commit;
-        }
-
-        if ($this->application->git_commit_sha && $this->application->git_commit_sha !== 'HEAD') {
-            return $this->application->git_commit_sha;
-        }
-
-        return $this->application->git_branch;
+        return determineGitHubDeploymentRef(
+            pullRequestId: $this->pull_request_id,
+            branch: $this->application->git_branch,
+            commit: $this->commit ?: $this->application->git_commit_sha,
+            rollback: $this->rollback,
+        );
     }
 
     private function resolveGitHubDeploymentEnvironment(): string

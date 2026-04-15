@@ -50,6 +50,33 @@ it('detects github deployments permission from the app record', function () {
     expect(hasGitHubDeploymentsPermission($this->githubApp->forceFill(['deployments' => 'read'])))->toBeFalse();
 });
 
+it('uses the pull request ref for preview deployments', function () {
+    expect(determineGitHubDeploymentRef(
+        pullRequestId: 12,
+        branch: 'main',
+        commit: 'abc123def456',
+        rollback: false,
+    ))->toBe('refs/pull/12/head');
+});
+
+it('uses the branch name for non-rollback deployments', function () {
+    expect(determineGitHubDeploymentRef(
+        pullRequestId: 0,
+        branch: 'main',
+        commit: 'abc123def456',
+        rollback: false,
+    ))->toBe('main');
+});
+
+it('uses the exact commit for rollback deployments', function () {
+    expect(determineGitHubDeploymentRef(
+        pullRequestId: 0,
+        branch: 'main',
+        commit: 'abc123def456',
+        rollback: true,
+    ))->toBe('abc123def456');
+});
+
 it('creates GitHub deployments with the expected payload', function () {
     Http::fake([
         'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [

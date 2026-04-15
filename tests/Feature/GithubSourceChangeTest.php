@@ -63,6 +63,25 @@ describe('GitHub Source Change Component', function () {
             ->assertSet('privateKeyId', null);
     });
 
+    test('mount falls back to app url for webhook endpoint when instance urls are missing', function () {
+        config()->set('app.url', 'https://coolify.example.test');
+
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSuccessful()
+            ->assertSet('webhook_endpoint', 'https://coolify.example.test');
+    });
+
     test('can mount with fully configured github app', function () {
         $privateKey = PrivateKey::create([
             'name' => 'Test Key',
@@ -276,5 +295,24 @@ describe('GitHub Source Change Component', function () {
         $githubApp->refresh();
 
         expect($githubApp->deployments)->toBe('write');
+    });
+
+    test('automated installation manifest does not include invalid github app callback url', function () {
+        config()->set('app.url', 'https://coolify.example.test');
+
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSee('redirect_url:', false)
+            ->assertDontSee('/login/github/app', false);
     });
 });

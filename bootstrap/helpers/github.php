@@ -168,6 +168,23 @@ function hasGitHubDeploymentsPermission(GithubApp $source): bool
     return $source->deployments === 'write';
 }
 
+function determineGitHubDeploymentRef(int $pullRequestId, ?string $branch = null, ?string $commit = null, bool $rollback = false): string
+{
+    if ($pullRequestId !== 0) {
+        return "refs/pull/{$pullRequestId}/head";
+    }
+
+    if (! $rollback && filled($branch)) {
+        return $branch;
+    }
+
+    if (filled($commit) && $commit !== 'HEAD') {
+        return $commit;
+    }
+
+    return filled($branch) ? $branch : 'HEAD';
+}
+
 function createGitHubDeployment(
     GithubApp $source,
     string $repository,
