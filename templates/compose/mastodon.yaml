@@ -1,0 +1,129 @@
+# documentation: https://docs.joinmastodon.org/admin/install/
+# slogan: Free, open-source decentralized social media platform.
+# category: social
+# tags: social,fediverse,activitypub,microblogging,decentralized
+# logo: svgs/mastodon.svg
+# port: 3000
+
+# IMPORTANT: Before deploying, generate VAPID keys by running:
+#   docker run --rm ghcr.io/mastodon/mastodon:latest bundle exec rake mastodon:webpush:generate_vapid_key
+# Set LOCAL_DOMAIN to your domain (e.g. mastodon.example.com) — cannot be changed after first run.
+
+services:
+  web:
+    image: ghcr.io/mastodon/mastodon:latest
+    command: bundle exec puma -C config/puma.rb
+    environment:
+      - SERVICE_URL_WEB_3000
+      - LOCAL_DOMAIN=${LOCAL_DOMAIN:?}
+      - SECRET_KEY_BASE=${SERVICE_PASSWORD_64_SECRETKEYBASE}
+      - OTP_SECRET=${SERVICE_PASSWORD_64_OTPSECRET}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:?}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:?}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB:-mastodon_production}
+      - DB_USER=${SERVICE_USER_POSTGRESQL}
+      - DB_PASS=${SERVICE_PASSWORD_POSTGRESQL}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ES_ENABLED=false
+      - SMTP_SERVER=${SMTP_SERVER:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_LOGIN=${SMTP_LOGIN:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM_ADDRESS=${SMTP_FROM_ADDRESS:-notifications@example.com}
+    volumes:
+      - mastodon-system:/mastodon/public/system
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', "curl -s --noproxy localhost localhost:3000/health | grep -q 'OK' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  streaming:
+    image: ghcr.io/mastodon/mastodon-streaming:latest
+    command: node ./streaming/index.js
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB:-mastodon_production}
+      - DB_USER=${SERVICE_USER_POSTGRESQL}
+      - DB_PASS=${SERVICE_PASSWORD_POSTGRESQL}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SECRET_KEY_BASE=${SERVICE_PASSWORD_64_SECRETKEYBASE}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', "curl -s --noproxy localhost localhost:4000/api/v1/streaming/health | grep -q 'OK' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  sidekiq:
+    image: ghcr.io/mastodon/mastodon:latest
+    command: bundle exec sidekiq
+    environment:
+      - LOCAL_DOMAIN=${LOCAL_DOMAIN:?}
+      - SECRET_KEY_BASE=${SERVICE_PASSWORD_64_SECRETKEYBASE}
+      - OTP_SECRET=${SERVICE_PASSWORD_64_OTPSECRET}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB:-mastodon_production}
+      - DB_USER=${SERVICE_USER_POSTGRESQL}
+      - DB_PASS=${SERVICE_PASSWORD_POSTGRESQL}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ES_ENABLED=false
+      - SMTP_SERVER=${SMTP_SERVER:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_LOGIN=${SMTP_LOGIN:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM_ADDRESS=${SMTP_FROM_ADDRESS:-notifications@example.com}
+    volumes:
+      - mastodon-system:/mastodon/public/system
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', "ps aux | grep '[s]idekiq 8' || false"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  db:
+    image: postgres:14-alpine
+    shm_size: 256mb
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-mastodon_production}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB:-mastodon_production}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
