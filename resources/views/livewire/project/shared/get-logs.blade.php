@@ -513,13 +513,28 @@
                                 </div>
                             @endif
                             @if ($healthcheckOutputs)
-                                @foreach (explode("\n", $healthcheckOutputs) as $index => $line)
-                                    @if (trim($line) !== '')
-                                        <div wire:key="hc-{{ $index }}" data-log-line data-log-content="{{ $line }}" class="flex gap-2 log-line">
-                                            <span data-line-text="{{ $line }}" class="whitespace-pre-wrap break-all {{ str_contains($line, 'FAIL') ? 'text-red-500 dark:text-red-400' : '' }} {{ str_contains($line, 'PASS') ? 'text-green-600 dark:text-green-400' : '' }}">{{ $line }}</span>
-                                        </div>
-                                    @endif
+                                @php
+                                    $headerLines = collect(explode("\n", $healthcheckOutputs))
+                                        ->take(2)
+                                        ->filter(fn($line) => trim($line) !== '');
+                                @endphp
+                                @foreach ($headerLines as $index => $line)
+                                    <div wire:key="hc-header-{{ $index }}" data-log-line data-log-content="{{ $line }}" class="flex gap-2 log-line">
+                                        <span data-line-text="{{ $line }}" class="whitespace-pre-wrap break-all">{{ $line }}</span>
+                                    </div>
                                 @endforeach
+                                @forelse ($healthcheckEntries as $index => $entry)
+                                    <div wire:key="hc-{{ $index }}" data-log-line data-log-content="{{ $entry['text'] }}" class="flex gap-2 log-line">
+                                        <span data-line-text="{{ $entry['text'] }}" class="whitespace-pre-wrap break-all {{ $entry['exitCode'] === 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400' }}">{{ $entry['text'] }}</span>
+                                    </div>
+                                @empty
+                                    <div class="flex gap-2 log-line">
+                                        <span class="whitespace-pre-wrap break-all text-neutral-400">No healthcheck log entries yet.</span>
+                                    </div>
+                                @endforelse
+                                <div class="mt-2 pt-2 border-t dark:border-coolgray-300 border-neutral-200">
+                                    <span class="text-xs text-neutral-400">Docker stores only the last 5 healthcheck results per container.</span>
+                                </div>
                             @else
                                 <pre class="font-logs whitespace-pre-wrap break-all max-w-full text-neutral-400">No healthcheck data. Click refresh or enable streaming.</pre>
                             @endif

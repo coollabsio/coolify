@@ -13,6 +13,7 @@ it('has healthcheck properties on GetLogs component', function () {
     expect($this->getLogsFile)
         ->toContain('public bool $showHealthcheckLogs = false')
         ->toContain('public string $healthcheckOutputs = ')
+        ->toContain('public array $healthcheckEntries = []')
         ->toContain('public ?string $healthcheckStatus = null');
 });
 
@@ -97,10 +98,9 @@ it('uses slower poll interval for healthcheck mode', function () {
         ->toContain("wire:poll.5000ms='getHealthcheckLogs'");
 });
 
-it('color-codes PASS and FAIL lines in healthcheck display', function () {
+it('color-codes healthcheck entries based on exit code', function () {
     expect($this->bladeFile)
-        ->toContain("str_contains(\$line, 'FAIL')")
-        ->toContain("str_contains(\$line, 'PASS')")
+        ->toContain("\$entry['exitCode'] === 0")
         ->toContain('text-red-500')
         ->toContain('text-green-600');
 });
@@ -139,6 +139,17 @@ it('logs failed DateTime parsing instead of swallowing the exception', function 
     expect($this->methodBody)
         ->toContain('Log::debug')
         ->toContain('Failed to parse healthcheck timestamp');
+});
+
+it('builds structured healthcheckEntries array with exitCode and text', function () {
+    expect($this->methodBody)
+        ->toContain("\$entries[] = ['exitCode' => \$exitCode, 'text' => \$line]")
+        ->toContain('$this->healthcheckEntries = $entries');
+});
+
+it('shows Docker limitation note about 5 healthcheck entries', function () {
+    expect($this->bladeFile)
+        ->toContain('Docker stores only the last 5 healthcheck results per container.');
 });
 
 it('downloadAllLogs returns healthcheck outputs when in healthcheck mode', function () {

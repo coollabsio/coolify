@@ -61,6 +61,9 @@ class GetLogs extends Component
 
     public string $healthcheckOutputs = '';
 
+    /** @var array<int, array{exitCode: int|string, text: string}> */
+    public array $healthcheckEntries = [];
+
     public ?string $healthcheckStatus = null;
 
     public function mount()
@@ -364,6 +367,7 @@ class GetLogs extends Component
                 "Status: {$this->healthcheckStatus} | Failing streak: {$failingStreak}",
                 '----------------------------------------',
             ];
+            $entries = [];
 
             if (empty($logs)) {
                 $lines[] = 'No healthcheck log entries yet.';
@@ -389,9 +393,11 @@ class GetLogs extends Component
                         $line .= " — {$output}";
                     }
                     $lines[] = $line;
+                    $entries[] = ['exitCode' => $exitCode, 'text' => $line];
                 }
             }
 
+            $this->healthcheckEntries = $entries;
             $this->healthcheckOutputs = implode("\n", $lines);
         } catch (\Throwable $e) {
             $this->healthcheckOutputs = 'Failed to retrieve healthcheck data: '.$e->getMessage();
