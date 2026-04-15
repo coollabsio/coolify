@@ -42,12 +42,33 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ['CMD-SHELL', "curl -s --noproxy localhost localhost:3000/health | grep -q 'OK' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 30s
+
+  db-migrate:
+    image: ghcr.io/mastodon/mastodon:latest
+    restart: "no"
+    command: bundle exec rails db:migrate
+    environment:
+      - LOCAL_DOMAIN=${LOCAL_DOMAIN:?}
+      - SECRET_KEY_BASE=${SERVICE_HEX_64_SECRETKEYBASE}
+      - ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY=${SERVICE_BASE64_32_ARDETKEY}
+      - ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT=${SERVICE_BASE64_32_ARKEYSALT}
+      - ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY=${SERVICE_BASE64_32_ARPRIMARYKEY}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB:-mastodon_production}
+      - DB_USER=${SERVICE_USER_POSTGRESQL}
+      - DB_PASS=${SERVICE_PASSWORD_POSTGRESQL}
+    depends_on:
+      db:
+        condition: service_healthy
 
   streaming:
     image: ghcr.io/mastodon/mastodon-streaming:latest
