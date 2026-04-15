@@ -1,0 +1,74 @@
+# documentation: https://docs.joinpeertube.org/install/docker
+# slogan: Free, open-source and decentralized video platform.
+# category: media
+# tags: video,fediverse,activitypub,youtube,streaming,self-hosted
+# logo: svgs/peertube.svg
+# port: 9000
+
+# IMPORTANT: Set PEERTUBE_WEBSERVER_HOSTNAME to your domain before deploying.
+
+services:
+  peertube:
+    image: chocobozzz/peertube:production
+    environment:
+      - SERVICE_URL_PEERTUBE_9000
+      - PEERTUBE_WEBSERVER_HOSTNAME=${PEERTUBE_WEBSERVER_HOSTNAME:?}
+      - PEERTUBE_WEBSERVER_PORT=443
+      - PEERTUBE_WEBSERVER_HTTPS=true
+      - PEERTUBE_TRUST_PROXY=["127.0.0.1", "loopback", "172.18.0.0/16"]
+      - PEERTUBE_SECRET=${SERVICE_PASSWORD_64_PEERTUBESECRET}
+      - PEERTUBE_DB_USERNAME=${SERVICE_USER_POSTGRESQL}
+      - PEERTUBE_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - PEERTUBE_DB_HOSTNAME=postgres
+      - PEERTUBE_DB_SSL=false
+      - PEERTUBE_REDIS_HOSTNAME=redis
+      - PEERTUBE_SMTP_HOSTNAME=postfix
+      - PEERTUBE_SMTP_PORT=25
+      - PEERTUBE_SMTP_FROM=noreply@${PEERTUBE_WEBSERVER_HOSTNAME:-example.com}
+      - PEERTUBE_SMTP_TLS=false
+      - PEERTUBE_SMTP_DISABLE_STARTTLS=false
+      - PEERTUBE_ADMIN_EMAIL=${PEERTUBE_ADMIN_EMAIL:?}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRES_DB:-peertube}
+    volumes:
+      - peertube-data:/data
+      - peertube-config:/config
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRES_DB:-peertube}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB:-peertube}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+
+  redis:
+    image: redis:8-alpine
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+
+  postfix:
+    image: mwader/postfix-relay
+    environment:
+      - POSTFIX_myhostname=${PEERTUBE_WEBSERVER_HOSTNAME:-example.com}
+    restart: always
