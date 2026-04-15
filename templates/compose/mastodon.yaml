@@ -54,7 +54,7 @@ services:
   db-migrate:
     image: ghcr.io/mastodon/mastodon:latest
     restart: "no"
-    command: bundle exec rails db:migrate
+    command: bundle exec rake db:prepare
     environment:
       - LOCAL_DOMAIN=${LOCAL_DOMAIN:?}
       - SECRET_KEY_BASE=${SERVICE_HEX_64_SECRETKEYBASE}
