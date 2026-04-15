@@ -681,12 +681,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->dockerSecretsSupported && ! empty($this->build_secrets)) {
                 $composeFile = $this->add_build_secrets_to_compose($composeFile);
             }
-
-            $yaml = Yaml::dump(convertToArray($composeFile), 10);
         }
+        $yaml = Yaml::dump(convertToArray($composeFile), 10);
+
         $this->docker_compose_base64 = base64_encode($yaml);
+        // Note: -f uses $this->basedir (not $this->workdir) because $this->workdir already includes
+        // the base_directory subdirectory path, and docker_compose_location is relative to the repo root.
+        // Using $this->workdir + $this->docker_compose_location would result in a double subdirectory path.
         $this->execute_remote_command([
-            executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}{$this->docker_compose_location} > /dev/null"),
+            executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->basedir}{$this->docker_compose_location} > /dev/null"),
             'hidden' => true,
         ]);
 
@@ -700,9 +703,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         if ($this->docker_compose_custom_build_command) {
             // Auto-inject -f (compose file) and --env-file flags using helper function
+            // Note: -f uses $this->basedir (not $this->workdir) to avoid double subdirectory path
             $build_command = injectDockerComposeFlags(
                 $this->docker_compose_custom_build_command,
-                "{$this->workdir}{$this->docker_compose_location}",
+                "{$this->basedir}{$this->docker_compose_location}",
                 self::BUILD_TIME_ENV_PATH
             );
 
@@ -744,10 +748,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             // Use build-time .env file from /artifacts (outside Docker context to prevent it from being in the image)
             $command .= ' --env-file '.self::BUILD_TIME_ENV_PATH;
+            // Note: -f uses $this->basedir (not $this->workdir) because $this->workdir already includes
+            // the base_directory subdirectory path, and docker_compose_location is relative to the repo root.
+            // Using $this->workdir + $this->docker_compose_location would result in a double subdirectory path.
             if ($this->force_rebuild) {
-                $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull --no-cache";
+                $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->basedir}{$this->docker_compose_location} build --pull --no-cache";
             } else {
-                $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull";
+                $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->basedir}{$this->docker_compose_location} build --pull";
             }
 
             if (! $this->application->settings->use_build_secrets && $this->build_args instanceof Collection && $this->build_args->isNotEmpty()) {
@@ -790,10 +797,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             if ($this->docker_compose_custom_start_command) {
                 // Auto-inject -f (compose file) and --env-file flags using helper function
+                // Note: -f uses $this->basedir (not $workdir_path) to avoid double subdirectory path
                 $start_command = injectDockerComposeFlags(
                     $this->docker_compose_custom_start_command,
-                    "{$server_workdir}{$this->docker_compose_location}",
-                    "{$server_workdir}/.env"
+                    "{$this->basedir}{$this->docker_compose_location}",
+                    "{$this->basedir}/.env"
                 );
 
                 $this->write_deployment_configurations();
