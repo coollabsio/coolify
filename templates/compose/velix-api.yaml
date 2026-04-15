@@ -20,7 +20,7 @@ services:
       - ENGINE_STORE_PATH=/data/instances
       - ENGINE_AUTO_RECONNECT=true
       - ENGINE_MAX_INSTANCES=200
-      - REGISTRATION_ENABLED=true
+      - REGISTRATION_ENABLED=false
     volumes:
       - velix-data:/data
     depends_on:
