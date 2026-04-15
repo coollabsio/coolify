@@ -1150,6 +1150,23 @@
         "minversion": "0.0.0",
         "port": "6555"
     },
+    "emqx": {
+        "documentation": "https://www.emqx.io/docs/en/latest/deploy/install-docker.html?utm_source=coolify.io",
+        "slogan": "Open-source MQTT broker for IoT, IIoT, and connected vehicles.",
+        "compose": "c2VydmljZXM6CiAgZW1xeDoKICAgIGltYWdlOiAnZW1xeC9lbXF4LWVudGVycHJpc2U6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfRU1RWF8xODA4MwogICAgICAtICdFTVFYX0RBU0hCT0FSRF9fREVGQVVMVF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfRU1RWH0nCiAgICB2b2x1bWVzOgogICAgICAtICdlbXF4X2RhdGE6L29wdC9lbXF4L2RhdGEnCiAgICAgIC0gJ2VtcXhfbG9nOi9vcHQvZW1xeC9sb2cnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gL29wdC9lbXF4L2Jpbi9lbXF4CiAgICAgICAgLSBjdGwKICAgICAgICAtIHN0YXR1cwogICAgICBpbnRlcnZhbDogMTBzCiAgICAgIHRpbWVvdXQ6IDMwcwogICAgICByZXRyaWVzOiA1CiAgICAgIHN0YXJ0X3BlcmlvZDogMzBzCg==",
+        "tags": [
+            "mqtt",
+            "broker",
+            "iot",
+            "messaging",
+            "emqx",
+            "iiot"
+        ],
+        "category": "iot",
+        "logo": "svgs/emqx.svg",
+        "minversion": "0.0.0",
+        "port": "18083"
+    },
     "ente-photos-with-s3": {
         "documentation": "https://help.ente.io/self-hosting/installation/compose?utm_source=coolify.io",
         "slogan": "Ente Photos is a fully open source, End to End Encrypted alternative to Google Photos and Apple Photos.",
