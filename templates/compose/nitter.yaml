@@ -20,7 +20,7 @@ services:
         read_only: true
         content: |
           [Server]
-          hostname = "localhost"
+          hostname = "localhost"      # CHANGE THIS to your domain (e.g. nitter.example.com)
           title = "Nitter"
           address = "0.0.0.0"
           port = 8080
@@ -58,7 +58,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -nv --tries=1 --spider http://127.0.0.1:8080/x/status/20 || exit 1"]
+      test: ["CMD-SHELL", "wget -nv --tries=1 --spider http://127.0.0.1:8080/Jack/status/20 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 2
