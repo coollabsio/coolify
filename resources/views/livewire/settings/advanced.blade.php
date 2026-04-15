@@ -42,6 +42,11 @@
                         </div>
                     @endif
                     <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_only_enabled"
+                            helper="Only allow users to self-register via OAuth providers (e.g., GitHub, Google). Password-based registration will be disabled. Requires at least one OAuth provider to be configured."
+                            label="OAuth-Only Registration" />
+                    </div>
+                    <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."
                             label="Do Not Track" />

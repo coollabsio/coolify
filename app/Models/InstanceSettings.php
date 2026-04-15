@@ -18,6 +18,7 @@ class InstanceSettings extends Model
         'do_not_track',
         'is_auto_update_enabled',
         'is_registration_enabled',
+        'is_oauth_only_enabled',
         'next_channel',
         'smtp_enabled',
         'smtp_from_address',

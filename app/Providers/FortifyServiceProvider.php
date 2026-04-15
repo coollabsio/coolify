@@ -47,7 +47,7 @@ class FortifyServiceProvider extends ServiceProvider
             $isFirstUser = User::count() === 0;
 
             $settings = instanceSettings();
-            if (! $settings->is_registration_enabled) {
+            if (! $settings->is_registration_enabled && ! $settings->is_oauth_only_enabled) {
                 return redirect()->route('login');
             }
 
@@ -78,6 +78,10 @@ class FortifyServiceProvider extends ServiceProvider
                 $user &&
                 Hash::check($request->password, $user->password)
             ) {
+                $settings = instanceSettings();
+                if ($settings->is_oauth_only_enabled) {
+                    return null;
+                }
                 $user->updated_at = now();
                 $user->save();
 
