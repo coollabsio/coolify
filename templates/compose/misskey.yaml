@@ -5,11 +5,14 @@
 # logo: svgs/misskey.svg
 # port: 3000
 
+# IMPORTANT: Set MISSKEY_URL to your public URL (e.g. https://misskey.example.com) before deploying.
+# This cannot be changed after first run.
+
 services:
   misskey:
     image: misskey/misskey:latest
     environment:
-      - MISSKEY_URL=${SERVICE_URL_MISSKEY_3000}
+      - MISSKEY_URL=${MISSKEY_URL:?}
       - DATABASE_DB=${POSTGRES_DB:-misskey}
       - DATABASE_USER=${SERVICE_USER_POSTGRESQL}
       - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
