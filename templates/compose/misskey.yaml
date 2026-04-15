@@ -1,0 +1,65 @@
+# documentation: https://misskey-hub.net/docs/for-admin/install/guides/docker/
+# slogan: An open source, decentralized social media platform that's free forever!
+# category: social
+# tags: social,fediverse,activitypub,microblogging,decentralized
+# logo: svgs/misskey.svg
+# port: 3000
+
+services:
+  misskey:
+    image: misskey/misskey:latest
+    environment:
+      - SERVICE_URL_MISSKEY_3000
+    volumes:
+      - type: bind
+        source: ./config.yml
+        target: /misskey/.config/default.yml
+        content: |
+          url: ${SERVICE_URL_MISSKEY_3000}
+          port: 3000
+          db:
+            host: db
+            port: 5432
+            db: ${POSTGRES_DB:-misskey}
+            user: ${SERVICE_USER_POSTGRESQL}
+            pass: ${SERVICE_PASSWORD_POSTGRESQL}
+          redis:
+            host: redis
+            port: 6379
+          id: 'aidx'
+      - misskey-files:/misskey/files
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/meta"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-misskey}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB:-misskey}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
