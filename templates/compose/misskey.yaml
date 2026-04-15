@@ -16,6 +16,8 @@ services:
       - DATABASE_DB=${POSTGRES_DB:-misskey}
       - DATABASE_USER=${SERVICE_USER_POSTGRESQL}
       - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+    ports:
+      - '3000'
     volumes:
       - type: bind
         source: ./config.yml
