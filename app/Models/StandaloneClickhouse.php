@@ -39,6 +39,7 @@ class StandaloneClickhouse extends BaseModel
         'last_restart_type',
         'last_online_at',
         'public_port_timeout',
+        'public_host',
         'custom_docker_run_options',
         'clickhouse_db',
         'destination_type',
@@ -295,14 +296,15 @@ class StandaloneClickhouse extends BaseModel
             get: function () {
                 if ($this->is_public && $this->public_port) {
                     $serverIp = $this->destination->server->getIp;
-                    if (empty($serverIp)) {
+                    $host = $this->public_host ?? $serverIp;
+                    if (empty($host)) {
                         return null;
                     }
                     $encodedUser = rawurlencode($this->clickhouse_admin_user);
                     $encodedPass = rawurlencode($this->clickhouse_admin_password);
                     $database = $this->clickhouse_db ?? 'default';
 
-                    return "clickhouse://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$database}";
+                    return "clickhouse://{$encodedUser}:{$encodedPass}@{$host}:{$this->public_port}/{$database}";
                 }
 
                 return null;

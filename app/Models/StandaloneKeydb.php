@@ -39,6 +39,7 @@ class StandaloneKeydb extends BaseModel
         'last_restart_type',
         'last_online_at',
         'public_port_timeout',
+        'public_host',
         'enable_ssl',
         'custom_docker_run_options',
         'destination_type',
@@ -300,12 +301,13 @@ class StandaloneKeydb extends BaseModel
             get: function () {
                 if ($this->is_public && $this->public_port) {
                     $serverIp = $this->destination->server->getIp;
-                    if (empty($serverIp)) {
+                    $host = $this->public_host ?? $serverIp;
+                    if (empty($host)) {
                         return null;
                     }
                     $scheme = $this->enable_ssl ? 'rediss' : 'redis';
                     $encodedPass = rawurlencode($this->keydb_password);
-                    $url = "{$scheme}://:{$encodedPass}@{$serverIp}:{$this->public_port}/0";
+                    $url = "{$scheme}://:{$encodedPass}@{$host}:{$this->public_port}/0";
 
                     if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
                         $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';

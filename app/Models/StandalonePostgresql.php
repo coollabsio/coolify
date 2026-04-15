@@ -42,6 +42,7 @@ class StandalonePostgresql extends BaseModel
         'last_restart_type',
         'last_online_at',
         'public_port_timeout',
+        'public_host',
         'enable_ssl',
         'ssl_mode',
         'is_log_drain_enabled',
@@ -317,12 +318,13 @@ class StandalonePostgresql extends BaseModel
             get: function () {
                 if ($this->is_public && $this->public_port) {
                     $serverIp = $this->destination->server->getIp;
-                    if (empty($serverIp)) {
+                    $host = $this->public_host ?? $serverIp;
+                    if (empty($host)) {
                         return null;
                     }
                     $encodedUser = rawurlencode($this->postgres_user);
                     $encodedPass = rawurlencode($this->postgres_password);
-                    $url = "postgres://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$this->postgres_db}";
+                    $url = "postgres://{$encodedUser}:{$encodedPass}@{$host}:{$this->public_port}/{$this->postgres_db}";
                     if ($this->enable_ssl) {
                         $url .= "?sslmode={$this->ssl_mode}";
                         if (in_array($this->ssl_mode, ['verify-ca', 'verify-full'])) {

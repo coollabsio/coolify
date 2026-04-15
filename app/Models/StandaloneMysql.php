@@ -40,6 +40,7 @@ class StandaloneMysql extends BaseModel
         'last_restart_type',
         'last_online_at',
         'public_port_timeout',
+        'public_host',
         'enable_ssl',
         'ssl_mode',
         'is_log_drain_enabled',
@@ -306,12 +307,13 @@ class StandaloneMysql extends BaseModel
             get: function () {
                 if ($this->is_public && $this->public_port) {
                     $serverIp = $this->destination->server->getIp;
-                    if (empty($serverIp)) {
+                    $host = $this->public_host ?? $serverIp;
+                    if (empty($host)) {
                         return null;
                     }
                     $encodedUser = rawurlencode($this->mysql_user);
                     $encodedPass = rawurlencode($this->mysql_password);
-                    $url = "mysql://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$this->mysql_database}";
+                    $url = "mysql://{$encodedUser}:{$encodedPass}@{$host}:{$this->public_port}/{$this->mysql_database}";
                     if ($this->enable_ssl) {
                         $url .= "?ssl-mode={$this->ssl_mode}";
                         if (in_array($this->ssl_mode, ['VERIFY_CA', 'VERIFY_IDENTITY'])) {

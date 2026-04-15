@@ -136,6 +136,8 @@
                 id="publicPort" label="Public Port" canGate="update" :canResource="$database" />
             <x-forms.input type="number" placeholder="3600" disabled="{{ $isPublic }}" id="publicPortTimeout"
                 label="Proxy Timeout (seconds)" helper="Timeout for the public TCP proxy connection in seconds. Default: 3600 (1 hour)." canGate="update" :canResource="$database" />
+                    <x-forms.input placeholder="db.example.com" disabled="{{ $isPublic }}" id="publicHost"
+                        label="Public Host" helper="Optional custom host or domain for the public database URL. When set, this replaces the server IP in the connection URL." canGate="update" :canResource="$database" />
         </div>
         <x-forms.textarea placeholder="# maxmemory 256mb
 # maxmemory-policy allkeys-lru

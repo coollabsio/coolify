@@ -39,6 +39,7 @@ class StandaloneMongodb extends BaseModel
         'last_restart_type',
         'last_online_at',
         'public_port_timeout',
+        'public_host',
         'enable_ssl',
         'ssl_mode',
         'is_log_drain_enabled',
@@ -326,12 +327,13 @@ class StandaloneMongodb extends BaseModel
             get: function () {
                 if ($this->is_public && $this->public_port) {
                     $serverIp = $this->destination->server->getIp;
-                    if (empty($serverIp)) {
+                    $host = $this->public_host ?? $serverIp;
+                    if (empty($host)) {
                         return null;
                     }
                     $encodedUser = rawurlencode($this->mongo_initdb_root_username);
                     $encodedPass = rawurlencode($this->mongo_initdb_root_password);
-                    $url = "mongodb://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/?directConnection=true";
+                    $url = "mongodb://{$encodedUser}:{$encodedPass}@{$host}:{$this->public_port}/?directConnection=true";
                     if ($this->enable_ssl) {
                         $url .= '&tls=true&tlsCAFile=/etc/mongo/certs/ca.pem';
                         if (in_array($this->ssl_mode, ['verify-full'])) {
