@@ -1,0 +1,88 @@
+# documentation: https://github.com/zedeus/nitter
+# slogan: Alternative Twitter/X front-end focused on privacy.
+# category: social
+# tags: twitter,x,privacy,frontend,proxy
+# logo: svgs/nitter.svg
+# port: 8080
+
+# IMPORTANT: You must provide sessions.jsonl with valid Twitter/X session tokens.
+# Generate it using: https://github.com/zedeus/nitter/tree/master/tools
+
+services:
+  nitter:
+    image: zedeus/nitter:latest
+    environment:
+      - SERVICE_URL_NITTER_8080
+    volumes:
+      - type: bind
+        source: ./nitter.conf
+        target: /src/nitter.conf
+        read_only: true
+        content: |
+          [Server]
+          hostname = "localhost"
+          title = "Nitter"
+          address = "0.0.0.0"
+          port = 8080
+          https = false
+          httpMaxConnections = 100
+          staticDir = "./public"
+
+          [Cache]
+          listMinutes = 240
+          rssMinutes = 10
+          redisHost = "nitter-redis"
+          redisPort = 6379
+          redisPassword = ""
+          redisConnections = 20
+          redisMaxConnections = 30
+
+          [Config]
+          hmacKey = "changeme-random-secret"
+          base64Media = false
+          enableRSS = true
+          maxConcurrentReqs = 2
+          maxRetries = 1
+          retryDelayMs = 150
+
+          [Preferences]
+          theme = "Nitter"
+          proxyVideos = true
+      - type: bind
+        source: ./sessions.jsonl
+        target: /src/sessions.jsonl
+        read_only: true
+        content: ""
+    depends_on:
+      nitter-redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -nv --tries=1 --spider http://127.0.0.1:8080/x/status/20 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 2
+    user: "998:998"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  nitter-redis:
+    image: redis:6-alpine
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - nitter-redis:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 2
+    user: "999:1000"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
