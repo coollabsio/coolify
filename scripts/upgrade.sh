@@ -51,7 +51,16 @@ log_section "Step 1/6: Downloading configuration files"
 write_status "1" "Downloading configuration files"
 echo "1/6 Downloading latest configuration files..."
 log "Downloading docker-compose.yml from ${CDN}/docker-compose.yml"
-curl -fsSL -L $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
+DOWNLOADED_COMPOSE="/tmp/docker-compose-new.yml"
+curl -fsSL -L $CDN/docker-compose.yml -o "$DOWNLOADED_COMPOSE"
+if ! grep -q "image:" "$DOWNLOADED_COMPOSE" || ! grep -q "volumes:" "$DOWNLOADED_COMPOSE"; then
+    log "WARNING: Downloaded docker-compose.yml appears incomplete (missing 'image:' or 'volumes:'), keeping existing file"
+    echo "     WARNING: Downloaded docker-compose.yml appears incomplete, keeping existing file."
+else
+    cp "$DOWNLOADED_COMPOSE" /data/coolify/source/docker-compose.yml
+    log "docker-compose.yml updated successfully"
+fi
+rm -f "$DOWNLOADED_COMPOSE"
 log "Downloading docker-compose.prod.yml from ${CDN}/docker-compose.prod.yml"
 curl -fsSL -L $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
 log "Downloading .env.production from ${CDN}/.env.production"
