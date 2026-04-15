@@ -607,7 +607,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->validateShellSafeCommand($this->application->docker_compose_custom_build_command, 'docker_compose_custom_build_command');
             $this->docker_compose_custom_build_command = $this->application->docker_compose_custom_build_command;
             if (! str($this->docker_compose_custom_build_command)->contains('--project-directory')) {
-                $this->docker_compose_custom_build_command = str($this->docker_compose_custom_build_command)->replaceFirst('compose', 'compose --project-directory '.$this->workdir)->value();
+                // Use $this->basedir (not $this->workdir) because:
+                // - $this->workdir = /artifacts/{uuid}/{base_directory} (subdirectory with compose file)
+                // - $this->basedir = /artifacts/{uuid} (parent where Dockerfile lives)
+                // BuildKit resolves Dockerfile relative to --project-directory, so we need
+                // the parent to find the Dockerfile at $basedir/Dockerfile.
+                $this->docker_compose_custom_build_command = str($this->docker_compose_custom_build_command)->replaceFirst('compose', 'compose --project-directory '.$this->basedir)->value();
             }
         }
         if ($this->pull_request_id === 0) {
