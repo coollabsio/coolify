@@ -136,6 +136,9 @@
                         <x-forms.input id="pullRequests"
                             helper="write access needed to use deployment status update in previews."
                             label="Pull Request" readonly placeholder="N/A" />
+                        <x-forms.input id="deployments"
+                            helper="write access needed to sync deployment status back to GitHub."
+                            label="Deployments" readonly placeholder="N/A" />
                     </div>
                 </div>
             @endif
@@ -256,7 +259,7 @@
                                     @endif
                                 </x-forms.select>
                                 <x-forms.button isHighlighted
-                                    x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}',{{ $administration }})">
+                                    x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}','{{ $deployment_statuses_permissions }}',{{ $administration }})">
                                     Register Now
                                 </x-forms.button>
                             </div>
@@ -264,7 +267,7 @@
                             <div class="flex flex-col sm:flex-row gap-2">
                                 <h2>Register a GitHub App</h2>
                                 <x-forms.button isHighlighted
-                                    x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}',{{ $administration }})">
+                                    x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}','{{ $deployment_statuses_permissions }}',{{ $administration }})">
                                     Register Now
                                 </x-forms.button>
                             </div>
@@ -276,6 +279,8 @@
                                 helper="Contents: read<br>Metadata: read<br>Email: read" />
                             <x-forms.checkbox id="preview_deployment_permissions" label="Preview Deployments "
                                 helper="Necessary for updating pull requests with useful comments (deployment status, links, etc.)<br><br>Pull Request: read & write" />
+                            <x-forms.checkbox id="deployment_statuses_permissions" label="GitHub Deployment Statuses"
+                                helper="Necessary for syncing deployment progress back to GitHub.<br><br>Deployments: write" />
                             {{-- <x-forms.checkbox id="administration" label="Administration (for Github Runners)"
                             helper="Necessary for adding Github Runners to repositories.<br><br>Administration: read & write" /> --}}
                         </div>
@@ -287,7 +292,7 @@
                 </div>
             </div>
             <script>
-                function createGithubApp(webhook_endpoint, preview_deployment_permissions, administration) {
+                function createGithubApp(webhook_endpoint, preview_deployment_permissions, deployment_statuses_permissions, administration) {
                     const {
                         organization,
                         uuid,
@@ -317,6 +322,9 @@
                     if (preview_deployment_permissions) {
                         default_permissions.pull_requests = 'write';
                         default_events.push('pull_request');
+                    }
+                    if (deployment_statuses_permissions) {
+                        default_permissions.deployments = 'write';
                     }
                     if (administration) {
                         default_permissions.administration = 'write';

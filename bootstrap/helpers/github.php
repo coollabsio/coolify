@@ -20,7 +20,7 @@ function generateGithubToken(GithubApp $source, string $type)
     $timeDiff = abs($serverTime->diffInSeconds($githubTime));
 
     if ($timeDiff > 50) {
-        throw new \Exception(
+        throw new Exception(
             'System time is out of sync with GitHub API time:<br>'.
             '- System time: '.$serverTime->format('Y-m-d H:i:s').' UTC<br>'.
             '- GitHub time: '.$githubTime->format('Y-m-d H:i:s').' UTC<br>'.
@@ -60,7 +60,7 @@ function generateGithubToken(GithubApp $source, string $type)
 
             return $response->json()['token'];
         })(),
-        default => throw new \InvalidArgumentException("Unsupported token type: {$type}")
+        default => throw new InvalidArgumentException("Unsupported token type: {$type}")
     };
 }
 
@@ -77,11 +77,11 @@ function generateGithubJwt(GithubApp $source)
 function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $method = 'get', ?array $data = null, bool $throwError = true)
 {
     if (is_null($source)) {
-        throw new \Exception('Source is required for API calls');
+        throw new Exception('Source is required for API calls');
     }
 
     if ($source->getMorphClass() !== GithubApp::class) {
-        throw new \InvalidArgumentException("Unsupported source type: {$source->getMorphClass()}");
+        throw new InvalidArgumentException("Unsupported source type: {$source->getMorphClass()}");
     }
 
     if ($source->is_public) {
@@ -100,7 +100,7 @@ function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $m
         $errorMessage = data_get($response->json(), 'message', 'no error message found');
         $remainingCalls = $response->header('X-RateLimit-Remaining', '0');
 
-        throw new \Exception(
+        throw new Exception(
             'GitHub API call failed:<br>'.
             "Error: {$errorMessage}<br>".
             'Rate Limit Status:<br>'.
@@ -162,6 +162,90 @@ function loadRepositoryByPage(GithubApp $source, string $token, int $page)
         'repositories' => $json['repositories'],
     ];
 }
+
+function hasGitHubDeploymentsPermission(GithubApp $source): bool
+{
+    return $source->deployments === 'write';
+}
+
+function createGitHubDeployment(
+    GithubApp $source,
+    string $repository,
+    string $ref,
+    string $environment,
+    ?string $description = null,
+    bool $transientEnvironment = false,
+    bool $productionEnvironment = false
+): ?int {
+    try {
+        $payload = [
+            'ref' => $ref,
+            'environment' => $environment,
+            'auto_merge' => false,
+            'required_contexts' => [],
+            'transient_environment' => $transientEnvironment,
+            'production_environment' => $productionEnvironment,
+        ];
+
+        if ($description) {
+            $payload['description'] = $description;
+        }
+
+        $response = githubApi($source, "repos/{$repository}/deployments", 'post', $payload);
+
+        return data_get($response, 'data.id');
+    } catch (Exception $e) {
+        Log::warning('Failed to create GitHub deployment.', [
+            'repository' => $repository,
+            'environment' => $environment,
+            'error' => $e->getMessage(),
+        ]);
+
+        return null;
+    }
+}
+
+function updateGitHubDeploymentStatus(
+    GithubApp $source,
+    string $repository,
+    int $deploymentId,
+    string $state,
+    ?string $description = null,
+    ?string $logUrl = null,
+    ?string $environmentUrl = null
+): bool {
+    try {
+        $payload = [
+            'state' => $state,
+        ];
+
+        if ($description) {
+            $payload['description'] = $description;
+        }
+
+        if ($logUrl) {
+            $payload['log_url'] = $logUrl;
+        }
+
+        if ($environmentUrl) {
+            $payload['environment_url'] = $environmentUrl;
+        }
+
+        githubApi($source, "repos/{$repository}/deployments/{$deploymentId}/statuses", 'post', $payload);
+
+        return true;
+    } catch (Exception $e) {
+        Log::warning('Failed to update GitHub deployment status.', [
+            'repository' => $repository,
+            'deployment_id' => $deploymentId,
+            'state' => $state,
+            'error' => $e->getMessage(),
+        ]);
+
+        return false;
+    }
+}
+
 function getGithubCommitRangeFiles(?GithubApp $source, string $owner, string $repo, string $beforeSha, string $afterSha): array
 {
     try {
