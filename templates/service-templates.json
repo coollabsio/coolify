@@ -871,6 +871,24 @@
         "logo": "svgs/diun.svg",
         "minversion": "0.0.0"
     },
+    "docker-mailserver": {
+        "documentation": "https://docker-mailserver.github.io/docker-mailserver/latest/?utm_source=coolify.io",
+        "slogan": "Production-ready fullstack mail server (SMTP, IMAP, LDAP, Antispam, Antivirus) using Docker Mailserver.",
+        "compose": "c2VydmljZXM6CiAgbWFpbHNlcnZlcjoKICAgIGltYWdlOiAnbWFpbHNlcnZlci9kb2NrZXItbWFpbHNlcnZlcjpsYXRlc3QnCiAgICBob3N0bmFtZTogJyR7U0VSVklDRV9GUUROX01BSUxTRVJWRVJ9JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ09WRVJSSURFX0hPU1ROQU1FPSR7U0VSVklDRV9GUUROX01BSUxTRVJWRVJ9JwogICAgICAtIEVOQUJMRV9SU1BBTUQ9MQogICAgICAtIEVOQUJMRV9DTEFNQVY9MQogICAgICAtIEVOQUJMRV9GQUlMMkJBTj0xCiAgICAgIC0gU1BPT0ZfUFJPVEVDVElPTj0xCiAgICAgIC0gJ1BPU1RNQVNURVJfQUREUkVTUz1wb3N0bWFzdGVyQCR7U0VSVklDRV9GUUROX01BSUxTRVJWRVJ9JwogICAgICAtICdUWj0ke1RaOi1VVEN9JwogICAgcG9ydHM6CiAgICAgIC0gJzI1OjI1JwogICAgICAtICcxNDM6MTQzJwogICAgICAtICc0NjU6NDY1JwogICAgICAtICc1ODc6NTg3JwogICAgICAtICc5OTM6OTkzJwogICAgdm9sdW1lczoKICAgICAgLSAnbWFpbC1kYXRhOi92YXIvbWFpbCcKICAgICAgLSAnbWFpbC1zdGF0ZTovdmFyL21haWwtc3RhdGUnCiAgICAgIC0gJ21haWwtbG9nczovdmFyL2xvZy9tYWlsJwogICAgICAtICdtYWlsLWNvbmZpZzovdG1wL2RvY2tlci1tYWlsc2VydmVyJwogICAgICAtICcvZXRjL2xvY2FsdGltZTovZXRjL2xvY2FsdGltZTpybycKICAgIGNhcF9hZGQ6CiAgICAgIC0gTkVUX0FETUlOCiAgICByZXN0YXJ0OiBhbHdheXMKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBzcwogICAgICAgIC0gJy0tbGlzdGVuaW5nJwogICAgICAgIC0gJy0tdGNwJwogICAgICAgIC0gJ3wnCiAgICAgICAgLSBncmVwCiAgICAgICAgLSAnLVAnCiAgICAgICAgLSAnTElTVEVOLis6c210cCcKICAgICAgaW50ZXJ2YWw6IDMwcwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogNQo=",
+        "tags": [
+            "mail",
+            "email",
+            "smtp",
+            "imap",
+            "postfix",
+            "dovecot",
+            "rspamd",
+            "clamav"
+        ],
+        "category": "email",
+        "logo": "svgs/docker-mailserver.svg",
+        "minversion": "0.0.0"
+    },
     "docker-registry": {
         "documentation": "https://distribution.github.io/distribution/?utm_source=coolify.io",
         "slogan": "The Docker Registry lets you distribute Docker images.",
