@@ -1,0 +1,45 @@
+# documentation: https://docs.litespeedtech.com/cloud/docker/openlitespeed/
+# slogan: WordPress running on OpenLiteSpeed, a high-performance HTTP server with built-in caching.
+# category: cms
+# tags: cms, wordpress, openlitespeed, litespeed, lscache, mariadb
+# logo: svgs/wordpress.svg
+# port: 8088
+
+services:
+  openlitespeed:
+    image: litespeedtech/openlitespeed:1.8.2-lsphp83
+    environment:
+      - SERVICE_FQDN_OPENLITESPEED_80
+      - TZ=${TZ:-UTC}
+      - DOMAIN=${SERVICE_FQDN_OPENLITESPEED}
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+      - MYSQL_HOST=mariadb
+    volumes:
+      - wordpress-sites:/var/www/vhosts
+      - openlitespeed-conf:/usr/local/lsws/conf
+      - openlitespeed-admin-conf:/usr/local/lsws/admin/conf
+      - openlitespeed-logs:/usr/local/lsws/logs
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8088 >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
