@@ -8,6 +8,10 @@
             href="{{ route('server.proxy.dynamic-confs', $parameters) }}">
             <span class="menu-item-label">Dynamic Configurations</span>
         </a>
+        <a class="{{ request()->routeIs('server.proxy.gateway') ? 'sub-menu-item menu-item-active' : 'sub-menu-item' }}" {{ wireNavigate() }}
+            href="{{ route('server.proxy.gateway', $parameters) }}">
+            <span class="menu-item-label">Gateway</span>
+        </a>
         <a class="{{ request()->routeIs('server.proxy.logs') ? 'sub-menu-item menu-item-active' : 'sub-menu-item' }}"
             href="{{ route('server.proxy.logs', $parameters) }}">
             <span class="menu-item-label">Logs</span>
