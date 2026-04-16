@@ -32,7 +32,7 @@
             helper="Traefik entrypoints, e.g. http, https" />
         <x-forms.input canGate="update" :canResource="$server" id="tls_cert_resolver" :value="$tls_cert_resolver"
             label="TLS Cert Resolver" placeholder="letsencrypt"
-            helper="Name of a Traefik certResolver. Required when TLS is enabled." />
+            helper="Name of a Traefik certResolver. Leave empty if a wildcard cert is pre-mounted in tls.certificates." />
     </div>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
