@@ -139,12 +139,45 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
+        $publicHost = $this->getPublicHost();
+
+        if (blank($port) || blank($publicHost)) {
+            return null;
+        }
+
+        return "{$publicHost}:{$port}";
+    }
+
+    public static function normalizePublicHost(?string $host): ?string
+    {
+        $normalizedHost = str($host)
+            ->trim()
+            ->replaceStart('tcp://', '')
+            ->replaceStart('udp://', '')
+            ->replaceStart('http://', '')
+            ->replaceStart('https://', '')
+            ->trim('/')
+            ->trim()
+            ->lower()
+            ->value();
+
+        return filled($normalizedHost) ? $normalizedHost : null;
+    }
+
+    public function getPublicHost(): ?string
+    {
+        $host = self::normalizePublicHost(data_get($this, 'fqdn'));
+
+        if (filled($host)) {
+            return $host;
+        }
+
         $realIp = $this->service->server->ip;
         if ($this->service->server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
-        return "{$realIp}:{$port}";
+        return filled($realIp) ? $realIp : null;
     }
 
     public function team()
