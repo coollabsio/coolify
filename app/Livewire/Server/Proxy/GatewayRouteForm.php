@@ -100,12 +100,12 @@ class GatewayRouteForm extends Component
 
             $config = $this->buildRouteConfig($newRouterName, $entrypoints);
 
-            // If renaming, drop the old per-route file so we don't leave an orphan.
+            Gateway::writeRouteFile($this->server, $newRouterName, $config);
+
+            // On rename, drop the old per-route file only after the new one was written.
             if ($this->routerName && $this->routerName !== $newRouterName) {
                 Gateway::deleteRouteFile($this->server, $this->routerName);
             }
-
-            Gateway::writeRouteFile($this->server, $newRouterName, $config);
 
             $this->dispatch('gatewayRoutesSaved');
             $this->dispatch('success', 'Gateway route saved.');
