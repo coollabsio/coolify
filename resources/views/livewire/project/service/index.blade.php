@@ -250,10 +250,14 @@
                                     <x-forms.checkbox canGate="update" :canResource="$serviceDatabase" instantSave id="isPublic"
                                         label="Make it publicly available" />
                                 </div>
+                                <x-forms.input canGate="update" :canResource="$serviceDatabase" id="fqdn"
+                                    label="Host / Domain"
+                                    placeholder="db.example.com"
+                                    helper="Optional. If set, the public database address will use this host instead of the server IP. Enter only the host or domain name." />
                                 <x-forms.input type="number" canGate="update" :canResource="$serviceDatabase" placeholder="5432"
                                     disabled="{{ $serviceDatabase->is_public }}" id="publicPort" label="Public Port" />
                                 @if ($db_url_public)
-                                    <x-forms.input label="Database IP:PORT (public)"
+                                    <x-forms.input label="Database Host:PORT (public)"
                                         helper="Your credentials are available in your environment variables." type="password"
                                         readonly wire:model="db_url_public" />
                                 @endif

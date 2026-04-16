@@ -158,6 +158,7 @@ class Index extends Component
         if ($toModel) {
             $this->serviceDatabase->human_name = $this->humanName;
             $this->serviceDatabase->description = $this->description;
+            $this->serviceDatabase->fqdn = ServiceDatabase::normalizePublicHost($this->fqdn);
             $this->serviceDatabase->image = $this->image;
             $this->serviceDatabase->exclude_from_status = $this->excludeFromStatus;
             $this->serviceDatabase->public_port = $this->publicPort ?: null;
@@ -167,6 +168,7 @@ class Index extends Component
         } else {
             $this->humanName = $this->serviceDatabase->human_name;
             $this->description = $this->serviceDatabase->description;
+            $this->fqdn = $this->serviceDatabase->fqdn;
             $this->image = $this->serviceDatabase->image;
             $this->excludeFromStatus = $this->serviceDatabase->exclude_from_status ?? false;
             $this->publicPort = $this->serviceDatabase->public_port;
