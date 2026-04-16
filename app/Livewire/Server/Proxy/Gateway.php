@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server\Proxy;
 
+use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -31,6 +32,9 @@ class Gateway extends Component
             $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->first();
             if (is_null($this->server)) {
                 return redirect()->route('server.index');
+            }
+            if ($this->server->proxyType() !== ProxyTypes::TRAEFIK->value) {
+                return redirect()->route('server.proxy', ['server_uuid' => $this->server->uuid]);
             }
             $this->routes = collect();
         } catch (\Throwable $e) {
