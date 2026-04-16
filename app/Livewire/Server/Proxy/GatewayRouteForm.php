@@ -74,7 +74,7 @@ class GatewayRouteForm extends Component
 
             $this->validate([
                 'name' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z0-9 _\-]+$/'],
-                'domain' => ['required', 'string', 'max:255', 'regex:/^(\*\.)?[A-Za-z0-9.\-_]+$/'],
+                'domain' => ['required', 'string', 'max:255', 'regex:'.Gateway::DOMAIN_REGEX],
                 'target_url' => ['required', 'url:http,https', 'max:500'],
                 'path_prefix' => ['required', 'string', 'max:255', 'regex:#^/[A-Za-z0-9._\-/]*$#'],
                 'entrypoints_input' => ['nullable', 'string', 'max:255', 'regex:/^[A-Za-z0-9_,\s\-]*$/'],
