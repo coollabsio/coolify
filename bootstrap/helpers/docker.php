@@ -86,7 +86,7 @@ function format_docker_command_output_to_json($rawOutput): Collection
         return $outputLines
             ->reject(fn ($line) => empty($line))
             ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
-    } catch (\Throwable) {
+    } catch (Throwable) {
         return collect([]);
     }
 }
@@ -123,7 +123,7 @@ function format_docker_envs_to_json($rawOutput)
 
             return [$env[0] => $env[1]];
         });
-    } catch (\Throwable) {
+    } catch (Throwable) {
         return collect([]);
     }
 }
@@ -256,12 +256,12 @@ function defaultLabels($id, $name, string $projectName, string $resourceName, st
 
 function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 {
-    if ($resource->getMorphClass() === \App\Models\ServiceApplication::class) {
+    if ($resource->getMorphClass() === ServiceApplication::class) {
         $uuid = data_get($resource, 'uuid');
         $server = data_get($resource, 'service.server');
         $environment_variables = data_get($resource, 'service.environment_variables');
         $type = $resource->serviceType();
-    } elseif ($resource->getMorphClass() === \App\Models\Application::class) {
+    } elseif ($resource->getMorphClass() === Application::class) {
         $uuid = data_get($resource, 'uuid');
         $server = data_get($resource, 'destination.server');
         $environment_variables = data_get($resource, 'environment_variables');
@@ -667,7 +667,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     }
                 }
             }
-        } catch (\Throwable) {
+        } catch (Throwable) {
             continue;
         }
     }
@@ -683,6 +683,9 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     }
     $pull_request_id = data_get($preview, 'pull_request_id', 0);
     $appUuid = $application->uuid;
+    // The configuration page can generate labels during Livewire mount, so resolve this before
+    // entering the FQDN branches to avoid undefined-variable 500 errors while rendering.
+    $usePublicCertResolver = shouldUsePublicCertResolver($application->destination?->server);
     if ($pull_request_id !== 0) {
         $appUuid = $appUuid.'-pr-'.$pull_request_id;
     }
@@ -1249,7 +1252,7 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
     $server = Server::ownedByCurrentTeam()->find($server_id);
     try {
         if (! $server) {
-            throw new \Exception('Server not found');
+            throw new Exception('Server not found');
         }
         $yaml_compose = Yaml::parse($compose);
 
@@ -1265,7 +1268,7 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
         ], $server);
 
         return 'OK';
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         return $e->getMessage();
     } finally {
         if (filled($server)) {
@@ -1381,10 +1384,10 @@ function escapeBashDoubleQuoted(?string $value): string
  * Generate Docker build arguments from environment variables collection
  * Returns only keys (no values) since values are sourced from environment via export
  *
- * @param  \Illuminate\Support\Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
- * @return \Illuminate\Support\Collection Collection of formatted --build-arg strings (keys only)
+ * @param  Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
+ * @return Collection Collection of formatted --build-arg strings (keys only)
  */
-function generateDockerBuildArgs($variables): \Illuminate\Support\Collection
+function generateDockerBuildArgs($variables): Collection
 {
     $variables = collect($variables);
 
@@ -1399,7 +1402,7 @@ function generateDockerBuildArgs($variables): \Illuminate\Support\Collection
 /**
  * Generate Docker environment flags from environment variables collection
  *
- * @param  \Illuminate\Support\Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
+ * @param  Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
  * @return string Space-separated environment flags
  */
 function generateDockerEnvFlags($variables): string
