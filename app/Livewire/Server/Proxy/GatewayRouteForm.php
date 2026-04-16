@@ -15,6 +15,8 @@ class GatewayRouteForm extends Component
 
     public ?string $routerName = null;
 
+    public ?string $sourceFile = null;
+
     public Server $server;
 
     public string $name = '';
@@ -42,11 +44,10 @@ class GatewayRouteForm extends Component
         $this->server = Server::ownedByCurrentTeam()->whereId($this->server_id)->firstOrFail();
 
         if ($this->routerName) {
-            $config = Gateway::readRouteConfig($this->server, $this->routerName);
-            $existing = collect(Gateway::parseRoutes($config))
-                ->firstWhere('router_name', $this->routerName);
+            $existing = Gateway::findRoute($this->server, $this->routerName);
 
             if ($existing) {
+                $this->sourceFile = $existing['source_file'];
                 $this->name = $existing['name'];
                 $this->domain = $existing['domain'];
                 $this->target_url = $existing['target_url'];
@@ -89,22 +90,34 @@ class GatewayRouteForm extends Component
             $newRouterName = "gateway-{$slug}";
 
             if ($newRouterName !== $this->routerName) {
-                $existingNames = collect(Gateway::listRouteFiles($this->server))
-                    ->map(fn ($p) => basename($p, '.yaml'));
-                if ($existingNames->contains($newRouterName)) {
+                if (Gateway::findRoute($this->server, $newRouterName) !== null) {
                     throw ValidationException::withMessages([
                         'name' => "A route named '{$this->name}' already exists on this server.",
                     ]);
                 }
+
+                if (! $this->sourceFile) {
+                    $newPath = Gateway::routeFilePath($this->server, $newRouterName);
+                    if (Gateway::fileExistsAt($this->server, $newPath)) {
+                        throw ValidationException::withMessages([
+                            'name' => "A file named '{$newRouterName}.yaml' already exists on this server.",
+                        ]);
+                    }
+                }
             }
 
-            $config = $this->buildRouteConfig($newRouterName, $entrypoints);
+            $delta = $this->buildRouteConfig($newRouterName, $entrypoints);
 
-            Gateway::writeRouteFile($this->server, $newRouterName, $config);
-
-            // On rename, drop the old per-route file only after the new one was written.
-            if ($this->routerName && $this->routerName !== $newRouterName) {
-                Gateway::deleteRouteFile($this->server, $this->routerName);
+            if ($this->sourceFile) {
+                $config = Gateway::readRouteFile($this->server, $this->sourceFile);
+                if ($this->routerName) {
+                    $config = Gateway::stripRouter($config, $this->routerName);
+                }
+                $config = $this->mergeDelta($config, $delta);
+                Gateway::writeFile($this->server, $this->sourceFile, $config);
+            } else {
+                $file = Gateway::routeFilePath($this->server, $newRouterName);
+                Gateway::writeFile($this->server, $file, $delta);
             }
 
             $this->dispatch('gatewayRoutesSaved');
@@ -187,6 +200,21 @@ class GatewayRouteForm extends Component
         ]];
         if (! empty($middlewares)) {
             $config['http']['middlewares'] = $middlewares;
+        }
+
+        return $config;
+    }
+
+    private function mergeDelta(array $config, array $delta): array
+    {
+        $config['http'] = $config['http'] ?? [];
+
+        foreach (['routers', 'services', 'middlewares'] as $section) {
+            $existing = $config['http'][$section] ?? [];
+            $incoming = $delta['http'][$section] ?? [];
+            if (! empty($incoming)) {
+                $config['http'][$section] = array_merge($existing, $incoming);
+            }
         }
 
         return $config;

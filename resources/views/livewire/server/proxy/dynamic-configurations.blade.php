@@ -29,6 +29,10 @@
                         @foreach ($contents as $fileName => $value)
                             @php
                                 $realName = str_replace('|', '.', $fileName);
+                                $isManagedGateway =
+                                    str_starts_with($realName, 'gateway-') &&
+                                    str_ends_with($realName, '.yaml') &&
+                                    str_contains((string) $value, \App\Livewire\Server\Proxy\Gateway::MANAGED_FILE_MARKER);
                             @endphp
                             <div class="flex flex-col gap-2 py-2">
                                 @if (
@@ -37,7 +41,7 @@
                                         $realName === 'coolify.caddy' ||
                                         $realName === 'default_redirect_503.yaml' ||
                                         $realName === 'default_redirect_503.caddy' ||
-                                        (str_starts_with($realName, 'gateway-') && str_ends_with($realName, '.yaml')))
+                                        $isManagedGateway)
                                     <div>
                                         <h3 class="dark:text-white">File: {{ $realName }}</h3>
                                     </div>
