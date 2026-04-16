@@ -9,7 +9,7 @@ services:
   n8n:
     image: n8nio/n8n:2.16.1
     ports:
-      - '0.0.0.0:5678:5678'
+      - '127.0.0.1:5678:5678'
     environment:
       - SERVICE_URL_N8N_5678
       - N8N_EDITOR_BASE_URL=${SERVICE_URL_N8N}
