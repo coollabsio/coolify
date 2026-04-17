@@ -3,188 +3,61 @@
 namespace App\Livewire\Settings;
 
 use App\Models\InstanceSettings;
-use App\Rules\ValidDnsServers;
-use App\Rules\ValidIpOrCidr;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Advanced extends Component
-{
-    public InstanceSettings $settings;
-
-    #[Validate('boolean')]
-    public bool $is_registration_enabled;
-
-    #[Validate('boolean')]
-    public bool $do_not_track;
-
-    #[Validate('boolean')]
-    public bool $is_dns_validation_enabled;
-
-    public ?string $custom_dns_servers = null;
-
-    #[Validate('boolean')]
-    public bool $is_api_enabled;
-
-    public ?string $allowed_ips = null;
-
-    #[Validate('boolean')]
-    public bool $is_sponsorship_popup_enabled;
-
-    #[Validate('boolean')]
-    public bool $disable_two_step_confirmation;
-
-    #[Validate('boolean')]
-    public bool $is_wire_navigate_enabled;
-
-    public function rules()
     {
-        return [
-            'is_registration_enabled' => 'boolean',
-            'do_not_track' => 'boolean',
-            'is_dns_validation_enabled' => 'boolean',
-            'custom_dns_servers' => ['nullable', 'string', new ValidDnsServers],
-            'is_api_enabled' => 'boolean',
-            'allowed_ips' => ['nullable', 'string', new ValidIpOrCidr],
-            'is_sponsorship_popup_enabled' => 'boolean',
-            'disable_two_step_confirmation' => 'boolean',
-            'is_wire_navigate_enabled' => 'boolean',
-        ];
-    }
+            public InstanceSettings $settings;
+
+    #[Validate('boolean')]
+            public bool $is_auto_update_enabled;
+
+    #[Validate('boolean')]
+            public bool $is_registration_enabled;
+
+    #[Validate('boolean')]
+            public bool $is_oauth_registration_enabled;
+
+    #[Validate('boolean')]
+            public bool $force_oauth_only_login;
+
+    #[Validate('string|nullable')]
+            public ?string $allowed_ips = null;
+
+    protected $rules = [
+                'is_auto_update_enabled' => 'required|boolean',
+                'is_registration_enabled' => 'required|boolean',
+                'is_oauth_registration_enabled' => 'required|boolean',
+                'force_oauth_only_login' => 'required|boolean',
+                'allowed_ips' => 'nullable|string',
+            ];
 
     public function mount()
-    {
-        if (! isInstanceAdmin()) {
-            return redirect()->route('dashboard');
+        {
+                    $this->settings = instanceSettings();
+                    $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
+                    $this->is_registration_enabled = $this->settings->is_registration_enabled;
+                    $this->is_oauth_registration_enabled = $this->settings->is_oauth_registration_enabled;
+                    $this->force_oauth_only_login = $this->settings->force_oauth_only_login;
+                    $this->allowed_ips = $this->settings->allowed_ips;
         }
-        $this->settings = instanceSettings();
-        $this->custom_dns_servers = $this->settings->custom_dns_servers;
-        $this->allowed_ips = $this->settings->allowed_ips;
-        $this->do_not_track = $this->settings->do_not_track;
-        $this->is_registration_enabled = $this->settings->is_registration_enabled;
-        $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
-        $this->is_api_enabled = $this->settings->is_api_enabled;
-        $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
-        $this->is_sponsorship_popup_enabled = $this->settings->is_sponsorship_popup_enabled;
-        $this->is_wire_navigate_enabled = $this->settings->is_wire_navigate_enabled ?? true;
-    }
 
     public function submit()
-    {
-        try {
-            $this->validate();
-
-            $this->custom_dns_servers = str($this->custom_dns_servers)->replaceEnd(',', '')->trim();
-            $this->custom_dns_servers = str($this->custom_dns_servers)->trim()->explode(',')->map(function ($dns) {
-                return str($dns)->trim()->lower();
-            })->unique()->implode(',');
-
-            // Handle allowed IPs with subnet support and 0.0.0.0 special case
-            $this->allowed_ips = str($this->allowed_ips)->replaceEnd(',', '')->trim();
-
-            // Only validate and clean up if we have IPs and it's not 0.0.0.0 (allow all)
-            if (! empty($this->allowed_ips) && ! in_array('0.0.0.0', array_map('trim', explode(',', $this->allowed_ips)))) {
-                $invalidEntries = [];
-                $validEntries = str($this->allowed_ips)->trim()->explode(',')->map(function ($entry) use (&$invalidEntries) {
-                    $entry = str($entry)->trim()->toString();
-
-                    if (empty($entry)) {
-                        return null;
-                    }
-
-                    // Check if it's valid CIDR notation
-                    if (str_contains($entry, '/')) {
-                        [$ip, $mask] = explode('/', $entry);
-                        $isIpv6 = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
-                        $maxMask = $isIpv6 ? 128 : 32;
-                        if (filter_var($ip, FILTER_VALIDATE_IP) && is_numeric($mask) && $mask >= 0 && $mask <= $maxMask) {
-                            return $entry;
-                        }
-                        $invalidEntries[] = $entry;
-
-                        return null;
-                    }
-
-                    // Check if it's a valid IP address
-                    if (filter_var($entry, FILTER_VALIDATE_IP)) {
-                        return $entry;
-                    }
-
-                    $invalidEntries[] = $entry;
-
-                    return null;
-                })->filter()->values()->all();
-
-                if (! empty($invalidEntries)) {
-                    $this->dispatch('error', 'Invalid IP addresses or subnets: '.implode(', ', $invalidEntries));
-
-                    return;
-                }
-
-                if (empty($validEntries)) {
-                    $this->dispatch('error', 'No valid IP addresses or subnets provided');
-
-                    return;
-                }
-
-                $validEntries = deduplicateAllowlist($validEntries);
-
-                $this->allowed_ips = implode(',', $validEntries);
-            }
-
-            $this->instantSave();
-        } catch (\Exception $e) {
-            return handleError($e, $this);
+        {
+                    $this->validate();
+                    $this->settings->update([
+                                                        'is_auto_update_enabled' => $this->is_auto_update_enabled,
+                                                        'is_registration_enabled' => $this->is_registration_enabled,
+                                                        'is_oauth_registration_enabled' => $this->is_oauth_registration_enabled,
+                                                        'force_oauth_only_login' => $this->force_oauth_only_login,
+                                                        'allowed_ips' => $this->allowed_ips,
+                                                    ]);
+                    $this->dispatch('success', 'Settings updated.');
         }
-    }
-
-    public function instantSave()
-    {
-        try {
-            $this->settings->is_registration_enabled = $this->is_registration_enabled;
-            $this->settings->do_not_track = $this->do_not_track;
-            $this->settings->is_dns_validation_enabled = $this->is_dns_validation_enabled;
-            $this->settings->custom_dns_servers = $this->custom_dns_servers;
-            $this->settings->is_api_enabled = $this->is_api_enabled;
-            $this->settings->allowed_ips = $this->allowed_ips;
-            $this->settings->is_sponsorship_popup_enabled = $this->is_sponsorship_popup_enabled;
-            $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation;
-            $this->settings->is_wire_navigate_enabled = $this->is_wire_navigate_enabled;
-            $this->settings->save();
-            $this->dispatch('success', 'Settings updated!');
-        } catch (\Exception $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function toggleRegistration($password): bool
-    {
-        if (! verifyPasswordConfirmation($password, $this)) {
-            return false;
-        }
-
-        $this->settings->is_registration_enabled = $this->is_registration_enabled = true;
-        $this->settings->save();
-        $this->dispatch('success', 'Registration has been enabled.');
-
-        return true;
-    }
-
-    public function toggleTwoStepConfirmation($password): bool
-    {
-        if (! verifyPasswordConfirmation($password, $this)) {
-            return false;
-        }
-
-        $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation = true;
-        $this->settings->save();
-        $this->dispatch('success', 'Two step confirmation has been disabled.');
-
-        return true;
-    }
 
     public function render()
-    {
-        return view('livewire.settings.advanced');
+        {
+                    return view('livewire.settings.advanced');
+        }
     }
-}
