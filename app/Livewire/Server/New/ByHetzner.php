@@ -46,6 +46,10 @@ class ByHetzner extends Component
 
     public array $hetznerSshKeys = [];
 
+    public array $hetznerFirewalls = [];
+
+    public array $hetznerNetworks = [];
+
     public ?string $selected_location = null;
 
     public ?int $selected_image = null;
@@ -53,6 +57,10 @@ class ByHetzner extends Component
     public ?string $selected_server_type = null;
 
     public array $selectedHetznerSshKeyIds = [];
+
+    public array $selectedHetznerFirewallIds = [];
+
+    public array $selectedHetznerNetworkIds = [];
 
     public string $server_name = '';
 
@@ -112,6 +120,9 @@ class ByHetzner extends Component
         $this->save_cloud_init_script = false;
         $this->cloud_init_script_name = null;
         $this->selected_cloud_init_script_id = null;
+        $this->selectedHetznerSshKeyIds = [];
+        $this->selectedHetznerFirewallIds = [];
+        $this->selectedHetznerNetworkIds = [];
     }
 
     public function loadTokens()
@@ -160,6 +171,10 @@ class ByHetzner extends Component
                 'private_key_id' => 'required|integer|exists:private_keys,id,team_id,'.currentTeam()->id,
                 'selectedHetznerSshKeyIds' => 'nullable|array',
                 'selectedHetznerSshKeyIds.*' => 'integer',
+                'selectedHetznerFirewallIds' => 'nullable|array',
+                'selectedHetznerFirewallIds.*' => 'integer',
+                'selectedHetznerNetworkIds' => 'nullable|array',
+                'selectedHetznerNetworkIds.*' => 'integer',
                 'enable_ipv4' => 'required|boolean',
                 'enable_ipv6' => 'required|boolean',
                 'cloud_init_script' => ['nullable', 'string', new ValidCloudInitYaml],
@@ -241,6 +256,9 @@ class ByHetzner extends Component
     private function loadHetznerData(string $token)
     {
         $this->loading_data = true;
+        $this->selectedHetznerSshKeyIds = [];
+        $this->selectedHetznerFirewallIds = [];
+        $this->selectedHetznerNetworkIds = [];
 
         try {
             $hetznerService = new HetznerService($token);
@@ -270,6 +288,14 @@ class ByHetzner extends Component
                 ->toArray();
             // Load SSH keys from Hetzner
             $this->hetznerSshKeys = $hetznerService->getSshKeys();
+            $this->hetznerFirewalls = collect($hetznerService->getFirewalls())
+                ->sortBy('name')
+                ->values()
+                ->toArray();
+            $this->hetznerNetworks = collect($hetznerService->getNetworks())
+                ->sortBy('name')
+                ->values()
+                ->toArray();
             $this->loading_data = false;
         } catch (\Throwable $e) {
             $this->loading_data = false;
@@ -345,6 +371,37 @@ class ByHetzner extends Component
         return $filtered;
     }
 
+    public function getAvailableNetworksProperty(): array
+    {
+        $attachableNetworks = collect($this->hetznerNetworks)
+            ->filter(function (array $network) {
+                return collect($network['subnets'] ?? [])->contains(function (array $subnet) {
+                    return in_array($subnet['type'] ?? null, ['cloud', 'server'], true);
+                });
+            });
+
+        if (! $this->selected_location) {
+            return $attachableNetworks->values()->toArray();
+        }
+
+        $location = collect($this->locations)->firstWhere('name', $this->selected_location);
+        $networkZone = $location['network_zone'] ?? null;
+
+        if (! $networkZone) {
+            return $attachableNetworks->values()->toArray();
+        }
+
+        return $attachableNetworks
+            ->filter(function (array $network) use ($networkZone) {
+                return collect($network['subnets'] ?? [])->contains(function (array $subnet) use ($networkZone) {
+                    return in_array($subnet['type'] ?? null, ['cloud', 'server'], true)
+                        && ($subnet['network_zone'] ?? null) === $networkZone;
+                });
+            })
+            ->values()
+            ->toArray();
+    }
+
     public function getSelectedServerPriceProperty(): ?string
     {
         if (! $this->selected_server_type) {
@@ -367,6 +424,13 @@ class ByHetzner extends Component
         // Reset server type and image when location changes
         $this->selected_server_type = null;
         $this->selected_image = null;
+
+        $this->selectedHetznerNetworkIds = array_values(array_filter(
+            $this->selectedHetznerNetworkIds,
+            function (int $selectedNetworkId): bool {
+                return collect($this->availableNetworks)->contains('id', $selectedNetworkId);
+            }
+        ));
     }
 
     public function updatedSelectedServerType($value)
@@ -453,6 +517,18 @@ class ByHetzner extends Component
                 'enable_ipv6' => $this->enable_ipv6,
             ],
         ];
+
+        $firewallIds = array_values(array_unique($this->selectedHetznerFirewallIds));
+        if ($firewallIds !== []) {
+            $params['firewalls'] = array_map(function (int $firewallId): array {
+                return ['firewall' => $firewallId];
+            }, $firewallIds);
+        }
+
+        $networkIds = array_values(array_unique($this->selectedHetznerNetworkIds));
+        if ($networkIds !== []) {
+            $params['networks'] = $networkIds;
+        }
 
         // Add cloud-init script if provided
         if (! empty($this->cloud_init_script)) {

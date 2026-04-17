@@ -117,6 +117,16 @@ class HetznerService
         return $this->requestPaginated('get', '/ssh_keys', 'ssh_keys');
     }
 
+    public function getFirewalls(): array
+    {
+        return $this->requestPaginated('get', '/firewalls', 'firewalls');
+    }
+
+    public function getNetworks(): array
+    {
+        return $this->requestPaginated('get', '/networks', 'networks');
+    }
+
     public function uploadSshKey(string $name, string $publicKey): array
     {
         $response = $this->request('post', '/ssh_keys', [

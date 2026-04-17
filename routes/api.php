@@ -94,6 +94,8 @@ Route::group([
     Route::get('/hetzner/server-types', [HetznerController::class, 'serverTypes'])->middleware(['api.ability:read']);
     Route::get('/hetzner/images', [HetznerController::class, 'images'])->middleware(['api.ability:read']);
     Route::get('/hetzner/ssh-keys', [HetznerController::class, 'sshKeys'])->middleware(['api.ability:read']);
+    Route::get('/hetzner/firewalls', [HetznerController::class, 'firewalls'])->middleware(['api.ability:read']);
+    Route::get('/hetzner/networks', [HetznerController::class, 'networks'])->middleware(['api.ability:read']);
     Route::post('/servers/hetzner', [HetznerController::class, 'createServer'])->middleware(['api.ability:write']);
 
     Route::get('/resources', [ResourcesController::class, 'resources'])->middleware(['api.ability:read']);

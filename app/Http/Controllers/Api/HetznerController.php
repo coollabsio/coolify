@@ -454,6 +454,193 @@ class HetznerController extends Controller
         }
     }
 
+    #[OA\Get(
+        summary: 'Get Hetzner Firewalls',
+        description: 'Get all existing Hetzner firewalls for the current project.',
+        path: '/hetzner/firewalls',
+        operationId: 'get-hetzner-firewalls',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Hetzner'],
+        parameters: [
+            new OA\Parameter(
+                name: 'cloud_provider_token_uuid',
+                in: 'query',
+                required: false,
+                description: 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.',
+                schema: new OA\Schema(type: 'string')
+            ),
+            new OA\Parameter(
+                name: 'cloud_provider_token_id',
+                in: 'query',
+                required: false,
+                deprecated: true,
+                description: 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.',
+                schema: new OA\Schema(type: 'string')
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'List of Hetzner firewalls.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    'id' => ['type' => 'integer'],
+                                    'name' => ['type' => 'string'],
+                                ]
+                            )
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function firewalls(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'cloud_provider_token_uuid' => 'required_without:cloud_provider_token_id|string',
+            'cloud_provider_token_id' => 'required_without:cloud_provider_token_uuid|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $tokenUuid = $this->getCloudProviderTokenUuid($request);
+        $token = CloudProviderToken::whereTeamId($teamId)
+            ->whereUuid($tokenUuid)
+            ->where('provider', 'hetzner')
+            ->first();
+
+        if (! $token) {
+            return response()->json(['message' => 'Hetzner cloud provider token not found.'], 404);
+        }
+
+        try {
+            $hetznerService = new HetznerService($token->token);
+
+            return response()->json($hetznerService->getFirewalls());
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Failed to fetch firewalls: '.$e->getMessage()], 500);
+        }
+    }
+
+    #[OA\Get(
+        summary: 'Get Hetzner Networks',
+        description: 'Get all existing Hetzner private networks for the current project.',
+        path: '/hetzner/networks',
+        operationId: 'get-hetzner-networks',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Hetzner'],
+        parameters: [
+            new OA\Parameter(
+                name: 'cloud_provider_token_uuid',
+                in: 'query',
+                required: false,
+                description: 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.',
+                schema: new OA\Schema(type: 'string')
+            ),
+            new OA\Parameter(
+                name: 'cloud_provider_token_id',
+                in: 'query',
+                required: false,
+                deprecated: true,
+                description: 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.',
+                schema: new OA\Schema(type: 'string')
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'List of Hetzner networks.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    'id' => ['type' => 'integer'],
+                                    'name' => ['type' => 'string'],
+                                    'ip_range' => ['type' => 'string'],
+                                ]
+                            )
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function networks(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'cloud_provider_token_uuid' => 'required_without:cloud_provider_token_id|string',
+            'cloud_provider_token_id' => 'required_without:cloud_provider_token_uuid|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $tokenUuid = $this->getCloudProviderTokenUuid($request);
+        $token = CloudProviderToken::whereTeamId($teamId)
+            ->whereUuid($tokenUuid)
+            ->where('provider', 'hetzner')
+            ->first();
+
+        if (! $token) {
+            return response()->json(['message' => 'Hetzner cloud provider token not found.'], 404);
+        }
+
+        try {
+            $hetznerService = new HetznerService($token->token);
+
+            return response()->json($hetznerService->getNetworks());
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Failed to fetch networks: '.$e->getMessage()], 500);
+        }
+    }
+
     #[OA\Post(
         summary: 'Create Hetzner Server',
         description: 'Create a new server on Hetzner and register it in Coolify.',
@@ -482,6 +669,8 @@ class HetznerController extends Controller
                         'enable_ipv4' => ['type' => 'boolean', 'example' => true, 'description' => 'Enable IPv4 (default: true)'],
                         'enable_ipv6' => ['type' => 'boolean', 'example' => true, 'description' => 'Enable IPv6 (default: true)'],
                         'hetzner_ssh_key_ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Additional Hetzner SSH key IDs'],
+                        'hetzner_firewall_ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Existing Hetzner firewall IDs to apply during server creation'],
+                        'hetzner_network_ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Existing Hetzner network IDs to attach during server creation'],
                         'cloud_init_script' => ['type' => 'string', 'description' => 'Cloud-init YAML script (optional)'],
                         'instant_validate' => ['type' => 'boolean', 'example' => false, 'description' => 'Validate server immediately after creation'],
                     ],
@@ -540,6 +729,8 @@ class HetznerController extends Controller
             'enable_ipv4',
             'enable_ipv6',
             'hetzner_ssh_key_ids',
+            'hetzner_firewall_ids',
+            'hetzner_network_ids',
             'cloud_init_script',
             'instant_validate',
         ];
@@ -566,6 +757,10 @@ class HetznerController extends Controller
             'enable_ipv6' => 'nullable|boolean',
             'hetzner_ssh_key_ids' => 'nullable|array',
             'hetzner_ssh_key_ids.*' => 'integer',
+            'hetzner_firewall_ids' => 'nullable|array',
+            'hetzner_firewall_ids.*' => 'integer',
+            'hetzner_network_ids' => 'nullable|array',
+            'hetzner_network_ids.*' => 'integer',
             'cloud_init_script' => ['nullable', 'string', new ValidCloudInitYaml],
             'instant_validate' => 'nullable|boolean',
         ]);
@@ -603,6 +798,12 @@ class HetznerController extends Controller
         }
         if (is_null($request->hetzner_ssh_key_ids)) {
             $request->offsetSet('hetzner_ssh_key_ids', []);
+        }
+        if (is_null($request->hetzner_firewall_ids)) {
+            $request->offsetSet('hetzner_firewall_ids', []);
+        }
+        if (is_null($request->hetzner_network_ids)) {
+            $request->offsetSet('hetzner_network_ids', []);
         }
         if (is_null($request->instant_validate)) {
             $request->offsetSet('instant_validate', false);
@@ -678,6 +879,18 @@ class HetznerController extends Controller
                     'enable_ipv6' => $request->enable_ipv6,
                 ],
             ];
+
+            $firewallIds = array_values(array_unique($request->hetzner_firewall_ids));
+            if ($firewallIds !== []) {
+                $params['firewalls'] = array_map(function (int $firewallId): array {
+                    return ['firewall' => $firewallId];
+                }, $firewallIds);
+            }
+
+            $networkIds = array_values(array_unique($request->hetzner_network_ids));
+            if ($networkIds !== []) {
+                $params['networks'] = $networkIds;
+            }
 
             // Add cloud-init script if provided
             if (! empty($request->cloud_init_script)) {

@@ -149,6 +149,37 @@
                         </x-forms.datalist>
                     </div>
 
+                    <div>
+                        <x-forms.datalist label="Firewalls (from Hetzner)" id="selectedHetznerFirewallIds"
+                            helper="Optionally apply existing Hetzner firewalls when the server is created."
+                            :multiple="true" :disabled="count($hetznerFirewalls) === 0" :placeholder="count($hetznerFirewalls) > 0
+                                ? 'Search and select firewalls...'
+                                : 'No firewalls found in Hetzner account'">
+                            @foreach ($hetznerFirewalls as $firewall)
+                                <option value="{{ $firewall['id'] }}">
+                                    {{ $firewall['name'] }}
+                                    @if (isset($firewall['rules']))
+                                        - {{ count($firewall['rules']) }} rules
+                                    @endif
+                                </option>
+                            @endforeach
+                        </x-forms.datalist>
+                    </div>
+
+                    <div>
+                        <x-forms.datalist label="Internal Networks (from Hetzner)" id="selectedHetznerNetworkIds"
+                            helper="Optionally attach one or more private networks. Networks are filtered to the selected location's network zone when possible."
+                            :multiple="true" :disabled="count($this->availableNetworks) === 0" :placeholder="count($this->availableNetworks) > 0
+                                ? 'Search and select networks...'
+                                : 'No compatible networks found'">
+                            @foreach ($this->availableNetworks as $network)
+                                <option value="{{ $network['id'] }}">
+                                    {{ $network['name'] }} - {{ $network['ip_range'] }}
+                                </option>
+                            @endforeach
+                        </x-forms.datalist>
+                    </div>
+
                     <div class="flex flex-col gap-2">
                         <label class="text-sm font-medium">Network Configuration</label>
                         <div class="flex gap-4">

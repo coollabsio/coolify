@@ -1,9 +1,12 @@
 <?php
 
 use App\Livewire\Server\New\ByHetzner;
+use App\Models\CloudProviderToken;
+use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 // Note: Full Livewire integration tests require database setup
@@ -141,6 +144,15 @@ it('validates deduplication when Coolify key is also in selected keys', function
         ->and(count($sshKeys))->toBe(3);
 });
 
+it('validates network array merging removes duplicate Hetzner network ids', function () {
+    $selectedHetznerNetworkIds = [456, 789, 456];
+
+    $networkIds = array_values(array_unique($selectedHetznerNetworkIds));
+
+    expect($networkIds)->toBe([456, 789])
+        ->and(count($networkIds))->toBe(2);
+});
+
 describe('Boarding Flow Integration', function () {
     uses(RefreshDatabase::class);
 
@@ -184,5 +196,82 @@ describe('Boarding Flow Integration', function () {
 
         // Boarding should still be enabled since it wasn't created from onboarding
         expect($this->team->fresh()->show_boarding)->toBeTrue();
+    });
+});
+
+describe('Hetzner data loading', function () {
+    uses(RefreshDatabase::class);
+
+    beforeEach(function () {
+        $this->team = Team::factory()->create();
+        $this->user = User::factory()->create();
+        $this->team->members()->attach($this->user->id, ['role' => 'owner']);
+
+        $this->actingAs($this->user);
+        session(['currentTeam' => $this->team]);
+
+        $this->hetznerToken = CloudProviderToken::factory()->create([
+            'team_id' => $this->team->id,
+            'provider' => 'hetzner',
+            'token' => 'test-hetzner-api-token',
+        ]);
+
+        PrivateKey::factory()->create([
+            'team_id' => $this->team->id,
+        ]);
+    });
+
+    test('loads firewalls and networks for the selected Hetzner token', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/locations*' => Http::response([
+                'locations' => [
+                    ['id' => 1, 'name' => 'nbg1', 'city' => 'Nuremberg', 'country' => 'DE', 'network_zone' => 'eu-central'],
+                ],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+            'https://api.hetzner.cloud/v1/server_types*' => Http::response([
+                'server_types' => [
+                    ['id' => 1, 'name' => 'cx11', 'description' => 'CX11', 'locations' => [['name' => 'nbg1']], 'architecture' => 'x86'],
+                ],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+            'https://api.hetzner.cloud/v1/images*' => Http::response([
+                'images' => [
+                    ['id' => 15512617, 'name' => 'ubuntu-24.04', 'type' => 'system', 'deprecated' => false, 'architecture' => 'x86'],
+                ],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+            'https://api.hetzner.cloud/v1/ssh_keys*' => Http::response([
+                'ssh_keys' => [],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+            'https://api.hetzner.cloud/v1/firewalls*' => Http::response([
+                'firewalls' => [
+                    ['id' => 38, 'name' => 'web-firewall', 'rules' => []],
+                ],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+            'https://api.hetzner.cloud/v1/networks*' => Http::response([
+                'networks' => [
+                    [
+                        'id' => 456,
+                        'name' => 'private-eu',
+                        'ip_range' => '10.0.0.0/16',
+                        'subnets' => [
+                            ['type' => 'cloud', 'network_zone' => 'eu-central'],
+                        ],
+                    ],
+                ],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+        ]);
+
+        $component = Livewire::test(ByHetzner::class)
+            ->set('selected_token_id', $this->hetznerToken->id)
+            ->call('nextStep')
+            ->assertSet('current_step', 2);
+
+        expect($component->get('hetznerFirewalls'))->toHaveCount(1)
+            ->and($component->get('hetznerNetworks'))->toHaveCount(1);
     });
 });

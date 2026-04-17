@@ -4,6 +4,7 @@ use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
@@ -207,6 +208,52 @@ describe('GET /api/v1/hetzner/ssh-keys', function () {
         $response->assertStatus(200);
         $response->assertJsonCount(2);
         $response->assertJsonFragment(['name' => 'my-key']);
+    });
+});
+
+describe('GET /api/v1/hetzner/firewalls', function () {
+    test('gets Hetzner firewalls', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/firewalls*' => Http::response([
+                'firewalls' => [
+                    ['id' => 38, 'name' => 'web-firewall', 'rules' => []],
+                    ['id' => 39, 'name' => 'ssh-firewall', 'rules' => []],
+                ],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->getJson('/api/v1/hetzner/firewalls?cloud_provider_token_id='.$this->hetznerToken->uuid);
+
+        $response->assertSuccessful();
+        $response->assertJsonCount(2);
+        $response->assertJsonFragment(['name' => 'web-firewall']);
+    });
+});
+
+describe('GET /api/v1/hetzner/networks', function () {
+    test('gets Hetzner networks', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/networks*' => Http::response([
+                'networks' => [
+                    ['id' => 456, 'name' => 'private-eu', 'ip_range' => '10.0.0.0/16', 'subnets' => []],
+                    ['id' => 457, 'name' => 'private-us', 'ip_range' => '10.1.0.0/16', 'subnets' => []],
+                ],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->getJson('/api/v1/hetzner/networks?cloud_provider_token_id='.$this->hetznerToken->uuid);
+
+        $response->assertSuccessful();
+        $response->assertJsonCount(2);
+        $response->assertJsonFragment(['name' => 'private-eu']);
     });
 });
 
@@ -416,6 +463,53 @@ describe('POST /api/v1/servers/hetzner', function () {
 
         $response->assertStatus(201);
         $response->assertJsonFragment(['ip' => '2001:db8::1']);
+    });
+
+    test('passes selected firewalls and networks to Hetzner server creation', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/ssh_keys*' => Http::response([
+                'ssh_keys' => [],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+            'https://api.hetzner.cloud/v1/ssh_keys' => Http::response([
+                'ssh_key' => ['id' => 123],
+            ], 201),
+            'https://api.hetzner.cloud/v1/servers' => Http::response([
+                'server' => [
+                    'id' => 456,
+                    'public_net' => [
+                        'ipv4' => ['ip' => '1.2.3.4'],
+                        'ipv6' => ['ip' => '2001:db8::1'],
+                    ],
+                ],
+            ], 201),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson('/api/v1/servers/hetzner', [
+            'cloud_provider_token_id' => $this->hetznerToken->uuid,
+            'location' => 'nbg1',
+            'server_type' => 'cx11',
+            'image' => 15512617,
+            'name' => 'test-server',
+            'private_key_uuid' => $this->privateKey->uuid,
+            'hetzner_firewall_ids' => [38, 39],
+            'hetzner_network_ids' => [456, 457, 456],
+        ]);
+
+        $response->assertCreated();
+
+        Http::assertSent(function (HttpRequest $request): bool {
+            return $request->method() === 'POST'
+                && $request->url() === 'https://api.hetzner.cloud/v1/servers'
+                && $request['networks'] === [456, 457]
+                && $request['firewalls'] === [
+                    ['firewall' => 38],
+                    ['firewall' => 39],
+                ];
+        });
     });
 
     test('rejects extra fields not in allowed list', function () {
