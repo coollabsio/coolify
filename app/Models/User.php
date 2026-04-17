@@ -49,6 +49,7 @@ class User extends Authenticatable implements SendsEmail
         'password',
         'force_password_reset',
         'marketing_emails',
+            'force_oauth_login',
         'pending_email',
         'email_change_code',
         'email_change_code_expires_at',
@@ -62,7 +63,8 @@ class User extends Authenticatable implements SendsEmail
     ];
 
     protected $casts = [
-        'email_verified_at' => 'datetime',
+        'email_verified_at' => 'datetime
+                'force_oauth_login' => 'boolean',',
         'force_password_reset' => 'boolean',
         'show_boarding' => 'boolean',
         'email_change_code_expires_at' => 'datetime',
