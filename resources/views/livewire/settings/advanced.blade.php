@@ -38,9 +38,19 @@
                                 warningMessage="Enabling registration allows anyone to create an account on this instance. Make sure you understand the implications before proceeding."
                                 confirmationText="ENABLE REGISTRATION"
                                 confirmationLabel="Please type the confirmation text to enable registration."
-                                shortConfirmationLabel="Confirmation text" />
-                        </div>
-                    @endif
+                                shortConfirmationLabel="Confirmation text" />¿Empezamos firmando el CLA de OpenSign para limpiar tu historial y procedemos con el fix Maestro de Coolify?
+
+</div>
+                    @endif                    <div class="md:w-96">
+                                                <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                                                                                helper="Allow users to self-register via OAuth even if general registration is disabled."
+                                                                                label="OAuth Registration Allowed" />
+                                                                        </x-forms.checkbox>div>
+                                            <div class="md:w-96">
+                                                                        <x-forms.checkbox instantSave id="force_oauth_only_login"
+                                                                                                        helper="Force all users to login via OAuth. Password login will be disabled for everyone."
+                                                                                                        label="Force OAuth Only Login" />
+                                                                                                </x-forms.checkbox>div>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."
