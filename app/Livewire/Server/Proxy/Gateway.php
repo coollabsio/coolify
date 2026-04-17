@@ -318,7 +318,10 @@ class Gateway extends Component
             $isValidTargetUrl = $targetUrl !== ''
                 && filter_var($targetUrl, FILTER_VALIDATE_URL) !== false
                 && in_array(parse_url($targetUrl, PHP_URL_SCHEME), ['http', 'https'], true);
-            $passHostHeaderRaw = $service['loadBalancer']['passHostHeader'] ?? false;
+            // Traefik defaults passHostHeader to true when omitted; preserve that behavior when parsing.
+            $lb = is_array($service['loadBalancer'] ?? null) ? $service['loadBalancer'] : null;
+            $passHostHeaderPresent = $lb !== null && array_key_exists('passHostHeader', $lb);
+            $passHostHeaderRaw = $passHostHeaderPresent ? $lb['passHostHeader'] : true;
             $passHostHeader = $passHostHeaderRaw === true;
 
             $routerMiddlewares = is_array($router['middlewares'] ?? null) ? $router['middlewares'] : [];
@@ -329,6 +332,7 @@ class Gateway extends Component
                 }
             }
 
+            $entrypointsPresent = array_key_exists('entryPoints', $router);
             $entrypoints = is_array($router['entryPoints'] ?? null) ? $router['entryPoints'] : [];
 
             $isValidDomain = $domain !== ''
@@ -342,9 +346,12 @@ class Gateway extends Component
             if (! $isValidTargetUrl) {
                 $missingFields[] = 'target_url';
             }
-            if (is_array($service['loadBalancer'] ?? null)
-                && array_key_exists('passHostHeader', $service['loadBalancer'])
-                && ! is_bool($service['loadBalancer']['passHostHeader'])) {
+            // Traefik treats an omitted entryPoints as "all default entrypoints"; saving from the UI would
+            // narrow that to the form value, so flag it as missing and require the user to be explicit.
+            if (! $entrypointsPresent || empty($entrypoints)) {
+                $missingFields[] = 'entrypoints';
+            }
+            if ($passHostHeaderPresent && ! is_bool($lb['passHostHeader'])) {
                 $missingFields[] = 'pass_host_header';
             }
 
@@ -361,7 +368,7 @@ class Gateway extends Component
                 'pass_host_header' => $passHostHeader,
                 'https_redirect' => isset($routers["{$name}-http"]),
                 'strip_prefix' => $stripPrefix,
-                'has_extra_config' => self::detectExtraConfig($name, $router, $service, $middlewares, $config),
+                'has_extra_config' => self::detectExtraConfig($name, $router, $service, $middlewares, $config, $routers),
                 'missing_fields' => $missingFields,
             ];
         }
@@ -369,7 +376,7 @@ class Gateway extends Component
         return $routes;
     }
 
-    private static function detectExtraConfig(string $name, array $router, ?array $service, array $middlewares, array $config): bool
+    private static function detectExtraConfig(string $name, array $router, ?array $service, array $middlewares, array $config, array $routers = []): bool
     {
         $knownRouterKeys = ['rule', 'entryPoints', 'service', 'tls', 'middlewares'];
         if (count(array_diff(array_keys($router), $knownRouterKeys)) > 0) {
@@ -393,6 +400,23 @@ class Gateway extends Component
             }
             if (! str_ends_with($mw, '-stripprefix') && ! str_ends_with($mw, '-redirect')) {
                 return true;
+            }
+            if (! self::middlewareBodyMatchesUiShape($mw, $middlewares[$mw] ?? null)) {
+                return true;
+            }
+        }
+
+        // Inspect the auto-generated HTTP redirect router's middleware body if present.
+        $httpRedirectRouter = $routers["{$name}-http"] ?? null;
+        if (is_array($httpRedirectRouter)) {
+            $redirectMiddlewares = $httpRedirectRouter['middlewares'] ?? [];
+            if (is_array($redirectMiddlewares)) {
+                foreach ($redirectMiddlewares as $mw) {
+                    if (is_string($mw) && str_ends_with($mw, '-redirect')
+                        && ! self::middlewareBodyMatchesUiShape($mw, $middlewares[$mw] ?? null)) {
+                        return true;
+                    }
+                }
             }
         }
 
@@ -421,6 +445,47 @@ class Gateway extends Component
             if (count(array_diff(array_keys($config['http']), ['routers', 'services', 'middlewares'])) > 0) {
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    private static function middlewareBodyMatchesUiShape(string $middlewareName, mixed $body): bool
+    {
+        if (! is_array($body)) {
+            return false;
+        }
+
+        if (str_ends_with($middlewareName, '-stripprefix')) {
+            if (array_keys($body) !== ['stripPrefix']) {
+                return false;
+            }
+            $sp = $body['stripPrefix'];
+            if (! is_array($sp) || array_keys($sp) !== ['prefixes']) {
+                return false;
+            }
+            if (! is_array($sp['prefixes'])) {
+                return false;
+            }
+            foreach ($sp['prefixes'] as $prefix) {
+                if (! is_string($prefix)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if (str_ends_with($middlewareName, '-redirect')) {
+            if (array_keys($body) !== ['redirectScheme']) {
+                return false;
+            }
+            $rs = $body['redirectScheme'];
+            if (! is_array($rs) || array_keys($rs) !== ['scheme']) {
+                return false;
+            }
+
+            return $rs['scheme'] === 'https';
         }
 
         return false;

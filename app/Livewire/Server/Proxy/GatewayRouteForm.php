@@ -67,19 +67,21 @@ class GatewayRouteForm extends Component
         try {
             $this->authorize('update', $this->server);
 
-            $entrypoints = array_values(array_filter(array_map('trim', explode(',', $this->entrypoints_input))));
-            if (empty($entrypoints)) {
-                $entrypoints = ['https'];
-            }
-
             $this->validate([
                 'name' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z0-9 _\-]+$/'],
                 'domain' => ['required', 'string', 'max:255', 'regex:'.Gateway::DOMAIN_REGEX],
                 'target_url' => ['required', 'url:http,https', 'max:500'],
                 'path_prefix' => ['required', 'string', 'max:255', 'regex:#^/[A-Za-z0-9._\-/]*$#'],
-                'entrypoints_input' => ['nullable', 'string', 'max:255', 'regex:/^[A-Za-z0-9_,\s\-]*$/'],
+                'entrypoints_input' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z0-9_,\s\-]*$/'],
                 'tls_cert_resolver' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9_\-]*$/'],
             ]);
+
+            $entrypoints = array_values(array_filter(array_map('trim', explode(',', $this->entrypoints_input))));
+            if (empty($entrypoints)) {
+                throw ValidationException::withMessages([
+                    'entrypoints_input' => 'At least one entrypoint is required (e.g. https).',
+                ]);
+            }
 
             $slug = str($this->name)->slug()->toString();
             if ($slug === '') {

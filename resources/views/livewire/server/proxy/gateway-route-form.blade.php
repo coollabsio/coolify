@@ -1,12 +1,25 @@
 <form wire:submit.prevent="save" class="flex flex-col w-full gap-4"
-    x-data="{ domain: @js($domain) }">
+    x-data="{
+        name: @js($name),
+        target_url: @js($target_url),
+        domain: @js($domain),
+        entrypoints_input: @js($entrypoints_input),
+        get canSubmit() {
+            return this.name.trim() !== ''
+                && this.target_url.trim() !== ''
+                && this.domain.trim() !== ''
+                && this.entrypoints_input.trim() !== '';
+        }
+    }">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <x-forms.input canGate="update" :canResource="$server" id="name" :value="$name" label="Service Name" required
             placeholder="my-backend-api"
-            helper="Used to derive the Traefik router and service names (e.g. gateway-my-backend-api)." />
+            helper="Used to derive the Traefik router and service names (e.g. gateway-my-backend-api)."
+            x-on:input="name = $event.target.value" />
         <x-forms.input canGate="update" :canResource="$server" id="target_url" :value="$target_url" label="Target URL"
             required placeholder="http://192.168.1.10:3000"
-            helper="Where Traefik forwards matching traffic. Include scheme and port, e.g. http://10.0.0.5:8080." />
+            helper="Where Traefik forwards matching traffic. Include scheme and port, e.g. http://10.0.0.5:8080."
+            x-on:input="target_url = $event.target.value" />
     </div>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -28,8 +41,9 @@
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <x-forms.input canGate="update" :canResource="$server" id="entrypoints_input" :value="$entrypoints_input"
-            label="Entrypoints (comma-separated)" placeholder="websecure"
-            helper="Traefik entrypoints, e.g. http, https" />
+            label="Entrypoints (comma-separated)" required placeholder="websecure"
+            helper="Traefik entrypoints, e.g. http, https"
+            x-on:input="entrypoints_input = $event.target.value" />
         <x-forms.input canGate="update" :canResource="$server" id="tls_cert_resolver" :value="$tls_cert_resolver"
             label="TLS Cert Resolver" placeholder="letsencrypt"
             helper="Name of a Traefik certResolver. Leave empty if a wildcard cert is pre-mounted in tls.certificates." />
@@ -61,7 +75,10 @@
         </x-forms.select>
     </div>
 
-    <x-forms.button canGate="update" :canResource="$server" type="submit" @click="modalOpen=false">
+    <x-forms.button canGate="update" :canResource="$server" type="submit"
+        x-bind:disabled="!canSubmit"
+        x-bind:class="!canSubmit ? 'opacity-50 cursor-not-allowed' : ''"
+        x-on:click="if ($el.form.reportValidity() && canSubmit) { modalOpen = false }">
         {{ $routerName ? 'Update Route' : 'Add Route' }}
     </x-forms.button>
 </form>
