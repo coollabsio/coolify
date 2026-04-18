@@ -5,6 +5,15 @@ namespace App\Livewire\Project\Database;
 use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\ServiceDatabase;
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
@@ -147,21 +156,27 @@ class Import extends Component
 
     public array $importCommands = [];
 
-    public bool $dumpAll = false;
+    public bool $dumpAll = true;
 
-    public string $restoreCommandText = '';
+    public bool $legacySingleDb = false;
+
+    public bool $importDatabases = false;
+
+    public string $restoreMode = 'dump_all';
+
+    public string $databasesToRestore = '';
 
     public string $customLocation = '';
 
     public ?int $activityId = null;
 
-    public string $postgresqlRestoreCommand = 'pg_restore -U $POSTGRES_USER -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
+    public string $postgresqlRestoreCommand = '(gunzip -cf $tmpPath 2>/dev/null || cat $tmpPath) | psql -X -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
 
-    public string $mysqlRestoreCommand = 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
+    public string $mysqlRestoreCommand = '(gunzip -cf $tmpPath 2>/dev/null || cat $tmpPath) | mysql -u root -p$MYSQL_ROOT_PASSWORD';
 
-    public string $mariadbRestoreCommand = 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE';
+    public string $mariadbRestoreCommand = '(gunzip -cf $tmpPath 2>/dev/null || cat $tmpPath) | mariadb -u root -p$MARIADB_ROOT_PASSWORD';
 
-    public string $mongodbRestoreCommand = 'mongorestore --authenticationDatabase=admin --username $MONGO_INITDB_ROOT_USERNAME --password $MONGO_INITDB_ROOT_PASSWORD --uri mongodb://localhost:27017 --gzip --archive=';
+    public string $mongodbRestoreCommand = 'mongorestore --uri="mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@localhost:27017" --gzip --archive=$tmpPath';
 
     // S3 Restore properties
     public array $availableS3Storages = [];
@@ -212,14 +227,28 @@ class Import extends Component
         $this->parameters = get_route_parameters();
         $this->getContainers();
         $this->loadAvailableS3Storages();
+        $this->updatedRestoreMode($this->restoreMode);
     }
 
-    public function updatedDumpAll($value)
+    public function updatedRestoreMode($value)
     {
+        $this->dumpAll = $value === 'dump_all';
+        $this->importDatabases = $value === 'archive';
+        $this->legacySingleDb = $value === 'legacy';
+
+        $this->updateRestoreCommands();
+    }
+
+    private function updateRestoreCommands()
+    {
+        if (! $this->dumpAll && ! $this->legacySingleDb && ! $this->importDatabases) {
+            $this->dumpAll = true;
+        }
+
         $morphClass = $this->resource->getMorphClass();
 
         // Handle ServiceDatabase by checking the database type
-        if ($morphClass === \App\Models\ServiceDatabase::class) {
+        if ($morphClass === ServiceDatabase::class) {
             $dbType = $this->resource->databaseType();
             if (str_contains($dbType, 'mysql')) {
                 $morphClass = 'mysql';
@@ -227,53 +256,88 @@ class Import extends Component
                 $morphClass = 'mariadb';
             } elseif (str_contains($dbType, 'postgres')) {
                 $morphClass = 'postgresql';
+            } elseif (str_contains($dbType, 'mongo')) {
+                $morphClass = 'mongodb';
             }
         }
 
         switch ($morphClass) {
-            case \App\Models\StandaloneMariadb::class:
+            case StandaloneMariadb::class:
             case 'mariadb':
-                if ($value === true) {
+                if ($this->dumpAll) {
                     $this->mariadbRestoreCommand = <<<'EOD'
 for pid in $(mariadb -u root -p$MARIADB_ROOT_PASSWORD -N -e "SELECT id FROM information_schema.processlist WHERE user != 'root';"); do
   mariadb -u root -p$MARIADB_ROOT_PASSWORD -e "KILL $pid" 2>/dev/null || true
 done && \
 mariadb -u root -p$MARIADB_ROOT_PASSWORD -N -e "SELECT CONCAT('DROP DATABASE IF EXISTS \`',schema_name,'\`;') FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema','mysql','performance_schema','sys');" | mariadb -u root -p$MARIADB_ROOT_PASSWORD && \
-mariadb -u root -p$MARIADB_ROOT_PASSWORD -e "CREATE DATABASE IF NOT EXISTS \`${MARIADB_DATABASE:-default}\`;" && \
-(gunzip -cf $tmpPath 2>/dev/null || cat $tmpPath) | sed -e '/^CREATE DATABASE/d' -e '/^USE \`mysql\`/d' | mariadb -u root -p$MARIADB_ROOT_PASSWORD ${MARIADB_DATABASE:-default}
+(gunzip -cf $tmpPath 2>/dev/null || cat $tmpPath) | mariadb -u root -p$MARIADB_ROOT_PASSWORD
 EOD;
-                    $this->restoreCommandText = $this->mariadbRestoreCommand.' && (gunzip -cf <temp_backup_file> 2>/dev/null || cat <temp_backup_file>) | mariadb -u root -p$MARIADB_ROOT_PASSWORD ${MARIADB_DATABASE:-default}';
+                } elseif ($this->importDatabases) {
+                    $this->mariadbRestoreCommand = 'tar -xzf $tmpPath -C /tmp/coolify-restore && mariadb -u root -p$MARIADB_ROOT_PASSWORD < /tmp/coolify-restore/mariadb-dump-<database>.sql';
+                } elseif ($this->legacySingleDb) {
+                    $this->mariadbRestoreCommand = <<<'EOD'
+mariadb -u root -p$MARIADB_ROOT_PASSWORD -e "DROP DATABASE IF EXISTS \`<database>\`; CREATE DATABASE \`<database>\`;" && \
+mariadb -u root -p$MARIADB_ROOT_PASSWORD <database> < $tmpPath
+EOD;
                 } else {
-                    $this->mariadbRestoreCommand = 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE';
+                    $this->mariadbRestoreCommand = 'mariadb -u root -p$MARIADB_ROOT_PASSWORD ${MARIADB_DATABASE:-default}';
                 }
                 break;
-            case \App\Models\StandaloneMysql::class:
+            case StandaloneMysql::class:
             case 'mysql':
-                if ($value === true) {
+                if ($this->dumpAll) {
                     $this->mysqlRestoreCommand = <<<'EOD'
 for pid in $(mysql -u root -p$MYSQL_ROOT_PASSWORD -N -e "SELECT id FROM information_schema.processlist WHERE user != 'root';"); do
   mysql -u root -p$MYSQL_ROOT_PASSWORD -e "KILL $pid" 2>/dev/null || true
 done && \
 mysql -u root -p$MYSQL_ROOT_PASSWORD -N -e "SELECT CONCAT('DROP DATABASE IF EXISTS \`',schema_name,'\`;') FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema','mysql','performance_schema','sys');" | mysql -u root -p$MYSQL_ROOT_PASSWORD && \
-mysql -u root -p$MYSQL_ROOT_PASSWORD -e "CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE:-default}\`;" && \
-(gunzip -cf $tmpPath 2>/dev/null || cat $tmpPath) | sed -e '/^CREATE DATABASE/d' -e '/^USE \`mysql\`/d' | mysql -u root -p$MYSQL_ROOT_PASSWORD ${MYSQL_DATABASE:-default}
+(gunzip -cf $tmpPath 2>/dev/null || cat $tmpPath) | mysql -u root -p$MYSQL_ROOT_PASSWORD
 EOD;
-                    $this->restoreCommandText = $this->mysqlRestoreCommand.' && (gunzip -cf <temp_backup_file> 2>/dev/null || cat <temp_backup_file>) | mysql -u root -p$MYSQL_ROOT_PASSWORD ${MYSQL_DATABASE:-default}';
+                } elseif ($this->importDatabases) {
+                    $this->mysqlRestoreCommand = 'tar -xzf $tmpPath -C /tmp/coolify-restore && mysql -u root -p$MYSQL_ROOT_PASSWORD < /tmp/coolify-restore/mysql-dump-<database>.sql';
+                } elseif ($this->legacySingleDb) {
+                    $this->mysqlRestoreCommand = <<<'EOD'
+mysql -u root -p$MYSQL_ROOT_PASSWORD -e "DROP DATABASE IF EXISTS \`<database>\`; CREATE DATABASE \`<database>\`;" && \
+mysql -u root -p$MYSQL_ROOT_PASSWORD <database> < $tmpPath
+EOD;
                 } else {
-                    $this->mysqlRestoreCommand = 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
+                    $this->mysqlRestoreCommand = 'mysql -u root -p$MYSQL_ROOT_PASSWORD ${MYSQL_DATABASE:-default}';
                 }
                 break;
-            case \App\Models\StandalonePostgresql::class:
+            case StandalonePostgresql::class:
             case 'postgresql':
-                if ($value === true) {
+                if ($this->dumpAll) {
                     $this->postgresqlRestoreCommand = <<<'EOD'
-psql -U ${POSTGRES_USER} -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()" && \
-psql -U ${POSTGRES_USER} -t -c "SELECT datname FROM pg_database WHERE NOT datistemplate" | xargs -I {} dropdb -U ${POSTGRES_USER} --if-exists {} && \
-createdb -U ${POSTGRES_USER} ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}
+psql -U ${POSTGRES_USER} -d template1 -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()" && \
+psql -U ${POSTGRES_USER} -d template1 -t -c "SELECT datname FROM pg_database WHERE NOT datistemplate" | xargs -r -I {} dropdb -U ${POSTGRES_USER} --if-exists {} && \
+createdb -U ${POSTGRES_USER} ${POSTGRES_DB:-${POSTGRES_USER:-postgres}} && \
+(gunzip -cf $tmpPath 2>/dev/null || cat $tmpPath) | psql -X -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}
 EOD;
-                    $this->restoreCommandText = $this->postgresqlRestoreCommand.' && (gunzip -cf <temp_backup_file> 2>/dev/null || cat <temp_backup_file>) | psql -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
+                } elseif ($this->importDatabases) {
+                    $this->postgresqlRestoreCommand = <<<'EOD'
+tar -xzf $tmpPath -C /tmp/coolify-restore && \
+psql -U ${POSTGRES_USER} -d template1 -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '<database>' AND pid <> pg_backend_pid()" && \
+dropdb -U ${POSTGRES_USER} --if-exists <database> && \
+createdb -U ${POSTGRES_USER} <database> && \
+pg_restore -U ${POSTGRES_USER} -d <database> /tmp/coolify-restore/pg-dump-<database>.dmp
+EOD;
+                } elseif ($this->legacySingleDb) {
+                    $this->postgresqlRestoreCommand = <<<'EOD'
+psql -U ${POSTGRES_USER} -d template1 -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '<database>' AND pid <> pg_backend_pid()" && \
+dropdb -U ${POSTGRES_USER} --if-exists <database> && \
+createdb -U ${POSTGRES_USER} <database> && \
+pg_restore -U ${POSTGRES_USER} -d <database> $tmpPath
+EOD;
                 } else {
                     $this->postgresqlRestoreCommand = 'pg_restore -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
+                }
+                break;
+            case StandaloneMongodb::class:
+            case 'mongodb':
+                if ($this->importDatabases) {
+                    $this->mongodbRestoreCommand = 'tar -xzf $tmpPath -C /tmp/coolify-restore && for archive in /tmp/coolify-restore/mongo-dump-*; do [ -e "$archive" ] || continue; mongorestore --uri="mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@localhost:27017" --drop --gzip --archive="$archive"; done && rm -rf /tmp/coolify-restore';
+                } else {
+                    $this->mongodbRestoreCommand = 'mongorestore --uri="mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@localhost:27017" --drop --gzip --archive=$tmpPath';
                 }
                 break;
         }
@@ -321,7 +385,7 @@ EOD;
         $this->resourceStatus = $resource->status ?? '';
 
         // Handle ServiceDatabase server access differently
-        if ($resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
+        if ($resource->getMorphClass() === ServiceDatabase::class) {
             $server = $resource->service?->server;
             if (! $server) {
                 abort(404, 'Server not found for this service database.');
@@ -359,16 +423,16 @@ EOD;
         }
 
         if (
-            $resource->getMorphClass() === \App\Models\StandaloneRedis::class ||
-            $resource->getMorphClass() === \App\Models\StandaloneKeydb::class ||
-            $resource->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
-            $resource->getMorphClass() === \App\Models\StandaloneClickhouse::class
+            $resource->getMorphClass() === StandaloneRedis::class ||
+            $resource->getMorphClass() === StandaloneKeydb::class ||
+            $resource->getMorphClass() === StandaloneDragonfly::class ||
+            $resource->getMorphClass() === StandaloneClickhouse::class
         ) {
             $this->unsupported = true;
         }
 
         // Mark unsupported ServiceDatabase types (Redis, KeyDB, etc.)
-        if ($resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
+        if ($resource->getMorphClass() === ServiceDatabase::class) {
             $dbType = $resource->databaseType();
             if (str_contains($dbType, 'redis') || str_contains($dbType, 'keydb') ||
                 str_contains($dbType, 'dragonfly') || str_contains($dbType, 'clickhouse')) {
@@ -664,7 +728,7 @@ EOD;
             $fullImageName = "{$helperImage}:{$latestVersion}";
 
             // Get the database destination network
-            if ($this->resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
+            if ($this->resource->getMorphClass() === ServiceDatabase::class) {
                 $destinationNetwork = $this->resource->service->destination->network ?? 'coolify';
             } else {
                 $destinationNetwork = $this->resource->destination->network ?? 'coolify';
@@ -754,9 +818,10 @@ EOD;
     public function buildRestoreCommand(string $tmpPath): string
     {
         $morphClass = $this->resource->getMorphClass();
+        $databaseToRestore = null;
 
         // Handle ServiceDatabase by checking the database type
-        if ($morphClass === \App\Models\ServiceDatabase::class) {
+        if ($morphClass === ServiceDatabase::class) {
             $dbType = $this->resource->databaseType();
             if (str_contains($dbType, 'mysql')) {
                 $morphClass = 'mysql';
@@ -769,40 +834,84 @@ EOD;
             }
         }
 
+        if ($this->legacySingleDb) {
+            $databases = collect(explode(',', $this->databasesToRestore))
+                ->map(fn ($database) => trim($database))
+                ->filter();
+
+            if ($databases->count() !== 1) {
+                throw new \Exception('Please specify exactly one database to restore for a legacy backup file.');
+            }
+
+            $databaseToRestore = $databases->first();
+            validateShellSafePath($databaseToRestore, 'database name');
+        }
+
+        if ($this->importDatabases) {
+            validateDatabasesBackupInput($this->databasesToRestore);
+            $databases = collect(explode(',', $this->databasesToRestore))
+                ->map(fn ($database) => trim($database))
+                ->filter();
+
+            if ($databases->isEmpty()) {
+                throw new \Exception('Please specify at least one database to restore from the archive.');
+            }
+
+            $extractPath = '/tmp/coolify-restore';
+
+            $commands = ["rm -rf {$extractPath}", "mkdir -p {$extractPath}", "tar -xzf {$tmpPath} -C {$extractPath}"];
+
+            foreach ($databases as $database) {
+                $escapedDatabase = escapeshellarg($database);
+
+                switch ($morphClass) {
+                    case StandaloneMariadb::class:
+                    case 'mariadb':
+                        $commands[] = "for pid in \$(mariadb -u root -p\$MARIADB_ROOT_PASSWORD -N -e \"SELECT id FROM information_schema.processlist WHERE user != 'root';\"); do mariadb -u root -p\$MARIADB_ROOT_PASSWORD -e \"KILL \$pid\" 2>/dev/null || true; done";
+                        $commands[] = "mariadb -u root -p\$MARIADB_ROOT_PASSWORD -e \"DROP DATABASE IF EXISTS \\`{$database}\\`; CREATE DATABASE \\`{$database}\\`;\"";
+                        $commands[] = "mariadb -u root -p\$MARIADB_ROOT_PASSWORD {$escapedDatabase} < {$extractPath}/mariadb-dump-{$database}.sql";
+                        break;
+                    case StandaloneMysql::class:
+                    case 'mysql':
+                        $commands[] = "for pid in \$(mysql -u root -p\$MYSQL_ROOT_PASSWORD -N -e \"SELECT id FROM information_schema.processlist WHERE user != 'root';\"); do mysql -u root -p\$MYSQL_ROOT_PASSWORD -e \"KILL \$pid\" 2>/dev/null || true; done";
+                        $commands[] = "mysql -u root -p\$MYSQL_ROOT_PASSWORD -e \"DROP DATABASE IF EXISTS \\`{$database}\\`; CREATE DATABASE \\`{$database}\\`;\"";
+                        $commands[] = "mysql -u root -p\$MYSQL_ROOT_PASSWORD {$escapedDatabase} < {$extractPath}/mysql-dump-{$database}.sql";
+                        break;
+                    case StandalonePostgresql::class:
+                    case 'postgresql':
+                        $commands[] = "psql -U \${POSTGRES_USER} -d template1 -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = {$escapedDatabase} AND pid <> pg_backend_pid()\"";
+                        $commands[] = "dropdb -U \${POSTGRES_USER} --if-exists {$escapedDatabase}";
+                        $commands[] = "createdb -U \${POSTGRES_USER} {$escapedDatabase}";
+                        $commands[] = "pg_restore -U \${POSTGRES_USER} -d {$escapedDatabase} {$extractPath}/pg-dump-{$database}.dmp";
+                        break;
+                    case StandaloneMongodb::class:
+                    case 'mongodb':
+                        $commands[] = "mongorestore --uri=\"mongodb://\$MONGO_INITDB_ROOT_USERNAME:\$MONGO_INITDB_ROOT_PASSWORD@localhost:27017\" --drop --gzip --archive={$extractPath}/mongo-dump-{$database}.archive.gz";
+                        break;
+                }
+            }
+
+            $commands[] = "rm -rf {$extractPath}";
+
+            return implode(' && ', $commands);
+        }
+
         switch ($morphClass) {
-            case \App\Models\StandaloneMariadb::class:
+            case StandaloneMariadb::class:
             case 'mariadb':
-                $restoreCommand = $this->mariadbRestoreCommand;
-                if ($this->dumpAll) {
-                    $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mariadb -u root -p\$MARIADB_ROOT_PASSWORD \${MARIADB_DATABASE:-default}";
-                } else {
-                    $restoreCommand .= " < {$tmpPath}";
-                }
+                $restoreCommand = str_replace(['$tmpPath', '<database>'], [$tmpPath, $databaseToRestore ?? '<database>'], $this->mariadbRestoreCommand);
                 break;
-            case \App\Models\StandaloneMysql::class:
+            case StandaloneMysql::class:
             case 'mysql':
-                $restoreCommand = $this->mysqlRestoreCommand;
-                if ($this->dumpAll) {
-                    $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mysql -u root -p\$MYSQL_ROOT_PASSWORD \${MYSQL_DATABASE:-default}";
-                } else {
-                    $restoreCommand .= " < {$tmpPath}";
-                }
+                $restoreCommand = str_replace(['$tmpPath', '<database>'], [$tmpPath, $databaseToRestore ?? '<database>'], $this->mysqlRestoreCommand);
                 break;
-            case \App\Models\StandalonePostgresql::class:
+            case StandalonePostgresql::class:
             case 'postgresql':
-                $restoreCommand = $this->postgresqlRestoreCommand;
-                if ($this->dumpAll) {
-                    $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | psql -U \${POSTGRES_USER} -d \${POSTGRES_DB:-\${POSTGRES_USER:-postgres}}";
-                } else {
-                    $restoreCommand .= " {$tmpPath}";
-                }
+                $restoreCommand = str_replace(['$tmpPath', '<database>'], [$tmpPath, $databaseToRestore ?? '<database>'], $this->postgresqlRestoreCommand);
                 break;
-            case \App\Models\StandaloneMongodb::class:
+            case StandaloneMongodb::class:
             case 'mongodb':
-                $restoreCommand = $this->mongodbRestoreCommand;
-                if ($this->dumpAll === false) {
-                    $restoreCommand .= "{$tmpPath}";
-                }
+                $restoreCommand = str_replace('$tmpPath', $tmpPath, $this->mongodbRestoreCommand);
                 break;
             default:
                 $restoreCommand = '';
