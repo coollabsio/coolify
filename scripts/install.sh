@@ -539,6 +539,15 @@ install_docker_manually() {
         echo "Docker installed successfully."
     fi
 }
+
+install_docker_from_rhel_repo() {
+    echo " - Installing Docker from the RHEL repository for Rocky Linux..."
+    rm -f /etc/yum.repos.d/docker-ce.repo /etc/yum.repos.d/docker-ce-staging.repo
+    dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+    dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    systemctl --now enable docker
+}
+
 log_section "Step 3/9: Checking Docker installation"
 echo "3/9 Checking Docker installation..."
 if ! [ -x "$(command -v docker)" ]; then
@@ -576,6 +585,13 @@ if ! [ -x "$(command -v docker)" ]; then
         if ! [ -x "$(command -v docker)" ]; then
             echo " - Failed to install Docker with dnf. Try to install it manually."
             echo "   Please visit https://www.cyberciti.biz/faq/how-to-install-docker-on-amazon-linux-2/ for more information."
+            exit 1
+        fi
+        ;;
+    "rocky")
+        install_docker_from_rhel_repo
+        if ! [ -x "$(command -v docker)" ]; then
+            echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
             exit 1
         fi
         ;;

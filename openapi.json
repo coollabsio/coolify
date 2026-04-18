@@ -361,7 +361,7 @@
                                                 },
                                                 "domain": {
                                                     "type": "string",
-                                                    "description": "Comma-separated list of URLs (e.g. \"http:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
+                                                    "description": "Comma-separated list of URLs (e.g. \"https:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
                                                 }
                                             },
                                             "type": "object"
@@ -811,7 +811,7 @@
                                                 },
                                                 "domain": {
                                                     "type": "string",
-                                                    "description": "Comma-separated list of URLs (e.g. \"http:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
+                                                    "description": "Comma-separated list of URLs (e.g. \"https:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
                                                 }
                                             },
                                             "type": "object"
@@ -1261,7 +1261,7 @@
                                                 },
                                                 "domain": {
                                                     "type": "string",
-                                                    "description": "Comma-separated list of URLs (e.g. \"http:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
+                                                    "description": "Comma-separated list of URLs (e.g. \"https:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
                                                 }
                                             },
                                             "type": "object"
@@ -2692,7 +2692,7 @@
                                                 },
                                                 "domain": {
                                                     "type": "string",
-                                                    "description": "Comma-separated list of URLs (e.g. \"http:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
+                                                    "description": "Comma-separated list of URLs (e.g. \"https:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
                                                 }
                                             },
                                             "type": "object"
@@ -10811,7 +10811,7 @@
                                                 },
                                                 "url": {
                                                     "type": "string",
-                                                    "description": "Comma-separated list of URLs (e.g. \"http:\/\/app.coolify.io,https:\/\/app2.coolify.io\")."
+                                                    "description": "Comma-separated list of URLs (e.g. \"https:\/\/app.coolify.io,https:\/\/app2.coolify.io\")."
                                                 }
                                             },
                                             "type": "object"
@@ -11142,7 +11142,7 @@
                                                 },
                                                 "url": {
                                                     "type": "string",
-                                                    "description": "Comma-separated list of URLs (e.g. \"http:\/\/app.coolify.io,https:\/\/app2.coolify.io\")."
+                                                    "description": "Comma-separated list of URLs (e.g. \"https:\/\/app.coolify.io,https:\/\/app2.coolify.io\")."
                                                 }
                                             },
                                             "type": "object"

@@ -30,7 +30,7 @@ it('does not clean up servers with unreachable_count less than 3', function () {
         'updated_at' => now()->subDays(8),
     ]);
 
-    $originalIp = $server->ip;
+    $originalIp = (string) $server->ip;
 
     $this->artisan('cleanup:unreachable-servers')->assertSuccessful();
 
@@ -47,7 +47,7 @@ it('does not clean up servers updated within 7 days', function () {
         'updated_at' => now()->subDays(3),
     ]);
 
-    $originalIp = $server->ip;
+    $originalIp = (string) $server->ip;
 
     $this->artisan('cleanup:unreachable-servers')->assertSuccessful();
 
@@ -64,7 +64,7 @@ it('does not clean up servers without notification sent', function () {
         'updated_at' => now()->subDays(8),
     ]);
 
-    $originalIp = $server->ip;
+    $originalIp = (string) $server->ip;
 
     $this->artisan('cleanup:unreachable-servers')->assertSuccessful();
 

@@ -112,6 +112,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - dev_coolify_data:/data/coolify
+      - dev_coolify_data:/var/lib/docker/volumes/coolify_dev_coolify_data/_data
       - dev_backups_data:/data/coolify/backups
       - dev_postgres_data:/data/coolify/_volumes/database
       - dev_redis_data:/data/coolify/_volumes/redis
