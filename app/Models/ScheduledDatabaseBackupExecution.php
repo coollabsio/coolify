@@ -13,7 +13,7 @@ class ScheduledDatabaseBackupExecution extends BaseModel
         'message',
         'size',
         'filename',
-        'database_name',
+        'databases',
         'finished_at',
         'local_storage_deleted',
         's3_storage_deleted',
