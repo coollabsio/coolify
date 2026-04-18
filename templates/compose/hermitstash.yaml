@@ -1,0 +1,26 @@
+# documentation: https://github.com/dotCooCoo/hermitstash#docker-deployment
+# slogan: Post-quantum encrypted, self-hosted file uploads.
+# category: storage
+# tags: file-sharing,encryption,post-quantum,pqc,ml-kem,self-hosted,file-upload,zero-knowledge
+# logo: svgs/hermitstash.svg
+# port: 3000
+# minversion: 0.0.0
+
+services:
+  hermitstash:
+    image: ghcr.io/dotcoocoo/hermitstash:latest
+    environment:
+      - SERVICE_FQDN_HERMITSTASH_3000
+      - NODE_ENV=production
+      - HERMITSTASH_TMPDIR=/dev/shm
+      - TRUST_PROXY=true
+      - RP_ORIGIN=${SERVICE_FQDN_HERMITSTASH_3000}
+    volumes:
+      - hermitstash-data:/app/data
+      - hermitstash-uploads:/app/uploads
+    shm_size: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000/health', r => { let d=''; r.on('data', c => d+=c); r.on('end', () => { process.exit(JSON.parse(d).status === 'ok' ? 0 : 1) }) }).on('error', () => process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
