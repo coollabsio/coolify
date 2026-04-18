@@ -1,79 +1,123 @@
 <?php
 
 use App\Livewire\Project\Database\Import;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
 
-test('buildRestoreCommand handles PostgreSQL without dumpAll', function () {
-    $component = new Import;
-    $component->dumpAll = false;
-    $component->postgresqlRestoreCommand = 'pg_restore -U $POSTGRES_USER -d $POSTGRES_DB';
+class TestImportComponent extends Import
+{
+    public mixed $resource;
+}
 
-    $database = Mockery::mock('App\Models\StandalonePostgresql');
-    $database->shouldReceive('getMorphClass')->andReturn('App\Models\StandalonePostgresql');
+function importComponentFor(object $database): TestImportComponent
+{
+    $component = new TestImportComponent;
     $component->resource = $database;
 
-    $result = $component->buildRestoreCommand('/tmp/test.dump');
+    return $component;
+}
 
-    expect($result)->toContain('pg_restore');
-    expect($result)->toContain('/tmp/test.dump');
-});
+test('buildRestoreCommand handles PostgreSQL dump all by default', function () {
+    $database = Mockery::mock(StandalonePostgresql::class);
+    $database->shouldReceive('getMorphClass')->andReturn(StandalonePostgresql::class);
 
-test('buildRestoreCommand handles PostgreSQL with dumpAll', function () {
-    $component = new Import;
-    $component->dumpAll = true;
-    // This is the full dump-all command prefix that would be set in the updatedDumpAll method
-    $component->postgresqlRestoreCommand = 'psql -U $POSTGRES_USER -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()" && psql -U $POSTGRES_USER -t -c "SELECT datname FROM pg_database WHERE NOT datistemplate" | xargs -I {} dropdb -U $POSTGRES_USER --if-exists {} && createdb -U $POSTGRES_USER postgres';
-
-    $database = Mockery::mock('App\Models\StandalonePostgresql');
-    $database->shouldReceive('getMorphClass')->andReturn('App\Models\StandalonePostgresql');
-    $component->resource = $database;
+    $component = importComponentFor($database);
+    $component->updatedRestoreMode('dump_all');
 
     $result = $component->buildRestoreCommand('/tmp/test.dump');
 
     expect($result)->toContain('gunzip -cf /tmp/test.dump');
-    expect($result)->toContain('psql -U $POSTGRES_USER postgres');
+    expect($result)->toContain('{ gunzip -cf /tmp/test.dump 2>/dev/null || cat /tmp/test.dump; }');
+    expect($result)->toContain('psql -X -U ${POSTGRES_USER} -d postgres');
 });
 
-test('buildRestoreCommand handles MySQL without dumpAll', function () {
-    $component = new Import;
-    $component->dumpAll = false;
-    $component->mysqlRestoreCommand = 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
+test('buildRestoreCommand handles PostgreSQL legacy single db restore', function () {
+    $database = Mockery::mock(StandalonePostgresql::class);
+    $database->shouldReceive('getMorphClass')->andReturn(StandalonePostgresql::class);
 
-    $database = Mockery::mock('App\Models\StandaloneMysql');
-    $database->shouldReceive('getMorphClass')->andReturn('App\Models\StandaloneMysql');
-    $component->resource = $database;
+    $component = importComponentFor($database);
+    $component->updatedRestoreMode('legacy');
+    $component->databasesToRestore = 'legacy_db';
 
     $result = $component->buildRestoreCommand('/tmp/test.dump');
+
+    expect($result)->toContain('pg_restore');
+    expect($result)->toContain('--clean --if-exists');
+    expect($result)->toContain('-d legacy_db');
+    expect($result)->toContain('/tmp/test.dump');
+});
+
+test('buildRestoreCommand handles PostgreSQL archive import restore', function () {
+    $database = Mockery::mock(StandalonePostgresql::class);
+    $database->shouldReceive('getMorphClass')->andReturn(StandalonePostgresql::class);
+
+    $component = importComponentFor($database);
+    $component->updatedRestoreMode('archive');
+    $component->databasesToRestore = 'app_one,app_two';
+
+    $result = $component->buildRestoreCommand('/tmp/test.tar.gz');
+
+    expect($result)->toContain('tar -xzf /tmp/test.tar.gz -C /tmp/coolify-restore');
+    expect($result)->toContain('pg_restore --clean --if-exists');
+    expect($result)->toContain('pg-dump-app_one.dmp');
+    expect($result)->toContain('pg-dump-app_two.dmp');
+    expect($result)->toContain('pg_restore --clean --if-exists -U ${POSTGRES_USER} -d');
+    expect($result)->toContain('rm -rf /tmp/coolify-restore');
+});
+
+test('buildRestoreCommand handles MySQL legacy single db restore', function () {
+    $database = Mockery::mock(StandaloneMysql::class);
+    $database->shouldReceive('getMorphClass')->andReturn(StandaloneMysql::class);
+
+    $component = importComponentFor($database);
+    $component->updatedRestoreMode('legacy');
+    $component->databasesToRestore = 'legacy_db';
+
+    $result = $component->buildRestoreCommand('/tmp/test.sql');
 
     expect($result)->toContain('mysql -u $MYSQL_USER');
-    expect($result)->toContain('< /tmp/test.dump');
+    expect($result)->toContain('legacy_db < /tmp/test.sql');
+    expect($result)->toContain('< /tmp/test.sql');
 });
 
-test('buildRestoreCommand handles MariaDB without dumpAll', function () {
-    $component = new Import;
-    $component->dumpAll = false;
-    $component->mariadbRestoreCommand = 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE';
+test('buildRestoreCommand handles MariaDB legacy single db restore', function () {
+    $database = Mockery::mock(StandaloneMariadb::class);
+    $database->shouldReceive('getMorphClass')->andReturn(StandaloneMariadb::class);
 
-    $database = Mockery::mock('App\Models\StandaloneMariadb');
-    $database->shouldReceive('getMorphClass')->andReturn('App\Models\StandaloneMariadb');
-    $component->resource = $database;
+    $component = importComponentFor($database);
+    $component->updatedRestoreMode('legacy');
+    $component->databasesToRestore = 'legacy_db';
 
-    $result = $component->buildRestoreCommand('/tmp/test.dump');
+    $result = $component->buildRestoreCommand('/tmp/test.sql');
 
     expect($result)->toContain('mariadb -u $MARIADB_USER');
-    expect($result)->toContain('< /tmp/test.dump');
+    expect($result)->toContain('legacy_db < /tmp/test.sql');
+    expect($result)->toContain('< /tmp/test.sql');
+});
+
+test('buildRestoreCommand requires exactly one database for PostgreSQL legacy restore', function () {
+    $database = Mockery::mock(StandalonePostgresql::class);
+    $database->shouldReceive('getMorphClass')->andReturn(StandalonePostgresql::class);
+
+    $component = importComponentFor($database);
+    $component->updatedRestoreMode('legacy');
+    $component->databasesToRestore = 'db_one,db_two';
+
+    expect(fn () => $component->buildRestoreCommand('/tmp/test.dump'))
+        ->toThrow(Exception::class, 'Please specify exactly one database to restore for a legacy backup file.');
 });
 
 test('buildRestoreCommand handles MongoDB', function () {
-    $component = new Import;
-    $component->dumpAll = false;
-    $component->mongodbRestoreCommand = 'mongorestore --authenticationDatabase=admin --username $MONGO_INITDB_ROOT_USERNAME --password $MONGO_INITDB_ROOT_PASSWORD --uri mongodb://localhost:27017 --gzip --archive=';
+    $database = Mockery::mock(StandaloneMongodb::class);
+    $database->shouldReceive('getMorphClass')->andReturn(StandaloneMongodb::class);
 
-    $database = Mockery::mock('App\Models\StandaloneMongodb');
-    $database->shouldReceive('getMorphClass')->andReturn('App\Models\StandaloneMongodb');
-    $component->resource = $database;
+    $component = importComponentFor($database);
 
     $result = $component->buildRestoreCommand('/tmp/test.dump');
 
     expect($result)->toContain('mongorestore');
+    expect($result)->toContain('--uri="mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@localhost:27017/admin"');
     expect($result)->toContain('/tmp/test.dump');
 });

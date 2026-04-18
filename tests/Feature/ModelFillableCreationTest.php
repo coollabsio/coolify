@@ -978,7 +978,7 @@ it('creates ScheduledDatabaseBackupExecution with all fillable attributes', func
         'message' => 'Backup completed successfully',
         'size' => 1048576,
         'filename' => 'backup-2026-03-31.sql.gz',
-        'database_name' => 'testdb',
+        'databases' => 'testdb',
         'finished_at' => now()->toISOString(),
         'local_storage_deleted' => false,
         's3_storage_deleted' => false,
@@ -989,7 +989,7 @@ it('creates ScheduledDatabaseBackupExecution with all fillable attributes', func
     expect($execution->uuid)->toBe('custom-exec-uuid');
     expect($execution->status)->toBe('success');
     expect($execution->filename)->toBe('backup-2026-03-31.sql.gz');
-    expect($execution->database_name)->toBe('testdb');
+    expect($execution->databases)->toBe('testdb');
     expect($execution->size)->toBe(1048576);
 });
 

@@ -71,7 +71,7 @@ test('markStaleExecutionsAsFailed marks stale running executions as failed', fun
     // Create a stale execution (3 hours old, timeout is 1h, threshold is 2h)
     $staleExecution = ScheduledDatabaseBackupExecution::create([
         'uuid' => 'stale-exec-uuid',
-        'database_name' => 'test_db',
+        'databases' => 'test_db',
         'scheduled_database_backup_id' => $backup->id,
         'status' => 'running',
     ]);
@@ -105,7 +105,7 @@ test('markStaleExecutionsAsFailed does not mark recent running executions as fai
     // Create a recent execution (30 minutes old, threshold is 2 hours)
     $recentExecution = ScheduledDatabaseBackupExecution::create([
         'uuid' => 'recent-exec-uuid',
-        'database_name' => 'test_db',
+        'databases' => 'test_db',
         'scheduled_database_backup_id' => $backup->id,
         'status' => 'running',
     ]);
@@ -173,7 +173,7 @@ test('cleanup instance stuffs job calls retention enforcement without errors', f
     foreach (range(1, 3) as $i) {
         ScheduledDatabaseBackupExecution::create([
             'uuid' => "exec-uuid-{$i}",
-            'database_name' => 'test_db',
+            'databases' => 'test_db',
             'filename' => "/backup/test_{$i}.dmp",
             'scheduled_database_backup_id' => $backup->id,
             'status' => 'success',
@@ -209,7 +209,7 @@ test('deleteOldBackupsLocally identifies correct backups for deletion by retenti
     foreach (range(1, 3) as $i) {
         $exec = ScheduledDatabaseBackupExecution::create([
             'uuid' => "exec-uuid-{$i}",
-            'database_name' => 'test_db',
+            'databases' => 'test_db',
             'filename' => "/backup/test_{$i}.dmp",
             'scheduled_database_backup_id' => $backup->id,
             'status' => 'success',
