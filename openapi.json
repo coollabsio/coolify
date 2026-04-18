@@ -4302,7 +4302,7 @@
                                     "dump_all": {
                                         "type": "boolean",
                                         "description": "Whether to dump all databases",
-                                        "default": false
+                                        "default": true
                                     },
                                     "backup_now": {
                                         "type": "boolean",

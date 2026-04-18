@@ -635,7 +635,7 @@ class DatabasesController extends Controller
                         'save_s3' => ['type' => 'boolean', 'description' => 'Whether to save backups to S3', 'default' => false],
                         's3_storage_uuid' => ['type' => 'string', 'description' => 'S3 storage UUID (required if save_s3 is true)'],
                         'databases_to_backup' => ['type' => 'string', 'description' => 'Comma separated list of databases to backup'],
-                        'dump_all' => ['type' => 'boolean', 'description' => 'Whether to dump all databases', 'default' => false],
+                        'dump_all' => ['type' => 'boolean', 'description' => 'Whether to dump all databases', 'default' => true],
                         'backup_now' => ['type' => 'boolean', 'description' => 'Whether to trigger backup immediately after creation'],
                         'database_backup_retention_amount_locally' => ['type' => 'integer', 'description' => 'Number of backups to retain locally'],
                         'database_backup_retention_days_locally' => ['type' => 'integer', 'description' => 'Number of days to retain backups locally'],
@@ -786,15 +786,11 @@ class DatabasesController extends Controller
             unset($backupData['s3_storage_uuid']);
         }
 
-        // Set default databases_to_backup based on database type if not provided
-        if (! isset($backupData['databases_to_backup']) || empty($backupData['databases_to_backup'])) {
-            if ($database->type() === 'standalone-postgresql') {
-                $backupData['databases_to_backup'] = $database->postgres_db;
-            } elseif ($database->type() === 'standalone-mysql') {
-                $backupData['databases_to_backup'] = $database->mysql_database;
-            } elseif ($database->type() === 'standalone-mariadb') {
-                $backupData['databases_to_backup'] = $database->mariadb_database;
-            }
+        if (array_key_exists('dump_all', $backupData) && $backupData['dump_all'] === false && blank($backupData['databases_to_backup'] ?? null)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['databases_to_backup' => ['databases_to_backup is required when dump_all is false.']],
+            ], 422);
         }
 
         // Validate databases_to_backup input
@@ -1025,6 +1021,20 @@ class DatabasesController extends Controller
                 ], 422);
             }
             unset($backupData['s3_storage_uuid']);
+        }
+
+        $effectiveDumpAll = array_key_exists('dump_all', $backupData)
+            ? $backupData['dump_all']
+            : $backupConfig->dump_all;
+        $effectiveDatabasesToBackup = array_key_exists('databases_to_backup', $backupData)
+            ? $backupData['databases_to_backup']
+            : $backupConfig->databases_to_backup;
+
+        if ($effectiveDumpAll === false && blank($effectiveDatabasesToBackup)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['databases_to_backup' => ['databases_to_backup is required when dump_all is false.']],
+            ], 422);
         }
 
         // Validate databases_to_backup input
