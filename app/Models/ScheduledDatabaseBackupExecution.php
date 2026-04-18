@@ -18,6 +18,7 @@ class ScheduledDatabaseBackupExecution extends BaseModel
         'local_storage_deleted',
         's3_storage_deleted',
         's3_uploaded',
+        'legacy',
     ];
 
     protected function casts(): array
@@ -26,6 +27,7 @@ class ScheduledDatabaseBackupExecution extends BaseModel
             's3_uploaded' => 'boolean',
             'local_storage_deleted' => 'boolean',
             's3_storage_deleted' => 'boolean',
+            'legacy' => 'boolean',
         ];
     }
 
