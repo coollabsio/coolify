@@ -6,7 +6,7 @@
 
     <div class="flex justify-end gap-2">
         @if ($modal_mode)
-            <x-forms.button type="button" @click="$dispatch('closeModal')">
+            <x-forms.button type="button" @click="$dispatch('close-modal')">
                 Cancel
             </x-forms.button>
         @endif

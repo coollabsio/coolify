@@ -87,7 +87,7 @@ class CloudInitScriptForm extends Component
             $this->dispatch('success', $message);
 
             if ($this->modal_mode) {
-                $this->dispatch('closeModal');
+                $this->dispatch('close-modal');
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);

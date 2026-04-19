@@ -14,7 +14,7 @@
     $modalId = 'modal-' . uniqid();
 @endphp
 
-<div x-data="{ modalOpen: false }"
+<div x-data="{ modalOpen: false }" x-on:close-modal.window="modalOpen = false"
     x-init="$watch('modalOpen', value => { if (!value) { $wire.dispatch('modalClosed') } })"
     :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
     class="relative w-auto h-auto" wire:ignore>
