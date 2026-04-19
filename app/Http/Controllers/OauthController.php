@@ -22,14 +22,19 @@ class OauthController extends Controller
             $user = User::whereEmail($oauthUser->email)->first();
             if (! $user) {
                 $settings = instanceSettings();
-                if (! $settings->is_registration_enabled) {
+                // Allow OAuth registration if either global registration or OAuth-only registration is enabled
+                if (! $settings->is_registration_enabled && ! $settings->is_oauth_registration_enabled) {
                     abort(403, 'Registration is disabled');
                 }
 
                 $user = User::create([
                     'name' => $oauthUser->name,
                     'email' => $oauthUser->email,
+                    'oauth_provider' => $provider,
                 ]);
+            } elseif ($user->oauth_provider && $user->oauth_provider !== $provider) {
+                // User exists but was registered with a different OAuth provider
+                abort(403, 'This email is already registered with a different OAuth provider');
             }
             Auth::login($user);
 
