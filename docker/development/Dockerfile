@@ -12,12 +12,12 @@ ARG POSTGRES_VERSION=18
 # =================================================================
 # Get MinIO client
 # =================================================================
-FROM minio/mc:${MINIO_VERSION} AS minio-client
+FROM docker.io/minio/mc:${MINIO_VERSION} AS minio-client
 
 # =================================================================
 # Final Stage: Production image
 # =================================================================
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
+FROM docker.io/serversideup/php:${SERVERSIDEUP_PHP_VERSION}
 
 ARG USER_ID
 ARG GROUP_ID
@@ -49,7 +49,7 @@ RUN apk add --no-cache \
     vim
 
 # Install PHP extensions
-RUN install-php-extensions sockets
+# RUN docker-php-ext-install sockets
 
 # Configure shell aliases
 RUN echo "alias ll='ls -al'" >> /etc/profile && \

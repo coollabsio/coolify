@@ -1,0 +1,34 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('service_databases', function (Blueprint $table) {
+            $table->foreignId('service_id')->nullable()->change();
+            $table->foreignId('application_id')->nullable()->constrained()->onDelete('cascade');
+            $table->foreignId('application_preview_id')->nullable()->constrained()->onDelete('cascade');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('service_databases', function (Blueprint $table) {
+            $table->foreignId('service_id')->nullable(false)->change();
+            $table->dropForeign(['application_id']);
+            $table->dropColumn('application_id');
+            $table->dropForeign(['application_preview_id']);
+            $table->dropColumn('application_preview_id');
+        });
+    }
+};

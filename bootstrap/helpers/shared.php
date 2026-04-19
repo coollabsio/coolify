@@ -1818,6 +1818,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $topLevelConfigs = collect(data_get($yaml, 'configs', []));
             $topLevelSecrets = collect(data_get($yaml, 'secrets', []));
             $services = data_get($yaml, 'services');
+            $detectedDatabases = collect([]);
 
             $generatedServiceFQDNS = collect([]);
             if (is_null($resource->destination)) {
@@ -1958,6 +1959,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             }
                         }
                     }
+                }
+
+                if ($isDatabase) {
+                    $detectedDatabases->put($serviceName, $service);
                 }
 
                 data_set($service, 'is_database', $isDatabase);
@@ -2601,7 +2606,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         $topLevelConfigs = collect(data_get($yaml, 'configs', []));
         $topLevelSecrets = collect(data_get($yaml, 'secrets', []));
         $services = data_get($yaml, 'services');
-
+        $detectedDatabases = collect([]);
         $generatedServiceFQDNS = collect([]);
         if (is_null($resource->destination)) {
             $destination = $server->destinations()->first();
@@ -2917,6 +2922,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $image = data_get_str($service, 'image');
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
+            if ($isDatabase) {
+                $detectedDatabases->put($serviceName, $service);
+            }
 
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
@@ -3313,6 +3321,15 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         data_forget($resource, 'environment_variables');
         data_forget($resource, 'environment_variables_preview');
         $resource->save();
+
+        if ($pull_request_id !== 0) {
+            $resourceToSync = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pull_request_id);
+        } else {
+            $resourceToSync = $resource;
+        }
+        if ($resourceToSync) {
+            updateResourceDatabases($resourceToSync, $detectedDatabases);
+        }
 
         return collect($finalServices);
     }

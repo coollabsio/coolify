@@ -194,4 +194,9 @@ class ApplicationPreview extends BaseModel
 
         $this->save();
     }
+
+    public function databases()
+    {
+        return $this->hasMany(ServiceDatabase::class);
+    }
 }

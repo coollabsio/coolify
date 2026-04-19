@@ -403,6 +403,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     }
 
     $parsedServices = collect([]);
+    $detectedDatabases = collect([]);
 
     $allMagicEnvironments = collect([]);
     foreach ($services as $serviceName => $service) {
@@ -1445,6 +1446,17 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         }
 
         $parsedServices->put($serviceName, $payload);
+        if (isset($isDatabase) && $isDatabase) {
+            $detectedDatabases->put($serviceName, $service);
+        }
+    }
+    if ($isPullRequest) {
+        $resourceToSync = $resource->previews()->where('pull_request_id', $pullRequestId)->first();
+    } else {
+        $resourceToSync = $resource;
+    }
+    if ($resourceToSync) {
+        updateResourceDatabases($resourceToSync, $detectedDatabases);
     }
     $topLevel->put('services', $parsedServices);
 

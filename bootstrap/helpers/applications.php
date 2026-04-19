@@ -151,6 +151,25 @@ function next_queuable(string $server_id, string $application_id, string $commit
         return false;
     }
 
+    // Check if there's a running backup for this application
+    $running_backup = \App\Models\ScheduledDatabaseBackupExecution::where('status', 'running')
+        ->whereHas('scheduledDatabaseBackup', function ($query) use ($application_id, $pull_request_id) {
+            $query->where('database_type', \App\Models\ServiceDatabase::class)
+                ->whereHas('database', function ($q) use ($application_id, $pull_request_id) {
+                    if ($pull_request_id !== 0) {
+                        $q->whereHas('application_preview', function ($sub) use ($application_id, $pull_request_id) {
+                            $sub->where('application_id', $application_id)->where('pull_request_id', $pull_request_id);
+                        });
+                    } else {
+                        $q->where('application_id', $application_id);
+                    }
+                });
+        })->exists();
+
+    if ($running_backup) {
+        return false;
+    }
+
     // Check server's concurrent build limit
     $server = Server::find($server_id);
     $concurrent_builds = $server->settings->concurrent_builds;

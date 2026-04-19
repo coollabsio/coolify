@@ -2257,4 +2257,9 @@ class Application extends BaseModel
             throw new \Exception('Failed to update application settings');
         }
     }
+
+    public function databases()
+    {
+        return $this->hasMany(ServiceDatabase::class);
+    }
 }

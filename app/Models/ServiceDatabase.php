@@ -11,6 +11,8 @@ class ServiceDatabase extends BaseModel
 
     protected $fillable = [
         'service_id',
+        'application_id',
+        'application_preview_id',
         'name',
         'human_name',
         'description',
@@ -52,7 +54,11 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application_preview.application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -61,7 +67,13 @@ class ServiceDatabase extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        $teamId = currentTeam()->id;
+
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application_preview.application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -76,8 +88,21 @@ class ServiceDatabase extends BaseModel
 
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        $server = null;
+        $container_id = null;
+        if ($this->service_id) {
+            $container_id = $this->name.'-'.$this->service->uuid;
+            $server = $this->service->server;
+        } elseif ($this->application_id) {
+            $container_id = generateApplicationContainerName($this->application);
+            $server = $this->application->destination->server;
+        } elseif ($this->application_preview_id) {
+            $container_id = generateApplicationContainerName($this->application_preview->application, $this->application_preview->pull_request_id);
+            $server = $this->application_preview->application->destination->server;
+        }
+        if ($container_id && $server) {
+            remote_process(["docker restart {$container_id}"], $server);
+        }
     }
 
     public function isRunning()
@@ -139,8 +164,21 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = null;
+        if ($this->service_id) {
+            $server = $this->service->server;
+        } elseif ($this->application_id) {
+            $server = $this->application->destination->server;
+        } elseif ($this->application_preview_id) {
+            $server = $this->application_preview->application->destination->server;
+        }
+
+        if (! $server) {
+            return null;
+        }
+
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -149,17 +187,43 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'service.environment.project.team');
+        if ($this->service_id) {
+            return data_get($this, 'service.environment.project.team');
+        } elseif ($this->application_id) {
+            return data_get($this, 'application.environment.project.team');
+        } elseif ($this->application_preview_id) {
+            return data_get($this, 'application_preview.application.environment.project.team');
+        }
+
+        return null;
     }
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->service->uuid}";
+        if ($this->service_id) {
+            return service_configuration_dir()."/{$this->service->uuid}";
+        } elseif ($this->application_id) {
+            return application_configuration_dir()."/{$this->application->uuid}";
+        } elseif ($this->application_preview_id) {
+            return application_configuration_dir()."/{$this->application_preview->application->uuid}";
+        }
+
+        return null;
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
+    }
+
+    public function application_preview()
+    {
+        return $this->belongsTo(ApplicationPreview::class);
     }
 
     public function persistentStorages()
