@@ -45,6 +45,7 @@ class User extends Authenticatable implements SendsEmail
 
     protected $fillable = [
         'name',
+        'oauth_provider',
         'email',
         'password',
         'force_password_reset',
