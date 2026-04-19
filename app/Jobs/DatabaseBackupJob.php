@@ -262,26 +262,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $databaseType = $this->database->type();
                 $databasesToBackup = data_get($this->backup, 'databases_to_backup');
             }
-            if (filled($databasesToBackup)) {
-                if (str($databaseType)->contains('postgres')) {
-                    // Format: db1,db2,db3
-                    $databasesToBackup = explode(',', $databasesToBackup);
-                    $databasesToBackup = array_map('trim', $databasesToBackup);
-                } elseif (str($databaseType)->contains('mongo')) {
-                    // Format: db1:collection1,collection2|db2:collection3,collection4
-                    if (is_string($databasesToBackup)) {
-                        $databasesToBackup = explode('|', $databasesToBackup);
-                        $databasesToBackup = array_map('trim', $databasesToBackup);
-                    }
-                } elseif (str($databaseType)->contains('mysql')) {
-                    // Format: db1,db2,db3
-                    $databasesToBackup = explode(',', $databasesToBackup);
-                    $databasesToBackup = array_map('trim', $databasesToBackup);
-                } elseif (str($databaseType)->contains('mariadb')) {
-                    // Format: db1,db2,db3
-                    $databasesToBackup = explode(',', $databasesToBackup);
-                    $databasesToBackup = array_map('trim', $databasesToBackup);
-                }
+            if (filled($databasesToBackup) && is_string($databasesToBackup)) {
+                // MongoDB format: db1:collection1,collection2|db2:collection3,collection4
+                // All others: db1,db2,db3
+                $separator = str($databaseType)->contains('mongo') ? '|' : ',';
+                $databasesToBackup = array_map('trim', explode($separator, $databasesToBackup));
             }
             $this->backup_dir = backup_dir().'/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name;
             if ($this->database->name === 'coolify-db') {
