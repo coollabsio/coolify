@@ -2,12 +2,15 @@
 
 namespace App\Livewire;
 
+use App\Models\InstanceSettings;
 use App\Models\OauthSetting;
 use Livewire\Component;
 
 class SettingsOauth extends Component
 {
     public $oauth_settings_map;
+    public $is_oauth_registration_enabled;
+    public $is_oauth_only_login_enabled;
 
     protected function rules()
     {
@@ -20,7 +23,10 @@ class SettingsOauth extends Component
             $carry["oauth_settings_map.$setting->provider.base_url"] = 'nullable';
 
             return $carry;
-        }, []);
+        }, [
+            'is_oauth_registration_enabled' => 'boolean',
+            'is_oauth_only_login_enabled' => 'boolean',
+        ]);
     }
 
     public function mount()
@@ -28,6 +34,10 @@ class SettingsOauth extends Component
         if (! isInstanceAdmin()) {
             return redirect()->route('home');
         }
+        $settings = InstanceSettings::get();
+        $this->is_oauth_registration_enabled = $settings->is_oauth_registration_enabled ?? false;
+        $this->is_oauth_only_login_enabled = $settings->is_oauth_only_login_enabled ?? false;
+        
         $this->oauth_settings_map = OauthSetting::all()->sortBy('provider')->reduce(function ($carry, $setting) {
             $carry[$setting->provider] = [
                 'id' => $setting->id,
@@ -121,6 +131,12 @@ class SettingsOauth extends Component
                     'base_url' => $oauth->base_url,
                 ];
             }
+
+            // Save instance settings
+            $settings = InstanceSettings::get();
+            $settings->is_oauth_registration_enabled = $this->is_oauth_registration_enabled;
+            $settings->is_oauth_only_login_enabled = $this->is_oauth_only_login_enabled;
+            $settings->save();
 
             if (! empty($errors)) {
                 $this->dispatch('error', implode('<br/>', $errors));
