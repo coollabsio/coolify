@@ -1,5 +1,12 @@
 <?php
 
+use App\Models\Environment;
+use App\Models\InstanceSettings;
+use App\Models\Project;
+use App\Models\S3Storage;
+use App\Models\ScheduledDatabaseBackup;
+use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
@@ -8,50 +15,110 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    // Create a team with owner
+    InstanceSettings::updateOrCreate(['id' => 0]);
+
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
 
-    // Create an API token for the user
-    $this->token = $this->user->createToken('test-token', ['*'], $this->team->id);
+    session(['currentTeam' => $this->team]);
+
+    $this->token = $this->user->createToken('test-token', ['*']);
     $this->bearerToken = $this->token->plainTextToken;
 
-    // Mock a database - we'll use Mockery to avoid needing actual database setup
-    $this->database = \Mockery::mock(StandalonePostgresql::class);
-    $this->database->shouldReceive('getAttribute')->with('id')->andReturn(1);
-    $this->database->shouldReceive('getAttribute')->with('uuid')->andReturn('test-db-uuid');
-    $this->database->shouldReceive('getAttribute')->with('postgres_db')->andReturn('testdb');
-    $this->database->shouldReceive('type')->andReturn('standalone-postgresql');
-    $this->database->shouldReceive('getMorphClass')->andReturn('App\Models\StandalonePostgresql');
-});
+    $this->server = Server::factory()->create(['team_id' => $this->team->id]);
+    $this->destination = StandaloneDocker::where('server_id', $this->server->id)->first();
+    $this->project = Project::factory()->create(['team_id' => $this->team->id]);
+    $this->environment = Environment::factory()->create(['project_id' => $this->project->id]);
 
-afterEach(function () {
-    \Mockery::close();
+    $this->database = StandalonePostgresql::create([
+        'name' => 'test-postgres',
+        'image' => 'postgres:15-alpine',
+        'postgres_user' => 'postgres',
+        'postgres_password' => 'password',
+        'postgres_db' => 'testdb',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    $this->s3Storage = S3Storage::create([
+        'name' => 'test-s3',
+        'region' => 'us-east-1',
+        'key' => 'test-key',
+        'secret' => 'test-secret',
+        'bucket' => 'test-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $this->team->id,
+        'is_usable' => true,
+    ]);
 });
 
 describe('POST /api/v1/databases/{uuid}/backups', function () {
-    test('creates backup configuration with minimal required fields', function () {
-        // This is a unit-style test using mocks to avoid database dependency
-        // For full integration testing, this should be run inside Docker
+    test('creates backup with s3 storage via API token', function () {
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson("/api/v1/databases/{$this->database->uuid}/backups", [
+            'frequency' => '0 2 * * 0',
+            'save_s3' => true,
+            's3_storage_uuid' => $this->s3Storage->uuid,
+            'enabled' => true,
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonStructure(['uuid', 'message']);
+
+        $backup = ScheduledDatabaseBackup::where('uuid', $response->json('uuid'))->first();
+        expect($backup)->not->toBeNull();
+        expect($backup->s3_storage_id)->toBe($this->s3Storage->id);
+        expect($backup->save_s3)->toBeTrue();
+        expect($backup->team_id)->toBe($this->team->id);
+    });
+
+    test('creates backup without s3 storage', function () {
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson("/api/v1/databases/{$this->database->uuid}/backups", [
+            'frequency' => 'daily',
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonStructure(['uuid', 'message']);
+    });
+
+    test('rejects s3_storage_uuid from another team', function () {
+        $otherTeam = Team::factory()->create();
+        $otherS3 = S3Storage::create([
+            'name' => 'other-s3',
+            'region' => 'us-east-1',
+            'key' => 'other-key',
+            'secret' => 'other-secret',
+            'bucket' => 'other-bucket',
+            'endpoint' => 'https://s3.example.com',
+            'team_id' => $otherTeam->id,
+            'is_usable' => true,
+        ]);
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$this->bearerToken,
             'Content-Type' => 'application/json',
-        ])->postJson('/api/v1/databases/test-db-uuid/backups', [
-            'frequency' => 'daily',
+        ])->postJson("/api/v1/databases/{$this->database->uuid}/backups", [
+            'frequency' => '0 2 * * 0',
+            'save_s3' => true,
+            's3_storage_uuid' => $otherS3->uuid,
         ]);
 
-        // Since we're mocking, this test verifies the endpoint exists and basic validation
-        // Full integration tests should be run in Docker environment
-        expect($response->status())->toBeIn([201, 404, 422]);
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['s3_storage_uuid']);
     });
 
     test('validates frequency is required', function () {
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$this->bearerToken,
             'Content-Type' => 'application/json',
-        ])->postJson('/api/v1/databases/test-db-uuid/backups', [
+        ])->postJson("/api/v1/databases/{$this->database->uuid}/backups", [
             'enabled' => true,
         ]);
 
@@ -63,83 +130,78 @@ describe('POST /api/v1/databases/{uuid}/backups', function () {
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$this->bearerToken,
             'Content-Type' => 'application/json',
-        ])->postJson('/api/v1/databases/test-db-uuid/backups', [
+        ])->postJson("/api/v1/databases/{$this->database->uuid}/backups", [
             'frequency' => 'daily',
             'save_s3' => true,
         ]);
 
-        // Should fail validation because s3_storage_uuid is missing
-        expect($response->status())->toBeIn([404, 422]);
-    });
-
-    test('rejects invalid frequency format', function () {
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$this->bearerToken,
-            'Content-Type' => 'application/json',
-        ])->postJson('/api/v1/databases/test-db-uuid/backups', [
-            'frequency' => 'invalid-frequency',
-        ]);
-
-        expect($response->status())->toBeIn([404, 422]);
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['s3_storage_uuid']);
     });
 
     test('rejects request without authentication', function () {
-        $response = $this->postJson('/api/v1/databases/test-db-uuid/backups', [
+        $response = $this->postJson("/api/v1/databases/{$this->database->uuid}/backups", [
             'frequency' => 'daily',
         ]);
 
         $response->assertStatus(401);
     });
+});
 
-    test('validates retention fields are integers with minimum 0', function () {
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$this->bearerToken,
-            'Content-Type' => 'application/json',
-        ])->postJson('/api/v1/databases/test-db-uuid/backups', [
+describe('PATCH /api/v1/databases/{uuid}/backups/{scheduled_backup_uuid}', function () {
+    test('updates backup to use s3 storage via API token', function () {
+        $backup = ScheduledDatabaseBackup::create([
             'frequency' => 'daily',
-            'database_backup_retention_amount_locally' => -1,
+            'enabled' => true,
+            'database_id' => $this->database->id,
+            'database_type' => $this->database->getMorphClass(),
+            'team_id' => $this->team->id,
         ]);
 
-        expect($response->status())->toBeIn([404, 422]);
-    });
-
-    test('accepts valid cron expressions', function () {
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$this->bearerToken,
             'Content-Type' => 'application/json',
-        ])->postJson('/api/v1/databases/test-db-uuid/backups', [
-            'frequency' => '0 2 * * *', // Daily at 2 AM
+        ])->patchJson("/api/v1/databases/{$this->database->uuid}/backups/{$backup->uuid}", [
+            'save_s3' => true,
+            's3_storage_uuid' => $this->s3Storage->uuid,
         ]);
 
-        // Will fail with 404 because database doesn't exist, but validates the request format
-        expect($response->status())->toBeIn([201, 404, 422]);
+        $response->assertStatus(200);
+        $backup->refresh();
+        expect($backup->s3_storage_id)->toBe($this->s3Storage->id);
+        expect($backup->save_s3)->toBeTrue();
     });
 
-    test('accepts predefined frequency values', function () {
-        $frequencies = ['every_minute', 'hourly', 'daily', 'weekly', 'monthly', 'yearly'];
+    test('rejects s3_storage_uuid from another team on update', function () {
+        $otherTeam = Team::factory()->create();
+        $otherS3 = S3Storage::create([
+            'name' => 'other-s3',
+            'region' => 'us-east-1',
+            'key' => 'other-key',
+            'secret' => 'other-secret',
+            'bucket' => 'other-bucket',
+            'endpoint' => 'https://s3.example.com',
+            'team_id' => $otherTeam->id,
+            'is_usable' => true,
+        ]);
 
-        foreach ($frequencies as $frequency) {
-            $response = $this->withHeaders([
-                'Authorization' => 'Bearer '.$this->bearerToken,
-                'Content-Type' => 'application/json',
-            ])->postJson('/api/v1/databases/test-db-uuid/backups', [
-                'frequency' => $frequency,
-            ]);
-
-            // Will fail with 404 because database doesn't exist, but validates the request format
-            expect($response->status())->toBeIn([201, 404, 422]);
-        }
-    });
-
-    test('rejects extra fields not in allowed list', function () {
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$this->bearerToken,
-            'Content-Type' => 'application/json',
-        ])->postJson('/api/v1/databases/test-db-uuid/backups', [
+        $backup = ScheduledDatabaseBackup::create([
             'frequency' => 'daily',
-            'invalid_field' => 'invalid_value',
+            'enabled' => true,
+            'database_id' => $this->database->id,
+            'database_type' => $this->database->getMorphClass(),
+            'team_id' => $this->team->id,
         ]);
 
-        expect($response->status())->toBeIn([404, 422]);
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->patchJson("/api/v1/databases/{$this->database->uuid}/backups/{$backup->uuid}", [
+            'save_s3' => true,
+            's3_storage_uuid' => $otherS3->uuid,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['s3_storage_uuid']);
     });
 });

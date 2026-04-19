@@ -18,6 +18,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
@@ -25,6 +26,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -257,6 +259,16 @@ function isInstanceAdmin()
 function currentTeam()
 {
     return Auth::user()?->currentTeam() ?? null;
+}
+
+function find_destination_for_current_team(?string $uuid): StandaloneDocker|SwarmDocker|null
+{
+    if (blank($uuid) || ! currentTeam()) {
+        return null;
+    }
+
+    return StandaloneDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first()
+        ?? SwarmDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first();
 }
 
 function showBoarding(): bool
@@ -3487,34 +3499,6 @@ function getHelperVersion(): string
     }
 
     return config('constants.coolify.helper_version');
-}
-
-function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id)
-{
-    $server = Server::find($server_id)->where('team_id', $team_id)->first();
-    if (! $server) {
-        return;
-    }
-    $uuid = new Cuid2;
-    $cloneCommand = "git clone --no-checkout -b $branch $repository .";
-    $workdir = rtrim($base_directory, '/');
-    $fileList = collect([".$workdir/coolify.json"]);
-    $commands = collect([
-        "rm -rf /tmp/{$uuid}",
-        "mkdir -p /tmp/{$uuid}",
-        "cd /tmp/{$uuid}",
-        $cloneCommand,
-        'git sparse-checkout init --cone',
-        "git sparse-checkout set {$fileList->implode(' ')}",
-        'git read-tree -mu HEAD',
-        "cat .$workdir/coolify.json",
-        'rm -rf /tmp/{$uuid}',
-    ]);
-    try {
-        return instant_remote_process($commands, $server);
-    } catch (Exception) {
-        // continue
-    }
 }
 
 function loggy($message = null, array $context = [])

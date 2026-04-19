@@ -66,6 +66,13 @@ class S3Storage extends BaseModel
         return S3Storage::whereTeamId(currentTeam()->id)->select($selectArray->all())->orderBy('name');
     }
 
+    public static function ownedByCurrentTeamAPI(int $teamId, array $select = ['*'])
+    {
+        $selectArray = collect($select)->concat(['id']);
+
+        return S3Storage::whereTeamId($teamId)->select($selectArray->all())->orderBy('name');
+    }
+
     public function isUsable()
     {
         return $this->is_usable;

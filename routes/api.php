@@ -26,7 +26,8 @@ Route::group([
     Route::get('/health', [OtherController::class, 'healthcheck']);
 });
 
-Route::post('/feedback', [OtherController::class, 'feedback']);
+Route::post('/feedback', [OtherController::class, 'feedback'])
+    ->middleware('throttle:feedback');
 
 Route::group([
     'middleware' => ['auth:sanctum', 'api.ability:write'],
@@ -129,6 +130,8 @@ Route::group([
     Route::match(['get', 'post'], '/applications/{uuid}/restart', [ApplicationsController::class, 'action_restart'])->middleware(['api.ability:deploy']);
     Route::match(['get', 'post'], '/applications/{uuid}/stop', [ApplicationsController::class, 'action_stop'])->middleware(['api.ability:deploy']);
 
+    Route::delete('/applications/{uuid}/previews/{pull_request_id}', [ApplicationsController::class, 'delete_preview_by_pull_request_id'])->middleware(['api.ability:write']);
+
     Route::get('/github-apps', [GithubController::class, 'list_github_apps'])->middleware(['api.ability:read']);
     Route::post('/github-apps', [GithubController::class, 'create_github_app'])->middleware(['api.ability:write']);
     Route::patch('/github-apps/{github_app_id}', [GithubController::class, 'update_github_app'])->middleware(['api.ability:write']);
@@ -218,7 +221,7 @@ Route::group([
         try {
             $decrypted = decrypt($naked_token);
             $decrypted_token = json_decode($decrypted, true);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json(['message' => 'Invalid token'], 401);
         }
         $server_uuid = data_get($decrypted_token, 'server_uuid');
