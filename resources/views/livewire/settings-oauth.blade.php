@@ -13,6 +13,22 @@
             </div>
             <div class="pb-4 ">Custom authentication (OAuth) configurations.</div>
         </div>
+        
+        <!-- OAuth Registration Options -->
+        <div class="p-4 border dark:border-coolgray-300 border-neutral-200 mb-4">
+            <h3>OAuth Registration Options</h3>
+            <div class="flex flex-col gap-4 pt-2">
+                <x-forms.checkbox 
+                    id="is_oauth_registration_enabled"
+                    label="Allow OAuth-only self-registration"
+                    helper="Allow users logging in with OAuth accounts to self-register even when general self-registration is disabled. This allows controlling access through OAuth providers like Authentik." />
+                <x-forms.checkbox 
+                    id="is_oauth_only_login_enabled"
+                    label="Block password login for OAuth users"
+                    helper="Prevent users who registered via OAuth from using password login. This allows centralized user management through the OAuth provider." />
+            </div>
+        </div>
+        
         <div class="flex flex-col gap-2 pt-4">
             @foreach ($oauth_settings_map as $oauth_setting)
                 <div class="p-4 border dark:border-coolgray-300 border-neutral-200">
