@@ -101,7 +101,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (data_get($this->backup, 'database_type') === ServiceDatabase::class) {
                 $this->database = data_get($this->backup, 'database');
-                $this->server = $this->database->service->server;
+                if ($this->database->service_id) {
+                    $this->server = $this->database->service->server;
+                } elseif ($this->database->application_id) {
+                    $this->server = data_get($this->database, 'application.destination.server');
+                } elseif ($this->database->application_preview_id) {
+                    $this->server = data_get($this->database, 'application_preview.application.destination.server');
+                }
                 $this->s3 = $this->backup->s3;
             } else {
                 $this->database = data_get($this->backup, 'database');
@@ -113,6 +119,29 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (is_null($this->database)) {
                 throw new \Exception('Database not found?!');
+            }
+
+            // Check for active deployments if it's an application-linked database
+            if ($this->database instanceof ServiceDatabase) {
+                $applicationId = $this->database->application_id;
+                $pullRequestId = 0;
+                if ($this->database->application_preview_id) {
+                    $applicationId = data_get($this->database->application_preview, 'application_id');
+                    $pullRequestId = data_get($this->database->application_preview, 'pull_request_id');
+                }
+
+                if ($applicationId) {
+                    $deploymentInProgress = \App\Models\ApplicationDeploymentQueue::where('application_id', $applicationId)
+                        ->where('pull_request_id', $pullRequestId)
+                        ->where('status', \App\Enums\ApplicationDeploymentStatus::IN_PROGRESS->value)
+                        ->exists();
+
+                    if ($deploymentInProgress) {
+                        $this->release(60);
+
+                        return;
+                    }
+                }
             }
 
             $this->markStaleExecutionsAsFailed();
@@ -131,8 +160,19 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (data_get($this->backup, 'database_type') === ServiceDatabase::class) {
                 $databaseType = $this->database->databaseType();
-                $serviceUuid = $this->database->service->uuid;
-                $serviceName = str($this->database->service->name)->slug();
+                if ($this->database->service_id) {
+                    $serviceUuid = $this->database->service->uuid;
+                    $serviceName = str($this->database->service->name)->slug();
+                } else {
+                    if ($this->database->application_id) {
+                        $serviceUuid = $this->database->application->uuid;
+                        $serviceName = str($this->database->application->name)->slug();
+                    } else {
+                        $serviceUuid = $this->database->application_preview->application->uuid;
+                        $serviceName = str($this->database->application_preview->application->name)->slug();
+                        $serviceUuid = "{$serviceUuid}-pr-{$this->database->application_preview->pull_request_id}";
+                    }
+                }
                 if (str($databaseType)->contains('postgres')) {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName.'-'.$this->container_name;

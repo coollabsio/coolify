@@ -105,6 +105,29 @@ class ServiceDatabase extends BaseModel
         }
     }
 
+    /**
+     * Resolve the server this database runs on, regardless of ownership type.
+     *
+     * Resolution chain:
+     *   service_id       → service → server (belongsTo)
+     *   application_id   → application → destination (morphTo) → server (belongsTo)
+     *   preview_id       → application_preview → application → destination → server
+     */
+    public function getServerAttribute()
+    {
+        if ($this->service_id) {
+            return data_get($this, 'service.server');
+        }
+        if ($this->application_id) {
+            return data_get($this, 'application.destination.server');
+        }
+        if ($this->application_preview_id) {
+            return data_get($this, 'application_preview.application.destination.server');
+        }
+
+        return null;
+    }
+
     public function isRunning()
     {
         return str($this->status)->contains('running');
