@@ -1,31 +1,71 @@
-# documentation: https://hermes-agent.nousresearch.com/docs/
-# slogan: The self-improving AI agent with built-in learning loop, skills, and multi-platform messaging gateway.
+# documentation: https://hermes-agent.nousresearch.com/docs
+# slogan: Self-hosted AI agent with gateway and web dashboard.
 # category: ai
-# tags: ai,agent,llm,openai,anthropic,openrouter,telegram,discord,memory,self-improving
+# tags: hermes, ai, agent, gateway, dashboard, openai-compatible, automation
 # logo: svgs/hermes-agent.svg
 # port: 9119
 
 services:
-  hermes-agent:
-    image: nousresearch/hermes-agent:latest
-    command: dashboard --host 0.0.0.0 --port 9119 --no-open
+  hermes:
+    image: 'nousresearch/hermes-agent:${HERMES_VERSION:-latest}'
+    restart: unless-stopped
+    command: 'gateway run'
     environment:
-      - SERVICE_URL_HERMESAGENT_9119
-      # At least one LLM provider key is required (configure via Web UI after start)
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - HERMES_UID=${HERMES_UID:-10000}
-      - HERMES_GID=${HERMES_GID:-10000}
+      - SERVICE_URL_HERMES_8642
+      - API_SERVER_ENABLED=true
+      - API_SERVER_HOST=0.0.0.0
+      - API_SERVER_PORT=8642
+      - API_SERVER_KEY=$SERVICE_PASSWORD_64_APIKEY
+      - API_SERVER_MODEL_NAME=${API_SERVER_MODEL_NAME:-hermes-agent}
+      - HERMES_API_TIMEOUT=1800
+      - HERMES_STREAM_READ_TIMEOUT=1800
+      - HERMES_INFERENCE_PROVIDER=${HERMES_INFERENCE_PROVIDER:-auto}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AI_GATEWAY_API_KEY=${AI_GATEWAY_API_KEY}
     volumes:
-      - hermes-data:/opt/data
+      - 'hermes-data:/opt/data'
+    shm_size: 1gb
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:9119"]
-      interval: 10s
-      timeout: 30s
-      retries: 12
-      start_period: 30s
+      test:
+        - CMD-SHELL
+        - 'python3 -c "import urllib.request; urllib.request.urlopen(''http://127.0.0.1:8642/health'', timeout=3).read()"'
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+    mem_limit: 4g
+    mem_reservation: 1g
+    cpus: '2.0'
+
+  hermes-dashboard:
+    image: 'nousresearch/hermes-agent:${HERMES_VERSION:-latest}'
+    restart: unless-stopped
+    command: 'dashboard --host 0.0.0.0 --port 9119 --no-open --insecure'
+    environment:
+      - SERVICE_URL_HERMESDASHBOARD_9119
+      - GATEWAY_HEALTH_URL=http://hermes:8642
+      - GATEWAY_HEALTH_TIMEOUT=5
+    volumes:
+      - 'hermes-data:/opt/data'
+    depends_on:
+      hermes:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'python3 -c "import urllib.request; urllib.request.urlopen(''http://127.0.0.1:9119/api/status'', timeout=3).read()"'
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    mem_limit: 512m
+    mem_reservation: 128m
+    cpus: '0.5'
+    labels:
+      - traefik.http.middlewares.authentik-auth@file
 
 volumes:
   hermes-data: null
