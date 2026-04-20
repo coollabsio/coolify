@@ -174,34 +174,6 @@ class FileBrowser extends Component
         $this->browsePath($parentPath);
     }
 
-    public function downloadFile(string $filePath)
-    {
-        try {
-            $this->authorize('update', $this->resource);
-            
-            $escapedPath = escapeshellarg($filePath);
-            $command = collect([
-                "docker exec {$this->containerName} cat {$escapedPath} 2>&1"
-            ]);
-            
-            $content = instant_remote_process($command, $this->server, false);
-            
-            if (!$content) {
-                throw new \Exception('Failed to download file');
-            }
-            
-            // Create temporary file and send
-            $fileName = basename($filePath);
-            return response()->streamDownload(function () use ($content) {
-                echo $content;
-            }, $fileName, [
-                'Content-Type' => 'application/octet-stream',
-            ]);
-        } catch (\Throwable $e) {
-            $this->errorMessage = 'Download failed: ' . $e->getMessage();
-        }
-    }
-
     public function uploadFile()
     {
         try {

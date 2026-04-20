@@ -137,7 +137,7 @@
                                 <td class="px-4 py-3">
                                     <div class="flex items-center justify-end gap-2">
                                         @if(!$file['is_directory'])
-                                            <a href="{{ route('services.filebrowser.download', ['service' => $resource->uuid, 'path' => ltrim($file['path'], '/')]) }}" 
+                                            <a href="{{ route('services.filebrowser.download', ['service_uuid' => $resource->uuid, 'path' => ltrim($file['path'], '/')]) }}" 
                                                class="p-1 hover:bg-coollabs/10 rounded transition-colors"
                                                title="Download">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
