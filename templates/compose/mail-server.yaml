@@ -1,0 +1,45 @@
+# documentation: https://github.com/docker-mailserver/docker-mailserver
+# slogan: Complete mail server solution with SMTP, IMAP, POP3, and spam filtering.
+# category: infrastructure
+# tags: mail, email, smtp, imap, postfix, dovecot, docker-mailserver
+# port: 25
+
+services:
+  mail:
+    image: docker-mailserver/docker-mailserver:latest
+    container_name: mail
+    hostname: mail
+    domainname: yourdomain.com
+    volumes:
+      - mail-data:/var/mail
+      - mail-state:/var/mail-state
+      - mail-logs:/var/log/mail
+      - ./docker/dms-prod/:/tmp/docker-mailserver/
+    environment:
+      - TZ=UTC
+      - ENABLE_FAIL2BAN=1
+      - SA_TAG=-5.0
+      - SA_TAG2=5.0
+      - VIRUSMAIL_TAG=virus
+      - LOG_LEVEL=info
+      - ONE_DIR=1
+      - DMS_DEAMON_VERSION=latest
+    ports:
+      - "25:25"
+      - "143:143"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+      - "995:995"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "25"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    cap_add:
+      - NET_ADMIN
+
+volumes:
+  mail-data:
+  mail-state:
+  mail-logs:
