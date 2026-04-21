@@ -257,7 +257,7 @@ class User extends Authenticatable implements SendsEmail
             Carbon::now()->addMinutes(Config::get('auth.verification.expire', 60)),
             [
                 'id' => $this->getKey(),
-                'hash' => sha1($this->getEmailForVerification()),
+                'hash' => hash('sha256', $this->getEmailForVerification()),
             ]
         );
         $mail->view('emails.email-verification', [

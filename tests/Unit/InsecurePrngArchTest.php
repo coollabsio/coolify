@@ -5,8 +5,6 @@
  *
  * mt_rand() and rand() are not cryptographically secure. Use random_int()
  * or random_bytes() instead for any security-sensitive context.
- *
- * @see GHSA-33rh-4c9r-74pf
  */
 arch('app code must not use mt_rand')
     ->expect('App')

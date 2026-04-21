@@ -100,7 +100,16 @@ class Gitlab extends Controller
             }
             foreach ($applications as $application) {
                 $webhook_secret = data_get($application, 'manual_webhook_secret_gitlab');
-                if (! hash_equals($webhook_secret ?? '', $x_gitlab_token ?? '')) {
+                if (empty($webhook_secret)) {
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'failed',
+                        'message' => 'Webhook secret not configured.',
+                    ]);
+
+                    continue;
+                }
+                if (! hash_equals($webhook_secret, $x_gitlab_token ?? '')) {
                     $return_payloads->push([
                         'application' => $application->name,
                         'status' => 'failed',

@@ -106,8 +106,12 @@ class Storage extends Component
             $this->validate([
                 'name' => ValidationPatterns::volumeNameRules(),
                 'mount_path' => 'required|string',
-                'host_path' => $this->isSwarm ? 'required|string' : 'string|nullable',
-            ], ValidationPatterns::volumeNameMessages());
+                'host_path' => $this->isSwarm
+                    ? ['required', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN]
+                    : ['nullable', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
+            ], array_merge(ValidationPatterns::volumeNameMessages(), [
+                'host_path.regex' => 'Host path must start with / and only contain safe path characters.',
+            ]));
 
             $name = $this->resource->uuid.'-'.$this->name;
 

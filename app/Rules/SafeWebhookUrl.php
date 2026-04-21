@@ -40,9 +40,15 @@ class SafeWebhookUrl implements ValidationRule
 
         $host = strtolower($host);
 
+        // Strip IPv6 brackets (e.g. "[::1]" -> "::1") before IP checks so bracketed
+        // literals can't sneak past filter_var FILTER_VALIDATE_IP.
+        $hostForIpCheck = (str_starts_with($host, '[') && str_ends_with($host, ']'))
+            ? substr($host, 1, -1)
+            : $host;
+
         // Block well-known dangerous hostnames
         $blockedHosts = ['localhost', '0.0.0.0', '::1'];
-        if (in_array($host, $blockedHosts) || str_ends_with($host, '.internal')) {
+        if (in_array($hostForIpCheck, $blockedHosts) || str_ends_with($host, '.internal')) {
             Log::warning('Webhook URL points to blocked host', [
                 'attribute' => $attribute,
                 'host' => $host,
@@ -55,7 +61,7 @@ class SafeWebhookUrl implements ValidationRule
         }
 
         // Block loopback (127.0.0.0/8) and link-local/metadata (169.254.0.0/16) when IP is provided directly
-        if (filter_var($host, FILTER_VALIDATE_IP) && ($this->isLoopback($host) || $this->isLinkLocal($host))) {
+        if (filter_var($hostForIpCheck, FILTER_VALIDATE_IP) && ($this->isLoopback($hostForIpCheck) || $this->isLinkLocal($hostForIpCheck))) {
             Log::warning('Webhook URL points to blocked IP range', [
                 'attribute' => $attribute,
                 'host' => $host,

@@ -215,14 +215,27 @@ class Application extends BaseModel
 
     protected $appends = ['server_status'];
 
-    protected $casts = [
-        'http_basic_auth_password' => 'encrypted',
-        'restart_count' => 'integer',
-        'last_restart_at' => 'datetime',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'http_basic_auth_password' => 'encrypted',
+            'manual_webhook_secret_github' => 'encrypted',
+            'manual_webhook_secret_gitlab' => 'encrypted',
+            'manual_webhook_secret_bitbucket' => 'encrypted',
+            'manual_webhook_secret_gitea' => 'encrypted',
+            'restart_count' => 'integer',
+            'last_restart_at' => 'datetime',
+        ];
+    }
 
     protected static function booted()
     {
+        static::creating(function ($application) {
+            $application->manual_webhook_secret_github ??= Str::random(40);
+            $application->manual_webhook_secret_gitlab ??= Str::random(40);
+            $application->manual_webhook_secret_bitbucket ??= Str::random(40);
+            $application->manual_webhook_secret_gitea ??= Str::random(40);
+        });
         static::addGlobalScope('withRelations', function ($builder) {
             $builder->withCount([
                 'additional_servers',

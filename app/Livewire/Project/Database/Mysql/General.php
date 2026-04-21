@@ -76,10 +76,18 @@ class General extends Component
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'mysqlRootPassword' => 'required',
-            'mysqlUser' => 'required',
-            'mysqlPassword' => 'required',
-            'mysqlDatabase' => 'required',
+            'mysqlRootPassword' => ValidationPatterns::databasePasswordRules(
+                enforcePattern: $this->mysqlRootPassword !== $this->database->mysql_root_password,
+            ),
+            'mysqlUser' => ValidationPatterns::databaseIdentifierRules(
+                enforcePattern: $this->mysqlUser !== $this->database->mysql_user,
+            ),
+            'mysqlPassword' => ValidationPatterns::databasePasswordRules(
+                enforcePattern: $this->mysqlPassword !== $this->database->mysql_password,
+            ),
+            'mysqlDatabase' => ValidationPatterns::databaseIdentifierRules(
+                enforcePattern: $this->mysqlDatabase !== $this->database->mysql_database,
+            ),
             'mysqlConf' => 'nullable',
             'image' => 'required',
             'portsMappings' => ValidationPatterns::portMappingRules(),
@@ -100,10 +108,10 @@ class General extends Component
             ValidationPatterns::portMappingMessages(),
             [
                 'name.required' => 'The Name field is required.',
-                'mysqlRootPassword.required' => 'The Root Password field is required.',
-                'mysqlUser.required' => 'The MySQL User field is required.',
-                'mysqlPassword.required' => 'The MySQL Password field is required.',
-                'mysqlDatabase.required' => 'The MySQL Database field is required.',
+                ...ValidationPatterns::databasePasswordMessages('mysqlRootPassword', 'Root Password'),
+                ...ValidationPatterns::databaseIdentifierMessages('mysqlUser', 'MySQL User'),
+                ...ValidationPatterns::databasePasswordMessages('mysqlPassword', 'MySQL Password'),
+                ...ValidationPatterns::databaseIdentifierMessages('mysqlDatabase', 'MySQL Database'),
                 'image.required' => 'The Docker Image field is required.',
                 'publicPort.integer' => 'The Public Port must be an integer.',
                 'publicPort.min' => 'The Public Port must be at least 1.',

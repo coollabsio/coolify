@@ -109,7 +109,7 @@ class StartKeydb
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => [
-                        'test' => "keydb-cli --pass {$this->database->keydb_password} ping",
+                        'test' => ['CMD', 'keydb-cli', '--pass', (string) $this->database->keydb_password, 'ping'],
                         'interval' => '5s',
                         'timeout' => '5s',
                         'retries' => 10,
@@ -166,7 +166,7 @@ class StartKeydb
             $docker_compose['volumes'] = $volume_names;
         }
 
-        if (! is_null($this->database->keydb_conf) || ! empty($this->database->keydb_conf)) {
+        if (! is_null($this->database->keydb_conf) && ! empty($this->database->keydb_conf)) {
             $docker_compose['services'][$container_name]['volumes'] = array_merge(
                 $docker_compose['services'][$container_name]['volumes'] ?? [],
                 [
