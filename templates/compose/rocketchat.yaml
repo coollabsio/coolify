@@ -32,11 +32,11 @@ services:
     image: 'mongo:7'
     volumes:
       - 'mongodb_data:/data/db'
-    command: "sh -c \"\n  mongod --replSet ${MONGODB_REPLICA_SET_NAME:-rs0} --bind_ip_all &\n  sleep 5 &&\n  mongosh --eval 'rs.initiate({_id:\\\"${MONGODB_REPLICA_SET_NAME:-rs0}\\\", members:[{_id:0, host:\\\"mongodb:27017\\\"}]})' ||\n  true &&\n  wait\n\"\n"
+    command: "sh -c \"mongod --replSet ${MONGODB_REPLICA_SET_NAME:-rs0} --bind_ip_all --noauth & sleep 5 && mongosh --quiet --eval 'rs.initiate({_id:\\\"${MONGODB_REPLICA_SET_NAME:-rs0}\\\", members:[{_id:0, host:\\\"mongodb:27017\\\"}]})' || true && wait\""
     healthcheck:
       test:
         - CMD
-        - mongosh
+        - mongo
         - '--quiet'
         - '--eval'
         - "db.adminCommand('ping')"
