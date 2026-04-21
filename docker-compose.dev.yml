@@ -8,11 +8,10 @@ services:
       args:
         - USER_ID=${USERID:-1000}
         - GROUP_ID=${GROUPID:-1000}
-    network_mode: host
-    # ports:
-    #   - "${APP_PORT:-8000}:8080"
+    ports:
+      - "${APP_PORT:-8000}:8080"
     environment:
-      AUTORUN_ENABLED: "false"
+      AUTORUN_ENABLED: false
       PUSHER_HOST: "${PUSHER_HOST}"
       PUSHER_PORT: "${PUSHER_PORT}"
       PUSHER_SCHEME: "${PUSHER_SCHEME:-http}"
@@ -27,14 +26,12 @@ services:
     volumes:
       - .:/var/www/html/:cached
       - dev_backups_data:/var/www/html/storage/app/backups
-    # networks:
-    #   - coolify
+    networks:
+      - coolify
   postgres:
-    image: docker.io/library/postgres:15-alpine
     pull_policy: always
-    network_mode: host
-    # ports:
-    #   - "${FORWARD_DB_PORT:-5432}:5432"
+    ports:
+      - "${FORWARD_DB_PORT:-5432}:5432"
     env_file:
       - .env
     environment:
@@ -50,11 +47,9 @@ services:
     volumes:
       - dev_postgres_data:/var/lib/postgresql/data
   redis:
-    image: docker.io/library/redis:7-alpine
     pull_policy: always
-    network_mode: host
-    # ports:
-    #   - "${FORWARD_REDIS_PORT:-6379}:6379"
+    ports:
+      - "${FORWARD_REDIS_PORT:-6379}:6379"
     env_file:
       - .env
     healthcheck:
@@ -72,10 +67,9 @@ services:
       dockerfile: ./docker/coolify-realtime/Dockerfile
     env_file:
       - .env
-    network_mode: host
-    # ports:
-    #   - "${FORWARD_SOKETI_PORT:-6001}:6001"
-    #   - "6002:6002"
+    ports:
+      - "${FORWARD_SOKETI_PORT:-6001}:6001"
+      - "6002:6002"
     volumes:
       - ./storage:/var/www/html/storage
       - ./docker/coolify-realtime/terminal-server.js:/terminal/terminal-server.js
@@ -93,21 +87,20 @@ services:
       timeout: 2s
     entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
   vite:
-    image: docker.io/library/node:24-alpine
+    image: node:24-alpine
     pull_policy: always
     container_name: coolify-vite
     working_dir: /var/www/html
     environment:
       VITE_HOST: "${VITE_HOST:-localhost}"
       VITE_PORT: "${VITE_PORT:-5173}"
-    network_mode: host
-    # ports:
-    #   - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
+    ports:
+      - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
     volumes:
       - .:/var/www/html/:cached
     command: sh -c "npm install && npm run dev"
-    # networks:
-    #   - coolify
+    networks:
+      - coolify
   testing-host:
     image: coolify-testing-host:dev
     pull_policy: never
@@ -115,7 +108,6 @@ services:
       context: .
       dockerfile: ./docker/testing-host/Dockerfile
     init: true
-    network_mode: host
     container_name: coolify-testing-host
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -125,39 +117,37 @@ services:
       - dev_postgres_data:/data/coolify/_volumes/database
       - dev_redis_data:/data/coolify/_volumes/redis
       - dev_minio_data:/data/coolify/_volumes/minio
-    # networks:
-    #   - coolify
+    networks:
+      - coolify
   mailpit:
-    image: docker.io/axllent/mailpit:latest
+    image: axllent/mailpit:latest
     pull_policy: always
-    network_mode: host
     container_name: coolify-mail
-    # ports:
-    #   - "${FORWARD_MAILPIT_PORT:-1025}:1025"
-    #   - "${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
-    # networks:
-    #   - coolify
+    ports:
+      - "${FORWARD_MAILPIT_PORT:-1025}:1025"
+      - "${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
+    networks:
+      - coolify
   minio:
     image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
     pull_policy: always
     container_name: coolify-minio
     command: server /data --console-address ":9001"
-    network_mode: host
-    # ports:
-    #   - "${FORWARD_MINIO_PORT:-9000}:9000"
-    #   - "${FORWARD_MINIO_PORT_CONSOLE:-9001}:9001"
+    ports:
+      - "${FORWARD_MINIO_PORT:-9000}:9000"
+      - "${FORWARD_MINIO_PORT_CONSOLE:-9001}:9001"
     environment:
       MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minioadmin}"
       MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minioadmin}"
     volumes:
       - dev_minio_data:/data
-    # networks:
-    #   - coolify
+    networks:
+      - coolify
   minio-init:
-    image: docker.io/minio/mc:latest
+    image: minio/mc:latest
     pull_policy: always
     container_name: coolify-minio-init
-    restart: "no"
+    restart: no
     depends_on:
       - minio
     entrypoint: >
@@ -171,8 +161,8 @@ services:
       mc mb local/local --ignore-existing;
       echo 'MinIO initialization complete - bucket local is ready';
       "
-    # networks:
-    #   - coolify
+    networks:
+      - coolify
 
 volumes:
   dev_backups_data:
@@ -181,7 +171,7 @@ volumes:
   dev_coolify_data:
   dev_minio_data:
 
-# networks:
-#   coolify:
-#     name: coolify
-#     external: false
+networks:
+  coolify:
+    name: coolify
+    external: false
