@@ -22,14 +22,21 @@ class OauthController extends Controller
             $user = User::whereEmail($oauthUser->email)->first();
             if (! $user) {
                 $settings = instanceSettings();
-                if (! $settings->is_registration_enabled) {
+                $registrationAllowed = $settings->is_registration_enabled
+                    || $settings->is_oauth_self_registration_enabled;
+                if (! $registrationAllowed) {
                     abort(403, 'Registration is disabled');
                 }
 
                 $user = User::create([
                     'name' => $oauthUser->name,
                     'email' => $oauthUser->email,
+                    'oauth_provider' => $provider,
                 ]);
+            } elseif (empty($user->oauth_provider)) {
+                // Mark pre-existing accounts that authenticate via OAuth as OAuth users
+                // so admins can disable their password login through the instance setting.
+                $user->forceFill(['oauth_provider' => $provider])->save();
             }
             Auth::login($user);
 

@@ -16,6 +16,12 @@ class Advanced extends Component
     public bool $is_registration_enabled;
 
     #[Validate('boolean')]
+    public bool $is_oauth_self_registration_enabled;
+
+    #[Validate('boolean')]
+    public bool $disable_password_login_for_oauth_users;
+
+    #[Validate('boolean')]
     public bool $do_not_track;
 
     #[Validate('boolean')]
@@ -41,6 +47,8 @@ class Advanced extends Component
     {
         return [
             'is_registration_enabled' => 'boolean',
+            'is_oauth_self_registration_enabled' => 'boolean',
+            'disable_password_login_for_oauth_users' => 'boolean',
             'do_not_track' => 'boolean',
             'is_dns_validation_enabled' => 'boolean',
             'custom_dns_servers' => ['nullable', 'string', new ValidDnsServers],
@@ -62,6 +70,8 @@ class Advanced extends Component
         $this->allowed_ips = $this->settings->allowed_ips;
         $this->do_not_track = $this->settings->do_not_track;
         $this->is_registration_enabled = $this->settings->is_registration_enabled;
+        $this->is_oauth_self_registration_enabled = (bool) $this->settings->is_oauth_self_registration_enabled;
+        $this->disable_password_login_for_oauth_users = (bool) $this->settings->disable_password_login_for_oauth_users;
         $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
         $this->is_api_enabled = $this->settings->is_api_enabled;
         $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
@@ -142,6 +152,8 @@ class Advanced extends Component
     {
         try {
             $this->settings->is_registration_enabled = $this->is_registration_enabled;
+            $this->settings->is_oauth_self_registration_enabled = $this->is_oauth_self_registration_enabled;
+            $this->settings->disable_password_login_for_oauth_users = $this->disable_password_login_for_oauth_users;
             $this->settings->do_not_track = $this->do_not_track;
             $this->settings->is_dns_validation_enabled = $this->is_dns_validation_enabled;
             $this->settings->custom_dns_servers = $this->custom_dns_servers;

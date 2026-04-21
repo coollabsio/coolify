@@ -17,6 +17,10 @@ class UpdateUserPassword implements UpdatesUserPasswords
      */
     public function update(User $user, array $input): void
     {
+        if ($user->isPasswordLoginDisabled()) {
+            abort(403, 'Password login is disabled for OAuth users on this instance.');
+        }
+
         Validator::make($input, [
             'current_password' => ['required', 'string', 'current_password:web'],
             'password' => ['required', Password::defaults(), 'confirmed'],

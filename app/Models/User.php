@@ -52,6 +52,7 @@ class User extends Authenticatable implements SendsEmail
         'pending_email',
         'email_change_code',
         'email_change_code_expires_at',
+        'oauth_provider',
     ];
 
     protected $hidden = [
@@ -486,5 +487,30 @@ class User extends Authenticatable implements SendsEmail
     public function hasPassword(): bool
     {
         return ! empty($this->password);
+    }
+
+    /**
+     * Check if the user was provisioned via an OAuth provider.
+     */
+    public function isOauthUser(): bool
+    {
+        return ! empty($this->oauth_provider);
+    }
+
+    /**
+     * Determine whether this user is forbidden from logging in with or
+     * managing a password locally. This is true when the user came from an
+     * OAuth provider AND the instance is configured to disable password
+     * login for OAuth users.
+     */
+    public function isPasswordLoginDisabled(): bool
+    {
+        if (! $this->isOauthUser()) {
+            return false;
+        }
+
+        $settings = instanceSettings();
+
+        return (bool) ($settings->disable_password_login_for_oauth_users ?? false);
     }
 }
