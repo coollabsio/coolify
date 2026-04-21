@@ -1,0 +1,70 @@
+# documentation: https://docs.litespeedtech.com/cloud/docker/ols-wordpress/
+# slogan: WordPress on OpenLiteSpeed - high-performance PHP hosting with LiteSpeed Cache.
+# category: cms
+# tags: cms, wordpress, litespeed, openlitespeed, php, performance
+# logo: svgs/wordpress.svg
+# port: 8080
+
+services:
+ ols:
+    image: litespeedtech/openlitespeed:1.9.5-lsphp85
+    container_name: ols-wordpress
+    volumes:
+      - ols-conf:/usr/local/lsws/conf
+      - ols-html:/var/www/vhosts/localhost/html
+      - ols-logs:/usr/local/lsws/logs
+    environment:
+      - TZ=UTC
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ols-net
+
+  wordpress:
+    image: wordpress:php8.2-fpm-alpine
+    volumes:
+      - wordpress-files:/var/www/html
+    environment:
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_USER=$SERVICE_USER_WORDPRESS
+      - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+      - WORDPRESS_DB_NAME=wordpress
+      - TZ=UTC
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - ols-net
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_WORDPRESS_ROOT
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    networks:
+      - ols-net
+
+networks:
+  ols-net:
+
+volumes:
+  ols-conf:
+  ols-html:
+  ols-logs:
+  wordpress-files:
+  mariadb-data:
