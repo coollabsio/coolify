@@ -1,0 +1,32 @@
+# documentation: https://docs.attraccess.org
+# slogan: Tool access for makerspaces, built open / card scan in, machine on, fully logged.
+# category: productivity
+# tags: makerspace,fablab,access-control,resource-management,rfid,iot
+# logo: svgs/attraccess.png
+# port: 3000
+
+services:
+  attraccess:
+    image: attraccess/attraccess:v1.5.2
+    environment:
+      - SERVICE_FQDN_ATTRACCESS_3000
+      - ATTRACCESS_URL=$SERVICE_URL_ATTRACCESS
+      - AUTH_SESSION_SECRET=$SERVICE_PASSWORD_64_ATTRACCESS
+      - STORAGE_ROOT=/app/storage
+      - NODE_ENV=production
+      - LOG_LEVELS=${LOG_LEVELS:-error,warn,log}
+    volumes:
+      - attraccess-storage:/app/storage
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://127.0.0.1:3000/api/info', r => process.exit(r.statusCode < 400 ? 0 : 1)).on('error', () => process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  attraccess-storage:
