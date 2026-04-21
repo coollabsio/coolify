@@ -42,6 +42,16 @@
                         </div>
                     @endif
                     <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                            helper="Allow users authenticating via OAuth providers to self-register, even when general registration is disabled. Useful for restricting access to your identity provider (e.g. Authentik, Google Workspace)."
+                            label="OAuth Self-Registration Allowed" />
+                    </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="disable_password_login_for_oauth_users"
+                            helper="When enabled, users that signed up through (or were linked to) an OAuth provider can no longer log in with a password. They must use their OAuth provider. This lets you suspend access centrally from the OAuth provider."
+                            label="Disable Password Login for OAuth Users" />
+                    </div>
+                    <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."
                             label="Do Not Track" />

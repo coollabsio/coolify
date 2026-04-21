@@ -52,6 +52,7 @@ class User extends Authenticatable implements SendsEmail
         'pending_email',
         'email_change_code',
         'email_change_code_expires_at',
+        'oauth_provider',
     ];
 
     protected $hidden = [
