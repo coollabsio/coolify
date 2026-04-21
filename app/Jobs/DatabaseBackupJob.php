@@ -121,7 +121,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 throw new \Exception('Database not found?!');
             }
 
-            // Check for active deployments if it's an application-linked database
             if ($this->database instanceof ServiceDatabase) {
                 $applicationId = $this->database->application_id;
                 $pullRequestId = 0;

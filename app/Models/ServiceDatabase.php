@@ -61,10 +61,6 @@ class ServiceDatabase extends BaseModel
         })->orderBy('name');
     }
 
-    /**
-     * Get query builder for service databases owned by current team.
-     * If you need all service databases without further query chaining, use ownedByCurrentTeamCached() instead.
-     */
     public static function ownedByCurrentTeam()
     {
         $teamId = currentTeam()->id;
@@ -76,9 +72,6 @@ class ServiceDatabase extends BaseModel
         })->orderBy('name');
     }
 
-    /**
-     * Get all service databases owned by current team (cached for request duration).
-     */
     public static function ownedByCurrentTeamCached()
     {
         return once(function () {
@@ -105,14 +98,6 @@ class ServiceDatabase extends BaseModel
         }
     }
 
-    /**
-     * Resolve the server this database runs on, regardless of ownership type.
-     *
-     * Resolution chain:
-     *   service_id       → service → server (belongsTo)
-     *   application_id   → application → destination (morphTo) → server (belongsTo)
-     *   preview_id       → application_preview → application → destination → server
-     */
     public function getServerAttribute()
     {
         if ($this->service_id) {

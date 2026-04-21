@@ -151,7 +151,6 @@ function next_queuable(string $server_id, string $application_id, string $commit
         return false;
     }
 
-    // Check if there's a running backup for this application
     $running_backup = \App\Models\ScheduledDatabaseBackupExecution::where('status', 'running')
         ->whereHas('scheduledDatabaseBackup', function ($query) use ($application_id, $pull_request_id) {
             $query->where('database_type', \App\Models\ServiceDatabase::class)

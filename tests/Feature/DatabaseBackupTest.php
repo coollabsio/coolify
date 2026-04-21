@@ -35,7 +35,7 @@ test('it resolves container name for main application', function () {
         'enabled' => true,
         'save_s3' => false,
         'frequency' => '0 0 * * *',
-        'database_id' => 1, // Mock
+        'database_id' => 1,
         'database_type' => ServiceDatabase::class,
         'team_id' => 0,
     ]);
@@ -48,11 +48,7 @@ test('it resolves container name for main application', function () {
 
     $job = new DatabaseBackupJob($backup);
     
-    // We expect the container name to match Coolify's pattern
     $expectedName = "{$this->application->uuid}-db";
-    
-    // Call the internal resolution logic (via reflection if needed, but here we can just test if the job identifies it)
-    // Since we can't easily call private methods, we verify the logic trace in the handle()
 });
 
 test('it blocks backup if deployment is running', function () {
@@ -71,14 +67,13 @@ test('it blocks backup if deployment is running', function () {
         'name' => 'db',
     ]);
 
-    // Mock an active deployment
+
     \Illuminate\Support\Facades\Cache::put("deployment:pipeline:{$this->application->id}", true);
     
     $job = new DatabaseBackupJob($backup);
     $job->handle();
     
-    // Execution record should show as failed/skipped due to deployment
-    // We check the latest execution log
+
     $execution = \App\Models\ScheduledDatabaseBackupExecution::where('scheduled_database_backup_id', $backup->id)->first();
     expect($execution->status)->toBe('failed');
     expect($execution->message)->toContain('Deployment in progress');
@@ -90,10 +85,10 @@ test('it blocks deployment if backup is running', function () {
         'name' => 'db',
     ]);
 
-    // Mock an active backup lock
+
     \Illuminate\Support\Facades\Cache::put("backup:running:{$this->application->id}", true);
     
-    // next_queuable() is a helper function in bootstrap/helpers/applications.php
+
     $canQueue = next_queuable($this->server->id, $this->application->id);
     
     expect($canQueue)->toBeFalse();
@@ -122,7 +117,4 @@ test('it correctly resolves preview container name', function () {
 
     $job = new DatabaseBackupJob($backup);
     
-    // The Container name resolution logic we added in DatabaseBackupJob.php:155
-    // uses generateApplicationContainerName($application, $preview)
-    // For preview 123, it should be uuid-123-db-pr
 });
