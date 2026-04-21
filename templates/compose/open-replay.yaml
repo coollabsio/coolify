@@ -1,0 +1,85 @@
+# documentation: https://docs.openreplay.com/
+# slogan: Open source session replay suite for developers
+# category: analytics
+# tags: session-replay,analytics,developer-tools,ux
+# logo: svgs/default.webp
+# port: 80
+
+services:
+  openreplay:
+    image: openreplay/openreplay:latest
+    environment:
+      - SERVICE_FQDN_OPENREPLAY_80
+      - NODE_ENV=production
+      - FRONTEND_URL=${SERVICE_URL_OPENREPLAY}
+      - API_URL=${SERVICE_URL_OPENREPLAY}/api
+      - PG_DB=${POSTGRES_DB:-openreplay}
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_USER=${SERVICE_USER_POSTGRES}
+      - PG_PASS=${SERVICE_PASSWORD_POSTGRES}
+      - PG_SSL=true
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASS=${REDIS_PASSWORD}
+      - REDIS_SSL=true
+      - IS_SSL=false
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
+      - CLICKHOUSE_PASS=${CLICKHOUSE_PASSWORD}
+    volumes:
+      - openreplay-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:80/ || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 3
+
+  postgres:
+    image: bitnami/postgresql:latest
+    environment:
+      - POSTGRESQL_USERNAME=${SERVICE_USER_POSTGRES}
+      - POSTGRESQL_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRESQL_DATABASE=${POSTGRES_DB:-openreplay}
+    volumes:
+      - openreplay-postgres-data:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${SERVICE_USER_POSTGRES}"]
+      interval: 5s
+      timeout: 20s
+      retries: 3
+
+  redis:
+    image: bitnami/redis:latest
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_TLS_ENABLED=true
+    volumes:
+      - openreplay-redis-data:/bitnami/redis
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --raw auth ${REDIS_PASSWORD} ping | grep PONG"]
+      interval: 5s
+      timeout: 20s
+      retries: 3
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    environment:
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
+      - CLICKHOUSE_DB=${CLICKHOUSE_DB:-openreplay}
+    volumes:
+      - openreplay-clickhouse-data:/var/lib/clickhouse
+      - openreplay-clickhouse-logs:/var/log/clickhouse-server
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1'"]
+      interval: 5s
+      timeout: 20s
+      retries: 3
