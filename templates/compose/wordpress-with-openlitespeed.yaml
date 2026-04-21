@@ -1,0 +1,47 @@
+# documentation: https://openlitespeed.org/
+# slogan: WordPress with OpenLiteSpeed web server
+# category: cms
+# tags: wordpress,cms,openlitespeed,php
+# logo: svgs/default.webp
+# port: 80
+
+services:
+  wordpress:
+    image: lscr.io/linuxserver/openlitespeed:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-UTC}
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_USER=${SERVICE_USER_MYSQL}
+      - WORDPRESS_DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - WORDPRESS_DB_NAME=${MYSQL_DATABASE:-wordpress}
+    volumes:
+      - wordpress-data:/config
+      - wordpress-www:/var/www/html
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:80/ || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 3
+
+  mariadb:
+    image: lscr.io/linuxserver/mariadb:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-UTC}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MARIADB_ROOT}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-wordpress}
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+    volumes:
+      - wordpress-mariadb-data:/config
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 5s
+      timeout: 20s
+      retries: 3
