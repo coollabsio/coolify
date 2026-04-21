@@ -1,0 +1,37 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/
+# slogan: Self-hosted email server with SMTP, IMAP, POP3 and spam filtering
+# category: productivity
+# tags: email,smtp,imap,self-hosted,mail
+# logo: svgs/default.webp
+# port: 25
+
+services:
+  email:
+    image: docker.io/mailserver/docker-mailserver:latest
+    environment:
+      - DMS_HOSTNAME=${SERVICE_FQDN_EMAIL}
+      - SSL_TYPE=letsencrypt
+      - ENABLE_SPAMASSASSIN=1
+      - ENABLE_CLAMAV=1
+      - ENABLE_FAIL2BAN=1
+      - ONE_DIR=1
+      - PERMIT_DOCKER=host
+      - MOVE_SPAM_TO_JUNK=1
+    volumes:
+      - email-data:/var/mail
+      - email-state:/var/mail-state
+      - email-logs:/var/log/mail
+      - ./docker/email/dms:/tmp/docker-mailserver
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "25:25"
+      - "143:143"
+      - "587:587"
+      - "993:993"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 25 || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 3
+    cap_add:
+      - NET_ADMIN
