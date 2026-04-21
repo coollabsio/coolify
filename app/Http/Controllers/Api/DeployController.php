@@ -405,6 +405,14 @@ class DeployController extends Controller
                         $dockerTagForResource = $preview?->docker_registry_image_tag;
                     } else {
                         $preview = $resource->previews()->where('pull_request_id', $pr)->first();
+                        if (! $preview && $resource instanceof Application) {
+                            $preview = ApplicationPreview::create([
+                                'application_id' => $resource->id,
+                                'pull_request_id' => $pr,
+                                'pull_request_html_url' => '',
+                            ]);
+                            $preview->generate_preview_fqdn();
+                        }
                     }
                     if (! $preview) {
                         $deployments->push(['message' => "Pull request {$pr} not found for this resource.", 'resource_uuid' => $uuid]);

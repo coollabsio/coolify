@@ -9,6 +9,7 @@ use App\Enums\BuildPackTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\LocalFileVolume;
@@ -3604,6 +3605,14 @@ class ApplicationsController extends Controller
                     default: false,
                 )
             ),
+            new OA\Parameter(
+                name: 'pull_request_id',
+                in: 'query',
+                description: 'Pull request number. When provided, deploys a preview container for this PR. Auto-creates the preview if it does not exist.',
+                schema: new OA\Schema(
+                    type: 'integer',
+                )
+            ),
         ],
         responses: [
             new OA\Response(
@@ -3655,11 +3664,27 @@ class ApplicationsController extends Controller
 
         $this->authorize('deploy', $application);
 
+        $pullRequestId = $request->input('pull_request_id', $request->input('pr'));
+        $pr = $pullRequestId ? max((int) $pullRequestId, 0) : 0;
+
+        if ($pr !== 0) {
+            $preview = $application->previews()->where('pull_request_id', $pr)->first();
+            if (! $preview) {
+                $preview = ApplicationPreview::create([
+                    'application_id' => $application->id,
+                    'pull_request_id' => $pr,
+                    'pull_request_html_url' => '',
+                ]);
+                $preview->generate_preview_fqdn();
+            }
+        }
+
         $deployment_uuid = new Cuid2;
 
         $result = queue_application_deployment(
             application: $application,
             deployment_uuid: $deployment_uuid,
+            pull_request_id: $pr,
             force_rebuild: $force,
             is_api: true,
             no_questions_asked: $instant_deploy
@@ -3710,6 +3735,14 @@ class ApplicationsController extends Controller
                     default: true,
                 )
             ),
+            new OA\Parameter(
+                name: 'pull_request_id',
+                in: 'query',
+                description: 'Pull request number. When provided, stops only the preview container for this PR instead of the main application.',
+                schema: new OA\Schema(
+                    type: 'integer',
+                )
+            ),
         ],
         responses: [
             new OA\Response(
@@ -3758,6 +3791,30 @@ class ApplicationsController extends Controller
 
         $this->authorize('deploy', $application);
 
+        $pullRequestId = $request->input('pull_request_id', $request->input('pr'));
+        $pr = $pullRequestId ? max((int) $pullRequestId, 0) : 0;
+
+        if ($pr !== 0) {
+            $preview = $application->previews()->where('pull_request_id', $pr)->first();
+            if (! $preview) {
+                return response()->json(['message' => "Pull request {$pr} not found."], 404);
+            }
+
+            $server = $application->destination->server;
+            $containers = getCurrentApplicationContainerStatus($server, $application->id, $pr);
+            if ($containers->isEmpty()) {
+                return response()->json(['message' => "No running container found for PR #{$pr}."], 404);
+            }
+            foreach ($containers->pluck('Names') as $containerName) {
+                instant_remote_process(command: [
+                    "docker stop -t 30 $containerName",
+                    "docker rm -f $containerName",
+                ], server: $server, throwError: false);
+            }
+
+            return response()->json(['message' => "Preview container for PR #{$pr} stopping request queued."]);
+        }
+
         $dockerCleanup = $request->boolean('docker_cleanup', true);
         StopApplication::dispatch($application, false, $dockerCleanup);
 
@@ -3785,6 +3842,14 @@ class ApplicationsController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
+                )
+            ),
+            new OA\Parameter(
+                name: 'pull_request_id',
+                in: 'query',
+                description: 'Pull request number. When provided, restarts only the preview container for this PR. Auto-creates the preview if it does not exist.',
+                schema: new OA\Schema(
+                    type: 'integer',
                 )
             ),
         ],
@@ -3837,11 +3902,27 @@ class ApplicationsController extends Controller
 
         $this->authorize('deploy', $application);
 
+        $pullRequestId = $request->input('pull_request_id', $request->input('pr'));
+        $pr = $pullRequestId ? max((int) $pullRequestId, 0) : 0;
+
+        if ($pr !== 0) {
+            $preview = $application->previews()->where('pull_request_id', $pr)->first();
+            if (! $preview) {
+                $preview = ApplicationPreview::create([
+                    'application_id' => $application->id,
+                    'pull_request_id' => $pr,
+                    'pull_request_html_url' => '',
+                ]);
+                $preview->generate_preview_fqdn();
+            }
+        }
+
         $deployment_uuid = new Cuid2;
 
         $result = queue_application_deployment(
             application: $application,
             deployment_uuid: $deployment_uuid,
+            pull_request_id: $pr,
             restart_only: true,
             is_api: true,
         );
