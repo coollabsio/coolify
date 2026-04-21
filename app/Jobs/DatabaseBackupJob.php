@@ -34,10 +34,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $maxExceptions = 1;
+    public int $tries = 60;
 
     public ?Team $team = null;
 
-    public Server $server;
+    public ?Server $server = null;
 
     public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|ServiceDatabase $database;
 
@@ -47,7 +48,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?ScheduledDatabaseBackupExecution $backup_log = null;
 
-    public string $backup_status = 'failed';
+    public string $backup_status = ScheduledDatabaseBackupExecution::STATUS_FAILED;
 
     public ?string $backup_location = null;
 
@@ -101,7 +102,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (data_get($this->backup, 'database_type') === ServiceDatabase::class) {
                 $this->database = data_get($this->backup, 'database');
-                $this->server = $this->database->service->server;
+                if ($this->database->service_id) {
+                    $this->server = $this->database->service->server;
+                } elseif ($this->database->application_id) {
+                    $this->server = data_get($this->database, 'application.destination.server');
+                } elseif ($this->database->application_preview_id) {
+                    $this->server = data_get($this->database, 'application_preview.application.destination.server');
+                }
                 $this->s3 = $this->backup->s3;
             } else {
                 $this->database = data_get($this->backup, 'database');
@@ -113,6 +120,28 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (is_null($this->database)) {
                 throw new \Exception('Database not found?!');
+            }
+
+            if ($this->database instanceof ServiceDatabase) {
+                $applicationId = $this->database->application_id;
+                $pullRequestId = 0;
+                if ($this->database->application_preview_id) {
+                    $applicationId = data_get($this->database->application_preview, 'application_id');
+                    $pullRequestId = data_get($this->database->application_preview, 'pull_request_id');
+                }
+
+                if ($applicationId) {
+                    $deploymentInProgress = \App\Models\ApplicationDeploymentQueue::where('application_id', $applicationId)
+                        ->where('pull_request_id', $pullRequestId)
+                        ->where('status', \App\Enums\ApplicationDeploymentStatus::IN_PROGRESS->value)
+                        ->exists();
+
+                    if ($deploymentInProgress) {
+                        $this->release(60);
+
+                        return;
+                    }
+                }
             }
 
             $this->markStaleExecutionsAsFailed();
@@ -131,10 +160,33 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (data_get($this->backup, 'database_type') === ServiceDatabase::class) {
                 $databaseType = $this->database->databaseType();
-                $serviceUuid = $this->database->service->uuid;
-                $serviceName = str($this->database->service->name)->slug();
+                if ($this->database->service_id) {
+                    $serviceUuid = $this->database->service->uuid;
+                    $serviceName = str($this->database->service->name)->slug();
+                    $this->container_name = "{$this->database->name}-{$serviceUuid}";
+                } else {
+                    if ($this->database->application_id) {
+                        $application = $this->database->application;
+                        $serviceName = str($application->name)->slug();
+                        $compose = \Symfony\Component\Yaml\Yaml::parse($application?->docker_compose ?: '') ?: [];
+                        $this->container_name = data_get($compose, 'services.' . $this->database->name . '.container_name');
+                        if (! $this->container_name) {
+                            $this->container_name = "{$this->database->name}-" . generateApplicationContainerName($application);
+                        }
+                    } else {
+                        $preview = $this->database->application_preview;
+                        $application = $preview?->application;
+                        $serviceName = str($application?->name)->slug();
+                        $compose = \Symfony\Component\Yaml\Yaml::parse($application?->docker_compose ?: '') ?: [];
+                        $this->container_name = data_get($compose, 'services.' . $this->database->name . '.container_name');
+                        if (! $this->container_name) {
+                            $this->container_name = $preview && $application
+                                ? "{$this->database->name}-" . generateApplicationContainerName($application, $preview->pull_request_id)
+                                : null;
+                        }
+                    }
+                }
                 if (str($databaseType)->contains('postgres')) {
-                    $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName.'-'.$this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep POSTGRES_";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
@@ -165,7 +217,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         $this->postgres_password = str($this->postgres_password)->after('POSTGRES_PASSWORD=')->value();
                     }
                 } elseif (str($databaseType)->contains('mysql')) {
-                    $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName.'-'.$this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep MYSQL_";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
@@ -188,7 +239,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         throw new \Exception('MYSQL_DATABASE not found');
                     }
                 } elseif (str($databaseType)->contains('mariadb')) {
-                    $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName.'-'.$this->container_name;
                     $commands[] = "docker exec $this->container_name env";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
@@ -489,6 +539,18 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 ]);
             }
         }
+
+        if ($this->database instanceof ServiceDatabase) {
+            if ($this->database->application_id || $this->database->application_preview_id) {
+                $application = $this->database->application_id
+                    ? $this->database->application
+                    : $this->database->application_preview?->application;
+
+                if ($application) {
+                    queue_next_deployment($application);
+                }
+            }
+        }
     }
 
     private function backup_standalone_mongodb(string $databaseWithCollections): void
@@ -684,10 +746,21 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $endpoint = $this->s3->endpoint;
             $this->s3->testConnection(shouldSave: true);
             if (data_get($this->backup, 'database_type') === ServiceDatabase::class) {
-                $network = $this->database->service->destination->network;
+                if ($this->database->service_id) {
+                    $network = data_get($this->database, 'service.destination.network');
+                } elseif ($this->database->application_id) {
+                    $network = data_get($this->database, 'application.destination.network');
+                } elseif ($this->database->application_preview_id) {
+                    $network = data_get($this->database, 'application_preview.application.destination.network');
+                }
             } else {
-                $network = $this->database->destination->network;
+                $network = data_get($this->database, 'destination.network');
             }
+
+            if (! $network) {
+                throw new \Exception('Unable to resolve network for database: '.$this->database->name);
+            }
+
             $safeNetwork = escapeshellarg($network);
 
             $fullImageName = $this->getFullImageName();
@@ -743,13 +816,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $timeoutSeconds = ($this->backup->timeout ?? 3600) * 2;
 
             $staleExecutions = $this->backup->executions()
-                ->where('status', 'running')
+                ->where('status', ScheduledDatabaseBackupExecution::STATUS_RUNNING)
                 ->where('created_at', '<', now()->subSeconds($timeoutSeconds))
                 ->get();
 
             foreach ($staleExecutions as $execution) {
                 $execution->update([
-                    'status' => 'failed',
+                    'status' => ScheduledDatabaseBackupExecution::STATUS_FAILED,
                     'message' => 'Marked as failed - backup execution exceeded maximum allowed time',
                     'finished_at' => now(),
                 ]);
@@ -781,9 +854,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             // Don't overwrite a successful backup status — a post-backup error
             // (e.g. notification failure) should not retroactively mark the backup
             // as failed (see GitHub issue #9088)
-            if ($log->status !== 'success') {
+            if ($log->status !== ScheduledDatabaseBackupExecution::STATUS_SUCCESS) {
                 $log->update([
-                    'status' => 'failed',
+                    'status' => ScheduledDatabaseBackupExecution::STATUS_FAILED,
                     'message' => 'Job permanently failed after '.$this->attempts().' attempts: '.($exception?->getMessage() ?? 'Unknown error'),
                     'size' => 0,
                     'filename' => null,
@@ -793,7 +866,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         // Notify team about permanent failure (only if backup didn't already succeed)
-        if ($this->team && $log?->status !== 'success') {
+        if ($this->team && $log?->status !== ScheduledDatabaseBackupExecution::STATUS_SUCCESS) {
             $databaseName = $log?->database_name ?? 'unknown';
             $output = $this->backup_output ?? $exception?->getMessage() ?? 'Unknown error';
             try {

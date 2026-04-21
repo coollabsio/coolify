@@ -2680,7 +2680,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         $topLevelConfigs = collect(data_get($yaml, 'configs', []));
         $topLevelSecrets = collect(data_get($yaml, 'secrets', []));
         $services = data_get($yaml, 'services');
-
+        $detectedDatabases = collect([]);
         $generatedServiceFQDNS = collect([]);
         if (is_null($resource->destination)) {
             $destination = $server->destinations()->first();
@@ -2693,7 +2693,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
         }
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id, $detectedDatabases) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -2996,6 +2996,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $image = data_get_str($service, 'image');
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
+            if ($isDatabase) {
+                $detectedDatabases->put($serviceName, $service);
+            }
 
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
@@ -3392,6 +3395,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         data_forget($resource, 'environment_variables');
         data_forget($resource, 'environment_variables_preview');
         $resource->save();
+
+        if ($pull_request_id !== 0) {
+            $resourceToSync = ApplicationPreview::where('application_id', $resource->id)
+                ->where('pull_request_id', $pull_request_id)
+                ->first();
+        } else {
+            $resourceToSync = $resource;
+        }
+        if ($resourceToSync) {
+            updateResourceDatabases($resourceToSync, $detectedDatabases);
+        }
 
         return collect($finalServices);
     }

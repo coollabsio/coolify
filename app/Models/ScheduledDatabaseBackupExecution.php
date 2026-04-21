@@ -6,6 +6,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ScheduledDatabaseBackupExecution extends BaseModel
 {
+    const STATUS_RUNNING = 'running';
+    const STATUS_SUCCESS = 'success';
+    const STATUS_FAILED = 'failed';
     protected $fillable = [
         'uuid',
         'scheduled_database_backup_id',

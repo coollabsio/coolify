@@ -31,9 +31,39 @@ class StartDatabaseProxy
 
         if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
             $databaseType = $database->databaseType();
-            $network = $database->service->uuid;
-            $server = data_get($database, 'service.destination.server');
-            $containerName = "{$database->name}-{$database->service->uuid}";
+            if ($database->service_id) {
+                $service = $database->service;
+                $network = $service?->uuid;
+                $server = data_get($service, 'destination.server');
+                $containerName = $service ? "{$database->name}-{$service->uuid}" : null;
+            } else {
+                if ($database->application_id) {
+                    $application = $database->application;
+                    $network = data_get($application, 'destination.network');
+                    $server = data_get($application, 'destination.server');
+                    $compose = \Symfony\Component\Yaml\Yaml::parse($application?->docker_compose ?: '') ?: [];
+                    $containerName = data_get($compose, 'services.' . $database->name . '.container_name');
+                    if (! $containerName) {
+                        $containerName = "{$database->name}-" . generateApplicationContainerName($application);
+                    }
+                } else {
+                    $preview = $database->application_preview;
+                    $application = $preview?->application;
+                    $network = data_get($application, 'destination.network');
+                    $server = data_get($application, 'destination.server');
+                    $compose = \Symfony\Component\Yaml\Yaml::parse($application?->docker_compose ?: '') ?: [];
+                    $containerName = data_get($compose, 'services.' . $database->name . '.container_name');
+                    if (! $containerName) {
+                        $containerName = $preview && $application
+                            ? "{$database->name}-" . generateApplicationContainerName($application, $preview->pull_request_id)
+                            : null;
+                    }
+                }
+            }
+
+            if (! $server || ! $network || ! $containerName) {
+                throw new \RuntimeException("Unable to resolve proxy target for database {$database->name}.");
+            }
         }
         $internalPort = match ($databaseType) {
             'standalone-mariadb', 'standalone-mysql' => 3306,

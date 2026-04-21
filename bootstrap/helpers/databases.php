@@ -341,7 +341,7 @@ function deleteOldBackupsLocally($backup): Collection
 
     $server = null;
     if ($backup->database_type === ServiceDatabase::class) {
-        $server = $backup->database->service->server;
+        $server = $backup->database->server;
     } else {
         $server = $backup->database->destination->server;
     }

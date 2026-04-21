@@ -8,6 +8,13 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ScheduledDatabaseBackup extends BaseModel
 {
+    protected static function booted(): void
+    {
+        static::deleting(function (ScheduledDatabaseBackup $backup): void {
+            $backup->executions()->delete();
+        });
+    }
+
     protected function casts(): array
     {
         return [
@@ -91,12 +98,21 @@ class ScheduledDatabaseBackup extends BaseModel
         ];
     }
 
-    public function server()
+    public function server(): ?Server
     {
         if ($this->database) {
+            $server = null;
             if ($this->database instanceof ServiceDatabase) {
-                $destination = data_get($this->database->service, 'destination');
-                $server = data_get($destination, 'server');
+                if ($this->database->service_id) {
+                    $destination = data_get($this->database->service, 'destination');
+                    $server = data_get($destination, 'server');
+                } elseif ($this->database->application_id) {
+                    $destination = data_get($this->database->application, 'destination');
+                    $server = data_get($destination, 'server');
+                } elseif ($this->database->application_preview_id) {
+                    $destination = data_get($this->database->application_preview?->application, 'destination');
+                    $server = data_get($destination, 'server');
+                }
             } else {
                 $destination = data_get($this->database, 'destination');
                 $server = data_get($destination, 'server');
