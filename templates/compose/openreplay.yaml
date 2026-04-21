@@ -1,0 +1,60 @@
+# documentation: https://docs.openreplay.com
+# slogan: Open-source Session Replay and Product Analytics. Self-host and own your data.
+# category: analytics
+# tags: analytics, session-replay, openreplay, product-analytics
+# port: 80
+
+services:
+  openreplay:
+    image: openreplay/openreplay:latest
+    container_name: openreplay
+    volumes:
+      - replay-data:/var/lib/openreplay
+      - etl-data:/var/lib/openreplay/etl
+    environment:
+      - TZ=UTC
+      - FRONTEND_URL=$SERVICE_URL_OPENREPLAY
+      - API_SERVICE_URL=$SERVICE_URL_OPENREPLAY/api
+      - STORAGE_URL=$SERVICE_URL_OPENREPLAY/storage
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/openreplay
+      - REDIS_HOST=redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  postgres:
+    image: postgres:15-alpine
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=openreplay
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SERVICE_USER_POSTGRES}"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  replay-data:
+  etl-data:
+  postgres-data:
+  redis-data:
