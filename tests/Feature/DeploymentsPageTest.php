@@ -322,10 +322,19 @@ it('normalizes project filter values when listing and applying project filters',
         'name' => ' Alpha Project ',
     ]);
 
+    createDeploymentForTeam($this->team, [
+        'status' => ApplicationDeploymentStatus::FINISHED->value,
+    ], [
+        'name' => 'Different Project App',
+    ], [
+        'name' => 'Beta Project',
+    ]);
+
     Livewire::test(Deployments::class)
         ->assertDontSee('All servers')
         ->assertDontSee('All sources')
         ->set('project', 'Alpha Project')
         ->assertSee('Canonical App')
-        ->assertSee('Spaced App');
+        ->assertSee('Spaced App')
+        ->assertDontSee('Different Project App');
 });
