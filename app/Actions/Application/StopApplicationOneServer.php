@@ -20,7 +20,9 @@ class StopApplicationOneServer
         }
         try {
             $containers = getCurrentApplicationContainerStatus($server, $application->id, 0);
-            $timeout = $application->settings->stop_grace_period ?? DEFAULT_STOP_GRACE_PERIOD_SECONDS;
+            $timeout = ($application->settings->stop_grace_period > 0)
+                ? $application->settings->stop_grace_period
+                : DEFAULT_STOP_GRACE_PERIOD_SECONDS;
 
             if ($containers->count() > 0) {
                 foreach ($containers as $container) {
