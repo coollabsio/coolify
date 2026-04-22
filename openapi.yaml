@@ -4829,7 +4829,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Application'
+                  $ref: '#/components/schemas/ApplicationDeploymentQueue'
         '401':
           $ref: '#/components/responses/401'
         '400':

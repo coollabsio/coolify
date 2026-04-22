@@ -629,7 +629,7 @@ class DeployController extends Controller
                         mediaType: 'application/json',
                         schema: new OA\Schema(
                             type: 'array',
-                            items: new OA\Items(ref: '#/components/schemas/Application'),
+                            items: new OA\Items(ref: '#/components/schemas/ApplicationDeploymentQueue'),
                         )
                     ),
                 ]),
