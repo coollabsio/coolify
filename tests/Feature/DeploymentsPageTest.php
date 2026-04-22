@@ -28,6 +28,20 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
+/**
+ * @param  array{
+ *     status?: string,
+ *     application_name?: string,
+ *     server_name?: string,
+ *     server_id?: int,
+ *     git_type?: string,
+ *     deployment_url?: string|null,
+ *     commit_message?: string,
+ *     deployment_uuid?: string
+ * }  $deploymentOverrides
+ * @param  array{name?: string}  $applicationOverrides
+ * @param  array{name?: string}  $projectOverrides
+ */
 function createDeploymentForTeam(Team $team, array $deploymentOverrides = [], array $applicationOverrides = [], array $projectOverrides = []): ApplicationDeploymentQueue
 {
     $project = Project::factory()->create(array_merge([
@@ -162,6 +176,34 @@ it('ignores hidden server and source query filters', function () {
     $response->assertSee('Solo App');
     $response->assertDontSee('All servers');
     $response->assertDontSee('All sources');
+});
+
+it('applies filters when query string values are literal zero strings', function () {
+    createDeploymentForTeam($this->team, [
+        'status' => '0',
+        'server_name' => '0',
+        'git_type' => '0',
+    ], [
+        'name' => 'Zero App',
+    ], [
+        'name' => '0',
+    ]);
+
+    createDeploymentForTeam($this->team, [
+        'status' => ApplicationDeploymentStatus::FAILED->value,
+        'server_name' => 'Fail Server',
+        'git_type' => 'gitlab',
+    ], [
+        'name' => 'Non Zero App',
+    ], [
+        'name' => 'Non Zero Project',
+    ]);
+
+    $response = $this->get('/deployments?status=0&project=0&server=0&source=0');
+
+    $response->assertOk();
+    $response->assertSee('Zero App');
+    $response->assertDontSee('Non Zero App');
 });
 
 it('normalizes trimmed filter values before deciding whether to show filter controls', function () {

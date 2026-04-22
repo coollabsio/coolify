@@ -54,21 +54,21 @@ class Deployments extends Component
         $sourceColumn = $baseQuery->getQuery()->getGrammar()->wrap('git_type');
 
         $filteredQuery = (clone $baseQuery)
-            ->when($this->status, fn (Builder $query) => $query->where('status', $this->status))
-            ->when($this->project, function (Builder $query) {
+            ->when(filled($this->status), fn (Builder $query) => $query->where('status', trim($this->status ?? '')))
+            ->when(filled($this->project), function (Builder $query) {
                 $query->whereHas('application.environment.project', function (Builder $projectQuery) {
                     $wrappedProjectName = $projectQuery->getQuery()->getGrammar()->wrap('name');
 
-                    $projectQuery->whereRaw("TRIM({$wrappedProjectName}) = ?", [trim($this->project)]);
+                    $projectQuery->whereRaw("TRIM({$wrappedProjectName}) = ?", [trim($this->project ?? '')]);
                 });
             })
             ->when(
-                $this->server && $availableServers->count() > 1,
-                fn (Builder $query) => $query->whereRaw("TRIM({$serverColumn}) = ?", [trim($this->server)])
+                filled($this->server) && $availableServers->count() > 1,
+                fn (Builder $query) => $query->whereRaw("TRIM({$serverColumn}) = ?", [trim($this->server ?? '')])
             )
             ->when(
-                $this->source && $availableSources->count() > 1,
-                fn (Builder $query) => $query->whereRaw("TRIM({$sourceColumn}) = ?", [trim($this->source)])
+                filled($this->source) && $availableSources->count() > 1,
+                fn (Builder $query) => $query->whereRaw("TRIM({$sourceColumn}) = ?", [trim($this->source ?? '')])
             );
 
         $deployments = (clone $filteredQuery)
