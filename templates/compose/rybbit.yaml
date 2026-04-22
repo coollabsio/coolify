@@ -25,6 +25,7 @@ services:
   rybbit_backend:
     image: 'ghcr.io/rybbit-io/rybbit-backend:v2.2.3'
     environment:
+      - SERVICE_URL_RYBBIT_3001=/api
       - NODE_ENV=production
       - TRUST_PROXY=true
       - 'BASE_URL=${SERVICE_URL_RYBBIT}'
