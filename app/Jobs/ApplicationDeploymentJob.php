@@ -2446,9 +2446,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_URL')->isEmpty()) {
-                $url = str($this->preview->fqdn)->replace('http://', '')->replace('https://', '');
+                $url = Url::fromString($this->preview->fqdn);
+                $fqdn = $url->getHost();
+                $url = $url->withHost($fqdn)->withPort(null)->__toString();
                 if ((int) $this->application->compose_parsing_version >= 3) {
-                    $coolify_envs->put('COOLIFY_FQDN', $url);
+                    $coolify_envs->put('COOLIFY_FQDN', $fqdn);
                 } else {
                     $coolify_envs->put('COOLIFY_URL', $url);
                 }
@@ -2490,9 +2492,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
             if ($this->application->environment_variables->where('key', 'COOLIFY_URL')->isEmpty()) {
-                $url = str($this->application->fqdn)->replace('http://', '')->replace('https://', '');
+                $url = Url::fromString($this->application->fqdn);
+                $fqdn = $url->getHost();
+                $url = $url->withHost($fqdn)->withPort(null)->__toString();
                 if ((int) $this->application->compose_parsing_version >= 3) {
-                    $coolify_envs->put('COOLIFY_FQDN', $url);
+                    $coolify_envs->put('COOLIFY_FQDN', $fqdn);
                 } else {
                     $coolify_envs->put('COOLIFY_URL', $url);
                 }
