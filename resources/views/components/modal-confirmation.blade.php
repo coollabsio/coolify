@@ -43,6 +43,7 @@
 
 <div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
     modalOpen: false,
+    previouslyFocusedElement: null,
     step: {{ empty($checkboxes) ? 2 : 1 }},
     initialStep: {{ empty($checkboxes) ? 2 : 1 }},
     finalStep: {{ $confirmWithPassword && !$skipPasswordConfirmation ? 3 : 2 }},
@@ -127,6 +128,17 @@
         }
     }
 }"
+    x-init="$watch('modalOpen', value => {
+        if (value) {
+            previouslyFocusedElement = document.activeElement;
+            $nextTick(() => {
+                const focusTarget = $refs.confirmationModal?.querySelector('[data-modal-initial-focus], input, textarea, select, button:not([disabled]), [href], [tabindex]:not([tabindex=\'-1\'])');
+                focusTarget?.focus();
+            });
+        } else if (previouslyFocusedElement) {
+            $nextTick(() => previouslyFocusedElement?.focus?.());
+        }
+    })"
     @keydown.escape.window="if (modalOpen) { modalOpen = false; resetModal(); }" :class="{ 'z-40': modalOpen }"
     class="relative w-auto h-auto">
     @if (isset($trigger))
@@ -197,7 +209,7 @@
             class="fixed top-0 left-0 z-99 flex items-center justify-center w-screen h-screen p-0 sm:p-4" x-cloak>
             <div x-show="modalOpen" class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs">
             </div>
-            <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
+            <div x-show="modalOpen" x-ref="confirmationModal" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                 x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave="ease-in duration-100"
@@ -206,7 +218,7 @@
                 class="relative w-full border rounded-none sm:rounded-sm min-w-full lg:min-w-[36rem] max-w-full sm:max-w-[48rem] h-screen sm:h-auto max-h-screen sm:max-h-[calc(100vh-2rem)] bg-neutral-100 border-neutral-400 dark:bg-base dark:border-coolgray-300 flex flex-col">
                 <div class="flex justify-between items-center py-6 px-7 shrink-0">
                     <h3 class="pr-8 text-2xl font-bold">{{ $title }}</h3>
-                    <button @click="modalOpen = false; resetModal()"
+                    <button data-modal-initial-focus @click="modalOpen = false; resetModal()"
                         class="flex absolute top-2 right-2 justify-center items-center w-8 h-8 rounded-full dark:text-white hover:bg-coolgray-300">
                         <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                             stroke-width="1.5" stroke="currentColor">
