@@ -221,7 +221,7 @@ class ServicesController extends Controller
                                 type: 'object',
                                 properties: [
                                     'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
-                                    'url' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io").'],
+                                    'url' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io").'],
                                 ],
                             ),
                         ],
@@ -843,7 +843,7 @@ class ServicesController extends Controller
                                     type: 'object',
                                     properties: [
                                         'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
-                                        'url' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io").'],
+                                        'url' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io").'],
                                     ],
                                 ),
                             ],
@@ -2018,7 +2018,7 @@ class ServicesController extends Controller
             'resource_uuid' => 'required|string',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'required|string',
-            'host_path' => 'string|nullable',
+            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
             'is_directory' => 'boolean',
             'fs_path' => 'string',
@@ -2227,7 +2227,7 @@ class ServicesController extends Controller
             'is_preview_suffix_enabled' => 'boolean',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'string',
-            'host_path' => 'string|nullable',
+            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
         ]);
 

@@ -147,11 +147,15 @@ class OtherController extends Controller
 
     public function feedback(Request $request)
     {
-        $content = $request->input('content');
+        $data = $request->validate([
+            'content' => ['required', 'string', 'min:10', 'max:2000'],
+        ]);
+
         $webhook_url = config('constants.webhooks.feedback_discord_webhook');
         if ($webhook_url) {
-            Http::post($webhook_url, [
-                'content' => $content,
+            Http::timeout(5)->post($webhook_url, [
+                'content' => $data['content'],
+                'allowed_mentions' => ['parse' => []],
             ]);
         }
 

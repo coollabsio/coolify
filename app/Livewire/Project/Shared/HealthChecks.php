@@ -34,7 +34,7 @@ class HealthChecks extends Component
     #[Validate(['nullable', 'integer', 'min:1', 'max:65535'])]
     public ?string $healthCheckPort = null;
 
-    #[Validate(['required', 'string', 'regex:#^[a-zA-Z0-9/\-_.~%]+$#'])]
+    #[Validate(['required', 'string', 'regex:#^[a-zA-Z0-9/\-_.~%,;]+$#'])]
     public string $healthCheckPath;
 
     #[Validate(['integer'])]
@@ -62,7 +62,7 @@ class HealthChecks extends Component
         'healthCheckEnabled' => 'boolean',
         'healthCheckType' => 'string|in:http,cmd',
         'healthCheckCommand' => ['nullable', 'string', 'max:1000', 'regex:/^[a-zA-Z0-9 \-_.\/:=@,+]+$/'],
-        'healthCheckPath' => ['required', 'string', 'regex:#^[a-zA-Z0-9/\-_.~%]+$#'],
+        'healthCheckPath' => ['required', 'string', 'regex:#^[a-zA-Z0-9/\-_.~%,;]+$#'],
         'healthCheckPort' => 'nullable|integer|min:1|max:65535',
         'healthCheckHost' => ['required', 'string', 'regex:/^[a-zA-Z0-9.\-_]+$/'],
         'healthCheckMethod' => 'required|string|in:GET,HEAD,POST,OPTIONS',

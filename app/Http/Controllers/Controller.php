@@ -6,8 +6,8 @@ use App\Events\TestEvent;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Providers\RouteServiceProvider;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
@@ -39,9 +39,29 @@ class Controller extends BaseController
         return view('auth.verify-email');
     }
 
-    public function email_verify(EmailVerificationRequest $request)
+    public function email_verify(Request $request)
     {
-        $request->fulfill();
+        if (! $request->hasValidSignature()) {
+            abort(403);
+        }
+
+        $user = auth()->user();
+        if (! $user) {
+            abort(403);
+        }
+
+        if (! hash_equals((string) $request->route('id'), (string) $user->getKey())) {
+            abort(403);
+        }
+
+        if (! hash_equals((string) $request->route('hash'), hash('sha256', $user->getEmailForVerification()))) {
+            abort(403);
+        }
+
+        if (! $user->hasVerifiedEmail()) {
+            $user->markEmailAsVerified();
+            event(new Verified($user));
+        }
 
         return redirect(RouteServiceProvider::HOME);
     }
@@ -93,10 +113,6 @@ class Controller extends BaseController
                     $invitation->delete();
                 } else {
                     $team = $user->teams()->first();
-                }
-                if (is_null(data_get($user, 'email_verified_at'))) {
-                    $user->email_verified_at = now();
-                    $user->save();
                 }
                 Auth::login($user);
                 session(['currentTeam' => $team]);

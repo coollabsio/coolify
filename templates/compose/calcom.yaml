@@ -4,6 +4,7 @@
 # tags: calcom,calendso,scheduling,open,source
 # logo: svgs/calcom.svg
 # port: 3000
+# amd_only: true
 
 services:
   calcom:

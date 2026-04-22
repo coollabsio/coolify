@@ -233,6 +233,9 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
                 'is_reachable' => false,
             ]);
             ServerReachabilityChanged::dispatch($server);
+            $server->unreachable_count = 3;
+            $server->unreachable_notification_sent = true;
+            $server->save();
         }
     }
 
@@ -344,5 +347,4 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     {
         return $this->hasOne(WebhookNotificationSettings::class);
     }
-
 }

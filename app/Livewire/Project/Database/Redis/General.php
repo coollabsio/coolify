@@ -81,8 +81,12 @@ class General extends Component
             'publicPortTimeout' => 'nullable|integer|min:1',
             'isLogDrainEnabled' => 'nullable|boolean',
             'customDockerRunOptions' => 'nullable',
-            'redisUsername' => 'required',
-            'redisPassword' => 'required',
+            'redisUsername' => ValidationPatterns::databaseIdentifierRules(
+                enforcePattern: $this->redisUsername !== $this->database->redis_username,
+            ),
+            'redisPassword' => ValidationPatterns::databasePasswordRules(
+                enforcePattern: $this->redisPassword !== $this->database->redis_password,
+            ),
             'enableSsl' => 'boolean',
         ];
     }
@@ -100,8 +104,8 @@ class General extends Component
                 'publicPort.max' => 'The Public Port must not exceed 65535.',
                 'publicPortTimeout.integer' => 'The Public Port Timeout must be an integer.',
                 'publicPortTimeout.min' => 'The Public Port Timeout must be at least 1.',
-                'redisUsername.required' => 'The Redis Username field is required.',
-                'redisPassword.required' => 'The Redis Password field is required.',
+                ...ValidationPatterns::databaseIdentifierMessages('redisUsername', 'Redis Username'),
+                ...ValidationPatterns::databasePasswordMessages('redisPassword', 'Redis Password'),
             ]
         );
     }

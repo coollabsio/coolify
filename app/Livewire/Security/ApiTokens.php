@@ -13,9 +13,19 @@ class ApiTokens extends Component
 
     public ?string $description = null;
 
+    public ?int $expiresInDays = 30;
+
     public $tokens = [];
 
     public array $permissions = ['read'];
+
+    public array $expirationOptions = [
+        7 => '7 days',
+        30 => '30 days',
+        60 => '60 days',
+        90 => '90 days',
+        365 => '1 year',
+    ];
 
     public $isApiEnabled;
 
@@ -90,8 +100,10 @@ class ApiTokens extends Component
 
             $this->validate([
                 'description' => 'required|min:3|max:255',
+                'expiresInDays' => 'nullable|integer|in:7,30,60,90,365',
             ]);
-            $token = auth()->user()->createToken($this->description, array_values($this->permissions));
+            $expiresAt = $this->expiresInDays ? now()->addDays($this->expiresInDays) : null;
+            $token = auth()->user()->createToken($this->description, array_values($this->permissions), $expiresAt);
             $this->getTokens();
             session()->flash('token', $token->plainTextToken);
         } catch (\Exception $e) {

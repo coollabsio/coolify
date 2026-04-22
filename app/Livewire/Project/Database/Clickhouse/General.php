@@ -76,8 +76,12 @@ class General extends Component
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'clickhouseAdminUser' => 'required|string',
-            'clickhouseAdminPassword' => 'required|string',
+            'clickhouseAdminUser' => ValidationPatterns::databaseIdentifierRules(
+                enforcePattern: $this->clickhouseAdminUser !== $this->database->clickhouse_admin_user,
+            ),
+            'clickhouseAdminPassword' => ValidationPatterns::databasePasswordRules(
+                enforcePattern: $this->clickhouseAdminPassword !== $this->database->clickhouse_admin_password,
+            ),
             'image' => 'required|string',
             'portsMappings' => ValidationPatterns::portMappingRules(),
             'isPublic' => 'nullable|boolean',
@@ -96,10 +100,8 @@ class General extends Component
             ValidationPatterns::combinedMessages(),
             ValidationPatterns::portMappingMessages(),
             [
-                'clickhouseAdminUser.required' => 'The Admin User field is required.',
-                'clickhouseAdminUser.string' => 'The Admin User must be a string.',
-                'clickhouseAdminPassword.required' => 'The Admin Password field is required.',
-                'clickhouseAdminPassword.string' => 'The Admin Password must be a string.',
+                ...ValidationPatterns::databaseIdentifierMessages('clickhouseAdminUser', 'Admin User'),
+                ...ValidationPatterns::databasePasswordMessages('clickhouseAdminPassword', 'Admin Password'),
                 'image.required' => 'The Docker Image field is required.',
                 'image.string' => 'The Docker Image must be a string.',
                 'publicPort.integer' => 'The Public Port must be an integer.',

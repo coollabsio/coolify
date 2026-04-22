@@ -28,6 +28,11 @@ class ViewScheduledLogs extends Command
     public function handle()
     {
         $date = $this->option('date') ?: now()->format('Y-m-d');
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            $this->error('Invalid date format. Use Y-m-d (e.g. 2025-01-31).');
+
+            return self::INVALID;
+        }
         $logPaths = $this->getLogPaths($date);
 
         if (empty($logPaths)) {
@@ -49,17 +54,19 @@ class ViewScheduledLogs extends Command
             $this->line('');
 
             if (count($logPaths) === 1) {
-                $logPath = $logPaths[0];
+                $logPath = escapeshellarg($logPaths[0]);
                 if ($filters) {
-                    passthru("tail -f {$logPath} | grep -E '{$filters}'");
+                    $escapedFilters = escapeshellarg($filters);
+                    passthru("tail -f {$logPath} | grep -E {$escapedFilters}");
                 } else {
                     passthru("tail -f {$logPath}");
                 }
             } else {
                 // Multiple files - use multitail or tail with process substitution
-                $logPathsStr = implode(' ', $logPaths);
+                $logPathsStr = implode(' ', array_map('escapeshellarg', $logPaths));
                 if ($filters) {
-                    passthru("tail -f {$logPathsStr} | grep -E '{$filters}'");
+                    $escapedFilters = escapeshellarg($filters);
+                    passthru("tail -f {$logPathsStr} | grep -E {$escapedFilters}");
                 } else {
                     passthru("tail -f {$logPathsStr}");
                 }
@@ -68,20 +75,23 @@ class ViewScheduledLogs extends Command
             $this->info("Showing last {$lines} lines of {$logTypeDescription} logs for {$date}{$filterDescription}:");
             $this->line('');
 
+            $escapedLines = escapeshellarg((string) $lines);
             if (count($logPaths) === 1) {
-                $logPath = $logPaths[0];
+                $logPath = escapeshellarg($logPaths[0]);
                 if ($filters) {
-                    passthru("tail -n {$lines} {$logPath} | grep -E '{$filters}'");
+                    $escapedFilters = escapeshellarg($filters);
+                    passthru("tail -n {$escapedLines} {$logPath} | grep -E {$escapedFilters}");
                 } else {
-                    passthru("tail -n {$lines} {$logPath}");
+                    passthru("tail -n {$escapedLines} {$logPath}");
                 }
             } else {
                 // Multiple files - concatenate and sort by timestamp
-                $logPathsStr = implode(' ', $logPaths);
+                $logPathsStr = implode(' ', array_map('escapeshellarg', $logPaths));
                 if ($filters) {
-                    passthru("tail -n {$lines} {$logPathsStr} | sort | grep -E '{$filters}'");
+                    $escapedFilters = escapeshellarg($filters);
+                    passthru("tail -n {$escapedLines} {$logPathsStr} | sort | grep -E {$escapedFilters}");
                 } else {
-                    passthru("tail -n {$lines} {$logPathsStr} | sort");
+                    passthru("tail -n {$escapedLines} {$logPathsStr} | sort");
                 }
             }
         }

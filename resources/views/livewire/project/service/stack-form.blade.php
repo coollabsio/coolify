@@ -20,6 +20,9 @@
             placeholder="My super WordPress site" />
         <x-forms.input canGate="update" :canResource="$service" id="description" label="Description" />
     </div>
+    <div>
+        <h3>Network</h3>
+    </div>
     <div class="w-full sm:w-96">
         <x-forms.checkbox canGate="update" :canResource="$service" instantSave id="connectToDockerNetwork"
             label="Connect To Predefined Network"

@@ -379,9 +379,9 @@ class DatabasesController extends Controller
             case 'standalone-postgresql':
                 $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf'];
                 $validator = customApiValidator($request->all(), [
-                    'postgres_user' => 'string',
-                    'postgres_password' => 'string',
-                    'postgres_db' => 'string',
+                    'postgres_user' => ValidationPatterns::databaseIdentifierRules(required: false),
+                    'postgres_password' => ValidationPatterns::databasePasswordRules(required: false),
+                    'postgres_db' => ValidationPatterns::databaseIdentifierRules(required: false),
                     'postgres_initdb_args' => 'string',
                     'postgres_host_auth_method' => 'string',
                     'postgres_conf' => 'string',
@@ -410,20 +410,20 @@ class DatabasesController extends Controller
             case 'standalone-clickhouse':
                 $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'clickhouse_admin_user', 'clickhouse_admin_password'];
                 $validator = customApiValidator($request->all(), [
-                    'clickhouse_admin_user' => 'string',
-                    'clickhouse_admin_password' => 'string',
+                    'clickhouse_admin_user' => ValidationPatterns::databaseIdentifierRules(required: false),
+                    'clickhouse_admin_password' => ValidationPatterns::databasePasswordRules(required: false),
                 ]);
                 break;
             case 'standalone-dragonfly':
                 $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'dragonfly_password'];
                 $validator = customApiValidator($request->all(), [
-                    'dragonfly_password' => 'string',
+                    'dragonfly_password' => ValidationPatterns::databasePasswordRules(required: false),
                 ]);
                 break;
             case 'standalone-redis':
                 $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'redis_password', 'redis_conf'];
                 $validator = customApiValidator($request->all(), [
-                    'redis_password' => 'string',
+                    'redis_password' => ValidationPatterns::databasePasswordRules(required: false),
                     'redis_conf' => 'string',
                 ]);
                 if ($request->has('redis_conf')) {
@@ -450,7 +450,7 @@ class DatabasesController extends Controller
             case 'standalone-keydb':
                 $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'keydb_password', 'keydb_conf'];
                 $validator = customApiValidator($request->all(), [
-                    'keydb_password' => 'string',
+                    'keydb_password' => ValidationPatterns::databasePasswordRules(required: false),
                     'keydb_conf' => 'string',
                 ]);
                 if ($request->has('keydb_conf')) {
@@ -478,10 +478,10 @@ class DatabasesController extends Controller
                 $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database'];
                 $validator = customApiValidator($request->all(), [
                     'mariadb_conf' => 'string',
-                    'mariadb_root_password' => 'string',
-                    'mariadb_user' => 'string',
-                    'mariadb_password' => 'string',
-                    'mariadb_database' => 'string',
+                    'mariadb_root_password' => ValidationPatterns::databasePasswordRules(required: false),
+                    'mariadb_user' => ValidationPatterns::databaseIdentifierRules(required: false),
+                    'mariadb_password' => ValidationPatterns::databasePasswordRules(required: false),
+                    'mariadb_database' => ValidationPatterns::databaseIdentifierRules(required: false),
                 ]);
                 if ($request->has('mariadb_conf')) {
                     if (! isBase64Encoded($request->mariadb_conf)) {
@@ -508,9 +508,9 @@ class DatabasesController extends Controller
                 $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database'];
                 $validator = customApiValidator($request->all(), [
                     'mongo_conf' => 'string',
-                    'mongo_initdb_root_username' => 'string',
-                    'mongo_initdb_root_password' => 'string',
-                    'mongo_initdb_database' => 'string',
+                    'mongo_initdb_root_username' => ValidationPatterns::databaseIdentifierRules(required: false),
+                    'mongo_initdb_root_password' => ValidationPatterns::databasePasswordRules(required: false),
+                    'mongo_initdb_database' => ValidationPatterns::databaseIdentifierRules(required: false),
                 ]);
                 if ($request->has('mongo_conf')) {
                     if (! isBase64Encoded($request->mongo_conf)) {
@@ -537,10 +537,10 @@ class DatabasesController extends Controller
             case 'standalone-mysql':
                 $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
                 $validator = customApiValidator($request->all(), [
-                    'mysql_root_password' => 'string',
-                    'mysql_password' => 'string',
-                    'mysql_user' => 'string',
-                    'mysql_database' => 'string',
+                    'mysql_root_password' => ValidationPatterns::databasePasswordRules(required: false),
+                    'mysql_password' => ValidationPatterns::databasePasswordRules(required: false),
+                    'mysql_user' => ValidationPatterns::databaseIdentifierRules(required: false),
+                    'mysql_database' => ValidationPatterns::databaseIdentifierRules(required: false),
                     'mysql_conf' => 'string',
                 ]);
                 if ($request->has('mysql_conf')) {
@@ -747,7 +747,7 @@ class DatabasesController extends Controller
         }
 
         if ($request->filled('s3_storage_uuid')) {
-            $existsInTeam = S3Storage::ownedByCurrentTeam()->where('uuid', $request->s3_storage_uuid)->exists();
+            $existsInTeam = S3Storage::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->s3_storage_uuid)->exists();
             if (! $existsInTeam) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -774,7 +774,7 @@ class DatabasesController extends Controller
 
         // Convert s3_storage_uuid to s3_storage_id
         if (isset($backupData['s3_storage_uuid'])) {
-            $s3Storage = S3Storage::ownedByCurrentTeam()->where('uuid', $backupData['s3_storage_uuid'])->first();
+            $s3Storage = S3Storage::ownedByCurrentTeamAPI($teamId)->where('uuid', $backupData['s3_storage_uuid'])->first();
             if ($s3Storage) {
                 $backupData['s3_storage_id'] = $s3Storage->id;
             } elseif ($request->boolean('save_s3')) {
@@ -982,7 +982,7 @@ class DatabasesController extends Controller
             ], 422);
         }
         if ($request->filled('s3_storage_uuid')) {
-            $existsInTeam = S3Storage::ownedByCurrentTeam()->where('uuid', $request->s3_storage_uuid)->exists();
+            $existsInTeam = S3Storage::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->s3_storage_uuid)->exists();
             if (! $existsInTeam) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -1015,7 +1015,7 @@ class DatabasesController extends Controller
 
         // Convert s3_storage_uuid to s3_storage_id
         if (isset($backupData['s3_storage_uuid'])) {
-            $s3Storage = S3Storage::ownedByCurrentTeam()->where('uuid', $backupData['s3_storage_uuid'])->first();
+            $s3Storage = S3Storage::ownedByCurrentTeamAPI($teamId)->where('uuid', $backupData['s3_storage_uuid'])->first();
             if ($s3Storage) {
                 $backupData['s3_storage_id'] = $s3Storage->id;
             } elseif ($request->boolean('save_s3')) {
@@ -1724,9 +1724,9 @@ class DatabasesController extends Controller
         if ($type === NewDatabaseTypes::POSTGRESQL) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf'];
             $validator = customApiValidator($request->all(), [
-                'postgres_user' => 'string',
-                'postgres_password' => 'string',
-                'postgres_db' => 'string',
+                'postgres_user' => ValidationPatterns::databaseIdentifierRules(required: false),
+                'postgres_password' => ValidationPatterns::databasePasswordRules(required: false),
+                'postgres_db' => ValidationPatterns::databaseIdentifierRules(required: false),
                 'postgres_initdb_args' => 'string',
                 'postgres_host_auth_method' => 'string',
                 'postgres_conf' => 'string',
@@ -1766,7 +1766,7 @@ class DatabasesController extends Controller
                 }
                 $request->offsetSet('postgres_conf', $postgresConf);
             }
-            $database = create_standalone_postgresql($environment->id, $destination->uuid, $request->only($allowedFields));
+            $database = create_standalone_postgresql($environment->id, $destination, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
@@ -1783,8 +1783,11 @@ class DatabasesController extends Controller
         } elseif ($type === NewDatabaseTypes::MARIADB) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database'];
             $validator = customApiValidator($request->all(), [
-                'clickhouse_admin_user' => 'string',
-                'clickhouse_admin_password' => 'string',
+                'mariadb_conf' => 'string',
+                'mariadb_root_password' => ValidationPatterns::databasePasswordRules(required: false),
+                'mariadb_user' => ValidationPatterns::databaseIdentifierRules(required: false),
+                'mariadb_password' => ValidationPatterns::databasePasswordRules(required: false),
+                'mariadb_database' => ValidationPatterns::databaseIdentifierRules(required: false),
             ]);
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
             if ($validator->fails() || ! empty($extraFields)) {
@@ -1821,7 +1824,7 @@ class DatabasesController extends Controller
                 }
                 $request->offsetSet('mariadb_conf', $mariadbConf);
             }
-            $database = create_standalone_mariadb($environment->id, $destination->uuid, $request->only($allowedFields));
+            $database = create_standalone_mariadb($environment->id, $destination, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
@@ -1839,10 +1842,10 @@ class DatabasesController extends Controller
         } elseif ($type === NewDatabaseTypes::MYSQL) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
             $validator = customApiValidator($request->all(), [
-                'mysql_root_password' => 'string',
-                'mysql_password' => 'string',
-                'mysql_user' => 'string',
-                'mysql_database' => 'string',
+                'mysql_root_password' => ValidationPatterns::databasePasswordRules(required: false),
+                'mysql_password' => ValidationPatterns::databasePasswordRules(required: false),
+                'mysql_user' => ValidationPatterns::databaseIdentifierRules(required: false),
+                'mysql_database' => ValidationPatterns::databaseIdentifierRules(required: false),
                 'mysql_conf' => 'string',
             ]);
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -1880,7 +1883,7 @@ class DatabasesController extends Controller
                 }
                 $request->offsetSet('mysql_conf', $mysqlConf);
             }
-            $database = create_standalone_mysql($environment->id, $destination->uuid, $request->only($allowedFields));
+            $database = create_standalone_mysql($environment->id, $destination, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
@@ -1898,7 +1901,7 @@ class DatabasesController extends Controller
         } elseif ($type === NewDatabaseTypes::REDIS) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'redis_password', 'redis_conf'];
             $validator = customApiValidator($request->all(), [
-                'redis_password' => 'string',
+                'redis_password' => ValidationPatterns::databasePasswordRules(required: false),
                 'redis_conf' => 'string',
             ]);
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -1936,7 +1939,7 @@ class DatabasesController extends Controller
                 }
                 $request->offsetSet('redis_conf', $redisConf);
             }
-            $database = create_standalone_redis($environment->id, $destination->uuid, $request->only($allowedFields));
+            $database = create_standalone_redis($environment->id, $destination, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
@@ -1954,7 +1957,7 @@ class DatabasesController extends Controller
         } elseif ($type === NewDatabaseTypes::DRAGONFLY) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares',  'dragonfly_password'];
             $validator = customApiValidator($request->all(), [
-                'dragonfly_password' => 'string',
+                'dragonfly_password' => ValidationPatterns::databasePasswordRules(required: false),
             ]);
 
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -1973,7 +1976,7 @@ class DatabasesController extends Controller
             }
 
             removeUnnecessaryFieldsFromRequest($request);
-            $database = create_standalone_dragonfly($environment->id, $destination->uuid, $request->only($allowedFields));
+            $database = create_standalone_dragonfly($environment->id, $destination, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
@@ -1984,7 +1987,7 @@ class DatabasesController extends Controller
         } elseif ($type === NewDatabaseTypes::KEYDB) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'keydb_password', 'keydb_conf'];
             $validator = customApiValidator($request->all(), [
-                'keydb_password' => 'string',
+                'keydb_password' => ValidationPatterns::databasePasswordRules(required: false),
                 'keydb_conf' => 'string',
             ]);
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -2022,7 +2025,7 @@ class DatabasesController extends Controller
                 }
                 $request->offsetSet('keydb_conf', $keydbConf);
             }
-            $database = create_standalone_keydb($environment->id, $destination->uuid, $request->only($allowedFields));
+            $database = create_standalone_keydb($environment->id, $destination, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
@@ -2040,8 +2043,8 @@ class DatabasesController extends Controller
         } elseif ($type === NewDatabaseTypes::CLICKHOUSE) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares',  'clickhouse_admin_user', 'clickhouse_admin_password'];
             $validator = customApiValidator($request->all(), [
-                'clickhouse_admin_user' => 'string',
-                'clickhouse_admin_password' => 'string',
+                'clickhouse_admin_user' => ValidationPatterns::databaseIdentifierRules(required: false),
+                'clickhouse_admin_password' => ValidationPatterns::databasePasswordRules(required: false),
             ]);
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
             if ($validator->fails() || ! empty($extraFields)) {
@@ -2058,7 +2061,7 @@ class DatabasesController extends Controller
                 ], 422);
             }
             removeUnnecessaryFieldsFromRequest($request);
-            $database = create_standalone_clickhouse($environment->id, $destination->uuid, $request->only($allowedFields));
+            $database = create_standalone_clickhouse($environment->id, $destination, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
@@ -2077,9 +2080,9 @@ class DatabasesController extends Controller
             $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database'];
             $validator = customApiValidator($request->all(), [
                 'mongo_conf' => 'string',
-                'mongo_initdb_root_username' => 'string',
-                'mongo_initdb_root_password' => 'string',
-                'mongo_initdb_database' => 'string',
+                'mongo_initdb_root_username' => ValidationPatterns::databaseIdentifierRules(required: false),
+                'mongo_initdb_root_password' => ValidationPatterns::databasePasswordRules(required: false),
+                'mongo_initdb_database' => ValidationPatterns::databaseIdentifierRules(required: false),
             ]);
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
             if ($validator->fails() || ! empty($extraFields)) {
@@ -2116,7 +2119,7 @@ class DatabasesController extends Controller
                 }
                 $request->offsetSet('mongo_conf', $mongoConf);
             }
-            $database = create_standalone_mongodb($environment->id, $destination->uuid, $request->only($allowedFields));
+            $database = create_standalone_mongodb($environment->id, $destination, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
@@ -2332,7 +2335,7 @@ class DatabasesController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return response()->json(['message' => 'Failed to delete backup: '.$e->getMessage()], 500);
+            return response()->json(['message' => 'Failed to delete backup.'], 500);
         }
     }
 
@@ -2452,7 +2455,7 @@ class DatabasesController extends Controller
                 'message' => 'Backup execution deleted.',
             ]);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Failed to delete backup execution: '.$e->getMessage()], 500);
+            return response()->json(['message' => 'Failed to delete backup execution.'], 500);
         }
     }
 
@@ -3496,7 +3499,7 @@ class DatabasesController extends Controller
             'type' => 'required|string|in:persistent,file',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'required|string',
-            'host_path' => 'string|nullable',
+            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
             'is_directory' => 'boolean',
             'fs_path' => 'string',
@@ -3694,7 +3697,7 @@ class DatabasesController extends Controller
             'is_preview_suffix_enabled' => 'boolean',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'string',
-            'host_path' => 'string|nullable',
+            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
         ]);
 

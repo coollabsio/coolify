@@ -414,7 +414,7 @@ describe('docker_compose_custom_command validation', function () {
         expect($validator->fails())->toBeTrue();
     });
 
-    test('rejects single quotes in docker_compose_custom_start_command', function () {
+    test('allows single-quoted arguments in docker_compose_custom_start_command', function () {
         $rules = sharedDataApplications();
 
         $validator = validator(
@@ -422,7 +422,7 @@ describe('docker_compose_custom_command validation', function () {
             ['docker_compose_custom_start_command' => $rules['docker_compose_custom_start_command']]
         );
 
-        expect($validator->fails())->toBeTrue();
+        expect($validator->fails())->toBeFalse();
     });
 
     test('allows double quotes in docker_compose_custom_start_command', function () {
@@ -474,6 +474,127 @@ describe('docker_compose_custom_command validation', function () {
         expect($method->invoke($instance, 'docker compose up -d --build', 'docker_compose_custom_start_command'))
             ->toBe('docker compose up -d --build');
     });
+
+    test('rejects bare ampersand PoC payload (GHSA-chg4-63hm-xv9x)', function () {
+        $rules = sharedDataApplications();
+        $payload = 'true & docker run --rm -v /:/h alpine sh -c "cp /h/etc/shadow /h/tmp/leak"';
+
+        $validator = validator(
+            ['docker_compose_custom_start_command' => $payload],
+            ['docker_compose_custom_start_command' => $rules['docker_compose_custom_start_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects bare ampersand across every shell-safe field', function ($field) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            [$field => 'cmd1 & cmd2'],
+            [$field => $rules[$field]]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    })->with([
+        'install_command',
+        'build_command',
+        'start_command',
+        'docker_compose_custom_build_command',
+        'docker_compose_custom_start_command',
+        'custom_docker_run_options',
+    ]);
+
+    test('rejects command substitution inside double quotes', function ($payload) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => "echo $payload"],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    })->with(['"$(whoami)"', '"`whoami`"']);
+
+    test('rejects unbalanced quotes', function ($payload) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => $payload],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    })->with(['echo "unterminated', "echo 'unterminated"]);
+
+    test('rejects backslash anywhere', function ($payload) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => $payload],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    })->with(['echo \\;', 'echo \\$HOME']);
+
+    test('runtime validateShellSafeCommand rejects bare ampersand payload', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validateShellSafeCommand');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect(fn () => $method->invoke($instance, 'true & whoami', 'docker_compose_custom_start_command'))
+            ->toThrow(RuntimeException::class, 'contains forbidden shell characters');
+    });
+
+    test('allows logical OR chaining', function ($cmd) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => $cmd],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with([
+        'make build || make clean',
+        'npm run build || npm run fallback',
+        'cmd-a || cmd-b && cmd-c',
+    ]);
+
+    test('allows glob and bang tokens', function ($cmd) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => $cmd],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with([
+        'rm *.tmp',
+        'cp src/?.js dist/',
+        '! grep -q foo && echo missing',
+        'docker build --tag app-v1!',
+    ]);
+
+    test('rejects bare pipe even though || is allowed', function ($cmd) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => $cmd],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    })->with([
+        'cmd | cat',
+        'cmd|cat',
+        'a |b',
+        'a| b',
+    ]);
 });
 
 describe('custom_docker_run_options validation', function () {
@@ -676,7 +797,7 @@ describe('API route middleware for deploy actions', function () {
     });
 });
 
-describe('install/build/start command validation (GHSA-9pp4-wcmj-rq73)', function () {
+describe('install/build/start command validation', function () {
     test('rejects semicolon injection in install_command', function () {
         $rules = sharedDataApplications();
 

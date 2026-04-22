@@ -7,8 +7,6 @@ use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\Project;
-use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Support\ValidationPatterns;
@@ -130,13 +128,10 @@ class GithubPrivateRepositoryDeployKey extends Component
     {
         $this->validate();
         try {
-            $destination_uuid = $this->query['destination'];
-            $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+            $destination_uuid = $this->query['destination'] ?? null;
+            $destination = find_destination_for_current_team($destination_uuid);
             if (! $destination) {
-                $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
-            }
-            if (! $destination) {
-                throw new \Exception('Destination not found. What?!');
+                throw new \Exception('Destination not found.');
             }
             $destination_class = $destination->getMorphClass();
 

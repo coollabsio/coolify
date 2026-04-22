@@ -15,7 +15,7 @@ class Help extends Component
     #[Validate(['required', 'min:10', 'max:1000'])]
     public string $description;
 
-    #[Validate(['required', 'min:3'])]
+    #[Validate(['required', 'min:3', 'max:600'])]
     public string $subject;
 
     public function submit()
