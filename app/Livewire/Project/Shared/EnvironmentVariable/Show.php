@@ -26,6 +26,8 @@ class Show extends Component
 
     public bool $isMagicVariable = false;
 
+    public bool $isDefinedInDockerCompose = false;
+
     public bool $isSharedVariable = false;
 
     public string $type;
@@ -151,11 +153,18 @@ class Show extends Component
     public function checkEnvs()
     {
         $this->isDisabled = false;
+        $this->isLocked = false;
         $this->isMagicVariable = false;
+        $this->isDefinedInDockerCompose = false;
 
         if (str($this->env->key)->startsWith('SERVICE_FQDN') || str($this->env->key)->startsWith('SERVICE_URL') || str($this->env->key)->startsWith('SERVICE_NAME')) {
             $this->isDisabled = true;
             $this->isMagicVariable = true;
+        }
+
+        if (in_array($this->type, ['application', 'service'], true) && $this->env->resourceable?->docker_compose) {
+            [$isUsedInDockerCompose] = $this->isEnvironmentVariableUsedInDockerCompose($this->env->key, $this->env->resourceable->docker_compose);
+            $this->isDefinedInDockerCompose = $isUsedInDockerCompose;
         }
 
         if ($this->env->is_shown_once) {
@@ -178,6 +187,25 @@ class Show extends Component
         }
         $this->serialize();
         $this->env->save();
+        $this->checkEnvs();
+        $this->dispatch('refreshEnvs');
+    }
+
+    public function unlock()
+    {
+        $this->authorize('update', $this->env);
+
+        if (! $this->isDefinedInDockerCompose) {
+            return;
+        }
+
+        $this->env->is_shown_once = false;
+        if ($this->isSharedVariable) {
+            unset($this->env->is_required);
+        }
+        $this->serialize();
+        $this->env->save();
+        $this->syncData(false);
         $this->checkEnvs();
         $this->dispatch('refreshEnvs');
     }

@@ -29,6 +29,9 @@
                             placeholder="{{ $isMagicVariable ? 'This env cannot be edited manually, it is handled by Coolify.' : '' }}"
                             helper="Add a note to document what this environment variable is used for." maxlength="256" />
                     </div>
+                    @if ($isDefinedInDockerCompose)
+                        <x-forms.button type="button" wire:click="unlock">Unlock</x-forms.button>
+                    @endif
                     <x-forms.button type="submit">Update</x-forms.button>
                 </div>
                 <div class="flex flex-col w-full gap-3">
