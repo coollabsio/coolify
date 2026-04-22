@@ -13,6 +13,19 @@
             </div>
             <div class="pb-4 ">Custom authentication (OAuth) configurations.</div>
         </div>
+        <div class="flex flex-col gap-1 pb-4">
+            <h3>OAuth Registration</h3>
+            <div class="md:w-96">
+                <x-forms.checkbox instantSave="saveInstanceSettings" id="is_oauth_registration_enabled"
+                    label="OAuth Registration Allowed"
+                    helper="Allow new users to self-register through enabled OAuth providers even when normal registration is disabled." />
+            </div>
+            <div class="md:w-96">
+                <x-forms.checkbox instantSave="saveInstanceSettings" id="is_oauth_password_creation_disabled"
+                    label="OAuth Accounts Only"
+                    helper="Keep OAuth-created accounts without passwords by blocking password resets for accounts that do not already have a password." />
+            </div>
+        </div>
         <div class="flex flex-col gap-2 pt-4">
             @foreach ($oauth_settings_map as $oauth_setting)
                 <div class="p-4 border dark:border-coolgray-300 border-neutral-200">
