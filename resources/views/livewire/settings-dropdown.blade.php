@@ -2,12 +2,18 @@
     dropdownOpen: false,
     search: '',
     allEntries: [],
+    visibleEntryCount: 10,
     darkColorContent: getComputedStyle($el).getPropertyValue('--color-base'),
     whiteColorContent: getComputedStyle($el).getPropertyValue('--color-white'),
     init() {
         this.mounted();
         // Load all entries when component initializes
         this.allEntries = @js($entries->toArray());
+        this.$watch('search', value => {
+            if (value.trim() === '') {
+                this.visibleEntryCount = 10;
+            }
+        });
     },
     markEntryAsRead(tagName) {
         // Update the entry in our local Alpine data
@@ -94,7 +100,7 @@
         }
 
         // Always sort: unread first, then by published date (newest first)
-        return entries.sort((a, b) => {
+        return [...entries].sort((a, b) => {
             // First sort by read status (unread first)
             if (a.is_read !== b.is_read) {
                 return a.is_read ? 1 : -1; // unread (false) comes before read (true)
@@ -102,6 +108,19 @@
             // Then sort by published date (newest first)
             return new Date(b.published_at) - new Date(a.published_at);
         });
+    },
+    get displayedEntries() {
+        if (this.search.trim() !== '') {
+            return this.filteredEntries;
+        }
+
+        return this.filteredEntries.slice(0, this.visibleEntryCount);
+    },
+    get hasMoreEntries() {
+        return this.search.trim() === '' && this.filteredEntries.length > this.visibleEntryCount;
+    },
+    showMoreEntries() {
+        this.visibleEntryCount += 10;
     }
 }" @click.outside="dropdownOpen = false">
     <!-- Custom Dropdown without arrow -->
@@ -134,7 +153,7 @@
                 <div class="flex flex-col gap-1">
                     <!-- What's New Section -->
                     @if ($unreadCount > 0)
-                        <button wire:click="openWhatsNewModal" @click="dropdownOpen = false"
+                        <button wire:click="openWhatsNewModal" @click="dropdownOpen = false; visibleEntryCount = 10; search = ''"
                             class="px-1 dropdown-item-no-padding flex items-center justify-between">
                             <div class="flex items-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -149,7 +168,7 @@
                             </span>
                         </button>
                     @else
-                        <button wire:click="openWhatsNewModal" @click="dropdownOpen = false"
+                        <button wire:click="openWhatsNewModal" @click="dropdownOpen = false; visibleEntryCount = 10; search = ''"
                             class="px-1 dropdown-item-no-padding flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -300,9 +319,9 @@
 
                 <!-- Content -->
                 <div class="py-4 flex-1 overflow-y-auto scrollbar">
-                    <div x-show="filteredEntries.length > 0">
+                    <div x-show="displayedEntries.length > 0">
                         <div class="space-y-4">
-                            <template x-for="entry in filteredEntries" :key="entry.tag_name">
+                            <template x-for="entry in displayedEntries" :key="entry.tag_name">
                                 <div class="relative p-4 border dark:border-coolgray-300 rounded-sm"
                                     :class="!entry.is_read ? 'dark:bg-coolgray-200 border-warning' : 'dark:bg-coolgray-100'">
                                     <div class="flex items-start justify-between">
@@ -337,9 +356,19 @@
                                 </div>
                             </template>
                         </div>
+
+                        <div x-show="hasMoreEntries" class="mt-4 flex flex-col items-center gap-3">
+                            <x-forms.button @click="showMoreEntries()">
+                                Show 10 more
+                            </x-forms.button>
+                            <a href="https://github.com/coollabsio/coolify/releases" target="_blank" rel="noopener"
+                                class="text-sm text-blue-500 hover:text-blue-600 underline">
+                                View full changelog on GitHub
+                            </a>
+                        </div>
                     </div>
 
-                    <div x-show="filteredEntries.length === 0" class="text-center py-8">
+                    <div x-show="displayedEntries.length === 0" class="text-center py-8">
                         <svg class="mx-auto h-12 w-12 dark:text-neutral-400" fill="none" stroke="currentColor"
                             viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
