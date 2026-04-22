@@ -57,7 +57,9 @@ class Deployments extends Component
             ->when($this->status, fn (Builder $query) => $query->where('status', $this->status))
             ->when($this->project, function (Builder $query) {
                 $query->whereHas('application.environment.project', function (Builder $projectQuery) {
-                    $projectQuery->where('name', $this->project);
+                    $wrappedProjectName = $projectQuery->getQuery()->getGrammar()->wrap('name');
+
+                    $projectQuery->whereRaw("TRIM({$wrappedProjectName}) = ?", [trim($this->project)]);
                 });
             })
             ->when(
@@ -90,15 +92,21 @@ class Deployments extends Component
 
     private function availableProjects(int $teamId): Collection
     {
-        return ApplicationDeploymentQueue::query()
+        $query = ApplicationDeploymentQueue::query()
             ->join('applications', 'application_deployment_queues.application_id', '=', 'applications.id')
             ->join('environments', 'applications.environment_id', '=', 'environments.id')
             ->join('projects', 'environments.project_id', '=', 'projects.id')
-            ->where('projects.team_id', $teamId)
-            ->select('projects.name')
+            ->where('projects.team_id', $teamId);
+
+        $wrappedProjectName = $query->getQuery()->getGrammar()->wrap('projects.name');
+
+        return $query
+            ->selectRaw("TRIM({$wrappedProjectName}) as value")
+            ->whereNotNull('projects.name')
+            ->whereRaw("TRIM({$wrappedProjectName}) != ''")
             ->distinct()
-            ->orderBy('projects.name')
-            ->pluck('projects.name');
+            ->orderBy('value')
+            ->pluck('value');
     }
 
     private function distinctValues(Builder $query, string $column): Collection

@@ -223,3 +223,28 @@ it('keeps all project options available while other filters are active', functio
     $response->assertSee('Queued Project');
     $response->assertSee('Failed Project');
 });
+
+it('normalizes project filter values when listing and applying project filters', function () {
+    createDeploymentForTeam($this->team, [
+        'status' => ApplicationDeploymentStatus::QUEUED->value,
+    ], [
+        'name' => 'Canonical App',
+    ], [
+        'name' => 'Alpha Project',
+    ]);
+
+    createDeploymentForTeam($this->team, [
+        'status' => ApplicationDeploymentStatus::FAILED->value,
+    ], [
+        'name' => 'Spaced App',
+    ], [
+        'name' => ' Alpha Project ',
+    ]);
+
+    Livewire::test(Deployments::class)
+        ->assertDontSee('All servers')
+        ->assertDontSee('All sources')
+        ->set('project', 'Alpha Project')
+        ->assertSee('Canonical App')
+        ->assertSee('Spaced App');
+});
