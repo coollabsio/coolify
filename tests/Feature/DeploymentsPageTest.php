@@ -45,7 +45,7 @@ function createDeploymentForTeam(Team $team, array $deploymentOverrides = [], ar
 
     return ApplicationDeploymentQueue::query()->create(array_merge([
         'application_id' => (string) $application->id,
-        'deployment_uuid' => 'dep-'.$application->id.'-'.str()->random(8),
+        'deployment_uuid' => fake()->lexify('dep-'.$application->id.'-????????'),
         'status' => 'queued',
         'application_name' => $application->name,
         'server_name' => 'Main Server',

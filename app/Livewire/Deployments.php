@@ -63,7 +63,7 @@ class Deployments extends Component
 
         return view('livewire.deployments', [
             'deployments' => $deployments,
-            'availableProjects' => $this->availableProjects($baseQuery, $team->id),
+            'availableProjects' => $this->availableProjects($team->id),
             'availableServers' => $this->distinctValues($baseQuery, 'server_name'),
             'availableSources' => $this->distinctValues($baseQuery, 'git_type'),
             'availableStatuses' => $this->distinctValues($baseQuery, 'status'),
@@ -73,7 +73,7 @@ class Deployments extends Component
         ]);
     }
 
-    private function availableProjects(Builder $query, int $teamId): Collection
+    private function availableProjects(int $teamId): Collection
     {
         return ApplicationDeploymentQueue::query()
             ->join('applications', 'application_deployment_queues.application_id', '=', 'applications.id')
@@ -94,6 +94,8 @@ class Deployments extends Component
         return (clone $query)
             ->select($column)
             ->whereNotNull($column)
+            ->where($column, '!=', '')
+            ->whereRaw('TRIM('.$column.") != ''")
             ->distinct()
             ->orderBy($column)
             ->pluck($column);
