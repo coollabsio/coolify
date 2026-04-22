@@ -5,7 +5,7 @@
 
     <div class="flex items-center gap-2">
         <h1>Deployments</h1>
-        <span class="text-xs">({{ $deployments->count() }})</span>
+        <span class="text-xs">({{ $deployments->total() }})</span>
     </div>
     <div class="subtitle">Track recent and historical deployments across the current team.</div>
 
@@ -61,9 +61,22 @@
         </div>
     </div>
 
-    <div class="flex flex-col gap-3" wire:poll.5000ms>
+    <div class="flex flex-col gap-3" @if ($isPollingActive) wire:poll.5000ms @endif>
         @forelse ($deployments as $deployment)
-            <a href="{{ data_get($deployment, 'deployment_url') ?: '#' }}" {{ wireNavigate() }} class="block">
+            @php
+                $deploymentUrl = data_get($deployment, 'deployment_url');
+                $createdAt = data_get($deployment, 'created_at');
+
+                if (is_string($createdAt)) {
+                    $createdAt = \Illuminate\Support\Carbon::parse($createdAt);
+                }
+            @endphp
+
+            @if ($deploymentUrl)
+                <a href="{{ $deploymentUrl }}" {{ wireNavigate() }} class="block">
+            @else
+                <div class="block">
+            @endif
                 <div @class([
                     'p-4 border-l-2 bg-white dark:bg-coolgray-100 rounded-r-md',
                     'border-purple-500/50 border-dashed' => data_get($deployment, 'status') === 'queued',
@@ -86,7 +99,7 @@
                     <div class="mt-3 text-sm text-neutral-600 dark:text-neutral-400 grid gap-1 md:grid-cols-2 xl:grid-cols-4">
                         <div>Server: {{ data_get($deployment, 'server_name') ?: 'Unknown' }}</div>
                         <div>Source: {{ str(data_get($deployment, 'git_type') ?: 'unknown')->headline() }}</div>
-                        <div>Created: {{ data_get($deployment, 'created_at') }}</div>
+                        <div>Created: {{ $createdAt?->diffForHumans() ?? 'N/A' }}</div>
                         <div>Commit: {{ str(data_get($deployment, 'commit') ?: 'HEAD')->limit(12) }}</div>
                     </div>
                     @if (data_get($deployment, 'commit_message'))
@@ -95,9 +108,19 @@
                         </div>
                     @endif
                 </div>
-            </a>
+            @if ($deploymentUrl)
+                </a>
+            @else
+                </div>
+            @endif
         @empty
             <div>No deployments found.</div>
         @endforelse
     </div>
+
+    @if ($deployments->hasPages())
+        <div class="mt-6">
+            {{ $deployments->links() }}
+        </div>
+    @endif
 </div>

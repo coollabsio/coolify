@@ -3,12 +3,16 @@
 namespace App\Livewire;
 
 use App\Models\ApplicationDeploymentQueue;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class Deployments extends Component
 {
+    use WithPagination;
+
     public ?string $status = null;
 
     public ?string $project = null;
@@ -24,15 +28,26 @@ class Deployments extends Component
         'source' => ['except' => ''],
     ];
 
-    public function render()
+    public function updating(string $name): void
     {
+        if (in_array($name, ['status', 'project', 'server', 'source'], true)) {
+            $this->resetPage();
+        }
+    }
+
+    public function render(): View
+    {
+        $team = currentTeam();
+
+        abort_unless($team, 403);
+
         $baseQuery = ApplicationDeploymentQueue::query()
             ->with(['application.environment.project'])
-            ->whereHas('application.environment.project', function (Builder $query) {
-                $query->where('team_id', currentTeam()->id);
+            ->whereHas('application.environment.project', function (Builder $query) use ($team) {
+                $query->where('team_id', $team->id);
             });
 
-        $deployments = (clone $baseQuery)
+        $filteredQuery = (clone $baseQuery)
             ->when($this->status, fn (Builder $query) => $query->where('status', $this->status))
             ->when($this->project, function (Builder $query) {
                 $query->whereHas('application.environment.project', function (Builder $projectQuery) {
@@ -40,57 +55,47 @@ class Deployments extends Component
                 });
             })
             ->when($this->server, fn (Builder $query) => $query->where('server_name', $this->server))
-            ->when($this->source, fn (Builder $query) => $query->where('git_type', $this->source))
+            ->when($this->source, fn (Builder $query) => $query->where('git_type', $this->source));
+
+        $deployments = (clone $filteredQuery)
             ->latest()
-            ->get();
+            ->paginate(25);
 
         return view('livewire.deployments', [
             'deployments' => $deployments,
-            'availableProjects' => $this->availableProjects($baseQuery),
-            'availableServers' => $this->availableServers($baseQuery),
-            'availableSources' => $this->availableSources($baseQuery),
-            'availableStatuses' => $this->availableStatuses($baseQuery),
+            'availableProjects' => $this->availableProjects($baseQuery, $team->id),
+            'availableServers' => $this->distinctValues($baseQuery, 'server_name'),
+            'availableSources' => $this->distinctValues($baseQuery, 'git_type'),
+            'availableStatuses' => $this->distinctValues($baseQuery, 'status'),
+            'isPollingActive' => (clone $filteredQuery)
+                ->whereIn('status', ['queued', 'in_progress'])
+                ->exists(),
         ]);
     }
 
-    private function availableProjects(Builder $query): Collection
+    private function availableProjects(Builder $query, int $teamId): Collection
     {
-        return (clone $query)
-            ->get()
-            ->map(fn (ApplicationDeploymentQueue $deployment) => data_get($deployment, 'application.environment.project.name'))
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values();
+        return ApplicationDeploymentQueue::query()
+            ->join('applications', 'application_deployment_queues.application_id', '=', 'applications.id')
+            ->join('environments', 'applications.environment_id', '=', 'environments.id')
+            ->join('projects', 'environments.project_id', '=', 'projects.id')
+            ->where('projects.team_id', $teamId)
+            ->when($this->status, fn (Builder $builder) => $builder->where('application_deployment_queues.status', $this->status))
+            ->when($this->server, fn (Builder $builder) => $builder->where('application_deployment_queues.server_name', $this->server))
+            ->when($this->source, fn (Builder $builder) => $builder->where('application_deployment_queues.git_type', $this->source))
+            ->select('projects.name')
+            ->distinct()
+            ->orderBy('projects.name')
+            ->pluck('projects.name');
     }
 
-    private function availableServers(Builder $query): Collection
+    private function distinctValues(Builder $query, string $column): Collection
     {
         return (clone $query)
-            ->pluck('server_name')
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values();
-    }
-
-    private function availableSources(Builder $query): Collection
-    {
-        return (clone $query)
-            ->pluck('git_type')
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values();
-    }
-
-    private function availableStatuses(Builder $query): Collection
-    {
-        return (clone $query)
-            ->pluck('status')
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values();
+            ->select($column)
+            ->whereNotNull($column)
+            ->distinct()
+            ->orderBy($column)
+            ->pluck($column);
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Deployments;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
@@ -8,6 +9,7 @@ use App\Models\Project;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -112,6 +114,14 @@ it('filters deployments by status, project, server, and source', function () {
     $response->assertOk();
     $response->assertSee('Queued App');
     $response->assertDontSee('Failed App');
+
+    Livewire::test(Deployments::class)
+        ->set('status', 'queued')
+        ->set('project', 'Queued Project')
+        ->set('server', 'Queue Server')
+        ->set('source', 'github')
+        ->assertSee('Queued App')
+        ->assertDontSee('Failed App');
 });
 
 it('hides server and source filters when there is only one choice', function () {
@@ -128,8 +138,8 @@ it('hides server and source filters when there is only one choice', function () 
     $response = $this->get('/deployments');
 
     $response->assertOk();
-    $response->assertSee('Project');
-    $response->assertSee('Status');
+    $response->assertSee('All projects');
+    $response->assertSee('All statuses');
     $response->assertDontSee('All servers');
     $response->assertDontSee('All sources');
 });
