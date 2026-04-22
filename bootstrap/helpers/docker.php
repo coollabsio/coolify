@@ -144,6 +144,20 @@ function escapeShellValue(string $value): string
 
 function executeInDocker(string $containerId, string $command)
 {
+    if (preg_match('/\\bgit\\s+(clone|ls-remote|fetch|pull)\\b/', $command)) {
+        $wrapped = "n=0; max=5; delay=3; while : ; do { {$command} ; } ; rc=\\$?; ".
+            'if [ $rc -eq 0 ]; then exit 0; fi; '.
+            'n=$((n+1)); '.
+            'if [ $n -ge $max ]; then exit $rc; fi; '.
+            'echo "[coolify-git-retry] attempt $n/$max failed rc=$rc, sleeping ${delay}s" 1>&2; '.
+            'sleep $delay; delay=$((delay*2)); '.
+            'done';
+
+        $escapedCommand = str_replace("'", "'\\''", $wrapped);
+
+        return "docker exec {$containerId} bash -c '{$escapedCommand}'";
+    }
+
     $escapedCommand = str_replace("'", "'\\''", $command);
 
     return "docker exec {$containerId} bash -c '{$escapedCommand}'";

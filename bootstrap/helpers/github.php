@@ -14,7 +14,7 @@ use Lcobucci\JWT\Token\Builder;
 
 function generateGithubToken(GithubApp $source, string $type)
 {
-    $response = Http::get("{$source->api_url}/zen");
+    $response = Http::connectTimeout(8)->timeout(20)->retry(5, 500, throw: false)->get("{$source->api_url}/zen");
     $serverTime = CarbonImmutable::now()->setTimezone('UTC');
     $githubTime = Carbon::parse($response->header('date'));
     $timeDiff = abs($serverTime->diffInSeconds($githubTime));
@@ -45,7 +45,7 @@ function generateGithubToken(GithubApp $source, string $type)
     return match ($type) {
         'jwt' => $jwt,
         'installation' => (function () use ($source, $jwt) {
-            $response = Http::withHeaders([
+            $response = Http::connectTimeout(8)->timeout(20)->retry(5, 500, throw: false)->withHeaders([
                 'Authorization' => "Bearer $jwt",
                 'Accept' => 'application/vnd.github.machine-man-preview+json',
             ])->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");

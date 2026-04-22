@@ -67,13 +67,13 @@ class AppServiceProvider extends ServiceProvider
     {
         Http::macro('GitHub', function (string $api_url, ?string $github_access_token = null) {
             if ($github_access_token) {
-                return Http::withHeaders([
+                return Http::connectTimeout(8)->timeout(30)->retry(5, 500, throw: false)->withHeaders([
                     'X-GitHub-Api-Version' => '2022-11-28',
                     'Accept' => 'application/vnd.github.v3+json',
                     'Authorization' => "Bearer $github_access_token",
                 ])->baseUrl($api_url);
             } else {
-                return Http::withHeaders([
+                return Http::connectTimeout(8)->timeout(30)->retry(5, 500, throw: false)->withHeaders([
                     'Accept' => 'application/vnd.github.v3+json',
                 ])->baseUrl($api_url);
             }
