@@ -61,7 +61,7 @@ function createDeploymentForTeam(Team $team, array $deploymentOverrides = [], ar
     return ApplicationDeploymentQueue::query()->create(array_merge([
         'application_id' => $application->id,
         'deployment_uuid' => fake()->lexify('dep-'.$application->id.'-????????'),
-        'status' => 'queued',
+        'status' => ApplicationDeploymentStatus::QUEUED->value,
         'application_name' => $application->name,
         'server_name' => 'Main Server',
         'server_id' => 101,
@@ -70,6 +70,45 @@ function createDeploymentForTeam(Team $team, array $deploymentOverrides = [], ar
         'commit_message' => 'Deploy alpha app',
     ], $deploymentOverrides));
 }
+
+it('normalizes trimmed status filter values when listing and applying status filters', function () {
+    createDeploymentForTeam($this->team, [
+        'status' => ApplicationDeploymentStatus::QUEUED->value,
+    ], [
+        'name' => 'Canonical Status App',
+    ], [
+        'name' => 'Canonical Status Project',
+    ]);
+
+    createDeploymentForTeam($this->team, [
+        'status' => ' queued ',
+    ], [
+        'name' => 'Spaced Status App',
+    ], [
+        'name' => 'Spaced Status Project',
+    ]);
+
+    createDeploymentForTeam($this->team, [
+        'status' => ApplicationDeploymentStatus::FAILED->value,
+    ], [
+        'name' => 'Failed Status App',
+    ], [
+        'name' => 'Failed Status Project',
+    ]);
+
+    $response = $this->get('/deployments?status='.ApplicationDeploymentStatus::QUEUED->value);
+
+    $response->assertOk();
+    $response->assertSee('Canonical Status App');
+    $response->assertSee('Spaced Status App');
+    $response->assertDontSee('Failed Status App');
+
+    Livewire::test(Deployments::class)
+        ->set('status', ApplicationDeploymentStatus::QUEUED->value)
+        ->assertSee('Canonical Status App')
+        ->assertSee('Spaced Status App')
+        ->assertDontSee('Failed Status App');
+});
 
 it('shows deployments page link in the main navbar', function () {
     $response = $this->get('/');

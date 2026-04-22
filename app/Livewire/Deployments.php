@@ -52,9 +52,13 @@ class Deployments extends Component
         $availableSources = $this->distinctValues($baseQuery, 'git_type');
         $serverColumn = $baseQuery->getQuery()->getGrammar()->wrap('server_name');
         $sourceColumn = $baseQuery->getQuery()->getGrammar()->wrap('git_type');
+        $statusColumn = $baseQuery->getQuery()->getGrammar()->wrap('status');
 
         $filteredQuery = (clone $baseQuery)
-            ->when(filled($this->status), fn (Builder $query) => $query->where('status', trim($this->status ?? '')))
+            ->when(
+                filled($this->status),
+                fn (Builder $query) => $query->whereRaw("TRIM({$statusColumn}) = ?", [trim($this->status ?? '')])
+            )
             ->when(filled($this->project), function (Builder $query) {
                 $query->whereHas('application.environment.project', function (Builder $projectQuery) {
                     $wrappedProjectName = $projectQuery->getQuery()->getGrammar()->wrap('name');
@@ -82,7 +86,7 @@ class Deployments extends Component
             'availableSources' => $availableSources,
             'availableStatuses' => $this->distinctValues($baseQuery, 'status'),
             'isPollingActive' => (clone $filteredQuery)
-                ->whereIn('status', [
+                ->whereRaw("TRIM({$statusColumn}) IN (?, ?)", [
                     ApplicationDeploymentStatus::QUEUED->value,
                     ApplicationDeploymentStatus::IN_PROGRESS->value,
                 ])
