@@ -114,7 +114,7 @@ class Show extends Component
             ->map(function ($line) {
                 return $line['timestamp'].' '.
                        (isset($line['command']) && $line['command'] ? '[CMD]: ' : '').
-                       trim($line['line']);
+                       rtrim($line['line'], "\r\n");
             })
             ->join("\n");
 
@@ -133,7 +133,7 @@ class Show extends Component
                     $prefix .= '[CMD]: ';
                 }
 
-                return $line['timestamp'].' '.$prefix.trim($line['line']);
+                return $line['timestamp'].' '.$prefix.rtrim($line['line'], "\r\n");
             })
             ->join("\n");
 

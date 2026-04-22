@@ -336,7 +336,7 @@
                             </div>
                             @forelse ($this->logLines as $line)
                                 @php
-                                    $lineContent = (isset($line['command']) && $line['command'] ? '[CMD]: ' : '') . trim($line['line']);
+                                    $lineContent = (isset($line['command']) && $line['command'] ? '[CMD]: ' : '') . rtrim($line['line'], "\r\n");
                                     $searchableContent = $line['timestamp'] . ' ' . $lineContent;
                                 @endphp
                                 <div data-log-line data-log-content="{{ htmlspecialchars($searchableContent) }}"
