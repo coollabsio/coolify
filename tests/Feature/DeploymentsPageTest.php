@@ -145,6 +145,55 @@ it('hides server and source filters when there is only one choice', function () 
     $response->assertDontSee('All sources');
 });
 
+it('ignores hidden server and source query filters', function () {
+    createDeploymentForTeam($this->team, [
+        'status' => ApplicationDeploymentStatus::QUEUED->value,
+        'server_name' => 'Solo Server',
+        'git_type' => 'github',
+    ], [
+        'name' => 'Solo App',
+    ], [
+        'name' => 'Solo Project',
+    ]);
+
+    $response = $this->get('/deployments?server=Skynet&source=gitlab');
+
+    $response->assertOk();
+    $response->assertSee('Solo App');
+    $response->assertDontSee('All servers');
+    $response->assertDontSee('All sources');
+});
+
+it('normalizes trimmed filter values before deciding whether to show filter controls', function () {
+    createDeploymentForTeam($this->team, [
+        'status' => ApplicationDeploymentStatus::QUEUED->value,
+        'server_name' => 'Solo Server',
+        'git_type' => 'github',
+    ], [
+        'name' => 'Alpha App',
+    ], [
+        'name' => 'Alpha Project',
+    ]);
+
+    createDeploymentForTeam($this->team, [
+        'status' => ApplicationDeploymentStatus::FAILED->value,
+        'server_name' => ' Solo Server ',
+        'git_type' => ' github ',
+    ], [
+        'name' => 'Beta App',
+    ], [
+        'name' => 'Beta Project',
+    ]);
+
+    $response = $this->get('/deployments');
+
+    $response->assertOk();
+    $response->assertSee('Alpha App');
+    $response->assertSee('Beta App');
+    $response->assertDontSee('All servers');
+    $response->assertDontSee('All sources');
+});
+
 it('keeps all project options available while other filters are active', function () {
     createDeploymentForTeam($this->team, [
         'status' => ApplicationDeploymentStatus::QUEUED->value,

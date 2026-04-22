@@ -48,6 +48,11 @@ class Deployments extends Component
                 $query->where('team_id', $team->id);
             });
 
+        $availableServers = $this->distinctValues($baseQuery, 'server_name');
+        $availableSources = $this->distinctValues($baseQuery, 'git_type');
+        $serverColumn = $baseQuery->getQuery()->getGrammar()->wrap('server_name');
+        $sourceColumn = $baseQuery->getQuery()->getGrammar()->wrap('git_type');
+
         $filteredQuery = (clone $baseQuery)
             ->when($this->status, fn (Builder $query) => $query->where('status', $this->status))
             ->when($this->project, function (Builder $query) {
@@ -55,8 +60,14 @@ class Deployments extends Component
                     $projectQuery->where('name', $this->project);
                 });
             })
-            ->when($this->server, fn (Builder $query) => $query->where('server_name', $this->server))
-            ->when($this->source, fn (Builder $query) => $query->where('git_type', $this->source));
+            ->when(
+                $this->server && $availableServers->count() > 1,
+                fn (Builder $query) => $query->whereRaw("TRIM({$serverColumn}) = ?", [trim($this->server)])
+            )
+            ->when(
+                $this->source && $availableSources->count() > 1,
+                fn (Builder $query) => $query->whereRaw("TRIM({$sourceColumn}) = ?", [trim($this->source)])
+            );
 
         $deployments = (clone $filteredQuery)
             ->latest()
@@ -65,8 +76,8 @@ class Deployments extends Component
         return view('livewire.deployments', [
             'deployments' => $deployments,
             'availableProjects' => $this->availableProjects($team->id),
-            'availableServers' => $this->distinctValues($baseQuery, 'server_name'),
-            'availableSources' => $this->distinctValues($baseQuery, 'git_type'),
+            'availableServers' => $availableServers,
+            'availableSources' => $availableSources,
             'availableStatuses' => $this->distinctValues($baseQuery, 'status'),
             'isPollingActive' => (clone $filteredQuery)
                 ->whereIn('status', [
@@ -95,11 +106,11 @@ class Deployments extends Component
         $wrappedColumn = $query->getQuery()->getGrammar()->wrap($column);
 
         return (clone $query)
-            ->select($column)
+            ->selectRaw("TRIM({$wrappedColumn}) as value")
             ->whereNotNull($column)
             ->whereRaw("TRIM({$wrappedColumn}) != ''")
             ->distinct()
-            ->orderBy($column)
-            ->pluck($column);
+            ->orderBy('value')
+            ->pluck('value');
     }
 }
