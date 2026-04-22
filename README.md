@@ -60,7 +60,7 @@ Thank you so much!
 * [MVPS](https://www.mvps.net?ref=coolify.io) - Cheap VPS servers at the highest possible quality
 * [SerpAPI](https://serpapi.com?ref=coolify.io) - Google Search API — Scrape Google and other search engines from our fast, easy, and complete API
 * [ScreenshotOne](https://screenshotone.com?ref=coolify.io) - Screenshot API for devs
-*
+* [PrivateAlps](https://privatealps.net?ref=coolify.io) - Offshore hosting — anonymity, uncensored, security.
 
 ### Big Sponsors
 
@@ -151,6 +151,7 @@ Thank you so much!
 <a href="https://capgo.app/?utm_source=coolify.io"><img width="60px" alt="Cap-go" src="https://github.com/cap-go.png"/></a>
 <a href="https://interviewpal.com/?utm_source=coolify.io"><img width="60px" alt="InterviewPal" src="/public/svgs/interviewpal.svg"/></a>
 <a href="https://transcript.lol/?utm_source=coolify.io"><img width="60px" alt="Transcript LOL" src="https://transcript.lol/logo.png"/></a>
+<a href="https://youstable.com/?utm_source=coolify.io"><img width="60px" alt="YouStable" src="https://github.com/youstable.png"/></a>
 
 
 ...and many more at [GitHub Sponsors](https://github.com/sponsors/coollabsio)
