@@ -1200,11 +1200,28 @@ class Application extends BaseModel
         return application_configuration_dir()."/{$this->uuid}";
     }
 
-    public function setGitImportSettings(string $deployment_uuid, string $git_clone_command, bool $public = false, ?string $commit = null, ?string $git_ssh_command = null)
+    private function buildGitCommand(bool $forceHttpVersionOne = false, array $config = []): string
+    {
+        $gitCommand = 'git';
+
+        if ($forceHttpVersionOne) {
+            $config = array_merge(['http.version' => 'HTTP/1.1'], $config);
+        }
+
+        foreach ($config as $key => $value) {
+            $gitCommand .= ' -c '.escapeshellarg("{$key}={$value}");
+        }
+
+        return $gitCommand;
+    }
+
+    public function setGitImportSettings(string $deployment_uuid, string $git_clone_command, bool $public = false, ?string $commit = null, ?string $git_ssh_command = null, bool $forceHttpVersionOne = false)
     {
         $baseDir = $this->generateBaseDir($deployment_uuid);
         $escapedBaseDir = escapeshellarg($baseDir);
         $isShallowCloneEnabled = $this->settings?->is_git_shallow_clone_enabled ?? false;
+        $gitCommand = $this->buildGitCommand($forceHttpVersionOne);
+        $gitCheckoutCommand = $this->buildGitCommand($forceHttpVersionOne, ['advice.detachedHead' => 'false']);
 
         // Use the full GIT_SSH_COMMAND (including -i for SSH key and port options) when provided,
         // so that git fetch, submodule update, and lfs pull can authenticate the same way as git clone.
@@ -1219,23 +1236,23 @@ class Application extends BaseModel
             // If shallow clone is enabled and we need a specific commit,
             // we need to fetch that specific commit with depth=1
             if ($isShallowCloneEnabled) {
-                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} git fetch --depth=1 origin {$escapedCommit} && git -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
+                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} {$gitCommand} fetch --depth=1 origin {$escapedCommit} && {$gitCheckoutCommand} checkout {$escapedCommit} >/dev/null 2>&1";
             } else {
-                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} git -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
+                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} {$gitCheckoutCommand} checkout {$escapedCommit} >/dev/null 2>&1";
             }
         }
         if ($this->settings->is_git_submodules_enabled) {
             // Check if .gitmodules file exists before running submodule commands
             $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && if [ -f .gitmodules ]; then";
             if ($public) {
-                $git_clone_command = "{$git_clone_command} sed -i \"s#git@\(.*\):#https://\\1/#g\" {$escapedBaseDir}/.gitmodules || true &&";
+                $git_clone_command = "{$git_clone_command} sed -i \"s#git@\\(.*\\):#https://\\1/#g\" {$escapedBaseDir}/.gitmodules || true &&";
             }
             // Add shallow submodules flag if shallow clone is enabled
             $submoduleFlags = $isShallowCloneEnabled ? '--depth=1' : '';
-            $git_clone_command = "{$git_clone_command} git submodule sync && {$sshCommand} git submodule update --init --recursive {$submoduleFlags}; fi";
+            $git_clone_command = "{$git_clone_command} {$gitCommand} submodule sync && {$sshCommand} {$gitCommand} submodule update --init --recursive {$submoduleFlags}; fi";
         }
         if ($this->settings->is_git_lfs_enabled) {
-            $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} git lfs pull";
+            $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} {$gitCommand} lfs pull";
         }
 
         return $git_clone_command;
@@ -1438,6 +1455,7 @@ class Application extends BaseModel
         // Check if shallow clone is enabled
         $isShallowCloneEnabled = $this->settings?->is_git_shallow_clone_enabled ?? false;
         $depthFlag = $isShallowCloneEnabled ? ' --depth=1' : '';
+        $forceHttpVersionOne = false;
 
         $submoduleFlags = '';
         if ($this->settings->is_git_submodules_enabled) {
@@ -1464,9 +1482,14 @@ class Application extends BaseModel
                 if ($this->source->is_public) {
                     $fullRepoUrl = "{$this->source->html_url}/{$customRepository}";
                     $escapedRepoUrl = escapeshellarg("{$this->source->html_url}/{$customRepository}");
-                    $git_clone_command = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
+                    $forceHttpVersionOne = str($fullRepoUrl)->startsWith('https://');
+                    $gitCloneCommand = $this->buildGitCommand($forceHttpVersionOne).' clone'.$depthFlag.$submoduleFlags;
+                    if ($only_checkout) {
+                        $gitCloneCommand .= ' --no-checkout';
+                    }
+                    $git_clone_command = "{$gitCloneCommand} -b {$escapedBranch} {$escapedRepoUrl} {$escapedBaseDir}";
                     if (! $only_checkout) {
-                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit);
+                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, forceHttpVersionOne: $forceHttpVersionOne);
                     }
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, $git_clone_command));
@@ -1479,16 +1502,26 @@ class Application extends BaseModel
                     if ($exec_in_docker) {
                         $repoUrl = "$source_html_url_scheme://x-access-token:$encodedToken@$source_html_url_host/{$customRepository}.git";
                         $escapedRepoUrl = escapeshellarg($repoUrl);
-                        $git_clone_command = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
                         $fullRepoUrl = $repoUrl;
+                        $forceHttpVersionOne = str($fullRepoUrl)->startsWith('https://');
+                        $gitCloneCommand = $this->buildGitCommand($forceHttpVersionOne).' clone'.$depthFlag.$submoduleFlags;
+                        if ($only_checkout) {
+                            $gitCloneCommand .= ' --no-checkout';
+                        }
+                        $git_clone_command = "{$gitCloneCommand} -b {$escapedBranch} {$escapedRepoUrl} {$escapedBaseDir}";
                     } else {
                         $repoUrl = "$source_html_url_scheme://x-access-token:$encodedToken@$source_html_url_host/{$customRepository}";
                         $escapedRepoUrl = escapeshellarg($repoUrl);
-                        $git_clone_command = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
                         $fullRepoUrl = $repoUrl;
+                        $forceHttpVersionOne = str($fullRepoUrl)->startsWith('https://');
+                        $gitCloneCommand = $this->buildGitCommand($forceHttpVersionOne).' clone'.$depthFlag.$submoduleFlags;
+                        if ($only_checkout) {
+                            $gitCloneCommand .= ' --no-checkout';
+                        }
+                        $git_clone_command = "{$gitCloneCommand} -b {$escapedBranch} {$escapedRepoUrl} {$escapedBaseDir}";
                     }
                     if (! $only_checkout) {
-                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false, commit: $commit);
+                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false, commit: $commit, forceHttpVersionOne: $forceHttpVersionOne);
                     }
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, $git_clone_command));
@@ -1499,12 +1532,13 @@ class Application extends BaseModel
                 if ($pull_request_id !== 0) {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
 
-                    $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, $forceHttpVersionOne);
                     $escapedPrBranch = escapeshellarg($branch);
+                    $gitFetchCommand = $this->buildGitCommand($forceHttpVersionOne).' fetch origin '.$escapedPrBranch;
                     if ($exec_in_docker) {
-                        $commands->push(executeInDocker($deployment_uuid, "cd {$escapedBaseDir} && git fetch origin {$escapedPrBranch} && $git_checkout_command"));
+                        $commands->push(executeInDocker($deployment_uuid, "cd {$escapedBaseDir} && {$gitFetchCommand} && $git_checkout_command"));
                     } else {
-                        $commands->push("cd {$escapedBaseDir} && git fetch origin {$escapedPrBranch} && $git_checkout_command");
+                        $commands->push("cd {$escapedBaseDir} && {$gitFetchCommand} && $git_checkout_command");
                     }
                 }
 
@@ -1571,8 +1605,15 @@ class Application extends BaseModel
                 // GitLab source without private key — use URL as-is (supports user-embedded basic auth)
                 $fullRepoUrl = $customRepository;
                 $escapedCustomRepository = escapeshellarg($customRepository);
-                $git_clone_command = "{$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
-                $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit);
+                $forceHttpVersionOne = str($fullRepoUrl)->startsWith('https://');
+                $gitCloneCommand = $this->buildGitCommand($forceHttpVersionOne).' clone'.$depthFlag.$submoduleFlags;
+                if ($only_checkout) {
+                    $gitCloneCommand .= ' --no-checkout';
+                }
+                $git_clone_command = "{$gitCloneCommand} -b {$escapedBranch} {$escapedCustomRepository} {$escapedBaseDir}";
+                if (! $only_checkout) {
+                    $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, forceHttpVersionOne: $forceHttpVersionOne);
+                }
 
                 if ($exec_in_docker) {
                     $commands->push(executeInDocker($deployment_uuid, $git_clone_command));
@@ -1657,8 +1698,15 @@ class Application extends BaseModel
         if ($this->deploymentType() === 'other') {
             $fullRepoUrl = $customRepository;
             $escapedCustomRepository = escapeshellarg($customRepository);
-            $git_clone_command = "{$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
-            $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit);
+            $forceHttpVersionOne = str($fullRepoUrl)->startsWith('https://');
+            $gitCloneCommand = $this->buildGitCommand($forceHttpVersionOne).' clone'.$depthFlag.$submoduleFlags;
+            if ($only_checkout) {
+                $gitCloneCommand .= ' --no-checkout';
+            }
+            $git_clone_command = "{$gitCloneCommand} -b {$escapedBranch} {$escapedCustomRepository} {$escapedBaseDir}";
+            if (! $only_checkout) {
+                $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, forceHttpVersionOne: $forceHttpVersionOne);
+            }
 
             if ($pull_request_id !== 0) {
                 if ($git_type === 'gitlab') {
@@ -1782,7 +1830,9 @@ class Application extends BaseModel
             return;
         }
         $uuid = new Cuid2;
-        ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
+        $checkoutDirectory = "/tmp/{$uuid}/checkout";
+        ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: $checkoutDirectory);
+        $escapedCheckoutDirectory = escapeshellarg($checkoutDirectory);
         $workdir = rtrim($this->base_directory, '/');
         $composeFile = $this->docker_compose_location;
         $fileList = collect([".$workdir$composeFile"]);
@@ -1810,8 +1860,8 @@ class Application extends BaseModel
             $commands = collect([
                 "rm -rf /tmp/{$uuid}",
                 "mkdir -p /tmp/{$uuid}",
-                "cd /tmp/{$uuid}",
                 $cloneCommand,
+                "cd {$escapedCheckoutDirectory}",
                 'git sparse-checkout init',
                 "git sparse-checkout set {$fileList->implode(' ')}",
                 'git read-tree -mu HEAD',
@@ -1821,8 +1871,8 @@ class Application extends BaseModel
             $commands = collect([
                 "rm -rf /tmp/{$uuid}",
                 "mkdir -p /tmp/{$uuid}",
-                "cd /tmp/{$uuid}",
                 $cloneCommand,
+                "cd {$escapedCheckoutDirectory}",
                 'git sparse-checkout init --cone',
                 "git sparse-checkout set {$fileList->implode(' ')}",
                 'git read-tree -mu HEAD',
@@ -1932,13 +1982,15 @@ class Application extends BaseModel
         );
     }
 
-    protected function buildGitCheckoutCommand($target): string
+    protected function buildGitCheckoutCommand($target, bool $forceHttpVersionOne = false): string
     {
         $escapedTarget = escapeshellarg($target);
-        $command = "git checkout {$escapedTarget}";
+        $gitCheckoutCommand = $this->buildGitCommand($forceHttpVersionOne, ['advice.detachedHead' => 'false']);
+        $gitCommand = $this->buildGitCommand($forceHttpVersionOne);
+        $command = "{$gitCheckoutCommand} checkout {$escapedTarget}";
 
         if ($this->settings->is_git_submodules_enabled) {
-            $command .= ' && git submodule update --init --recursive';
+            $command .= " && {$gitCommand} submodule update --init --recursive";
         }
 
         return $command;
