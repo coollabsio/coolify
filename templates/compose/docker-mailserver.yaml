@@ -1,0 +1,41 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Production-ready self-hosted email server with SMTP, IMAP, SpamAssassin, and DKIM support.
+# category: email
+# tags: email, smtp, imap, mailserver, docker-mailserver, postfix, dovecot
+# logo: svgs/mailpit.svg
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: mail
+    domainname: ${MAIL_DOMAIN:-example.com}
+    volumes:
+      - maildata:/var/mail
+      - mailstate:/var/mail-state
+      - maillogs:/var/log/mail
+      - config:/tmp/docker-mailserver
+    environment:
+      - SERVICE_URL_MAILSERVER
+      - ENABLE_SPAMASSASSIN=1
+      - SPAMASSASSIN_SPAM_TO_INBOX=1
+      - ENABLE_CLAMAV=0
+      - ENABLE_FAIL2BAN=1
+      - ENABLE_POSTGREY=1
+      - ENABLE_SRS=1
+      - POSTMASTER_ADDRESS=postmaster@${MAIL_DOMAIN:-example.com}
+      - DMS_VMAIL_UID=${DMS_VMAIL_UID:-5000}
+      - DMS_VMAIL_GID=${DMS_VMAIL_GID:-5000}
+      - SSL_TYPE=letsencrypt
+      - TLS_LEVEL=intermediate
+    ports:
+      - "25:25"
+      - "143:143"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep master > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
