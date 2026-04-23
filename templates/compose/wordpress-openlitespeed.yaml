@@ -1,28 +1,27 @@
-# documentation: https://openlitespeed.org
-# slogan: WordPress with OpenLiteSpeed - High-performance web server with built-in caching.
+# documentation: https://openlitespeed.org/
+# slogan: High-performance WordPress hosting with OpenLiteSpeed web server, LSAPI PHP, and MariaDB.
 # category: cms
-# tags: cms, wordpress, openlitespeed, litespeed, cache, performance
+# tags: wordpress,openlitespeed,litespeed,cms,php
 # logo: svgs/wordpress.svg
+# port: 80
 
 services:
-  wordpress:
+  openlitespeed:
     image: litespeedtech/openlitespeed:latest
     volumes:
-      - wordpress-files:/var/www/html
-      - litespeed-conf:/usr/local/litespeed/conf
+      - wordpress-root:/var/www/html
+      - litespeed-conf:/usr/local/lsws/conf
+      - litespeed-logs:/usr/local/lsws/logs
     environment:
-      - SERVICE_URL_WORDPRESS
+      - SERVICE_URL_OPENLITESPEED
       - DB_HOST=mariadb
       - DB_USER=$SERVICE_USER_WORDPRESS
       - DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
       - DB_NAME=wordpress
-      - WP_ADMIN_USER=admin
-      - WP_ADMIN_PASSWORD=$SERVICE_PASSWORD_ADMIN
     depends_on:
-      mariadb:
-        condition: service_healthy
+      - mariadb
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8088"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
       interval: 5s
       timeout: 10s
       retries: 10
