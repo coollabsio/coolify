@@ -664,12 +664,38 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit);
             // Always add .env file to services
             $services = collect(data_get($composeFile, 'services', []));
-            $services = $services->map(function ($service, $name) {
-                $service['env_file'] = ['.env'];
+            $isSelectiveEnabled = $this->application->settings->is_selective_env_per_service_enabled;
+
+            $services = $services->map(function ($service, $name) use ($isSelectiveEnabled) {
+                $envFiles = data_get($service, 'env_file', []);
+                if (is_string($envFiles)) {
+                    $envFiles = [$envFiles];
+                }
+                if (! is_array($envFiles)) {
+                    $envFiles = [];
+                }
+
+                if ($isSelectiveEnabled) {
+                    $service['env_file'] = array_merge($envFiles, [".env.$name"]);
+                } else {
+                    $service['env_file'] = array_merge($envFiles, ['.env']);
+                }
 
                 return $service;
             });
             $composeFile['services'] = $services->toArray();
+
+            if ($isSelectiveEnabled) {
+                foreach (array_keys($composeFile['services']) as $serviceName) {
+                    $this->execute_remote_command(
+                        [
+                            executeInDocker($this->deployment_uuid, "touch {$this->workdir}/.env.{$serviceName}"),
+                            'hidden' => true,
+                        ]
+                    );
+                }
+            }
+
             if (empty($composeFile)) {
                 $this->application_deployment_queue->addLogEntry('Failed to parse docker-compose file.');
                 $this->fail('Failed to parse docker-compose file.');
@@ -1389,6 +1415,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Generate runtime environment variables locally
         $environment_variables = $this->generate_runtime_environment_variables();
+        $isSelectiveEnabled = $this->application->settings->is_selective_env_per_service_enabled;
 
         // Handle empty environment variables
         if ($environment_variables->isEmpty()) {
@@ -1454,15 +1481,50 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         // Write the environment variables to file
-        $envs_base64 = base64_encode($environment_variables->implode("\n"));
+        $all_envs = $environment_variables->all();
+        $envs_base64 = base64_encode(implode("\n", $all_envs));
 
-        // Write .env file to workdir (for container runtime)
+        // Always write the global .env file (for build process and backward compatibility)
         $this->application_deployment_queue->addLogEntry('Creating .env file with runtime variables for container.', hidden: true);
         $this->execute_remote_command(
             [
                 executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/.env > /dev/null"),
             ]
         );
+
+        $selectiveEnvFiles = [];
+        if ($isSelectiveEnabled &&
+            $this->build_pack === 'dockercompose' &&
+            ! $this->application->settings->is_raw_compose_deployment_enabled) {
+            $this->application->loadComposeFile(isInit: false);
+            $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit);
+            $mapping = $this->getServiceEnvMapping($composeFile);
+
+            foreach ($mapping as $serviceName => $vars) {
+                $serviceEnvs = [];
+                foreach ($all_envs as $envLine) {
+                    if (str_contains($envLine, '=')) {
+                        $key = explode('=', $envLine, 2)[0];
+                        // Include if referenced OR if it's a system variable
+                        if (in_array($key, $vars) ||
+                            str_starts_with($key, 'COOLIFY_') ||
+                            str_starts_with($key, 'SERVICE_URL_') ||
+                            str_starts_with($key, 'SERVICE_NAME_') ||
+                            str_starts_with($key, 'SERVICE_FQDN_')) {
+                            $serviceEnvs[] = $envLine;
+                        }
+                    }
+                }
+                $serviceEnvsBase64 = base64_encode(implode("\n", $serviceEnvs));
+                $selectiveEnvFiles[".env.$serviceName"] = $serviceEnvsBase64;
+
+                $this->execute_remote_command(
+                    [
+                        executeInDocker($this->deployment_uuid, "echo '$serviceEnvsBase64' | base64 -d | tee $this->workdir/.env.$serviceName > /dev/null"),
+                    ]
+                );
+            }
+        }
 
         if (isDev()) {
             $this->execute_remote_command(
@@ -1481,6 +1543,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
                 ]
             );
+            foreach ($selectiveEnvFiles as $fileName => $fileBase64) {
+                $this->execute_remote_command(
+                    [
+                        "echo '$fileBase64' | base64 -d | tee $this->configuration_dir/$fileName > /dev/null",
+                    ]
+                );
+            }
             $this->server = $this->build_server;
         } else {
             $this->execute_remote_command(
@@ -1488,7 +1557,69 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
                 ]
             );
+            foreach ($selectiveEnvFiles as $fileName => $fileBase64) {
+                $this->execute_remote_command(
+                    [
+                        "echo '$fileBase64' | base64 -d | tee $this->configuration_dir/$fileName > /dev/null",
+                    ]
+                );
+            }
         }
+    }
+
+    private function getServiceEnvMapping(array $composeArray): array
+    {
+        $mapping = [];
+        $services = data_get($composeArray, 'services', []);
+
+        foreach ($services as $serviceName => $service) {
+            $foundVars = [];
+
+            // 1. Check environment section
+            $env = data_get($service, 'environment', []);
+            if (is_array($env)) {
+                foreach ($env as $key => $value) {
+                    if (is_numeric($key)) {
+                        // List format: - VAR=VAL or - VAR
+                        if (str_contains($value, '=')) {
+                            $parts = explode('=', $value, 2);
+                            $foundVars[] = $parts[0];
+                            // Also check for refs in the value part (e.g., VAR=${VAL})
+                            preg_match_all('/\${?([a-zA-Z_][a-zA-Z0-9_]*)/', $parts[1], $matches);
+                            $foundVars = array_merge($foundVars, $matches[1]);
+                        } else {
+                            $foundVars[] = $value;
+                        }
+                    } else {
+                        // Dictionary format: VAR: VAL
+                        $foundVars[] = $key;
+                        if (is_string($value)) {
+                            preg_match_all('/\${?([a-zA-Z_][a-zA-Z0-9_]*)/', $value, $matches);
+                            $foundVars = array_merge($foundVars, $matches[1]);
+                        }
+                    }
+                }
+            }
+
+            // 2. Check other sections for variable interpolation
+            $fieldsToCheck = ['command', 'entrypoint', 'image', 'labels'];
+            foreach ($fieldsToCheck as $field) {
+                $val = data_get($service, $field);
+                if ($val) {
+                    if (is_array($val)) {
+                        $val = json_encode($val);
+                    }
+                    if (is_string($val)) {
+                        preg_match_all('/\${?([a-zA-Z_][a-zA-Z0-9_]*)/', $val, $matches);
+                        $foundVars = array_merge($foundVars, $matches[1]);
+                    }
+                }
+            }
+
+            $mapping[$serviceName] = array_unique($foundVars);
+        }
+
+        return $mapping;
     }
 
     private function generate_buildtime_environment_variables()

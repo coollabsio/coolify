@@ -63,6 +63,9 @@
                 <x-forms.checkbox instantSave id="isConnectToDockerNetworkEnabled" label="Connect To Predefined Network"
                     helper="By default, you do not reach the Coolify defined networks.<br>Starting a docker compose based resource will have an internal network. <br>If you connect to a Coolify defined network, you maybe need to use different internal DNS names to connect to a resource.<br><br>For more information, check <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/knowledge-base/docker/compose#connect-to-predefined-networks'>this</a>."
                     canGate="update" :canResource="$application" />
+                <x-forms.checkbox instantSave id="isSelectiveEnvPerServiceEnabled" label="Selective Environment Variables"
+                    helper="Only inject environment variables into containers that explicitly reference them in your Docker Compose file (e.g. via ${VAR_NAME} or in the environment: section). System variables (SERVICE_URL_*, etc.) are always included."
+                    canGate="update" :canResource="$application" />
             @endif
 
             <h3 class="pt-4">Proxy</h3>

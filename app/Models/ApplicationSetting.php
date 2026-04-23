@@ -25,6 +25,7 @@ class ApplicationSetting extends Model
         'is_git_submodules_enabled' => 'boolean',
         'is_git_lfs_enabled' => 'boolean',
         'is_git_shallow_clone_enabled' => 'boolean',
+        'is_selective_env_per_service_enabled' => 'boolean',
         'docker_images_to_keep' => 'integer',
     ];
 
@@ -63,6 +64,7 @@ class ApplicationSetting extends Model
         'use_build_secrets',
         'inject_build_args_to_dockerfile',
         'include_source_commit_in_build',
+        'is_selective_env_per_service_enabled',
         'docker_images_to_keep',
     ];
 
