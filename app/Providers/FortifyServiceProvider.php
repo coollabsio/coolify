@@ -67,6 +67,7 @@ class FortifyServiceProvider extends ServiceProvider
 
             return view('auth.login', [
                 'is_registration_enabled' => $settings->is_registration_enabled,
+                'is_oauth_only' => $settings->is_oauth_only,
                 'enabled_oauth_providers' => $enabled_oauth_providers,
             ]);
         });
@@ -78,6 +79,11 @@ class FortifyServiceProvider extends ServiceProvider
                 $user &&
                 Hash::check($request->password, $user->password)
             ) {
+                $settings = instanceSettings();
+                // Check if OAuth-only mode is enabled and user is an OAuth user
+                if ($settings->is_oauth_only && ! empty($user->oauth_provider)) {
+                    return null;
+                }
                 $user->updated_at = now();
                 $user->save();
 
