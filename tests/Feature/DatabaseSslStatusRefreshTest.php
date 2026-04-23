@@ -38,12 +38,12 @@ dataset('ssl-aware-database-general-components', [
     DragonflyGeneral::class,
 ]);
 
-it('maps database status broadcasts to refresh for ssl-aware database general components', function (string $componentClass) {
+it('maps database status broadcasts to refresh without subscribing forms to service polling broadcasts', function (string $componentClass) {
     $component = app($componentClass);
     $listeners = $component->getListeners();
 
     expect($listeners["echo-private:user.{$this->user->id},DatabaseStatusChanged"])->toBe('refresh')
-        ->and($listeners["echo-private:team.{$this->team->id},ServiceChecked"])->toBe('refresh');
+        ->and($listeners)->not->toHaveKey("echo-private:team.{$this->team->id},ServiceChecked");
 })->with('ssl-aware-database-general-components');
 
 it('reloads the mysql database model when refreshing so ssl controls follow the latest status', function () {

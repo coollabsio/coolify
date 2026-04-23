@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Project\Database;
 
-use Auth;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -20,11 +19,7 @@ class Configuration extends Component
 
     public function getListeners()
     {
-        $teamId = Auth::user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
-        ];
+        return [];
     }
 
     public function mount()

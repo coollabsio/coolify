@@ -60,7 +60,6 @@ class General extends Component
         return [
             "echo-private:team.{$teamId},DatabaseProxyStopped" => 'databaseProxyStopped',
             "echo-private:user.{$userId},DatabaseStatusChanged" => 'refresh',
-            "echo-private:team.{$teamId},ServiceChecked" => 'refresh',
         ];
     }
 

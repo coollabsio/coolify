@@ -4,7 +4,6 @@ namespace App\Livewire\Project\Service;
 
 use App\Models\Service;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class Configuration extends Component
@@ -29,10 +28,7 @@ class Configuration extends Component
 
     public function getListeners()
     {
-        $teamId = Auth::user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ServiceChecked" => 'serviceChecked',
             'refreshServices' => 'refreshServices',
             'refresh' => 'refreshServices',
         ];
@@ -101,20 +97,6 @@ class Configuration extends Component
                 $database->restart();
                 $this->dispatch('success', 'Service database restarted successfully.');
             }
-        } catch (\Exception $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function serviceChecked()
-    {
-        try {
-            $this->service->applications->each(function ($application) {
-                $application->refresh();
-            });
-            $this->service->databases->each(function ($database) {
-                $database->refresh();
-            });
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

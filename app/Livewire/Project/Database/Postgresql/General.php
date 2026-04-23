@@ -71,11 +71,9 @@ class General extends Component
     public function getListeners()
     {
         $userId = Auth::id();
-        $teamId = Auth::user()->currentTeam()->id;
 
         return [
             "echo-private:user.{$userId},DatabaseStatusChanged" => 'refresh',
-            "echo-private:team.{$teamId},ServiceChecked" => 'refresh',
             'save_init_script',
             'delete_init_script',
         ];
