@@ -7459,7 +7459,7 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#\/components\/schemas\/Application"
+                                        "$ref": "#\/components\/schemas\/ApplicationDeploymentQueue"
                                     }
                                 }
                             }
