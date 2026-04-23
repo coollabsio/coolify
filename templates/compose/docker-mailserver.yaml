@@ -1,0 +1,35 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Production-ready full-stack mail server with Postfix, Dovecot, Anti-spam and Anti-virus.
+# category: email
+# tags: mail,email,smtp,imap,postfix,dovecot,spamassassin
+# logo: svgs/mailpit.svg
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    volumes:
+      - maildata:/var/mail
+      - mailstate:/var/mail-state
+      - maillogs:/var/log/mail
+      - config:/tmp/docker-mailserver
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+      - "995:995"
+    environment:
+      - ENABLE_SPAMASSASSIN=1
+      - SPAMASSASSIN_SPAM_TO_INBOX=1
+      - ENABLE_CLAMAV=0
+      - ENABLE_FAIL2BAN=1
+      - ENABLE_POSTGREY=1
+      - POSTMASTER_ADDRESS=postmaster@${DOMAIN}
+      - OVERRIDE_HOSTNAME=${DOMAIN}
+    hostname: mail
+    domainname: ${DOMAIN}
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep master > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
