@@ -72,5 +72,5 @@ services:
   postfix:
     image: mwader/postfix-relay
     environment:
-      - POSTFIX_myhostname=${PEERTUBE_WEBSERVER_HOSTNAME:-example.com}
+      - POSTFIX_myhostname=${SERVICE_FQDN_PEERTUBE}
     restart: always
