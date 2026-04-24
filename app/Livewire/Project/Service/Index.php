@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Support\ContainerInfo;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,8 @@ class Index extends Component
     public ?string $resourceType = null;
 
     public ?string $currentRoute = null;
+
+    public ?array $containerInfo = null;
 
     public array $parameters;
 
@@ -132,6 +135,7 @@ class Index extends Component
                 $this->serviceDatabase->getFilesFromServer();
                 $this->initializeDatabaseProperties();
             }
+            $this->loadContainerInfo();
             $this->s3s = currentTeam()->s3s;
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -151,6 +155,26 @@ class Index extends Component
         $dbType = $this->serviceDatabase->databaseType();
         $supportedTypes = ['mysql', 'mariadb', 'postgres', 'mongo'];
         $this->isImportSupported = collect($supportedTypes)->contains(fn ($type) => str_contains($dbType, $type));
+    }
+
+    private function loadContainerInfo(): void
+    {
+        if (! $this->server || $this->server->isSwarm()) {
+            return;
+        }
+
+        $command = match ($this->resourceType) {
+            'application' => $this->serviceApplication ? ContainerInfo::inspectCommandForServiceSub($this->serviceApplication->id) : null,
+            'database' => $this->serviceDatabase ? ContainerInfo::inspectCommandForServiceSub($this->serviceDatabase->id) : null,
+            default => null,
+        };
+
+        if (blank($command)) {
+            return;
+        }
+
+        $inspect = instant_remote_process([$command], $this->server, false);
+        $this->containerInfo = ContainerInfo::fromDockerInspect($inspect);
     }
 
     private function syncDatabaseData(bool $toModel = false): void
@@ -329,6 +353,7 @@ class Index extends Component
     // Application-specific methods
     private function initializeApplicationProperties(): void
     {
+        $this->server = $this->serviceApplication->service->destination->server;
         $this->requiredPort = $this->serviceApplication->getRequiredPort();
         $this->syncApplicationData(false);
     }

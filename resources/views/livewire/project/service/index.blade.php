@@ -49,6 +49,7 @@
                             instantSave="instantSaveApplicationAdvanced" id="isLogDrainEnabled" label="Drain Logs" />
                     </div>
                 @else
+                    <x-container-info :container-info="$containerInfo" />
                     <form wire:submit='submitApplication'>
                         <div class="flex items-center gap-2 pb-4">
                             @if ($serviceApplication->human_name)
@@ -196,6 +197,7 @@
                             instantSave="instantSaveLogDrain" id="isLogDrainEnabled" label="Drain Logs" />
                     </div>
                 @else
+                    <x-container-info :container-info="$containerInfo" />
                     <form wire:submit='submitDatabase'>
                         <div class="flex items-center gap-2 pb-4">
                             @if ($serviceDatabase->human_name)

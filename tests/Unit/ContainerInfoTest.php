@@ -37,3 +37,19 @@ it('normalizes docker inspect data for display', function () {
         'ipv6_addresses' => ['fd00::5'],
     ]);
 });
+
+it('builds a docker inspect command for applications', function () {
+    expect(ContainerInfo::inspectCommandForApplication(42))
+        ->toContain('coolify.applicationId=42')
+        ->toContain('docker ps --filter')
+        ->toContain('docker ps -a --filter')
+        ->toContain('docker inspect');
+});
+
+it('builds a docker inspect command for service sub resources', function () {
+    expect(ContainerInfo::inspectCommandForServiceSub(99))
+        ->toContain('coolify.service.subId=99')
+        ->toContain('docker ps --filter')
+        ->toContain('docker ps -a --filter')
+        ->toContain('docker inspect');
+});

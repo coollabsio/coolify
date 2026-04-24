@@ -38,6 +38,21 @@ class ContainerInfo
         ];
     }
 
+    public static function inspectCommandForApplication(int $applicationId): string
+    {
+        return self::inspectCommandForLabel("coolify.applicationId={$applicationId}");
+    }
+
+    public static function inspectCommandForServiceSub(int $serviceSubId): string
+    {
+        return self::inspectCommandForLabel("coolify.service.subId={$serviceSubId}");
+    }
+
+    private static function inspectCommandForLabel(string $label): string
+    {
+        return "CONTAINER_ID=\$(docker ps --filter='label={$label}' --format '{{.ID}}' | head -n 1); if [ -z \"\$CONTAINER_ID\" ]; then CONTAINER_ID=\$(docker ps -a --filter='label={$label}' --format '{{.ID}}' | head -n 1); fi; if [ -n \"\$CONTAINER_ID\" ]; then docker inspect \"\$CONTAINER_ID\"; fi";
+    }
+
     private static function filledTimestamp(mixed $value): ?string
     {
         if (blank($value) || $value === '0001-01-01T00:00:00Z') {
