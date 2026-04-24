@@ -5,7 +5,6 @@
 # logo: svgs/peertube.svg
 # port: 9000
 
-# IMPORTANT: Set PEERTUBE_WEBSERVER_HOSTNAME to your domain before deploying.
 
 services:
   peertube:
