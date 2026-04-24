@@ -8,7 +8,7 @@
 
 services:
   peertube:
-    image: chocobozzz/peertube:production
+    image: chocobozzz/peertube:v8.1.5 # Released on April 23 2026
     environment:
       - SERVICE_URL_PEERTUBE_9000
       - PEERTUBE_WEBSERVER_HOSTNAME=${SERVICE_FQDN_PEERTUBE}
