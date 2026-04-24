@@ -5,6 +5,7 @@
         return this.initLoadingCompose || !this.canUpdate;
     }
 }">
+    <x-container-info :container-info="$containerInfo" />
     <form wire:submit='submit' class="flex flex-col pb-32">
         <div class="flex items-center gap-2">
             <h2>General</h2>

@@ -24,6 +24,18 @@ namespace App\Livewire\Project\Service {
     }
 }
 
+namespace App\Livewire\Project\Application {
+    use App\Livewire\Project\Service\ContainerInfoTestSpy;
+    use App\Models\Server;
+
+    function instant_remote_process(array $command, Server $server, bool $throwError = true): ?string
+    {
+        ContainerInfoTestSpy::$commands[] = $command[0] ?? null;
+
+        return ContainerInfoTestSpy::$inspectResponse;
+    }
+}
+
 namespace App\Models {
     function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Application $oneService, bool $isInit = false): void {}
 }
@@ -31,6 +43,7 @@ namespace App\Models {
 namespace {
 
     use App\Livewire\Project\Service\ContainerInfoTestSpy;
+    use App\Models\Application;
     use App\Models\Environment;
     use App\Models\InstanceSettings;
     use App\Models\PrivateKey;
@@ -81,6 +94,13 @@ namespace {
 
         $this->environment = Environment::factory()->create([
             'project_id' => $this->project->id,
+        ]);
+
+        $this->application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'status' => 'running',
         ]);
 
         $this->service = Service::factory()->create([
@@ -188,6 +208,46 @@ namespace {
             ->toContain("coolify.serviceId={$this->service->id}")
             ->toContain('coolify.service.subType=database')
             ->toContain("coolify.service.subId={$serviceDatabase->id}");
+    });
+
+    it('loads container info for standalone application general routes using the application label selector', function () {
+        ContainerInfoTestSpy::$inspectResponse = json_encode([[
+            'Id' => 'application-container-id',
+            'Name' => '/standalone-application',
+            'Config' => ['Image' => 'ghcr.io/example/app:9.9.9'],
+            'Created' => '2026-04-24T12:34:56.123456789Z',
+            'State' => ['StartedAt' => '2026-04-24T12:35:10.987654321Z'],
+            'NetworkSettings' => ['Networks' => ['coolify' => ['IPAddress' => '172.18.0.7', 'GlobalIPv6Address' => '']]],
+        ]]);
+
+        $response = $this->get(route('project.application.configuration', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'application_uuid' => $this->application->uuid,
+        ]));
+
+        $response->assertOk()
+            ->assertSee('Container Info')
+            ->assertSee('standalone-application')
+            ->assertSee('Copy container ID')
+            ->assertSee('Copy IPv4 address');
+
+        expect(ContainerInfoTestSpy::$commands)
+            ->toHaveCount(1)
+            ->and(ContainerInfoTestSpy::$commands[0])
+            ->toContain("coolify.applicationId={$this->application->id}");
+    });
+
+    it('does not inspect standalone application containers on advanced routes that do not render the card', function () {
+        $response = $this->get(route('project.application.advanced', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'application_uuid' => $this->application->uuid,
+        ]));
+
+        $response->assertOk()->assertDontSee('Container Info');
+
+        expect(ContainerInfoTestSpy::$commands)->toBeEmpty();
     });
 
     it('skips the remote container inspect when the advanced route does not render the container card', function () {

@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Application\GenerateConfig;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
+use App\Support\ContainerInfo;
 use App\Support\ValidationPatterns;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -23,6 +24,8 @@ class General extends Component
     public Application $application;
 
     public Collection $services;
+
+    public ?array $containerInfo = null;
 
     public string $name;
 
@@ -341,6 +344,22 @@ class General extends Component
         // Sync data from model to properties at the END, after all business logic
         // This ensures any modifications to $this->application during mount() are reflected in properties
         $this->syncData();
+        $this->loadContainerInfo();
+    }
+
+    private function loadContainerInfo(): void
+    {
+        $server = $this->application->destination?->server;
+
+        if (request()->route()?->getName() !== 'project.application.configuration' || ! $server || $server->isSwarm()) {
+            return;
+        }
+
+        $inspect = instant_remote_process([
+            ContainerInfo::inspectCommandForApplication($this->application->id),
+        ], $server, false);
+
+        $this->containerInfo = ContainerInfo::fromDockerInspect($inspect);
     }
 
     public function syncData(bool $toModel = false): void
