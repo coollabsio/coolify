@@ -235,7 +235,8 @@ namespace {
         expect(ContainerInfoTestSpy::$commands)
             ->toHaveCount(1)
             ->and(ContainerInfoTestSpy::$commands[0])
-            ->toContain("coolify.applicationId={$this->application->id}");
+            ->toContain("coolify.applicationId={$this->application->id}")
+            ->toContain('coolify.pullRequestId=0');
     });
 
     it('does not inspect standalone application containers on advanced routes that do not render the card', function () {

@@ -38,9 +38,10 @@ it('normalizes docker inspect data for display', function () {
     ]);
 });
 
-it('builds a docker inspect command for applications', function () {
+it('builds a docker inspect command for base application containers only', function () {
     expect(ContainerInfo::inspectCommandForApplication(42))
         ->toContain('coolify.applicationId=42')
+        ->toContain('coolify.pullRequestId=0')
         ->toContain('docker ps --filter')
         ->toContain('docker ps -a --filter')
         ->toContain('docker inspect');
