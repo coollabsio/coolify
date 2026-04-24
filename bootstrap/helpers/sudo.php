@@ -112,14 +112,14 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
             $line = $line->replace('$(', '$(sudo ');
         }
         if (! $isComplexPipeCommand && str($line)->contains('||')) {
-            $line = $line->replace('||', '|| sudo');
+            $line = str(preg_replace('/\|\|(\s+)(?!sudo\s)/', '||$1sudo ', $line->value()));
         }
         if (! $isComplexPipeCommand && str($line)->contains('&&')) {
-            $line = $line->replace('&&', '&& sudo');
+            $line = str(preg_replace('/&&(\s+)(?!sudo\s)/', '&&$1sudo ', $line->value()));
         }
         // Don't insert sudo into pipes for complex commands
         if (! $isComplexPipeCommand && str($line)->contains(' | ')) {
-            $line = $line->replace(' | ', ' | sudo ');
+            $line = str(preg_replace('/ \| (?!sudo\s)/', ' | sudo ', $line->value()));
         }
 
         return $line->value();

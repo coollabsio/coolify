@@ -183,9 +183,7 @@ test('adds ownership changes for Coolify data paths', function () {
 
     $result = parseCommandsByLineForSudo($commands, $this->server);
 
-    // Note: The && operator adds another sudo, creating double sudo for chown/chmod
-    // This is existing behavior that may need refactoring but isn't part of this bug fix
-    expect($result[0])->toBe('sudo mkdir -p /data/coolify/logs && sudo sudo chown -R ubuntu:ubuntu /data/coolify/logs && sudo sudo chmod -R o-rwx /data/coolify/logs');
+    expect($result[0])->toBe('sudo mkdir -p /data/coolify/logs && sudo chown -R ubuntu:ubuntu /data/coolify/logs && sudo chmod -R o-rwx /data/coolify/logs');
 });
 
 test('adds ownership changes for Coolify tmp paths', function () {
@@ -195,9 +193,7 @@ test('adds ownership changes for Coolify tmp paths', function () {
 
     $result = parseCommandsByLineForSudo($commands, $this->server);
 
-    // Note: The && operator adds another sudo, creating double sudo for chown/chmod
-    // This is existing behavior that may need refactoring but isn't part of this bug fix
-    expect($result[0])->toBe('sudo mkdir -p /tmp/coolify/cache && sudo sudo chown -R ubuntu:ubuntu /tmp/coolify/cache && sudo sudo chmod -R o-rwx /tmp/coolify/cache');
+    expect($result[0])->toBe('sudo mkdir -p /tmp/coolify/cache && sudo chown -R ubuntu:ubuntu /tmp/coolify/cache && sudo chmod -R o-rwx /tmp/coolify/cache');
 });
 
 test('does not add ownership changes for system paths', function () {
@@ -620,4 +616,91 @@ test('do keyword with word boundary is not given sudo', function () {
     $result = parseCommandsByLineForSudo($commands, $this->server);
 
     expect($result[0])->toBe('do');
+});
+
+// ---------------------------------------------------------------------------
+// Regression tests: prevent double sudo in operator replacements
+//
+// Root cause: the third map pass replaced every `&&`, `||`, and ` | ` with
+// `&& sudo`, `|| sudo`, and ` | sudo ` — even when the next token was already
+// `sudo` (produced by the second map pass that appended `&& sudo chown ...`).
+// Fix: use a negative lookahead so sudo is only inserted when not already present.
+// ---------------------------------------------------------------------------
+
+test('does not produce double sudo after && when chown already starts with sudo', function () {
+    // The second map pass produces:
+    //   sudo mkdir -p /data/coolify/proxy && sudo chown -R ubuntu:ubuntu ... && sudo chmod -R o-rwx ...
+    // The third map pass must NOT turn `&& sudo` into `&& sudo sudo`.
+    $commands = collect([
+        'mkdir -p /data/coolify/proxy',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->not->toContain('sudo sudo');
+    expect($result[0])->toBe('sudo mkdir -p /data/coolify/proxy && sudo chown -R ubuntu:ubuntu /data/coolify/proxy && sudo chmod -R o-rwx /data/coolify/proxy');
+});
+
+test('does not produce double sudo when input already contains && sudo', function () {
+    // Simulate a line that already has `&& sudo` tokens (e.g. pre-built by another pass).
+    $commands = collect([
+        'sudo mkdir -p /data/coolify/test && sudo chown -R ubuntu:ubuntu /data/coolify/test && sudo chmod -R o-rwx /data/coolify/test',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->not->toContain('sudo sudo');
+    expect($result[0])->toBe('sudo mkdir -p /data/coolify/test && sudo chown -R ubuntu:ubuntu /data/coolify/test && sudo chmod -R o-rwx /data/coolify/test');
+});
+
+test('does not produce double sudo after || when next token is already sudo', function () {
+    $commands = collect([
+        'sudo docker stop proxy 2>/dev/null || sudo true',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->not->toContain('sudo sudo');
+    expect($result[0])->toBe('sudo docker stop proxy 2>/dev/null || sudo true');
+});
+
+test('does not produce double sudo after pipe when next token is already sudo', function () {
+    $commands = collect([
+        'sudo cat file | sudo grep pattern',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->not->toContain('sudo sudo');
+    expect($result[0])->toBe('sudo cat file | sudo grep pattern');
+});
+
+test('still injects sudo after && when next token is not sudo', function () {
+    $commands = collect([
+        'mkdir -p /foo && chown ubuntu /foo',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo mkdir -p /foo && sudo chown ubuntu /foo');
+});
+
+test('still injects sudo after || when next token is not sudo', function () {
+    $commands = collect([
+        'sudo docker stop proxy 2>/dev/null || true',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo docker stop proxy 2>/dev/null || sudo true');
+});
+
+test('still injects sudo after pipe when next token is not sudo', function () {
+    $commands = collect([
+        'sudo cat file | grep pattern',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo cat file | sudo grep pattern');
 });
