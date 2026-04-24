@@ -1,4 +1,6 @@
 <div>
+    <x-resources.edit-aware-polling-scripts />
+
     <x-slot:title>
         {{ data_get_str($service, 'name')->limit(10) }} > Configuration | Coolify
     </x-slot>
@@ -27,7 +29,7 @@
             <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
                 href="{{ route('project.service.danger', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Danger Zone</span></a>
         </div>
-        <div class="w-full">
+        <div class="w-full" x-data="coolifyFormFocusTracker()" @focusin="startEditing()" @focusout="finishEditing()">
             @if ($currentRoute === 'project.service.configuration')
                 <livewire:project.service.stack-form :service="$service" />
                 <h3>Services</h3>

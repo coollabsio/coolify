@@ -1,4 +1,9 @@
-<div wire:poll.10000ms="checkStatus" class="pb-6">
+<x-resources.edit-aware-polling-scripts />
+
+<div x-data="coolifyEditAwarePoller($wire, 'checkStatus')"
+    @coolify-form-editing-started.window="pause()"
+    @coolify-form-editing-finished.window="resumeAndRefresh()"
+    class="pb-6">
     <livewire:project.shared.configuration-checker :resource="$service" />
     <x-slide-over @startservice.window="slideOverOpen = true" closeWithX fullScreen>
         <x-slot:title>Service Startup</x-slot:title>

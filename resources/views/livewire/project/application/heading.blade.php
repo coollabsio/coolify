@@ -1,4 +1,9 @@
-<nav wire:poll.10000ms="checkStatus" class="pb-6">
+<x-resources.edit-aware-polling-scripts />
+
+<nav x-data="coolifyEditAwarePoller($wire, 'checkStatus')"
+    @coolify-form-editing-started.window="pause()"
+    @coolify-form-editing-finished.window="resumeAndRefresh()"
+    class="pb-6">
     <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
     <div class="navbar-main">
         <nav

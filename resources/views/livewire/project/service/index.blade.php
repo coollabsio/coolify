@@ -1,4 +1,6 @@
 <div>
+    <x-resources.edit-aware-polling-scripts />
+
     <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="$query" />
     <div class="flex flex-col h-full gap-8 sm:flex-row">
         @if ($resourceType === 'database')
@@ -20,7 +22,7 @@
                     href="{{ route('project.service.index.advanced', $parameters) }}"><span class="menu-item-label">Advanced</span></a>
             </div>
         @endif
-        <div class="w-full">
+        <div class="w-full" x-data="coolifyFormFocusTracker()" @focusin="startEditing()" @focusout="finishEditing()">
             @if ($resourceType === 'application')
                 <x-slot:title>
                     {{ data_get_str($service, 'name')->limit(10) }} >

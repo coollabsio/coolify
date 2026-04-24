@@ -1,4 +1,6 @@
 <div>
+    <x-resources.edit-aware-polling-scripts />
+
     <x-slot:title>
         {{ data_get_str($application, 'name')->limit(10) }} > Configuration | Coolify
     </x-slot>
@@ -68,7 +70,8 @@
             <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.application.danger', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Danger Zone</span></a>
         </div>
-        <div class="w-full sm:flex-grow">
+        <div class="w-full sm:flex-grow" x-data="coolifyFormFocusTracker()" @focusin="startEditing()"
+            @focusout="finishEditing()">
             @if ($currentRoute === 'project.application.configuration')
                 <livewire:project.application.general :application="$application" />
             @elseif ($currentRoute === 'project.application.swarm' && $application->destination->server->isSwarm())

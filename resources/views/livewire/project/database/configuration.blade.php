@@ -1,4 +1,6 @@
 <div>
+    <x-resources.edit-aware-polling-scripts />
+
     <x-slot:title>
         {{ data_get_str($database, 'name')->limit(10) }} > Configuration | Coolify
     </x-slot>
@@ -32,7 +34,7 @@
             <a class='sub-menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.database.danger', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"><span class="menu-item-label">Danger Zone</span></a>
         </div>
-        <div class="w-full">
+        <div class="w-full" x-data="coolifyFormFocusTracker()" @focusin="startEditing()" @focusout="finishEditing()">
             @if ($currentRoute === 'project.database.configuration')
                 @if ($database->type() === 'standalone-postgresql')
                     <livewire:project.database.postgresql.general :database="$database" />
