@@ -1,0 +1,45 @@
+# documentation: https://github.com/systempromptio/systemprompt-template/blob/main/docs/install/coolify.md
+# slogan: Self-hosted AI governance gateway — route Claude, OpenAI, and Gemini through one audited endpoint. Every tool call authenticated, scoped, secret-scanned, rate-limited.
+# category: ai
+# tags: ai, governance, gateway, llm, anthropic, openai, gemini, mcp, security, audit, self-hosted
+# logo: svgs/systemprompt.svg
+# port: 8080
+
+services:
+  systemprompt-gateway:
+    image: ghcr.io/systempromptio/systemprompt-template:latest
+    environment:
+      - SERVICE_URL_SYSTEMPROMPT_8080
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-systemprompt}
+      - HOST=0.0.0.0
+      - HTTP_PORT=8080
+      - RUST_LOG=${RUST_LOG:-info}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - JWT_SECRET=${SERVICE_PASSWORD_JWTSECRET}
+    volumes:
+      - systemprompt-storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/v1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-systemprompt}
+    volumes:
+      - systemprompt-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SERVICE_USER_POSTGRES} -d ${POSTGRES_DB:-systemprompt}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
