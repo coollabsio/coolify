@@ -1,3 +1,5 @@
+@props(['helper', 'icon' => null, 'popupClass' => ''])
+
 <div {{ $attributes->merge(['class' => 'group']) }}>
     <div class="info-helper">
         @isset($icon)
@@ -10,7 +12,7 @@
         @endisset
 
     </div>
-    <div class="info-helper-popup">
+    <div class="{{ trim('info-helper-popup '.$popupClass) }}">
         <div class="p-4">
             {!! $helper !!}
         </div>

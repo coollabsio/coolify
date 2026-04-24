@@ -48,34 +48,43 @@
         <h3>Settings</h3>
         <div class="flex gap-2 flex-col ">
             @if ($backup->database_type === 'App\Models\StandalonePostgresql' && $backup->database_id !== 0)
-                <div class="w-48">
-                    <x-forms.checkbox label="Backup All Databases" id="dumpAll" instantSave />
+                <div class="w-64">
+                    <x-forms.checkbox label="Backup All Databases" id="dumpAll" instantSave fullWidth
+                        helper="When enabled, dumps every database in the cluster via pg_dumpall." />
                 </div>
                 @if (!$backup->dump_all)
-                    <x-forms.input label="Databases To Backup"
-                        helper="Comma separated list of databases to backup. Empty will include the default one."
+                    <x-forms.input label="Databases To Backup" required
+                        helper="Comma separated list of databases to backup. Each database is dumped individually and bundled into a single .tar.gz archive."
                         id="databasesToBackup" />
                 @endif
             @elseif($backup->database_type === 'App\Models\StandaloneMongodb')
-                <x-forms.input label="Databases To Include"
-                    helper="A list of databases to backup. You can specify which collection(s) per database to exclude from the backup. Empty will include all databases and collections.<br><br>Example:<br><br>database1:collection1,collection2|database2:collection3,collection4<br><br> database1 will include all collections except collection1 and collection2. <br>database2 will include all collections except collection3 and collection4.<br><br>Another Example:<br><br>database1:collection1|database2<br><br> database1 will include all collections except collection1.<br>database2 will include ALL collections."
-                    id="databasesToBackup" />
-            @elseif($backup->database_type === 'App\Models\StandaloneMysql')
-                <div class="w-48">
-                    <x-forms.checkbox label="Backup All Databases" id="dumpAll" instantSave />
+                <div class="w-64">
+                    <x-forms.checkbox label="Backup All Databases" id="dumpAll" instantSave fullWidth
+                        helper="When enabled, dumps every database in the cluster via mongodump --archive." />
                 </div>
                 @if (!$backup->dump_all)
-                    <x-forms.input label="Databases To Backup"
-                        helper="Comma separated list of databases to backup. Empty will include the default one."
+                    <x-forms.input label="Databases To Include" required
+                        helper="Pipe separated list of databases to back up. You can optionally exclude collections per database with the format <code>database:collection1,collection2</code>.<br><br>Example:<br><br><code>database1:collection1,collection2|database2:collection3,collection4</code><br><br><code>database1</code> will exclude <code>collection1</code> and <code>collection2</code>.<br><code>database2</code> will exclude <code>collection3</code> and <code>collection4</code>.<br><br>Another example:<br><br><code>database1:collection1|database2</code><br><br><code>database1</code> will exclude <code>collection1</code>.<br><code>database2</code> will include all collections."
+                        id="databasesToBackup" />
+                @endif
+            @elseif($backup->database_type === 'App\Models\StandaloneMysql')
+                <div class="w-64">
+                    <x-forms.checkbox label="Backup All Databases" id="dumpAll" instantSave fullWidth
+                        helper="When enabled, dumps every database in the cluster via mysqldump --all-databases." />
+                </div>
+                @if (!$backup->dump_all)
+                    <x-forms.input label="Databases To Backup" required
+                        helper="Comma separated list of databases to backup. Each database is dumped individually and bundled into a single .tar.gz archive."
                         id="databasesToBackup" />
                 @endif
             @elseif($backup->database_type === 'App\Models\StandaloneMariadb')
-                <div class="w-48">
-                    <x-forms.checkbox label="Backup All Databases" id="dumpAll" instantSave />
+                <div class="w-64">
+                    <x-forms.checkbox label="Backup All Databases" id="dumpAll" instantSave fullWidth
+                        helper="When enabled, dumps every database in the cluster via mariadb-dump --all-databases." />
                 </div>
                 @if (!$backup->dump_all)
-                    <x-forms.input label="Databases To Backup"
-                        helper="Comma separated list of databases to backup. Empty will include the default one."
+                    <x-forms.input label="Databases To Backup" required
+                        helper="Comma separated list of databases to backup. Each database is dumped individually and bundled into a single .tar.gz archive."
                         id="databasesToBackup" />
                 @endif
             @endif

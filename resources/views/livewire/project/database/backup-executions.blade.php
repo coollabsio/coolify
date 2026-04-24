@@ -66,6 +66,13 @@
                             @endphp
                             {{ $statusText }}
                         </span>
+                        @if (data_get($execution, 'legacy'))
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium leading-normal rounded-full bg-warning/15 text-warning border border-warning/30">
+                                <span>Legacy</span>
+                                <x-helper class="relative" popupClass="w-xl max-w-xl left-0"
+                                    helper="This is a legacy backup. It was created before <code class='whitespace-nowrap'>v4.0.0-beta.474</code>. Multiple databases were backed up separately before that version. They are now stored in a single archive to simplify backup and restore, and to prepare for v5." />
+                            </span>
+                        @endif
                     </div>
                     <div class="text-gray-600 dark:text-gray-400 text-sm">
                         @if (data_get($execution, 'status') === 'running')
@@ -79,9 +86,11 @@
                                 • {{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->format('M j, H:i') }}
                             </span>
                         @endif
-                        • Database: {{ data_get($execution, 'database_name', 'N/A') }}
                         @if(data_get($execution, 'size'))
                             • Size: {{ formatBytes(data_get($execution, 'size')) }}
+                        @endif
+                        @if (filled(data_get($execution, 'databases')))
+                            • Databases: {{ data_get($execution, 'databases') }}
                         @endif
                     </div>
                     <div class="text-gray-600 dark:text-gray-400 text-sm">

@@ -69,11 +69,11 @@ class BackupEdit extends Component
     #[Validate(['nullable', 'integer'])]
     public ?int $s3StorageId = 1;
 
-    #[Validate(['nullable', 'string'])]
+    #[Validate(['nullable', 'string', 'required_if:dumpAll,false'], message: ['required_if' => 'Please make sure to specify the databases to back up when disabling "Backup All Databases".'])]
     public ?string $databasesToBackup = null;
 
     #[Validate(['required', 'boolean'])]
-    public bool $dumpAll = false;
+    public bool $dumpAll = true;
 
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int|string $timeout = 3600;

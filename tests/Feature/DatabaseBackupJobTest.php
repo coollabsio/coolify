@@ -133,7 +133,7 @@ test('failed method does not overwrite successful backup status', function () {
 
     $log = ScheduledDatabaseBackupExecution::create([
         'uuid' => 'test-uuid-success-guard',
-        'database_name' => 'test_db',
+        'databases' => 'test_db',
         'filename' => '/backup/test.dmp',
         'scheduled_database_backup_id' => $backup->id,
         'status' => 'success',
@@ -157,7 +157,7 @@ test('failed method does not overwrite successful backup status', function () {
     $log->refresh();
     expect($log->status)->toBe('success');
     expect($log->message)->toBe('Backup completed successfully');
-    expect($log->size)->toBe(1024);
+    expect((int) $log->size)->toBe(1024);
 });
 
 test('failed method updates status when backup was not successful', function () {
@@ -173,7 +173,7 @@ test('failed method updates status when backup was not successful', function () 
 
     $log = ScheduledDatabaseBackupExecution::create([
         'uuid' => 'test-uuid-pending-guard',
-        'database_name' => 'test_db',
+        'databases' => 'test_db',
         'filename' => '/backup/test.dmp',
         'scheduled_database_backup_id' => $backup->id,
         'status' => 'pending',

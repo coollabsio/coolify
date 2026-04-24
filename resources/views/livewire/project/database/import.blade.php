@@ -60,40 +60,37 @@
         </div>
         @if (str($resourceStatus)->startsWith('running'))
             {{-- Restore Command Configuration --}}
-            @if ($resourceDbType === 'standalone-postgresql')
-                @if ($dumpAll)
-                    <x-forms.textarea rows="6" readonly label="Custom Import Command"
-                        wire:model='restoreCommandText'></x-forms.textarea>
-                @else
-                    <x-forms.input label="Custom Import Command" wire:model='postgresqlRestoreCommand'></x-forms.input>
-                    <div class="flex flex-col gap-1 pt-1">
-                        <span class="text-xs">You can add "--clean" to drop objects before creating them, avoiding
-                            conflicts.</span>
-                        <span class="text-xs">You can add "--verbose" to log more things.</span>
+            @if (in_array($resourceDbType, ['standalone-postgresql', 'standalone-mysql', 'standalone-mariadb', 'standalone-mongodb']))
+                <div class="flex flex-col gap-2 pt-2">
+                    <div class="w-full max-w-xl">
+                        <x-forms.select label="Restore Mode" wire:model.live="restoreMode">
+                            <option value="dump_all">Restore all databases (dumpall-*.sql.gz / dumpall-*.tar.gz)</option>
+                            <option value="archive">Restore database(s) (dbs-*.tar.gz)</option>
+                            <option value="legacy">Restore legacy backup files (.sql or .dmp)</option>
+                        </x-forms.select>
                     </div>
-                @endif
-                <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
-                </div>
-            @elseif ($resourceDbType === 'standalone-mysql')
-                @if ($dumpAll)
-                    <x-forms.textarea rows="14" readonly label="Custom Import Command"
-                        wire:model='restoreCommandText'></x-forms.textarea>
-                @else
-                    <x-forms.input label="Custom Import Command" wire:model='mysqlRestoreCommand'></x-forms.input>
-                @endif
-                <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
-                </div>
-            @elseif ($resourceDbType === 'standalone-mariadb')
-                @if ($dumpAll)
-                    <x-forms.textarea rows="14" readonly label="Custom Import Command"
-                        wire:model='restoreCommandText'></x-forms.textarea>
-                @else
-                    <x-forms.input label="Custom Import Command" wire:model='mariadbRestoreCommand'></x-forms.input>
-                @endif
-                <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
+
+                    @php
+                        $databasesToRestoreHelper = $importDatabases
+                            ? 'Enter a comma separated list of databases to restore. The archive can contain 1 or more separate database backup files.'
+                            : 'Enter exactly one database name to restore this legacy backup file into.';
+                    @endphp
+
+                    @if ($importDatabases || $legacySingleDb)
+                        <x-forms.input label="Databases to restore" id="databasesToRestore" required
+                            :helper="$databasesToRestoreHelper" />
+                    @endif
+
+                    @if ($resourceDbType === 'standalone-postgresql')
+                        <x-forms.textarea rows="8" label="Import Command" wire:model='postgresqlRestoreCommand'></x-forms.textarea>
+                    @elseif ($resourceDbType === 'standalone-mysql')
+                        <x-forms.textarea rows="8" label="Import Command" wire:model='mysqlRestoreCommand'></x-forms.textarea>
+                    @elseif ($resourceDbType === 'standalone-mariadb')
+                        <x-forms.textarea rows="8" label="Import Command" wire:model='mariadbRestoreCommand'></x-forms.textarea>
+                    @elseif ($resourceDbType === 'standalone-mongodb')
+                        <x-forms.textarea rows="8" label="Import Command" wire:model='mongodbRestoreCommand'></x-forms.textarea>
+                    @endif
+
                 </div>
             @endif
 
