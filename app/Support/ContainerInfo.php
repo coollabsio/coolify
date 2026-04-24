@@ -40,7 +40,10 @@ class ContainerInfo
 
     public static function inspectCommandForApplication(int $applicationId): string
     {
-        return self::inspectCommandForLabel("coolify.applicationId={$applicationId}");
+        return self::inspectCommandForLabels([
+            "coolify.applicationId={$applicationId}",
+            'coolify.pullRequestId=0',
+        ]);
     }
 
     public static function inspectCommandForServiceSub(int $serviceId, string $serviceSubType, int $serviceSubId): string
