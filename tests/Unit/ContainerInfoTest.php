@@ -47,7 +47,9 @@ it('builds a docker inspect command for applications', function () {
 });
 
 it('builds a docker inspect command for service sub resources', function () {
-    expect(ContainerInfo::inspectCommandForServiceSub(99))
+    expect(ContainerInfo::inspectCommandForServiceSub(12, 'database', 99))
+        ->toContain('coolify.serviceId=12')
+        ->toContain('coolify.service.subType=database')
         ->toContain('coolify.service.subId=99')
         ->toContain('docker ps --filter')
         ->toContain('docker ps -a --filter')

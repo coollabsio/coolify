@@ -43,14 +43,30 @@ class ContainerInfo
         return self::inspectCommandForLabel("coolify.applicationId={$applicationId}");
     }
 
-    public static function inspectCommandForServiceSub(int $serviceSubId): string
+    public static function inspectCommandForServiceSub(int $serviceId, string $serviceSubType, int $serviceSubId): string
     {
-        return self::inspectCommandForLabel("coolify.service.subId={$serviceSubId}");
+        return self::inspectCommandForLabels([
+            "coolify.serviceId={$serviceId}",
+            "coolify.service.subType={$serviceSubType}",
+            "coolify.service.subId={$serviceSubId}",
+        ]);
     }
 
     private static function inspectCommandForLabel(string $label): string
     {
-        return "CONTAINER_ID=\$(docker ps --filter='label={$label}' --format '{{.ID}}' | head -n 1); if [ -z \"\$CONTAINER_ID\" ]; then CONTAINER_ID=\$(docker ps -a --filter='label={$label}' --format '{{.ID}}' | head -n 1); fi; if [ -n \"\$CONTAINER_ID\" ]; then docker inspect \"\$CONTAINER_ID\"; fi";
+        return self::inspectCommandForLabels([$label]);
+    }
+
+    /**
+     * @param  array<int, string>  $labels
+     */
+    private static function inspectCommandForLabels(array $labels): string
+    {
+        $filters = collect($labels)
+            ->map(fn (string $label) => "--filter='label={$label}'")
+            ->implode(' ');
+
+        return "CONTAINER_ID=\$(docker ps {$filters} --format '{{.ID}}' | head -n 1); if [ -z \"\$CONTAINER_ID\" ]; then CONTAINER_ID=\$(docker ps -a {$filters} --format '{{.ID}}' | head -n 1); fi; if [ -n \"\$CONTAINER_ID\" ]; then docker inspect \"\$CONTAINER_ID\"; fi";
     }
 
     private static function filledTimestamp(mixed $value): ?string

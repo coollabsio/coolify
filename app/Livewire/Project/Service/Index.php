@@ -159,13 +159,13 @@ class Index extends Component
 
     private function loadContainerInfo(): void
     {
-        if (! $this->server || $this->server->isSwarm()) {
+        if (! $this->shouldLoadContainerInfo()) {
             return;
         }
 
         $command = match ($this->resourceType) {
-            'application' => $this->serviceApplication ? ContainerInfo::inspectCommandForServiceSub($this->serviceApplication->id) : null,
-            'database' => $this->serviceDatabase ? ContainerInfo::inspectCommandForServiceSub($this->serviceDatabase->id) : null,
+            'application' => $this->serviceApplication ? ContainerInfo::inspectCommandForServiceSub($this->service->id, 'application', $this->serviceApplication->id) : null,
+            'database' => $this->serviceDatabase ? ContainerInfo::inspectCommandForServiceSub($this->service->id, 'database', $this->serviceDatabase->id) : null,
             default => null,
         };
 
@@ -175,6 +175,13 @@ class Index extends Component
 
         $inspect = instant_remote_process([$command], $this->server, false);
         $this->containerInfo = ContainerInfo::fromDockerInspect($inspect);
+    }
+
+    private function shouldLoadContainerInfo(): bool
+    {
+        return $this->currentRoute === 'project.service.index'
+            && $this->server
+            && ! $this->server->isSwarm();
     }
 
     private function syncDatabaseData(bool $toModel = false): void
