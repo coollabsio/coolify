@@ -116,10 +116,10 @@ describe('buildGitCheckoutCommand escaping', function () {
         $method = new ReflectionMethod($app, 'buildGitCheckoutCommand');
 
         $result = $method->invoke($app, 'abc123');
-        expect($result)->toContain("git checkout 'abc123'");
+        expect($result)->toContain("-c 'advice.detachedHead=false' checkout 'abc123'");
 
         $result = $method->invoke($app, "abc'; id; #");
         expect($result)->not->toContain('id;');
-        expect($result)->toContain("git checkout 'abc'");
+        expect($result)->toContain("-c 'advice.detachedHead=false' checkout 'abc'");
     });
 });
