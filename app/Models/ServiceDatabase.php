@@ -11,6 +11,7 @@ class ServiceDatabase extends BaseModel
 
     protected $fillable = [
         'service_id',
+        'application_id',
         'name',
         'human_name',
         'description',
@@ -52,7 +53,10 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                  ->orWhereRelation('application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -61,7 +65,10 @@ class ServiceDatabase extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        return ServiceDatabase::where(function ($query) {
+            $query->whereRelation('service.environment.project.team', 'id', currentTeam()->id)
+                  ->orWhereRelation('application.environment.project.team', 'id', currentTeam()->id);
+        })->orderBy('name');
     }
 
     /**
@@ -76,8 +83,9 @@ class ServiceDatabase extends BaseModel
 
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        $container_id = $this->name.'-'.$this->parent()->uuid;
+        $server = $this->parent() instanceof Application ? $this->parent()->destination->server : $this->parent()->server;
+        remote_process(["docker restart {$container_id}"], $server);
     }
 
     public function isRunning()
@@ -139,8 +147,9 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = $this->parent() instanceof Application ? $this->parent()->destination->server : $this->parent()->server;
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -149,17 +158,30 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'service.environment.project.team');
+        return data_get($this, 'service.environment.project.team') ?? data_get($this, 'application.environment.project.team');
     }
 
     public function workdir()
     {
+        if ($this->application) {
+            return base_configuration_dir()."/applications/{$this->application->uuid}";
+        }
         return service_configuration_dir()."/{$this->service->uuid}";
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
+    }
+
+    public function parent()
+    {
+        return $this->service ?? $this->application;
     }
 
     public function persistentStorages()
