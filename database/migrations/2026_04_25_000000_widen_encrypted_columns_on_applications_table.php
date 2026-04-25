@@ -13,10 +13,6 @@ return new class extends Migration
     {
         Schema::table('applications', function (Blueprint $table) {
             $table->text('http_basic_auth_password')->nullable()->default(null)->change();
-            $table->text('manual_webhook_secret_github')->nullable()->change();
-            $table->text('manual_webhook_secret_gitlab')->nullable()->change();
-            $table->text('manual_webhook_secret_bitbucket')->nullable()->change();
-            $table->text('manual_webhook_secret_gitea')->nullable()->change();
         });
     }
 
@@ -27,10 +23,6 @@ return new class extends Migration
     {
         Schema::table('applications', function (Blueprint $table) {
             $table->string('http_basic_auth_password')->nullable()->default(null)->change();
-            $table->string('manual_webhook_secret_github')->nullable()->change();
-            $table->string('manual_webhook_secret_gitlab')->nullable()->change();
-            $table->string('manual_webhook_secret_bitbucket')->nullable()->change();
-            $table->string('manual_webhook_secret_gitea')->nullable()->change();
         });
     }
 };
