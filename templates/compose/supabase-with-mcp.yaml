@@ -1,7 +1,7 @@
 # documentation: https://supabase.io
-# slogan: The open source Firebase alternative.
+# slogan: The open source Firebase alternative with MCP (Model Context Protocol) support for AI tools.
 # category: backend
-# tags: firebase, alternative, open-source
+# tags: firebase, alternative, open-source, mcp, ai
 # minversion: 4.0.0-beta.228
 # logo: svgs/supabase.svg
 # port: 8000
@@ -276,14 +276,12 @@ services:
                     allow:
                       - admin
 
-            ## MCP Server - local access only (security: do not expose to internet)
-            ## To enable MCP access:
-            ## 1. Set MCP_ALLOWED_IPS environment variable in Coolify (e.g., "- 172.18.0.1" for Docker bridge gateway)
-            ## 2. For SSH tunnel: add your Docker gateway IP (run: docker inspect supabase-kong --format '{{range .NetworkSettings.Networks}}{{println .Gateway}}{{end}}')
-            ## 3. For WireGuard: add your WireGuard client IPs (e.g., "- 10.0.0.0/24")
-            ## 4. Multiple instances: Each instance now has unique MCP path via /mcp/${COOLIFY_RESOURCE_UUID}
+            ## MCP Server - pre-enabled for AI tools (Cursor, Claude Code, Windsurf)
+            ## Security: MCP is accessible via SSH tunnel, WireGuard VPN, or local network
+            ## To restrict access further, set MCP_ALLOWED_IPS in Coolify environment variables
+            ## Multiple instances: Each instance has unique MCP path via /mcp/${COOLIFY_RESOURCE_UUID}
             - name: mcp
-              _comment: 'MCP: /mcp/${COOLIFY_RESOURCE_UUID} -> http://supabase-studio:3000/api/mcp (local access only)'
+              _comment: 'MCP: /mcp/${COOLIFY_RESOURCE_UUID} -> http://supabase-studio:3000/api/mcp (pre-enabled for AI tools)'
               url: http://supabase-studio:3000/api/mcp
               routes:
                 - name: mcp
@@ -297,6 +295,9 @@ services:
                     allow:
                       - 127.0.0.1
                       - ::1
+                      - 172.16.0.0/12
+                      - 192.168.0.0/16
+                      - 10.0.0.0/8
                       $MCP_ALLOWED_IPS
                     # Do not remove deny!
                     deny: []
