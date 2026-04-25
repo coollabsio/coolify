@@ -2997,6 +2997,21 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
 
+            if ($pull_request_id === 0 && $isDatabase) {
+                $savedDatabase = ServiceDatabase::where([
+                    'name' => $serviceName,
+                    'application_id' => $resource->id,
+                ])->first();
+                if (is_null($savedDatabase)) {
+                    ServiceDatabase::create([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'application_id' => $resource->id,
+                        'is_migrated' => true,
+                    ]);
+                }
+            }
+
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
@@ -3532,10 +3547,10 @@ function wireNavigate(): string
     try {
         $settings = instanceSettings();
 
-        // Return wire:navigate for SPA navigation with prefetching, or empty string if disabled
-        return ($settings->is_wire_navigate_enabled ?? true) ? 'wire:navigate' : '';
+        // Return wire:navigate.hover for SPA navigation with prefetching, or empty string if disabled
+        return ($settings->is_wire_navigate_enabled ?? true) ? 'wire:navigate.hover' : '';
     } catch (Exception $e) {
-        return 'wire:navigate';
+        return 'wire:navigate.hover';
     }
 }
 
