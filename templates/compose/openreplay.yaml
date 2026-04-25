@@ -1,0 +1,38 @@
+# documentation: https://docs.openreplay.com/
+# slogan: Open-source session replay and analytics.
+# tags: session-replay, analytics
+# port: 8080
+
+services:
+  postgresql:
+    image: ghcr.io/openreplay/postgres:${POSTGRES_VERSION}
+    volumes:
+      - pgdata:/bitnami/postgresql
+    environment:
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: ghcr.io/openreplay/valkey:${REDIS_VERSION}
+    volumes:
+      - redisdata:/data
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+
+  frontend-openreplay:
+    image: public.ecr.aws/p1t3u8a3/frontend:${COMMON_VERSION}
+    ports:
+      - "8080:80"
+    volumes:
+      - shared-volume:/mnt/efs
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  shared-volume:
