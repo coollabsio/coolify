@@ -43,9 +43,7 @@ function queue_application_deployment(Application $application, string $deployme
         ];
     }
 
-    // Per-application cap on simultaneous PR preview deployments (issue #9064).
-    // Counts running previews + queued/in-progress deployments for *other* PRs of the same app,
-    // so a flood of PR webhooks cannot all pass the gate before any container has finished building.
+    // Per-application cap on simultaneous PR previews (issue #9064): count includes pending PRs so webhook bursts can't race past the limit.
     if ($pull_request_id > 0) {
         $maxPreviews = (int) ($application->settings->max_preview_deployments ?? 0);
         if ($maxPreviews > 0) {

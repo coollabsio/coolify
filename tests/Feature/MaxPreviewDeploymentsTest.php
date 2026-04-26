@@ -18,9 +18,7 @@ use Visus\Cuid2\Cuid2;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    // Fake the deployment job so dispatch() does not actually run handle().
-    // Without this, ApplicationDeploymentJob (ShouldBeEncrypted + ShouldQueue) executes synchronously
-    // under QUEUE_CONNECTION=sync and tries to SSH to a non-existent server.
+    // Fake to stop the queued deployment job from running (it would try to SSH and load a real server).
     Bus::fake([ApplicationDeploymentJob::class]);
     InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
 
@@ -39,9 +37,7 @@ beforeEach(function () {
 
 function deployPr(Application $application, int $prId): array
 {
-    // Mirror production flow: ProcessGithubPullRequestWebhook always creates the
-    // ApplicationPreview row before invoking queue_application_deployment().
-    // Without it, ApplicationDeploymentJob::__construct() throws on findPreviewByApplicationAndPullId.
+    // Mirror production flow: webhook handlers always create the preview row before calling queue_application_deployment.
     ApplicationPreview::firstOrCreate(
         ['application_id' => $application->id, 'pull_request_id' => $prId],
         ['pull_request_html_url' => "https://example.test/pr/{$prId}", 'git_type' => 'github']
@@ -96,7 +92,6 @@ describe('Max Preview Deployments gate', function () {
         $this->application->settings->max_preview_deployments = 0;
         $this->application->settings->save();
 
-        // Even with 5 running previews, a new PR should still queue.
         for ($i = 1; $i <= 5; $i++) {
             makeRunningPreview($this->application, $i);
         }
@@ -145,11 +140,9 @@ describe('Max Preview Deployments gate', function () {
         $this->application->settings->save();
 
         makeRunningPreview($this->application, 1);
-        makeQueuedDeployment($this->application, 5); // PR 5 already queued — total active = 2
+        makeQueuedDeployment($this->application, 5);
 
-        // Re-syncing PR 5 must not count PR 5's own queued row toward the cap.
-        // The downstream existing-deployment guard may still return 'skipped' for the
-        // duplicate commit, so we assert by message that the cap-gate is what did NOT fire.
+        // The downstream duplicate-commit guard may still return 'skipped' — assert by message the cap-gate did NOT fire.
         $result = deployPr($this->application, 5);
 
         expect($result['message'] ?? '')->not->toContain('Max simultaneous preview deployments');
