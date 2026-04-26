@@ -1,0 +1,45 @@
+# documentation: https://wordpress.org
+# slogan: WordPress running on OpenLiteSpeed — a high-performance, open-source web server with built-in caching and HTTP/3 support.
+# category: cms
+# tags: cms, blog, content, management, openlitespeed, litespeed, php, mariadb
+# logo: svgs/wordpress.svg
+# port: 80
+
+services:
+  openlitespeed:
+    image: litespeedtech/openlitespeed:1.8.5-lsphp84
+    environment:
+      - SERVICE_URL_OPENLITESPEED
+      - TZ=${TZ:-America/New_York}
+      - MYSQL_HOST=mariadb
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-wordpress}
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    volumes:
+      - ols-sites:/var/www/vhosts
+      - ols-conf:/usr/local/lsws/conf
+      - ols-admin-conf:/usr/local/lsws/admin/conf
+      - ols-logs:/usr/local/lsws/logs
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  mariadb:
+    image: mariadb:11
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-wordpress}
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
