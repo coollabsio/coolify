@@ -26,6 +26,7 @@ class ApplicationSetting extends Model
         'is_git_lfs_enabled' => 'boolean',
         'is_git_shallow_clone_enabled' => 'boolean',
         'docker_images_to_keep' => 'integer',
+        'max_preview_deployments' => 'integer',
     ];
 
     protected $fillable = [
@@ -64,6 +65,7 @@ class ApplicationSetting extends Model
         'inject_build_args_to_dockerfile',
         'include_source_commit_in_build',
         'docker_images_to_keep',
+        'max_preview_deployments',
     ];
 
     public function isStatic(): Attribute
