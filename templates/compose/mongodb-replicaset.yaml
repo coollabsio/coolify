@@ -1,0 +1,117 @@
+# documentation: https://www.mongodb.com/docs/manual/replication/
+# slogan: MongoDB deployed as a replica set for high availability and data redundancy.
+# category: databases
+# tags: mongodb,database,replicaset,replica,nosql,document,high-availability
+# logo: svgs/mongodb.png
+# port: 27017
+
+services:
+  mongodb-primary:
+    image: mongo:7
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${SERVICE_USER_MONGODB}
+      - MONGO_INITDB_ROOT_PASSWORD=${SERVICE_PASSWORD_MONGODB}
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-mydb}
+      - MONGODB_REPLICA_SET_NAME=${MONGODB_REPLICA_SET_NAME:-rs0}
+    command: >
+      bash -c "
+        mongod --replSet ${MONGODB_REPLICA_SET_NAME:-rs0} --bind_ip_all \
+               --auth --keyFile /data/keyfile &
+        sleep 5 &&
+        mongosh --username ${SERVICE_USER_MONGODB} \
+                --password ${SERVICE_PASSWORD_MONGODB} \
+                --authenticationDatabase admin \
+                --eval '
+                  try {
+                    rs.initiate({
+                      _id: \"${MONGODB_REPLICA_SET_NAME:-rs0}\",
+                      members: [
+                        { _id: 0, host: \"mongodb-primary:27017\", priority: 2 },
+                        { _id: 1, host: \"mongodb-secondary1:27017\", priority: 1 },
+                        { _id: 2, host: \"mongodb-secondary2:27017\", priority: 1 }
+                      ]
+                    });
+                  } catch(e) { print(e); }
+                ' || true &&
+        wait
+      "
+    volumes:
+      - mongodb-primary-data:/data/db
+      - mongodb-keyfile:/data
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --eval
+        - "db.adminCommand('ping')"
+        - --username
+        - ${SERVICE_USER_MONGODB}
+        - --password
+        - ${SERVICE_PASSWORD_MONGODB}
+        - --authenticationDatabase
+        - admin
+      interval: 5s
+      timeout: 20s
+      retries: 15
+
+  mongodb-secondary1:
+    image: mongo:7
+    environment:
+      - MONGODB_REPLICA_SET_NAME=${MONGODB_REPLICA_SET_NAME:-rs0}
+    command: >
+      bash -c "
+        mongod --replSet ${MONGODB_REPLICA_SET_NAME:-rs0} --bind_ip_all \
+               --auth --keyFile /data/keyfile
+      "
+    volumes:
+      - mongodb-secondary1-data:/data/db
+      - mongodb-keyfile:/data
+    depends_on:
+      mongodb-primary:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --eval
+        - "db.adminCommand('ping')"
+        - --username
+        - ${SERVICE_USER_MONGODB}
+        - --password
+        - ${SERVICE_PASSWORD_MONGODB}
+        - --authenticationDatabase
+        - admin
+      interval: 5s
+      timeout: 20s
+      retries: 15
+
+  mongodb-secondary2:
+    image: mongo:7
+    environment:
+      - MONGODB_REPLICA_SET_NAME=${MONGODB_REPLICA_SET_NAME:-rs0}
+    command: >
+      bash -c "
+        mongod --replSet ${MONGODB_REPLICA_SET_NAME:-rs0} --bind_ip_all \
+               --auth --keyFile /data/keyfile
+      "
+    volumes:
+      - mongodb-secondary2-data:/data/db
+      - mongodb-keyfile:/data
+    depends_on:
+      mongodb-primary:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --eval
+        - "db.adminCommand('ping')"
+        - --username
+        - ${SERVICE_USER_MONGODB}
+        - --password
+        - ${SERVICE_PASSWORD_MONGODB}
+        - --authenticationDatabase
+        - admin
+      interval: 5s
+      timeout: 20s
+      retries: 15
