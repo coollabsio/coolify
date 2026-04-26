@@ -1,0 +1,27 @@
+# documentation: https://stalw.art/docs/install/docker
+# slogan: Stalwart Mail Server is an open-source, self-hostable email server that supports JMAP, IMAP4, POP3, and SMTP.
+# category: email
+# tags: email,mail,smtp,imap,pop3,jmap,stalwart,self-hosted
+# logo: svgs/stalwart.svg
+# port: 8080
+
+services:
+  stalwart:
+    image: stalwartlabs/mail-server:latest
+    volumes:
+      - stalwart-data:/opt/stalwart
+    environment:
+      - SERVICE_URL_STALWART_8080
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "143:143"
+      - "993:993"
+      - "110:110"
+      - "995:995"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
