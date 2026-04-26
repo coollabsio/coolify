@@ -1,15 +1,34 @@
 <?php
 
-use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Schema;
+use App\Models\Application;
+use App\Models\Environment;
+use App\Models\Project;
+use App\Models\Team;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
-uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
-it('stores encrypted http basic auth password longer than 31 characters', function () {
+beforeEach(function () {
+    $this->team = Team::factory()->create();
+    $this->project = Project::factory()->create(['team_id' => $this->team->id]);
+    $this->environment = Environment::factory()->create(['project_id' => $this->project->id]);
+});
+
+it('persists and decrypts a 64-char http basic auth password', function () {
     $longPassword = str_repeat('a', 64);
-    $encrypted = Crypt::encryptString($longPassword);
 
-    $columnType = Schema::getColumnType('applications', 'http_basic_auth_password');
-    expect($columnType)->toBe('text');
-    expect(strlen($encrypted))->toBeGreaterThan(255);
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'http_basic_auth_password' => $longPassword,
+    ]);
+
+    $raw = DB::table('applications')
+        ->where('id', $application->id)
+        ->value('http_basic_auth_password');
+
+    expect(strlen($raw))->toBeGreaterThan(255);
+
+    $application->refresh();
+    expect($application->http_basic_auth_password)->toBe($longPassword);
 });
