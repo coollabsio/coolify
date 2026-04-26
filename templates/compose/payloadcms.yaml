@@ -1,0 +1,68 @@
+# documentation: https://payloadcms.com/docs/getting-started/installation
+# slogan: The most powerful TypeScript-native headless CMS and application framework in the world.
+# category: cms
+# tags: cms,headless,typescript,nextjs,mongodb,content-management
+# logo: svgs/payloadcms.png
+# port: 3000
+
+services:
+  payload:
+    image: node:20-alpine
+    working_dir: /app
+    command: >
+      sh -c "
+        npm install --global create-payload-app@latest &&
+        npx create-payload-app@latest my-app \
+          --template blank \
+          --db mongodb \
+          --no-git \
+          --no-deps \
+          --accept-terms &&
+        cd my-app &&
+        npm install &&
+        npm run build &&
+        npm start
+      "
+    environment:
+      - SERVICE_URL_PAYLOAD_3000
+      - PAYLOAD_SECRET=${SERVICE_BASE64_PAYLOADSECRET}
+      - MONGODB_URI=mongodb://${SERVICE_USER_MONGODB}:${SERVICE_PASSWORD_MONGODB}@mongodb:27017/payload?authSource=admin
+      - PAYLOAD_PUBLIC_SERVER_URL=${SERVICE_URL_PAYLOAD}
+      - NODE_ENV=production
+      - PORT=3000
+    volumes:
+      - payload-media:/app/my-app/public/media
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 30s
+      retries: 10
+      start_period: 120s
+
+  mongodb:
+    image: mongo:7
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${SERVICE_USER_MONGODB}
+      - MONGO_INITDB_ROOT_PASSWORD=${SERVICE_PASSWORD_MONGODB}
+      - MONGO_INITDB_DATABASE=payload
+    volumes:
+      - payload-mongodb-data:/data/db
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --eval
+        - "db.adminCommand('ping')"
+        - --username
+        - ${SERVICE_USER_MONGODB}
+        - --password
+        - ${SERVICE_PASSWORD_MONGODB}
+        - --authenticationDatabase
+        - admin
+      interval: 5s
+      timeout: 20s
+      retries: 10
+      start_period: 30s
