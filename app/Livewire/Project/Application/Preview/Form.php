@@ -17,10 +17,14 @@ class Form extends Component
     #[Validate('required')]
     public string $previewUrlTemplate;
 
+    #[Validate(['integer', 'min:0', 'max:1000'])]
+    public int $maxPreviewDeployments = 0;
+
     public function mount()
     {
         try {
             $this->previewUrlTemplate = $this->application->preview_url_template;
+            $this->maxPreviewDeployments = (int) ($this->application->settings->max_preview_deployments ?? 0);
             $this->generateRealUrl();
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -35,7 +39,9 @@ class Form extends Component
             $this->validate();
             $this->application->preview_url_template = str_replace(' ', '', $this->previewUrlTemplate);
             $this->application->save();
-            $this->dispatch('success', 'Preview url template updated.');
+            $this->application->settings->max_preview_deployments = $this->maxPreviewDeployments;
+            $this->application->settings->save();
+            $this->dispatch('success', 'Preview settings updated.');
             $this->generateRealUrl();
         } catch (\Throwable $e) {
             return handleError($e, $this);

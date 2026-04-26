@@ -43,6 +43,43 @@ function queue_application_deployment(Application $application, string $deployme
         ];
     }
 
+    // Per-application cap on simultaneous PR preview deployments (issue #9064).
+    // Counts running previews + queued/in-progress deployments for *other* PRs of the same app,
+    // so a flood of PR webhooks cannot all pass the gate before any container has finished building.
+    if ($pull_request_id > 0) {
+        $maxPreviews = (int) ($application->settings->max_preview_deployments ?? 0);
+        if ($maxPreviews > 0) {
+            $runningCount = $application->previews()
+                ->where('status', 'LIKE', 'running%')
+                ->count();
+
+            $pendingPrCount = ApplicationDeploymentQueue::where('application_id', $application_id)
+                ->where('pull_request_id', '!=', $pull_request_id)
+                ->where('pull_request_id', '>', 0)
+                ->whereIn('status', [
+                    ApplicationDeploymentStatus::QUEUED->value,
+                    ApplicationDeploymentStatus::IN_PROGRESS->value,
+                ])
+                ->distinct('pull_request_id')
+                ->count('pull_request_id');
+
+            if (($runningCount + $pendingPrCount) >= $maxPreviews) {
+                \Log::info('Preview deployment skipped: max_preview_deployments reached', [
+                    'application_id' => $application_id,
+                    'pull_request_id' => $pull_request_id,
+                    'limit' => $maxPreviews,
+                    'running' => $runningCount,
+                    'pending' => $pendingPrCount,
+                ]);
+
+                return [
+                    'status' => 'skipped',
+                    'message' => "Max simultaneous preview deployments ({$maxPreviews}) reached for this application. New PR deployment will be skipped until an existing preview is stopped.",
+                ];
+            }
+        }
+    }
+
     // Check if there's already a deployment in progress or queued for this application and commit
     $existing_deployment = ApplicationDeploymentQueue::where('application_id', $application_id)
         ->where('commit', $commit)

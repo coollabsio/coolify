@@ -13,5 +13,8 @@
         @if ($previewUrlTemplate)
             <div class="">Domain Preview: {{ $previewUrlTemplate }}</div>
         @endif
+        <x-forms.input id="maxPreviewDeployments" type="number" min="0"
+            label="Max Concurrent Preview Deployments"
+            helper="Maximum simultaneous PR preview environments for this application. <span class='text-helper'>0</span> means unlimited. New PR webhooks beyond this limit will be skipped (and logged) until an existing preview is stopped." canGate="update" :canResource="$application" />
     </div>
 </form>
