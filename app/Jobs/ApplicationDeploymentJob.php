@@ -607,7 +607,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->validateShellSafeCommand($this->application->docker_compose_custom_build_command, 'docker_compose_custom_build_command');
             $this->docker_compose_custom_build_command = $this->application->docker_compose_custom_build_command;
             if (! str($this->docker_compose_custom_build_command)->contains('--project-directory')) {
-                $this->docker_compose_custom_build_command = str($this->docker_compose_custom_build_command)->replaceFirst('compose', 'compose --project-directory '.$this->workdir)->value();
+                $this->docker_compose_custom_build_command = str($this->docker_compose_custom_build_command)->replaceFirst('compose', 'compose --project-directory '.$this->dockerComposeBuildProjectDirectory())->value();
             }
         }
         if ($this->pull_request_id === 0) {
@@ -744,10 +744,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             // Use build-time .env file from /artifacts (outside Docker context to prevent it from being in the image)
             $command .= ' --env-file '.self::BUILD_TIME_ENV_PATH;
+            $buildProjectDirectory = $this->dockerComposeBuildProjectDirectory();
             if ($this->force_rebuild) {
-                $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull --no-cache";
+                $command .= " --project-name {$this->application->uuid} --project-directory {$buildProjectDirectory} -f {$this->workdir}{$this->docker_compose_location} build --pull --no-cache";
             } else {
-                $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull";
+                $command .= " --project-name {$this->application->uuid} --project-directory {$buildProjectDirectory} -f {$this->workdir}{$this->docker_compose_location} build --pull";
             }
 
             if (! $this->application->settings->use_build_secrets && $this->build_args instanceof Collection && $this->build_args->isNotEmpty()) {
@@ -866,6 +867,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $this->application_deployment_queue->addLogEntry('New container started.');
+    }
+
+    private function dockerComposeBuildProjectDirectory(): string
+    {
+        $composeDirectory = dirname($this->docker_compose_location);
+
+        if ($composeDirectory === '/' || $composeDirectory === '.') {
+            return rtrim($this->workdir, '/');
+        }
+
+        return rtrim($this->workdir, '/').'/'.ltrim($composeDirectory, '/');
     }
 
     private function deploy_dockerfile_buildpack()
