@@ -21,11 +21,11 @@ services:
     volumes:
       - hermes-data:/opt/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:9119"]
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:9119/api/status"]
       interval: 10s
-      timeout: 30s
-      retries: 12
-      start_period: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
 volumes:
   hermes-data: null
