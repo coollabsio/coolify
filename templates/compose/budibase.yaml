@@ -117,7 +117,7 @@ services:
       retries: 5
       start_period: 10s
     volumes:
-      - couchdb3_data:/opt/couchdb/data
+      - couchdb3_data:/data
 
   redis-service:
     image: redis
