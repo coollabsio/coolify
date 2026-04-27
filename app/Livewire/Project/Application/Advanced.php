@@ -82,6 +82,21 @@ class Advanced extends Component
     #[Validate(['boolean'])]
     public bool $isConnectToDockerNetworkEnabled = false;
 
+    #[Validate(['boolean'])]
+    public bool $isSablierEnabled = false;
+
+    #[Validate(['string', 'nullable'])]
+    public ?string $sablierGroup = null;
+
+    #[Validate(['string', 'nullable'])]
+    public ?string $sablierNetworkAlias = null;
+
+    #[Validate(['string'])]
+    public string $sablierSessionDuration = '10m';
+
+    #[Validate(['string'])]
+    public string $sablierTimeout = '60s';
+
     public function mount()
     {
         try {
@@ -144,6 +159,107 @@ class Advanced extends Component
             $this->disableBuildCache = $this->application->settings->disable_build_cache;
             $this->injectBuildArgsToDockerfile = $this->application->settings->inject_build_args_to_dockerfile ?? true;
             $this->includeSourceCommitInBuild = $this->application->settings->include_source_commit_in_build ?? false;
+            $this->syncSablierDataFromLabels();
+        }
+    }
+
+    private function decodedCustomLabels(): array
+    {
+        if (blank($this->application->custom_labels)) {
+            return [];
+        }
+
+        $decoded = base64_decode($this->application->custom_labels, true);
+        if ($decoded === false) {
+            return [];
+        }
+
+        return preg_split('/\r\n|\r|\n/', $decoded) ?: [];
+    }
+
+    private function customLabelsAsMap(): array
+    {
+        return collect($this->decodedCustomLabels())
+            ->filter(fn ($line) => str($line)->contains('='))
+            ->mapWithKeys(function ($line) {
+                [$key, $value] = explode('=', $line, 2);
+
+                return [trim($key) => trim($value)];
+            })
+            ->all();
+    }
+
+    private function setCustomLabel(array $lines, string $key, ?string $value): array
+    {
+        $found = false;
+        $lines = collect($lines)->map(function ($line) use ($key, $value, &$found) {
+            if (str($line)->before('=')->trim()->value() === $key) {
+                $found = true;
+
+                return is_null($value) ? null : "{$key}={$value}";
+            }
+
+            return $line;
+        })->filter(fn ($line) => ! is_null($line))->values()->all();
+
+        if (! $found && ! is_null($value)) {
+            $lines[] = "{$key}={$value}";
+        }
+
+        return $lines;
+    }
+
+    private function syncSablierDataFromLabels(): void
+    {
+        $labels = $this->customLabelsAsMap();
+        $this->isSablierEnabled = str(data_get($labels, 'sablier.enable', 'false'))->lower()->value() === 'true';
+        $this->sablierGroup = data_get($labels, 'sablier.group') ?: str($this->application->name)->slug()->value();
+        $this->sablierNetworkAlias = data_get($labels, 'sablier.alias') ?: data_get(explode(',', $this->application->custom_network_aliases ?? ''), 0) ?: str($this->sablierGroup)->slug()->append('-sablier')->value();
+        $this->sablierSessionDuration = data_get($labels, 'sablier.session_duration', '10m');
+        $this->sablierTimeout = data_get($labels, 'sablier.timeout', '60s');
+    }
+
+    public function saveSablierSettings(): void
+    {
+        try {
+            $this->authorize('update', $this->application);
+            $this->validate([
+                'isSablierEnabled' => 'boolean',
+                'sablierGroup' => 'nullable|string|max:255',
+                'sablierNetworkAlias' => 'nullable|string|max:255',
+                'sablierSessionDuration' => 'required|string|max:32',
+                'sablierTimeout' => 'required|string|max:32',
+            ]);
+
+            $group = str($this->sablierGroup ?: $this->application->name)->slug()->value();
+            $alias = str($this->sablierNetworkAlias ?: "{$group}-sablier")->slug()->value();
+            $middleware = "sablier-{$group}@file";
+            $routerMiddlewareLabel = "traefik.http.routers.https-0-{$this->application->uuid}.middlewares";
+            $labels = $this->customLabelsAsMap();
+            $middlewares = collect(explode(',', data_get($labels, $routerMiddlewareLabel, 'gzip')))
+                ->filter()
+                ->when($this->isSablierEnabled, fn ($items) => $items->contains($middleware) ? $items : $items->push($middleware))
+                ->when(! $this->isSablierEnabled, fn ($items) => $items->reject(fn ($item) => str($item)->startsWith('sablier-')))
+                ->implode(',');
+
+            $lines = $this->decodedCustomLabels();
+            $lines = $this->setCustomLabel($lines, $routerMiddlewareLabel, $middlewares ?: 'gzip');
+            $lines = $this->setCustomLabel($lines, 'sablier.enable', $this->isSablierEnabled ? 'true' : null);
+            $lines = $this->setCustomLabel($lines, 'sablier.group', $this->isSablierEnabled ? $group : null);
+            $lines = $this->setCustomLabel($lines, 'sablier.alias', $this->isSablierEnabled ? $alias : null);
+            $lines = $this->setCustomLabel($lines, 'sablier.session_duration', $this->isSablierEnabled ? $this->sablierSessionDuration : null);
+            $lines = $this->setCustomLabel($lines, 'sablier.timeout', $this->isSablierEnabled ? $this->sablierTimeout : null);
+
+            $this->application->custom_labels = base64_encode(implode("\n", $lines));
+            if ($this->isSablierEnabled) {
+                $this->application->custom_network_aliases = $alias;
+            }
+            $this->application->save();
+            $this->syncSablierDataFromLabels();
+            $this->dispatch('success', 'Sablier settings saved. Regenerate the proxy dynamic configuration and redeploy the application.');
+            $this->dispatch('configurationChanged');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 

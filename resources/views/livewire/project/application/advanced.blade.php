@@ -65,6 +65,31 @@
                     canGate="update" :canResource="$application" />
             @endif
 
+            <h3 class="pt-4">Hibernate / Sablier</h3>
+            <div class="flex flex-col gap-2 rounded border border-warning p-3 dark:border-warning">
+                <div class="text-sm text-warning">
+                    Draft integration. Requires Traefik with the Sablier plugin and a build containing
+                    <a class="underline" href="https://github.com/traefik/traefik/pull/13006" target="_blank">traefik/traefik#13006</a>
+                    for reliable plugin cache behavior after restarts. Coolify still needs to generate the persistent
+                    Traefik file-provider router for stopped containers.
+                </div>
+                <x-forms.checkbox id="isSablierEnabled" label="Enable Sablier Hibernate" canGate="update"
+                    :canResource="$application" />
+                <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    <x-forms.input id="sablierGroup" label="Sablier Group" placeholder="my-app" canGate="update"
+                        :canResource="$application" />
+                    <x-forms.input id="sablierNetworkAlias" label="Stable Network Alias" placeholder="my-app-sablier"
+                        canGate="update" :canResource="$application" />
+                    <x-forms.input id="sablierSessionDuration" label="Session Duration" placeholder="10m" canGate="update"
+                        :canResource="$application" />
+                    <x-forms.input id="sablierTimeout" label="Wake Timeout" placeholder="60s" canGate="update"
+                        :canResource="$application" />
+                </div>
+                <x-forms.button wire:click="saveSablierSettings" canGate="update" :canResource="$application">
+                    Save Sablier Settings
+                </x-forms.button>
+            </div>
+
             <h3 class="pt-4">Proxy</h3>
             @if ($application->settings->is_container_label_readonly_enabled)
                 <x-forms.checkbox
