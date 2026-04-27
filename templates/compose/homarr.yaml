@@ -7,11 +7,10 @@
 
 services:
   homarr:
-    image: ghcr.io/homarr-labs/homarr:v1.40.0
+    image: ghcr.io/homarr-labs/homarr:v1.59.3
     environment:
+      - SECRET_ENCRYPTION_KEY=$SERVICE_HEX_64_ENCRYPTION
       - SERVICE_URL_HOMARR_7575
-      - SERVICE_HEX_32_HOMARR
-      - 'SECRET_ENCRYPTION_KEY=${SERVICE_HEX_32_HOMARR}'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./homarr/appdata:/appdata
@@ -20,3 +19,4 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
+      
