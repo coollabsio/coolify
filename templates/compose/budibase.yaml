@@ -105,7 +105,7 @@ services:
       start_period: 10s
 
   couchdb-service:
-    image: budibase/couchdb
+    image: budibase/database
     environment:
       - COUCHDB_PASSWORD=$SERVICE_PASSWORD_COUCHDB
       - COUCHDB_USER=$SERVICE_USER_COUCHDB
