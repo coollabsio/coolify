@@ -70,6 +70,10 @@
                             class="block w-full text-center py-3 px-4 rounded-lg border border-neutral-300 dark:border-coolgray-400 font-medium hover:border-coollabs dark:hover:border-warning transition-colors">
                             {{ __('auth.register_now') }}
                         </a>
+                    @elseif ($allow_oauth_when_registration_disabled && $enabled_oauth_providers->isNotEmpty())
+                        {{-- Password registration is off, but OAuth-based signup is allowed.
+                             Don't show the "registration disabled" copy because that's misleading
+                             — the OAuth buttons below DO let new accounts sign up. --}}
                     @else
                         <div class="mt-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
                             {{ __('auth.registration_disabled') }}

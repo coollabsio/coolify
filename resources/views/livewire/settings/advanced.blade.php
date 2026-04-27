@@ -41,6 +41,11 @@
                                 shortConfirmationLabel="Confirmation text" />
                         </div>
                     @endif
+                    <div class="md:w-96" wire:key="allow-oauth-when-registration-disabled">
+                        <x-forms.checkbox instantSave id="allow_oauth_when_registration_disabled"
+                            helper="When enabled, OAuth sign-in (e.g. Authentik, Google, GitHub) can still create new accounts even if 'Registration Allowed' is off. Use this to run an OAuth-only instance: external IdP controls who can sign up, while the password registration form stays disabled."
+                            label="Allow OAuth Signup When Registration Disabled" />
+                    </div>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."

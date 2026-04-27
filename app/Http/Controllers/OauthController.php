@@ -22,7 +22,17 @@ class OauthController extends Controller
             $user = User::whereEmail($oauthUser->email)->first();
             if (! $user) {
                 $settings = instanceSettings();
-                if (! $settings->is_registration_enabled) {
+                // OAuth signup is allowed when either:
+                //   (a) general self-registration is enabled, or
+                //   (b) the admin has explicitly opted in to OAuth-only
+                //       signups via allow_oauth_when_registration_disabled.
+                // This decouples password-based registration from OAuth-
+                // based registration so an instance can run in "OAuth-only"
+                // mode (e.g. Authentik, Google Workspace) without leaving
+                // a password form open to the public internet.
+                $oauthSignupAllowed = $settings->is_registration_enabled
+                    || $settings->allow_oauth_when_registration_disabled;
+                if (! $oauthSignupAllowed) {
                     abort(403, 'Registration is disabled');
                 }
 
