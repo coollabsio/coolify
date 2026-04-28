@@ -5303,5 +5303,38 @@
         "logo": "svgs/cells.svg",
         "minversion": "0.0.0",
         "port": "8080"
+    },
+    "surrealdb": {
+        "documentation": "https://surrealdb.com/docs?utm_source=coolify.io",
+        "slogan": "SurrealDB is a scalable, distributed, collaborative, document-graph database for modern applications.",
+        "compose": "c2VydmljZXM6CiAgc3VycmVhbGRiOgogICAgaW1hZ2U6IHN1cnJlYWxkYi9zdXJyZWFsZGI6bGF0ZXN0CiAgICBjb21tYW5kOgogICAgLSBzdGFydAogICAgLSAtLWxvZwogICAgLSAke1NVUlJFQUxfTE9HX0xFVkVMOi1pbmZvfQogICAgLSAtLXVzZXIKICAgIC0gJHtTRVJWSUNFX1VTRVJfU1VSUkVBTERCfQogICAgLSAtLXBhc3MKICAgIC0gJHtTRVJWSUNFX1BBU1NXT1JEX1NVUlJFQUxEQn0KICAgIC0gcm9ja3NkYjovZGF0YS9kYXRhYmFzZS5kYgogICAgZW52aXJvbm1lbnQ6CiAgICAtIFNFUlZJQ0VfVVJMX1NVUlJFQUxEQl84MDAwCiAgICAtIFNFUlZJQ0VfVVNFUl9TVVJSRUFMREI9JHtTRVJWSUNFX1VTRVJfU1VSUkVBTERCOi1yb290fQogICAgLSBTRVJWSUNFX1BBU1NXT1JEX1NVUlJFQUxEQgogICAgLSBTVVJSRUFMX0xPR19MRVZFTD0ke1NVUlJFQUxfTE9HX0xFVkVMOi1pbmZvfQogICAgdm9sdW1lczoKICAgIC0gc3VycmVhbGRiLWRhdGE6L2RhdGEKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAtIENNRAogICAgICAtIHN1cnJlYWwKICAgICAgLSBpc3JlYWR5CiAgICAgIC0gLS1jb25uCiAgICAgIC0gaHR0cDovLzEyNy4wLjAuMTo4MDAwCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
+        "tags": [
+            "database",
+            "document",
+            "graph",
+            "multimodel",
+            "surrealdb"
+        ],
+        "category": "database",
+        "logo": "svgs/default.webp",
+        "minversion": "0.0.0",
+        "port": "8000"
+    },
+    "surrealdb-with-tikv": {
+        "documentation": "https://surrealdb.com/docs/surrealdb/installation/running/tikv?utm_source=coolify.io",
+        "slogan": "SurrealDB with a single-node TiKV backing store for scalable deployments.",
+        "compose": "c2VydmljZXM6CiAgc3VycmVhbGRiOgogICAgaW1hZ2U6IHN1cnJlYWxkYi9zdXJyZWFsZGI6bGF0ZXN0CiAgICBjb21tYW5kOgogICAgLSBzdGFydAogICAgLSAtLWxvZwogICAgLSAke1NVUlJFQUxfTE9HX0xFVkVMOi1pbmZvfQogICAgLSAtLXVzZXIKICAgIC0gJHtTRVJWSUNFX1VTRVJfU1VSUkVBTERCfQogICAgLSAtLXBhc3MKICAgIC0gJHtTRVJWSUNFX1BBU1NXT1JEX1NVUlJFQUxEQn0KICAgIC0gdGlrdjovL3BkOjIzNzkKICAgIGVudmlyb25tZW50OgogICAgLSBTRVJWSUNFX1VSTF9TVVJSRUFMREJfODAwMAogICAgLSBTRVJWSUNFX1VTRVJfU1VSUkVBTERCPSR7U0VSVklDRV9VU0VSX1NVUlJFQUxEQjotcm9vdH0KICAgIC0gU0VSVklDRV9QQVNTV09SRF9TVVJSRUFMREIKICAgIC0gU1VSUkVBTF9MT0dfTEVWRUw9JHtTVVJSRUFMX0xPR19MRVZFTDotaW5mb30KICAgIGRlcGVuZHNfb246CiAgICAgIHBkOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9zdGFydGVkCiAgICAgIHRpa3Y6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX3N0YXJ0ZWQKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAtIENNRAogICAgICAtIHN1cnJlYWwKICAgICAgLSBpc3JlYWR5CiAgICAgIC0gLS1jb25uCiAgICAgIC0gaHR0cDovLzEyNy4wLjAuMTo4MDAwCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAKICBwZDoKICAgIGltYWdlOiBwaW5nY2FwL3BkOmxhdGVzdAogICAgY29tbWFuZDoKICAgIC0gLS1uYW1lPXBkCiAgICAtIC0tZGF0YS1kaXI9L2RhdGEvcGQKICAgIC0gLS1jbGllbnQtdXJscz1odHRwOi8vMC4wLjAuMDoyMzc5CiAgICAtIC0tcGVlci11cmxzPWh0dHA6Ly8wLjAuMC4wOjIzODAKICAgIC0gLS1hZHZlcnRpc2UtY2xpZW50LXVybHM9aHR0cDovL3BkOjIzNzkKICAgIC0gLS1hZHZlcnRpc2UtcGVlci11cmxzPWh0dHA6Ly9wZDoyMzgwCiAgICAtIC0taW5pdGlhbC1jbHVzdGVyPXBkPWh0dHA6Ly9wZDoyMzgwCiAgICB2b2x1bWVzOgogICAgLSBzdXJyZWFsZGItcGQtZGF0YTovZGF0YS9wZAogIHRpa3Y6CiAgICBpbWFnZTogcGluZ2NhcC90aWt2OmxhdGVzdAogICAgY29tbWFuZDoKICAgIC0gLS1hZGRyPTAuMC4wLjA6MjAxNjAKICAgIC0gLS1hZHZlcnRpc2UtYWRkcj10aWt2OjIwMTYwCiAgICAtIC0tZGF0YS1kaXI9L2RhdGEvdGlrdgogICAgLSAtLXBkPXBkOjIzNzkKICAgIGRlcGVuZHNfb246CiAgICAgIHBkOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9zdGFydGVkCiAgICB2b2x1bWVzOgogICAgLSBzdXJyZWFsZGItdGlrdi1kYXRhOi9kYXRhL3Rpa3YK",
+        "tags": [
+            "database",
+            "document",
+            "graph",
+            "multimodel",
+            "surrealdb",
+            "tikv"
+        ],
+        "category": "database",
+        "logo": "svgs/default.webp",
+        "minversion": "0.0.0",
+        "port": "8000"
     }
 }
