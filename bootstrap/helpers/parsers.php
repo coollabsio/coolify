@@ -2751,6 +2751,19 @@ function serviceParser(Service $resource): Collection
         ray('Failed to update docker_compose_raw in serviceParser: '.$e->getMessage());
     }
 
+    // Remove ServiceApplication and ServiceDatabase records whose names no
+    // longer appear in the current compose definition so that stale "Exited"
+    // cards are cleaned up from the UI.
+    $currentServiceNames = collect($services)->keys()->all();
+    if (! empty($currentServiceNames)) {
+        $resource->applications()
+            ->whereNotIn('name', $currentServiceNames)
+            ->each(fn ($app) => $app->delete());
+        $resource->databases()
+            ->whereNotIn('name', $currentServiceNames)
+            ->each(fn ($db) => $db->delete());
+    }
+
     data_forget($resource, 'environment_variables');
     data_forget($resource, 'environment_variables_preview');
     $resource->save();
