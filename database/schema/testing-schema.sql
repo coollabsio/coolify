@@ -460,6 +460,7 @@ CREATE TABLE IF NOT EXISTS "oauth_settings" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     "provider" TEXT NOT NULL,
     "enabled" INTEGER DEFAULT false NOT NULL,
+    "allow_registration" INTEGER DEFAULT true NOT NULL,
     "client_id" TEXT,
     "client_secret" TEXT,
     "redirect_uri" TEXT,

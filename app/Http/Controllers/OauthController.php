@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\OauthSetting;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -21,6 +22,11 @@ class OauthController extends Controller
             $oauthUser = get_socialite_provider($provider)->user();
             $user = User::whereEmail($oauthUser->email)->first();
             if (! $user) {
+                $oauthSetting = OauthSetting::where('provider', $provider)->first();
+                if (! $oauthSetting?->allow_registration) {
+                    abort(403, 'OAuth registration is disabled');
+                }
+
                 $settings = instanceSettings();
                 if (! $settings->is_registration_enabled) {
                     abort(403, 'Registration is disabled');
