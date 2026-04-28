@@ -129,7 +129,7 @@ services:
     networks:
       - coolify
   minio:
-    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
+    image: ghcr.io/coollabsio/maxio:latest
     pull_policy: always
     container_name: coolify-minio
     command: server /data --console-address ":9001"
