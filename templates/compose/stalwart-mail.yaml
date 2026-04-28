@@ -1,0 +1,31 @@
+# documentation: https://stalw.art/docs/install/docker
+# slogan: Modern all-in-one mail server with a web admin console for managing client email domains.
+# category: email
+# tags: mail,email-server,smtp,imap,jmap,stalwart
+# port: 8080
+
+services:
+  stalwart-mail:
+    image: stalwartlabs/stalwart:latest
+    environment:
+      - SERVICE_URL_STALWARTMAIL_8080
+      - STALWART_DOMAIN=${STALWART_DOMAIN:-example.com}
+      - STALWART_HOSTNAME=${STALWART_HOSTNAME:-mail.example.com}
+      - STALWART_ADMIN_SECRET=${SERVICE_PASSWORD_STALWARTADMIN}
+    volumes:
+      - stalwart-mail-data:/opt/stalwart-mail
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+      - "4190:4190"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://127.0.0.1:8080/login || exit 1",
+        ]
+      interval: 10s
+      timeout: 20s
+      retries: 10
