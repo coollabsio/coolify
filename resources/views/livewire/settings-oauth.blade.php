@@ -13,6 +13,16 @@
             </div>
             <div class="pb-4 ">Custom authentication (OAuth) configurations.</div>
         </div>
+        <div class="p-3 mb-2 border border-warning bg-warning/10 text-sm">
+            <div class="font-bold dark:text-warning">Trust warning</div>
+            <div class="dark:text-neutral-300">
+                Enabling an OAuth provider lets anyone with a verified email at that identity provider create
+                an account on this instance. For self-hosted IdPs (Authentik / Zitadel / Clerk / GitLab) the
+                IdP's administrators implicitly gain the ability to register Coolify users. OAuth login is
+                only allowed once a Coolify user explicitly links the provider from their Profile, and Coolify
+                does not enforce its own 2FA on the OAuth path — your IdP is trusted to enforce MFA.
+            </div>
+        </div>
         <div class="flex flex-col gap-2 pt-4">
             @foreach ($oauth_settings_map as $oauth_setting)
                 <div class="p-4 border dark:border-coolgray-300 border-neutral-200">

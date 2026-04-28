@@ -153,4 +153,6 @@
             Something went wrong. Please try again.
         </div>
     @endif
+
+    <livewire:profile.oauth-links />
 </div>

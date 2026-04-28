@@ -234,6 +234,11 @@ class User extends Authenticatable implements SendsEmail
         return $this->belongsToMany(Team::class)->withPivot('role');
     }
 
+    public function oauthLinks()
+    {
+        return $this->hasMany(OauthUserLink::class);
+    }
+
     public function changelogReads()
     {
         return $this->hasMany(UserChangelogRead::class);
