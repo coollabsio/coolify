@@ -43,13 +43,14 @@ class Github extends Controller
                 $removed_files = data_get($payload, 'commits.*.removed');
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
-                $skip_deploy_commits = self::allCommitsSkipDeploy(data_get($payload, 'commits', []));
+                $skip_deploy_commits = self::shouldSkipDeploy(data_get($payload, 'commits.*.message', []));
             }
             if ($x_github_event === 'pull_request') {
                 $action = data_get($payload, 'action');
                 $full_name = data_get($payload, 'repository.full_name');
                 $pull_request_id = data_get($payload, 'number');
                 $pull_request_html_url = data_get($payload, 'pull_request.html_url');
+                $pull_request_title = data_get($payload, 'pull_request.title');
                 $branch = data_get($payload, 'pull_request.head.ref');
                 $base_branch = data_get($payload, 'pull_request.base.ref');
                 $before_sha = data_get($payload, 'before');
@@ -215,6 +216,7 @@ class Github extends Controller
                             commitSha: data_get($payload, 'pull_request.head.sha', 'HEAD'),
                             authorAssociation: $author_association,
                             fullName: $full_name,
+                            pullRequestTitle: $pull_request_title ?? null,
                         );
 
                         $return_payloads->push([
@@ -283,13 +285,14 @@ class Github extends Controller
                 $removed_files = data_get($payload, 'commits.*.removed');
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
-                $skip_deploy_commits = self::allCommitsSkipDeploy(data_get($payload, 'commits', []));
+                $skip_deploy_commits = self::shouldSkipDeploy(data_get($payload, 'commits.*.message', []));
             }
             if ($x_github_event === 'pull_request') {
                 $action = data_get($payload, 'action');
                 $id = data_get($payload, 'repository.id');
                 $pull_request_id = data_get($payload, 'number');
                 $pull_request_html_url = data_get($payload, 'pull_request.html_url');
+                $pull_request_title = data_get($payload, 'pull_request.title');
                 $branch = data_get($payload, 'pull_request.head.ref');
                 $base_branch = data_get($payload, 'pull_request.base.ref');
                 $before_sha = data_get($payload, 'before');
@@ -423,6 +426,7 @@ class Github extends Controller
                             commitSha: data_get($payload, 'pull_request.head.sha', 'HEAD'),
                             authorAssociation: $author_association,
                             fullName: $full_name,
+                            pullRequestTitle: $pull_request_title ?? null,
                         );
 
                         $return_payloads->push([
@@ -493,19 +497,29 @@ class Github extends Controller
     }
 
     /**
-     * Returns true if there is at least one commit and every commit message
+     * Returns true if there is at least one non-empty message and every message
      * contains [skip cd] or [skip ci] (case-insensitive).
      *
-     * @param  array<int, array<string, mixed>>  $commits
+     * Accepts an array of strings (commit messages, PR titles, etc). Null/empty
+     * entries are filtered out before evaluation.
+     *
+     * @param  array<int, string|null>  $messages
      */
-    public static function allCommitsSkipDeploy(array $commits): bool
+    public static function shouldSkipDeploy(array $messages): bool
     {
-        $commitList = collect($commits);
+        $messages = array_values(array_filter($messages, fn ($m) => filled($m)));
 
-        return $commitList->isNotEmpty() && $commitList->every(function (array $commit): bool {
-            $message = strtolower((string) data_get($commit, 'message', ''));
+        if (empty($messages)) {
+            return false;
+        }
 
-            return str_contains($message, '[skip cd]') || str_contains($message, '[skip ci]');
-        });
+        foreach ($messages as $message) {
+            $lower = strtolower((string) $message);
+            if (! str_contains($lower, '[skip cd]') && ! str_contains($lower, '[skip ci]')) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

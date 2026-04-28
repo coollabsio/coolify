@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Application\CleanupPreviewDeployment;
 use App\Enums\ProcessStatus;
+use App\Http\Controllers\Webhook\Github;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GithubApp;
@@ -36,6 +37,7 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
         public string $commitSha,
         public ?string $authorAssociation,
         public string $fullName,
+        public ?string $pullRequestTitle = null,
     ) {
         $this->onQueue('high');
     }
@@ -80,6 +82,11 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
     private function handleOpenAction(Application $application, ?GithubApp $githubApp): void
     {
         if (! $application->isPRDeployable()) {
+            return;
+        }
+
+        // Skip preview deployment if PR title contains [skip cd] or [skip ci]
+        if (Github::shouldSkipDeploy([$this->pullRequestTitle])) {
             return;
         }
 

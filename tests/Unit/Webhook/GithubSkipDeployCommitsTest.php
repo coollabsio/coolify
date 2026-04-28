@@ -2,53 +2,59 @@
 
 use App\Http\Controllers\Webhook\Github;
 
-describe('Github::allCommitsSkipDeploy', function () {
-    test('returns false when commits array is empty', function () {
-        expect(Github::allCommitsSkipDeploy([]))->toBeFalse();
+describe('Github::shouldSkipDeploy', function () {
+    test('returns false when messages array is empty', function () {
+        expect(Github::shouldSkipDeploy([]))->toBeFalse();
     });
 
-    test('returns true when all commits contain [skip ci]', function () {
-        $commits = [
-            ['message' => 'Update docs [skip ci]'],
-            ['message' => 'Fix typo [skip ci]'],
-        ];
-        expect(Github::allCommitsSkipDeploy($commits))->toBeTrue();
+    test('returns false when only nulls or empty strings are provided', function () {
+        expect(Github::shouldSkipDeploy([null, '', null]))->toBeFalse();
     });
 
-    test('returns true when all commits contain [skip cd]', function () {
-        $commits = [
-            ['message' => 'Update README [skip cd]'],
+    test('returns true when all messages contain [skip ci]', function () {
+        $messages = [
+            'Update docs [skip ci]',
+            'Fix typo [skip ci]',
         ];
-        expect(Github::allCommitsSkipDeploy($commits))->toBeTrue();
+        expect(Github::shouldSkipDeploy($messages))->toBeTrue();
     });
 
-    test('returns true when all commits contain either marker (case-insensitive)', function () {
-        $commits = [
-            ['message' => 'Docs [SKIP CI]'],
-            ['message' => 'Changelog [Skip Cd]'],
-        ];
-        expect(Github::allCommitsSkipDeploy($commits))->toBeTrue();
+    test('returns true when single message contains [skip cd]', function () {
+        expect(Github::shouldSkipDeploy(['Update README [skip cd]']))->toBeTrue();
     });
 
-    test('returns false when at least one commit has no skip marker', function () {
-        $commits = [
-            ['message' => 'Update docs [skip ci]'],
-            ['message' => 'Actual feature change'],
+    test('returns true with mixed [skip ci] and [skip cd] (case-insensitive)', function () {
+        $messages = [
+            'Docs [SKIP CI]',
+            'Changelog [Skip Cd]',
         ];
-        expect(Github::allCommitsSkipDeploy($commits))->toBeFalse();
+        expect(Github::shouldSkipDeploy($messages))->toBeTrue();
     });
 
-    test('returns false when single commit has no skip marker', function () {
-        $commits = [
-            ['message' => 'Deploy this please'],
+    test('returns false when at least one message has no skip marker', function () {
+        $messages = [
+            'Update docs [skip ci]',
+            'Actual feature change',
         ];
-        expect(Github::allCommitsSkipDeploy($commits))->toBeFalse();
+        expect(Github::shouldSkipDeploy($messages))->toBeFalse();
     });
 
-    test('handles commit with missing message key', function () {
-        $commits = [
-            ['id' => 'abc123'],
+    test('returns false when single message has no skip marker', function () {
+        expect(Github::shouldSkipDeploy(['Deploy this please']))->toBeFalse();
+    });
+
+    test('null entries are filtered before evaluation', function () {
+        $messages = [
+            null,
+            'Docs [skip ci]',
+            null,
         ];
-        expect(Github::allCommitsSkipDeploy($commits))->toBeFalse();
+        expect(Github::shouldSkipDeploy($messages))->toBeTrue();
+    });
+
+    test('matches PR title scenario (single string)', function () {
+        expect(Github::shouldSkipDeploy(['chore: update readme [skip ci]']))->toBeTrue();
+        expect(Github::shouldSkipDeploy(['feat: real change']))->toBeFalse();
+        expect(Github::shouldSkipDeploy([null]))->toBeFalse();
     });
 });
