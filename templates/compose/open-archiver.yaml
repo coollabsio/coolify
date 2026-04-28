@@ -1,5 +1,6 @@
 # documentation: https://docs.openarchiver.com/
 # slogan: A self-hosted, open-source email archiving solution with full-text search capability.
+# category: email
 # tags: email archiving,email,compliance,search
 # logo: svgs/openarchiver.svg
 # port: 3000

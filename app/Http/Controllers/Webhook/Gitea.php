@@ -67,8 +67,29 @@ class Gitea extends Controller
             }
             foreach ($applications as $application) {
                 $webhook_secret = data_get($application, 'manual_webhook_secret_gitea');
+                if (empty($webhook_secret)) {
+                    auditLogWebhookFailure('gitea', 'webhook_secret_missing', [
+                        'application_uuid' => $application->uuid,
+                        'application_name' => $application->name,
+                        'repository' => $full_name ?? null,
+                        'event' => $x_gitea_event,
+                    ]);
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'failed',
+                        'message' => 'Webhook secret not configured.',
+                    ]);
+
+                    continue;
+                }
                 $hmac = hash_hmac('sha256', $request->getContent(), $webhook_secret);
                 if (! hash_equals($x_hub_signature_256, $hmac) && ! isDev()) {
+                    auditLogWebhookFailure('gitea', 'invalid_signature', [
+                        'application_uuid' => $application->uuid,
+                        'application_name' => $application->name,
+                        'repository' => $full_name ?? null,
+                        'event' => $x_gitea_event,
+                    ]);
                     $return_payloads->push([
                         'application' => $application->name,
                         'status' => 'failed',
@@ -108,6 +129,15 @@ class Gitea extends Controller
                                     'message' => $result['message'],
                                 ]);
                             } else {
+                                auditLog('webhook.deployment.queued', [
+                                    'provider' => 'gitea',
+                                    'mode' => 'manual',
+                                    'application_uuid' => $application->uuid,
+                                    'application_name' => $application->name,
+                                    'deployment_uuid' => $deployment_uuid->toString(),
+                                    'commit' => data_get($payload, 'after'),
+                                    'repository' => $full_name ?? null,
+                                ]);
                                 $return_payloads->push([
                                     'status' => 'success',
                                     'message' => 'Deployment queued.',

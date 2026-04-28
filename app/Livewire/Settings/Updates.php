@@ -25,6 +25,9 @@ class Updates extends Component
 
     public function mount()
     {
+        if (! isInstanceAdmin()) {
+            return redirect()->route('dashboard');
+        }
         if (! isCloud()) {
             $this->server = Server::findOrFail(0);
         }

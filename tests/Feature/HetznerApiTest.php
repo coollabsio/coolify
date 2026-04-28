@@ -446,3 +446,74 @@ describe('POST /api/v1/servers/hetzner', function () {
         $response->assertStatus(401);
     });
 });
+
+describe('error responses do not leak exception details', function () {
+    test('locations endpoint returns generic 500 message on upstream failure', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/locations*' => Http::response([
+                'error' => ['message' => 'INTERNAL_LEAK_TOKEN_abc /var/secret/path'],
+            ], 500),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->getJson('/api/v1/hetzner/locations?cloud_provider_token_id='.$this->hetznerToken->uuid);
+
+        $response->assertStatus(500);
+        $response->assertExactJson(['message' => 'Failed to fetch Hetzner locations.']);
+        expect($response->getContent())->not->toContain('INTERNAL_LEAK_TOKEN_abc');
+        expect($response->getContent())->not->toContain('/var/secret/path');
+    });
+
+    test('server-types endpoint returns generic 500 message on upstream failure', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/server_types*' => Http::response([
+                'error' => ['message' => 'INTERNAL_LEAK_TOKEN_abc'],
+            ], 500),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->getJson('/api/v1/hetzner/server-types?cloud_provider_token_id='.$this->hetznerToken->uuid);
+
+        $response->assertStatus(500);
+        $response->assertExactJson(['message' => 'Failed to fetch Hetzner server types.']);
+        expect($response->getContent())->not->toContain('INTERNAL_LEAK_TOKEN_abc');
+    });
+
+    test('images endpoint returns generic 500 message on upstream failure', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/images*' => Http::response([
+                'error' => ['message' => 'INTERNAL_LEAK_TOKEN_abc'],
+            ], 500),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->getJson('/api/v1/hetzner/images?cloud_provider_token_id='.$this->hetznerToken->uuid);
+
+        $response->assertStatus(500);
+        $response->assertExactJson(['message' => 'Failed to fetch Hetzner images.']);
+        expect($response->getContent())->not->toContain('INTERNAL_LEAK_TOKEN_abc');
+    });
+
+    test('ssh-keys endpoint returns generic 500 message on upstream failure', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/ssh_keys*' => Http::response([
+                'error' => ['message' => 'INTERNAL_LEAK_TOKEN_abc'],
+            ], 500),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->getJson('/api/v1/hetzner/ssh-keys?cloud_provider_token_id='.$this->hetznerToken->uuid);
+
+        $response->assertStatus(500);
+        $response->assertExactJson(['message' => 'Failed to fetch Hetzner SSH keys.']);
+        expect($response->getContent())->not->toContain('INTERNAL_LEAK_TOKEN_abc');
+    });
+});

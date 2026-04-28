@@ -13,13 +13,51 @@ class StandalonePostgresql extends BaseModel
 {
     use ClearsGlobalSearchCache, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'uuid',
+        'name',
+        'description',
+        'postgres_user',
+        'postgres_password',
+        'postgres_db',
+        'postgres_initdb_args',
+        'postgres_host_auth_method',
+        'postgres_conf',
+        'init_scripts',
+        'status',
+        'image',
+        'is_public',
+        'public_port',
+        'ports_mappings',
+        'limits_memory',
+        'limits_memory_swap',
+        'limits_memory_swappiness',
+        'limits_memory_reservation',
+        'limits_cpus',
+        'limits_cpuset',
+        'limits_cpu_shares',
+        'started_at',
+        'restart_count',
+        'last_restart_at',
+        'last_restart_type',
+        'last_online_at',
+        'public_port_timeout',
+        'enable_ssl',
+        'ssl_mode',
+        'is_log_drain_enabled',
+        'is_include_timestamps',
+        'custom_docker_run_options',
+        'destination_type',
+        'destination_id',
+        'environment_id',
+    ];
 
     protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
     protected $casts = [
         'init_scripts' => 'array',
         'postgres_password' => 'encrypted',
+        'public_port_timeout' => 'integer',
         'restart_count' => 'integer',
         'last_restart_at' => 'datetime',
         'last_restart_type' => 'string',
@@ -58,7 +96,7 @@ class StandalonePostgresql extends BaseModel
         });
         static::saving(function ($database) {
             if ($database->isDirty('status')) {
-                $database->forceFill(['last_online_at' => now()]);
+                $database->last_online_at = now();
             }
         });
     }
@@ -113,7 +151,7 @@ class StandalonePostgresql extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
-            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+            instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
         }
     }
 

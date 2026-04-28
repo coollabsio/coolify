@@ -14,7 +14,10 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-    --font-sans: Inter, sans-serif;
+    --font-sans: 'Geist Sans', Inter, sans-serif;
+    --font-mono: 'Geist Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    --font-geist-sans: 'Geist Sans', Inter, sans-serif;
+    --font-logs: 'Geist Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 
     --color-base: #101010;
     --color-warning: #fcd452;
@@ -96,7 +99,7 @@ body {
 }
 
 body {
-    @apply min-h-screen text-sm antialiased scrollbar overflow-x-hidden;
+    @apply min-h-screen text-sm font-sans antialiased scrollbar overflow-x-hidden;
 }
 
 .coolify-monaco-editor {
@@ -163,7 +166,7 @@ tbody {
 }
 
 tr {
-    @apply text-black dark:text-neutral-400 dark:hover:bg-black hover:bg-neutral-200;
+    @apply text-black dark:text-neutral-400 dark:hover:bg-coolgray-300 hover:bg-neutral-100;
 }
 
 tr th {

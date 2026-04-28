@@ -57,11 +57,48 @@ class Bitbucket extends Controller
             }
             foreach ($applications as $application) {
                 $webhook_secret = data_get($application, 'manual_webhook_secret_bitbucket');
+                if (empty($webhook_secret)) {
+                    auditLogWebhookFailure('bitbucket', 'webhook_secret_missing', [
+                        'application_uuid' => $application->uuid,
+                        'application_name' => $application->name,
+                        'repository' => $full_name ?? null,
+                        'event' => $x_bitbucket_event,
+                    ]);
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'failed',
+                        'message' => 'Webhook secret not configured.',
+                    ]);
+
+                    continue;
+                }
                 $payload = $request->getContent();
 
-                [$algo, $hash] = explode('=', $x_bitbucket_token, 2);
-                $payloadHash = hash_hmac($algo, $payload, $webhook_secret);
+                $parts = explode('=', $x_bitbucket_token, 2);
+                if (count($parts) !== 2 || $parts[0] !== 'sha256') {
+                    auditLogWebhookFailure('bitbucket', 'malformed_signature', [
+                        'application_uuid' => $application->uuid,
+                        'application_name' => $application->name,
+                        'repository' => $full_name ?? null,
+                        'event' => $x_bitbucket_event,
+                    ]);
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'failed',
+                        'message' => 'Invalid signature.',
+                    ]);
+
+                    continue;
+                }
+                $hash = $parts[1];
+                $payloadHash = hash_hmac('sha256', $payload, $webhook_secret);
                 if (! hash_equals($hash, $payloadHash) && ! isDev()) {
+                    auditLogWebhookFailure('bitbucket', 'invalid_signature', [
+                        'application_uuid' => $application->uuid,
+                        'application_name' => $application->name,
+                        'repository' => $full_name ?? null,
+                        'event' => $x_bitbucket_event,
+                    ]);
                     $return_payloads->push([
                         'application' => $application->name,
                         'status' => 'failed',
@@ -99,6 +136,15 @@ class Bitbucket extends Controller
                                 'message' => $result['message'],
                             ]);
                         } else {
+                            auditLog('webhook.deployment.queued', [
+                                'provider' => 'bitbucket',
+                                'mode' => 'manual',
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
+                                'deployment_uuid' => $deployment_uuid->toString(),
+                                'commit' => $commit,
+                                'repository' => $full_name ?? null,
+                            ]);
                             $return_payloads->push([
                                 'application' => $application->name,
                                 'status' => 'success',

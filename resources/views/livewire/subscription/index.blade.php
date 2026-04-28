@@ -3,29 +3,26 @@
         Subscribe | Coolify
     </x-slot>
     @if (auth()->user()->isAdminFromSession())
-        @if (request()->query->get('cancelled'))
-            <div class="mb-6 rounded-sm alert-error">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
-                    viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>Something went wrong with your subscription. Please try again or contact
-                    support.</span>
-            </div>
-        @endif
         <div class="flex gap-2">
             <h1>Subscriptions</h1>
         </div>
         @if ($loading)
-            <div class="flex gap-2" wire:init="getStripeStatus">
-                Loading your subscription status...
+            <div class="flex items-center justify-center min-h-[60vh]" wire:init="getStripeStatus">
+                <x-loading text="Loading your subscription status..." />
             </div>
         @else
             @if ($isUnpaid)
-                <div class="mb-6 rounded-sm alert-error">
-                    <span>Your last payment was failed for Coolify Cloud.</span>
-                </div>
+                <x-banner :closable="false">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-red-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        <span><span class="font-bold text-red-500">Payment Failed.</span> Your last payment for Coolify
+                            Cloud has failed.</span>
+                    </div>
+                </x-banner>
                 <div>
                     <p class="mb-2">Open the following link, navigate to the button and pay your unpaid/past due
                         subscription.
@@ -34,18 +31,20 @@
                 </div>
             @else
                 @if (config('subscription.provider') === 'stripe')
-                    <div @class([
-                        'pb-4' => $isCancelled,
-                        'pb-10' => !$isCancelled,
-                    ])>
-                        @if ($isCancelled)
-                            <div class="alert-error">
-                                <span>It looks like your previous subscription has been cancelled, because you forgot to
-                                    pay
-                                    the bills.<br />Please subscribe again to continue using Coolify.</span>
+                    @if ($isCancelled)
+                        <x-banner :closable="false">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-5 h-5 text-red-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd"
+                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                                        clip-rule="evenodd" />
+                                </svg>
+                                <span><span class="font-bold text-red-500">No Active Subscription.</span> Subscribe to
+                                    a plan to start using Coolify Cloud.</span>
                             </div>
-                        @endif
-                    </div>
+                        </x-banner>
+                    @endif
+                    <div @class(['pt-4 pb-4' => $isCancelled, 'pb-10' => !$isCancelled])></div>
                     <livewire:subscription.pricing-plans />
                 @endif
             @endif

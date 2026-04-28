@@ -65,7 +65,7 @@ class Select extends Component
                 $this->existingPostgresqlUrl = 'postgres://coolify:password@coolify-db:5432';
             }
             $projectUuid = data_get($this->parameters, 'project_uuid');
-            $project = Project::whereUuid($projectUuid)->firstOrFail();
+            $project = Project::ownedByCurrentTeam()->whereUuid($projectUuid)->firstOrFail();
             $this->environments = $project->environments;
             $this->selectedEnvironment = $this->environments->where('uuid', data_get($this->parameters, 'environment_uuid'))->firstOrFail()->name;
 
@@ -79,7 +79,7 @@ class Select extends Component
                 $this->type = $queryType;
                 $this->server_id = $queryServerId;
                 $this->destination_uuid = $queryDestination;
-                $this->server = Server::find($queryServerId);
+                $this->server = Server::ownedByCurrentTeam()->find($queryServerId);
                 $this->current_step = 'select-postgresql-type';
             }
         } catch (\Exception $e) {

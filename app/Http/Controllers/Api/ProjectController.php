@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Support\ValidationPatterns;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
@@ -234,7 +235,7 @@ class ProjectController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = Validator::make($request->all(), [
@@ -261,6 +262,12 @@ class ProjectController extends Controller
             'name' => $request->name,
             'description' => $request->description,
             'team_id' => $teamId,
+        ]);
+
+        auditLog('api.project.created', [
+            'team_id' => $teamId,
+            'project_uuid' => $project->uuid,
+            'project_name' => $project->name,
         ]);
 
         return response()->json([
@@ -347,7 +354,7 @@ class ProjectController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = Validator::make($request->all(), [
@@ -380,6 +387,13 @@ class ProjectController extends Controller
         }
 
         $project->update($request->only($allowedFields));
+
+        auditLog('api.project.updated', [
+            'team_id' => $teamId,
+            'project_uuid' => $project->uuid,
+            'project_name' => $project->name,
+            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
+        ]);
 
         return response()->json([
             'uuid' => $project->uuid,
@@ -459,7 +473,15 @@ class ProjectController extends Controller
             return response()->json(['message' => 'Project has resources, so it cannot be deleted.'], 400);
         }
 
+        $projectUuid = $project->uuid;
+        $projectName = $project->name;
         $project->delete();
+
+        auditLog('api.project.deleted', [
+            'team_id' => $teamId,
+            'project_uuid' => $projectUuid,
+            'project_name' => $projectName,
+        ]);
 
         return response()->json(['message' => 'Project deleted.']);
     }
@@ -600,7 +622,7 @@ class ProjectController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = Validator::make($request->all(), [
@@ -638,6 +660,13 @@ class ProjectController extends Controller
 
         $environment = $project->environments()->create([
             'name' => $request->name,
+        ]);
+
+        auditLog('api.project.environment_created', [
+            'team_id' => $teamId,
+            'project_uuid' => $project->uuid,
+            'environment_uuid' => $environment->uuid,
+            'environment_name' => $environment->name,
         ]);
 
         return response()->json([
@@ -722,7 +751,16 @@ class ProjectController extends Controller
             return response()->json(['message' => 'Environment has resources, so it cannot be deleted.'], 400);
         }
 
+        $envUuid = $environment->uuid;
+        $envName = $environment->name;
         $environment->delete();
+
+        auditLog('api.project.environment_deleted', [
+            'team_id' => $teamId,
+            'project_uuid' => $project->uuid,
+            'environment_uuid' => $envUuid,
+            'environment_name' => $envName,
+        ]);
 
         return response()->json(['message' => 'Environment deleted.']);
     }

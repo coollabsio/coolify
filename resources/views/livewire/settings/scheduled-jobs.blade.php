@@ -34,7 +34,7 @@
                 ])
                 :class="activeTab === 'skipped-jobs' && 'dark:bg-coollabs bg-coollabs text-white'"
                 @click="activeTab = 'skipped-jobs'; window.location.hash = 'skipped-jobs'">
-                Skipped Jobs ({{ $skipLogs->count() }})
+                Skipped Jobs ({{ $skipTotalCount }})
             </div>
         </div>
 
@@ -186,14 +186,35 @@
         {{-- Skipped Jobs Tab --}}
         <div x-show="activeTab === 'skipped-jobs'" x-cloak>
             <div class="pb-4 text-sm text-gray-500">Jobs that were not dispatched because conditions were not met.</div>
+            @if($skipTotalCount > $skipDefaultTake)
+                <div class="flex items-center gap-2 mb-4">
+                    <x-forms.button disabled="{{ !$showSkipPrev }}" wire:click="skipPreviousPage">
+                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </x-forms.button>
+                    <span class="text-sm">
+                        Page {{ $skipCurrentPage }} of {{ ceil($skipTotalCount / $skipDefaultTake) }}
+                    </span>
+                    <x-forms.button disabled="{{ !$showSkipNext }}" wire:click="skipNextPage">
+                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 5l7 7-7 7" />
+                        </svg>
+                    </x-forms.button>
+                </div>
+            @endif
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-left">
                     <thead class="text-xs uppercase bg-gray-50 dark:bg-coolgray-200">
                         <tr>
                             <th class="px-4 py-3">Time</th>
                             <th class="px-4 py-3">Type</th>
+                            <th class="px-4 py-3">Resource</th>
                             <th class="px-4 py-3">Reason</th>
-                            <th class="px-4 py-3">Details</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -215,6 +236,17 @@
                                     </span>
                                 </td>
                                 <td class="px-4 py-2">
+                                    @if($skip['link'] ?? null)
+                                        <a href="{{ $skip['link'] }}" class="text-white underline hover:no-underline">
+                                            {{ $skip['resource_name'] }}
+                                        </a>
+                                    @elseif($skip['resource_name'] ?? null)
+                                        {{ $skip['resource_name'] }}
+                                    @else
+                                        <span class="text-gray-500">{{ $skip['context']['task_name'] ?? $skip['context']['server_name'] ?? 'Deleted' }}</span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-2">
                                     @php
                                         $reasonLabel = match($skip['reason']) {
                                             'server_not_functional' => 'Server not functional',
@@ -234,15 +266,6 @@
                                         };
                                     @endphp
                                     <span class="{{ $reasonBg }}">{{ $reasonLabel }}</span>
-                                </td>
-                                <td class="px-4 py-2 text-xs text-gray-500">
-                                    @php
-                                        $details = collect($skip['context'])
-                                            ->except(['type', 'skip_reason', 'execution_time'])
-                                            ->map(fn($v, $k) => str_replace('_', ' ', $k) . ': ' . $v)
-                                            ->implode(', ');
-                                    @endphp
-                                    {{ $details }}
                                 </td>
                             </tr>
                         @empty

@@ -32,6 +32,9 @@ class Gitlab extends Controller
             }
 
             if (empty($x_gitlab_token)) {
+                auditLogWebhookFailure('gitlab', 'webhook_token_missing', [
+                    'event' => $x_gitlab_event,
+                ]);
                 $return_payloads->push([
                     'status' => 'failed',
                     'message' => 'Invalid signature.',
@@ -100,7 +103,28 @@ class Gitlab extends Controller
             }
             foreach ($applications as $application) {
                 $webhook_secret = data_get($application, 'manual_webhook_secret_gitlab');
-                if (! hash_equals($webhook_secret ?? '', $x_gitlab_token ?? '')) {
+                if (empty($webhook_secret)) {
+                    auditLogWebhookFailure('gitlab', 'webhook_secret_missing', [
+                        'application_uuid' => $application->uuid,
+                        'application_name' => $application->name,
+                        'repository' => $full_name ?? null,
+                        'event' => $x_gitlab_event,
+                    ]);
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'failed',
+                        'message' => 'Webhook secret not configured.',
+                    ]);
+
+                    continue;
+                }
+                if (! hash_equals($webhook_secret, $x_gitlab_token ?? '')) {
+                    auditLogWebhookFailure('gitlab', 'invalid_signature', [
+                        'application_uuid' => $application->uuid,
+                        'application_name' => $application->name,
+                        'repository' => $full_name ?? null,
+                        'event' => $x_gitlab_event,
+                    ]);
                     $return_payloads->push([
                         'application' => $application->name,
                         'status' => 'failed',
@@ -141,6 +165,15 @@ class Gitlab extends Controller
                                     'application_name' => $application->name,
                                 ]);
                             } else {
+                                auditLog('webhook.deployment.queued', [
+                                    'provider' => 'gitlab',
+                                    'mode' => 'manual',
+                                    'application_uuid' => $application->uuid,
+                                    'application_name' => $application->name,
+                                    'deployment_uuid' => $deployment_uuid->toString(),
+                                    'commit' => data_get($payload, 'after'),
+                                    'repository' => $full_name ?? null,
+                                ]);
                                 $return_payloads->push([
                                     'status' => 'success',
                                     'message' => 'Deployment queued.',

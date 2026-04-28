@@ -181,7 +181,7 @@ class StartRedis
             );
         }
 
-        if (! is_null($this->database->redis_conf) || ! empty($this->database->redis_conf)) {
+        if (! is_null($this->database->redis_conf) && ! empty($this->database->redis_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
                 'source' => $this->configuration_dir.'/redis.conf',
@@ -203,6 +203,9 @@ class StartRedis
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         if ($this->database->enable_ssl) {
             $this->commands[] = "chown -R 999:999 $this->configuration_dir/ssl/server.key $this->configuration_dir/ssl/server.crt";
+        }
+        if (! is_null($this->database->redis_conf) && ! empty($this->database->redis_conf)) {
+            $this->commands[] = "chown 999:999 $this->configuration_dir/redis.conf";
         }
         $this->commands[] = "docker stop -t 10 $container_name 2>/dev/null || true";
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";

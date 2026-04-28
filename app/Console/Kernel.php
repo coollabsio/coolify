@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Jobs\ApiTokenExpirationWarningJob;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
 use App\Jobs\CheckTraefikVersionJob;
@@ -40,7 +41,9 @@ class Kernel extends ConsoleKernel
         }
 
         // $this->scheduleInstance->job(new CleanupStaleMultiplexedConnections)->hourly();
-        $this->scheduleInstance->command('cleanup:redis')->weekly();
+        $this->scheduleInstance->command('cleanup:redis --clear-locks')->daily();
+        $this->scheduleInstance->command('sanctum:prune-expired --hours=1')->hourly()->onOneServer();
+        $this->scheduleInstance->job(new ApiTokenExpirationWarningJob)->hourly()->onOneServer();
 
         if (isDev()) {
             // Instance Jobs

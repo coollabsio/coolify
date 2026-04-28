@@ -7,7 +7,7 @@
 
 services:
   databasus:
-    image: 'databasus/databasus:v2.18.0' # Released on 28 Dec, 2025
+    image: 'databasus/databasus:v3.16.2' # Released on 23 February, 2026
     environment:
       - SERVICE_URL_DATABASUS_4005
     volumes:

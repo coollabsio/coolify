@@ -85,10 +85,14 @@ class OtherController extends Controller
             return invalidTokenResponse();
         }
         if ($teamId !== '0') {
+            auditLog('api.instance.enable_denied', ['team_id' => $teamId], 'warning');
+
             return response()->json(['message' => 'You are not allowed to enable the API.'], 403);
         }
         $settings = instanceSettings();
         $settings->update(['is_api_enabled' => true]);
+
+        auditLog('api.instance.enabled', ['team_id' => $teamId]);
 
         return response()->json(['message' => 'API enabled.'], 200);
     }
@@ -137,21 +141,29 @@ class OtherController extends Controller
             return invalidTokenResponse();
         }
         if ($teamId !== '0') {
+            auditLog('api.instance.disable_denied', ['team_id' => $teamId], 'warning');
+
             return response()->json(['message' => 'You are not allowed to disable the API.'], 403);
         }
         $settings = instanceSettings();
         $settings->update(['is_api_enabled' => false]);
+
+        auditLog('api.instance.disabled', ['team_id' => $teamId]);
 
         return response()->json(['message' => 'API disabled.'], 200);
     }
 
     public function feedback(Request $request)
     {
-        $content = $request->input('content');
+        $data = $request->validate([
+            'content' => ['required', 'string', 'min:10', 'max:2000'],
+        ]);
+
         $webhook_url = config('constants.webhooks.feedback_discord_webhook');
         if ($webhook_url) {
-            Http::post($webhook_url, [
-                'content' => $content,
+            Http::timeout(5)->post($webhook_url, [
+                'content' => $data['content'],
+                'allowed_mentions' => ['parse' => []],
             ]);
         }
 

@@ -51,7 +51,7 @@ class StartClickhouse
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => [
-                        'test' => "clickhouse-client --user {$this->database->clickhouse_admin_user} --password {$this->database->clickhouse_admin_password} --query 'SELECT 1'",
+                        'test' => ['CMD', 'clickhouse-client', '--user', (string) $this->database->clickhouse_admin_user, '--password', (string) $this->database->clickhouse_admin_password, '--query', 'SELECT 1'],
                         'interval' => '5s',
                         'timeout' => '5s',
                         'retries' => 10,
