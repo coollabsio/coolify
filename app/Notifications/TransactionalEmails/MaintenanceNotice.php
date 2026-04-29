@@ -56,6 +56,7 @@ class MaintenanceNotice extends CustomEmailNotification
             'euAbbr' => $startEu->format('T'),
             'durationMinutes' => $this->durationMinutes,
             'subscriptionUrl' => 'https://app.coolify.io/subscription',
+            'subscriptionNewUrl' => 'https://app.coolify.io/subscription/new',
         ]);
 
         return $mail;
