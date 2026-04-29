@@ -797,12 +797,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                         LocalFileVolume::updateOrCreate(
                             [
+                                'fs_path' => (string) $source,
                                 'mount_path' => $target,
                                 'resource_id' => $originalResource->id,
                                 'resource_type' => get_class($originalResource),
                             ],
                             [
-                                'fs_path' => $source,
+                                'fs_path' => (string) $source,
                                 'mount_path' => $target,
                                 'content' => $content,
                                 'is_directory' => $isDirectory,
@@ -2178,12 +2179,13 @@ function serviceParser(Service $resource): Collection
                         $source = replaceLocalSource($source, $mainDirectory);
                         LocalFileVolume::updateOrCreate(
                             [
+                                'fs_path' => (string) $source,
                                 'mount_path' => $target,
                                 'resource_id' => $originalResource->id,
                                 'resource_type' => get_class($originalResource),
                             ],
                             [
-                                'fs_path' => $source,
+                                'fs_path' => (string) $source,
                                 'mount_path' => $target,
                                 'content' => $content,
                                 'is_directory' => $isDirectory,

@@ -2165,12 +2165,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
                             LocalFileVolume::updateOrCreate(
                                 [
+                                    'fs_path' => (string) $source,
                                     'mount_path' => $target,
                                     'resource_id' => $savedService->id,
                                     'resource_type' => get_class($savedService),
                                 ],
                                 [
-                                    'fs_path' => $source,
+                                    'fs_path' => (string) $source,
                                     'mount_path' => $target,
                                     'content' => $content,
                                     'is_directory' => $isDirectory,

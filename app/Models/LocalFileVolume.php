@@ -6,6 +6,7 @@ use App\Events\FileStorageChanged;
 use App\Jobs\ServerStorageSaveJob;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Stringable;
 use Symfony\Component\Yaml\Yaml;
 
 class LocalFileVolume extends BaseModel
@@ -279,69 +280,65 @@ class LocalFileVolume extends BaseModel
         return $this->isReadOnlyVolume();
     }
 
-    // Check if this volume is read-only by parsing the docker-compose content
+    // Check if this volume is read-only by parsing the docker-compose content.
+    // Matches the row to its source compose volume by both mount_path (container target)
+    // and fs_path (post-transform host source) — supports sibling rows where multiple
+    // compose services bind different host files to the same container path.
     public function isReadOnlyVolume(): bool
     {
         try {
-            // Only check for services
-            $service = $this->service;
-            if (! $service || ! method_exists($service, 'service')) {
+            $resource = $this->service;
+            if (! $resource) {
                 return false;
             }
 
-            $actualService = $service->service;
-            if (! $actualService || ! $actualService->docker_compose_raw) {
-                return false;
+            if ($this->isServiceResource()) {
+                $parent = $resource->service;
+                if (! $parent || ! $parent->docker_compose_raw) {
+                    return false;
+                }
+                $composeRaw = $parent->docker_compose_raw;
+                $mainDirectory = str(base_configuration_dir().'/services/'.$parent->uuid);
+            } else {
+                $composeRaw = data_get($resource, 'docker_compose_raw');
+                if (! $composeRaw) {
+                    return false;
+                }
+                $mainDirectory = str(base_configuration_dir().'/applications/'.$resource->uuid);
             }
 
-            // Parse the docker-compose content
-            $compose = Yaml::parse($actualService->docker_compose_raw);
+            $compose = Yaml::parse($composeRaw);
             if (! isset($compose['services'])) {
                 return false;
             }
 
-            // Find the service that this volume belongs to
-            $serviceName = $service->name;
-            if (! isset($compose['services'][$serviceName]['volumes'])) {
-                return false;
-            }
+            $myMount = str($this->mount_path)->ltrim('/')->toString();
 
-            $volumes = $compose['services'][$serviceName]['volumes'];
-
-            // Check each volume to find a match
-            // Note: We match on mount_path (container path) only, since fs_path gets transformed
-            // from relative (./file) to absolute (/data/coolify/services/uuid/file) during parsing
-            foreach ($volumes as $volume) {
-                // Volume can be string like "host:container:ro" or "host:container"
-                if (is_string($volume)) {
-                    $parts = explode(':', $volume);
-
-                    // Check if this volume matches our mount_path
-                    if (count($parts) >= 2) {
-                        $containerPath = $parts[1];
+            foreach ($compose['services'] as $svc) {
+                foreach (data_get($svc, 'volumes', []) as $volume) {
+                    if (is_string($volume)) {
+                        $parts = explode(':', $volume);
+                        if (count($parts) < 2) {
+                            continue;
+                        }
+                        $source = $parts[0];
+                        $target = $parts[1];
                         $options = $parts[2] ?? null;
 
-                        // Match based on mount_path
-                        // Remove leading slash from mount_path if present for comparison
-                        $mountPath = str($this->mount_path)->ltrim('/')->toString();
-                        $containerPathClean = str($containerPath)->ltrim('/')->toString();
-
-                        if ($mountPath === $containerPathClean || $this->mount_path === $containerPath) {
+                        if ($this->matchesComposeVolume($source, $target, $mainDirectory, $myMount)) {
                             return $options === 'ro';
                         }
-                    }
-                } elseif (is_array($volume)) {
-                    // Long-form syntax: { type: bind, source: ..., target: ..., read_only: true }
-                    $containerPath = data_get($volume, 'target');
-                    $readOnly = data_get($volume, 'read_only', false);
+                    } elseif (is_array($volume)) {
+                        $source = data_get($volume, 'source');
+                        $target = data_get($volume, 'target');
+                        $readOnly = (bool) data_get($volume, 'read_only', false);
+                        if ($source === null || $target === null) {
+                            continue;
+                        }
 
-                    // Match based on mount_path
-                    // Remove leading slash from mount_path if present for comparison
-                    $mountPath = str($this->mount_path)->ltrim('/')->toString();
-                    $containerPathClean = str($containerPath)->ltrim('/')->toString();
-
-                    if ($mountPath === $containerPathClean || $this->mount_path === $containerPath) {
-                        return $readOnly === true;
+                        if ($this->matchesComposeVolume($source, $target, $mainDirectory, $myMount)) {
+                            return $readOnly;
+                        }
                     }
                 }
             }
@@ -352,5 +349,16 @@ class LocalFileVolume extends BaseModel
 
             return false;
         }
+    }
+
+    private function matchesComposeVolume(string $source, string $target, Stringable $mainDirectory, string $normalizedMount): bool
+    {
+        $targetClean = str($target)->ltrim('/')->toString();
+        if ($targetClean !== $normalizedMount && $target !== $this->mount_path) {
+            return false;
+        }
+        $sourceTransformed = replaceLocalSource(str($source), $mainDirectory)->value();
+
+        return $sourceTransformed === $this->fs_path;
     }
 }
