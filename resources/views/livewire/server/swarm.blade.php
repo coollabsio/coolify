@@ -8,8 +8,12 @@
         <div class="w-full">
             <div>
                 <div class="flex items-center gap-2">
-                    <h2>Swarm <span class="text-xs text-neutral-500">(experimental)</span></h2>
+                    <h2>Swarm</h2>
+                    <x-deprecated-badge />
                 </div>
+                <x-callout type="warning" title="Deprecated" class="my-4">
+                    {{ config('deprecations.swarm') }}
+                </x-callout>
                 <div class="pb-4">Read the docs <a class='underline dark:text-white'
                         href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>.
                 </div>

@@ -835,6 +835,20 @@
                                                                 <div class="font-medium text-neutral-900 dark:text-white truncate"
                                                                     x-text="item.name">
                                                                 </div>
+                                                                <template x-if="item.amd_only">
+                                                                    <span
+                                                                        class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 shrink-0"
+                                                                        title="This service only supports AMD64/x86_64 architecture">
+                                                                        AMD only
+                                                                    </span>
+                                                                </template>
+                                                                <template x-if="item.arm_only">
+                                                                    <span
+                                                                        class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 shrink-0"
+                                                                        title="This service only supports ARM64/aarch64 architecture">
+                                                                        ARM only
+                                                                    </span>
+                                                                </template>
                                                                 <span
                                                                     class="text-xs text-neutral-500 dark:text-neutral-400 shrink-0"
                                                                     x-text="item.quickcommand"

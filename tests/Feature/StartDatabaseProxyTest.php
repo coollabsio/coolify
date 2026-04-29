@@ -43,3 +43,15 @@ test('isNonTransientError detects port conflict patterns', function () {
         ->and($method->invoke($action, 'network timeout'))->toBeFalse()
         ->and($method->invoke($action, 'connection refused'))->toBeFalse();
 });
+
+test('buildProxyTimeoutConfig normalizes invalid values to default', function (?int $input, string $expected) {
+    $action = new StartDatabaseProxy;
+    $method = new ReflectionMethod($action, 'buildProxyTimeoutConfig');
+
+    expect($method->invoke($action, $input))->toBe($expected);
+})->with([
+    [null, 'proxy_timeout 3600s;'],
+    [0, 'proxy_timeout 3600s;'],
+    [-10, 'proxy_timeout 3600s;'],
+    [120, 'proxy_timeout 120s;'],
+]);

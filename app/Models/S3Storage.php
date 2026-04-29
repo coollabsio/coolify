@@ -2,17 +2,29 @@
 
 namespace App\Models;
 
+use App\Rules\SafeWebhookUrl;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class S3Storage extends BaseModel
 {
     use HasFactory, HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+        'region',
+        'key',
+        'secret',
+        'bucket',
+        'endpoint',
+        'is_usable',
+        'unusable_email_sent',
+    ];
 
     protected $casts = [
         'is_usable' => 'boolean',
@@ -40,6 +52,13 @@ class S3Storage extends BaseModel
                 $storage->secret = trim($storage->secret);
             }
         });
+
+        static::deleting(function (S3Storage $storage) {
+            ScheduledDatabaseBackup::where('s3_storage_id', $storage->id)->update([
+                'save_s3' => false,
+                's3_storage_id' => null,
+            ]);
+        });
     }
 
     public static function ownedByCurrentTeam(array $select = ['*'])
@@ -47,6 +66,13 @@ class S3Storage extends BaseModel
         $selectArray = collect($select)->concat(['id']);
 
         return S3Storage::whereTeamId(currentTeam()->id)->select($selectArray->all())->orderBy('name');
+    }
+
+    public static function ownedByCurrentTeamAPI(int $teamId, array $select = ['*'])
+    {
+        $selectArray = collect($select)->concat(['id']);
+
+        return S3Storage::whereTeamId($teamId)->select($selectArray->all())->orderBy('name');
     }
 
     public function isUsable()
@@ -57,6 +83,11 @@ class S3Storage extends BaseModel
     public function team()
     {
         return $this->belongsTo(Team::class);
+    }
+
+    public function scheduledBackups()
+    {
+        return $this->hasMany(ScheduledDatabaseBackup::class, 's3_storage_id');
     }
 
     public function awsUrl()
@@ -110,6 +141,14 @@ class S3Storage extends BaseModel
     public function testConnection(bool $shouldSave = false)
     {
         try {
+            $validator = Validator::make(
+                ['endpoint' => $this['endpoint']],
+                ['endpoint' => ['required', new SafeWebhookUrl]],
+            );
+            if ($validator->fails()) {
+                throw new \RuntimeException('S3 endpoint is not allowed: '.$validator->errors()->first('endpoint'));
+            }
+
             $disk = Storage::build([
                 'driver' => 's3',
                 'region' => $this['region'],

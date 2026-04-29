@@ -89,6 +89,62 @@ class All extends Component
         return $query->get();
     }
 
+    public function getHardcodedEnvironmentVariablesProperty()
+    {
+        return $this->getHardcodedVariables(false);
+    }
+
+    public function getHardcodedEnvironmentVariablesPreviewProperty()
+    {
+        return $this->getHardcodedVariables(true);
+    }
+
+    protected function getHardcodedVariables(bool $isPreview)
+    {
+        // Only for services and docker-compose applications
+        if ($this->resource->type() !== 'service' &&
+            ($this->resourceClass !== 'App\Models\Application' ||
+             ($this->resourceClass === 'App\Models\Application' && $this->resource->build_pack !== 'dockercompose'))) {
+            return collect([]);
+        }
+
+        $dockerComposeRaw = $this->resource->docker_compose_raw ?? $this->resource->docker_compose;
+
+        if (blank($dockerComposeRaw)) {
+            return collect([]);
+        }
+
+        // Extract all hard-coded variables
+        $hardcodedVars = extractHardcodedEnvironmentVariables($dockerComposeRaw);
+
+        // Filter out magic variables (SERVICE_FQDN_*, SERVICE_URL_*, SERVICE_NAME_*)
+        $hardcodedVars = $hardcodedVars->filter(function ($var) {
+            $key = $var['key'];
+
+            return ! str($key)->startsWith(['SERVICE_FQDN_', 'SERVICE_URL_', 'SERVICE_NAME_']);
+        });
+
+        // Filter out variables that exist in database (user has overridden/managed them)
+        // For preview, check against preview variables; for production, check against production variables
+        if ($isPreview) {
+            $managedKeys = $this->resource->environment_variables_preview()->pluck('key')->toArray();
+        } else {
+            $managedKeys = $this->resource->environment_variables()->where('is_preview', false)->pluck('key')->toArray();
+        }
+
+        $hardcodedVars = $hardcodedVars->filter(function ($var) use ($managedKeys) {
+            return ! in_array($var['key'], $managedKeys);
+        });
+
+        // Apply sorting based on is_env_sorting_enabled
+        if ($this->is_env_sorting_enabled) {
+            $hardcodedVars = $hardcodedVars->sortBy('key')->values();
+        }
+        // Otherwise keep order from docker-compose file
+
+        return $hardcodedVars;
+    }
+
     public function getDevView()
     {
         $this->variables = $this->formatEnvironmentVariables($this->environmentVariables);
@@ -240,6 +296,7 @@ class All extends Component
         $environment->is_runtime = $data['is_runtime'] ?? true;
         $environment->is_buildtime = $data['is_buildtime'] ?? true;
         $environment->is_preview = $data['is_preview'] ?? false;
+        $environment->comment = $data['comment'] ?? null;
         $environment->resourceable_id = $this->resource->id;
         $environment->resourceable_type = $this->resource->getMorphClass();
 
@@ -280,18 +337,37 @@ class All extends Component
     private function updateOrCreateVariables($isPreview, $variables)
     {
         $count = 0;
-        foreach ($variables as $key => $value) {
+        foreach ($variables as $key => $data) {
             if (str($key)->startsWith('SERVICE_FQDN') || str($key)->startsWith('SERVICE_URL') || str($key)->startsWith('SERVICE_NAME')) {
                 continue;
             }
+
+            // Extract value and comment from parsed data
+            // Handle both array format ['value' => ..., 'comment' => ...] and plain string values
+            $value = is_array($data) ? ($data['value'] ?? '') : $data;
+            $comment = is_array($data) ? ($data['comment'] ?? null) : null;
+
             $method = $isPreview ? 'environment_variables_preview' : 'environment_variables';
             $found = $this->resource->$method()->where('key', $key)->first();
 
             if ($found) {
                 if (! $found->is_shown_once && ! $found->is_multiline) {
-                    // Only count as a change if the value actually changed
+                    $changed = false;
+
+                    // Update value if it changed
                     if ($found->value !== $value) {
                         $found->value = $value;
+                        $changed = true;
+                    }
+
+                    // Only update comment from inline comment if one is provided (overwrites existing)
+                    // If $comment is null, don't touch existing comment field to preserve it
+                    if ($comment !== null && $found->comment !== $comment) {
+                        $found->comment = $comment;
+                        $changed = true;
+                    }
+
+                    if ($changed) {
                         $found->save();
                         $count++;
                     }
@@ -300,6 +376,7 @@ class All extends Component
                 $environment = new EnvironmentVariable;
                 $environment->key = $key;
                 $environment->value = $value;
+                $environment->comment = $comment; // Set comment from inline comment
                 $environment->is_multiline = false;
                 $environment->is_preview = $isPreview;
                 $environment->resourceable_id = $this->resource->id;

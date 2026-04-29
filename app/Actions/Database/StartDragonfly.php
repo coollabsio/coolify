@@ -107,7 +107,7 @@ class StartDragonfly
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => [
-                        'test' => "redis-cli -a {$this->database->dragonfly_password} ping",
+                        'test' => ['CMD', 'redis-cli', '-a', (string) $this->database->dragonfly_password, 'ping'],
                         'interval' => '5s',
                         'timeout' => '5s',
                         'retries' => 10,

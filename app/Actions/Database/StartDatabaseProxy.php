@@ -51,9 +51,11 @@ class StartDatabaseProxy
         }
 
         $configuration_dir = database_proxy_dir($database->uuid);
+        $host_configuration_dir = $configuration_dir;
         if (isDev()) {
-            $configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
+            $host_configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
         }
+        $timeoutConfig = $this->buildProxyTimeoutConfig($database->public_port_timeout);
         $nginxconf = <<<EOF
     user  nginx;
     worker_processes  auto;
@@ -67,6 +69,7 @@ class StartDatabaseProxy
        server {
             listen $database->public_port;
             proxy_pass $containerName:$internalPort;
+            $timeoutConfig
        }
     }
     EOF;
@@ -85,7 +88,7 @@ class StartDatabaseProxy
                     'volumes' => [
                         [
                             'type' => 'bind',
-                            'source' => "$configuration_dir/nginx.conf",
+                            'source' => "$host_configuration_dir/nginx.conf",
                             'target' => '/etc/nginx/nginx.conf',
                         ],
                     ],
@@ -159,5 +162,14 @@ class StartDatabaseProxy
         }
 
         return false;
+    }
+
+    private function buildProxyTimeoutConfig(?int $timeout): string
+    {
+        if ($timeout === null || $timeout < 1) {
+            $timeout = 3600;
+        }
+
+        return "proxy_timeout {$timeout}s;";
     }
 }

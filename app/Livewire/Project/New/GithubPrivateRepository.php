@@ -5,9 +5,8 @@ namespace App\Livewire\Project\New;
 use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\Project;
-use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
 use App\Rules\ValidGitBranch;
+use App\Support\ValidationPatterns;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Livewire\Component;
@@ -98,6 +97,8 @@ class GithubPrivateRepository extends Component
     public function loadRepositories($github_app_id)
     {
         $this->repositories = collect();
+        $this->branches = collect();
+        $this->total_branches_count = 0;
         $this->page = 1;
         $this->selected_github_app_id = $github_app_id;
         $this->github_app = GithubApp::where('id', $github_app_id)->first();
@@ -168,25 +169,22 @@ class GithubPrivateRepository extends Component
                 'selected_repository_owner' => 'required|string|regex:/^[a-zA-Z0-9\-_]+$/',
                 'selected_repository_repo' => 'required|string|regex:/^[a-zA-Z0-9\-_\.]+$/',
                 'selected_branch_name' => ['required', 'string', new ValidGitBranch],
-                'docker_compose_location' => ['nullable', 'string', 'max:255', 'regex:/^\/[a-zA-Z0-9._\-\/]+$/'],
+                'docker_compose_location' => ValidationPatterns::filePathRules(),
             ]);
 
             if ($validator->fails()) {
                 throw new \RuntimeException('Invalid repository data: '.$validator->errors()->first());
             }
 
-            $destination_uuid = $this->query['destination'];
-            $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+            $destination_uuid = $this->query['destination'] ?? null;
+            $destination = find_destination_for_current_team($destination_uuid);
             if (! $destination) {
-                $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
-            }
-            if (! $destination) {
-                throw new \Exception('Destination not found. What?!');
+                throw new \Exception('Destination not found.');
             }
             $destination_class = $destination->getMorphClass();
 
-            $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-            $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
+            $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
+            $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
 
             $application = Application::create([
                 'name' => generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name),

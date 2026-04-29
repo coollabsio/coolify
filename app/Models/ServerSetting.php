@@ -49,13 +49,60 @@ use OpenApi\Attributes as OA;
         'updated_at' => ['type' => 'string'],
         'delete_unused_volumes' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused volumes should be deleted.'],
         'delete_unused_networks' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused networks should be deleted.'],
+        'connection_timeout' => ['type' => 'integer', 'description' => 'SSH connection timeout in seconds.'],
     ]
 )]
 class ServerSetting extends Model
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'server_id',
+        'is_swarm_manager',
+        'is_jump_server',
+        'is_build_server',
+        'is_reachable',
+        'is_usable',
+        'wildcard_domain',
+        'is_cloudflare_tunnel',
+        'is_logdrain_newrelic_enabled',
+        'logdrain_newrelic_license_key',
+        'logdrain_newrelic_base_uri',
+        'is_logdrain_highlight_enabled',
+        'logdrain_highlight_project_id',
+        'is_logdrain_axiom_enabled',
+        'logdrain_axiom_dataset_name',
+        'logdrain_axiom_api_key',
+        'is_swarm_worker',
+        'is_logdrain_custom_enabled',
+        'logdrain_custom_config',
+        'logdrain_custom_config_parser',
+        'concurrent_builds',
+        'dynamic_timeout',
+        'force_disabled',
+        'is_metrics_enabled',
+        'generate_exact_labels',
+        'force_docker_cleanup',
+        'docker_cleanup_frequency',
+        'docker_cleanup_threshold',
+        'server_timezone',
+        'delete_unused_volumes',
+        'delete_unused_networks',
+        'is_sentinel_enabled',
+        'sentinel_token',
+        'sentinel_metrics_refresh_rate_seconds',
+        'sentinel_metrics_history_days',
+        'sentinel_push_interval_seconds',
+        'sentinel_custom_url',
+        'server_disk_usage_notification_threshold',
+        'is_sentinel_debug_enabled',
+        'server_disk_usage_check_frequency',
+        'is_terminal_enabled',
+        'deployment_queue_limit',
+        'disable_application_image_retention',
+        'connection_timeout',
+    ];
 
     protected $casts = [
+        'force_disabled' => 'boolean',
         'force_docker_cleanup' => 'boolean',
         'docker_cleanup_threshold' => 'integer',
         'sentinel_token' => 'encrypted',
@@ -63,6 +110,7 @@ class ServerSetting extends Model
         'is_usable' => 'boolean',
         'is_terminal_enabled' => 'boolean',
         'disable_application_image_retention' => 'boolean',
+        'connection_timeout' => 'integer',
     ];
 
     protected static function booted()
@@ -90,6 +138,15 @@ class ServerSetting extends Model
                 $settings->server->restartSentinel();
             }
         });
+    }
+
+    /**
+     * Validate that a sentinel token contains only safe characters.
+     * Prevents OS command injection when the token is interpolated into shell commands.
+     */
+    public static function isValidSentinelToken(string $token): bool
+    {
+        return (bool) preg_match('/\A[a-zA-Z0-9._\-+=\/]+\z/', $token);
     }
 
     public function generateSentinelToken(bool $save = true, bool $ignoreEvent = false)

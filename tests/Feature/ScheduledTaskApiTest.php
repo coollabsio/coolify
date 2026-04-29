@@ -2,6 +2,7 @@
 
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledTaskExecution;
@@ -15,6 +16,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    // ApiAllowed middleware requires InstanceSettings with id=0
+    InstanceSettings::create(['id' => 0, 'is_api_enabled' => true]);
+
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
@@ -25,12 +29,14 @@ beforeEach(function () {
     $this->bearerToken = $this->token->plainTextToken;
 
     $this->server = Server::factory()->create(['team_id' => $this->team->id]);
-    $this->destination = StandaloneDocker::factory()->create(['server_id' => $this->server->id]);
+    // Server::booted() auto-creates a StandaloneDocker, reuse it
+    $this->destination = StandaloneDocker::where('server_id', $this->server->id)->first();
+    // Project::booted() auto-creates a 'production' Environment, reuse it
     $this->project = Project::factory()->create(['team_id' => $this->team->id]);
-    $this->environment = Environment::factory()->create(['project_id' => $this->project->id]);
+    $this->environment = $this->project->environments()->first();
 });
 
-function authHeaders($bearerToken): array
+function scheduledTaskAuthHeaders($bearerToken): array
 {
     return [
         'Authorization' => 'Bearer '.$bearerToken,
@@ -46,7 +52,7 @@ describe('GET /api/v1/applications/{uuid}/scheduled-tasks', function () {
             'destination_type' => $this->destination->getMorphClass(),
         ]);
 
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->getJson("/api/v1/applications/{$application->uuid}/scheduled-tasks");
 
         $response->assertStatus(200);
@@ -66,7 +72,7 @@ describe('GET /api/v1/applications/{uuid}/scheduled-tasks', function () {
             'name' => 'Test Task',
         ]);
 
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->getJson("/api/v1/applications/{$application->uuid}/scheduled-tasks");
 
         $response->assertStatus(200);
@@ -75,7 +81,7 @@ describe('GET /api/v1/applications/{uuid}/scheduled-tasks', function () {
     });
 
     test('returns 404 for unknown application uuid', function () {
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->getJson('/api/v1/applications/nonexistent-uuid/scheduled-tasks');
 
         $response->assertStatus(404);
@@ -90,7 +96,7 @@ describe('POST /api/v1/applications/{uuid}/scheduled-tasks', function () {
             'destination_type' => $this->destination->getMorphClass(),
         ]);
 
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->postJson("/api/v1/applications/{$application->uuid}/scheduled-tasks", [
                 'name' => 'Backup',
                 'command' => 'php artisan backup',
@@ -116,7 +122,7 @@ describe('POST /api/v1/applications/{uuid}/scheduled-tasks', function () {
             'destination_type' => $this->destination->getMorphClass(),
         ]);
 
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->postJson("/api/v1/applications/{$application->uuid}/scheduled-tasks", [
                 'command' => 'echo test',
                 'frequency' => '* * * * *',
@@ -132,7 +138,7 @@ describe('POST /api/v1/applications/{uuid}/scheduled-tasks', function () {
             'destination_type' => $this->destination->getMorphClass(),
         ]);
 
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->postJson("/api/v1/applications/{$application->uuid}/scheduled-tasks", [
                 'name' => 'Test',
                 'command' => 'echo test',
@@ -150,7 +156,7 @@ describe('POST /api/v1/applications/{uuid}/scheduled-tasks', function () {
             'destination_type' => $this->destination->getMorphClass(),
         ]);
 
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->postJson("/api/v1/applications/{$application->uuid}/scheduled-tasks", [
                 'name' => 'Test',
                 'command' => 'echo test',
@@ -168,7 +174,7 @@ describe('POST /api/v1/applications/{uuid}/scheduled-tasks', function () {
             'destination_type' => $this->destination->getMorphClass(),
         ]);
 
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->postJson("/api/v1/applications/{$application->uuid}/scheduled-tasks", [
                 'name' => 'Test',
                 'command' => 'echo test',
@@ -199,7 +205,7 @@ describe('PATCH /api/v1/applications/{uuid}/scheduled-tasks/{task_uuid}', functi
             'name' => 'Old Name',
         ]);
 
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->patchJson("/api/v1/applications/{$application->uuid}/scheduled-tasks/{$task->uuid}", [
                 'name' => 'New Name',
             ]);
@@ -215,7 +221,7 @@ describe('PATCH /api/v1/applications/{uuid}/scheduled-tasks/{task_uuid}', functi
             'destination_type' => $this->destination->getMorphClass(),
         ]);
 
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->patchJson("/api/v1/applications/{$application->uuid}/scheduled-tasks/nonexistent", [
                 'name' => 'Test',
             ]);
@@ -237,7 +243,7 @@ describe('DELETE /api/v1/applications/{uuid}/scheduled-tasks/{task_uuid}', funct
             'team_id' => $this->team->id,
         ]);
 
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->deleteJson("/api/v1/applications/{$application->uuid}/scheduled-tasks/{$task->uuid}");
 
         $response->assertStatus(200);
@@ -253,7 +259,7 @@ describe('DELETE /api/v1/applications/{uuid}/scheduled-tasks/{task_uuid}', funct
             'destination_type' => $this->destination->getMorphClass(),
         ]);
 
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->deleteJson("/api/v1/applications/{$application->uuid}/scheduled-tasks/nonexistent");
 
         $response->assertStatus(404);
@@ -279,7 +285,7 @@ describe('GET /api/v1/applications/{uuid}/scheduled-tasks/{task_uuid}/executions
             'message' => 'OK',
         ]);
 
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->getJson("/api/v1/applications/{$application->uuid}/scheduled-tasks/{$task->uuid}/executions");
 
         $response->assertStatus(200);
@@ -294,7 +300,7 @@ describe('GET /api/v1/applications/{uuid}/scheduled-tasks/{task_uuid}/executions
             'destination_type' => $this->destination->getMorphClass(),
         ]);
 
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->getJson("/api/v1/applications/{$application->uuid}/scheduled-tasks/nonexistent/executions");
 
         $response->assertStatus(404);
@@ -316,7 +322,7 @@ describe('Service scheduled tasks API', function () {
             'name' => 'Service Task',
         ]);
 
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->getJson("/api/v1/services/{$service->uuid}/scheduled-tasks");
 
         $response->assertStatus(200);
@@ -332,7 +338,7 @@ describe('Service scheduled tasks API', function () {
             'environment_id' => $this->environment->id,
         ]);
 
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->postJson("/api/v1/services/{$service->uuid}/scheduled-tasks", [
                 'name' => 'Service Backup',
                 'command' => 'pg_dump',
@@ -356,7 +362,7 @@ describe('Service scheduled tasks API', function () {
             'team_id' => $this->team->id,
         ]);
 
-        $response = $this->withHeaders(authHeaders($this->bearerToken))
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
             ->deleteJson("/api/v1/services/{$service->uuid}/scheduled-tasks/{$task->uuid}");
 
         $response->assertStatus(200);

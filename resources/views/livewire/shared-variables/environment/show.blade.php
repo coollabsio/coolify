@@ -26,7 +26,7 @@
         </div>
     @else
         <form wire:submit='submit' class="flex flex-col gap-2">
-            <x-forms.textarea canGate="update" :canResource="$environment" rows="20" class="whitespace-pre-wrap" id="variables" wire:model="variables"
+            <x-forms.textarea canGate="update" :canResource="$environment" rows="20" class="whitespace-pre-wrap" id="variables" wire:model="variables" monospace
                 label="Environment Shared Variables"></x-forms.textarea>
             <x-forms.button canGate="update" :canResource="$environment" type="submit" class="btn btn-primary">Save All Environment Variables</x-forms.button>
         </form>

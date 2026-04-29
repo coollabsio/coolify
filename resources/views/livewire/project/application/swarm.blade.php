@@ -2,6 +2,7 @@
     <form wire:submit='submit' class="flex flex-col">
         <div class="flex items-center gap-2">
             <h2>Swarm Configuration</h2>
+            <x-deprecated-badge />
             @can('update', $application)
                 <x-forms.button type="submit">
                     Save
@@ -13,6 +14,9 @@
                 </x-forms.button>
             @endcan
         </div>
+        <x-callout type="warning" title="Deprecated" class="my-4">
+            {{ config('deprecations.swarm') }}
+        </x-callout>
         <div class="flex flex-col gap-2 py-4">
             <div class="flex flex-col items-end gap-2 xl:flex-row">
                 <x-forms.input id="swarmReplicas" label="Replicas" required canGate="update" :canResource="$application" />

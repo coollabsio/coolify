@@ -22,6 +22,7 @@
     <env name="QUEUE_CONNECTION" value="sync" force="true"/>
     <env name="SESSION_DRIVER" value="array" force="true"/>
     <env name="TELESCOPE_ENABLED" value="false"/>
+    <env name="NIGHTWATCH_ENABLED" value="false"/>
   </php>
   <source>
     <include>

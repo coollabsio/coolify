@@ -30,7 +30,7 @@ class Source extends Component
     #[Validate(['required', 'string'])]
     public string $gitBranch;
 
-    #[Validate(['nullable', 'string'])]
+    #[Validate(['nullable', 'string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'])]
     public ?string $gitCommitSha = null;
 
     #[Locked]
