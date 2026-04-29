@@ -242,6 +242,17 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         }
     }
 
+    public function subscriptionActivated(): void
+    {
+        if ($this->is_inactive) {
+            $this->update(['is_inactive' => false]);
+        }
+
+        User::whereIn('id', $this->members()->select('users.id'))
+            ->where('is_inactive', true)
+            ->update(['is_inactive' => false]);
+    }
+
     public function environment_variables()
     {
         return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'team');
