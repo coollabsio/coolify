@@ -226,6 +226,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             'stripe_invoice_paid' => false,
             'stripe_trial_already_ended' => false,
             'stripe_past_due' => false,
+            'ended_at' => $this->subscription->ended_at ?? now(),
         ]);
         foreach ($this->servers as $server) {
             $server->settings()->update([
