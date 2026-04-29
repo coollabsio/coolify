@@ -46,10 +46,12 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'personal_team',
         'show_boarding',
         'custom_server_limit',
+        'is_inactive',
     ];
 
     protected $casts = [
         'personal_team' => 'boolean',
+        'is_inactive' => 'boolean',
     ];
 
     protected static function booted()
