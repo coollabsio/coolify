@@ -17,11 +17,16 @@ test('hasAllowedExtension accepts supported extensions', function (string $name)
     'uppercase sql' => ['BACKUP.SQL'],
     'compound sql.gz' => ['backup.sql.gz'],
     'compound tar.gz' => ['backup.tar.gz'],
+    'compound tar.bz2' => ['backup.tar.bz2'],
+    'compound tar.xz' => ['backup.tar.xz'],
+    'compound tar.zst' => ['backup.tar.zst'],
     'tgz' => ['archive.tgz'],
     'zip' => ['dump.zip'],
     'tar' => ['dump.tar'],
     'gz' => ['data.gz'],
     'dump' => ['data.dump'],
+    'dmp' => ['mysql-dump-mydb-1234567890.dmp'],
+    'backup' => ['pg-custom-format.backup'],
     'bak' => ['data.bak'],
     'bson' => ['data.bson'],
     'bson.gz' => ['data.bson.gz'],
@@ -29,6 +34,7 @@ test('hasAllowedExtension accepts supported extensions', function (string $name)
     'archive.gz' => ['data.archive.gz'],
     'bz2' => ['data.bz2'],
     'xz' => ['data.xz'],
+    'zst' => ['data.zst'],
 ]);
 
 test('hasAllowedExtension rejects unsupported or empty stems', function (string $name) {

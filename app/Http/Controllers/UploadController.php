@@ -20,8 +20,13 @@ class UploadController extends BaseController
         'zip',
         'tar',
         'tar.gz',
+        'tar.bz2',
+        'tar.xz',
+        'tar.zst',
         'tgz',
         'dump',
+        'dmp',
+        'backup',
         'bak',
         'bson',
         'bson.gz',
@@ -29,6 +34,7 @@ class UploadController extends BaseController
         'archive.gz',
         'bz2',
         'xz',
+        'zst',
     ];
 
     public function upload(Request $request)
