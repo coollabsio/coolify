@@ -76,7 +76,30 @@ class Index extends Component
 
             return;
         }
-        $container = collect($this->containers)->firstWhere('uuid', $this->selected_uuid);
+
+        // Container options encode "{server.uuid}|{container.name}" so duplicate
+        // container names across servers (e.g. when Custom Container Name is set
+        // on multi-server apps) resolve to the right container. Server-only
+        // options remain bare server UUIDs and fall through to server-mode SSH.
+        $container = null;
+        if (str_contains($this->selected_uuid, '|')) {
+            [$serverUuid, $containerName] = explode('|', $this->selected_uuid, 2);
+            if ($serverUuid === '' || $containerName === '') {
+                $this->dispatch('error', 'Invalid selection.');
+
+                return;
+            }
+            $container = collect($this->containers)->first(
+                fn ($c) => data_get($c, 'server_uuid') === $serverUuid
+                    && data_get($c, 'name') === $containerName
+            );
+            if (is_null($container)) {
+                $this->dispatch('error', 'Container not found.');
+
+                return;
+            }
+        }
+
         $this->dispatch('send-terminal-command',
             isset($container),
             $container['connection_name'] ?? $this->selected_uuid,
