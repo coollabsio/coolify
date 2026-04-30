@@ -1,0 +1,52 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/edge/
+# slogan: Production-ready, full-stack but simple mail server (SMTP, IMAP, LDAP, Antispam, Antivirus, etc.) running in a single Docker container.
+# category: email
+# tags: mail,smtp,imap,email,server,postfix,dovecot
+# logo: svgs/docker-mailserver.svg
+# port: 25
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: ${HOSTNAME:?Set your mail server FQDN, e.g. mail.example.com}
+    environment:
+      - SERVICE_URL_MAILSERVER_25
+      - TZ=${TZ:-Etc/UTC}
+      - SSL_TYPE=${SSL_TYPE:-letsencrypt}
+      - SSL_CERT_PATH=${SSL_CERT_PATH:-}
+      - SSL_KEY_PATH=${SSL_KEY_PATH:-}
+      - ENABLE_IMAP=${ENABLE_IMAP:-1}
+      - ENABLE_POP3=${ENABLE_POP3:-0}
+      - ENABLE_RSPAMD=${ENABLE_RSPAMD:-0}
+      - ENABLE_CLAMAV=${ENABLE_CLAMAV:-0}
+      - ENABLE_FAIL2BAN=${ENABLE_FAIL2BAN:-0}
+      - ENABLE_OPENDKIM=${ENABLE_OPENDKIM:-1}
+      - ENABLE_OPENDMARC=${ENABLE_OPENDMARC:-1}
+      - ENABLE_POLICYD_SPF=${ENABLE_POLICYD_SPF:-1}
+      - ENABLE_AMAVIS=${ENABLE_AMAVIS:-1}
+      - SPOOF_PROTECTION=${SPOOF_PROTECTION:-0}
+      - ENABLE_SRS=${ENABLE_SRS:-0}
+      - PERMIT_DOCKER=${PERMIT_DOCKER:-none}
+      - POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS:-postmaster@${HOSTNAME}}
+      - POSTFIX_INET_PROTOCOLS=${POSTFIX_INET_PROTOCOLS:-ipv4}
+      - DOVECOT_INET_PROTOCOLS=${DOVECOT_INET_PROTOCOLS:-ipv4}
+      - MOVE_SPAM_TO_JUNK=${MOVE_SPAM_TO_JUNK:-1}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    ports:
+      - "465:465"
+      - "587:587"
+      - "993:993"
+      - "110:110"
+      - "995:995"
+    volumes:
+      - mailserver-data:/var/mail/
+      - mailserver-state:/var/mail-state/
+      - mailserver-logs:/var/log/mail/
+      - mailserver-config:/tmp/docker-mailserver/
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: "ss --listening --ipv4 --tcp | grep --silent ':smtp' || exit 1"
+      timeout: 3s
+      interval: 30s
+      retries: 3
+      start_period: 60s
