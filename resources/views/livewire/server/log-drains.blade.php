@@ -68,11 +68,20 @@
                                             label="API Key" />
                                         <x-forms.input disabled required id="logDrainAxiomDatasetName"
                                             label="Dataset Name" />
+                                        <x-forms.input disabled required id="logDrainAxiomBaseUri"
+                                            placeholder="https://us-east-1.aws.edge.axiom.co"
+                                            helper="For US use: https://us-east-1.aws.edge.axiom.co<br>For EU use: https://eu-central-1.aws.edge.axiom.co"
+                                            label="Endpoint" />
                                     @else
                                         <x-forms.input canGate="update" :canResource="$server" type="password" required
                                             id="logDrainAxiomApiKey" label="API Key" />
                                         <x-forms.input canGate="update" :canResource="$server" required
                                             id="logDrainAxiomDatasetName" label="Dataset Name" />
+                                        <x-forms.input canGate="update" :canResource="$server" required
+                                            id="logDrainAxiomBaseUri"
+                                            placeholder="https://us-east-1.aws.edge.axiom.co"
+                                            helper="For US use: https://us-east-1.aws.edge.axiom.co<br>For EU use: https://eu-central-1.aws.edge.axiom.co"
+                                            label="Endpoint" />
                                     @endif
                                 </div>
                             </div>

@@ -36,6 +36,9 @@ class LogDrains extends Component
     #[Validate(['string', 'nullable', 'regex:/^[a-zA-Z0-9_\-\.]+$/'])]
     public ?string $logDrainAxiomApiKey = null;
 
+    #[Validate(['url', 'nullable'])]
+    public ?string $logDrainAxiomBaseUri = null;
+
     #[Validate(['string', 'nullable'])]
     public ?string $logDrainCustomConfig = null;
 
@@ -71,10 +74,12 @@ class LogDrains extends Component
             $this->server->settings->is_logdrain_axiom_enabled = $this->isLogDrainAxiomEnabled;
             $this->server->settings->logdrain_axiom_dataset_name = $this->logDrainAxiomDatasetName;
             $this->server->settings->logdrain_axiom_api_key = $this->logDrainAxiomApiKey;
+            $this->server->settings->logdrain_axiom_base_uri = $this->logDrainAxiomBaseUri;
         } else {
             $this->isLogDrainAxiomEnabled = $this->server->settings->is_logdrain_axiom_enabled;
             $this->logDrainAxiomDatasetName = $this->server->settings->logdrain_axiom_dataset_name;
             $this->logDrainAxiomApiKey = $this->server->settings->logdrain_axiom_api_key;
+            $this->logDrainAxiomBaseUri = $this->server->settings->logdrain_axiom_base_uri;
         }
     }
 
@@ -140,6 +145,7 @@ class LogDrains extends Component
                 $this->validate([
                     'logDrainAxiomDatasetName' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
                     'logDrainAxiomApiKey' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
+                    'logDrainAxiomBaseUri' => ['required', 'url'],
                 ]);
             } catch (\Throwable $e) {
                 $this->isLogDrainAxiomEnabled = false;
