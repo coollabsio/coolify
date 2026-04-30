@@ -1,0 +1,338 @@
+# documentation: https://openreplay.com/
+# slogan: Open-source session replay and product analytics to understand how users interact with your app.
+# category: analytics
+# tags: analytics,replay,session,tracking,debugging,ux
+# logo: svgs/openreplay.svg
+# port: 80
+
+services:
+  postgresql:
+    image: ghcr.io/openreplay/postgres:${POSTGRES_VERSION:-17}
+    environment:
+      - POSTGRESQL_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    volumes:
+      - postgres-data:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.3-alpine}
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "clickhouse", "client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: ghcr.io/openreplay/valkey:${REDIS_VERSION:-8}
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - PING
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  minio:
+    image: ghcr.io/openreplay/minio:${MINIO_VERSION:-2025}
+    environment:
+      - MINIO_ROOT_USER=$SERVICE_USER_MINIO
+      - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
+    volumes:
+      - minio-data:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  db-migration:
+    image: ghcr.io/openreplay/postgres:${POSTGRES_VERSION:-17}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRESQL_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    volumes:
+      - db-migration-data:/tmp
+    command: >
+      sh -c "psql -h postgresql -U postgres -c 'CREATE DATABASE app' 2>/dev/null || true"
+
+  db:
+    image: public.ecr.aws/p1t3u8a3/db:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+      - KAFKA_SERVERS=
+
+  frontend:
+    image: public.ecr.aws/p1t3u8a3/frontend:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+      - KAFKA_SERVERS=
+
+  api:
+    image: public.ecr.aws/p1t3u8a3/api:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+      - REDIS_STRING=redis://redis:6379
+      - CLICKHOUSE_STRING=clickhouse:9000/default
+      - CLICKHOUSE_HTTP_STRING=http://clickhouse:8123/default
+      - KAFKA_SERVERS=
+      - JWT_SECRET=$SERVICE_PASSWORD_JWT
+      - JWT_SPOT_SECRET=$SERVICE_PASSWORD_JWTSPOT
+      - JWT_REFRESH_SECRET=$SERVICE_PASSWORD_JWTREFRESH
+      - JWT_SPOT_REFRESH_SECRET=$SERVICE_PASSWORD_JWTSPOTREFRESH
+      - ASSIST_JWT_SECRET=$SERVICE_PASSWORD_ASSISTJWT
+      - ASSIST_KEY=$SERVICE_PASSWORD_ASSISTKEY
+      - AWS_ENDPOINT=$SERVICE_URL_MINIO
+      - AWS_ACCESS_KEY_ID=$SERVICE_USER_MINIO
+      - AWS_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_MINIO
+      - AWS_REGION=us-east-1
+
+  http:
+    image: public.ecr.aws/p1t3u8a3/http:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+      - REDIS_STRING=redis://redis:6379
+      - CLICKHOUSE_STRING=clickhouse:9000/default
+      - CLICKHOUSE_HTTP_STRING=http://clickhouse:8123/default
+      - KAFKA_SERVERS=
+
+  sink:
+    image: public.ecr.aws/p1t3u8a3/sink:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+      - REDIS_STRING=redis://redis:6379
+      - CLICKHOUSE_STRING=clickhouse:9000/default
+      - CLICKHOUSE_HTTP_STRING=http://clickhouse:8123/default
+      - KAFKA_SERVERS=
+
+  storage:
+    image: public.ecr.aws/p1t3u8a3/storage:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+      - AWS_ENDPOINT=$SERVICE_URL_MINIO
+      - AWS_ACCESS_KEY_ID=$SERVICE_USER_MINIO
+      - AWS_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_MINIO
+      - AWS_REGION=us-east-1
+      - KAFKA_SERVERS=
+
+  assets:
+    image: public.ecr.aws/p1t3u8a3/assets:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+      - AWS_ENDPOINT=$SERVICE_URL_MINIO
+      - AWS_ACCESS_KEY_ID=$SERVICE_USER_MINIO
+      - AWS_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_MINIO
+      - KAFKA_SERVERS=
+
+  sourcemapreader:
+    image: public.ecr.aws/p1t3u8a3/sourcemapreader:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+      - AWS_ENDPOINT=$SERVICE_URL_MINIO
+      - AWS_ACCESS_KEY_ID=$SERVICE_USER_MINIO
+      - AWS_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_MINIO
+
+  integrations:
+    image: public.ecr.aws/p1t3u8a3/integrations:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+      - REDIS_STRING=redis://redis:6379
+      - KAFKA_SERVERS=
+
+  chalice:
+    image: public.ecr.aws/p1t3u8a3/chalice:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+      - REDIS_STRING=redis://redis:6379
+      - CLICKHOUSE_STRING=clickhouse:9000/default
+      - KAFKA_SERVERS=
+
+  heuristics:
+    image: public.ecr.aws/p1t3u8a3/heuristics:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+      - KAFKA_SERVERS=
+
+  ender:
+    image: public.ecr.aws/p1t3u8a3/ender:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+      - REDIS_STRING=redis://redis:6379
+      - KAFKA_SERVERS=
+
+  alerts:
+    image: public.ecr.aws/p1t3u8a3/alerts:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+      - REDIS_STRING=redis://redis:6379
+      - KAFKA_SERVERS=
+
+  assist:
+    image: public.ecr.aws/p1t3u8a3/assist:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+      - REDIS_STRING=redis://redis:6379
+      - ASSIST_JWT_SECRET=$SERVICE_PASSWORD_ASSISTJWT
+      - ASSIST_KEY=$SERVICE_PASSWORD_ASSISTKEY
+
+  canvases:
+    image: public.ecr.aws/p1t3u8a3/canvases:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+
+  spot:
+    image: public.ecr.aws/p1t3u8a3/spot:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+      - REDIS_STRING=redis://redis:6379
+      - JWT_SPOT_SECRET=$SERVICE_PASSWORD_JWTSPOT
+      - JWT_SPOT_REFRESH_SECRET=$SERVICE_PASSWORD_JWTSPOTREFRESH
+
+  images:
+    image: public.ecr.aws/p1t3u8a3/images:${COMMON_VERSION:-v1.23.0}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - POSTGRES_STRING=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/app?sslmode=disable
+
+  nginx:
+    image: nginx:latest
+    depends_on:
+      - frontend
+      - api
+      - chalice
+      - http
+      - integrations
+      - spot
+      - assist
+      - storage
+    volumes:
+      - type: bind
+        source: ./nginx.conf
+        target: /etc/nginx/conf.d/default.conf
+        isDirectory: false
+        content: |
+          server {
+              listen 80;
+              location / {
+                  proxy_pass http://frontend:8080;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+              location /v2/api/ {
+                  proxy_pass http://api:8080;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+              location /api/ {
+                  proxy_pass http://chalice:8000;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+              location /ingest/ {
+                  proxy_pass http://http:8080;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+              location /integrations/ {
+                  proxy_pass http://integrations:8080;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+              location /spot/ {
+                  proxy_pass http://spot:8080;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+              location /assist/ {
+                  proxy_pass http://assist:9001;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "upgrade";
+              }
+              location /ws-assist/ {
+                  proxy_pass http://assist:9001;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "upgrade";
+              }
+          }
+    environment:
+      - SERVICE_URL_NGINX_80
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
