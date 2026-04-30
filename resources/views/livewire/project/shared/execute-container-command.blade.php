@@ -31,7 +31,8 @@
                         @if ($loop->first)
                             <option disabled value="default">Select a container</option>
                         @endif
-                        <option value="{{ data_get($container, 'container.Names') }}">
+                        @php($optionValue = data_get($container, 'server.uuid').'|'.data_get($container, 'container.Names'))
+                        <option value="{{ $optionValue }}" wire:key="container-option-{{ $optionValue }}">
                             {{ data_get($container, 'container.Names') }}
                             ({{ data_get($container, 'server.name') }})
                         </option>
