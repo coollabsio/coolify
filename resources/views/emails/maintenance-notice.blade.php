@@ -75,12 +75,12 @@
                                 @endif
 
                                 <p style="margin:0 0 8px 0;font-size:15px;line-height:1.6;color:#0f172a;">After the maintenance window: <strong>Yes</strong> (~10 minutes of work for most users):</p>
-                                <ul style="margin:0 0 8px 0;padding-left:20px;font-size:15px;line-height:1.7;color:#0f172a;">
+                                <ol style="margin:0 0 8px 0;padding-left:20px;font-size:15px;line-height:1.7;color:#0f172a;">
                                     <li><a href="https://app.coolify.io/login" style="color:#6b16ed;text-decoration:underline;">Login</a> again.</li>
-                                    <li>Update all your servers from the dashboard.</li>
-                                    <li>Check each app's configuration for correctness.</li>
-                                    <li>Redeploy each application once to move it to the new deployment architecture (auto-deployments on commits are disabled until this step is completed).</li>
-                                </ul>
+                                    <li>Upgrade all your servers from each server's detail page.</li>
+                                    <li>Verify each application and database is correctly configured.</li>
+                                    <li>Redeploy each application and database once to move them to the new deployment architecture. Auto-deployments on commits stay disabled until this step is completed.</li>
+                                </ol>
                                 <p style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#0f172a;">Full details in the <a href="#" style="color:#6b16ed;text-decoration:underline;font-weight:700;">v5 upgrade guide</a>.</p>
                             @endif
 
