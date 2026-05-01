@@ -40,6 +40,7 @@ class Gitea extends Controller
                 $removed_files = data_get($payload, 'commits.*.removed');
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
+                $commit_message = data_get($payload, 'head_commit.message');
             }
             if ($x_gitea_event === 'pull_request') {
                 $action = data_get($payload, 'action');
@@ -107,6 +108,7 @@ class Gitea extends Controller
                                 force_rebuild: false,
                                 commit: data_get($payload, 'after', 'HEAD'),
                                 is_webhook: true,
+                                commit_message: $commit_message,
                             );
                             if ($result['status'] === 'queue_full') {
                                 return response($result['message'], 429)->header('Retry-After', 60);

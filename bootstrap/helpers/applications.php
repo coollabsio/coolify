@@ -12,7 +12,53 @@ use App\Models\StandaloneDocker;
 use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
 
-function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null)
+/**
+ * Determine whether a commit message contains a Coolify skip tag.
+ *
+ * Returns true when the message (compared case-insensitively) includes
+ * `[skip coolify]` or `[coolify skip]`.
+ */
+function commit_message_has_skip_deployment_tag(?string $commit_message): bool
+{
+    if (! $commit_message) {
+        return false;
+    }
+
+    $lower = mb_strtolower($commit_message);
+
+    return str_contains($lower, '[skip coolify]') || str_contains($lower, '[coolify skip]');
+}
+
+/**
+ * Queue an application deployment.
+ *
+ * When called from a webhook (`$is_webhook = true`) and a `$commit_message` is provided,
+ * the function checks whether the message contains `[skip coolify]` or `[coolify skip]`
+ * (case-insensitive) via {@see commit_message_has_skip_deployment_tag()}. If found — and
+ * `$force_rebuild` is not set — a deployment record with status
+ * `SKIPPED_BY_COMMIT_MESSAGE` is persisted for UI visibility and the function returns
+ * early without dispatching a job. When `$force_rebuild` is `true` the skip tag is
+ * intentionally ignored so that manual force-rebuilds always proceed.
+ *
+ * @param  Application           $application
+ * @param  string                $deployment_uuid
+ * @param  int|null              $pull_request_id
+ * @param  string                $commit
+ * @param  bool                  $force_rebuild            When true, skip tags are ignored.
+ * @param  bool                  $is_webhook
+ * @param  bool                  $is_api
+ * @param  bool                  $restart_only
+ * @param  string|null           $git_type
+ * @param  bool                  $no_questions_asked
+ * @param  Server|null           $server
+ * @param  StandaloneDocker|null $destination
+ * @param  bool                  $only_this_server
+ * @param  bool                  $rollback
+ * @param  string|null           $docker_registry_image_tag
+ * @param  string|null           $commit_message            Head commit message from the webhook payload.
+ * @return array{status: string, message: string, deployment_uuid?: string, existing_deployment?: ApplicationDeploymentQueue}
+ */
+function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null, ?string $commit_message = null)
 {
     $application_id = $application->id;
     $deployment_link = Url::fromString($application->link()."/deployment/{$deployment_uuid}");
@@ -40,6 +86,35 @@ function queue_application_deployment(Application $application, string $deployme
         return [
             'status' => 'queue_full',
             'message' => 'Deployment queue is full. Please wait for existing deployments to complete.',
+        ];
+    }
+
+    if ($is_webhook && ! $force_rebuild && commit_message_has_skip_deployment_tag($commit_message)) {
+        // Record the skipped deployment so it appears in the UI deployment history.
+        ApplicationDeploymentQueue::create([
+            'application_id' => $application_id,
+            'application_name' => $application->name,
+            'server_id' => $server_id,
+            'server_name' => $server_name,
+            'destination_id' => $destination_id,
+            'deployment_uuid' => $deployment_uuid,
+            'deployment_url' => $deployment_url,
+            'pull_request_id' => $pull_request_id,
+            'force_rebuild' => false,
+            'is_webhook' => true,
+            'commit' => $commit,
+            'rollback' => false,
+            'git_type' => $git_type,
+            'only_this_server' => $only_this_server,
+            'status' => ApplicationDeploymentStatus::SKIPPED_BY_COMMIT_MESSAGE->value,
+            'commit_message' => $commit_message,
+            'finished_at' => now(),
+        ]);
+
+        return [
+            'status' => 'skipped',
+            'message' => 'Deployment skipped due to [skip coolify] in commit message.',
+            'deployment_uuid' => $deployment_uuid,
         ];
     }
 
@@ -82,6 +157,7 @@ function queue_application_deployment(Application $application, string $deployme
         'rollback' => $rollback,
         'git_type' => $git_type,
         'only_this_server' => $only_this_server,
+        'commit_message' => $commit_message,
     ]);
 
     if ($no_questions_asked) {

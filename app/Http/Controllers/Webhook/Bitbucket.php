@@ -31,6 +31,7 @@ class Bitbucket extends Controller
                 $branch = data_get($payload, 'push.changes.0.new.name');
                 $full_name = data_get($payload, 'repository.full_name');
                 $commit = data_get($payload, 'push.changes.0.new.target.hash');
+                $commit_message = data_get($payload, 'push.changes.0.new.target.message');
 
                 if (! $branch) {
                     return response([
@@ -107,7 +108,8 @@ class Bitbucket extends Controller
                             deployment_uuid: $deployment_uuid,
                             commit: $commit,
                             force_rebuild: false,
-                            is_webhook: true
+                            is_webhook: true,
+                            commit_message: $commit_message,
                         );
                         if ($result['status'] === 'queue_full') {
                             return response($result['message'], 429)->header('Retry-After', 60);

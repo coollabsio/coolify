@@ -44,6 +44,8 @@
                     data_get($deployment, 'status') === 'cancelled-by-user',
                 'border-error' => data_get($deployment, 'status') === 'failed',
                 'border-success' => data_get($deployment, 'status') === 'finished',
+                'border-warning border-dashed' =>
+                    data_get($deployment, 'status') === 'skipped-by-commit-message',
             ])>
                 <a href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}" {{ wireNavigate() }} class="block">
                     <div class="flex flex-col">
@@ -60,6 +62,8 @@
                                     data_get($deployment, 'status') === 'finished',
                                 'bg-gray-100 text-gray-700 dark:bg-gray-600/30 dark:text-gray-300' =>
                                     data_get($deployment, 'status') === 'cancelled-by-user',
+                                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200' =>
+                                    data_get($deployment, 'status') === 'skipped-by-commit-message',
                             ])>
                                 @php
                                     $statusText = match (data_get($deployment, 'status')) {
@@ -67,6 +71,7 @@
                                         'in_progress' => 'In Progress',
                                         'cancelled-by-user' => 'Cancelled',
                                         'queued' => 'Queued',
+                                        'skipped-by-commit-message' => 'Skipped',
                                         default => ucfirst(data_get($deployment, 'status')),
                                     };
                                 @endphp

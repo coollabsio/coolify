@@ -44,7 +44,7 @@ npm run build                   # production build
 - **Services/** — Business logic services (ConfigurationGenerator, DockerImageParser, ContainerStatusAggregator, HetznerService, etc.). Use Services for complex orchestration; use Actions for single-purpose domain operations.
 - **Helpers/** — Global helpers loaded via `bootstrap/includeHelpers.php` from `bootstrap/helpers/` — organized into `shared.php`, `constants.php`, `versions.php`, `subscriptions.php`, `domains.php`, `docker.php`, `services.php`, `github.php`, `proxy.php`, `notifications.php`.
 - **Data/** — Spatie Laravel Data DTOs (e.g., `ServerMetadata`).
-- **Enums/** — PHP enums (TitleCase keys). Key enums: `ProcessStatus`, `Role` (MEMBER/ADMIN/OWNER with rank comparison), `BuildPackTypes`, `ProxyTypes`, `ContainerStatusTypes`.
+- **Enums/** — PHP enums (TitleCase keys). Key enums: `ProcessStatus`, `Role` (MEMBER/ADMIN/OWNER with rank comparison), `BuildPackTypes`, `ProxyTypes`, `ContainerStatusTypes`, `ApplicationDeploymentStatus` (includes `SKIPPED_BY_COMMIT_MESSAGE` for webhook deployments skipped via `[skip coolify]` or `[coolify skip]` in the commit message).
 - **Rules/** — Custom validation rules (`ValidGitRepositoryUrl`, `ValidServerIp`, `ValidHostname`, `DockerImageFormat`, etc.).
 
 ### API Layer

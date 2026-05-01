@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- Skip deployment when commit message includes `[skip coolify]` or `[coolify skip]` (supported for GitHub, GitLab, Gitea, and Bitbucket webhooks). Skipped deployments are recorded and visible in the deployment history UI with a "Skipped" status.
 - Use tags in update
 - New update process (#115)
 - VaultWarden service

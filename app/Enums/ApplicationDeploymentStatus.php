@@ -9,4 +9,5 @@ enum ApplicationDeploymentStatus: string
     case FINISHED = 'finished';
     case FAILED = 'failed';
     case CANCELLED_BY_USER = 'cancelled-by-user';
+    case SKIPPED_BY_COMMIT_MESSAGE = 'skipped-by-commit-message';
 }

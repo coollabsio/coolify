@@ -58,6 +58,7 @@ class Gitlab extends Controller
                 $removed_files = data_get($payload, 'commits.*.removed');
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
+                $commit_message = data_get($payload, 'commits.0.message');
             }
             if ($x_gitlab_event === 'merge_request') {
                 $action = data_get($payload, 'object_attributes.action');
@@ -139,6 +140,7 @@ class Gitlab extends Controller
                                 commit: data_get($payload, 'after', 'HEAD'),
                                 force_rebuild: false,
                                 is_webhook: true,
+                                commit_message: $commit_message,
                             );
                             if ($result['status'] === 'queue_full') {
                                 return response($result['message'], 429)->header('Retry-After', 60);
