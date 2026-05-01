@@ -18,6 +18,7 @@ class InstanceSettings extends Model
         'do_not_track',
         'is_auto_update_enabled',
         'is_registration_enabled',
+        'is_oauth_registration_enabled',
         'next_channel',
         'smtp_enabled',
         'smtp_from_address',
@@ -63,6 +64,7 @@ class InstanceSettings extends Model
 
         'allowed_ip_ranges' => 'array',
         'is_auto_update_enabled' => 'boolean',
+        'is_oauth_registration_enabled' => 'boolean',
         'auto_update_frequency' => 'string',
         'update_check_frequency' => 'string',
         'sentinel_token' => 'encrypted',
@@ -125,16 +127,6 @@ class InstanceSettings extends Model
         return once(fn () => InstanceSettings::findOrFail(0));
     }
 
-    // public function getRecipients($notification)
-    // {
-    //     $recipients = data_get($notification, 'emails', null);
-    //     if (is_null($recipients) || $recipients === '') {
-    //         return [];
-    //     }
-
-    //     return explode(',', $recipients);
-    // }
-
     public function getTitleDisplayName(): string
     {
         $instanceName = $this->instance_name;
@@ -144,17 +136,4 @@ class InstanceSettings extends Model
 
         return "[{$instanceName}]";
     }
-
-    // public function helperVersion(): Attribute
-    // {
-    //     return Attribute::make(
-    //         get: function ($value) {
-    //             if (isDev()) {
-    //                 return 'latest';
-    //             }
-
-    //             return $value;
-    //         }
-    //     );
-    // }
 }
