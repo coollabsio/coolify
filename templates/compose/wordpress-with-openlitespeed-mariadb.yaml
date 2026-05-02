@@ -1,0 +1,54 @@
+# documentation: https://wordpress.org
+# slogan: WordPress is open source software you can use to create a beautiful website, blog, or app.
+# category: cms
+# tags: cms, blog, content, management, mariadb, openlitespeed
+# logo: svgs/wordpress.svg
+
+services:
+  wordpress:
+    image: litespeedtech/openlitespeed:latest
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost/html
+    environment:
+      - SERVICE_URL_WORDPRESS
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_USER=$SERVICE_USER_WORDPRESS
+      - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+      - WORDPRESS_DB_NAME=wordpress
+    depends_on:
+      - mariadb
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      set -e
+      DOCROOT="/var/www/vhosts/localhost/html"
+      if [ ! -f "$${DOCROOT}/wp-includes/version.php" ]; then
+        mkdir -p "$${DOCROOT}"
+        curl -sL https://wordpress.org/latest.tar.gz | tar -xz --strip-components=1 -C "$${DOCROOT}"
+      fi
+      if [ ! -f "$${DOCROOT}/wp-config.php" ]; then
+        cp "$${DOCROOT}/wp-config-sample.php" "$${DOCROOT}/wp-config.php"
+        sed -i "s/database_name_here/$${WORDPRESS_DB_NAME}/g" "$${DOCROOT}/wp-config.php"
+        sed -i "s/username_here/$${WORDPRESS_DB_USER}/g" "$${DOCROOT}/wp-config.php"
+        sed -i "s/password_here/$${WORDPRESS_DB_PASSWORD}/g" "$${DOCROOT}/wp-config.php"
+        sed -i "s/localhost/$${WORDPRESS_DB_HOST}/g" "$${DOCROOT}/wp-config.php"
+      fi
+      exec /entrypoint.sh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
+      interval: 2s
+      timeout: 10s
+      retries: 10
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
