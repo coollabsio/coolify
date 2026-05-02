@@ -1,0 +1,61 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Production-ready, full-featured mail server running in a single container. Includes Postfix (SMTP), Dovecot (IMAP/POP3), SpamAssassin, and Fail2ban.
+# category: email
+# tags: email, mail, smtp, imap, postfix, dovecot, spamassassin, self-hosted
+# logo: svgs/docker-mailserver.svg
+# port: 8080
+
+services:
+  docker-mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    container_name: docker-mailserver
+    hostname: ${SERVICE_FQDN_MAILSERVER}
+    environment:
+      - ENABLE_SPAMASSASSIN=${ENABLE_SPAMASSASSIN:-1}
+      - ENABLE_CLAMAV=${ENABLE_CLAMAV:-0}
+      - ENABLE_FAIL2BAN=${ENABLE_FAIL2BAN:-0}
+      - ENABLE_POSTGREY=${ENABLE_POSTGREY:-0}
+      - ENABLE_SASLAUTHD=${ENABLE_SASLAUTHD:-0}
+      - ONE_DIR=${ONE_DIR:-1}
+      - TZ=${TZ:-Etc/UTC}
+      - POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS:-postmaster@example.com}
+      - SSL_TYPE=${SSL_TYPE:-letsencrypt}
+      - ACCOUNT_PROVISIONER=${ACCOUNT_PROVISIONER:-FILE}
+      - SPOOF_PROTECTION=${SPOOF_PROTECTION:-0}
+      - ENABLE_UPDATE_CHECK=${ENABLE_UPDATE_CHECK:-1}
+      - ENABLE_RSPAMD=${ENABLE_RSPAMD:-0}
+      - ENABLE_AMAVIS=${ENABLE_AMAVIS:-1}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - mail-data:/var/mail
+      - mail-state:/var/mail-state
+      - mail-logs:/var/log/mail
+      - ./config/:/tmp/docker-mailserver/
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+      - "143:143"
+      - "110:110"
+      - "995:995"
+    restart: unless-stopped
+    stop_grace_period: 1m
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    healthcheck:
+      test: ["CMD-SHELL", "ss -tlnp | grep -q ':25 ' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  mail-data:
+    driver: local
+  mail-state:
+    driver: local
+  mail-logs:
+    driver: local
