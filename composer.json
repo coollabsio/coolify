@@ -18,6 +18,7 @@
         "laravel/fortify": "^1.34.0",
         "laravel/framework": "^12.49.0",
         "laravel/horizon": "^5.43.0",
+        "laravel/nightwatch": "^1.24",
         "laravel/pail": "^1.2.4",
         "laravel/prompts": "^0.3.11|^0.3.11|^0.3.11",
         "laravel/sanctum": "^4.3.0",
@@ -54,7 +55,7 @@
         "stevebauman/purify": "^6.3.1",
         "stripe/stripe-php": "^16.6.0",
         "symfony/yaml": "^7.4.1",
-        "visus/cuid2": "^4.1.0",
+        "visus/cuid2": "^6.0.0",
         "yosymfony/toml": "^1.0.4",
         "zircote/swagger-php": "^5.8.0"
     },

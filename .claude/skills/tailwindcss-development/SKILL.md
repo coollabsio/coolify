@@ -1,23 +1,12 @@
 ---
 name: tailwindcss-development
-description: >-
-  Styles applications using Tailwind CSS v4 utilities. Activates when adding styles, restyling components,
-  working with gradients, spacing, layout, flex, grid, responsive design, dark mode, colors,
-  typography, or borders; or when the user mentions CSS, styling, classes, Tailwind, restyle,
-  hero section, cards, buttons, or any visual/UI changes.
+description: "Always invoke when the user's message includes 'tailwind' in any form. Also invoke for: building responsive grid layouts (multi-column card grids, product grids), flex/grid page structures (dashboards with sidebars, fixed topbars, mobile-toggle navs), styling UI components (cards, tables, navbars, pricing sections, forms, inputs, badges), adding dark mode variants, fixing spacing or typography, and Tailwind v3/v4 work. The core use case: writing or fixing Tailwind utility classes in HTML templates (Blade, JSX, Vue). Skip for backend PHP logic, database queries, API routes, JavaScript with no HTML/CSS component, CSS file audits, build tool configuration, and vanilla CSS."
+license: MIT
+metadata:
+  author: laravel
 ---
 
 # Tailwind CSS Development
-
-## When to Apply
-
-Activate this skill when:
-
-- Adding styles to components or pages
-- Working with responsive design
-- Implementing dark mode
-- Extracting repeated patterns into components
-- Debugging spacing or layout issues
 
 ## Documentation
 
@@ -38,22 +27,24 @@ Use `search-docs` for detailed Tailwind CSS v4 patterns and documentation.
 
 In Tailwind v4, configuration is CSS-first using the `@theme` directive — no separate `tailwind.config.js` file is needed:
 
-<code-snippet name="CSS-First Config" lang="css">
+<!-- CSS-First Config -->
+```css
 @theme {
   --color-brand: oklch(0.72 0.11 178);
 }
-</code-snippet>
+```
 
 ### Import Syntax
 
 In Tailwind v4, import Tailwind with a regular CSS `@import` statement instead of the `@tailwind` directives used in v3:
 
-<code-snippet name="v4 Import Syntax" lang="diff">
+<!-- v4 Import Syntax -->
+```diff
 - @tailwind base;
 - @tailwind components;
 - @tailwind utilities;
 + @import "tailwindcss";
-</code-snippet>
+```
 
 ### Replaced Utilities
 
@@ -77,43 +68,47 @@ Tailwind v4 removed deprecated utilities. Use the replacements shown below. Opac
 
 Use `gap` utilities instead of margins for spacing between siblings:
 
-<code-snippet name="Gap Utilities" lang="html">
+<!-- Gap Utilities -->
+```html
 <div class="flex gap-8">
     <div>Item 1</div>
     <div>Item 2</div>
 </div>
-</code-snippet>
+```
 
 ## Dark Mode
 
 If existing pages and components support dark mode, new pages and components must support it the same way, typically using the `dark:` variant:
 
-<code-snippet name="Dark Mode" lang="html">
+<!-- Dark Mode -->
+```html
 <div class="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
     Content adapts to color scheme
 </div>
-</code-snippet>
+```
 
 ## Common Patterns
 
 ### Flexbox Layout
 
-<code-snippet name="Flexbox Layout" lang="html">
+<!-- Flexbox Layout -->
+```html
 <div class="flex items-center justify-between gap-4">
     <div>Left content</div>
     <div>Right content</div>
 </div>
-</code-snippet>
+```
 
 ### Grid Layout
 
-<code-snippet name="Grid Layout" lang="html">
+<!-- Grid Layout -->
+```html
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
     <div>Card 1</div>
     <div>Card 2</div>
     <div>Card 3</div>
 </div>
-</code-snippet>
+```
 
 ## Common Pitfalls
 

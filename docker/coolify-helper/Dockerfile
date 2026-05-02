@@ -28,7 +28,8 @@ ARG NIXPACKS_VERSION
 
 USER root
 WORKDIR /artifacts
-RUN apk add --no-cache bash curl git git-lfs openssh-client tar tini
+RUN apk upgrade --no-cache && \
+    apk add --no-cache bash curl git git-lfs openssh-client tar tini
 RUN mkdir -p ~/.docker/cli-plugins
 RUN if [[ ${TARGETPLATFORM} == 'linux/amd64' ]]; then \
     curl -sSL https://github.com/docker/buildx/releases/download/v${DOCKER_BUILDX_VERSION}/buildx-v${DOCKER_BUILDX_VERSION}.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx && \

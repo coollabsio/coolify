@@ -181,7 +181,7 @@ class StartRedis
             );
         }
 
-        if (! is_null($this->database->redis_conf) || ! empty($this->database->redis_conf)) {
+        if (! is_null($this->database->redis_conf) && ! empty($this->database->redis_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
                 'source' => $this->configuration_dir.'/redis.conf',

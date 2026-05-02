@@ -340,7 +340,10 @@ class StartMongodb
 
     private function add_default_database()
     {
-        $content = "db = db.getSiblingDB(\"{$this->database->mongo_initdb_database}\");db.createCollection('init_collection');db.createUser({user: \"{$this->database->mongo_initdb_root_username}\", pwd: \"{$this->database->mongo_initdb_root_password}\",roles: [{role:\"readWrite\",db:\"{$this->database->mongo_initdb_database}\"}]});";
+        $dbJson = json_encode($this->database->mongo_initdb_database, JSON_UNESCAPED_SLASHES);
+        $userJson = json_encode($this->database->mongo_initdb_root_username, JSON_UNESCAPED_SLASHES);
+        $pwdJson = json_encode($this->database->mongo_initdb_root_password, JSON_UNESCAPED_SLASHES);
+        $content = "db = db.getSiblingDB({$dbJson});db.createCollection('init_collection');db.createUser({user: {$userJson}, pwd: {$pwdJson}, roles: [{role:\"readWrite\",db:{$dbJson}}]});";
         $content_base64 = base64_encode($content);
         $this->commands[] = "mkdir -p $this->configuration_dir/docker-entrypoint-initdb.d";
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/docker-entrypoint-initdb.d/01-default-database.js > /dev/null";

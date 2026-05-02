@@ -41,7 +41,7 @@
     @endif
     @if (!$server->isBuildServer() && !$server->settings->is_cloudflare_tunnel)
         <a class="sub-menu-item {{ $activeMenu === 'swarm' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
-            href="{{ route('server.swarm', ['server_uuid' => $server->uuid]) }}"><span class="menu-item-label">Swarm (experimental)</span>
+            href="{{ route('server.swarm', ['server_uuid' => $server->uuid]) }}"><span class="menu-item-label">Swarm</span>
         </a>
     @endif
     @if (!$server->isLocalhost())

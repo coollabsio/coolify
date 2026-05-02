@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Application\CleanupPreviewDeployment;
 use App\Enums\ProcessStatus;
+use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GithubApp;
@@ -17,6 +18,7 @@ use Visus\Cuid2\Cuid2;
 
 class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
 {
+    use DetectsSkipDeployCommits;
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
@@ -31,6 +33,7 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
         public string $action,
         public int $pullRequestId,
         public string $pullRequestHtmlUrl,
+        public ?string $pullRequestTitle,
         public ?string $beforeSha,
         public ?string $afterSha,
         public string $commitSha,
@@ -80,6 +83,10 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
     private function handleOpenAction(Application $application, ?GithubApp $githubApp): void
     {
         if (! $application->isPRDeployable()) {
+            return;
+        }
+
+        if (self::shouldSkipDeployAny([$this->pullRequestTitle])) {
             return;
         }
 

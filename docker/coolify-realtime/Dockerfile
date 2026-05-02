@@ -10,12 +10,14 @@ ARG TARGETPLATFORM
 ARG CLOUDFLARED_VERSION
 
 WORKDIR /terminal
-RUN apk add --no-cache openssh-client make g++ python3 curl
+RUN apk upgrade --no-cache && \
+    apk add --no-cache openssh-client make g++ python3 curl
 COPY docker/coolify-realtime/package.json ./
 RUN npm i
 RUN npm rebuild node-pty --update-binary
 COPY docker/coolify-realtime/soketi-entrypoint.sh /soketi-entrypoint.sh
 COPY docker/coolify-realtime/terminal-server.js /terminal/terminal-server.js
+COPY docker/coolify-realtime/terminal-utils.js /terminal/terminal-utils.js
 
 # Install Cloudflared based on architecture
 RUN if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then \

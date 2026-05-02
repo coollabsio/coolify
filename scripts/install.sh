@@ -20,7 +20,7 @@ DATE=$(date +"%Y%m%d-%H%M%S")
 
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
 ENV_FILE="/data/coolify/source/.env"
-DOCKER_VERSION="27.0"
+DOCKER_VERSION="latest"
 # TODO: Ask for a user
 CURRENT_USER=$USER
 
@@ -499,13 +499,10 @@ fi
 
 install_docker() {
     set +e
-    curl -s https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh 2>&1 || true
+    curl -fsSL https://get.docker.com | sh 2>&1 || true
     if ! [ -x "$(command -v docker)" ]; then
-        curl -s https://get.docker.com | sh -s -- --version ${DOCKER_VERSION} 2>&1
-        if ! [ -x "$(command -v docker)" ]; then
-            echo "Automated Docker installation failed. Trying manual installation."
-            install_docker_manually
-        fi
+        echo "Automated Docker installation failed. Trying manual installation."
+        install_docker_manually
     fi
     set -e
 }
@@ -542,22 +539,21 @@ install_docker_manually() {
         echo "Docker installed successfully."
     fi
 }
+
+install_docker_from_rhel_repo() {
+    echo " - Installing Docker from the RHEL repository for Rocky Linux..."
+    rm -f /etc/yum.repos.d/docker-ce.repo /etc/yum.repos.d/docker-ce-staging.repo
+    dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+    dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    systemctl --now enable docker
+}
+
 log_section "Step 3/9: Checking Docker installation"
 echo "3/9 Checking Docker installation..."
 if ! [ -x "$(command -v docker)" ]; then
     echo " - Docker is not installed. Installing Docker. It may take a while."
     getAJoke
     case "$OS_TYPE" in
-    "almalinux")
-        dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo >/dev/null 2>&1
-        dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null 2>&1
-        if ! [ -x "$(command -v docker)" ]; then
-            echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
-            exit 1
-        fi
-        systemctl start docker >/dev/null 2>&1
-        systemctl enable docker >/dev/null 2>&1
-        ;;
     "alpine" | "postmarketos")
         apk add docker docker-cli-compose >/dev/null 2>&1
         rc-update add docker default >/dev/null 2>&1
@@ -569,8 +565,9 @@ if ! [ -x "$(command -v docker)" ]; then
         fi
         ;;
     "arch")
-        pacman -Sy docker docker-compose --noconfirm >/dev/null 2>&1
+        pacman -Syu --noconfirm --needed docker docker-compose >/dev/null 2>&1
         systemctl enable docker.service >/dev/null 2>&1
+        systemctl start docker.service >/dev/null 2>&1
         if ! [ -x "$(command -v docker)" ]; then
             echo " - Failed to install Docker with pacman. Try to install it manually."
             echo "   Please visit https://wiki.archlinux.org/title/docker for more information."
@@ -581,7 +578,7 @@ if ! [ -x "$(command -v docker)" ]; then
         dnf install docker -y >/dev/null 2>&1
         DOCKER_CONFIG=${DOCKER_CONFIG:-/usr/local/lib/docker}
         mkdir -p $DOCKER_CONFIG/cli-plugins >/dev/null 2>&1
-        curl -sL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o $DOCKER_CONFIG/cli-plugins/docker-compose >/dev/null 2>&1
+        curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o $DOCKER_CONFIG/cli-plugins/docker-compose >/dev/null 2>&1
         chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose >/dev/null 2>&1
         systemctl start docker >/dev/null 2>&1
         systemctl enable docker >/dev/null 2>&1
@@ -591,40 +588,54 @@ if ! [ -x "$(command -v docker)" ]; then
             exit 1
         fi
         ;;
-    "centos" | "fedora" | "rhel" | "tencentos")
-        if [ -x "$(command -v dnf5)" ]; then
-            # dnf5 is available
-            dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/$OS_TYPE/docker-ce.repo --overwrite >/dev/null 2>&1
-        else
-            # dnf5 is not available, use dnf
-            dnf config-manager --add-repo=https://download.docker.com/linux/$OS_TYPE/docker-ce.repo >/dev/null 2>&1
-        fi
-        dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null 2>&1
+    "rocky")
+        install_docker_from_rhel_repo
         if ! [ -x "$(command -v docker)" ]; then
             echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
             exit 1
         fi
+        ;;
+    "almalinux" | "tencentos")
+        dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo >/dev/null 2>&1
+        dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null 2>&1
         systemctl start docker >/dev/null 2>&1
         systemctl enable docker >/dev/null 2>&1
+        if ! [ -x "$(command -v docker)" ]; then
+            echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+            exit 1
+        fi
         ;;
-    "ubuntu" | "debian" | "raspbian")
+    "ubuntu" | "debian" | "raspbian" | "centos" | "fedora" | "rhel" | "sles")
         install_docker
         if ! [ -x "$(command -v docker)" ]; then
-            echo " - Automated Docker installation failed. Trying manual installation."
-            install_docker_manually
+            echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+            exit 1
         fi
         ;;
     *)
         install_docker
         if ! [ -x "$(command -v docker)" ]; then
-            echo " - Automated Docker installation failed. Trying manual installation."
-            install_docker_manually
+            echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+            exit 1
         fi
         ;;
     esac
     echo " - Docker installed successfully."
 else
     echo " - Docker is installed."
+fi
+
+# Verify minimum Docker version
+MIN_DOCKER_VERSION=24
+INSTALLED_DOCKER_VERSION=$(docker version --format '{{.Server.Version}}' 2>/dev/null | cut -d. -f1)
+if [ -z "$INSTALLED_DOCKER_VERSION" ]; then
+    echo " - WARNING: Could not determine Docker version. Please ensure Docker $MIN_DOCKER_VERSION+ is installed."
+elif [ "$INSTALLED_DOCKER_VERSION" -lt "$MIN_DOCKER_VERSION" ]; then
+    echo " - ERROR: Docker version $INSTALLED_DOCKER_VERSION is too old. Coolify requires Docker $MIN_DOCKER_VERSION or newer."
+    echo "   Please upgrade Docker: https://docs.docker.com/engine/install/"
+    exit 1
+else
+    echo " - Docker version $(docker version --format '{{.Server.Version}}' 2>/dev/null) meets minimum requirement ($MIN_DOCKER_VERSION+)."
 fi
 
 log_section "Step 4/9: Checking Docker configuration"
