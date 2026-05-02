@@ -358,7 +358,7 @@ class DeployController extends Controller
 
         $uuids = $request->input('uuid');
         $tags = $request->input('tag');
-        $force = $request->input('force') ?? false;
+        $force = $request->boolean('force');
         $pullRequestId = $request->input('pull_request_id', $request->input('pr'));
         $pr = $pullRequestId ? max((int) $pullRequestId, 0) : 0;
         $dockerTag = $request->string('docker_tag')->trim()->value() ?: null;
