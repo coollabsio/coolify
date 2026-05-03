@@ -72,7 +72,11 @@
                         </a>
                     @else
                         <div class="mt-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
-                            {{ __('auth.registration_disabled') }}
+                            @if ($is_oauth_registration_enabled && $enabled_oauth_providers->isNotEmpty())
+                                Account creation is available through OAuth providers.
+                            @else
+                                {{ __('auth.registration_disabled') }}
+                            @endif
                         </div>
                     @endif
 
