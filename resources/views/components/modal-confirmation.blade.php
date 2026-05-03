@@ -31,7 +31,7 @@
     use App\Models\InstanceSettings;
     // Global setting to disable ALL two-step confirmation (text + password)
     $disableTwoStepConfirmation = data_get(InstanceSettings::get(), 'disable_two_step_confirmation');
-    // Skip ONLY password confirmation for OAuth users (they have no password)
+    // Skip password confirmation for users who cannot use a local password.
     $skipPasswordConfirmation = shouldSkipPasswordConfirmation();
     if ($temporaryDisableTwoStepConfirmation) {
         $disableTwoStepConfirmation = false;

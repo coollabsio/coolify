@@ -14,6 +14,21 @@
             <div class="pb-4 ">Custom authentication (OAuth) configurations.</div>
         </div>
         <div class="flex flex-col gap-2 pt-4">
+            <div class="p-4 border dark:border-coolgray-300 border-neutral-200">
+                <h3>OAuth Access</h3>
+                <div class="flex flex-col gap-2 pt-2">
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave="instantSaveInstanceSettings"
+                            id="is_oauth_registration_enabled" label="OAuth Registration Allowed"
+                            helper="Allow new users to self-register with enabled OAuth providers even when general registration is disabled." />
+                    </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave="instantSaveInstanceSettings" id="is_oauth_only_enabled"
+                            label="OAuth-only Accounts"
+                            helper="When enabled, users who sign in with OAuth cannot use password login, password reset, or profile password changes." />
+                    </div>
+                </div>
+            </div>
             @foreach ($oauth_settings_map as $oauth_setting)
                 <div class="p-4 border dark:border-coolgray-300 border-neutral-200">
                     <h3>{{ ucfirst($oauth_setting['provider']) }}</h3>

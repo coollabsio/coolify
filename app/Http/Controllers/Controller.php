@@ -78,6 +78,11 @@ class Controller extends BaseController
                 return response()->json(['message' => 'Transactional emails are not active'], 400);
             }
             $request->validate([Fortify::email() => 'required|email']);
+            $user = User::whereEmail($request->input(Fortify::email()))->first();
+            if ($user?->mustUseOauth()) {
+                return app(FailedPasswordResetLinkRequestResponse::class, ['status' => Password::INVALID_USER]);
+            }
+
             $status = Password::broker(config('fortify.passwords'))->sendResetLink(
                 $request->only(Fortify::email())
             );
@@ -104,6 +109,9 @@ class Controller extends BaseController
             $user = User::whereEmail($email)->first();
             if (! $user) {
                 return redirect()->route('login');
+            }
+            if ($user->mustUseOauth()) {
+                return redirect()->route('login')->with('error', 'Password login is disabled for OAuth-only accounts. Please sign in with your OAuth provider.');
             }
             if (Hash::check($password, $user->password)) {
                 $invitation = TeamInvitation::whereEmail($email);

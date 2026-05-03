@@ -487,4 +487,20 @@ class User extends Authenticatable implements SendsEmail
     {
         return ! empty($this->password);
     }
+
+    /**
+     * Check if the user has authenticated through an OAuth provider.
+     */
+    public function hasOauthProvider(): bool
+    {
+        return filled($this->oauth_provider);
+    }
+
+    /**
+     * Check if local password authentication is disabled for this OAuth user.
+     */
+    public function mustUseOauth(): bool
+    {
+        return $this->hasOauthProvider() && (bool) data_get(instanceSettings(), 'is_oauth_only_enabled', false);
+    }
 }

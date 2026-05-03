@@ -30,6 +30,14 @@ class ForcePasswordReset extends Component
         if (auth()->user()->force_password_reset === false) {
             return redirect()->route('dashboard');
         }
+        if (auth()->user()->mustUseOauth()) {
+            auth()->user()->forceFill([
+                'password' => null,
+                'force_password_reset' => false,
+            ])->save();
+
+            return redirect()->route('dashboard');
+        }
         $this->email = auth()->user()->email;
     }
 
@@ -41,6 +49,14 @@ class ForcePasswordReset extends Component
     public function submit()
     {
         if (auth()->user()->force_password_reset === false) {
+            return redirect()->route('dashboard');
+        }
+        if (auth()->user()->mustUseOauth()) {
+            auth()->user()->forceFill([
+                'password' => null,
+                'force_password_reset' => false,
+            ])->save();
+
             return redirect()->route('dashboard');
         }
 
