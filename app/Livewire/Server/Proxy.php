@@ -141,6 +141,7 @@ class Proxy extends Component
             $this->authorize('update', $this->server);
             $this->server->proxy->redirect_enabled = $this->redirectEnabled;
             $this->server->save();
+            $this->server->setupTlsConfiguration();
             $this->server->setupDefaultRedirect();
             $this->dispatch('success', 'Proxy configuration saved.');
         } catch (\Throwable $e) {
@@ -156,6 +157,7 @@ class Proxy extends Component
             SaveProxyConfiguration::run($this->server, $this->proxySettings);
             $this->server->proxy->redirect_url = $this->redirectUrl;
             $this->server->save();
+            $this->server->setupTlsConfiguration();
             $this->server->setupDefaultRedirect();
             $this->dispatch('success', 'Proxy configuration saved.');
         } catch (\Throwable $e) {

@@ -53,11 +53,32 @@ class StartProxy
                     $proxy_path = '/data/coolify/proxy/caddy';
                 }
             }
-            $caddyfile = 'import /dynamic/*.caddy';
+            $caddyfile_content = '{
+    servers {
+        protocols [h1 h2 h3]
+    }
+}
+
+tls {
+    protocols tls1.2 tls1.3
+    ciphers TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+            TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+            TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+            TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+            TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+            TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+}
+
+header {
+    Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+}
+
+import /dynamic/*.caddy';
+            $caddyfile_base64 = base64_encode($caddyfile_content);
             $commands = $commands->merge([
                 "mkdir -p $proxy_path/dynamic",
                 "cd $proxy_path",
-                "echo '$caddyfile' > $proxy_path/dynamic/Caddyfile",
+                "echo '$caddyfile_base64' | base64 -d | tee $proxy_path/dynamic/Caddyfile > /dev/null",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Pulling docker image.'",
                 'docker compose pull',

@@ -32,6 +32,7 @@ class ProxyStatusChangedNotification implements ShouldQueueAfterCommit
         $versionCheckDispatched = false;
 
         if ($status === 'running') {
+            $server->setupTlsConfiguration();
             $server->setupDefaultRedirect();
             $server->setupDynamicProxyConfiguration();
             $server->proxy->force_stop = false;

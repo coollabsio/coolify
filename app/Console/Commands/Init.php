@@ -137,6 +137,7 @@ class Init extends Command
         try {
             $localhost = $this->servers->where('id', 0)->first();
             if ($localhost) {
+                $localhost->setupTlsConfiguration();
                 $localhost->setupDynamicProxyConfiguration();
             }
         } catch (\Throwable $e) {
