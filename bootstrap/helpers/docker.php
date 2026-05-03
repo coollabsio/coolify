@@ -646,60 +646,6 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     }
                 }
             }
-                    if ($is_gzip_enabled) {
-                        $middlewares->push('gzip');
-                    }
-                    $middlewares->push('hsts');
-                    if (str($image)->contains('ghost')) {
-                        $middlewares->push("redir-ghost-{$uuid}");
-                    }
-                    if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
-                        $labels = $labels->merge($redirect_to_non_www);
-                        $middlewares->push($to_non_www_name);
-                    }
-                    if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
-                        $labels = $labels->merge($redirect_to_www);
-                        $middlewares->push($to_www_name);
-                    }
-                    if ($is_http_basic_auth_enabled) {
-                        $middlewares->push($http_basic_auth_label);
-                    }
-                    $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
-                        $middlewares->push($middleware_name);
-                    });
-                    if ($middlewares->isNotEmpty()) {
-                        $middlewares = $middlewares->join(',');
-                        $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares}");
-                    }
-                } else {
-                    $middlewares = collect([]);
-                    if ($is_gzip_enabled) {
-                        $middlewares->push('gzip');
-                    }
-                    $middlewares->push('hsts');
-                    if (str($image)->contains('ghost')) {
-                        $middlewares->push("redir-ghost-{$uuid}");
-                    }
-                    if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
-                        $labels = $labels->merge($redirect_to_non_www);
-                        $middlewares->push($to_non_www_name);
-                    }
-                    if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
-                        $labels = $labels->merge($redirect_to_www);
-                        $middlewares->push($to_www_name);
-                    }
-                    if ($is_http_basic_auth_enabled) {
-                        $middlewares->push($http_basic_auth_label);
-                    }
-                    $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
-                        $middlewares->push($middleware_name);
-                    });
-                    if ($middlewares->isNotEmpty()) {
-                        $middlewares = $middlewares->join(',');
-                        $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares}");
-                    }
-                }
-            }
         } catch (\Throwable) {
             continue;
         }
