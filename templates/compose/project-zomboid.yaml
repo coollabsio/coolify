@@ -1,0 +1,45 @@
+# documentation: https://hub.docker.com/r/m4lagon/project-zomboid-server
+# slogan: Project Zomboid dedicated server with persistent saves, Steam Workshop support, presets, and RCON.
+# category: games
+# tags: project-zomboid,zomboid,game-server,dedicated-server,steam,workshop,survival
+# logo: svgs/project-zomboid.svg
+# port: 16261
+# amd_only: true
+
+services:
+  project-zomboid:
+    image: m4lagon/project-zomboid-server:latest
+    restart: unless-stopped
+    stop_grace_period: 2m
+    ports:
+      - '${PROJECT_ZOMBOID_PORT:-16261}:16261/udp'
+      - '${PROJECT_ZOMBOID_PLAYER_PORT:-16262}:16262/udp'
+      - '${PROJECT_ZOMBOID_RCON_PORT:-27015}:27015/tcp'
+    volumes:
+      - project-zomboid-data:/root/Zomboid
+      - project-zomboid-workshop:/root/.local/share/Steam/steamapps/workshop
+    environment:
+      - 'SERVER_NAME=${PROJECT_ZOMBOID_SERVER_NAME:-CoolifyZomboid}'
+      - 'PUBLIC_NAME=${PROJECT_ZOMBOID_PUBLIC_NAME:-Coolify Project Zomboid}'
+      - 'ADMIN_USERNAME=${PROJECT_ZOMBOID_ADMIN_USERNAME:-admin}'
+      - 'ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}'
+      - 'SERVER_MEMORY=${PROJECT_ZOMBOID_SERVER_MEMORY:-4096m}'
+      - 'MAX_PLAYERS=${PROJECT_ZOMBOID_MAX_PLAYERS:-16}'
+      - 'PUBLIC=${PROJECT_ZOMBOID_PUBLIC:-true}'
+      - 'PASSWORD=${PROJECT_ZOMBOID_PASSWORD:-}'
+      - 'PVP=${PROJECT_ZOMBOID_PVP:-true}'
+      - 'PAUSE_EMPTY=${PROJECT_ZOMBOID_PAUSE_EMPTY:-true}'
+      - 'SERVER_PRESET=${PROJECT_ZOMBOID_SERVER_PRESET:-Survival}'
+      - 'FORCE_PRESET=${PROJECT_ZOMBOID_FORCE_PRESET:-0}'
+      - 'MAP=${PROJECT_ZOMBOID_MAP:-Muldraugh, KY}'
+      - 'NO_STEAM=${PROJECT_ZOMBOID_NO_STEAM:-0}'
+      - 'STEAM_VAC=${PROJECT_ZOMBOID_STEAM_VAC:-true}'
+      - 'WORKSHOP_ITEMS=${PROJECT_ZOMBOID_WORKSHOP_ITEMS:-}'
+      - 'MODS=${PROJECT_ZOMBOID_MODS:-}'
+      - 'RCON_PASSWORD=${SERVICE_PASSWORD_RCON}'
+      - 'RCON_PORT=27015'
+      - 'TZ=${PROJECT_ZOMBOID_TZ:-UTC}'
+
+volumes:
+  project-zomboid-data: null
+  project-zomboid-workshop: null
