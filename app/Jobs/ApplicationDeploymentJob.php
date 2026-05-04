@@ -1876,11 +1876,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $healthcheckLabel = $this->application->health_check_type === 'cmd' ? 'Healthcheck command' : 'Healthcheck URL';
                         $this->application_deployment_queue->addLogEntry("{$healthcheckLabel} (inside the container): {$this->full_healthcheck_url}");
                     }
-                    $this->application_deployment_queue->addLogEntry("Waiting for the start period ({$this->application->health_check_start_period} seconds) before starting healthcheck.");
-                    $sleeptime = 0;
-                    while ($sleeptime < $this->application->health_check_start_period) {
-                        Sleep::for(1)->seconds();
-                        $sleeptime++;
+                    if ($this->application->health_check_start_period > 0) {
+                        $this->application_deployment_queue->addLogEntry("Docker healthcheck start period configured for {$this->application->health_check_start_period} seconds. Coolify will not count Docker's 'starting' status against healthcheck retries.");
                     }
                     while ($counter <= $this->application->health_check_retries) {
                         $this->execute_remote_command(
@@ -1907,18 +1904,22 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                             $this->application_deployment_queue->addLogEntry("Healthcheck logs: {$health_check_logs} | Return code: {$health_check_return_code}");
                         }
 
-                        if (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'healthy') {
+                        $healthCheckStatus = str($this->saved_outputs->get('health_check'))->replace('"', '')->value();
+
+                        if ($healthCheckStatus === 'healthy') {
                             $this->newVersionIsHealthy = true;
                             $this->application->update(['status' => 'running']);
                             $this->application_deployment_queue->addLogEntry('New container is healthy.');
                             break;
-                        } elseif (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'unhealthy') {
+                        } elseif ($healthCheckStatus === 'unhealthy') {
                             $this->newVersionIsHealthy = false;
                             $this->application_deployment_queue->addLogEntry('New container is unhealthy.', type: 'error');
                             $this->query_logs();
                             break;
                         }
-                        $counter++;
+                        if ($this->shouldCountHealthcheckAttempt($healthCheckStatus)) {
+                            $counter++;
+                        }
                         $sleeptime = 0;
                         while ($sleeptime < $this->application->health_check_interval) {
                             Sleep::for(1)->seconds();
@@ -1933,6 +1934,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Exception $e) {
             throw new DeploymentException('Health check failed ('.get_class($e).'): '.$e->getMessage(), $e->getCode(), $e);
         }
+    }
+
+    private function shouldCountHealthcheckAttempt(string $healthCheckStatus): bool
+    {
+        return $healthCheckStatus !== 'starting';
     }
 
     private function query_logs()
