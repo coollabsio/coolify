@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Project Zomboid</title>
+  <desc id="desc">A simple Project Zomboid server icon with PZ initials.</desc>
+  <rect width="256" height="256" rx="40" fill="#141a16"/>
+  <path d="M48 42h160c13.3 0 24 10.7 24 24v124c0 13.3-10.7 24-24 24H48c-13.3 0-24-10.7-24-24V66c0-13.3 10.7-24 24-24Z" fill="#253326"/>
+  <path d="M53 70h150v22H92v29h85v22H92v43H53V70Z" fill="#d7dfc4"/>
+  <path d="M112 70h91v20l-48 76h50v20h-96v-20l48-76h-45V70Z" fill="#80a66b"/>
+  <path d="M46 207h164" stroke="#80a66b" stroke-width="10" stroke-linecap="round"/>
+</svg>
