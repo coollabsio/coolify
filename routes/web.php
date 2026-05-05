@@ -234,6 +234,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/deployment/{deployment_uuid}', DeploymentShow::class)->name('project.application.deployment.show');
         Route::get('/logs', Logs::class)->name('project.application.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.application.command')->middleware('can.access.terminal');
+        Route::get('/container-info', \App\Livewire\Project\Application\ContainerInfo::class)->name('project.application.container-info');
         Route::get('/tasks/{task_uuid}', ApplicationConfiguration::class)->name('project.application.scheduled-tasks');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}')->group(function () {

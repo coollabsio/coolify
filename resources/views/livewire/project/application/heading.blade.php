@@ -22,6 +22,10 @@
                     @endif
                 </div>
             </a>
+            <a class="shrink-0 {{ request()->routeIs('project.application.container-info') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+                href="{{ route('project.application.container-info', $parameters) }}">
+                Container Info
+            </a>
             @if (!$application->destination->server->isSwarm())
                 @can('canAccessTerminal')
                     <a class="shrink-0 {{ request()->routeIs('project.application.command') ? 'dark:text-white' : '' }}"
