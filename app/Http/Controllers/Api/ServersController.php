@@ -6,6 +6,7 @@ use App\Actions\Server\DeleteServer;
 use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
+use App\Helpers\SshMultiplexingHelper;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
@@ -16,6 +17,8 @@ use App\Rules\ValidServerIp;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
 use Stringable;
 
@@ -938,5 +941,232 @@ class ServersController extends Controller
         ]);
 
         return response()->json(['message' => 'Validation started.'], 201);
+    }
+
+    #[OA\Post(
+        summary: 'Execute Command',
+        description: 'Execute a non-interactive shell command on a server through Coolify SSH.',
+        path: '/servers/{uuid}/exec',
+        operationId: 'execute-command-on-server-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    required: ['command'],
+                    properties: [
+                        'command' => ['type' => 'string', 'description' => 'Shell command to execute on the server.'],
+                        'timeout' => ['type' => 'integer', 'description' => 'Command timeout in seconds. Defaults to the configured SSH command timeout.'],
+                        'no_sudo' => ['type' => 'boolean', 'description' => 'Do not add sudo for non-root server users.'],
+                    ],
+                    type: 'object',
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Command finished.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'exit_code' => ['type' => 'integer'],
+                                'stdout' => ['type' => 'string'],
+                                'stderr' => ['type' => 'string'],
+                            ],
+                        ),
+                    ),
+                ],
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Terminal access is disabled on this server.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function execute_command(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $allowedFields = ['command', 'timeout', 'no_sudo'];
+        $validator = customApiValidator($request->all(), [
+            'command' => 'required|string|max:20000',
+            'timeout' => 'integer|nullable|min:1|max:600',
+            'no_sudo' => 'boolean|nullable',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->route('uuid'))->first();
+        if (! $server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+        if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
+            return response()->json(['message' => 'Terminal access is disabled on this server.'], 403);
+        }
+
+        $commands = [$request->command];
+        if ($server->isNonRoot() && ! $request->boolean('no_sudo')) {
+            $commands = parseCommandsByLineForSudo(collect($commands), $server)->toArray();
+        }
+        $command = implode("\n", $commands);
+        $timeout = $request->integer('timeout') ?: config('constants.ssh.command_timeout');
+        $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command, disableMultiplexing: true);
+        $process = Process::timeout($timeout)->run($sshCommand);
+
+        auditLog('api.server.command.executed', [
+            'team_id' => $teamId,
+            'server_uuid' => $server->uuid,
+            'server_name' => $server->name,
+            'exit_code' => $process->exitCode(),
+        ]);
+
+        return response()->json([
+            'exit_code' => $process->exitCode(),
+            'stdout' => sanitize_utf8_text($process->output()),
+            'stderr' => sanitize_utf8_text($process->errorOutput()),
+        ]);
+    }
+
+    #[OA\Post(
+        summary: 'Create Terminal Session',
+        description: 'Create a terminal session descriptor for the realtime terminal websocket.',
+        path: '/servers/{uuid}/terminal-sessions',
+        operationId: 'create-terminal-session-for-server-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    properties: [
+                        'command' => ['type' => 'string', 'description' => 'Optional shell command to run before opening the terminal shell.'],
+                        'timeout' => ['type' => 'integer', 'description' => 'Optional websocket PTY timeout in seconds.'],
+                    ],
+                    type: 'object',
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Terminal session descriptor created.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'session_id' => ['type' => 'string'],
+                                'websocket_path' => ['type' => 'string'],
+                                'websocket_command' => ['type' => 'array', 'items' => ['type' => 'string']],
+                            ],
+                        ),
+                    ),
+                ],
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Terminal access is disabled on this server.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function create_terminal_session(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $allowedFields = ['command', 'timeout'];
+        $validator = customApiValidator($request->all(), [
+            'command' => 'string|nullable|max:20000',
+            'timeout' => 'integer|nullable|min:1|max:3600',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->route('uuid'))->first();
+        if (! $server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+        if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
+            return response()->json(['message' => 'Terminal access is disabled on this server.'], 403);
+        }
+
+        $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
+                        'if [ -f ~/.profile ]; then . ~/.profile; fi && '.
+                        'if [ -n "$SHELL" ] && [ -x "$SHELL" ]; then exec $SHELL; else sh; fi';
+        if ($request->filled('command')) {
+            $shellCommand = $request->command."\n".$shellCommand;
+        }
+
+        $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $shellCommand, disableMultiplexing: true);
+        if ($request->filled('timeout')) {
+            $sshCommand = 'timeout '.$request->integer('timeout').' '.$sshCommand;
+        }
+
+        auditLog('api.server.terminal_session.created', [
+            'team_id' => $teamId,
+            'server_uuid' => $server->uuid,
+            'server_name' => $server->name,
+        ]);
+
+        return response()->json([
+            'session_id' => (string) Str::uuid(),
+            'websocket_path' => '/terminal/ws',
+            'websocket_command' => [$sshCommand],
+        ], 201);
     }
 }

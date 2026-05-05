@@ -87,6 +87,8 @@ Route::group([
     Route::get('/servers/{uuid}/resources', [ServersController::class, 'resources_by_server'])->middleware(['api.ability:read']);
 
     Route::get('/servers/{uuid}/validate', [ServersController::class, 'validate_server'])->middleware(['api.ability:write']);
+    Route::post('/servers/{uuid}/exec', [ServersController::class, 'execute_command'])->middleware(['api.ability:deploy']);
+    Route::post('/servers/{uuid}/terminal-sessions', [ServersController::class, 'create_terminal_session'])->middleware(['api.ability:deploy']);
 
     Route::post('/servers', [ServersController::class, 'create_server'])->middleware(['api.ability:write']);
     Route::patch('/servers/{uuid}', [ServersController::class, 'update_server'])->middleware(['api.ability:write']);
