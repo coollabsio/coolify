@@ -130,12 +130,34 @@ describe('POST /api/v1/servers/{uuid}/terminal-sessions', function () {
         $response->assertStatus(201);
         $response->assertJsonPath('websocket_path', '/terminal/ws');
         $response->assertJsonStructure([
-            'session_id',
             'websocket_path',
-            'websocket_command',
+            'websocket_message' => ['command'],
         ]);
-        expect($response->json('websocket_command.0'))->toContain('cd /tmp');
-        expect($response->json('websocket_command.0'))->toContain('coolify-testing-host');
+        expect($response->json('websocket_message.command'))->toContain('cd /tmp');
+        expect($response->json('websocket_message.command'))->toContain('coolify-testing-host');
+    });
+
+    test('requires deploy token ability', function () {
+        $readOnlyToken = createServerTerminalApiToken($this->user, $this->team, ['read']);
+
+        $response = $this->withHeaders(serverTerminalAuthHeaders($readOnlyToken))
+            ->postJson("/api/v1/servers/{$this->server->uuid}/terminal-sessions", [
+                'command' => 'whoami',
+            ]);
+
+        $response->assertStatus(403);
+    });
+
+    test('returns 403 when terminal access is disabled', function () {
+        $this->server->settings()->update(['is_terminal_enabled' => false]);
+
+        $response = $this->withHeaders(serverTerminalAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/servers/{$this->server->uuid}/terminal-sessions", [
+                'command' => 'whoami',
+            ]);
+
+        $response->assertStatus(403);
+        $response->assertJson(['message' => 'Terminal access is disabled on this server.']);
     });
 
     test('returns 404 for servers outside the token team', function () {

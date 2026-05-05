@@ -18,7 +18,6 @@ use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
 use Stringable;
 
@@ -1092,9 +1091,14 @@ class ServersController extends Controller
                         schema: new OA\Schema(
                             type: 'object',
                             properties: [
-                                'session_id' => ['type' => 'string'],
                                 'websocket_path' => ['type' => 'string'],
-                                'websocket_command' => ['type' => 'array', 'items' => ['type' => 'string']],
+                                'websocket_message' => [
+                                    'type' => 'object',
+                                    'description' => 'JSON message the client should send on first websocket connect to start the PTY.',
+                                    'properties' => [
+                                        'command' => ['type' => 'string'],
+                                    ],
+                                ],
                             ],
                         ),
                     ),
@@ -1164,9 +1168,8 @@ class ServersController extends Controller
         ]);
 
         return response()->json([
-            'session_id' => (string) Str::uuid(),
             'websocket_path' => '/terminal/ws',
-            'websocket_command' => [$sshCommand],
+            'websocket_message' => ['command' => $sshCommand],
         ], 201);
     }
 }
