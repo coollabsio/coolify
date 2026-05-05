@@ -118,6 +118,8 @@ Route::group([
     Route::patch('/applications/{uuid}/envs/bulk', [ApplicationsController::class, 'create_bulk_envs'])->middleware(['api.ability:write']);
     Route::patch('/applications/{uuid}/envs', [ApplicationsController::class, 'update_env_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/envs/{env_uuid}', [ApplicationsController::class, 'delete_env_by_uuid'])->middleware(['api.ability:write']);
+    Route::post('/applications/{uuid}/exec', [ApplicationsController::class, 'execute_command'])->middleware(['api.ability:deploy']);
+    Route::post('/applications/{uuid}/terminal-sessions', [ApplicationsController::class, 'create_terminal_session'])->middleware(['api.ability:deploy']);
     Route::get('/applications/{uuid}/logs', [ApplicationsController::class, 'logs_by_uuid'])->middleware(['api.ability:read']);
     Route::get('/applications/{uuid}/storages', [ApplicationsController::class, 'storages'])->middleware(['api.ability:read']);
     Route::post('/applications/{uuid}/storages', [ApplicationsController::class, 'create_storage'])->middleware(['api.ability:write']);

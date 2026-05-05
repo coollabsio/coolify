@@ -6,6 +6,7 @@ use App\Actions\Application\CleanupPreviewDeployment;
 use App\Actions\Application\LoadComposeFile;
 use App\Actions\Application\StopApplication;
 use App\Enums\BuildPackTypes;
+use App\Helpers\SshMultiplexingHelper;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
@@ -25,6 +26,7 @@ use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
@@ -63,6 +65,113 @@ class ApplicationsController extends Controller
         }
 
         return serializeApiResponse($application);
+    }
+
+    private function resolveApplicationTerminalTarget(Application $application, Request $request): array|JsonResponse
+    {
+        $requestedServerUuid = $request->string('server_uuid')->value();
+        $requestedContainer = $request->string('container')->value();
+        $pullRequestId = $request->filled('pull_request_id') ? $request->integer('pull_request_id') : null;
+
+        if ($requestedContainer && ! ValidationPatterns::isValidContainerName($requestedContainer)) {
+            return response()->json(['message' => 'Invalid container name.'], 422);
+        }
+
+        $application->loadMissing(['destination.server', 'additional_servers']);
+        $servers = collect([$application->destination?->server])
+            ->merge($application->additional_servers)
+            ->filter()
+            ->unique('id')
+            ->values();
+
+        if ($requestedServerUuid) {
+            $servers = $servers->filter(fn ($server) => $server->uuid === $requestedServerUuid)->values();
+            if ($servers->isEmpty()) {
+                return response()->json(['message' => 'Server not found for this application.'], 404);
+            }
+        }
+
+        $runningContainers = collect();
+        $disabledServers = collect();
+        foreach ($servers as $server) {
+            if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
+                $disabledServers->push($server);
+
+                continue;
+            }
+
+            if ($server->isSwarm()) {
+                $containers = collect([[
+                    'Names' => $application->uuid.'_'.$application->uuid,
+                    'State' => 'running',
+                ]]);
+            } else {
+                $containers = getCurrentApplicationContainerStatus($server, $application->id, $pullRequestId, includePullrequests: true);
+            }
+
+            $containers
+                ->filter(fn ($container) => data_get($container, 'State') === 'running')
+                ->each(function ($container) use ($runningContainers, $server) {
+                    $runningContainers->push([
+                        'server' => $server,
+                        'container' => data_get($container, 'Names'),
+                    ]);
+                });
+        }
+
+        if ($runningContainers->isEmpty()) {
+            if ($servers->count() > 0 && $disabledServers->count() === $servers->count()) {
+                return response()->json(['message' => 'Terminal access is disabled on this server.'], 403);
+            }
+
+            return response()->json(['message' => 'No running application containers found.'], 404);
+        }
+
+        if ($requestedContainer) {
+            $target = $runningContainers->firstWhere('container', $requestedContainer);
+            if (! $target) {
+                return response()->json(['message' => 'Container not found for this application.'], 404);
+            }
+
+            return $target;
+        }
+
+        if ($runningContainers->count() > 1) {
+            return response()->json([
+                'message' => 'Multiple running containers found. Specify a container.',
+                'containers' => $runningContainers->map(fn ($target) => [
+                    'server_uuid' => $target['server']->uuid,
+                    'container' => $target['container'],
+                ])->values(),
+            ], 422);
+        }
+
+        return $runningContainers->first();
+    }
+
+    private function applicationShellCommand(?string $initialCommand = null): string
+    {
+        $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
+                        'if [ -f ~/.profile ]; then . ~/.profile; fi && '.
+                        'if [ -n "$SHELL" ] && [ -x "$SHELL" ]; then exec $SHELL; else sh; fi';
+
+        if ($initialCommand) {
+            return $initialCommand."\n".$shellCommand;
+        }
+
+        return $shellCommand;
+    }
+
+    private function applicationDockerExecCommand(Server $server, string $container, string $command, bool $interactive = false): string
+    {
+        $interactiveFlag = $interactive ? '-it ' : '';
+        $dockerCommand = "docker exec {$interactiveFlag}".escapeshellarg($container).' sh -c '.escapeshellarg($command);
+
+        if ($server->isNonRoot()) {
+            return "sudo {$dockerCommand}";
+        }
+
+        return $dockerCommand;
     }
 
     #[OA\Get(
@@ -1914,6 +2023,255 @@ class ApplicationsController extends Controller
         }
 
         return response()->json(['message' => 'Invalid type.'], 400);
+    }
+
+    #[OA\Post(
+        summary: 'Execute Command',
+        description: 'Execute a non-interactive shell command inside a running application container.',
+        path: '/applications/{uuid}/exec',
+        operationId: 'execute-command-on-application-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Application UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    required: ['command'],
+                    properties: [
+                        'command' => ['type' => 'string', 'description' => 'Shell command to execute in the application container.'],
+                        'timeout' => ['type' => 'integer', 'description' => 'Command timeout in seconds. Defaults to the configured SSH command timeout.'],
+                        'container' => ['type' => 'string', 'description' => 'Optional container name when the application has multiple running containers.'],
+                        'server_uuid' => ['type' => 'string', 'description' => 'Optional server UUID when the application runs on multiple servers.'],
+                        'pull_request_id' => ['type' => 'integer', 'description' => 'Optional preview pull request identifier.'],
+                    ],
+                    type: 'object',
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Command finished.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'exit_code' => ['type' => 'integer'],
+                                'stdout' => ['type' => 'string'],
+                                'stderr' => ['type' => 'string'],
+                            ],
+                        ),
+                    ),
+                ],
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Terminal access is disabled on the target server.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function execute_command(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $allowedFields = ['command', 'timeout', 'container', 'server_uuid', 'pull_request_id'];
+        $validator = customApiValidator($request->all(), [
+            'command' => 'required|string|max:20000',
+            'timeout' => 'integer|nullable|min:1|max:600',
+            'container' => 'string|nullable|max:255',
+            'server_uuid' => 'string|nullable',
+            'pull_request_id' => 'integer|nullable|min:0',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $target = $this->resolveApplicationTerminalTarget($application, $request);
+        if ($target instanceof JsonResponse) {
+            return $target;
+        }
+
+        $server = $target['server'];
+        if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
+            return response()->json(['message' => 'Terminal access is disabled on this server.'], 403);
+        }
+
+        $dockerCommand = $this->applicationDockerExecCommand($server, $target['container'], $request->command);
+        $timeout = $request->integer('timeout') ?: config('constants.ssh.command_timeout');
+        $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $dockerCommand, disableMultiplexing: true);
+        $process = Process::timeout($timeout)->run($sshCommand);
+
+        auditLog('api.application.command.executed', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'application_name' => $application->name,
+            'server_uuid' => $server->uuid,
+            'container' => $target['container'],
+            'exit_code' => $process->exitCode(),
+        ]);
+
+        return response()->json([
+            'exit_code' => $process->exitCode(),
+            'stdout' => sanitize_utf8_text($process->output()),
+            'stderr' => sanitize_utf8_text($process->errorOutput()),
+        ]);
+    }
+
+    #[OA\Post(
+        summary: 'Create Terminal Session',
+        description: 'Create a terminal session descriptor for a running application container.',
+        path: '/applications/{uuid}/terminal-sessions',
+        operationId: 'create-terminal-session-for-application-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Application UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    properties: [
+                        'command' => ['type' => 'string', 'description' => 'Optional shell command to run before opening the terminal shell.'],
+                        'timeout' => ['type' => 'integer', 'description' => 'Optional websocket PTY timeout in seconds.'],
+                        'container' => ['type' => 'string', 'description' => 'Optional container name when the application has multiple running containers.'],
+                        'server_uuid' => ['type' => 'string', 'description' => 'Optional server UUID when the application runs on multiple servers.'],
+                        'pull_request_id' => ['type' => 'integer', 'description' => 'Optional preview pull request identifier.'],
+                    ],
+                    type: 'object',
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Terminal session descriptor created.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'websocket_path' => ['type' => 'string'],
+                                'websocket_message' => [
+                                    'type' => 'object',
+                                    'description' => 'JSON message the client should send on first websocket connect to start the PTY.',
+                                    'properties' => [
+                                        'command' => ['type' => 'string'],
+                                    ],
+                                ],
+                            ],
+                        ),
+                    ),
+                ],
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Terminal access is disabled on the target server.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function create_terminal_session(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $allowedFields = ['command', 'timeout', 'container', 'server_uuid', 'pull_request_id'];
+        $validator = customApiValidator($request->all(), [
+            'command' => 'string|nullable|max:20000',
+            'timeout' => 'integer|nullable|min:1|max:3600',
+            'container' => 'string|nullable|max:255',
+            'server_uuid' => 'string|nullable',
+            'pull_request_id' => 'integer|nullable|min:0',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $target = $this->resolveApplicationTerminalTarget($application, $request);
+        if ($target instanceof JsonResponse) {
+            return $target;
+        }
+
+        $server = $target['server'];
+        if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
+            return response()->json(['message' => 'Terminal access is disabled on this server.'], 403);
+        }
+
+        $dockerCommand = $this->applicationDockerExecCommand($server, $target['container'], $this->applicationShellCommand($request->command), interactive: true);
+        $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $dockerCommand, disableMultiplexing: true);
+        if ($request->filled('timeout')) {
+            $sshCommand = 'timeout '.$request->integer('timeout').' '.$sshCommand;
+        }
+
+        auditLog('api.application.terminal_session.created', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'application_name' => $application->name,
+            'server_uuid' => $server->uuid,
+            'container' => $target['container'],
+        ]);
+
+        return response()->json([
+            'websocket_path' => '/terminal/ws',
+            'websocket_message' => ['command' => $sshCommand],
+        ], 201);
     }
 
     #[OA\Get(
