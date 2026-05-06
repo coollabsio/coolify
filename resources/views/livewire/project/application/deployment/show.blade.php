@@ -155,9 +155,9 @@
 
             this.matchCount = query ? count : 0;
         },
-        downloadLogs() {
+        collectVisibleLogs() {
             const logs = document.getElementById('logs');
-            if (!logs) return;
+            if (!logs) return '';
             const visibleLines = logs.querySelectorAll('[data-log-line]:not(.hidden)');
             let content = '';
             visibleLines.forEach(line => {
@@ -166,6 +166,17 @@
                     content += text + String.fromCharCode(10);
                 }
             });
+            return content;
+        },
+        copyLogs() {
+            const content = this.collectVisibleLogs();
+            if (!content) return;
+            navigator.clipboard.writeText(content);
+            Livewire.dispatch('success', ['Logs copied to clipboard.']);
+        },
+        downloadLogs() {
+            const content = this.collectVisibleLogs();
+            if (!content) return;
             const blob = new Blob([content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -258,12 +269,7 @@
                             </div>
                             <div class="flex flex-wrap items-center gap-1">
                                 <button
-                                    x-on:click="
-                                    $wire.copyLogs().then(logs => {
-                                        navigator.clipboard.writeText(logs);
-                                        Livewire.dispatch('success', ['Logs copied to clipboard.']);
-                                    });
-                                "
+                                    x-on:click="copyLogs()"
                                 title="Copy Logs"
                                 class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                                 <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"

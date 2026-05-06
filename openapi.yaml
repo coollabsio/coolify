@@ -5484,6 +5484,64 @@ paths:
       security:
         -
           bearerAuth: []
+  /mcp/enable:
+    post:
+      summary: 'Enable MCP Server'
+      description: 'Enable the MCP server endpoint at /mcp (only with root permissions).'
+      operationId: enable-mcp
+      responses:
+        '200':
+          description: 'MCP server enabled.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'MCP server enabled.' }
+                type: object
+        '403':
+          description: 'You are not allowed to enable the MCP server.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'You are not allowed to enable the MCP server.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /mcp/disable:
+    post:
+      summary: 'Disable MCP Server'
+      description: 'Disable the MCP server endpoint at /mcp (only with root permissions).'
+      operationId: disable-mcp
+      responses:
+        '200':
+          description: 'MCP server disabled.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'MCP server disabled.' }
+                type: object
+        '403':
+          description: 'You are not allowed to disable the MCP server.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'You are not allowed to disable the MCP server.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
   /health:
     get:
       summary: Healthcheck

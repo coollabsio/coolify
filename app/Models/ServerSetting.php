@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
@@ -144,19 +145,54 @@ class ServerSetting extends Model
      * Validate that a sentinel token contains only safe characters.
      * Prevents OS command injection when the token is interpolated into shell commands.
      */
-    public static function isValidSentinelToken(string $token): bool
+    public static function isValidSentinelToken(?string $token): bool
     {
+        if ($token === null) {
+            return false;
+        }
+
         return (bool) preg_match('/\A[a-zA-Z0-9._\-+=\/]+\z/', $token);
     }
 
-    public function generateSentinelToken(bool $save = true, bool $ignoreEvent = false)
+    /**
+     * Returns a valid sentinel token, regenerating it if the stored value is
+     * empty, undecryptable, or otherwise invalid. Throws only when regeneration
+     * still fails to produce a valid token.
+     */
+    public function ensureValidSentinelToken(): string
+    {
+        try {
+            $token = $this->sentinel_token;
+        } catch (DecryptException) {
+            $token = null;
+        }
+
+        if (! self::isValidSentinelToken($token)) {
+            // Clear undecryptable raw value so Eloquent's dirty-check won't try to
+            // decrypt the bad original during save().
+            $attrs = $this->getAttributes();
+            $attrs['sentinel_token'] = null;
+            $this->setRawAttributes($attrs, true);
+
+            $this->generateSentinelToken(save: true, ignoreEvent: true);
+            $this->refresh();
+            $token = $this->sentinel_token;
+        }
+
+        if (! self::isValidSentinelToken($token)) {
+            throw new \RuntimeException('Sentinel token invalid after regeneration. Allowed characters: a-z, A-Z, 0-9, dot, underscore, hyphen, plus, slash, equals.');
+        }
+
+        return $token;
+    }
+
+    public function generateSentinelToken(bool $save = true, bool $ignoreEvent = false): string
     {
         $data = [
             'server_uuid' => $this->server->uuid,
         ];
-        $token = json_encode($data);
-        $encrypted = encrypt($token);
-        $this->sentinel_token = $encrypted;
+        $token = encrypt(json_encode($data));
+        $this->sentinel_token = $token;
         if ($save) {
             if ($ignoreEvent) {
                 $this->saveQuietly();

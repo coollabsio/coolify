@@ -70,6 +70,17 @@
                             environments!
                         </x-callout>
                     @endif
+                    <h4 class="pt-4">MCP Server</h4>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_mcp_server_enabled" label="Enable MCP Server"
+                            helper="Exposes a Streamable HTTP Model Context Protocol endpoint at /mcp for AI clients (Claude Desktop, Cursor, etc.). Authenticates via Sanctum API tokens (Security > API Tokens). Requires API Access to be enabled." />
+                    </div>
+                    @if ($is_mcp_server_enabled)
+                        <x-callout type="info" title="MCP Endpoint" class="mt-2">
+                            Endpoint: <code>{{ url('/mcp') }}</code><br>
+                            Authenticate with <code>Authorization: Bearer &lt;token&gt;</code> using a token created in Security &raquo; API Tokens.
+                        </x-callout>
+                    @endif
                     <h4 class="pt-4">UI Settings</h4>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="is_wire_navigate_enabled" label="SPA Navigation"

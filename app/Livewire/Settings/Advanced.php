@@ -37,6 +37,9 @@ class Advanced extends Component
     #[Validate('boolean')]
     public bool $is_wire_navigate_enabled;
 
+    #[Validate('boolean')]
+    public bool $is_mcp_server_enabled;
+
     public function rules()
     {
         return [
@@ -49,6 +52,7 @@ class Advanced extends Component
             'is_sponsorship_popup_enabled' => 'boolean',
             'disable_two_step_confirmation' => 'boolean',
             'is_wire_navigate_enabled' => 'boolean',
+            'is_mcp_server_enabled' => 'boolean',
         ];
     }
 
@@ -67,6 +71,7 @@ class Advanced extends Component
         $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
         $this->is_sponsorship_popup_enabled = $this->settings->is_sponsorship_popup_enabled;
         $this->is_wire_navigate_enabled = $this->settings->is_wire_navigate_enabled ?? true;
+        $this->is_mcp_server_enabled = $this->settings->is_mcp_server_enabled ?? false;
     }
 
     public function submit()
@@ -150,6 +155,7 @@ class Advanced extends Component
             $this->settings->is_sponsorship_popup_enabled = $this->is_sponsorship_popup_enabled;
             $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation;
             $this->settings->is_wire_navigate_enabled = $this->is_wire_navigate_enabled;
+            $this->settings->is_mcp_server_enabled = $this->is_mcp_server_enabled;
             $this->settings->save();
             $this->dispatch('success', 'Settings updated!');
         } catch (\Exception $e) {

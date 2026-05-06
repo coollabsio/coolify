@@ -1058,44 +1058,17 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
 }
 function queryDatabaseByUuidWithinTeam(string $uuid, string $teamId)
 {
-    $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
-    if ($postgresql && $postgresql->team()->id == $teamId) {
-        return $postgresql->unsetRelation('environment');
-    }
-    $redis = StandaloneRedis::whereUuid($uuid)->first();
-    if ($redis && $redis->team()->id == $teamId) {
-        return $redis->unsetRelation('environment');
-    }
-    $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
-    if ($mongodb && $mongodb->team()->id == $teamId) {
-        return $mongodb->unsetRelation('environment');
-    }
-    $mysql = StandaloneMysql::whereUuid($uuid)->first();
-    if ($mysql && $mysql->team()->id == $teamId) {
-        return $mysql->unsetRelation('environment');
-    }
-    $mariadb = StandaloneMariadb::whereUuid($uuid)->first();
-    if ($mariadb && $mariadb->team()->id == $teamId) {
-        return $mariadb->unsetRelation('environment');
-    }
-    $keydb = StandaloneKeydb::whereUuid($uuid)->first();
-    if ($keydb && $keydb->team()->id == $teamId) {
-        return $keydb->unsetRelation('environment');
-    }
-    $dragonfly = StandaloneDragonfly::whereUuid($uuid)->first();
-    if ($dragonfly && $dragonfly->team()->id == $teamId) {
-        return $dragonfly->unsetRelation('environment');
-    }
-    $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
-    if ($clickhouse && $clickhouse->team()->id == $teamId) {
-        return $clickhouse->unsetRelation('environment');
+    foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
+        $database = $modelClass::whereUuid($uuid)->first();
+        if ($database && $database->team()->id == $teamId) {
+            return $database->unsetRelation('environment');
+        }
     }
 
     return null;
 }
 function queryResourcesByUuid(string $uuid)
 {
-    $resource = null;
     $application = Application::whereUuid($uuid)->first();
     if ($application) {
         return $application;
@@ -1104,37 +1077,11 @@ function queryResourcesByUuid(string $uuid)
     if ($service) {
         return $service;
     }
-    $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
-    if ($postgresql) {
-        return $postgresql;
-    }
-    $redis = StandaloneRedis::whereUuid($uuid)->first();
-    if ($redis) {
-        return $redis;
-    }
-    $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
-    if ($mongodb) {
-        return $mongodb;
-    }
-    $mysql = StandaloneMysql::whereUuid($uuid)->first();
-    if ($mysql) {
-        return $mysql;
-    }
-    $mariadb = StandaloneMariadb::whereUuid($uuid)->first();
-    if ($mariadb) {
-        return $mariadb;
-    }
-    $keydb = StandaloneKeydb::whereUuid($uuid)->first();
-    if ($keydb) {
-        return $keydb;
-    }
-    $dragonfly = StandaloneDragonfly::whereUuid($uuid)->first();
-    if ($dragonfly) {
-        return $dragonfly;
-    }
-    $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
-    if ($clickhouse) {
-        return $clickhouse;
+    foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
+        $database = $modelClass::whereUuid($uuid)->first();
+        if ($database) {
+            return $database;
+        }
     }
 
     // Check for ServiceDatabase by its own UUID
@@ -1143,7 +1090,7 @@ function queryResourcesByUuid(string $uuid)
         return $serviceDatabase;
     }
 
-    return $resource;
+    return null;
 }
 function generateTagDeployWebhook($tag_name)
 {

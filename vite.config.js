@@ -17,6 +17,15 @@ export default defineConfig(({ mode }) => {
             },
             host: "0.0.0.0",
             allowedHosts: true,
+            cors: {
+                origin: [
+                    /^https?:\/\/localhost(:\d+)?$/,
+                    /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+                    /^https?:\/\/\[::1\](:\d+)?$/,
+                    ...(env.APP_URL ? [env.APP_URL] : []),
+                    ...(viteHost ? [`http://${viteHost}:${vitePort}`, `https://${viteHost}:${vitePort}`] : []),
+                ],
+            },
             origin: viteHost ? `http://${viteHost}:${vitePort}` : undefined,
             hmr: viteHost
                 ? { host: viteHost, clientPort: vitePort }
