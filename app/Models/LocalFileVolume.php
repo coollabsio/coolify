@@ -298,7 +298,10 @@ class LocalFileVolume extends BaseModel
                     return false;
                 }
                 $composeRaw = $parent->docker_compose_raw;
-                $mainDirectory = str(base_configuration_dir().'/services/'.$parent->uuid);
+                $baseSegment = (int) data_get($parent, 'compose_parsing_version', 0) >= 4
+                    ? 'services'
+                    : 'applications';
+                $mainDirectory = str(base_configuration_dir()."/{$baseSegment}/".$parent->uuid);
             } else {
                 $composeRaw = data_get($resource, 'docker_compose_raw');
                 if (! $composeRaw) {
@@ -358,7 +361,8 @@ class LocalFileVolume extends BaseModel
             return false;
         }
         $sourceTransformed = replaceLocalSource(str($source), $mainDirectory)->value();
+        $currentFsPath = replaceLocalSource(str($this->fs_path), $mainDirectory)->value();
 
-        return $sourceTransformed === $this->fs_path;
+        return $sourceTransformed === $currentFsPath;
     }
 }

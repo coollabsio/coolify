@@ -14,7 +14,7 @@ beforeEach(function () {
 });
 
 it('dedupes when both fs_path and mount_path are identical', function () {
-    $resourceId = 99998;
+    $resourceId = fake()->unique()->numberBetween(10000, 99999);
     $resourceType = Application::class;
 
     for ($i = 0; $i < 2; $i++) {
