@@ -1,0 +1,44 @@
+# documentation: https://testsigma.com/docs
+# slogan: Open source, cloud-native test automation platform for web, mobile, and API testing.
+# category: testing
+# tags: testing, automation, qa, web, mobile, api, open-source
+# logo: svgs/testsigma.svg
+# port: 9090
+
+services:
+  testsigma:
+    image: testsigmainc/testsigma:latest
+    environment:
+      - SERVICE_URL_TESTSIGMA
+      - DB_HOST=testsigma-mysql
+      - DB_PORT=3306
+      - DB_NAME=${DB_NAME:-testsigma}
+      - DB_USER=$SERVICE_USER_MYSQL
+      - DB_PASSWORD=$SERVICE_PASSWORD_MYSQL
+      - TS_DATA_DIR=${TS_DATA_DIR:-/opt/testsigma/data}
+    volumes:
+      - testsigma_data:/opt/testsigma/data
+    depends_on:
+      testsigma-mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
+      interval: 15s
+      timeout: 20s
+      retries: 10
+      start_period: 30s
+
+  testsigma-mysql:
+    image: mysql:8.0
+    environment:
+      - MYSQL_DATABASE=${DB_NAME:-testsigma}
+      - MYSQL_USER=$SERVICE_USER_MYSQL
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_MYSQL
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_MYSQLROOT
+    volumes:
+      - testsigma_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p$SERVICE_PASSWORD_MYSQLROOT"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
