@@ -9,7 +9,7 @@
         fullscreen: @entangle('fullscreen'),
         alwaysScroll: {{ $isKeepAliveOn ? 'true' : 'false' }},
         rafId: null,
-        showTimestamps: true,
+        showTimestamps: localStorage.getItem('coolify-deployment-show-timestamps') !== 'false',
         searchQuery: '',
         matchCount: 0,
         deploymentId: '{{ $application_deployment_queue->deployment_uuid ?? 'deployment' }}',
@@ -279,7 +279,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <button title="Toggle Timestamps" x-on:click="showTimestamps = !showTimestamps"
+                            <button title="Toggle Timestamps" x-on:click="showTimestamps = !showTimestamps; localStorage.setItem('coolify-deployment-show-timestamps', showTimestamps)"
                                 :class="showTimestamps ? '!text-warning' : ''"
                                 class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                                 <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
