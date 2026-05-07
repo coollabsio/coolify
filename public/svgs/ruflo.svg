@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Ruflo">
+  <title>Ruflo</title>
+  <defs>
+    <linearGradient id="ruflo-bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+    <linearGradient id="ruflo-stroke" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.75"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#ruflo-bg)"/>
+  <!-- Mesh / swarm: 7 nodes connected in a hub-spoke + ring pattern -->
+  <g stroke="url(#ruflo-stroke)" stroke-width="1.6" stroke-linecap="round">
+    <line x1="32" y1="32" x2="32" y2="14"/>
+    <line x1="32" y1="32" x2="48" y2="22"/>
+    <line x1="32" y1="32" x2="50" y2="40"/>
+    <line x1="32" y1="32" x2="40" y2="52"/>
+    <line x1="32" y1="32" x2="22" y2="50"/>
+    <line x1="32" y1="32" x2="14" y2="38"/>
+    <line x1="32" y1="32" x2="18" y2="22"/>
+    <line x1="32" y1="14" x2="48" y2="22"/>
+    <line x1="48" y1="22" x2="50" y2="40"/>
+    <line x1="50" y1="40" x2="40" y2="52"/>
+    <line x1="40" y1="52" x2="22" y2="50"/>
+    <line x1="22" y1="50" x2="14" y2="38"/>
+    <line x1="14" y1="38" x2="18" y2="22"/>
+    <line x1="18" y1="22" x2="32" y2="14"/>
+  </g>
+  <g fill="#FFFFFF">
+    <circle cx="32" cy="32" r="4.5"/>
+    <circle cx="32" cy="14" r="2.6"/>
+    <circle cx="48" cy="22" r="2.6"/>
+    <circle cx="50" cy="40" r="2.6"/>
+    <circle cx="40" cy="52" r="2.6"/>
+    <circle cx="22" cy="50" r="2.6"/>
+    <circle cx="14" cy="38" r="2.6"/>
+    <circle cx="18" cy="22" r="2.6"/>
+  </g>
+</svg>
