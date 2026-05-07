@@ -1,0 +1,139 @@
+# documentation: https://github.com/ruvnet/ruflo
+# slogan: Multi-agent orchestration for Claude Code with 87 MCP tools, swarm coordination, and a built-in chat UI
+# tags: ai,agents,mcp,claude,llm,orchestration,swarm,chat-ui
+# logo: svgs/ruflo.svg
+# port: 3000
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Ruflo on Coolify v4
+#
+# Mirrors ruflo/docker-compose.yml from upstream (ruvnet/ruflo) and replaces:
+#   • host port bindings  →  ${SERVICE_FQDN_NGINX_3000} (Coolify routes via Traefik)
+#   • bare Mongo          →  authenticated Mongo with ${SERVICE_USER_MONGO} / ${SERVICE_PASSWORD_MONGO}
+#   • build contexts      →  pre-built images at ghcr.io/yashodhank/ruflo-*
+#                            (published by the companion ruvnet/ruflo workflow)
+#
+# Required (set in Coolify env panel):
+#   At least ONE of OPENAI_API_KEY / GOOGLE_API_KEY / OPENROUTER_API_KEY
+#
+# Optional MCP-tool group toggles (all default per upstream defaults):
+#   MCP_GROUP_INTELLIGENCE / _AGENTS / _MEMORY / _DEVTOOLS  (default: true)
+#   MCP_GROUP_SECURITY / _BROWSER / _NEURAL / _AGENTIC_FLOW
+#     / _CLAUDE_CODE / _GEMINI / _CODEX                     (default: false)
+#   ANTHROPIC_API_KEY                                       (required iff MCP_GROUP_CLAUDE_CODE=true)
+#
+# Magic envs resolved by Coolify at deploy time:
+#   ${SERVICE_FQDN_NGINX_3000}   → public HTTPS URL for the chat UI
+#   ${SERVICE_USER_MONGO} / ${SERVICE_PASSWORD_MONGO}
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── MongoDB ────────────────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${SERVICE_USER_MONGO}
+      MONGO_INITDB_ROOT_PASSWORD: ${SERVICE_PASSWORD_MONGO}
+      MONGO_INITDB_DATABASE: ${MONGODB_DB_NAME:-chat-db}
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ── MCP Bridge — OpenAI-compatible MCP gateway ─────────────────────────────
+  mcp-bridge:
+    image: ghcr.io/yashodhank/ruflo-mcp-bridge:${RUFLO_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      PORT: "3001"
+      NODE_ENV: production
+      # ── At least ONE provider key required ─────────────────────────────
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      # ── Optional: Anthropic key (only when MCP_GROUP_CLAUDE_CODE=true) ─
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # ── Optional backend service URLs ──────────────────────────────────
+      SEARCH_API_URL: ${SEARCH_API_URL:-}
+      RESEARCH_API_URL: ${RESEARCH_API_URL:-}
+      # ── Tool group toggles (mirror upstream defaults) ──────────────────
+      MCP_GROUP_INTELLIGENCE: ${MCP_GROUP_INTELLIGENCE:-true}
+      MCP_GROUP_AGENTS: ${MCP_GROUP_AGENTS:-true}
+      MCP_GROUP_MEMORY: ${MCP_GROUP_MEMORY:-true}
+      MCP_GROUP_DEVTOOLS: ${MCP_GROUP_DEVTOOLS:-true}
+      MCP_GROUP_SECURITY: ${MCP_GROUP_SECURITY:-false}
+      MCP_GROUP_BROWSER: ${MCP_GROUP_BROWSER:-false}
+      MCP_GROUP_NEURAL: ${MCP_GROUP_NEURAL:-false}
+      MCP_GROUP_AGENTIC_FLOW: ${MCP_GROUP_AGENTIC_FLOW:-false}
+      MCP_GROUP_CLAUDE_CODE: ${MCP_GROUP_CLAUDE_CODE:-false}
+      MCP_GROUP_GEMINI: ${MCP_GROUP_GEMINI:-false}
+      MCP_GROUP_CODEX: ${MCP_GROUP_CODEX:-false}
+    volumes:
+      - mcp-bridge-state:/app/.claude-flow
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health').then(r => process.exit(r.ok ? 0 : 1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Chat UI — RUVocal SvelteKit fork (HuggingFace chat-ui base) ────────────
+  chat-ui:
+    image: ghcr.io/yashodhank/ruflo-chat-ui:${RUFLO_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      mcp-bridge:
+        condition: service_healthy
+    environment:
+      DOTENV_LOCAL: |
+        MONGODB_URL=mongodb://${SERVICE_USER_MONGO}:${SERVICE_PASSWORD_MONGO}@mongodb:27017/?authSource=admin
+        MONGODB_DB_NAME=${MONGODB_DB_NAME:-chat-db}
+        PUBLIC_APP_NAME=${BRAND_NAME:-RuFlo}
+        PUBLIC_APP_DESCRIPTION=${BRAND_DESCRIPTION:-Enterprise AI Agent Orchestration Platform}
+        PUBLIC_APP_ASSETS=chatui
+        PUBLIC_ORIGIN=${SERVICE_FQDN_NGINX_3000}
+        LLM_SUMMARIZATION=${LLM_SUMMARIZATION:-true}
+        ENABLE_DATA_EXPORT=${ENABLE_DATA_EXPORT:-true}
+        ALLOW_IFRAME=${ALLOW_IFRAME:-true}
+        OPENAI_BASE_URL=http://mcp-bridge:3001
+        OPENAI_API_KEY=${OPENAI_API_KEY:-sk-placeholder}
+        MCP_SERVERS=[{"name":"Core Tools","url":"http://mcp-bridge:3001/mcp/core"},{"name":"Intelligence & Learning","url":"http://mcp-bridge:3001/mcp/intelligence"},{"name":"Agents & Orchestration","url":"http://mcp-bridge:3001/mcp/agents"},{"name":"Memory & Knowledge","url":"http://mcp-bridge:3001/mcp/memory"},{"name":"Dev Tools & Analysis","url":"http://mcp-bridge:3001/mcp/devtools"}]
+        COOKIE_SECURE=${COOKIE_SECURE:-true}
+        COOKIE_SAMESITE=${COOKIE_SAMESITE:-lax}
+        OPENID_PROVIDER_URL=${OPENID_PROVIDER_URL:-}
+        OPENID_CLIENT_ID=${OPENID_CLIENT_ID:-}
+        OPENID_CLIENT_SECRET=${OPENID_CLIENT_SECRET:-}
+        OPENID_SCOPES=${OPENID_SCOPES:-openid profile email}
+        OPENID_NAME_CLAIM=${OPENID_NAME_CLAIM:-name}
+
+  # ── Nginx reverse proxy — primary HTTP entrypoint, brand injection ─────────
+  nginx:
+    image: ghcr.io/yashodhank/ruflo-nginx:${RUFLO_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      chat-ui:
+        condition: service_started
+      mcp-bridge:
+        condition: service_healthy
+    environment:
+      SERVICE_FQDN_NGINX_3000: ""
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  mongo-data:
+    driver: local
+  mcp-bridge-state:
+    driver: local
