@@ -25,6 +25,7 @@ class StandaloneClickhouse extends BaseModel
         'image',
         'is_public',
         'public_port',
+        'public_host',
         'ports_mappings',
         'limits_memory',
         'limits_memory_swap',
@@ -298,11 +299,12 @@ class StandaloneClickhouse extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $host = $this->public_host ?: $serverIp;
                     $encodedUser = rawurlencode($this->clickhouse_admin_user);
                     $encodedPass = rawurlencode($this->clickhouse_admin_password);
                     $database = $this->clickhouse_db ?? 'default';
 
-                    return "clickhouse://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$database}";
+                    return "clickhouse://{$encodedUser}:{$encodedPass}@{$host}:{$this->public_port}/{$database}";
                 }
 
                 return null;

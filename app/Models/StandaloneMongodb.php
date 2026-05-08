@@ -25,6 +25,7 @@ class StandaloneMongodb extends BaseModel
         'image',
         'is_public',
         'public_port',
+        'public_host',
         'ports_mappings',
         'limits_memory',
         'limits_memory_swap',
@@ -329,9 +330,10 @@ class StandaloneMongodb extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $host = $this->public_host ?: $serverIp;
                     $encodedUser = rawurlencode($this->mongo_initdb_root_username);
                     $encodedPass = rawurlencode($this->mongo_initdb_root_password);
-                    $url = "mongodb://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/?directConnection=true";
+                    $url = "mongodb://{$encodedUser}:{$encodedPass}@{$host}:{$this->public_port}/?directConnection=true";
                     if ($this->enable_ssl) {
                         $url .= '&tls=true&tlsCAFile=/etc/mongo/certs/ca.pem';
                         if (in_array($this->ssl_mode, ['verify-full'])) {
