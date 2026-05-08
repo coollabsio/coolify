@@ -252,6 +252,8 @@
                                 </div>
                                 <x-forms.input type="number" canGate="update" :canResource="$serviceDatabase" placeholder="5432"
                                     disabled="{{ $serviceDatabase->is_public }}" id="publicPort" label="Public Port" />
+                                <x-forms.input placeholder="db.example.com" disabled="{{ $serviceDatabase->is_public }}" id="publicHost"
+                                    label="Public Host" helper="Optional custom hostname for the public connection URL. Falls back to server IP if empty." canGate="update" :canResource="$serviceDatabase" />
                                 @if ($db_url_public)
                                     <x-forms.input label="Database IP:PORT (public)"
                                         helper="Your credentials are available in your environment variables." type="password"

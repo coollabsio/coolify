@@ -21,6 +21,7 @@ class ServiceDatabase extends BaseModel
         'exclude_from_status',
         'image',
         'public_port',
+        'public_host',
         'is_public',
         'is_log_drain_enabled',
         'is_include_timestamps',
@@ -139,12 +140,12 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
-            $realIp = base_ip();
+        $host = $this->public_host ?: $this->service->server->ip;
+        if (! $this->public_host && ($this->service->server->isLocalhost() || isDev())) {
+            $host = base_ip();
         }
 
-        return "{$realIp}:{$port}";
+        return "{$host}:{$port}";
     }
 
     public function team()

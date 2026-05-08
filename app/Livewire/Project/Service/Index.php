@@ -53,6 +53,8 @@ class Index extends Component
 
     public mixed $publicPort = null;
 
+    public ?string $publicHost = null;
+
     public mixed $publicPortTimeout = 3600;
 
     public bool $isPublic = false;
@@ -92,6 +94,7 @@ class Index extends Component
         'image' => 'required',
         'excludeFromStatus' => 'required|boolean',
         'publicPort' => 'nullable|integer|min:1|max:65535',
+        'publicHost' => 'nullable|string',
         'publicPortTimeout' => 'nullable|integer|min:1',
         'isPublic' => 'required|boolean',
         'isLogDrainEnabled' => 'required|boolean',
@@ -161,6 +164,7 @@ class Index extends Component
             $this->serviceDatabase->image = $this->image;
             $this->serviceDatabase->exclude_from_status = $this->excludeFromStatus;
             $this->serviceDatabase->public_port = $this->publicPort ?: null;
+            $this->serviceDatabase->public_host = $this->publicHost ?: null;
             $this->serviceDatabase->public_port_timeout = $this->publicPortTimeout ?: null;
             $this->serviceDatabase->is_public = $this->isPublic;
             $this->serviceDatabase->is_log_drain_enabled = $this->isLogDrainEnabled;
@@ -170,6 +174,7 @@ class Index extends Component
             $this->image = $this->serviceDatabase->image;
             $this->excludeFromStatus = $this->serviceDatabase->exclude_from_status ?? false;
             $this->publicPort = $this->serviceDatabase->public_port;
+            $this->publicHost = $this->serviceDatabase->public_host;
             $this->publicPortTimeout = $this->serviceDatabase->public_port_timeout;
             $this->isPublic = $this->serviceDatabase->is_public ?? false;
             $this->isLogDrainEnabled = $this->serviceDatabase->is_log_drain_enabled ?? false;

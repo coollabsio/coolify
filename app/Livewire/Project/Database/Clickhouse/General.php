@@ -36,6 +36,8 @@ class General extends Component
 
     public mixed $publicPort = null;
 
+    public ?string $publicHost = null;
+
     public mixed $publicPortTimeout = 3600;
 
     public ?string $customDockerRunOptions = null;
@@ -86,6 +88,7 @@ class General extends Component
             'portsMappings' => ValidationPatterns::portMappingRules(),
             'isPublic' => 'nullable|boolean',
             'publicPort' => 'nullable|integer|min:1|max:65535',
+            'publicHost' => 'nullable|string',
             'publicPortTimeout' => 'nullable|integer|min:1',
             'customDockerRunOptions' => 'nullable|string',
             'dbUrl' => 'nullable|string',
@@ -125,6 +128,7 @@ class General extends Component
             $this->database->ports_mappings = $this->portsMappings;
             $this->database->is_public = $this->isPublic;
             $this->database->public_port = $this->publicPort ?: null;
+            $this->database->public_host = $this->publicHost ?: null;
             $this->database->public_port_timeout = $this->publicPortTimeout ?: null;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
@@ -141,6 +145,7 @@ class General extends Component
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
             $this->publicPort = $this->database->public_port;
+            $this->publicHost = $this->database->public_host;
             $this->publicPortTimeout = $this->database->public_port_timeout;
             $this->customDockerRunOptions = $this->database->custom_docker_run_options;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;

@@ -42,6 +42,8 @@ class General extends Component
 
     public mixed $publicPort = null;
 
+    public ?string $publicHost = null;
+
     public mixed $publicPortTimeout = 3600;
 
     public bool $isLogDrainEnabled = false;
@@ -88,6 +90,7 @@ class General extends Component
             'portsMappings' => ValidationPatterns::portMappingRules(),
             'isPublic' => 'nullable|boolean',
             'publicPort' => 'nullable|integer|min:1|max:65535',
+            'publicHost' => 'nullable|string',
             'publicPortTimeout' => 'nullable|integer|min:1',
             'isLogDrainEnabled' => 'nullable|boolean',
             'customDockerRunOptions' => 'nullable',
@@ -128,6 +131,7 @@ class General extends Component
         'portsMappings' => 'Port Mapping',
         'isPublic' => 'Is Public',
         'publicPort' => 'Public Port',
+        'publicHost' => 'Public Host',
         'publicPortTimeout' => 'Public Port Timeout',
         'customDockerRunOptions' => 'Custom Docker Run Options',
         'enableSsl' => 'Enable SSL',
@@ -170,6 +174,7 @@ class General extends Component
             $this->database->ports_mappings = $this->portsMappings;
             $this->database->is_public = $this->isPublic;
             $this->database->public_port = $this->publicPort ?: null;
+            $this->database->public_host = $this->publicHost ?: null;
             $this->database->public_port_timeout = $this->publicPortTimeout ?: null;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
@@ -190,6 +195,7 @@ class General extends Component
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
             $this->publicPort = $this->database->public_port;
+            $this->publicHost = $this->database->public_host;
             $this->publicPortTimeout = $this->database->public_port_timeout;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
             $this->customDockerRunOptions = $this->database->custom_docker_run_options;

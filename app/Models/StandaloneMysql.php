@@ -26,6 +26,7 @@ class StandaloneMysql extends BaseModel
         'image',
         'is_public',
         'public_port',
+        'public_host',
         'ports_mappings',
         'limits_memory',
         'limits_memory_swap',
@@ -305,13 +306,13 @@ class StandaloneMysql extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    $serverIp = $this->destination->server->getIp;
-                    if (empty($serverIp)) {
+                    $host = $this->public_host ?: $this->destination->server->getIp;
+                    if (empty($host)) {
                         return null;
                     }
                     $encodedUser = rawurlencode($this->mysql_user);
                     $encodedPass = rawurlencode($this->mysql_password);
-                    $url = "mysql://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$this->mysql_database}";
+                    $url = "mysql://{$encodedUser}:{$encodedPass}@{$host}:{$this->public_port}/{$this->mysql_database}";
                     if ($this->enable_ssl) {
                         $url .= "?ssl-mode={$this->ssl_mode}";
                         if (in_array($this->ssl_mode, ['VERIFY_CA', 'VERIFY_IDENTITY'])) {

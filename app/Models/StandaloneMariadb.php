@@ -27,6 +27,7 @@ class StandaloneMariadb extends BaseModel
         'image',
         'is_public',
         'public_port',
+        'public_host',
         'ports_mappings',
         'limits_memory',
         'limits_memory_swap',
@@ -291,14 +292,14 @@ class StandaloneMariadb extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    $serverIp = $this->destination->server->getIp;
-                    if (empty($serverIp)) {
+                    $host = $this->public_host ?: $this->destination->server->getIp;
+                    if (empty($host)) {
                         return null;
                     }
                     $encodedUser = rawurlencode($this->mariadb_user);
                     $encodedPass = rawurlencode($this->mariadb_password);
 
-                    return "mysql://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$this->mariadb_database}";
+                    return "mysql://{$encodedUser}:{$encodedPass}@{$host}:{$this->public_port}/{$this->mariadb_database}";
                 }
 
                 return null;
