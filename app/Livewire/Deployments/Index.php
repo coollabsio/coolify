@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Deployments;
 
-use App\Enums\ApplicationDeploymentStatus;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Project;
 use App\Models\Server;
