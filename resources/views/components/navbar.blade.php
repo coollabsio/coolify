@@ -175,7 +175,16 @@
                             <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Servers</span>
                         </a>
                     </li>
-
+                    <li>
+                        <a title="Deployments" href="/deployments" {{ wireNavigate() }}
+                            class="{{ request()->is('deployments') ? 'menu-item-active menu-item' : 'menu-item' }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="menu-item-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3.75v1.5m7.5 0v-1.5" />
+                            </svg>
+                            <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Deployments</span>
+                        </a>
+                    </li>
                     <li>
                         <a title="Sources" {{ wireNavigate() }}
                             class="{{ request()->is('source*') ? 'menu-item-active menu-item' : 'menu-item' }}"

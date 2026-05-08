@@ -19,6 +19,7 @@ use App\Livewire\Profile\Index as ProfileIndex;
 use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
 use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
 use App\Livewire\Project\Application\Deployment\Show as DeploymentShow;
+use App\Livewire\Deployments\Index as DeploymentsIndex;
 use App\Livewire\Project\CloneMe as ProjectCloneMe;
 use App\Livewire\Project\Database\Backup\Execution as DatabaseBackupExecution;
 use App\Livewire\Project\Database\Backup\Index as DatabaseBackupIndex;
@@ -201,6 +202,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/projects', ProjectIndex::class)->name('project.index');
+    Route::get('/deployments', DeploymentsIndex::class)->name('deployments.index');
     Route::prefix('project/{project_uuid}')->group(function () {
         Route::get('/', ProjectShow::class)->name('project.show');
         Route::get('/edit', ProjectEdit::class)->name('project.edit')->middleware('can.update.resource');
