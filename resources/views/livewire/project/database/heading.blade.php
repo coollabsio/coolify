@@ -25,6 +25,10 @@
                     href="{{ route('project.database.command', $parameters) }}">
                     Terminal
                 </a>
+                <a class="shrink-0 {{ request()->routeIs('project.database.file-browser') ? 'dark:text-white' : '' }}"
+                    href="{{ route('project.database.file-browser', $parameters) }}">
+                    Files
+                </a>
             @endcan
             @if (
                 $database->getMorphClass() === 'App\Models\StandalonePostgresql' ||

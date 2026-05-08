@@ -28,6 +28,10 @@
                         href="{{ route('project.application.command', $parameters) }}">
                         Terminal
                     </a>
+                    <a class="shrink-0 {{ request()->routeIs('project.application.file-browser') ? 'dark:text-white' : '' }}"
+                        href="{{ route('project.application.file-browser', $parameters) }}">
+                        Files
+                    </a>
                 @endcan
             @endif
             <div class="shrink-0">

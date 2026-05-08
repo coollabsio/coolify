@@ -24,6 +24,10 @@
                     href="{{ route('project.service.command', $parameters) }}">
                     <button>Terminal</button>
                 </a>
+                <a class="shrink-0 {{ request()->routeIs('project.service.file-browser') ? 'dark:text-white' : '' }}"
+                    href="{{ route('project.service.file-browser', $parameters) }}">
+                    <button>Files</button>
+                </a>
             @endcan
             <div class="shrink-0">
                 <x-services.links :service="$service" />
