@@ -210,6 +210,12 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                         $this->updateApplicationPreviewStatus($applicationId, $pullRequestId, $containerStatus);
                     }
                 } catch (\Exception $e) {
+                    \Log::warning('PushServerUpdateJob: Failed to process application container status', [
+                        'server_id' => $this->server->id,
+                        'application_id' => $applicationId,
+                        'pull_request_id' => $pullRequestId,
+                        'error' => $e->getMessage(),
+                    ]);
                 }
             } elseif ($labels->has('coolify.serviceId')) {
                 $serviceId = $labels->get('coolify.serviceId');
@@ -498,6 +504,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                         $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
                     }
                 } catch (\Throwable $e) {
+                    \Log::warning('PushServerUpdateJob: Failed to restart proxy', [
+                        'server_id' => $this->server->id,
+                        'error' => $e->getMessage(),
+                    ]);
                 }
             } else {
                 // Connect proxy to networks periodically (every 10 min) to avoid excessive job dispatches.
