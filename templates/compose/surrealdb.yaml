@@ -1,0 +1,35 @@
+# documentation: https://surrealdb.com/docs/surrealdb
+# slogan: A scalable, distributed, document-graph database with SQL-style queries, ACID transactions, and real-time subscriptions.
+# category: database
+# tags: db, database, document, graph, sql, nosql, realtime, surrealdb
+# logo: svgs/surrealdb.svg
+# port: 8000
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    command:
+      - start
+      - --user
+      - ${SERVICE_USER_SURREALDB}
+      - --pass
+      - ${SERVICE_PASSWORD_SURREALDB}
+      - --bind
+      - 0.0.0.0:8000
+      - rocksdb:/data/database.db
+    environment:
+      - SERVICE_URL_SURREALDB_8000
+      - SERVICE_USER_SURREALDB
+      - SERVICE_PASSWORD_SURREALDB
+    volumes:
+      - surrealdb-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - /surreal
+        - is-ready
+        - --endpoint
+        - http://localhost:8000
+      interval: 10s
+      timeout: 5s
+      retries: 10
