@@ -1,0 +1,115 @@
+# documentation: https://docs.litespeedtech.com/cloud/docker/
+# slogan: WordPress running on OpenLiteSpeed with MariaDB.
+# category: cms
+# tags: cms, blog, content, management, wordpress, openlitespeed, litespeed, mariadb
+# logo: svgs/wordpress.svg
+# port: 80
+
+services:
+  openlitespeed:
+    image: litespeedtech/openlitespeed:${OPENLITESPEED_VERSION:-1.8.5-lsphp85}
+    volumes:
+      - openlitespeed-sites:/var/www/vhosts
+      - openlitespeed-conf:/usr/local/lsws/conf
+      - openlitespeed-admin-conf:/usr/local/lsws/admin/conf
+      - openlitespeed-logs:/usr/local/lsws/logs
+    environment:
+      - SERVICE_URL_OPENLITESPEED_80
+      - TZ=${TIMEZONE:-UTC}
+    depends_on:
+      wordpress-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1/ || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  wordpress-init:
+    image: litespeedtech/openlitespeed:${OPENLITESPEED_VERSION:-1.8.5-lsphp85}
+    restart: "no"
+    volumes:
+      - openlitespeed-sites:/var/www/vhosts
+    environment:
+      - SERVICE_URL_OPENLITESPEED_80
+      - WORDPRESS_SITE_TITLE=${WORDPRESS_SITE_TITLE:-WordPress}
+      - WORDPRESS_ADMIN_EMAIL=${WORDPRESS_ADMIN_EMAIL:-admin@example.com}
+      - WORDPRESS_ADMIN_USER=${SERVICE_USER_ADMIN}
+      - WORDPRESS_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - WORDPRESS_DB_NAME=${MARIADB_DATABASE:-wordpress}
+      - WORDPRESS_DB_USER=${SERVICE_USER_WORDPRESS}
+      - WORDPRESS_DB_PASSWORD=${SERVICE_PASSWORD_WORDPRESS}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    entrypoint:
+      - /bin/bash
+      - -c
+    command:
+      - |
+        set -euo pipefail
+        webroot=/var/www/vhosts/localhost/html
+        site_url=$$SERVICE_URL_OPENLITESPEED_80
+        site_host=$${site_url#http://}
+        site_host=$${site_host#https://}
+        site_host=$${site_host%%/*}
+        export HTTP_HOST="$$site_host"
+        mkdir -p "$$webroot"
+
+        if [ ! -f "$$webroot/wp-settings.php" ]; then
+          wp core download --path="$$webroot" --force --allow-root
+        fi
+
+        if [ ! -f "$$webroot/wp-config.php" ]; then
+          wp config create \
+            --path="$$webroot" \
+            --dbname="$$WORDPRESS_DB_NAME" \
+            --dbuser="$$WORDPRESS_DB_USER" \
+            --dbpass="$$WORDPRESS_DB_PASSWORD" \
+            --dbhost=mariadb \
+            --skip-check \
+            --allow-root
+        fi
+
+        if ! wp core is-installed --path="$$webroot" --allow-root; then
+          wp core install \
+            --path="$$webroot" \
+            --url="$$site_url" \
+            --title="$$WORDPRESS_SITE_TITLE" \
+            --admin_user="$$WORDPRESS_ADMIN_USER" \
+            --admin_password="$$WORDPRESS_ADMIN_PASSWORD" \
+            --admin_email="$$WORDPRESS_ADMIN_EMAIL" \
+            --skip-email \
+            --allow-root
+        fi
+
+        if ! wp plugin is-installed litespeed-cache --path="$$webroot" --allow-root; then
+          wp plugin install litespeed-cache --path="$$webroot" --allow-root
+        fi
+        if ! wp plugin is-active litespeed-cache --path="$$webroot" --allow-root; then
+          wp plugin activate litespeed-cache --path="$$webroot" --allow-root
+        fi
+
+        chown -R 1000:1000 /var/www/vhosts/localhost
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+      - MYSQL_DATABASE=${MARIADB_DATABASE:-wordpress}
+      - MYSQL_USER=${SERVICE_USER_WORDPRESS}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_WORDPRESS}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+volumes:
+  openlitespeed-sites:
+  openlitespeed-conf:
+  openlitespeed-admin-conf:
+  openlitespeed-logs:
+  mariadb-data:
