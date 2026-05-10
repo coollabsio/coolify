@@ -26,17 +26,15 @@ class OauthController extends Controller
             $email = strtolower($email);
             $user = User::whereEmail($email)->first();
             if (! $user) {
-                $settings = instanceSettings();
-                if (! $settings->is_registration_enabled) {
-                    abort(403, 'Registration is disabled');
-                }
-
-                $user = User::create([
-                    'name' => $oauthUser->name,
-                    'email' => $email,
-                ]);
+                $user = $this->createOauthUser($provider, $oauthUser, $email);
+            } elseif (! $user->hasPassword() && blank($user->oauth_provider)) {
+                $user->forceFill(['oauth_provider' => $provider])->save();
             }
             Auth::login($user);
+            $team = $user->teams()->where('personal_team', true)->first() ?? $user->teams()->first();
+            if ($team) {
+                session(['currentTeam' => $team]);
+            }
 
             return redirect('/');
         } catch (\Exception $e) {
@@ -44,5 +42,32 @@ class OauthController extends Controller
 
             return redirect()->route('login')->withErrors([__($errorCode)]);
         }
+    }
+
+    private function createOauthUser(string $provider, object $oauthUser, string $email): User
+    {
+        $name = data_get($oauthUser, 'name') ?: data_get($oauthUser, 'nickname') ?: $email;
+
+        if (User::count() === 0) {
+            $user = (new User)->forceFill([
+                'id' => 0,
+                'name' => $name,
+                'email' => $email,
+                'oauth_provider' => $provider,
+            ]);
+            $user->save();
+
+            $settings = instanceSettings();
+            $settings->is_registration_enabled = false;
+            $settings->save();
+
+            return $user;
+        }
+
+        return User::create([
+            'name' => $name,
+            'email' => $email,
+            'oauth_provider' => $provider,
+        ]);
     }
 }

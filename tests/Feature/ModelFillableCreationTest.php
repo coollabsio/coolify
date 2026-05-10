@@ -48,6 +48,7 @@ it('creates User with all fillable attributes', function () {
         'name' => 'Test User',
         'email' => 'fillable-test@example.com',
         'password' => bcrypt('password123'),
+        'oauth_provider' => 'github',
         'force_password_reset' => true,
         'marketing_emails' => false,
         'pending_email' => 'newemail@example.com',
@@ -58,6 +59,7 @@ it('creates User with all fillable attributes', function () {
     expect($user->exists)->toBeTrue();
     expect($user->name)->toBe('Test User');
     expect($user->email)->toBe('fillable-test@example.com');
+    expect($user->oauth_provider)->toBe('github');
     expect($user->force_password_reset)->toBeTrue();
     expect($user->marketing_emails)->toBeFalse();
     expect($user->pending_email)->toBe('newemail@example.com');
