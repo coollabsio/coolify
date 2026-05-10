@@ -15,6 +15,10 @@ class SubscriptionInvoiceFailedJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public int $tries = 3;
+
+    public array $backoff = [30, 60, 120];
+
     public function __construct(protected Team $team)
     {
         $this->onQueue('high');
@@ -60,6 +64,9 @@ class SubscriptionInvoiceFailedJob implements ShouldBeEncrypted, ShouldQueue
                         }
                     }
                 } catch (\Exception $e) {
+                    send_internal_notification('SubscriptionInvoiceFailedJob: Stripe verification failed, will retry: '.$e->getMessage());
+
+                    throw $e;
                 }
             }
 

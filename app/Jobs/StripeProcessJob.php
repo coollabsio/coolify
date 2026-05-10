@@ -177,6 +177,9 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                                 break;
                             }
                         } catch (\Exception $e) {
+                            send_internal_notification('invoice.payment_failed: Unable to verify payment intent status: '.$e->getMessage());
+                            SubscriptionInvoiceFailedJob::dispatch($team)->delay(now()->addSeconds(60));
+                            break;
                         }
                     }
 
@@ -342,6 +345,8 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
             }
         } catch (\Exception $e) {
             send_internal_notification('StripeProcessJob error: '.$e->getMessage());
+
+            throw $e;
         }
     }
 }

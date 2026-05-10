@@ -99,6 +99,8 @@ class VerifyStripeSubscriptionStatusJob implements ShouldBeEncrypted, ShouldQueu
             send_internal_notification(
                 'VerifyStripeSubscriptionStatusJob failed for subscription ID '.$this->subscription->id.': '.$e->getMessage()
             );
+
+            throw $e;
         }
     }
 }
