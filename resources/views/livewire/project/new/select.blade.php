@@ -452,6 +452,7 @@
                         <div class="flex flex-col mx-6">
                             <div class="font-bold dark:group-hover:text-white">
                                 Swarm Docker <span class="text-xs">({{ $swarmDocker->name }})</span>
+                                <x-deprecated-badge />
                             </div>
                         </div>
                     </div>

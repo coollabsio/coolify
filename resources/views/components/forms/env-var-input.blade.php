@@ -229,7 +229,7 @@
             @readonly($readonly)
             @if ($modelBinding !== 'null')
                 wire:model="{{ $modelBinding }}"
-                wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4"
+                wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]"
             @endif
             wire:loading.attr="disabled"
             @disabled($disabled)

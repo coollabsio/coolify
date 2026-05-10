@@ -3788,6 +3788,70 @@
                 ]
             }
         },
+        "\/applications\/{uuid}\/previews\/{pull_request_id}": {
+            "delete": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Delete Preview Deployment",
+                "description": "Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes\/networks, and deletes the preview record.",
+                "operationId": "delete-preview-deployment-by-pull-request-id",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "pull_request_id",
+                        "in": "path",
+                        "description": "Pull request ID of the preview to delete.",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Preview deletion queued.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/cloud-tokens": {
             "get": {
                 "tags": [
@@ -4317,8 +4381,8 @@
                                         "description": "Number of days to retain backups locally"
                                     },
                                     "database_backup_retention_max_storage_locally": {
-                                        "type": "integer",
-                                        "description": "Max storage (MB) for local backups"
+                                        "type": "number",
+                                        "description": "Max storage (GB) for local backups"
                                     },
                                     "database_backup_retention_amount_s3": {
                                         "type": "integer",
@@ -4329,8 +4393,8 @@
                                         "description": "Number of days to retain backups in S3"
                                     },
                                     "database_backup_retention_max_storage_s3": {
-                                        "type": "integer",
-                                        "description": "Max storage (MB) for S3 backups"
+                                        "type": "number",
+                                        "description": "Max storage (GB) for S3 backups"
                                     },
                                     "timeout": {
                                         "type": "integer",
@@ -4887,7 +4951,7 @@
                                         "description": "Retention days of the backup locally"
                                     },
                                     "database_backup_retention_max_storage_locally": {
-                                        "type": "integer",
+                                        "type": "number",
                                         "description": "Max storage of the backup locally"
                                     },
                                     "database_backup_retention_amount_s3": {
@@ -4899,7 +4963,7 @@
                                         "description": "Retention days of the backup in s3"
                                     },
                                     "database_backup_retention_max_storage_s3": {
-                                        "type": "integer",
+                                        "type": "number",
                                         "description": "Max storage of the backup in S3"
                                     },
                                     "timeout": {
@@ -8586,6 +8650,110 @@
                 ]
             }
         },
+        "\/mcp\/enable": {
+            "post": {
+                "summary": "Enable MCP Server",
+                "description": "Enable the MCP server endpoint at \/mcp (only with root permissions).",
+                "operationId": "enable-mcp",
+                "responses": {
+                    "200": {
+                        "description": "MCP server enabled.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "MCP server enabled."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "You are not allowed to enable the MCP server.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "You are not allowed to enable the MCP server."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/mcp\/disable": {
+            "post": {
+                "summary": "Disable MCP Server",
+                "description": "Disable the MCP server endpoint at \/mcp (only with root permissions).",
+                "operationId": "disable-mcp",
+                "responses": {
+                    "200": {
+                        "description": "MCP server disabled.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "MCP server disabled."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "You are not allowed to disable the MCP server.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "You are not allowed to disable the MCP server."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/health": {
             "get": {
                 "summary": "Healthcheck",
@@ -10481,6 +10649,10 @@
                                     "server_disk_usage_check_frequency": {
                                         "type": "string",
                                         "description": "Cron expression for disk usage check frequency."
+                                    },
+                                    "connection_timeout": {
+                                        "type": "integer",
+                                        "description": "SSH connection timeout in seconds (1-300). Default: 10."
                                     }
                                 },
                                 "type": "object"
@@ -13285,6 +13457,10 @@
                     "delete_unused_networks": {
                         "type": "boolean",
                         "description": "The flag to indicate if the unused networks should be deleted."
+                    },
+                    "connection_timeout": {
+                        "type": "integer",
+                        "description": "SSH connection timeout in seconds."
                     }
                 },
                 "type": "object"

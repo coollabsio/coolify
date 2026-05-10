@@ -391,7 +391,7 @@ Route::middleware(['auth'])->group(function () {
                 'Content-Disposition' => 'attachment; filename="'.basename($filename).'"',
             ]);
         } catch (Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 500);
+            return response()->json(['message' => 'Failed to download backup.'], 500);
         }
     })->name('download.backup');
 

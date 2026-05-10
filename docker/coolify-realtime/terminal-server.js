@@ -105,9 +105,25 @@ const verifyClient = async (info, callback) => {
 
 const wss = new WebSocketServer({ server, path: '/terminal/ws', verifyClient: verifyClient });
 
+const HEARTBEAT_INTERVAL_MS = 30000;
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+
 wss.on('connection', async (ws, req) => {
+    ws.isAlive = true;
+    ws.on('pong', () => { ws.isAlive = true; });
+
     const userId = generateUserId();
-    const userSession = { ws, userId, ptyProcess: null, isActive: false, authorizedIPs: [] };
+    ws.userId = userId;
+    const userSession = {
+        ws,
+        userId,
+        ptyProcess: null,
+        isActive: false,
+        authorizedIPs: [],
+        lastActivityAt: Date.now(),
+        authReady: false,
+        pendingMessages: [],
+    };
     const { xsrfToken, laravelSession, sessionCookieName } = getSessionCookie(req);
     const connectionContext = {
         userId,
@@ -116,6 +132,26 @@ wss.on('connection', async (ws, req) => {
         hasXsrfToken: Boolean(xsrfToken),
         hasLaravelSession: Boolean(laravelSession),
     };
+
+    // Register socket handlers up front so messages sent immediately by the client
+    // (e.g. a command replay on reconnect) are not dropped while the auth/IP fetch
+    // below is still pending.
+    ws.on('message', (message) => {
+        if (userSession.authReady) {
+            handleMessage(userSession, message);
+        } else {
+            userSession.pendingMessages.push(message);
+        }
+    });
+    ws.on('error', (err) => handleError(err, userId));
+    ws.on('close', (code, reason) => {
+        logTerminal('log', 'Terminal websocket connection closed.', {
+            userId,
+            code,
+            reason: reason?.toString(),
+        });
+        handleClose(userId);
+    });
 
     // Verify presence of required tokens
     if (!laravelSession || !xsrfToken) {
@@ -148,28 +184,66 @@ wss.on('connection', async (ws, req) => {
     }
 
     userSessions.set(userId, userSession);
+    userSession.authReady = true;
     logTerminal('log', 'Terminal websocket connection established.', {
         ...connectionContext,
         authorizedHostCount: userSession.authorizedIPs.length,
+        bufferedMessages: userSession.pendingMessages.length,
     });
 
-    ws.on('message', (message) => {
-        handleMessage(userSession, message);
-    });
-    ws.on('error', (err) => handleError(err, userId));
-    ws.on('close', (code, reason) => {
-        logTerminal('log', 'Terminal websocket connection closed.', {
-            userId,
-            code,
-            reason: reason?.toString(),
-        });
-        handleClose(userId);
-    });
+    // Drain any messages that arrived while we were waiting on the IP auth call.
+    while (userSession.pendingMessages.length > 0) {
+        handleMessage(userSession, userSession.pendingMessages.shift());
+    }
 });
 
+const heartbeat = setInterval(() => {
+    wss.clients.forEach((ws) => {
+        if (ws.isAlive === false) {
+            logTerminal('warn', 'Terminating WS due to missed protocol pong.');
+            return ws.terminate();
+        }
+        ws.isAlive = false;
+        try {
+            ws.ping();
+        } catch (_) {
+            // ignore — close handler will follow
+        }
+
+        const session = ws.userId ? userSessions.get(ws.userId) : null;
+        if (session?.isActive && session.lastActivityAt && (Date.now() - session.lastActivityAt > IDLE_TIMEOUT_MS)) {
+            const idleMs = Date.now() - session.lastActivityAt;
+            logTerminal('warn', 'Closing terminal session due to idle timeout.', {
+                userId: ws.userId,
+                idleMs,
+                idleTimeoutMs: IDLE_TIMEOUT_MS,
+            });
+            try {
+                ws.send('idle-timeout');
+            } catch (_) {
+                // ignore — close still attempted below
+            }
+            killPtyProcess(ws.userId);
+            setTimeout(() => {
+                try {
+                    ws.close(1000, 'Idle timeout');
+                } catch (_) {
+                    // ignore — already closed
+                }
+            }, 100);
+        }
+    });
+}, HEARTBEAT_INTERVAL_MS);
+
+wss.on('close', () => clearInterval(heartbeat));
+
 const messageHandlers = {
-    message: (session, data) => session.ptyProcess.write(data),
+    message: (session, data) => {
+        session.lastActivityAt = Date.now();
+        session.ptyProcess.write(data);
+    },
     resize: (session, { cols, rows }) => {
+        session.lastActivityAt = Date.now();
         cols = cols > 0 ? cols : 80;
         rows = rows > 0 ? rows : 30;
         session.ptyProcess.resize(cols, rows)
@@ -196,12 +270,6 @@ function handleMessage(userSession, message) {
         });
         return;
     }
-
-    logTerminal('log', 'Received websocket message.', {
-        userId: userSession.userId,
-        keys: Object.keys(parsed),
-        isActive: userSession.isActive,
-    });
 
     Object.entries(parsed).forEach(([key, value]) => {
         const handler = messageHandlers[key];
@@ -301,6 +369,7 @@ async function handleCommand(ws, command, userId) {
 
     userSession.ptyProcess = ptyProcess;
     userSession.isActive = true;
+    userSession.lastActivityAt = Date.now();
 
     ws.send('pty-ready');
 

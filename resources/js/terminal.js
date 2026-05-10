@@ -42,6 +42,10 @@ export function initializeTerminalComponent() {
             maxHeartbeatMisses: 3,
             // Command buffering for race condition prevention
             pendingCommand: null,
+            // Last successfully sent SSH command — replayed after a transient reconnect
+            // so the PTY respawns automatically. Cleared on intentional terminations
+            // (pty-exited, idle-timeout, unprocessable).
+            lastSentCommand: null,
             // Resize handling
             resizeObserver: null,
             resizeTimeout: null,
@@ -74,8 +78,6 @@ export function initializeTerminalComponent() {
                     };
                     focusWhenReady();
                 });
-
-                this.keepAliveInterval = setInterval(this.keepAlive.bind(this), 30000);
 
                 this.$watch('terminalActive', (active) => {
                     if (!active && this.keepAliveInterval) {
@@ -150,8 +152,11 @@ export function initializeTerminalComponent() {
             },
 
             clearAllTimers() {
-                [this.keepAliveInterval, this.reconnectInterval, this.connectionTimeoutId, this.pingTimeoutId, this.resizeTimeout]
-                    .forEach(timer => timer && clearInterval(timer));
+                if (this.keepAliveInterval) {
+                    clearInterval(this.keepAliveInterval);
+                }
+                [this.reconnectInterval, this.connectionTimeoutId, this.pingTimeoutId, this.resizeTimeout]
+                    .forEach(timer => timer && clearTimeout(timer));
                 this.keepAliveInterval = null;
                 this.reconnectInterval = null;
                 this.connectionTimeoutId = null;
@@ -161,9 +166,17 @@ export function initializeTerminalComponent() {
 
             resetTerminal() {
                 if (this.term) {
-                    this.$wire.dispatch('error', 'Terminal websocket connection lost.');
-                    this.term.reset();
-                    this.term.clear();
+                    this.$wire.dispatch('error', 'Terminal websocket connection lost. Reconnecting...');
+                    // Preserve scrollback so the user keeps the context of their previous
+                    // session. Print a visible marker so they know where the disconnect
+                    // happened. Old PTY shell state cannot be restored — this is purely
+                    // a visual carry-over.
+                    try {
+                        const stamp = new Date().toLocaleTimeString();
+                        this.term.write(`\r\n\x1b[33m── Connection lost at ${stamp}, reconnecting... ──\x1b[0m\r\n`);
+                    } catch (_) {
+                        // ignore — terminal not ready to receive writes
+                    }
                     this.pendingWrites = 0;
                     this.paused = false;
                     this.commandBuffer = '';
@@ -276,10 +289,22 @@ export function initializeTerminalComponent() {
                     this.connectionTimeoutId = null;
                 }
 
-                // Flush any buffered command from before WebSocket was ready
+                // Flush any buffered command from before WebSocket was ready, otherwise
+                // replay the last command so a transient reconnect respawns the PTY
+                // automatically without requiring the user to click Connect again.
                 if (this.pendingCommand) {
                     this.sendMessage(this.pendingCommand);
                     this.pendingCommand = null;
+                } else if (this.lastSentCommand) {
+                    logTerminal('log', '[Terminal] Replaying last command after reconnect.');
+                    this.sendMessage(this.lastSentCommand);
+                }
+
+                // (Re)start application-level keepalive on every successful connect.
+                // Server-side WebSocket protocol pings are the primary heartbeat; this
+                // adds a JSON-level ping in case the server-side is older or restarting.
+                if (!this.keepAliveInterval) {
+                    this.keepAliveInterval = setInterval(this.keepAlive.bind(this), 30000);
                 }
 
                 // Start ping timeout monitoring
@@ -354,6 +379,9 @@ export function initializeTerminalComponent() {
             sendMessage(message) {
                 if (this.socket && this.socket.readyState === WebSocket.OPEN) {
                     this.socket.send(JSON.stringify(message));
+                    if (message && message.command) {
+                        this.lastSentCommand = message;
+                    }
                 } else {
                     logTerminal('warn', '[Terminal] WebSocket not ready, message not sent:', message);
                 }
@@ -368,8 +396,6 @@ export function initializeTerminalComponent() {
             },
 
             handleSocketMessage(event) {
-                logTerminal('log', '[Terminal] Received WebSocket message:', event.data);
-
                 // Handle pong responses
                 if (event.data === 'pong') {
                     this.heartbeatMissed = 0;
@@ -387,7 +413,15 @@ export function initializeTerminalComponent() {
                         this.term.open(document.getElementById('terminal'));
                         this.term._initialized = true;
                     } else {
-                        this.term.reset();
+                        // Already initialized — this is a reconnect or a follow-up command.
+                        // Preserve scrollback so the user keeps context. Write a visible
+                        // separator so the new shell prompt is easy to spot.
+                        try {
+                            const stamp = new Date().toLocaleTimeString();
+                            this.term.write(`\r\n\x1b[32m── Reconnected at ${stamp} ──\x1b[0m\r\n`);
+                        } catch (_) {
+                            // ignore — fall through; xterm will render the new prompt anyway
+                        }
                     }
                     this.terminalActive = true;
                     this.term.focus();
@@ -415,6 +449,7 @@ export function initializeTerminalComponent() {
                 } else if (event.data === 'unprocessable') {
                     if (this.term) this.term.reset();
                     this.terminalActive = false;
+                    this.lastSentCommand = null;
                     this.message = '(sorry, something went wrong, please try again)';
 
                     // Notify parent component that terminal connection failed
@@ -423,8 +458,18 @@ export function initializeTerminalComponent() {
                     this.terminalActive = false;
                     this.term.reset();
                     this.commandBuffer = '';
+                    this.lastSentCommand = null;
 
                     // Notify parent component that terminal disconnected
+                    this.$wire.dispatch('terminalDisconnected');
+                } else if (event.data === 'idle-timeout') {
+                    this.$wire.dispatch('error', 'Terminal closed after 30 minutes of inactivity.');
+                    this.terminalActive = false;
+                    if (this.term) {
+                        this.term.reset();
+                    }
+                    this.commandBuffer = '';
+                    this.lastSentCommand = null;
                     this.$wire.dispatch('terminalDisconnected');
                 } else if (
                     typeof event.data === 'string' &&
@@ -494,11 +539,6 @@ export function initializeTerminalComponent() {
             },
 
             keepAlive() {
-                // Skip keepalive when document is hidden to prevent unnecessary disconnects
-                if (!this.isDocumentVisible) {
-                    return;
-                }
-
                 if (this.socket && this.socket.readyState === WebSocket.OPEN) {
                     this.sendMessage({ ping: true });
                 } else if (this.connectionState === 'disconnected') {
@@ -524,10 +564,23 @@ export function initializeTerminalComponent() {
                     logTerminal('log', '[Terminal] Tab visible, resuming connection management');
 
                     if (this.wasConnectedBeforeHidden && this.socket && this.socket.readyState === WebSocket.OPEN) {
-                        // Send immediate ping to verify connection is still alive
+                        // Connection may be half-open after Cloudflare/proxy idle drop while hidden.
+                        // Probe with a short timeout (5s) instead of the default 35s — force a
+                        // reconnect quickly if no pong arrives so the user is not stuck typing
+                        // into a dead socket.
                         this.heartbeatMissed = 0;
                         this.sendMessage({ ping: true });
-                        this.resetPingTimeout();
+                        if (this.pingTimeoutId) {
+                            clearTimeout(this.pingTimeoutId);
+                        }
+                        this.pingTimeoutId = setTimeout(() => {
+                            logTerminal('warn', '[Terminal] Visibility-resume ping timed out, forcing reconnect.');
+                            try {
+                                this.socket.close(4000, 'Visibility-resume timeout');
+                            } catch (_) {
+                                // ignore — close handler will run on its own
+                            }
+                        }, 5000);
                     } else if (this.wasConnectedBeforeHidden && this.connectionState !== 'connected') {
                         // Was connected before but now disconnected - attempt reconnection
                         this.reconnectAttempts = 0;

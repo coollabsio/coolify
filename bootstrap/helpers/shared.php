@@ -18,6 +18,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
@@ -25,6 +26,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -156,6 +158,73 @@ function validateShellSafePath(string $input, string $context = 'path'): string
 }
 
 /**
+ * Validate that a filename is safe for use as a plain file name (no path components).
+ *
+ * Prevents path traversal attacks by rejecting directory separators, traversal
+ * sequences, and null bytes, in addition to all shell metacharacters blocked by
+ * validateShellSafePath(). Intended for user-supplied filenames such as PostgreSQL
+ * init script names that are later written to a specific directory on the host.
+ *
+ * @param  string  $input  The filename to validate
+ * @param  string  $context  Descriptive name for error messages (e.g., 'init script filename')
+ * @return string The validated input (unchanged if valid)
+ *
+ * @throws Exception If dangerous characters or path traversal sequences are detected
+ */
+function validateFilenameSafe(string $input, string $context = 'filename'): string
+{
+    // First apply shell-metachar checks
+    validateShellSafePath($input, $context);
+
+    // Reject NUL bytes (can be used to truncate path strings in some contexts)
+    if (str_contains($input, "\0")) {
+        throw new Exception(
+            "Invalid {$context}: contains null byte. ".
+            'Null bytes are not allowed in filenames for security reasons.'
+        );
+    }
+
+    // Reject directory separators — filename must be a single path component
+    if (str_contains($input, '/') || str_contains($input, '\\')) {
+        throw new Exception(
+            "Invalid {$context}: directory separators ('/' or '\\') are not allowed. ".
+            'Provide a plain filename without path components.'
+        );
+    }
+
+    // Reject path traversal sequences (catches encoded or unusual forms)
+    if (str_contains($input, '..')) {
+        throw new Exception(
+            "Invalid {$context}: path traversal sequence ('..') is not allowed."
+        );
+    }
+
+    // Reject shell globbing / expansion metacharacters and whitespace that would
+    // split the filename into additional shell arguments if ever interpolated
+    // unquoted (defence in depth on top of escapeshellarg() at call sites).
+    $shellExpansionChars = [
+        ' ' => 'whitespace',
+        '*' => 'glob wildcard',
+        '?' => 'glob wildcard',
+        '[' => 'glob character class',
+        ']' => 'glob character class',
+        '~' => 'tilde expansion',
+        '"' => 'double quote',
+        "'" => 'single quote',
+    ];
+
+    foreach ($shellExpansionChars as $char => $description) {
+        if (str_contains($input, $char)) {
+            throw new Exception(
+                "Invalid {$context}: contains forbidden character '{$char}' ({$description})."
+            );
+        }
+    }
+
+    return $input;
+}
+
+/**
  * Validate that a databases_to_backup input string is safe from command injection.
  *
  * Supports all database formats:
@@ -257,6 +326,16 @@ function isInstanceAdmin()
 function currentTeam()
 {
     return Auth::user()?->currentTeam() ?? null;
+}
+
+function find_destination_for_current_team(?string $uuid): StandaloneDocker|SwarmDocker|null
+{
+    if (blank($uuid) || ! currentTeam()) {
+        return null;
+    }
+
+    return StandaloneDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first()
+        ?? SwarmDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first();
 }
 
 function showBoarding(): bool
@@ -979,44 +1058,17 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
 }
 function queryDatabaseByUuidWithinTeam(string $uuid, string $teamId)
 {
-    $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
-    if ($postgresql && $postgresql->team()->id == $teamId) {
-        return $postgresql->unsetRelation('environment');
-    }
-    $redis = StandaloneRedis::whereUuid($uuid)->first();
-    if ($redis && $redis->team()->id == $teamId) {
-        return $redis->unsetRelation('environment');
-    }
-    $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
-    if ($mongodb && $mongodb->team()->id == $teamId) {
-        return $mongodb->unsetRelation('environment');
-    }
-    $mysql = StandaloneMysql::whereUuid($uuid)->first();
-    if ($mysql && $mysql->team()->id == $teamId) {
-        return $mysql->unsetRelation('environment');
-    }
-    $mariadb = StandaloneMariadb::whereUuid($uuid)->first();
-    if ($mariadb && $mariadb->team()->id == $teamId) {
-        return $mariadb->unsetRelation('environment');
-    }
-    $keydb = StandaloneKeydb::whereUuid($uuid)->first();
-    if ($keydb && $keydb->team()->id == $teamId) {
-        return $keydb->unsetRelation('environment');
-    }
-    $dragonfly = StandaloneDragonfly::whereUuid($uuid)->first();
-    if ($dragonfly && $dragonfly->team()->id == $teamId) {
-        return $dragonfly->unsetRelation('environment');
-    }
-    $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
-    if ($clickhouse && $clickhouse->team()->id == $teamId) {
-        return $clickhouse->unsetRelation('environment');
+    foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
+        $database = $modelClass::whereUuid($uuid)->first();
+        if ($database && $database->team()->id == $teamId) {
+            return $database->unsetRelation('environment');
+        }
     }
 
     return null;
 }
 function queryResourcesByUuid(string $uuid)
 {
-    $resource = null;
     $application = Application::whereUuid($uuid)->first();
     if ($application) {
         return $application;
@@ -1025,37 +1077,11 @@ function queryResourcesByUuid(string $uuid)
     if ($service) {
         return $service;
     }
-    $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
-    if ($postgresql) {
-        return $postgresql;
-    }
-    $redis = StandaloneRedis::whereUuid($uuid)->first();
-    if ($redis) {
-        return $redis;
-    }
-    $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
-    if ($mongodb) {
-        return $mongodb;
-    }
-    $mysql = StandaloneMysql::whereUuid($uuid)->first();
-    if ($mysql) {
-        return $mysql;
-    }
-    $mariadb = StandaloneMariadb::whereUuid($uuid)->first();
-    if ($mariadb) {
-        return $mariadb;
-    }
-    $keydb = StandaloneKeydb::whereUuid($uuid)->first();
-    if ($keydb) {
-        return $keydb;
-    }
-    $dragonfly = StandaloneDragonfly::whereUuid($uuid)->first();
-    if ($dragonfly) {
-        return $dragonfly;
-    }
-    $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
-    if ($clickhouse) {
-        return $clickhouse;
+    foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
+        $database = $modelClass::whereUuid($uuid)->first();
+        if ($database) {
+            return $database;
+        }
     }
 
     // Check for ServiceDatabase by its own UUID
@@ -1064,7 +1090,7 @@ function queryResourcesByUuid(string $uuid)
         return $serviceDatabase;
     }
 
-    return $resource;
+    return null;
 }
 function generateTagDeployWebhook($tag_name)
 {
@@ -3453,10 +3479,10 @@ function wireNavigate(): string
     try {
         $settings = instanceSettings();
 
-        // Return wire:navigate.hover for SPA navigation with prefetching, or empty string if disabled
-        return ($settings->is_wire_navigate_enabled ?? true) ? 'wire:navigate.hover' : '';
+        // Return wire:navigate for SPA navigation with prefetching, or empty string if disabled
+        return ($settings->is_wire_navigate_enabled ?? true) ? 'wire:navigate' : '';
     } catch (Exception $e) {
-        return 'wire:navigate.hover';
+        return 'wire:navigate';
     }
 }
 
@@ -3487,34 +3513,6 @@ function getHelperVersion(): string
     }
 
     return config('constants.coolify.helper_version');
-}
-
-function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id)
-{
-    $server = Server::find($server_id)->where('team_id', $team_id)->first();
-    if (! $server) {
-        return;
-    }
-    $uuid = new Cuid2;
-    $cloneCommand = "git clone --no-checkout -b $branch $repository .";
-    $workdir = rtrim($base_directory, '/');
-    $fileList = collect([".$workdir/coolify.json"]);
-    $commands = collect([
-        "rm -rf /tmp/{$uuid}",
-        "mkdir -p /tmp/{$uuid}",
-        "cd /tmp/{$uuid}",
-        $cloneCommand,
-        'git sparse-checkout init --cone',
-        "git sparse-checkout set {$fileList->implode(' ')}",
-        'git read-tree -mu HEAD',
-        "cat .$workdir/coolify.json",
-        'rm -rf /tmp/{$uuid}',
-    ]);
-    try {
-        return instant_remote_process($commands, $server);
-    } catch (Exception) {
-        // continue
-    }
 }
 
 function loggy($message = null, array $context = [])

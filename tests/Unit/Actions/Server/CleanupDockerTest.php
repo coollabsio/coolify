@@ -437,6 +437,16 @@ it('deletes all build images when retention is disabled', function () {
     expect($buildImagesToDelete->pluck('tag')->toArray())->toContain('commit1-build');
 });
 
+it('container prune excludes persistent resource types', function () {
+    $sourceFile = file_get_contents(__DIR__.'/../../../../app/Actions/Server/CleanupDocker.php');
+
+    expect($sourceFile)->toContain('label!=coolify.type=database');
+    expect($sourceFile)->toContain('label!=coolify.type=application');
+    expect($sourceFile)->toContain('label!=coolify.type=service');
+    expect($sourceFile)->toContain('label!=coolify.proxy=true');
+    expect($sourceFile)->toContain('label=coolify.managed=true');
+});
+
 it('preserves build image for currently running tag', function () {
     $images = collect([
         ['repository' => 'app-uuid', 'tag' => 'commit1', 'created_at' => '2024-01-01 10:00:00', 'image_ref' => 'app-uuid:commit1'],

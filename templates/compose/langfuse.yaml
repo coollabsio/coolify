@@ -88,6 +88,11 @@ services:
     environment:
       <<: *app-env
     depends_on: *langfuse-depends-on
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3030/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   postgres:
     image: postgres:17-alpine

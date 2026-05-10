@@ -29,7 +29,10 @@
                     <a class="coolbox group" {{ wireNavigate() }}
                         href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}">
                         <div class="flex flex-col mx-6">
-                            <div class="box-title">{{ $destination->name }}</div>
+                            <div class="box-title">
+                                {{ $destination->name }}
+                                <x-deprecated-badge />
+                            </div>
                             <div class="box-description">server: {{ $destination->server->name }}</div>
                         </div>
                     </a>

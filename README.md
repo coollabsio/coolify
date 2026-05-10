@@ -60,7 +60,7 @@ Thank you so much!
 * [MVPS](https://www.mvps.net?ref=coolify.io) - Cheap VPS servers at the highest possible quality
 * [SerpAPI](https://serpapi.com?ref=coolify.io) - Google Search API — Scrape Google and other search engines from our fast, easy, and complete API
 * [ScreenshotOne](https://screenshotone.com?ref=coolify.io) - Screenshot API for devs
-*
+* [PrivateAlps](https://privatealps.net?ref=coolify.io) - Cloud Services Provider, VPS, servers Infrastructure for people who care about privacy and control
 
 ### Big Sponsors
 
@@ -69,6 +69,7 @@ Thank you so much!
 * [Arcjet](https://arcjet.com?ref=coolify.io) - Advanced web security and performance solutions
 * [BC Direct](https://bc.direct?ref=coolify.io) - Your trusted technology consulting partner
 * [Blacksmith](https://blacksmith.sh?ref=coolify.io) - Infrastructure automation platform
+* [Capture.page](https://capture.page/?ref=coolify.io) - Fast & Reliable Screenshot API for Developers
 * [Context.dev](https://context.dev?ref=coolify.io) - API to personalize your product with logos, colors, and company info from any domain
 * [ByteBase](https://www.bytebase.com?ref=coolify.io) - Database CI/CD and Security at Scale
 * [CodeRabbit](https://coderabbit.ai?ref=coolify.io) - Cut Code Review Time & Bugs in Half
@@ -87,6 +88,7 @@ Thank you so much!
 * [Juxtdigital](https://juxtdigital.com?ref=coolify.io) - Digital PR & AI Authority Building Agency
 * [LiquidWeb](https://liquidweb.com?ref=coolify.io) - Premium managed hosting solutions
 * [Logto](https://logto.io?ref=coolify.io) - The better identity infrastructure for developers
+* [LumaDock](https://lumadock.com/vps-hosting/coolify?utm_source=coolify&utm_medium=sponsorship&utm_campaign=coolify_oss_sponsor_2026&utm_content=github_readme) - Fast and reliable virtual server hosting
 * [Macarne](https://macarne.com?ref=coolify.io) - Best IP Transit & Carrier Ethernet Solutions for Simplified Network Connectivity
 * [Mobb](https://vibe.mobb.ai/?ref=coolify.io) - Secure Your AI-Generated Code to Unlock Dev Productivity
 * [PetroSky Cloud](https://petrosky.io?ref=coolify.io) - Open source cloud deployment solutions
@@ -151,6 +153,10 @@ Thank you so much!
 <a href="https://capgo.app/?utm_source=coolify.io"><img width="60px" alt="Cap-go" src="https://github.com/cap-go.png"/></a>
 <a href="https://interviewpal.com/?utm_source=coolify.io"><img width="60px" alt="InterviewPal" src="/public/svgs/interviewpal.svg"/></a>
 <a href="https://transcript.lol/?utm_source=coolify.io"><img width="60px" alt="Transcript LOL" src="https://transcript.lol/logo.png"/></a>
+<a href="https://youstable.com/?utm_source=coolify.io"><img width="60px" alt="YouStable" src="https://github.com/youstable.png"/></a>
+<a href="https://github.com/mindedtech?utm_source=coolify.io"><img width="60px" alt="MindedTech" src="https://github.com/mindedtech.png"/></a>
+<a href="https://netrouting.com/?utm_source=coolify.io"><img width="60px" alt="NetRouting" src="https://github.com/netroutingcom.png"/></a>
+<a href="https://github.com/parsecph?utm_source=coolify.io"><img width="60px" alt="ParsecPH" src="https://github.com/parsecph.png"/></a>
 
 
 ...and many more at [GitHub Sponsors](https://github.com/sponsors/coollabsio)

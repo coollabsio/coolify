@@ -4,7 +4,6 @@ namespace App\Livewire\Project\Resource;
 
 use App\Models\EnvironmentVariable;
 use App\Models\Service;
-use App\Models\StandaloneDocker;
 use Livewire\Component;
 
 class Create extends Component
@@ -18,7 +17,6 @@ class Create extends Component
 
         $type = str(request()->query('type'));
         $destination_uuid = request()->query('destination');
-        $server_id = request()->query('server_id');
         $database_image = request()->query('database_image');
 
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
@@ -30,7 +28,11 @@ class Create extends Component
         if (! $environment) {
             return redirect()->route('dashboard');
         }
-        if (isset($type) && isset($destination_uuid) && isset($server_id)) {
+        if (isset($type) && isset($destination_uuid)) {
+            $destination = find_destination_for_current_team($destination_uuid);
+            if (! $destination) {
+                return redirect()->route('dashboard');
+            }
             $services = get_service_templates();
 
             if (in_array($type, DATABASE_TYPES)) {
@@ -44,23 +46,23 @@ class Create extends Component
                     }
                     $database = create_standalone_postgresql(
                         environmentId: $environment->id,
-                        destinationUuid: $destination_uuid,
+                        destination: $destination,
                         databaseImage: $database_image
                     );
                 } elseif ($type->value() === 'redis') {
-                    $database = create_standalone_redis($environment->id, $destination_uuid);
+                    $database = create_standalone_redis($environment->id, $destination);
                 } elseif ($type->value() === 'mongodb') {
-                    $database = create_standalone_mongodb($environment->id, $destination_uuid);
+                    $database = create_standalone_mongodb($environment->id, $destination);
                 } elseif ($type->value() === 'mysql') {
-                    $database = create_standalone_mysql($environment->id, $destination_uuid);
+                    $database = create_standalone_mysql($environment->id, $destination);
                 } elseif ($type->value() === 'mariadb') {
-                    $database = create_standalone_mariadb($environment->id, $destination_uuid);
+                    $database = create_standalone_mariadb($environment->id, $destination);
                 } elseif ($type->value() === 'keydb') {
-                    $database = create_standalone_keydb($environment->id, $destination_uuid);
+                    $database = create_standalone_keydb($environment->id, $destination);
                 } elseif ($type->value() === 'dragonfly') {
-                    $database = create_standalone_dragonfly($environment->id, $destination_uuid);
+                    $database = create_standalone_dragonfly($environment->id, $destination);
                 } elseif ($type->value() === 'clickhouse') {
-                    $database = create_standalone_clickhouse($environment->id, $destination_uuid);
+                    $database = create_standalone_clickhouse($environment->id, $destination);
                 }
 
                 return redirect()->route('project.database.configuration', [
@@ -69,7 +71,7 @@ class Create extends Component
                     'database_uuid' => $database->uuid,
                 ]);
             }
-            if ($type->startsWith('one-click-service-') && ! is_null((int) $server_id)) {
+            if ($type->startsWith('one-click-service-')) {
                 $oneClickServiceName = $type->after('one-click-service-')->value();
                 $oneClickService = data_get($services, "$oneClickServiceName.compose");
                 $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
@@ -79,12 +81,11 @@ class Create extends Component
                     });
                 }
                 if ($oneClickService) {
-                    $destination = StandaloneDocker::whereUuid($destination_uuid)->first();
                     $service_payload = [
                         'docker_compose_raw' => base64_decode($oneClickService),
                         'environment_id' => $environment->id,
                         'service_type' => $oneClickServiceName,
-                        'server_id' => (int) $server_id,
+                        'server_id' => $destination->server_id,
                         'destination_id' => $destination->id,
                         'destination_type' => $destination->getMorphClass(),
                     ];

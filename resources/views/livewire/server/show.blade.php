@@ -191,6 +191,12 @@
                                 label="Port" required :disabled="$isValidating" />
                         </div>
                     </div>
+                    <div class="w-full lg:w-64">
+                        <x-forms.input canGate="update" :canResource="$server" type="number"
+                            id="connectionTimeout" label="SSH Connection Timeout (s)"
+                            helper="Seconds to wait for SSH connection before failing. Default: 10."
+                            min="1" max="300" required :disabled="$isValidating" />
+                    </div>
                     <div class="w-full">
                         <div class="flex items-center mb-1">
                             <label for="serverTimezone">Server Timezone</label>

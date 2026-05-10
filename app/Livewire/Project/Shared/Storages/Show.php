@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Shared\Storages;
 
 use App\Models\LocalPersistentVolume;
+use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -31,18 +32,32 @@ class Show extends Component
 
     public bool $isPreviewSuffixEnabled = true;
 
-    protected $rules = [
-        'name' => 'required|string',
-        'mountPath' => 'required|string',
-        'hostPath' => 'string|nullable',
-        'isPreviewSuffixEnabled' => 'required|boolean',
-    ];
-
     protected $validationAttributes = [
         'name' => 'name',
         'mountPath' => 'mount',
         'hostPath' => 'host',
     ];
+
+    protected function rules(): array
+    {
+        return [
+            'name' => ValidationPatterns::volumeNameRules(),
+            'mountPath' => ['required', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
+            'hostPath' => ['nullable', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
+            'isPreviewSuffixEnabled' => 'required|boolean',
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return array_merge(
+            ValidationPatterns::volumeNameMessages(),
+            [
+                'mountPath.regex' => 'Mount path must start with / and only contain safe path characters.',
+                'hostPath.regex' => 'Host path must start with / and only contain safe path characters.',
+            ]
+        );
+    }
 
     /**
      * Sync data between component properties and model

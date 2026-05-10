@@ -9,6 +9,9 @@
         fullscreen: @entangle('fullscreen'),
         alwaysScroll: {{ $isKeepAliveOn ? 'true' : 'false' }},
         rafId: null,
+        scrollDebounce: null,
+        isScrolling: false,
+        lastTouchY: 0,
         showTimestamps: true,
         searchQuery: '',
         matchCount: 0,
@@ -19,8 +22,53 @@
         scrollToBottom() {
             const logsContainer = document.getElementById('logsContainer');
             if (logsContainer) {
+                this.isScrolling = true;
                 logsContainer.scrollTop = logsContainer.scrollHeight;
+                setTimeout(() => { this.isScrolling = false; }, 50);
             }
+        },
+        disableFollow() {
+            if (!this.alwaysScroll) return;
+            this.alwaysScroll = false;
+            if (this.rafId) {
+                cancelAnimationFrame(this.rafId);
+                this.rafId = null;
+            }
+        },
+        handleWheel(event) {
+            if (this.alwaysScroll && event.deltaY < 0) {
+                this.disableFollow();
+            }
+        },
+        handleTouchStart(event) {
+            this.lastTouchY = event.touches[0].clientY;
+        },
+        handleTouchMove(event) {
+            if (!this.alwaysScroll) return;
+            const currentY = event.touches[0].clientY;
+            if (currentY > this.lastTouchY) {
+                this.disableFollow();
+            }
+            this.lastTouchY = currentY;
+        },
+        handleKeyScroll(event) {
+            if (!this.alwaysScroll) return;
+            const upKeys = ['ArrowUp', 'PageUp', 'Home'];
+            if (upKeys.includes(event.key)) {
+                this.disableFollow();
+            }
+        },
+        handleScroll(event) {
+            if (this.isScrolling) return;
+            clearTimeout(this.scrollDebounce);
+            this.scrollDebounce = setTimeout(() => {
+                const el = event.target;
+                const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+                if (!this.alwaysScroll && distanceFromBottom <= 10) {
+                    this.alwaysScroll = true;
+                    this.scheduleScroll();
+                }
+            }, 150);
         },
         scheduleScroll() {
             if (!this.alwaysScroll) return;
@@ -107,9 +155,9 @@
 
             this.matchCount = query ? count : 0;
         },
-        downloadLogs() {
+        collectVisibleLogs() {
             const logs = document.getElementById('logs');
-            if (!logs) return;
+            if (!logs) return '';
             const visibleLines = logs.querySelectorAll('[data-log-line]:not(.hidden)');
             let content = '';
             visibleLines.forEach(line => {
@@ -118,6 +166,17 @@
                     content += text + String.fromCharCode(10);
                 }
             });
+            return content;
+        },
+        copyLogs() {
+            const content = this.collectVisibleLogs();
+            if (!content) return;
+            navigator.clipboard.writeText(content);
+            Livewire.dispatch('success', ['Logs copied to clipboard.']);
+        },
+        downloadLogs() {
+            const content = this.collectVisibleLogs();
+            if (!content) return;
             const blob = new Blob([content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -210,12 +269,7 @@
                             </div>
                             <div class="flex flex-wrap items-center gap-1">
                                 <button
-                                    x-on:click="
-                                    $wire.copyLogs().then(logs => {
-                                        navigator.clipboard.writeText(logs);
-                                        Livewire.dispatch('success', ['Logs copied to clipboard.']);
-                                    });
-                                "
+                                    x-on:click="copyLogs()"
                                 title="Copy Logs"
                                 class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                                 <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -327,7 +381,8 @@
                             </div>
                         </div>
                     </div>
-                    <div id="logsContainer"
+                    <div id="logsContainer" @scroll="handleScroll" @wheel="handleWheel"
+                        @touchstart="handleTouchStart" @touchmove="handleTouchMove" @keydown="handleKeyScroll" tabindex="0"
                         class="flex min-h-40 flex-1 flex-col overflow-y-auto p-2 px-4 scrollbar">
                         <div id="logs" class="flex flex-col font-logs">
                             <div x-show="searchQuery.trim() && matchCount === 0"

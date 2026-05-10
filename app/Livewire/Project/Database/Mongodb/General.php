@@ -75,9 +75,15 @@ class General extends Component
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
             'mongoConf' => 'nullable',
-            'mongoInitdbRootUsername' => 'required',
-            'mongoInitdbRootPassword' => 'required',
-            'mongoInitdbDatabase' => 'required',
+            'mongoInitdbRootUsername' => ValidationPatterns::databaseIdentifierRules(
+                enforcePattern: $this->mongoInitdbRootUsername !== $this->database->mongo_initdb_root_username,
+            ),
+            'mongoInitdbRootPassword' => ValidationPatterns::databasePasswordRules(
+                enforcePattern: $this->mongoInitdbRootPassword !== $this->database->mongo_initdb_root_password,
+            ),
+            'mongoInitdbDatabase' => ValidationPatterns::databaseIdentifierRules(
+                enforcePattern: $this->mongoInitdbDatabase !== $this->database->mongo_initdb_database,
+            ),
             'image' => 'required',
             'portsMappings' => ValidationPatterns::portMappingRules(),
             'isPublic' => 'nullable|boolean',
@@ -97,9 +103,9 @@ class General extends Component
             ValidationPatterns::portMappingMessages(),
             [
                 'name.required' => 'The Name field is required.',
-                'mongoInitdbRootUsername.required' => 'The Root Username field is required.',
-                'mongoInitdbRootPassword.required' => 'The Root Password field is required.',
-                'mongoInitdbDatabase.required' => 'The MongoDB Database field is required.',
+                ...ValidationPatterns::databaseIdentifierMessages('mongoInitdbRootUsername', 'Root Username'),
+                ...ValidationPatterns::databasePasswordMessages('mongoInitdbRootPassword', 'Root Password'),
+                ...ValidationPatterns::databaseIdentifierMessages('mongoInitdbDatabase', 'MongoDB Database'),
                 'image.required' => 'The Docker Image field is required.',
                 'publicPort.integer' => 'The Public Port must be an integer.',
                 'publicPort.min' => 'The Public Port must be at least 1.',

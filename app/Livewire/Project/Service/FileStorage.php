@@ -63,13 +63,16 @@ class FileStorage extends Component
             $this->fs_path = $this->fileStorage->fs_path;
         }
 
-        $this->isReadOnly = $this->fileStorage->shouldBeReadOnlyInUI();
+        $this->isReadOnly = $this->fileStorage->shouldBeReadOnlyInUI() || $this->fileStorage->is_too_large;
         $this->syncData();
     }
 
     public function syncData(bool $toModel = false): void
     {
         if ($toModel) {
+            if ($this->fileStorage->is_too_large) {
+                return;
+            }
             $this->validate();
 
             // Sync to model
@@ -172,6 +175,12 @@ class FileStorage extends Component
     {
         $this->authorize('update', $this->resource);
 
+        if ($this->fileStorage->is_too_large) {
+            $this->dispatch('error', 'File on server is too large to edit from the UI.');
+
+            return;
+        }
+
         $original = $this->fileStorage->getOriginal();
         try {
             $this->validate();
@@ -197,6 +206,11 @@ class FileStorage extends Component
     public function instantSave(): void
     {
         $this->authorize('update', $this->resource);
+        if ($this->fileStorage->is_too_large) {
+            $this->dispatch('error', 'File on server is too large to edit from the UI.');
+
+            return;
+        }
         $this->syncData(true);
         $this->dispatch('success', 'File updated.');
     }

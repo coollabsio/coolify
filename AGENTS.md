@@ -1,3 +1,7 @@
+## Design Reference
+
+For UI/UX design specifications, principles, and visual standards, consult `DESIGN.md` in the [coollabsio/architecture](https://github.com/coollabsio/architecture) repo.
+
 <laravel-boost-guidelines>
 === foundation rules ===
 

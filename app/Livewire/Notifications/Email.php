@@ -45,7 +45,7 @@ class Email extends Component
     public ?string $smtpPort = null;
 
     #[Validate(['nullable', 'string', 'in:starttls,tls,none'])]
-    public ?string $smtpEncryption = null;
+    public ?string $smtpEncryption = 'starttls';
 
     #[Validate(['nullable', 'string'])]
     public ?string $smtpUsername = null;
