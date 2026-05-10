@@ -19,19 +19,22 @@ class OauthController extends Controller
     {
         try {
             $oauthUser = get_socialite_provider($provider)->user();
-            $user = User::whereEmail($oauthUser->email)->first();
-            if (! $user) {
-                $settings = instanceSettings();
-                if (! $settings->is_registration_enabled) {
-                    abort(403, 'Registration is disabled');
-                }
+            $email = data_get($oauthUser, 'email');
+            if (blank($email)) {
+                throw new \Exception('OAuth provider did not return an email address.');
+            }
 
-                $user = User::create([
-                    'name' => $oauthUser->name,
-                    'email' => $oauthUser->email,
-                ]);
+            $user = User::whereEmail($email)->first();
+            if (! $user) {
+                $user = $this->createOauthUser($provider, $oauthUser);
+            } elseif (! $user->hasPassword() && blank($user->oauth_provider)) {
+                $user->forceFill(['oauth_provider' => $provider])->save();
             }
             Auth::login($user);
+            $team = $user->teams()->where('personal_team', true)->first() ?? $user->teams()->first();
+            if ($team) {
+                session(['currentTeam' => $team]);
+            }
 
             return redirect('/');
         } catch (\Exception $e) {
@@ -39,5 +42,33 @@ class OauthController extends Controller
 
             return redirect()->route('login')->withErrors([__($errorCode)]);
         }
+    }
+
+    private function createOauthUser(string $provider, object $oauthUser): User
+    {
+        $email = data_get($oauthUser, 'email');
+        $name = data_get($oauthUser, 'name') ?: data_get($oauthUser, 'nickname') ?: $email;
+
+        if (User::count() === 0) {
+            $user = (new User)->forceFill([
+                'id' => 0,
+                'name' => $name,
+                'email' => $email,
+                'oauth_provider' => $provider,
+            ]);
+            $user->save();
+
+            $settings = instanceSettings();
+            $settings->is_registration_enabled = false;
+            $settings->save();
+
+            return $user;
+        }
+
+        return User::create([
+            'name' => $name,
+            'email' => $email,
+            'oauth_provider' => $provider,
+        ]);
     }
 }
