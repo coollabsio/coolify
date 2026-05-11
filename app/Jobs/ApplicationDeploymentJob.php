@@ -775,7 +775,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             // TODO
         } else {
             $this->execute_remote_command([
-                "docker network inspect '{$networkId}' >/dev/null 2>&1 || docker network create --attachable '{$networkId}' >/dev/null || true",
+                dockerNetworkCreateCommand(escapeshellarg($networkId)),
                 'hidden' => true,
                 'ignore_errors' => true,
             ], [

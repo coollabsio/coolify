@@ -149,6 +149,15 @@ function executeInDocker(string $containerId, string $command)
     return "docker exec {$containerId} bash -c '{$escapedCommand}'";
 }
 
+function dockerNetworkCreateCommand(string $network, string $driver = 'bridge'): string
+{
+    $driverOption = $driver === 'bridge' ? '' : " --driver {$driver}";
+    $createWithIpv6 = "docker network create{$driverOption} --attachable --ipv6 {$network}";
+    $createWithoutIpv6 = "docker network create{$driverOption} --attachable {$network}";
+
+    return "docker network inspect {$network} >/dev/null 2>&1 || {$createWithIpv6} >/dev/null 2>&1 || {$createWithoutIpv6} >/dev/null 2>&1 || true";
+}
+
 function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
 {
     if ($server->isSwarm()) {
