@@ -68,6 +68,10 @@ class Controller extends BaseController
 
     public function forgot_password(Request $request)
     {
+        if (! (instanceSettings()->is_password_authentication_enabled ?? true)) {
+            return response()->json(['message' => 'Password authentication is disabled'], 403);
+        }
+
         if (is_transactional_emails_enabled()) {
             $arrayOfRequest = $request->only(Fortify::email());
             $request->merge([

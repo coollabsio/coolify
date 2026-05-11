@@ -27,6 +27,12 @@ class ForcePasswordReset extends Component
 
     public function mount()
     {
+        if (! (instanceSettings()->is_password_authentication_enabled ?? true)) {
+            auth()->user()->forceFill(['force_password_reset' => false])->save();
+
+            return redirect()->route('dashboard');
+        }
+
         if (auth()->user()->force_password_reset === false) {
             return redirect()->route('dashboard');
         }
@@ -41,6 +47,12 @@ class ForcePasswordReset extends Component
     public function submit()
     {
         if (auth()->user()->force_password_reset === false) {
+            return redirect()->route('dashboard');
+        }
+
+        if (! (instanceSettings()->is_password_authentication_enabled ?? true)) {
+            auth()->user()->forceFill(['force_password_reset' => false])->save();
+
             return redirect()->route('dashboard');
         }
 
