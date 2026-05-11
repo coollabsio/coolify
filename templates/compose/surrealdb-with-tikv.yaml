@@ -1,0 +1,66 @@
+# documentation: https://surrealdb.com/docs/surrealdb/installation/running/tikv
+# slogan: A scalable SurrealDB deployment backed by a single-node TiKV cluster.
+# category: database
+# tags: database, nosql, realtime, graph, document, tikv
+# logo: svgs/default.webp
+# port: 8000
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    command:
+      - start
+      - --bind
+      - 0.0.0.0:8000
+      - tikv://pd:2379
+    environment:
+      - SERVICE_URL_SURREALDB_8000
+      - SURREAL_USER=$SERVICE_USER_SURREALDB
+      - SURREAL_PASS=$SERVICE_PASSWORD_SURREALDB
+    depends_on:
+      pd:
+        condition: service_healthy
+      tikv:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "surreal", "version", "--endpoint", "http://127.0.0.1:8000"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  pd:
+    image: pingcap/pd:latest
+    command:
+      - --name=pd
+      - --data-dir=/data/pd
+      - --client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://pd:2379
+      - --peer-urls=http://0.0.0.0:2380
+      - --advertise-peer-urls=http://pd:2380
+      - --initial-cluster=pd=http://pd:2380
+    volumes:
+      - pd-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:2379/pd/api/v1/status"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  tikv:
+    image: pingcap/tikv:latest
+    command:
+      - --addr=0.0.0.0:20160
+      - --advertise-addr=tikv:20160
+      - --status-addr=0.0.0.0:20180
+      - --data-dir=/data/tikv
+      - --pd=pd:2379
+    volumes:
+      - tikv-data:/data
+    depends_on:
+      pd:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:20180/metrics"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
