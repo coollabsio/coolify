@@ -111,7 +111,7 @@ function connectProxyToNetworks(Server $server)
         $commands = $networks->map(function ($network) {
             $safe = escapeshellarg($network);
             return [
-                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --driver overlay --attachable {$safe} >/dev/null",
+                dockerNetworkCreateCommand($safe, 'overlay'),
                 "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
@@ -120,7 +120,7 @@ function connectProxyToNetworks(Server $server)
         $commands = $networks->map(function ($network) {
             $safe = escapeshellarg($network);
             return [
-                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --attachable {$safe} >/dev/null",
+                dockerNetworkCreateCommand($safe),
                 "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
@@ -146,7 +146,7 @@ function ensureProxyNetworksExist(Server $server)
             $safe = escapeshellarg($network);
             return [
                 "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable {$safe}",
+                dockerNetworkCreateCommand($safe, 'overlay'),
             ];
         });
     } else {
@@ -154,7 +154,7 @@ function ensureProxyNetworksExist(Server $server)
             $safe = escapeshellarg($network);
             return [
                 "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable {$safe}",
+                dockerNetworkCreateCommand($safe),
             ];
         });
     }
