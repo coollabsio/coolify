@@ -11,7 +11,23 @@ class OauthSetting extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['provider', 'client_id', 'client_secret', 'redirect_uri', 'tenant', 'base_url', 'enabled'];
+    protected $fillable = [
+        'provider',
+        'client_id',
+        'client_secret',
+        'redirect_uri',
+        'tenant',
+        'base_url',
+        'enabled',
+        'is_registration_enabled',
+        'disable_password_auth',
+    ];
+
+    protected $casts = [
+        'enabled' => 'boolean',
+        'is_registration_enabled' => 'boolean',
+        'disable_password_auth' => 'boolean',
+    ];
 
     protected function clientSecret(): Attribute
     {

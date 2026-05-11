@@ -18,6 +18,8 @@ class SettingsOauth extends Component
             $carry["oauth_settings_map.$setting->provider.redirect_uri"] = 'nullable';
             $carry["oauth_settings_map.$setting->provider.tenant"] = 'nullable';
             $carry["oauth_settings_map.$setting->provider.base_url"] = 'nullable';
+            $carry["oauth_settings_map.$setting->provider.is_registration_enabled"] = 'boolean';
+            $carry["oauth_settings_map.$setting->provider.disable_password_auth"] = 'boolean';
 
             return $carry;
         }, []);
@@ -38,6 +40,8 @@ class SettingsOauth extends Component
                 'redirect_uri' => $setting->redirect_uri,
                 'tenant' => $setting->tenant,
                 'base_url' => $setting->base_url,
+                'is_registration_enabled' => $setting->is_registration_enabled,
+                'disable_password_auth' => $setting->disable_password_auth,
             ];
 
             return $carry;
@@ -61,6 +65,8 @@ class SettingsOauth extends Component
                 'redirect_uri' => $oauthData['redirect_uri'],
                 'tenant' => $oauthData['tenant'],
                 'base_url' => $oauthData['base_url'],
+                'is_registration_enabled' => $oauthData['is_registration_enabled'],
+                'disable_password_auth' => $oauthData['disable_password_auth'],
             ]);
 
             if (! $oauth->couldBeEnabled()) {
@@ -79,6 +85,8 @@ class SettingsOauth extends Component
                 'redirect_uri' => $oauth->redirect_uri,
                 'tenant' => $oauth->tenant,
                 'base_url' => $oauth->base_url,
+                'is_registration_enabled' => $oauth->is_registration_enabled,
+                'disable_password_auth' => $oauth->disable_password_auth,
             ];
 
             $this->dispatch('success', 'OAuth settings for '.$oauth->provider.' updated successfully!');
@@ -100,6 +108,8 @@ class SettingsOauth extends Component
                     'redirect_uri' => $settingData['redirect_uri'],
                     'tenant' => $settingData['tenant'],
                     'base_url' => $settingData['base_url'],
+                    'is_registration_enabled' => $settingData['is_registration_enabled'],
+                    'disable_password_auth' => $settingData['disable_password_auth'],
                 ]);
 
                 if ($settingData['enabled'] && ! $oauth->couldBeEnabled()) {
@@ -119,6 +129,8 @@ class SettingsOauth extends Component
                     'redirect_uri' => $oauth->redirect_uri,
                     'tenant' => $oauth->tenant,
                     'base_url' => $oauth->base_url,
+                    'is_registration_enabled' => $oauth->is_registration_enabled,
+                    'disable_password_auth' => $oauth->disable_password_auth,
                 ];
             }
 

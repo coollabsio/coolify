@@ -21,6 +21,16 @@
                         <x-forms.checkbox instantSave="instantSave('{{ $oauth_setting['provider'] }}')"
                             id="oauth_settings_map.{{ $oauth_setting['provider'] }}.enabled" label="Enabled" />
                     </div>
+                    <div class="grid gap-2 pb-2 md:grid-cols-2">
+                        <x-forms.checkbox instantSave="instantSave('{{ $oauth_setting['provider'] }}')"
+                            id="oauth_settings_map.{{ $oauth_setting['provider'] }}.is_registration_enabled"
+                            label="Allow OAuth self-registration"
+                            helper="Allow new users from this provider to sign up even when password registration is disabled." />
+                        <x-forms.checkbox instantSave="instantSave('{{ $oauth_setting['provider'] }}')"
+                            id="oauth_settings_map.{{ $oauth_setting['provider'] }}.disable_password_auth"
+                            label="Disable password login for OAuth users"
+                            helper="Users who sign in with this provider must continue using OAuth and cannot set or use a password." />
+                    </div>
                     <div class="flex flex-col w-full gap-2 xl:flex-row">
                         <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.client_id"
                             label="Client ID" />
