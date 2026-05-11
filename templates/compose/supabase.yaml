@@ -441,16 +441,26 @@ services:
                   config:
                     status_code: 403
                     message: "Access is forbidden."
-                # Enable local access (danger zone!)
+                # MCP local/VPN access workaround:
+                # - Keep this route blocked unless the client reaches Coolify over a trusted private network.
+                # - For WireGuard/Tailscale/NetBird, allow the VPN client IP or subnet instead of 0.0.0.0/0.
+                # - Each Supabase service has its own Kong FQDN, so multiple Supabase instances use
+                #   different MCP URLs: https://<instance-a-kong>/mcp, https://<instance-b-kong>/mcp, etc.
+                # - Configure Cursor, Claude Code, or Windsurf with the selected instance URL above
+                #   and the matching Supabase access token/credentials for that instance.
+                #
+                # Enable trusted local/VPN access:
                 # 1. Comment out the 'request-termination' section above
                 # 2. Uncomment the entire section below, including 'deny'
-                # 3. Add your local IPs to the 'allow' list
+                # 3. Replace the example IPs with your local or VPN client IPs/subnets
+                # 4. Redeploy the Supabase service so Kong reloads this declarative config
                 #- name: cors
                 #- name: ip-restriction
                 #  config:
                 #    allow:
                 #      - 127.0.0.1
                 #      - ::1
+                #      - 10.8.0.0/24
                 #    deny: []
 
             ## Protected Dashboard - catch all remaining routes
