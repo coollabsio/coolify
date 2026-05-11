@@ -1,0 +1,48 @@
+# documentation: https://docs.litespeedtech.com/cloud/docker/openlitespeed/
+# slogan: WordPress running on OpenLiteSpeed — a high-performance, open-source web server with built-in LSCache. Pairs LiteSpeed's WP-aware caching with MariaDB for a production-ready blog or site.
+# category: cms
+# tags: cms, blog, content, management, wordpress, openlitespeed, litespeed, lscache, mariadb, php
+# logo: svgs/wordpress.svg
+# port: 8088
+
+services:
+  openlitespeed:
+    image: "litespeedtech/openlitespeed:1.8.4-lsphp83"
+    environment:
+      - SERVICE_FQDN_OPENLITESPEED_80
+      - TZ=${TZ:-UTC}
+      # Surface the DB credentials so wp-config.php can pick them up; the
+      # OpenLiteSpeed image ships with `wp-cli` which respects these envs.
+      - DB_HOST=mariadb
+      - DB_NAME=${WORDPRESS_DB_NAME:-wordpress}
+      - DB_USER=$SERVICE_USER_WORDPRESS
+      - DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+      - WORDPRESS_URL=$SERVICE_FQDN_OPENLITESPEED
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost/html
+      - openlitespeed-conf:/usr/local/lsws/conf
+      - openlitespeed-admin-conf:/usr/local/lsws/admin/conf
+      - openlitespeed-logs:/usr/local/lsws/logs
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1/ || curl -sf http://127.0.0.1:7080/ || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  mariadb:
+    image: "mariadb:11"
+    environment:
+      - MARIADB_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MARIADB_DATABASE=${WORDPRESS_DB_NAME:-wordpress}
+      - MARIADB_USER=$SERVICE_USER_WORDPRESS
+      - MARIADB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -p$$MARIADB_ROOT_PASSWORD || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
