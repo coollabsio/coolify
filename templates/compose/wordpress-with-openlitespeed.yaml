@@ -1,0 +1,78 @@
+# documentation: https://docs.litespeedtech.com/cloud/docker/ols-wordpress/
+# slogan: WordPress with OpenLiteSpeed and MariaDB for high-performance self-hosted sites.
+# category: cms
+# tags: cms, blog, content, management, wordpress, openlitespeed, mariadb
+# logo: svgs/wordpress.svg
+# port: 80
+
+services:
+  wordpress:
+    image: litespeedtech/openlitespeed:1.9.0-lsphp84
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost/html
+      - openlitespeed-conf:/usr/local/lsws/conf
+      - openlitespeed-admin-conf:/usr/local/lsws/admin/conf
+      - openlitespeed-logs:/usr/local/lsws/logs
+    environment:
+      - SERVICE_URL_WORDPRESS
+      - TZ=${TZ:-UTC}
+    depends_on:
+      wordpress-init:
+        condition: service_completed_successfully
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
+      interval: 2s
+      timeout: 10s
+      retries: 10
+
+  wordpress-init:
+    image: wordpress:cli-php8.3
+    volumes:
+      - wordpress-files:/var/www/html
+    environment:
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_USER=$SERVICE_USER_WORDPRESS
+      - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+      - WORDPRESS_DB_NAME=wordpress
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+        if [ ! -f /var/www/html/wp-config.php ]; then
+          wp core download --path=/var/www/html --allow-root &&
+          wp config create --path=/var/www/html --dbname=$${WORDPRESS_DB_NAME} --dbuser=$${WORDPRESS_DB_USER} --dbpass=$${WORDPRESS_DB_PASSWORD} --dbhost=$${WORDPRESS_DB_HOST} --allow-root;
+        fi &&
+        chown -R 1000:1000 /var/www/html
+      "
+    restart: "no"
+    exclude_from_hc: true
+
+  mariadb:
+    image: mariadb:11.4
+    command: ["--max-allowed-packet=512M"]
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
