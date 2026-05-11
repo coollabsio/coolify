@@ -283,6 +283,7 @@ class Select extends Component
             case 'redis':
             case 'keydb':
             case 'dragonfly':
+            case 'surrealdb':
             case 'clickhouse':
             case 'mongodb':
                 $this->isDatabase = true;
