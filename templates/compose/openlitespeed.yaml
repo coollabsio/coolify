@@ -1,0 +1,31 @@
+# documentation: https://docs.litespeedtech.com/cloud/docker/openlitespeed/
+# slogan: A lightweight, open-source web server from LiteSpeed Technologies.
+# category: web-server
+# tags: web-server, http, php, openlitespeed, litespeed
+# logo: svgs/default.webp
+# port: 80
+
+services:
+  openlitespeed:
+    image: litespeedtech/openlitespeed:${OLS_VERSION:-1.8.5}-${PHP_VERSION:-lsphp85}
+    environment:
+      - SERVICE_URL_OPENLITESPEED_80
+      - TZ=${TIMEZONE:-UTC}
+    volumes:
+      - openlitespeed-conf:/usr/local/lsws/conf
+      - openlitespeed-admin-conf:/usr/local/lsws/admin/conf
+      - openlitespeed-sites:/var/www/vhosts
+      - openlitespeed-acme:/root/.acme.sh
+      - openlitespeed-logs:/usr/local/lsws/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+volumes:
+  openlitespeed-conf:
+  openlitespeed-admin-conf:
+  openlitespeed-sites:
+  openlitespeed-acme:
+  openlitespeed-logs:
