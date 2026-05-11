@@ -1,4 +1,4 @@
-# documentation: https://supabase.io
+# documentation: https://supabase.com/docs/guides/self-hosting
 # slogan: The open source Firebase alternative.
 # category: backend
 # tags: firebase, alternative, open-source
@@ -426,9 +426,29 @@ services:
                     status_code: 403
                     message: "Access is forbidden."
 
-            ## MCP endpoint - local access
+            ## MCP endpoint - local or VPN access
+            ##
+            ## Supabase Studio exposes MCP internally at /api/mcp, but Supabase
+            ## recommends keeping self-hosted MCP off the public Internet because
+            ## it does not provide OAuth 2.1 authentication. Coolify exposes it
+            ## through Kong at /mcp only after an explicit allowlist is configured.
+            ##
+            ## Safe setup:
+            ## 1. Keep /api/mcp blocked. Do not expose Studio directly.
+            ## 2. Create an SSH tunnel or connect through a VPN to this Coolify host.
+            ## 3. Find the Docker bridge gateway IP seen by Kong, then add that IP
+            ##    to the allow list below:
+            ##    docker inspect <kong-container> --format '{{range .NetworkSettings.Networks}}{{println .Gateway}}{{end}}'
+            ## 4. Comment out the request-termination plugin below, uncomment cors
+            ##    and ip-restriction, add only trusted tunnel/VPN source IPs, then
+            ##    restart the supabase-kong service.
+            ## 5. Configure the MCP client URL as http://localhost:<tunnel-port>/mcp.
+            ##
+            ## For multiple Supabase services, repeat the same change in each
+            ## service's generated volumes/api/kong.yml and use a separate tunnel
+            ## or domain per instance so routes never share public /mcp access.
             - name: mcp
-              _comment: 'MCP: /mcp -> http://supabase-studio:3000/api/mcp (local access)'
+              _comment: 'MCP: /mcp -> http://supabase-studio:3000/api/mcp (local/VPN access only)'
               url: http://supabase-studio:3000/api/mcp
               routes:
                 - name: mcp
