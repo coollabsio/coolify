@@ -37,7 +37,7 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
             }
 
             $muxSocket = "/var/www/html/storage/app/ssh/mux/{$muxFile}";
-            $checkCommand = "ssh -O check -o ControlPath={$muxSocket} {$server->user}@{$server->ip} 2>/dev/null";
+            $checkCommand = "ssh -O check -o ControlPath={$muxSocket} ".escapeshellarg($server->user).'@'.escapeshellarg($server->ip).' 2>/dev/null';
             $checkProcess = Process::run($checkCommand);
 
             if ($checkProcess->exitCode() !== 0) {
