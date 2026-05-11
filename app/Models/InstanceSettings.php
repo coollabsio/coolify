@@ -35,6 +35,7 @@ class InstanceSettings extends Model
         'custom_dns_servers',
         'instance_name',
         'is_api_enabled',
+        'disable_password_auth_for_oauth_users',
         'allowed_ips',
         'auto_update_frequency',
         'update_check_frequency',
@@ -61,6 +62,7 @@ class InstanceSettings extends Model
         'resend_enabled' => 'boolean',
         'resend_api_key' => 'encrypted',
 
+        'disable_password_auth_for_oauth_users' => 'boolean',
         'allowed_ip_ranges' => 'array',
         'is_auto_update_enabled' => 'boolean',
         'auto_update_frequency' => 'string',

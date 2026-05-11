@@ -13,6 +13,11 @@
             </div>
             <div class="pb-4 ">Custom authentication (OAuth) configurations.</div>
         </div>
+        <div class="md:w-96">
+            <x-forms.checkbox id="disable_password_auth_for_oauth_users"
+                helper="When enabled, users created through OAuth without a password cannot create a local password through the password reset flow."
+                label="Disable password login for OAuth users" />
+        </div>
         <div class="flex flex-col gap-2 pt-4">
             @foreach ($oauth_settings_map as $oauth_setting)
                 <div class="p-4 border dark:border-coolgray-300 border-neutral-200">

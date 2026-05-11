@@ -9,6 +9,8 @@ class SettingsOauth extends Component
 {
     public $oauth_settings_map;
 
+    public bool $disable_password_auth_for_oauth_users = false;
+
     protected function rules()
     {
         return OauthSetting::all()->reduce(function ($carry, $setting) {
@@ -20,7 +22,9 @@ class SettingsOauth extends Component
             $carry["oauth_settings_map.$setting->provider.base_url"] = 'nullable';
 
             return $carry;
-        }, []);
+        }, [
+            'disable_password_auth_for_oauth_users' => 'boolean',
+        ]);
     }
 
     public function mount()
@@ -28,6 +32,7 @@ class SettingsOauth extends Component
         if (! isInstanceAdmin()) {
             return redirect()->route('home');
         }
+        $this->disable_password_auth_for_oauth_users = instanceSettings()->disable_password_auth_for_oauth_users;
         $this->oauth_settings_map = OauthSetting::all()->sortBy('provider')->reduce(function ($carry, $setting) {
             $carry[$setting->provider] = [
                 'id' => $setting->id,
@@ -139,6 +144,10 @@ class SettingsOauth extends Component
 
     public function submit()
     {
+        $settings = instanceSettings();
+        $settings->disable_password_auth_for_oauth_users = $this->disable_password_auth_for_oauth_users;
+        $settings->save();
+
         $this->updateOauthSettings();
         $this->dispatch('success', 'Instance settings updated successfully!');
     }

@@ -7,6 +7,7 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\OauthSetting;
+use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -74,6 +75,10 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::authenticateUsing(function (Request $request) {
             $email = strtolower($request->email);
             $user = User::where('email', $email)->with('teams')->first();
+            if ($user && instanceSettings()->disable_password_auth_for_oauth_users && $user->isOauthUser()) {
+                return null;
+            }
+
             if (
                 $user &&
                 Hash::check($request->password, $user->password)
@@ -82,7 +87,7 @@ class FortifyServiceProvider extends ServiceProvider
                 $user->save();
 
                 // Check if user has a pending invitation they haven't accepted yet
-                $invitation = \App\Models\TeamInvitation::whereEmail($email)->first();
+                $invitation = TeamInvitation::whereEmail($email)->first();
                 if ($invitation && $invitation->isValid()) {
                     // User is logging in for the first time after being invited
                     // Attach them to the invited team if not already attached
