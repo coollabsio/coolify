@@ -32,6 +32,8 @@ class Index extends Component
 
     public bool $show_verification = false;
 
+    public bool $password_management_disabled = false;
+
     public function mount()
     {
         $this->userId = Auth::id();
@@ -43,6 +45,9 @@ class Index extends Component
             $this->new_email = Auth::user()->pending_email;
             $this->show_verification = true;
         }
+
+        $this->password_management_disabled = Auth::user()->isOauthAccount()
+            && ! instanceSettings()->is_oauth_password_login_enabled;
     }
 
     public function submit()
@@ -240,6 +245,12 @@ class Index extends Component
     public function resetPassword()
     {
         try {
+            if ($this->password_management_disabled) {
+                $this->dispatch('error', 'This account is restricted to OAuth login.');
+
+                return;
+            }
+
             $this->validate([
                 'current_password' => ['required'],
                 'new_password' => ['required', Password::defaults(), 'confirmed'],

@@ -5,6 +5,7 @@ namespace App\Actions\Fortify;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Contracts\UpdatesUserPasswords;
 
@@ -17,6 +18,12 @@ class UpdateUserPassword implements UpdatesUserPasswords
      */
     public function update(User $user, array $input): void
     {
+        if ($user->isOauthAccount() && ! instanceSettings()->is_oauth_password_login_enabled) {
+            throw ValidationException::withMessages([
+                'password' => __('This account is restricted to OAuth login.'),
+            ]);
+        }
+
         Validator::make($input, [
             'current_password' => ['required', 'string', 'current_password:web'],
             'password' => ['required', Password::defaults(), 'confirmed'],

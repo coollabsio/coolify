@@ -42,6 +42,16 @@
                         </div>
                     @endif
                     <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                            helper="Allow enabled OAuth providers to create accounts even when password registration is disabled."
+                            label="OAuth Registration Allowed" />
+                    </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_password_login_enabled"
+                            helper="Allow accounts created through OAuth to add or use a local password. Disable to keep OAuth-created accounts OAuth-only."
+                            label="OAuth Password Login" />
+                    </div>
+                    <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."
                             label="Do Not Track" />

@@ -99,6 +99,7 @@ describe('mass assignment protection', function () {
         expect($user->isFillable('pending_email'))->toBeFalse('pending_email should not be fillable');
         expect($user->isFillable('email_change_code'))->toBeFalse('email_change_code should not be fillable');
         expect($user->isFillable('email_change_code_expires_at'))->toBeFalse('email_change_code_expires_at should not be fillable');
+        expect($user->isFillable('oauth_provider'))->toBeFalse('oauth_provider should not be fillable');
     });
 
     test('User model allows mass assignment of profile fields', function () {
