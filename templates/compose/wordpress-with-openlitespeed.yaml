@@ -1,0 +1,85 @@
+# documentation: https://docs.litespeedtech.com/cloud/docker/openlitespeed/
+# slogan: WordPress with OpenLiteSpeed and MariaDB for a fast self-hosted CMS stack.
+# category: cms
+# tags: cms, blog, content, management, wordpress, openlitespeed, litespeed, mariadb
+# logo: svgs/wordpress.svg
+# port: 80
+
+services:
+  wordpress:
+    image: litespeedtech/openlitespeed:1.8.5-lsphp85
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost/html
+      - openlitespeed-conf:/usr/local/lsws/conf
+      - openlitespeed-admin-conf:/usr/local/lsws/admin/conf
+      - openlitespeed-logs:/usr/local/lsws/logs
+    environment:
+      - SERVICE_URL_WORDPRESS_80
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_NAME=wordpress
+      - WORDPRESS_DB_USER=$SERVICE_USER_WORDPRESS
+      - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        DOCROOT=/var/www/vhosts/localhost/html
+        mkdir -p "$$DOCROOT"
+        if [ ! -f "$$DOCROOT/wp-load.php" ]; then
+          wp core download --allow-root --path="$$DOCROOT"
+        fi
+        if [ ! -f "$$DOCROOT/wp-config.php" ]; then
+          wp config create --allow-root --path="$$DOCROOT" \
+            --dbname="$${WORDPRESS_DB_NAME}" \
+            --dbuser="$${WORDPRESS_DB_USER}" \
+            --dbpass="$${WORDPRESS_DB_PASSWORD}" \
+            --dbhost="$${WORDPRESS_DB_HOST}" \
+            --skip-check
+        fi
+        if [ ! -f "$$DOCROOT/.htaccess" ]; then
+          cat > "$$DOCROOT/.htaccess" <<'EOF'
+        # BEGIN WordPress
+        <IfModule mod_rewrite.c>
+        RewriteEngine On
+        RewriteBase /
+        RewriteRule ^index\.php$ - [L]
+        RewriteCond %{REQUEST_FILENAME} !-f
+        RewriteCond %{REQUEST_FILENAME} !-d
+        RewriteRule . /index.php [L]
+        </IfModule>
+        # END WordPress
+        EOF
+        fi
+        chown -R nobody:nogroup /var/www/vhosts/localhost
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
+      interval: 5s
+      timeout: 20s
+      retries: 20
+      start_period: 60s
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+volumes:
+  wordpress-files:
+  openlitespeed-conf:
+  openlitespeed-admin-conf:
+  openlitespeed-logs:
+  mariadb-data:
