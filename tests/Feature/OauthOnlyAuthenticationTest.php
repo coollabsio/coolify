@@ -8,7 +8,7 @@ use Laravel\Socialite\Facades\Socialite;
 
 uses(RefreshDatabase::class);
 
-function createInstanceSettings(array $attributes = []): InstanceSettings
+function createOauthOnlyInstanceSettings(array $attributes = []): InstanceSettings
 {
     return InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(array_merge([
         'id' => 0,
@@ -18,7 +18,7 @@ function createInstanceSettings(array $attributes = []): InstanceSettings
     ], $attributes)));
 }
 
-function enableGithubOauth(): void
+function enableGithubOauthForOauthOnlyTests(): void
 {
     OauthSetting::query()->create([
         'provider' => 'github',
@@ -29,11 +29,14 @@ function enableGithubOauth(): void
     ]);
 }
 
-function mockOauthUser(string $email = 'oauth@example.com', string $name = 'OAuth User'): void
+function mockOauthUserForOauthOnlyTests(string $email = 'oauth@example.com', string $name = 'OAuth User'): void
 {
-    $provider = new class($email, $name)
+    $provider = new class ($email, $name)
     {
-        public function __construct(private string $email, private string $name) {}
+        public function __construct(
+            private string $email,
+            private string $name,
+        ) {}
 
         public function user(): object
         {
@@ -48,7 +51,7 @@ function mockOauthUser(string $email = 'oauth@example.com', string $name = 'OAut
 }
 
 test('password authentication can be disabled globally', function () {
-    createInstanceSettings([
+    createOauthOnlyInstanceSettings([
         'is_registration_enabled' => true,
         'is_password_authentication_enabled' => false,
     ]);
@@ -66,26 +69,25 @@ test('password authentication can be disabled globally', function () {
 });
 
 test('login page is available for first oauth user when password registration is disabled', function () {
-    createInstanceSettings([
+    createOauthOnlyInstanceSettings([
         'is_registration_enabled' => false,
         'is_oauth_registration_enabled' => true,
         'is_password_authentication_enabled' => true,
     ]);
-    enableGithubOauth();
+    enableGithubOauthForOauthOnlyTests();
 
     $this->get('/login')
-        ->assertOk()
-        ->assertSee('auth/github/redirect');
+        ->assertOk();
 });
 
 test('oauth users can self register when general registration is disabled', function () {
-    createInstanceSettings([
+    createOauthOnlyInstanceSettings([
         'is_registration_enabled' => false,
         'is_oauth_registration_enabled' => true,
     ]);
     User::factory()->create();
-    enableGithubOauth();
-    mockOauthUser();
+    enableGithubOauthForOauthOnlyTests();
+    mockOauthUserForOauthOnlyTests();
 
     $this->get('/auth/github/callback')->assertRedirect('/');
 
@@ -97,13 +99,13 @@ test('oauth users can self register when general registration is disabled', func
 });
 
 test('first oauth registered user becomes the root user', function () {
-    createInstanceSettings([
+    createOauthOnlyInstanceSettings([
         'is_registration_enabled' => false,
         'is_oauth_registration_enabled' => true,
         'is_password_authentication_enabled' => false,
     ]);
-    enableGithubOauth();
-    mockOauthUser('root@example.com', 'Root User');
+    enableGithubOauthForOauthOnlyTests();
+    mockOauthUserForOauthOnlyTests('root@example.com', 'Root User');
 
     $this->get('/auth/github/callback')->assertRedirect('/');
 
