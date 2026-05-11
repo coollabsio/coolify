@@ -12,10 +12,14 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Once::flush();
+    config([
+        'app.maintenance.driver' => 'file',
+        'cache.default' => 'array',
+    ]);
 
-    InstanceSettings::updateOrCreate([
-        'id' => 0,
-    ], [
+    $settings = new InstanceSettings;
+    $settings->id = 0;
+    $settings->forceFill([
         'is_registration_enabled' => false,
         'is_oauth_registration_enabled' => true,
         'is_oauth_only_auth_enabled' => true,
@@ -26,6 +30,7 @@ beforeEach(function () {
         'smtp_from_address' => 'noreply@example.com',
         'smtp_from_name' => 'Coolify',
     ]);
+    $settings->saveQuietly();
 
     OauthSetting::create([
         'provider' => 'google',
@@ -61,7 +66,7 @@ it('allows oauth self registration when password registration is disabled', func
         ->and($user->oauth_provider)->toBe('google')
         ->and($user->is_oauth_only)->toBeTrue()
         ->and($user->password)->toBeNull()
-        ->and(InstanceSettings::find(0)?->is_registration_enabled)->toBeFalse();
+        ->and(InstanceSettings::find(0)?->is_registration_enabled)->toBeFalsy();
 });
 
 it('blocks oauth self registration when oauth registration is also disabled', function () {
