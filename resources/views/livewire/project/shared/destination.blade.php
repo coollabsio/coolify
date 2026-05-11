@@ -20,6 +20,9 @@
                     Network: {{ data_get($resource, 'destination.network') }}
                 </div>
             </div>
+            @include('livewire.project.shared.partials.container-details', [
+                'containers' => $containerDetails->get(data_get($resource, 'destination.server.id'), collect([])),
+            ])
             @if ($resource?->additional_networks?->count() > 0)
                 <div class="flex gap-2">
                     <x-forms.button
@@ -53,6 +56,9 @@
                             </div>
                         </div>
                     </div>
+                    @include('livewire.project.shared.partials.container-details', [
+                        'containers' => $containerDetails->get(data_get($destination, 'server.id'), collect([])),
+                    ])
                     <div class="flex gap-2">
                         <x-forms.button
                             wire:click="redeploy('{{ data_get($destination, 'id') }}','{{ data_get($destination, 'server.id') }}')">Deploy</x-forms.button>

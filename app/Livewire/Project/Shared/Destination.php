@@ -17,6 +17,8 @@ class Destination extends Component
 
     public Collection $networks;
 
+    public Collection $containerDetails;
+
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
@@ -31,6 +33,7 @@ class Destination extends Component
     public function mount()
     {
         $this->networks = collect([]);
+        $this->containerDetails = collect([]);
         $this->loadData();
     }
 
@@ -53,6 +56,46 @@ class Destination extends Component
             $this->networks = $this->networks->reject(function ($network) {
                 return $this->resource->additional_servers->pluck('id')->contains($network->server->id);
             });
+        }
+
+        $this->loadContainerDetails();
+    }
+
+    private function loadContainerDetails(): void
+    {
+        $this->containerDetails = collect([]);
+
+        if ($this->resource->getMorphClass() !== 'App\Models\Application') {
+            return;
+        }
+
+        $destinations = collect([$this->resource->destination])
+            ->merge($this->resource->additional_networks ?? collect([]))
+            ->filter();
+
+        foreach ($destinations as $destination) {
+            $server = $destination->server;
+
+            if (! $server || ! $server->isFunctional() || $server->isSwarm()) {
+                continue;
+            }
+
+            try {
+                $containers = getCurrentApplicationContainerStatus($server, $this->resource->id)
+                    ->map(fn ($container) => [
+                        'id' => data_get($container, 'ID'),
+                        'name' => data_get($container, 'Names'),
+                        'image' => data_get($container, 'Image'),
+                        'status' => data_get($container, 'Status'),
+                        'networks' => data_get($container, 'Networks'),
+                        'ports' => data_get($container, 'Ports') ?: '-',
+                    ])
+                    ->values();
+
+                $this->containerDetails->put($server->id, $containers);
+            } catch (\Throwable) {
+                $this->containerDetails->put($server->id, collect([]));
+            }
         }
     }
 
