@@ -774,12 +774,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->server->isSwarm()) {
             // TODO
         } else {
+            $safeNetworkId = escapeshellarg($networkId);
+            $createNetworkCommand = dockerNetworkCreateCommand($networkId, hideOutput: true);
+
             $this->execute_remote_command([
-                "docker network inspect '{$networkId}' >/dev/null 2>&1 || docker network create --attachable '{$networkId}' >/dev/null || true",
+                "docker network inspect {$safeNetworkId} >/dev/null 2>&1 || {$createNetworkCommand} || true",
                 'hidden' => true,
                 'ignore_errors' => true,
             ], [
-                "docker network connect {$networkId} coolify-proxy >/dev/null 2>&1 || true",
+                "docker network connect {$safeNetworkId} coolify-proxy >/dev/null 2>&1 || true",
                 'hidden' => true,
                 'ignore_errors' => true,
             ]);
