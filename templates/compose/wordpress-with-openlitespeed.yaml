@@ -1,0 +1,72 @@
+# documentation: https://docs.litespeedtech.com/cloud/docker/ols-wordpress/
+# slogan: WordPress served by OpenLiteSpeed with MariaDB.
+# category: cms
+# tags: cms, blog, content, management, wordpress, openlitespeed, litespeed, mariadb
+# logo: svgs/wordpress.svg
+# port: 80
+
+services:
+  wordpress:
+    image: litespeedtech/openlitespeed:latest
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost/html
+    environment:
+      - SERVICE_URL_WORDPRESS_80
+      - TZ=${TZ:-UTC}
+    depends_on:
+      wordpress-init:
+        condition: service_completed_successfully
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
+      interval: 2s
+      timeout: 10s
+      retries: 10
+
+  wordpress-init:
+    exclude_from_hc: true
+    image: wordpress:cli-php8.3
+    restart: no
+    user: "0:0"
+    working_dir: /var/www/html
+    volumes:
+      - wordpress-files:/var/www/html
+    environment:
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_USER=${SERVICE_USER_WORDPRESS}
+      - WORDPRESS_DB_PASSWORD=${SERVICE_PASSWORD_WORDPRESS}
+      - WORDPRESS_DB_NAME=${MYSQL_DATABASE:-wordpress}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    command: >
+      sh -c '
+        set -e;
+        if [ ! -f wp-config.php ]; then
+          wp core download --allow-root &&
+          wp config create
+            --dbname="$${WORDPRESS_DB_NAME}"
+            --dbuser="$${WORDPRESS_DB_USER}"
+            --dbpass="$${WORDPRESS_DB_PASSWORD}"
+            --dbhost="$${WORDPRESS_DB_HOST}"
+            --skip-check
+            --allow-root;
+        fi;
+        chown -R 65534:65534 /var/www/html
+      '
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-wordpress}
+      - MYSQL_USER=${SERVICE_USER_WORDPRESS}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_WORDPRESS}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
