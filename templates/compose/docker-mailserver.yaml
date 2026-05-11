@@ -1,0 +1,57 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Production-ready fullstack but simple mail server (SMTP, IMAP, anti-spam, anti-virus) built on Postfix and Dovecot.
+# category: email
+# tags: mail,email,smtp,imap,mailserver,postfix,dovecot,self-hosted
+# logo: svgs/docker-mailserver.svg
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:15
+    environment:
+      # Public FQDN of this mail server (e.g. mail.example.com).
+      # IMPORTANT: replace the auto-generated domain with a domain you own and can set
+      # MX / SPF / DKIM / DMARC records for, and make sure its PTR (reverse DNS) matches.
+      # A random Coolify subdomain will not work for sending or receiving real mail.
+      - SERVICE_FQDN_MAILSERVER
+      - OVERRIDE_HOSTNAME=${SERVICE_FQDN_MAILSERVER}
+      # Postmaster address. Leave empty to default to postmaster@<your-domain>.
+      - POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS:-}
+      - TZ=${TZ:-UTC}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      # TLS for SMTP/IMAP. Empty = self-signed certificate (works, but clients will warn).
+      # Set to "letsencrypt" or "manual" and mount the matching certificate paths for trusted TLS:
+      # https://docker-mailserver.github.io/docker-mailserver/latest/config/security/ssl/
+      - SSL_TYPE=${SSL_TYPE:-}
+      # Which Docker networks may relay mail without authentication. "none" is the safe default;
+      # set to "connected-networks" to let other Coolify services use this as an SMTP relay.
+      - PERMIT_DOCKER=${PERMIT_DOCKER:-none}
+      # fail2ban needs the NET_ADMIN capability added below. Set to 0 to disable.
+      - ENABLE_FAIL2BAN=${ENABLE_FAIL2BAN:-1}
+      # Rspamd spam filtering. Set to 0 to disable.
+      - ENABLE_RSPAMD=${ENABLE_RSPAMD:-1}
+      # ClamAV antivirus is off by default (needs ~1 GB extra RAM). Set to 1 to enable.
+      - ENABLE_CLAMAV=${ENABLE_CLAMAV:-0}
+    ports:
+      - "25:25"     # SMTP  - mail received from other mail servers
+      - "143:143"   # IMAP4 - STARTTLS
+      - "465:465"   # ESMTP - implicit TLS (submissions)
+      - "587:587"   # ESMTP - STARTTLS (submission)
+      - "993:993"   # IMAP4 - implicit TLS (imaps)
+      # - "110:110"   # POP3 - STARTTLS
+      # - "995:995"   # POP3 - implicit TLS
+      # - "4190:4190" # ManageSieve
+    volumes:
+      - mailserver-data:/var/mail                  # mailboxes
+      - mailserver-state:/var/mail-state           # runtime state (queues, fail2ban, logs db)
+      - mailserver-logs:/var/log/mail              # mail logs
+      - mailserver-config:/tmp/docker-mailserver   # accounts, aliases, DKIM keys, custom config
+      - /etc/localtime:/etc/localtime:ro
+    cap_add:
+      - NET_ADMIN  # required by fail2ban
+    healthcheck:
+      test: "ss --listening --tcp | grep -P 'LISTEN.+:smtp' || exit 1"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    stop_grace_period: 1m
