@@ -61,12 +61,15 @@ class FortifyServiceProvider extends ServiceProvider
             $enabled_oauth_providers = OauthSetting::where('enabled', true)->get();
             $users = User::count();
             if ($users == 0) {
-                // If there are no users, redirect to registration
-                return redirect()->route('register');
+                // If there are no users, prefer password registration when enabled.
+                if ($settings->is_registration_enabled) {
+                    return redirect()->route('register');
+                }
             }
 
             return view('auth.login', [
                 'is_registration_enabled' => $settings->is_registration_enabled,
+                'is_oauth_registration_enabled' => $settings->is_oauth_registration_enabled,
                 'enabled_oauth_providers' => $enabled_oauth_providers,
             ]);
         });
@@ -76,6 +79,7 @@ class FortifyServiceProvider extends ServiceProvider
             $user = User::where('email', $email)->with('teams')->first();
             if (
                 $user &&
+                $user->canUsePasswordAuthentication() &&
                 Hash::check($request->password, $user->password)
             ) {
                 $user->updated_at = now();

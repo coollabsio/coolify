@@ -46,9 +46,11 @@ class User extends Authenticatable implements SendsEmail
     protected $fillable = [
         'name',
         'email',
+        'oauth_provider',
         'password',
         'force_password_reset',
         'marketing_emails',
+        'is_oauth_only',
         'pending_email',
         'email_change_code',
         'email_change_code_expires_at',
@@ -64,6 +66,7 @@ class User extends Authenticatable implements SendsEmail
     protected $casts = [
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',
+        'is_oauth_only' => 'boolean',
         'show_boarding' => 'boolean',
         'email_change_code_expires_at' => 'datetime',
     ];
@@ -486,5 +489,20 @@ class User extends Authenticatable implements SendsEmail
     public function hasPassword(): bool
     {
         return ! empty($this->password);
+    }
+
+    public function isOauthUser(): bool
+    {
+        return filled($this->oauth_provider);
+    }
+
+    public function usesOauthOnlyAuthentication(): bool
+    {
+        return $this->isOauthUser() && ($this->is_oauth_only || ! $this->hasPassword());
+    }
+
+    public function canUsePasswordAuthentication(): bool
+    {
+        return ! $this->usesOauthOnlyAuthentication();
     }
 }
