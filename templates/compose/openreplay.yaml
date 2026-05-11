@@ -1,0 +1,3224 @@
+# documentation: https://docs.openreplay.com/en/deployment/deploy-docker
+# slogan: OpenReplay is an open-source session replay and product analytics platform.
+# category: analytics
+# tags: session-replay, analytics, product-analytics, open-source, self-hosted
+# logo: svgs/default.webp
+# port: 80
+
+# vim: ft=yaml
+services:
+
+  postgresql:
+    image: ghcr.io/openreplay/postgres:${POSTGRES_VERSION:-17}
+    volumes:
+      - pgdata:/bitnami/postgresql
+    networks:
+      openreplay-net:
+        aliases:
+          - postgresql.db.svc.cluster.local
+    environment:
+      POSTGRESQL_PASSWORD: "${SERVICE_PASSWORD_POSTGRES}"
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.11-alpine}
+    volumes:
+      - clickhouse:/var/lib/clickhouse
+    networks:
+      openreplay-net:
+        aliases:
+          - clickhouse-openreplay-clickhouse.db.svc.cluster.local
+    environment:
+      CLICKHOUSE_USER: "default"
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+
+  redis:
+    image: ghcr.io/openreplay/valkey:${REDIS_VERSION:-8}
+    volumes:
+      - redisdata:/data
+    networks:
+      openreplay-net:
+        aliases:
+          - redis-master.db.svc.cluster.local
+    environment:
+      ALLOW_EMPTY_PASSWORD: "yes"
+
+  kafka:
+    image: bitnami/kafka:3.7
+    volumes:
+      - kafka-data:/bitnami/kafka
+    networks:
+      openreplay-net:
+        aliases:
+          - kafka.db.svc.cluster.local
+    environment:
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka.db.svc.cluster.local:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server 127.0.0.1:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  minio:
+    image: ghcr.io/openreplay/minio:${MINIO_VERSION:-2025}
+    volumes:
+      - miniodata:/bitnami/minio/data
+    networks:
+      openreplay-net:
+        aliases:
+          - minio.db.svc.cluster.local
+    environment:
+      MINIO_ROOT_USER: ${SERVICE_USER_MINIO}
+      MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_MINIO}
+
+  fs-permission:
+    image: debian:stable-slim
+    volumes:
+      - shared-volume:/mnt/efs
+      - miniodata:/mnt/minio
+      - pgdata:/mnt/postgres
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        chown -R 1001:1001 /mnt/{efs,minio,postgres}
+    restart: on-failure
+
+  minio-migration:
+    image: ghcr.io/openreplay/minio:${MINIO_VERSION:-2025}
+    depends_on:
+      - minio
+      - fs-permission
+    networks:
+      - openreplay-net
+    volumes:
+      - type: bind
+        source: ./minio.sh
+        target: /tmp/minio.sh
+        content: |
+          #!/bin/bash
+          
+          set -e
+          
+          cd /tmp
+          
+          buckets=("mobs" "sessions-assets" "static" "sourcemaps" "sessions-mobile-assets" "quickwit" "vault-data" "records" "spots")
+          
+          mc alias set minio $MINIO_HOST $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
+          
+          function init() {
+              echo "Initializing minio"
+          
+              cat <<EOF >/tmp/lifecycle.json
+          {
+            "Rules": [
+              {
+                "Expiration": {
+                  "Days": 180
+                },
+                "ID": "Delete old mob files",
+                "Status": "Enabled"
+              },
+              {
+                "Expiration": {
+                  "Days": 30
+                },
+                "ID": "Delete flagged mob files after 30 days",
+                "Filter": {
+                  "Tag": {
+                    "Key": "to_delete_in_days",
+                    "Value": "30"
+                  }
+                },
+                "Status": "Enabled"
+              }
+            ]
+          }
+          EOF
+          
+              for bucket in ${buckets[*]}; do
+                  mc mb minio/${bucket} || true
+              done
+              # eg: How to setup the lifecycle policy
+              # mc ilm import minio/mobs </tmp/lifecycle.json || true
+          
+              #####################################################
+              # Creating public bucket; Do not change this block!
+              # !! PUBLIC BUCKETS !!
+              #####################################################
+              mc policy set download minio/sessions-assets || true
+              mc anonymous set download minio/sessions-assets || true
+          
+          }
+          
+          # /bin/bash kafka.sh migrate $migration_versions
+          case "$1" in
+          migrate)
+              init
+              ;;
+          init)
+              init
+              ;;
+          *)
+              echo "Unknown operation for minio migration; exiting."
+              exit 1
+              ;;
+          esac
+    environment:
+      MINIO_HOST: http://minio.db.svc.cluster.local:9000
+      MINIO_ACCESS_KEY: ${SERVICE_USER_MINIO}
+      MINIO_SECRET_KEY: ${SERVICE_PASSWORD_MINIO}
+    user: root
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+          apt update && apt install netcat -y
+          # Wait for Minio to be ready
+          until nc -z -v -w30 minio 9000; do
+              echo "Waiting for Minio server to be ready..."
+              sleep 1
+          done
+          bash /tmp/minio.sh init || exit 100
+
+  db-migration:
+    image: ghcr.io/openreplay/postgres:${POSTGRES_VERSION:-17}
+    depends_on:
+      - postgresql
+      - minio-migration
+    networks:
+      - openreplay-net
+    volumes:
+      - type: bind
+        source: ./postgres-init_schema.sql
+        target: /tmp/init_schema.sql
+        content: |
+          \set or_version 'v1.27.0'
+          SET client_min_messages TO NOTICE;
+          \set ON_ERROR_STOP true
+          SELECT EXISTS (SELECT 1
+                         FROM information_schema.tables
+                         WHERE table_schema = 'public'
+                           AND table_name = 'tenants') AS db_exists;
+          \gset
+          \if :db_exists
+          \echo >DB already exists, stopping script
+          \echo >If you are trying to upgrade openreplay, please follow the instructions here: https://docs.openreplay.com/en/deployment/upgrade/
+          \q
+          \endif
+          
+          BEGIN;
+          -- Schemas and functions definitions:
+          CREATE SCHEMA IF NOT EXISTS events_common;
+          CREATE SCHEMA IF NOT EXISTS events;
+          CREATE SCHEMA IF NOT EXISTS events_ios;
+          CREATE EXTENSION IF NOT EXISTS pg_trgm;
+          CREATE EXTENSION IF NOT EXISTS pgcrypto;
+          
+          SELECT format($fn_def$
+          CREATE OR REPLACE FUNCTION openreplay_version()
+              RETURNS text AS
+          $$
+          SELECT '%1$s'
+          $$ LANGUAGE sql IMMUTABLE;
+          $fn_def$, :'or_version')
+          \gexec
+          
+          CREATE OR REPLACE FUNCTION generate_api_key(length integer) RETURNS text AS
+          $$
+          declare
+              chars  text[]  := '{0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z}';
+              result text    := '';
+              i      integer := 0;
+          begin
+              if length < 0 then
+                  raise exception 'Given length cannot be less than 0';
+              end if;
+              for i in 1..length
+                  loop
+                      result := result || chars[1 + random() * (array_length(chars, 1) - 1)];
+                  end loop;
+              return result;
+          end;
+          $$ LANGUAGE plpgsql;
+          
+          
+          CREATE OR REPLACE FUNCTION notify_integration() RETURNS trigger AS
+          $$
+          BEGIN
+              IF NEW IS NULL THEN
+                  PERFORM pg_notify('integration',
+                                    jsonb_build_object('project_id', OLD.project_id, 'provider', OLD.provider, 'options',
+                                                       null)::text);
+              ELSIF (OLD IS NULL) OR (OLD.options <> NEW.options) THEN
+                  PERFORM pg_notify('integration', row_to_json(NEW)::text);
+              END IF;
+              RETURN NULL;
+          END;
+          $$ LANGUAGE plpgsql;
+          
+          
+          CREATE OR REPLACE FUNCTION notify_alert() RETURNS trigger AS
+          $$
+          DECLARE
+              clone jsonb;
+          BEGIN
+              clone = to_jsonb(NEW);
+              clone = jsonb_set(clone, '{created_at}', to_jsonb(CAST(EXTRACT(epoch FROM NEW.created_at) * 1000 AS BIGINT)));
+              IF NEW.deleted_at NOTNULL THEN
+                  clone = jsonb_set(clone, '{deleted_at}', to_jsonb(CAST(EXTRACT(epoch FROM NEW.deleted_at) * 1000 AS BIGINT)));
+              END IF;
+              PERFORM pg_notify('alert', clone::text);
+              RETURN NEW;
+          END ;
+          $$ LANGUAGE plpgsql;
+          
+          
+          CREATE OR REPLACE FUNCTION notify_project() RETURNS trigger AS
+          $$
+          BEGIN
+              PERFORM pg_notify('project', row_to_json(NEW)::text);
+              RETURN NEW;
+          END;
+          $$ LANGUAGE plpgsql;
+          
+          -- All tables and types:
+          
+          CREATE TABLE public.tenants
+          (
+              tenant_id      integer                     NOT NULL DEFAULT 1,
+              tenant_key     text                        NOT NULL DEFAULT generate_api_key(20),
+              name           text                        NOT NULL,
+              api_key        text                        NOT NULL DEFAULT generate_api_key(20),
+              created_at     timestamp without time zone NOT NULL DEFAULT (now() at time zone 'utc'),
+              license        text                        NULL,
+              opt_out        bool                        NOT NULL DEFAULT FALSE,
+              t_projects     integer                     NOT NULL DEFAULT 1,
+              t_sessions     bigint                      NOT NULL DEFAULT 0,
+              t_users        integer                     NOT NULL DEFAULT 1,
+              t_integrations integer                     NOT NULL DEFAULT 0,
+              last_telemetry bigint                      NOT NULL DEFAULT CAST(EXTRACT(epoch FROM date_trunc('day', now())) * 1000 AS BIGINT),
+              scope_state    smallint                    NOT NULL DEFAULT 2,
+              CONSTRAINT onerow_uni CHECK (tenant_id = 1)
+          );
+          
+          CREATE TYPE user_role AS ENUM ('owner', 'admin', 'member');
+          
+          CREATE TABLE public.users
+          (
+              user_id              integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              email                text                        NOT NULL UNIQUE,
+              role                 user_role                   NOT NULL DEFAULT 'member',
+              name                 text                        NOT NULL,
+              created_at           timestamp without time zone NOT NULL DEFAULT (now() at time zone 'utc'),
+              deleted_at           timestamp without time zone NULL     DEFAULT NULL,
+              api_key              text UNIQUE                          DEFAULT generate_api_key(20) NOT NULL,
+              jwt_iat              timestamp without time zone NULL     DEFAULT NULL,
+              jwt_refresh_jti      integer                     NULL     DEFAULT NULL,
+              jwt_refresh_iat      timestamp without time zone NULL     DEFAULT NULL,
+              spot_jwt_iat         timestamp without time zone NULL     DEFAULT NULL,
+              spot_jwt_refresh_jti integer                     NULL     DEFAULT NULL,
+              spot_jwt_refresh_iat timestamp without time zone NULL     DEFAULT NULL,
+              data                 jsonb                       NOT NULL DEFAULT '{}'::jsonb,
+              weekly_report        boolean                     NOT NULL DEFAULT TRUE,
+              settings             jsonb                                DEFAULT '{
+                "modules": [
+                  "usability-tests",
+                  "feature-flags"
+                ]
+              }'::jsonb
+          );
+          
+          CREATE TABLE public.basic_authentication
+          (
+              user_id              integer                     NOT NULL REFERENCES public.users (user_id) ON DELETE CASCADE,
+              password             text                             DEFAULT NULL,
+              invitation_token     text                        NULL DEFAULT NULL,
+              invited_at           timestamp without time zone NULL DEFAULT NULL,
+              change_pwd_token     text                        NULL DEFAULT NULL,
+              change_pwd_expire_at timestamp without time zone NULL DEFAULT NULL,
+              changed_at           timestamp,
+              UNIQUE (user_id)
+          );
+          
+          CREATE TYPE oauth_provider AS ENUM ('jira', 'github');
+          CREATE TABLE public.oauth_authentication
+          (
+              user_id          integer        NOT NULL REFERENCES public.users (user_id) ON DELETE CASCADE,
+              provider         oauth_provider NOT NULL,
+              provider_user_id text           NOT NULL,
+              token            text           NOT NULL
+          );
+          CREATE UNIQUE INDEX oauth_authentication_unique_user_id_provider_idx ON public.oauth_authentication (user_id, provider);
+          
+          CREATE TYPE platform AS ENUM ('web','ios','android');
+          
+          CREATE TABLE public.projects
+          (
+              project_id                integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              project_key               varchar(20)                 NOT NULL UNIQUE DEFAULT generate_api_key(20),
+              name                      text                        NOT NULL,
+              platform                  platform                    NOT NULL        DEFAULT 'web',
+              active                    boolean                     NOT NULL,
+              sample_rate               smallint                    NOT NULL        DEFAULT 100 CHECK (sample_rate >= 0 AND sample_rate <= 100),
+              created_at                timestamp without time zone NOT NULL        DEFAULT (now() at time zone 'utc'),
+              deleted_at                timestamp without time zone NULL            DEFAULT NULL,
+              max_session_duration      integer                     NOT NULL        DEFAULT 7200000,
+              metadata_1                text                                        DEFAULT NULL,
+              metadata_2                text                                        DEFAULT NULL,
+              metadata_3                text                                        DEFAULT NULL,
+              metadata_4                text                                        DEFAULT NULL,
+              metadata_5                text                                        DEFAULT NULL,
+              metadata_6                text                                        DEFAULT NULL,
+              metadata_7                text                                        DEFAULT NULL,
+              metadata_8                text                                        DEFAULT NULL,
+              metadata_9                text                                        DEFAULT NULL,
+              metadata_10               text                                        DEFAULT NULL,
+              save_request_payloads     boolean                     NOT NULL        DEFAULT FALSE,
+              gdpr                      jsonb                       NOT NULL        DEFAULT '{
+                "maskEmails": true,
+                "sampleRate": 33,
+                "maskNumbers": false,
+                "defaultInputMode": "obscured"
+              }'::jsonb,
+              first_recorded_session_at timestamp without time zone NULL            DEFAULT NULL,
+              sessions_last_check_at    timestamp without time zone NULL            DEFAULT NULL,
+              beacon_size               integer                     NOT NULL        DEFAULT 0,
+              conditional_capture       boolean                     NOT NULL        DEFAULT FALSE
+          );
+          
+          CREATE INDEX projects_project_key_idx ON public.projects (project_key);
+          CREATE INDEX projects_project_id_deleted_at_n_idx ON public.projects (project_id) WHERE deleted_at IS NULL;
+          
+          CREATE TRIGGER on_insert_or_update
+              AFTER INSERT OR UPDATE
+              ON public.projects
+              FOR EACH ROW
+          EXECUTE PROCEDURE notify_project();
+          
+          
+          CREATE TYPE webhook_type AS ENUM ('webhook', 'slack', 'email', 'msteams');
+          
+          CREATE TABLE public.webhooks
+          (
+              webhook_id  integer generated by DEFAULT as identity
+                  constraint webhooks_pkey
+                      primary key,
+              endpoint    text                                           NOT NULL,
+              created_at  timestamp DEFAULT timezone('utc'::text, now()) NOT NULL,
+              deleted_at  timestamp,
+              auth_header text,
+              type        webhook_type                                   NOT NULL DEFAULT 'webhook',
+              index       integer   DEFAULT 0                            NOT NULL,
+              name        varchar(100)
+          );
+          
+          
+          CREATE TABLE public.notifications
+          (
+              notification_id integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              user_id         integer REFERENCES public.users (user_id) ON DELETE CASCADE,
+              title           text        NOT NULL,
+              description     text        NOT NULL,
+              button_text     varchar(80) NULL,
+              button_url      text        NULL,
+              image_url       text        NULL,
+              created_at      timestamp   NOT NULL DEFAULT timezone('utc'::text, now()),
+              options         jsonb       NOT NULL DEFAULT '{}'::jsonb
+          );
+          
+          CREATE INDEX notifications_user_id_index ON public.notifications (user_id);
+          CREATE INDEX notifications_created_at_index ON public.notifications (created_at DESC);
+          CREATE INDEX notifications_created_at_epoch_idx ON public.notifications (CAST(EXTRACT(EPOCH FROM created_at) * 1000 AS BIGINT) DESC);
+          
+          CREATE TABLE public.user_viewed_notifications
+          (
+              user_id         integer NOT NULL REFERENCES public.users (user_id) on delete cascade,
+              notification_id integer NOT NULL REFERENCES public.notifications (notification_id) on delete cascade,
+              constraint user_viewed_notifications_pkey primary key (user_id, notification_id)
+          );
+          
+          
+          CREATE TYPE announcement_type AS ENUM ('notification', 'alert');
+          
+          CREATE TABLE public.announcements
+          (
+              announcement_id serial                                                      NOT NULL
+                  constraint announcements_pk
+                      primary key,
+              title           text                                                        NOT NULL,
+              description     text                                                        NOT NULL,
+              button_text     varchar(30),
+              button_url      text,
+              image_url       text,
+              created_at      timestamp         DEFAULT timezone('utc'::text, now())      NOT NULL,
+              type            announcement_type DEFAULT 'notification'::announcement_type NOT NULL
+          );
+          
+          
+          CREATE TYPE integration_provider AS ENUM ('bugsnag', 'cloudwatch', 'datadog', 'newrelic', 'rollbar', 'sentry', 'stackdriver', 'sumologic', 'elasticsearch', 'dynatrace');
+          CREATE TABLE public.integrations
+          (
+              project_id   integer              NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              provider     integration_provider NOT NULL,
+              options      jsonb                NOT NULL,
+              request_data jsonb                NOT NULL DEFAULT '{}'::jsonb,
+              PRIMARY KEY (project_id, provider)
+          );
+          
+          CREATE TRIGGER on_insert_or_update_or_delete
+              AFTER INSERT OR UPDATE OR DELETE
+              ON public.integrations
+              FOR EACH ROW
+          EXECUTE PROCEDURE notify_integration();
+          
+          
+          CREATE TABLE public.jira_cloud
+          (
+              user_id  integer NOT NULL
+                  constraint jira_cloud_pk
+                      primary key
+                  constraint jira_cloud_users_fkey
+                      REFERENCES public.users
+                      on delete cascade,
+              username text    NOT NULL,
+              token    text    NOT NULL,
+              url      text
+          );
+          
+          
+          CREATE TYPE issue_type AS ENUM (
+              'click_rage',
+              'tap_rage',
+              'dead_click',
+              'excessive_scrolling',
+              'bad_request',
+              'missing_resource',
+              'memory',
+              'cpu',
+              'slow_resource',
+              'slow_page_load',
+              'crash',
+              'ml_cpu',
+              'ml_memory',
+              'ml_dead_click',
+              'ml_click_rage',
+              'ml_mouse_thrashing',
+              'ml_excessive_scrolling',
+              'ml_slow_resources',
+              'custom',
+              'js_exception',
+              'mouse_thrashing',
+              'app_crash',
+              'incident'
+              );
+          
+          CREATE TABLE public.issues
+          (
+              issue_id       text       NOT NULL PRIMARY KEY,
+              project_id     integer    NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              type           issue_type NOT NULL,
+              context_string text       NOT NULL,
+              context        jsonb DEFAULT NULL
+          );
+          CREATE INDEX issues_issue_id_type_idx ON public.issues (issue_id, type);
+          CREATE INDEX issues_project_id_issue_id_idx ON public.issues (project_id, issue_id);
+          CREATE INDEX issues_project_id_idx ON public.issues (project_id);
+          
+          
+          CREATE TYPE error_source AS ENUM ('js_exception', 'bugsnag', 'cloudwatch', 'datadog', 'newrelic', 'rollbar', 'sentry', 'stackdriver', 'sumologic', 'elasticsearch');
+          CREATE TYPE error_status AS ENUM ('unresolved', 'resolved', 'ignored');
+          CREATE TABLE public.errors
+          (
+              error_id             text         NOT NULL PRIMARY KEY,
+              project_id           integer      NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              source               error_source NOT NULL,
+              name                 text                  DEFAULT NULL,
+              message              text         NOT NULL,
+              payload              jsonb        NOT NULL,
+              status               error_status NOT NULL DEFAULT 'unresolved',
+              parent_error_id      text                  DEFAULT NULL REFERENCES public.errors (error_id) ON DELETE SET NULL,
+              stacktrace           jsonb, --to save the stacktrace and not query S3 another time
+              stacktrace_parsed_at timestamp
+          );
+          CREATE INDEX errors_project_id_source_idx ON public.errors (project_id, source);
+          CREATE INDEX errors_message_gin_idx ON public.errors USING GIN (message gin_trgm_ops);
+          CREATE INDEX errors_name_gin_idx ON public.errors USING GIN (name gin_trgm_ops);
+          CREATE INDEX errors_project_id_idx ON public.errors (project_id);
+          CREATE INDEX errors_project_id_status_idx ON public.errors (project_id, status);
+          CREATE INDEX errors_project_id_error_id_js_exception_idx ON public.errors (project_id, error_id) WHERE source = 'js_exception';
+          CREATE INDEX errors_project_id_error_id_idx ON public.errors (project_id, error_id);
+          CREATE INDEX errors_project_id_error_id_integration_idx ON public.errors (project_id, error_id) WHERE source != 'js_exception';
+          CREATE INDEX errors_error_id_idx ON public.errors (error_id);
+          CREATE INDEX errors_parent_error_id_idx ON public.errors (parent_error_id);
+          
+          CREATE TYPE device_type AS ENUM ('desktop', 'tablet', 'mobile', 'other');
+          CREATE TYPE country AS ENUM ('UN', 'RW', 'SO', 'YE', 'IQ', 'SA', 'IR', 'CY', 'TZ', 'SY', 'AM', 'KE', 'CD', 'DJ', 'UG', 'CF', 'SC', 'JO', 'LB', 'KW', 'OM', 'QA', 'BH', 'AE', 'IL', 'TR', 'ET', 'ER', 'EG', 'SD', 'GR', 'BI', 'EE', 'LV', 'AZ', 'LT', 'SJ', 'GE', 'MD', 'BY', 'FI', 'AX', 'UA', 'MK', 'HU', 'BG', 'AL', 'PL', 'RO', 'XK', 'ZW', 'ZM', 'KM', 'MW', 'LS', 'BW', 'MU', 'SZ', 'RE', 'ZA', 'YT', 'MZ', 'MG', 'AF', 'PK', 'BD', 'TM', 'TJ', 'LK', 'BT', 'IN', 'MV', 'IO', 'NP', 'MM', 'UZ', 'KZ', 'KG', 'TF', 'HM', 'CC', 'PW', 'VN', 'TH', 'ID', 'LA', 'TW', 'PH', 'MY', 'CN', 'HK', 'BN', 'MO', 'KH', 'KR', 'JP', 'KP', 'SG', 'CK', 'TL', 'RU', 'MN', 'AU', 'CX', 'MH', 'FM', 'PG', 'SB', 'TV', 'NR', 'VU', 'NC', 'NF', 'NZ', 'FJ', 'LY', 'CM', 'SN', 'CG', 'PT', 'LR', 'CI', 'GH', 'GQ', 'NG', 'BF', 'TG', 'GW', 'MR', 'BJ', 'GA', 'SL', 'ST', 'GI', 'GM', 'GN', 'TD', 'NE', 'ML', 'EH', 'TN', 'ES', 'MA', 'MT', 'DZ', 'FO', 'DK', 'IS', 'GB', 'CH', 'SE', 'NL', 'AT', 'BE', 'DE', 'LU', 'IE', 'MC', 'FR', 'AD', 'LI', 'JE', 'IM', 'GG', 'SK', 'CZ', 'NO', 'VA', 'SM', 'IT', 'SI', 'ME', 'HR', 'BA', 'AO', 'NA', 'SH', 'BV', 'BB', 'CV', 'GY', 'GF', 'SR', 'PM', 'GL', 'PY', 'UY', 'BR', 'FK', 'GS', 'JM', 'DO', 'CU', 'MQ', 'BS', 'BM', 'AI', 'TT', 'KN', 'DM', 'AG', 'LC', 'TC', 'AW', 'VG', 'VC', 'MS', 'MF', 'BL', 'GP', 'GD', 'KY', 'BZ', 'SV', 'GT', 'HN', 'NI', 'CR', 'VE', 'EC', 'CO', 'PA', 'HT', 'AR', 'CL', 'BO', 'PE', 'MX', 'PF', 'PN', 'KI', 'TK', 'TO', 'WF', 'WS', 'NU', 'MP', 'GU', 'PR', 'VI', 'UM', 'AS', 'CA', 'US', 'PS', 'RS', 'AQ', 'SX', 'CW', 'BQ', 'SS','AC','AN','BU','CP','CS','CT','DD','DG','DY','EA','FQ','FX','HV','IC','JT','MI','NH','NQ','NT','PC','PU','PZ','RH','SU','TA','TP','VD','WK','YD','YU','ZR');
+          
+          CREATE TABLE public.sessions
+          (
+              session_id              bigint PRIMARY KEY,
+              project_id              integer      NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              tracker_version         text         NOT NULL,
+              start_ts                bigint       NOT NULL,
+              timezone                text         NULL,
+              duration                integer      NULL,
+              rev_id                  text                  DEFAULT NULL,
+              platform                platform     NOT NULL DEFAULT 'web',
+              is_snippet              boolean      NOT NULL DEFAULT FALSE,
+              user_id                 text                  DEFAULT NULL,
+              user_anonymous_id       text                  DEFAULT NULL,
+              user_uuid               uuid         NOT NULL,
+              user_os                 text         NOT NULL,
+              user_os_version         text                  DEFAULT NULL,
+              user_browser            text                  DEFAULT NULL,
+              user_browser_version    text                  DEFAULT NULL,
+              user_device             text         NOT NULL,
+              user_device_type        device_type  NOT NULL,
+              user_device_memory_size integer               DEFAULT NULL,
+              user_device_heap_size   bigint                DEFAULT NULL,
+              user_country            country      NOT NULL,
+              user_city               text         NULL,
+              user_state              text         NULL,
+              pages_count             integer      NOT NULL DEFAULT 0,
+              events_count            integer      NOT NULL DEFAULT 0,
+              errors_count            integer      NOT NULL DEFAULT 0,
+              watchdogs_score         bigint       NOT NULL DEFAULT 0,
+              issue_types             issue_type[] NOT NULL DEFAULT '{}'::issue_type[],
+              utm_source              text         NULL     DEFAULT NULL,
+              utm_medium              text         NULL     DEFAULT NULL,
+              utm_campaign            text         NULL     DEFAULT NULL,
+              referrer                text         NULL     DEFAULT NULL,
+              base_referrer           text         NULL     DEFAULT NULL,
+              has_ut_test             boolean               DEFAULT FALSE,
+              screen_width            integer               DEFAULT NULL,
+              screen_height           integer               DEFAULT NULL,
+              metadata_1              text                  DEFAULT NULL,
+              metadata_2              text                  DEFAULT NULL,
+              metadata_3              text                  DEFAULT NULL,
+              metadata_4              text                  DEFAULT NULL,
+              metadata_5              text                  DEFAULT NULL,
+              metadata_6              text                  DEFAULT NULL,
+              metadata_7              text                  DEFAULT NULL,
+              metadata_8              text                  DEFAULT NULL,
+              metadata_9              text                  DEFAULT NULL,
+              metadata_10             text                  DEFAULT NULL
+          );
+          CREATE INDEX sessions_project_id_start_ts_idx ON public.sessions (project_id, start_ts);
+          CREATE INDEX sessions_project_id_user_id_idx ON public.sessions (project_id, user_id);
+          CREATE INDEX sessions_project_id_user_anonymous_id_idx ON public.sessions (project_id, user_anonymous_id);
+          CREATE INDEX sessions_project_id_user_device_idx ON public.sessions (project_id, user_device);
+          CREATE INDEX sessions_project_id_user_country_idx ON public.sessions (project_id, user_country);
+          CREATE INDEX sessions_project_id_user_city_idx ON public.sessions (project_id, user_city);
+          CREATE INDEX sessions_project_id_user_state_idx ON public.sessions (project_id, user_state);
+          CREATE INDEX sessions_project_id_user_browser_idx ON public.sessions (project_id, user_browser);
+          CREATE INDEX sessions_project_id_metadata_1_idx ON public.sessions (project_id, metadata_1);
+          CREATE INDEX sessions_project_id_metadata_2_idx ON public.sessions (project_id, metadata_2);
+          CREATE INDEX sessions_project_id_metadata_3_idx ON public.sessions (project_id, metadata_3);
+          CREATE INDEX sessions_project_id_metadata_4_idx ON public.sessions (project_id, metadata_4);
+          CREATE INDEX sessions_project_id_metadata_5_idx ON public.sessions (project_id, metadata_5);
+          CREATE INDEX sessions_project_id_metadata_6_idx ON public.sessions (project_id, metadata_6);
+          CREATE INDEX sessions_project_id_metadata_7_idx ON public.sessions (project_id, metadata_7);
+          CREATE INDEX sessions_project_id_metadata_8_idx ON public.sessions (project_id, metadata_8);
+          CREATE INDEX sessions_project_id_metadata_9_idx ON public.sessions (project_id, metadata_9);
+          CREATE INDEX sessions_project_id_metadata_10_idx ON public.sessions (project_id, metadata_10);
+          CREATE INDEX sessions_project_id_watchdogs_score_idx ON public.sessions (project_id, watchdogs_score DESC);
+          CREATE INDEX sessions_platform_idx ON public.sessions (platform);
+          
+          CREATE INDEX sessions_metadata1_gin_idx ON public.sessions USING GIN (metadata_1 gin_trgm_ops);
+          CREATE INDEX sessions_metadata2_gin_idx ON public.sessions USING GIN (metadata_2 gin_trgm_ops);
+          CREATE INDEX sessions_metadata3_gin_idx ON public.sessions USING GIN (metadata_3 gin_trgm_ops);
+          CREATE INDEX sessions_metadata4_gin_idx ON public.sessions USING GIN (metadata_4 gin_trgm_ops);
+          CREATE INDEX sessions_metadata5_gin_idx ON public.sessions USING GIN (metadata_5 gin_trgm_ops);
+          CREATE INDEX sessions_metadata6_gin_idx ON public.sessions USING GIN (metadata_6 gin_trgm_ops);
+          CREATE INDEX sessions_metadata7_gin_idx ON public.sessions USING GIN (metadata_7 gin_trgm_ops);
+          CREATE INDEX sessions_metadata8_gin_idx ON public.sessions USING GIN (metadata_8 gin_trgm_ops);
+          CREATE INDEX sessions_metadata9_gin_idx ON public.sessions USING GIN (metadata_9 gin_trgm_ops);
+          CREATE INDEX sessions_metadata10_gin_idx ON public.sessions USING GIN (metadata_10 gin_trgm_ops);
+          CREATE INDEX sessions_user_device_gin_idx ON public.sessions USING GIN (user_device gin_trgm_ops);
+          CREATE INDEX sessions_user_id_gin_idx ON public.sessions USING GIN (user_id gin_trgm_ops);
+          CREATE INDEX sessions_user_anonymous_id_gin_idx ON public.sessions USING GIN (user_anonymous_id gin_trgm_ops);
+          CREATE INDEX sessions_start_ts_idx ON public.sessions (start_ts) WHERE duration > 0;
+          CREATE INDEX sessions_project_id_idx ON public.sessions (project_id) WHERE duration > 0;
+          CREATE INDEX sessions_session_id_project_id_start_ts_idx ON public.sessions (session_id, project_id, start_ts) WHERE duration > 0;
+          CREATE INDEX sessions_session_id_project_id_start_ts_durationNN_idx ON public.sessions (session_id, project_id, start_ts) WHERE duration IS NOT NULL;
+          CREATE INDEX sessions_user_id_useridNN_idx ON public.sessions (user_id) WHERE user_id IS NOT NULL;
+          CREATE INDEX sessions_uid_projectid_startts_sessionid_uidNN_durGTZ_idx ON public.sessions (user_id, project_id, start_ts, session_id) WHERE user_id IS NOT NULL AND duration > 0;
+          CREATE INDEX sessions_utm_source_gin_idx ON public.sessions USING GIN (utm_source gin_trgm_ops);
+          CREATE INDEX sessions_utm_medium_gin_idx ON public.sessions USING GIN (utm_medium gin_trgm_ops);
+          CREATE INDEX sessions_utm_campaign_gin_idx ON public.sessions USING GIN (utm_campaign gin_trgm_ops);
+          CREATE INDEX sessions_base_referrer_gin_idx ON public.sessions USING GIN (base_referrer gin_trgm_ops);
+          CREATE INDEX sessions_session_id_has_ut_test_idx ON public.sessions (session_id, has_ut_test);
+          
+          
+          ALTER TABLE public.sessions
+              ADD CONSTRAINT web_browser_constraint CHECK (
+                  (sessions.platform = 'web' AND sessions.user_browser NOTNULL) OR
+                  (sessions.platform != 'web' AND sessions.user_browser ISNULL));
+          
+          ALTER TABLE public.sessions
+              ADD CONSTRAINT web_user_browser_version_constraint CHECK ( sessions.platform = 'web' OR sessions.user_browser_version ISNULL);
+          
+          
+          CREATE TABLE public.user_viewed_sessions
+          (
+              user_id    integer NOT NULL REFERENCES public.users (user_id) ON DELETE CASCADE,
+              session_id bigint  NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              PRIMARY KEY (user_id, session_id)
+          );
+          
+          CREATE TABLE public.user_favorite_sessions
+          (
+              user_id    integer NOT NULL REFERENCES public.users (user_id) ON DELETE CASCADE,
+              session_id bigint  NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              PRIMARY KEY (user_id, session_id)
+          );
+          CREATE INDEX user_favorite_sessions_user_id_session_id_idx ON public.user_favorite_sessions (user_id, session_id);
+          
+          
+          CREATE TABLE public.assigned_sessions
+          (
+              session_id    bigint                                         NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              issue_id      text                                           NOT NULL,
+              provider      oauth_provider                                 NOT NULL,
+              created_by    integer                                        NOT NULL,
+              created_at    timestamp DEFAULT timezone('utc'::text, now()) NOT NULL,
+              provider_data jsonb     DEFAULT '{}'::jsonb                  NOT NULL
+          );
+          CREATE INDEX assigned_sessions_session_id_idx ON public.assigned_sessions (session_id);
+          
+          
+          CREATE TYPE events_common.custom_level AS ENUM ('info','error');
+          
+          CREATE TABLE events_common.customs
+          (
+              session_id bigint                     NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              timestamp  bigint                     NOT NULL,
+              seq_index  integer                    NOT NULL,
+              name       text                       NOT NULL,
+              payload    jsonb                      NOT NULL,
+              level      events_common.custom_level NOT NULL DEFAULT 'info',
+              PRIMARY KEY (session_id, timestamp, seq_index)
+          );
+          CREATE INDEX customs_name_idx ON events_common.customs (name);
+          CREATE INDEX customs_name_gin_idx ON events_common.customs USING GIN (name gin_trgm_ops);
+          CREATE INDEX customs_timestamp_idx ON events_common.customs (timestamp);
+          
+          
+          CREATE TABLE events_common.issues
+          (
+              session_id bigint  NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              timestamp  bigint  NOT NULL,
+              seq_index  integer NOT NULL,
+              issue_id   text    NOT NULL REFERENCES public.issues (issue_id) ON DELETE CASCADE,
+              payload    jsonb DEFAULT NULL,
+              PRIMARY KEY (session_id, timestamp, seq_index)
+          );
+          CREATE INDEX issues_issue_id_timestamp_idx ON events_common.issues (issue_id, timestamp);
+          CREATE INDEX issues_timestamp_idx ON events_common.issues (timestamp);
+          
+          CREATE TYPE http_method AS ENUM ('GET','HEAD','POST','PUT','DELETE','CONNECT','OPTIONS','TRACE','PATCH');
+          
+          CREATE TABLE events_common.requests
+          (
+              session_id    bigint      NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              timestamp     bigint      NOT NULL,
+              seq_index     integer     NOT NULL,
+              url           text        NOT NULL,
+              duration      integer     NOT NULL,
+              success       boolean     NOT NULL,
+              request_body  text        NULL,
+              response_body text        NULL,
+              status_code   smallint    NULL,
+              method        http_method NULL,
+              host          text        NULL,
+              path          text        NULL,
+              query         text        NULL,
+              transfer_size bigint      NULL,
+              PRIMARY KEY (session_id, timestamp, seq_index)
+          );
+          
+          CREATE INDEX requests_duration_idx ON events_common.requests (duration);
+          CREATE INDEX requests_timestamp_idx ON events_common.requests (timestamp);
+          CREATE INDEX requests_timestamp_session_id_failed_idx ON events_common.requests (timestamp, session_id) WHERE success = FALSE;
+          CREATE INDEX requests_request_body_nn_gin_idx ON events_common.requests USING GIN (request_body gin_trgm_ops) WHERE request_body IS NOT NULL;
+          CREATE INDEX requests_response_body_nn_gin_idx ON events_common.requests USING GIN (response_body gin_trgm_ops) WHERE response_body IS NOT NULL;
+          CREATE INDEX requests_status_code_nn_idx ON events_common.requests (status_code) WHERE status_code IS NOT NULL;
+          CREATE INDEX requests_session_id_status_code_nn_idx ON events_common.requests (session_id, status_code) WHERE status_code IS NOT NULL;
+          CREATE INDEX requests_host_nn_gin_idx ON events_common.requests USING GIN (host gin_trgm_ops) WHERE host IS NOT NULL;
+          CREATE INDEX requests_path_nn_idx ON events_common.requests (path) WHERE path IS NOT NULL;
+          CREATE INDEX requests_path_nn_gin_idx ON events_common.requests USING GIN (path gin_trgm_ops) WHERE path IS NOT NULL;
+          CREATE INDEX requests_query_nn_gin_idx ON events_common.requests USING GIN (query gin_trgm_ops) WHERE query IS NOT NULL;
+          
+          
+          CREATE TABLE events.pages
+          (
+              session_id                  bigint NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              message_id                  bigint NOT NULL,
+              timestamp                   bigint NOT NULL,
+              host                        text   NOT NULL,
+              path                        text   NOT NULL,
+              query                       text   NULL,
+              referrer                    text    DEFAULT NULL,
+              base_referrer               text    DEFAULT NULL,
+              dom_building_time           integer DEFAULT NULL,
+              dom_content_loaded_time     integer DEFAULT NULL,
+              load_time                   integer DEFAULT NULL,
+              first_paint_time            integer DEFAULT NULL,
+              first_contentful_paint_time integer DEFAULT NULL,
+              speed_index                 integer DEFAULT NULL,
+              visually_complete           integer DEFAULT NULL,
+              time_to_interactive         integer DEFAULT NULL,
+              response_time               bigint  DEFAULT NULL,
+              response_end                bigint  DEFAULT NULL,
+              ttfb                        integer DEFAULT NULL,
+              web_vitals                  text    DEFAULT NULL,
+              PRIMARY KEY (session_id, message_id)
+          );
+          CREATE INDEX pages_session_id_idx ON events.pages (session_id);
+          CREATE INDEX pages_base_referrer_gin_idx ON events.pages USING GIN (base_referrer gin_trgm_ops);
+          CREATE INDEX pages_timestamp_idx ON events.pages (timestamp);
+          CREATE INDEX pages_session_id_timestamp_idx ON events.pages (session_id, timestamp);
+          CREATE INDEX pages_base_referrer_idx ON events.pages (base_referrer);
+          CREATE INDEX pages_response_time_idx ON events.pages (response_time);
+          CREATE INDEX pages_response_end_idx ON events.pages (response_end);
+          CREATE INDEX pages_path_gin_idx ON events.pages USING GIN (path gin_trgm_ops);
+          CREATE INDEX pages_path_idx ON events.pages (path);
+          CREATE INDEX pages_visually_complete_idx ON events.pages (visually_complete) WHERE visually_complete > 0;
+          CREATE INDEX pages_dom_building_time_idx ON events.pages (dom_building_time) WHERE dom_building_time > 0;
+          CREATE INDEX pages_load_time_idx ON events.pages (load_time) WHERE load_time > 0;
+          CREATE INDEX pages_first_contentful_paint_time_idx ON events.pages (first_contentful_paint_time) WHERE first_contentful_paint_time > 0;
+          CREATE INDEX pages_dom_content_loaded_time_idx ON events.pages (dom_content_loaded_time) WHERE dom_content_loaded_time > 0;
+          CREATE INDEX pages_first_paint_time_idx ON events.pages (first_paint_time) WHERE first_paint_time > 0;
+          CREATE INDEX pages_ttfb_idx ON events.pages (ttfb) WHERE ttfb > 0;
+          CREATE INDEX pages_time_to_interactive_idx ON events.pages (time_to_interactive) WHERE time_to_interactive > 0;
+          CREATE INDEX pages_session_id_timestamp_loadgt0NN_idx ON events.pages (session_id, timestamp) WHERE load_time > 0 AND load_time IS NOT NULL;
+          CREATE INDEX pages_session_id_timestamp_visualgt0nn_idx ON events.pages (session_id, timestamp) WHERE visually_complete > 0 AND visually_complete IS NOT NULL;
+          CREATE INDEX pages_timestamp_metgt0_idx ON events.pages (timestamp) WHERE response_time > 0 OR
+                                                                                    first_paint_time > 0 OR
+                                                                                    dom_content_loaded_time > 0 OR
+                                                                                    ttfb > 0 OR
+                                                                                    time_to_interactive > 0;
+          CREATE INDEX pages_session_id_speed_indexgt0nn_idx ON events.pages (session_id, speed_index) WHERE speed_index > 0 AND speed_index IS NOT NULL;
+          CREATE INDEX pages_session_id_timestamp_dom_building_timegt0nn_idx ON events.pages (session_id, timestamp, dom_building_time) WHERE dom_building_time > 0 AND dom_building_time IS NOT NULL;
+          CREATE INDEX pages_path_session_id_timestamp_idx ON events.pages (path, session_id, timestamp);
+          CREATE INDEX pages_path_pathLNGT2_idx ON events.pages (path) WHERE length(path) > 2;
+          CREATE INDEX pages_query_nn_idx ON events.pages (query) WHERE query IS NOT NULL;
+          CREATE INDEX pages_query_nn_gin_idx ON events.pages USING GIN (query gin_trgm_ops) WHERE query IS NOT NULL;
+          
+          
+          CREATE TABLE events.clicks
+          (
+              session_id   bigint             NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              message_id   bigint             NOT NULL,
+              timestamp    bigint             NOT NULL,
+              label        text    DEFAULT NULL,
+              url          text    DEFAULT '' NOT NULL,
+              path         text,
+              selector     text    DEFAULT '' NOT NULL,
+              hesitation   integer DEFAULT NULL,
+              normalized_x decimal DEFAULT NULL,
+              normalized_y decimal DEFAULT NULL,
+              PRIMARY KEY (session_id, message_id)
+          );
+          CREATE INDEX clicks_session_id_idx ON events.clicks (session_id);
+          CREATE INDEX clicks_label_idx ON events.clicks (label);
+          CREATE INDEX clicks_label_gin_idx ON events.clicks USING GIN (label gin_trgm_ops);
+          CREATE INDEX clicks_timestamp_idx ON events.clicks (timestamp);
+          CREATE INDEX clicks_label_session_id_timestamp_idx ON events.clicks (label, session_id, timestamp);
+          CREATE INDEX clicks_url_idx ON events.clicks (url);
+          CREATE INDEX clicks_url_session_id_timestamp_selector_idx ON events.clicks (url, session_id, timestamp, selector);
+          CREATE INDEX clicks_session_id_timestamp_idx ON events.clicks (session_id, timestamp);
+          CREATE INDEX clicks_selector_idx ON events.clicks (selector);
+          CREATE INDEX clicks_path_idx ON events.clicks (path);
+          CREATE INDEX clicks_path_gin_idx ON events.clicks USING GIN (path gin_trgm_ops);
+          
+          CREATE TABLE events.inputs
+          (
+              session_id bigint NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              message_id bigint NOT NULL,
+              timestamp  bigint NOT NULL,
+              label      text    DEFAULT NULL,
+              value      text    DEFAULT NULL,
+              duration   integer DEFAULT NULL,
+              hesitation integer DEFAULT NULL,
+              PRIMARY KEY (session_id, message_id)
+          );
+          CREATE INDEX inputs_session_id_idx ON events.inputs (session_id);
+          CREATE INDEX inputs_label_gin_idx ON events.inputs USING GIN (label gin_trgm_ops);
+          CREATE INDEX inputs_timestamp_idx ON events.inputs (timestamp);
+          CREATE INDEX inputs_label_session_id_timestamp_idx ON events.inputs (label, session_id, timestamp);
+          
+          CREATE TABLE events.errors
+          (
+              session_id bigint NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              message_id bigint NOT NULL,
+              timestamp  bigint NOT NULL,
+              error_id   text   NOT NULL REFERENCES public.errors (error_id) ON DELETE CASCADE,
+              PRIMARY KEY (session_id, message_id)
+          );
+          CREATE INDEX errors_session_id_idx ON events.errors (session_id);
+          CREATE INDEX errors_timestamp_idx ON events.errors (timestamp);
+          CREATE INDEX errors_session_id_timestamp_error_id_idx ON events.errors (session_id, timestamp, error_id);
+          CREATE INDEX errors_error_id_timestamp_idx ON events.errors (error_id, timestamp);
+          CREATE INDEX errors_timestamp_error_id_session_id_idx ON events.errors (timestamp, error_id, session_id);
+          CREATE INDEX errors_error_id_timestamp_session_id_idx ON events.errors (error_id, timestamp, session_id);
+          CREATE INDEX errors_error_id_idx ON events.errors (error_id);
+          
+          
+          CREATE TABLE events.graphql
+          (
+              session_id    bigint      NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              message_id    bigint      NOT NULL,
+              timestamp     bigint      NOT NULL,
+              name          text        NOT NULL,
+              request_body  text        NULL,
+              response_body text        NULL,
+              method        http_method NULL,
+              PRIMARY KEY (session_id, message_id)
+          );
+          CREATE INDEX graphql_name_idx ON events.graphql (name);
+          CREATE INDEX graphql_session_id_idx ON events.graphql (session_id);
+          CREATE INDEX graphql_name_gin_idx ON events.graphql USING GIN (name gin_trgm_ops);
+          CREATE INDEX graphql_timestamp_idx ON events.graphql (timestamp);
+          CREATE INDEX graphql_request_body_nn_idx ON events.graphql (request_body) WHERE request_body IS NOT NULL;
+          CREATE INDEX graphql_request_body_nn_gin_idx ON events.graphql USING GIN (request_body gin_trgm_ops) WHERE request_body IS NOT NULL;
+          CREATE INDEX graphql_response_body_nn_idx ON events.graphql (response_body) WHERE response_body IS NOT NULL;
+          CREATE INDEX graphql_response_body_nn_gin_idx ON events.graphql USING GIN (response_body gin_trgm_ops) WHERE response_body IS NOT NULL;
+          
+          CREATE TABLE events.state_actions
+          (
+              session_id bigint NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              message_id bigint NOT NULL,
+              timestamp  bigint NOT NULL,
+              name       text   NOT NULL,
+              PRIMARY KEY (session_id, message_id)
+          );
+          CREATE INDEX state_actions_name_gin_idx ON events.state_actions USING GIN (name gin_trgm_ops);
+          CREATE INDEX state_actions_timestamp_idx ON events.state_actions (timestamp);
+          
+          CREATE TABLE events.performance
+          (
+              session_id             bigint   NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              timestamp              bigint   NOT NULL,
+              message_id             bigint   NOT NULL,
+              host                   text     NULL DEFAULT NULL,
+              path                   text     NULL DEFAULT NULL,
+              query                  text     NULL DEFAULT NULL,
+              min_fps                smallint NOT NULL,
+              avg_fps                smallint NOT NULL,
+              max_fps                smallint NOT NULL,
+              min_cpu                smallint NOT NULL,
+              avg_cpu                smallint NOT NULL,
+              max_cpu                smallint NOT NULL,
+              min_total_js_heap_size bigint   NOT NULL,
+              avg_total_js_heap_size bigint   NOT NULL,
+              max_total_js_heap_size bigint   NOT NULL,
+              min_used_js_heap_size  bigint   NOT NULL,
+              avg_used_js_heap_size  bigint   NOT NULL,
+              max_used_js_heap_size  bigint   NOT NULL,
+              PRIMARY KEY (session_id, message_id)
+          );
+          CREATE INDEX performance_session_id_idx ON events.performance (session_id);
+          CREATE INDEX performance_timestamp_idx ON events.performance (timestamp);
+          CREATE INDEX performance_session_id_timestamp_idx ON events.performance (session_id, timestamp);
+          CREATE INDEX performance_avg_cpu_gt0_idx ON events.performance (avg_cpu) WHERE avg_cpu > 0;
+          CREATE INDEX performance_avg_used_js_heap_size_gt0_idx ON events.performance (avg_used_js_heap_size) WHERE avg_used_js_heap_size > 0;
+          
+          
+          CREATE TABLE public.autocomplete
+          (
+              value      text    NOT NULL,
+              type       text    NOT NULL,
+              project_id integer NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE
+          );
+          
+          CREATE UNIQUE INDEX autocomplete_unique_project_id_md5value_type_idx ON public.autocomplete (project_id, md5(value), type);
+          CREATE INDEX autocomplete_project_id_idx ON public.autocomplete (project_id);
+          CREATE INDEX autocomplete_type_idx ON public.autocomplete (type);
+          
+          CREATE INDEX autocomplete_value_clickonly_gin_idx ON public.autocomplete USING GIN (value gin_trgm_ops) WHERE type = 'CLICK';
+          CREATE INDEX autocomplete_value_customonly_gin_idx ON public.autocomplete USING GIN (value gin_trgm_ops) WHERE type = 'CUSTOM';
+          CREATE INDEX autocomplete_value_graphqlonly_gin_idx ON public.autocomplete USING GIN (value gin_trgm_ops) WHERE type = 'GRAPHQL';
+          CREATE INDEX autocomplete_value_inputonly_gin_idx ON public.autocomplete USING GIN (value gin_trgm_ops) WHERE type = 'INPUT';
+          CREATE INDEX autocomplete_value_locationonly_gin_idx ON public.autocomplete USING GIN (value gin_trgm_ops) WHERE type = 'LOCATION';
+          CREATE INDEX autocomplete_value_referreronly_gin_idx ON public.autocomplete USING GIN (value gin_trgm_ops) WHERE type = 'REFERRER';
+          CREATE INDEX autocomplete_value_requestonly_gin_idx ON public.autocomplete USING GIN (value gin_trgm_ops) WHERE type = 'REQUEST';
+          CREATE INDEX autocomplete_value_revidonly_gin_idx ON public.autocomplete USING GIN (value gin_trgm_ops) WHERE type = 'REVID';
+          CREATE INDEX autocomplete_value_stateactiononly_gin_idx ON public.autocomplete USING GIN (value gin_trgm_ops) WHERE type = 'STATEACTION';
+          CREATE INDEX autocomplete_value_useranonymousidonly_gin_idx ON public.autocomplete USING GIN (value gin_trgm_ops) WHERE type = 'USERANONYMOUSID';
+          CREATE INDEX autocomplete_value_userbrowseronly_gin_idx ON public.autocomplete USING GIN (value gin_trgm_ops) WHERE type = 'USERBROWSER';
+          CREATE INDEX autocomplete_value_usercountryonly_gin_idx ON public.autocomplete USING GIN (value gin_trgm_ops) WHERE type = 'USERCOUNTRY';
+          CREATE INDEX autocomplete_value_userdeviceonly_gin_idx ON public.autocomplete USING GIN (value gin_trgm_ops) WHERE type = 'USERDEVICE';
+          CREATE INDEX autocomplete_value_useridonly_gin_idx ON public.autocomplete USING GIN (value gin_trgm_ops) WHERE type = 'USERID';
+          CREATE INDEX autocomplete_value_userosonly_gin_idx ON public.autocomplete USING GIN (value gin_trgm_ops) WHERE type = 'USEROS';
+          
+          
+          CREATE TYPE job_status AS ENUM ('scheduled','running','cancelled','failed','completed');
+          CREATE TYPE job_action AS ENUM ('delete_user_data');
+          CREATE TABLE public.jobs
+          (
+              job_id       integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              description  text                                           NOT NULL,
+              status       job_status                                     NOT NULL,
+              project_id   integer                                        NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              action       job_action                                     NOT NULL,
+              reference_id text                                           NOT NULL,
+              created_at   timestamp DEFAULT timezone('utc'::text, now()) NOT NULL,
+              updated_at   timestamp DEFAULT timezone('utc'::text, now()) NULL,
+              start_at     timestamp                                      NOT NULL,
+              errors       text                                           NULL
+          );
+          CREATE INDEX jobs_status_idx ON public.jobs (status);
+          CREATE INDEX jobs_start_at_idx ON public.jobs (start_at);
+          CREATE INDEX jobs_project_id_idx ON public.jobs (project_id);
+          
+          CREATE TABLE public.metrics
+          (
+              metric_id      integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              project_id     integer   NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              user_id        integer   NULL REFERENCES public.users (user_id) ON DELETE SET NULL,
+              name           text      NOT NULL,
+              is_public      boolean   NOT NULL DEFAULT TRUE,
+              created_at     timestamp NOT NULL DEFAULT timezone('utc'::text, now()),
+              deleted_at     timestamp,
+              edited_at      timestamp NOT NULL DEFAULT timezone('utc'::text, now()),
+              metric_type    text      NOT NULL DEFAULT 'timeseries',
+              view_type      text      NOT NULL DEFAULT 'lineChart',
+              metric_of      text      NOT NULL DEFAULT 'sessionCount',
+              metric_value   text[]    NOT NULL DEFAULT '{}'::text[],
+              metric_format  text      NOT NULL DEFAULT 'sessionCount',
+              thumbnail      text,
+              is_pinned      boolean   NOT NULL DEFAULT FALSE,
+              default_config jsonb     NOT NULL DEFAULT '{
+                "col": 2,
+                "row": 2,
+                "position": 0
+              }'::jsonb,
+              data           jsonb     NULL,
+              card_info      jsonb     NULL
+          );
+          CREATE INDEX metrics_user_id_is_public_idx ON public.metrics (user_id, is_public);
+          
+          CREATE TABLE public.metric_series
+          (
+              series_id  integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              metric_id  integer REFERENCES public.metrics (metric_id) ON DELETE CASCADE,
+              index      integer                                        NOT NULL,
+              name       text                                           NULL,
+              filter     jsonb                                          NOT NULL,
+              created_at timestamp DEFAULT timezone('utc'::text, now()) NOT NULL,
+              deleted_at timestamp
+          );
+          CREATE INDEX metric_series_metric_id_idx ON public.metric_series (metric_id);
+          
+          CREATE TABLE public.dashboards
+          (
+              dashboard_id integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              project_id   integer   NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              user_id      integer   NULL REFERENCES public.users (user_id) ON DELETE SET NULL,
+              name         text      NOT NULL,
+              description  text      NOT NULL DEFAULT '',
+              is_public    boolean   NOT NULL DEFAULT TRUE,
+              is_pinned    boolean   NOT NULL DEFAULT FALSE,
+              created_at   timestamp NOT NULL DEFAULT timezone('utc'::text, now()),
+              deleted_at   timestamp NULL     DEFAULT NULL
+          );
+          
+          CREATE TABLE public.dashboard_widgets
+          (
+              widget_id    integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              dashboard_id integer   NOT NULL REFERENCES public.dashboards (dashboard_id) ON DELETE CASCADE,
+              metric_id    integer   NOT NULL REFERENCES public.metrics (metric_id) ON DELETE CASCADE,
+              user_id      integer   REFERENCES public.users (user_id) ON DELETE SET NULL,
+              created_at   timestamp NOT NULL DEFAULT timezone('utc'::text, now()),
+              config       jsonb     NOT NULL DEFAULT '{}'::jsonb
+          );
+          
+          
+          CREATE TABLE public.searches
+          (
+              search_id  integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              project_id integer NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              user_id    integer NOT NULL REFERENCES public.users (user_id) ON DELETE CASCADE,
+              name       text    NOT NULL,
+              filter     jsonb   NOT NULL,
+              created_at timestamp        DEFAULT timezone('utc'::text, now()) NOT NULL,
+              deleted_at timestamp,
+              is_public  boolean NOT NULL DEFAULT False
+          );
+          
+          CREATE INDEX searches_user_id_is_public_idx ON public.searches (user_id, is_public);
+          CREATE INDEX searches_project_id_idx ON public.searches (project_id);
+          
+          CREATE TYPE alert_detection_method AS ENUM ('threshold', 'change');
+          CREATE TYPE alert_change_type AS ENUM ('percent', 'change');
+          
+          CREATE TABLE public.alerts
+          (
+              alert_id         integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              project_id       integer                NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              series_id        integer                NULL REFERENCES public.metric_series (series_id) ON DELETE CASCADE,
+              name             text                   NOT NULL,
+              description      text                   NULL     DEFAULT NULL,
+              active           boolean                NOT NULL DEFAULT TRUE,
+              detection_method alert_detection_method NOT NULL,
+              change           alert_change_type      NOT NULL DEFAULT 'change',
+              query            jsonb                  NOT NULL,
+              deleted_at       timestamp              NULL     DEFAULT NULL,
+              created_at       timestamp              NOT NULL DEFAULT timezone('utc'::text, now()),
+              options          jsonb                  NOT NULL DEFAULT '{
+                "renotifyInterval": 1440
+              }'::jsonb
+          );
+          CREATE INDEX alerts_project_id_idx ON public.alerts (project_id);
+          CREATE INDEX alerts_series_id_idx ON public.alerts (series_id);
+          
+          CREATE TRIGGER on_insert_or_update_or_delete
+              AFTER INSERT OR UPDATE OR DELETE
+              ON public.alerts
+              FOR EACH ROW
+          EXECUTE PROCEDURE notify_alert();
+          
+          CREATE TABLE public.sessions_notes
+          (
+              note_id    integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              message    text                        NULL     DEFAULT NULL,
+              created_at timestamp without time zone NOT NULL DEFAULT (now() at time zone 'utc'),
+              user_id    integer                     NULL REFERENCES public.users (user_id) ON DELETE SET NULL,
+              deleted_at timestamp without time zone NULL     DEFAULT NULL,
+              tag        text                        NULL,
+              session_id bigint                      NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              project_id integer                     NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              timestamp  integer                     NOT NULL DEFAULT -1,
+              is_public  boolean                     NOT NULL DEFAULT FALSE,
+              thumbnail  text                        NULL,
+              updated_at timestamp without time zone NULL     DEFAULT NULL,
+              start_at   integer                     NULL,
+              end_at     integer                     NULL
+          );
+          
+          CREATE TABLE public.errors_tags
+          (
+              key        text                        NOT NULL,
+              value      text                        NOT NULL,
+              created_at timestamp without time zone NOT NULL default (now() at time zone 'utc'),
+              error_id   text                        NOT NULL REFERENCES public.errors (error_id) ON DELETE CASCADE,
+              session_id bigint                      NOT NULL,
+              message_id bigint                      NOT NULL,
+              FOREIGN KEY (session_id, message_id) REFERENCES events.errors (session_id, message_id) ON DELETE CASCADE
+          );
+          
+          CREATE INDEX errors_tags_error_id_idx ON public.errors_tags (error_id);
+          CREATE INDEX errors_tags_session_id_idx ON public.errors_tags (session_id);
+          CREATE INDEX errors_tags_message_id_idx ON public.errors_tags (message_id);
+          
+          
+          CREATE TABLE public.projects_stats
+          (
+              project_id     integer NOT NULL,
+              created_at     timestamp        default (now() AT TIME ZONE 'utc'::text),
+              sessions_count integer NOT NULL DEFAULT 0,
+              events_count   bigint  NOT NULL DEFAULT 0,
+              last_update_at timestamp        default (now() AT TIME ZONE 'utc'::text),
+              primary key (project_id, created_at)
+          );
+          
+          CREATE INDEX projects_stats_project_id_idx ON public.projects_stats (project_id);
+          
+          CREATE TABLE public.feature_flags
+          (
+              feature_flag_id integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              project_id      integer                     NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              flag_key        text                        NOT NULL,
+              description     text                                 DEFAULT NULL,
+              payload         jsonb                                DEFAULT NULL,
+              flag_type       text                        NOT NULL,
+              is_persist      boolean                     NOT NULL DEFAULT FALSE,
+              is_active       boolean                     NOT NULL DEFAULT FALSE,
+              created_by      integer                     REFERENCES public.users (user_id) ON DELETE SET NULL,
+              updated_by      integer                     REFERENCES public.users (user_id) ON DELETE SET NULL,
+              created_at      timestamp without time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+              updated_at      timestamp without time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+              deleted_at      timestamp without time zone NULL     DEFAULT NULL
+          );
+          
+          CREATE INDEX idx_feature_flags_project_id ON public.feature_flags (project_id);
+          
+          ALTER TABLE public.feature_flags
+              ADD CONSTRAINT unique_project_flag_deleted UNIQUE (project_id, flag_key, deleted_at);
+          
+          CREATE TABLE public.feature_flags_conditions
+          (
+              condition_id       integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              feature_flag_id    integer NOT NULL REFERENCES public.feature_flags (feature_flag_id) ON DELETE CASCADE,
+              name               text    NOT NULL,
+              rollout_percentage integer NOT NULL,
+              filters            jsonb   NOT NULL DEFAULT '[]'::jsonb
+          );
+          
+          CREATE TABLE public.feature_flags_variants
+          (
+              variant_id         integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              feature_flag_id    integer NOT NULL REFERENCES public.feature_flags (feature_flag_id) ON DELETE CASCADE,
+              value              text    NOT NULL,
+              description        text    DEFAULT NULL,
+              payload            jsonb   DEFAULT NULL,
+              rollout_percentage integer DEFAULT 0
+          );
+          
+          CREATE TABLE public.sessions_feature_flags
+          (
+              session_id      bigint  NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              feature_flag_id integer NOT NULL REFERENCES public.feature_flags (feature_flag_id) ON DELETE CASCADE,
+              condition_id    integer NULL REFERENCES public.feature_flags_conditions (condition_id) ON DELETE SET NULL
+          );
+          
+          
+          CREATE TABLE events_ios.views
+          (
+              session_id bigint  NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              timestamp  bigint  NOT NULL,
+              seq_index  integer NOT NULL,
+              name       text    NOT NULL,
+              PRIMARY KEY (session_id, timestamp, seq_index)
+          );
+          
+          CREATE TABLE events_ios.taps
+          (
+              session_id bigint  NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              timestamp  bigint  NOT NULL,
+              seq_index  integer NOT NULL,
+              label      text    NOT NULL,
+              PRIMARY KEY (session_id, timestamp, seq_index)
+          );
+          CREATE INDEX taps_session_id_idx ON events_ios.taps (session_id);
+          CREATE INDEX taps_label_idx ON events_ios.taps (label);
+          CREATE INDEX taps_label_gin_idx ON events_ios.taps USING GIN (label gin_trgm_ops);
+          CREATE INDEX taps_timestamp_idx ON events_ios.taps (timestamp);
+          CREATE INDEX taps_label_session_id_timestamp_idx ON events_ios.taps (label, session_id, timestamp);
+          CREATE INDEX taps_session_id_timestamp_idx ON events_ios.taps (session_id, timestamp);
+          
+          
+          CREATE TABLE events_ios.inputs
+          (
+              session_id bigint  NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              timestamp  bigint  NOT NULL,
+              seq_index  integer NOT NULL,
+              label      text    NOT NULL,
+              PRIMARY KEY (session_id, timestamp, seq_index)
+          );
+          CREATE INDEX inputs_session_id_idx ON events_ios.inputs (session_id);
+          CREATE INDEX inputs_label_gin_idx ON events_ios.inputs USING GIN (label gin_trgm_ops);
+          CREATE INDEX inputs_timestamp_idx ON events_ios.inputs (timestamp);
+          CREATE INDEX inputs_label_session_id_timestamp_idx ON events_ios.inputs (label, session_id, timestamp);
+          
+          
+          CREATE TABLE public.crashes_ios
+          (
+              crash_ios_id text    NOT NULL PRIMARY KEY,
+              project_id   integer NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              name         text    NOT NULL,
+              reason       text    NOT NULL,
+              stacktrace   text    NOT NULL
+          );
+          CREATE INDEX crashes_ios_project_id_crash_id_idx ON public.crashes_ios (project_id, crash_ios_id);
+          CREATE INDEX crashes_ios_project_id_idx ON public.crashes_ios (project_id);
+          
+          CREATE TABLE events_common.crashes
+          (
+              session_id   bigint  NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              timestamp    bigint  NOT NULL,
+              seq_index    integer NOT NULL,
+              crash_ios_id text    NULL REFERENCES public.crashes_ios (crash_ios_id) ON DELETE CASCADE,
+              PRIMARY KEY (session_id, timestamp, seq_index)
+          );
+          CREATE INDEX crashes_crash_ios_id_timestamp_idx ON events_common.crashes (crash_ios_id, timestamp);
+          CREATE INDEX crashes_session_id_idx ON events_common.crashes (session_id);
+          CREATE INDEX crashes_timestamp_idx ON events_common.crashes (timestamp);
+          
+          
+          CREATE TABLE events_ios.swipes
+          (
+              session_id bigint  NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              timestamp  bigint  NOT NULL,
+              seq_index  integer NOT NULL,
+              label      text    NOT NULL,
+              direction  text    NOT NULL,
+              x          integer DEFAULT NULL,
+              y          integer DEFAULT NULL,
+              PRIMARY KEY (session_id, timestamp, seq_index)
+          );
+          CREATE INDEX swipes_session_id_idx ON events_ios.swipes (session_id);
+          CREATE INDEX swipes_label_gin_idx ON events_ios.swipes USING GIN (label gin_trgm_ops);
+          CREATE INDEX swipes_timestamp_idx ON events_ios.swipes (timestamp);
+          CREATE INDEX swipes_label_session_id_timestamp_idx ON events_ios.swipes (label, session_id, timestamp);
+          
+          CREATE TABLE public.tags
+          (
+              tag_id            serial                      NOT NULL PRIMARY KEY,
+              name              text                        NOT NULL,
+              project_id        integer                     NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              selector          text                        NOT NULL,
+              ignore_click_rage boolean                     NOT NULL,
+              ignore_dead_click boolean                     NOT NULL,
+              location          text                        NULL DEFAULT NULL,
+              deleted_at        timestamp without time zone NULL DEFAULT NULL
+          );
+          CREATE INDEX tags_project_id_idx ON public.tags (project_id);
+          
+          CREATE TABLE events.tags
+          (
+              session_id bigint  NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              timestamp  bigint  NOT NULL,
+              seq_index  integer NOT NULL,
+              tag_id     integer NOT NULL REFERENCES public.tags (tag_id) ON DELETE CASCADE,
+              PRIMARY KEY (session_id, timestamp, seq_index)
+          );
+          CREATE INDEX tags_session_id_idx ON events.tags (session_id);
+          CREATE INDEX tags_timestamp_idx ON events.tags (timestamp);
+          
+          CREATE TYPE ui_tests_status AS ENUM ('preview', 'in-progress', 'paused', 'closed');
+          
+          CREATE TABLE public.ut_tests
+          (
+              test_id            integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              project_id         integer                     NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              title              VARCHAR(255)                NOT NULL,
+              starting_path      VARCHAR(255)                NULL,
+              status             ui_tests_status             NOT NULL,
+              require_mic        BOOLEAN                              DEFAULT FALSE,
+              require_camera     BOOLEAN                              DEFAULT FALSE,
+              description        TEXT                        NULL,
+              guidelines         TEXT                        NULL,
+              conclusion_message TEXT                        NULL,
+              created_by         integer                     REFERENCES public.users (user_id) ON DELETE SET NULL,
+              updated_by         integer                     REFERENCES public.users (user_id) ON DELETE SET NULL,
+              visibility         BOOLEAN                              DEFAULT FALSE,
+              created_at         timestamp without time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+              updated_at         timestamp without time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+              deleted_at         timestamp without time zone NULL     DEFAULT NULL
+          );
+          
+          CREATE TABLE public.ut_tests_tasks
+          (
+              task_id      integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              test_id      integer      NOT NULL REFERENCES ut_tests (test_id) ON DELETE CASCADE,
+              title        VARCHAR(255) NOT NULL,
+              description  TEXT         NULL,
+              allow_typing BOOLEAN DEFAULT FALSE
+          );
+          
+          CREATE TYPE ut_signal_status AS ENUM ('begin', 'done', 'skipped');
+          
+          CREATE TABLE public.ut_tests_signals
+          (
+              signal_id  integer generated BY DEFAULT AS IDENTITY PRIMARY KEY,
+              session_id BIGINT           NULL REFERENCES public.sessions (session_id) ON DELETE SET NULL,
+              test_id    integer          NOT NULL REFERENCES public.ut_tests (test_id) ON DELETE CASCADE,
+              task_id    integer          NULL REFERENCES public.ut_tests_tasks (task_id) ON DELETE CASCADE,
+              status     ut_signal_status NOT NULL,
+              comment    TEXT             NULL,
+              timestamp  BIGINT           NOT NULL,
+              duration   BIGINT           NULL
+          );
+          
+          CREATE UNIQUE INDEX ut_tests_signals_unique_session_id_test_id_task_id_ts_idx ON public.ut_tests_signals (session_id, test_id, task_id, timestamp);
+          CREATE INDEX ut_tests_signals_session_id_idx ON public.ut_tests_signals (session_id);
+          
+          CREATE TABLE events.canvas_recordings
+          (
+              session_id   bigint NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              recording_id text   NOT NULL,
+              timestamp    bigint NOT NULL
+          );
+          CREATE INDEX canvas_recordings_session_id_idx ON events.canvas_recordings (session_id);
+          
+          CREATE TABLE public.projects_conditions
+          (
+              condition_id integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+              project_id   integer      NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              name         varchar(255) NOT NULL,
+              capture_rate integer      NOT NULL CHECK (capture_rate >= 0 AND capture_rate <= 100),
+              filters      jsonb        NOT NULL DEFAULT '[]'::jsonb
+          );
+          
+          
+          CREATE SCHEMA IF NOT EXISTS spots;
+          
+          CREATE TABLE IF NOT EXISTS spots.spots
+          (
+              spot_id    BIGINT                      NOT NULL PRIMARY KEY,
+              name       TEXT                        NOT NULL,
+              user_id    BIGINT                      NOT NULL REFERENCES public.users (user_id) ON DELETE CASCADE,
+              tenant_id  BIGINT                      NOT NULL,
+              duration   INT                         NOT NULL,
+              crop       INT[],
+              comments   TEXT[],
+              status     TEXT                                 DEFAULT 'pending',
+              created_at timestamp without time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+              updated_at timestamp                            DEFAULT NULL,
+              deleted_at timestamp                            DEFAULT NULL
+          );
+          
+          CREATE TABLE IF NOT EXISTS spots.keys
+          (
+              spot_key   TEXT      NOT NULL PRIMARY KEY,
+              spot_id    BIGINT    NOT NULL UNIQUE REFERENCES spots.spots (spot_id) ON DELETE CASCADE,
+              user_id    BIGINT    NOT NULL,
+              expiration BIGINT    NOT NULL,
+              expired_at timestamp NOT NULL,
+              created_at timestamp NOT NULL,
+              updated_at timestamp DEFAULT NULL
+          );
+          
+          CREATE TABLE IF NOT EXISTS spots.streams
+          (
+              spot_id           BIGINT    NOT NULL PRIMARY KEY REFERENCES spots.spots (spot_id) ON DELETE CASCADE,
+              original_playlist TEXT      NOT NULL,
+              modified_playlist TEXT      NOT NULL,
+              created_at        timestamp NOT NULL,
+              expired_at        timestamp NOT NULL
+          );
+          
+          CREATE TABLE IF NOT EXISTS spots.tasks
+          (
+              spot_id    BIGINT    NOT NULL PRIMARY KEY REFERENCES spots.spots (spot_id) ON DELETE CASCADE,
+              duration   INT       NOT NULL,
+              crop       INT[],
+              status     TEXT      NOT NULL,
+              error      TEXT DEFAULT NULL,
+              added_time timestamp NOT NULL
+          );
+          
+          CREATE TABLE IF NOT EXISTS public.session_integrations
+          (
+              session_id bigint                      NOT NULL REFERENCES public.sessions (session_id) ON DELETE CASCADE,
+              project_id integer                     NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              provider   text                        NOT NULL,
+              created_at timestamp without time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+              PRIMARY KEY (session_id, project_id, provider)
+          );
+          
+          CREATE TABLE IF NOT EXISTS public.saved_searches
+          (
+              search_id   uuid PRIMARY KEY                     DEFAULT gen_random_uuid(),
+              project_id  integer                     NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              user_id     integer                     NOT NULL REFERENCES public.users (user_id) ON DELETE CASCADE,
+              name        varchar(255)                         DEFAULT NULL,
+              is_public   boolean                     NOT NULL DEFAULT FALSE,
+              is_share    boolean                     NOT NULL DEFAULT FALSE,
+              search_data jsonb                       NOT NULL,
+              created_at  timestamp without time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+              expires_at  timestamp without time zone NULL     DEFAULT NULL,
+              deleted_at  timestamp without time zone NULL     DEFAULT NULL
+          );
+          
+          CREATE INDEX saved_searches_project_id_idx ON public.saved_searches (project_id);
+          
+          CREATE TABLE public.actions
+          (
+              action_id   uuid                        PRIMARY KEY DEFAULT gen_random_uuid(),
+              project_id  integer                     NOT NULL REFERENCES public.projects (project_id) ON DELETE CASCADE,
+              user_id     integer                     NULL REFERENCES public.users (user_id) ON DELETE SET NULL,
+              name        varchar(255)                NOT NULL,
+              description varchar(1024)               NULL     DEFAULT NULL,
+              filters     jsonb                       NOT NULL DEFAULT '[]'::jsonb,
+              is_public   boolean                     NOT NULL DEFAULT FALSE,
+              created_at  timestamp without time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+              updated_at  timestamp without time zone NOT NULL DEFAULT timezone('utc'::text, now())
+          );
+          
+          CREATE INDEX actions_user_id_idx ON public.actions (user_id);
+          CREATE INDEX actions_project_id_user_id_idx ON public.actions (project_id, user_id);
+          CREATE INDEX actions_project_id_is_public_idx ON public.actions (project_id, is_public);
+          CREATE INDEX actions_name_gin_idx ON public.actions USING GIN (name gin_trgm_ops);
+          CREATE UNIQUE INDEX actions_project_id_name_idx ON public.actions (project_id, name);
+          CREATE INDEX actions_project_id_created_at_idx ON public.actions (project_id, created_at DESC);
+          
+          COMMIT;
+    environment:
+      PGHOST: postgresql
+      PGPORT: 5432
+      PGDATABASE: postgres
+      PGUSER: postgres
+      PGPASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+          until psql -c '\q'; do
+          echo "PostgreSQL is unavailable - sleeping"
+          sleep 1
+          done
+          echo "PostgreSQL is up - executing command"
+          psql -v ON_ERROR_STOP=1 -f /tmp/init_schema.sql
+
+  clickhouse-migration:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.11-alpine}
+    depends_on:
+      - clickhouse
+      - minio-migration
+    networks:
+      - openreplay-net
+    volumes:
+      - type: bind
+        source: ./clickhouse-init_schema.sql
+        target: /tmp/init_schema.sql
+        content: |
+          CREATE OR REPLACE FUNCTION openreplay_version AS() -> 'v1.27.0';
+          CREATE DATABASE IF NOT EXISTS experimental;
+          
+          CREATE TABLE IF NOT EXISTS experimental.sessions
+          (
+              session_id           UInt64,
+              project_id           UInt16,
+              tracker_version      LowCardinality(String),
+              rev_id               LowCardinality(Nullable(String)),
+              user_uuid            UUID,
+              user_os              LowCardinality(String),
+              user_os_version      LowCardinality(Nullable(String)),
+              user_browser         LowCardinality(String),
+              user_browser_version LowCardinality(Nullable(String)),
+              user_device          Nullable(String),
+              user_device_type     Enum8('other'=0, 'desktop'=1, 'mobile'=2,'tablet'=3),
+              user_country         Enum8('UN'=-128, 'RW'=-127, 'SO'=-126, 'YE'=-125, 'IQ'=-124, 'SA'=-123, 'IR'=-122, 'CY'=-121, 'TZ'=-120, 'SY'=-119, 'AM'=-118, 'KE'=-117, 'CD'=-116, 'DJ'=-115, 'UG'=-114, 'CF'=-113, 'SC'=-112, 'JO'=-111, 'LB'=-110, 'KW'=-109, 'OM'=-108, 'QA'=-107, 'BH'=-106, 'AE'=-105, 'IL'=-104, 'TR'=-103, 'ET'=-102, 'ER'=-101, 'EG'=-100, 'SD'=-99, 'GR'=-98, 'BI'=-97, 'EE'=-96, 'LV'=-95, 'AZ'=-94, 'LT'=-93, 'SJ'=-92, 'GE'=-91, 'MD'=-90, 'BY'=-89, 'FI'=-88, 'AX'=-87, 'UA'=-86, 'MK'=-85, 'HU'=-84, 'BG'=-83, 'AL'=-82, 'PL'=-81, 'RO'=-80, 'XK'=-79, 'ZW'=-78, 'ZM'=-77, 'KM'=-76, 'MW'=-75, 'LS'=-74, 'BW'=-73, 'MU'=-72, 'SZ'=-71, 'RE'=-70, 'ZA'=-69, 'YT'=-68, 'MZ'=-67, 'MG'=-66, 'AF'=-65, 'PK'=-64, 'BD'=-63, 'TM'=-62, 'TJ'=-61, 'LK'=-60, 'BT'=-59, 'IN'=-58, 'MV'=-57, 'IO'=-56, 'NP'=-55, 'MM'=-54, 'UZ'=-53, 'KZ'=-52, 'KG'=-51, 'TF'=-50, 'HM'=-49, 'CC'=-48, 'PW'=-47, 'VN'=-46, 'TH'=-45, 'ID'=-44, 'LA'=-43, 'TW'=-42, 'PH'=-41, 'MY'=-40, 'CN'=-39, 'HK'=-38, 'BN'=-37, 'MO'=-36, 'KH'=-35, 'KR'=-34, 'JP'=-33, 'KP'=-32, 'SG'=-31, 'CK'=-30, 'TL'=-29, 'RU'=-28, 'MN'=-27, 'AU'=-26, 'CX'=-25, 'MH'=-24, 'FM'=-23, 'PG'=-22, 'SB'=-21, 'TV'=-20, 'NR'=-19, 'VU'=-18, 'NC'=-17, 'NF'=-16, 'NZ'=-15, 'FJ'=-14, 'LY'=-13, 'CM'=-12, 'SN'=-11, 'CG'=-10, 'PT'=-9, 'LR'=-8, 'CI'=-7, 'GH'=-6, 'GQ'=-5, 'NG'=-4, 'BF'=-3, 'TG'=-2, 'GW'=-1, 'MR'=0, 'BJ'=1, 'GA'=2, 'SL'=3, 'ST'=4, 'GI'=5, 'GM'=6, 'GN'=7, 'TD'=8, 'NE'=9, 'ML'=10, 'EH'=11, 'TN'=12, 'ES'=13, 'MA'=14, 'MT'=15, 'DZ'=16, 'FO'=17, 'DK'=18, 'IS'=19, 'GB'=20, 'CH'=21, 'SE'=22, 'NL'=23, 'AT'=24, 'BE'=25, 'DE'=26, 'LU'=27, 'IE'=28, 'MC'=29, 'FR'=30, 'AD'=31, 'LI'=32, 'JE'=33, 'IM'=34, 'GG'=35, 'SK'=36, 'CZ'=37, 'NO'=38, 'VA'=39, 'SM'=40, 'IT'=41, 'SI'=42, 'ME'=43, 'HR'=44, 'BA'=45, 'AO'=46, 'NA'=47, 'SH'=48, 'BV'=49, 'BB'=50, 'CV'=51, 'GY'=52, 'GF'=53, 'SR'=54, 'PM'=55, 'GL'=56, 'PY'=57, 'UY'=58, 'BR'=59, 'FK'=60, 'GS'=61, 'JM'=62, 'DO'=63, 'CU'=64, 'MQ'=65, 'BS'=66, 'BM'=67, 'AI'=68, 'TT'=69, 'KN'=70, 'DM'=71, 'AG'=72, 'LC'=73, 'TC'=74, 'AW'=75, 'VG'=76, 'VC'=77, 'MS'=78, 'MF'=79, 'BL'=80, 'GP'=81, 'GD'=82, 'KY'=83, 'BZ'=84, 'SV'=85, 'GT'=86, 'HN'=87, 'NI'=88, 'CR'=89, 'VE'=90, 'EC'=91, 'CO'=92, 'PA'=93, 'HT'=94, 'AR'=95, 'CL'=96, 'BO'=97, 'PE'=98, 'MX'=99, 'PF'=100, 'PN'=101, 'KI'=102, 'TK'=103, 'TO'=104, 'WF'=105, 'WS'=106, 'NU'=107, 'MP'=108, 'GU'=109, 'PR'=110, 'VI'=111, 'UM'=112, 'AS'=113, 'CA'=114, 'US'=115, 'PS'=116, 'RS'=117, 'AQ'=118, 'SX'=119, 'CW'=120, 'BQ'=121, 'SS'=122,'BU'=123, 'VD'=124, 'YD'=125, 'DD'=126),
+              user_city            LowCardinality(String),
+              user_state           LowCardinality(String),
+              platform             Enum8('web'=1,'mobile'=2) DEFAULT 'web',
+              datetime             DateTime,
+              timezone             LowCardinality(Nullable(String)),
+              duration             UInt32,
+              pages_count          UInt16,
+              events_count         UInt16,
+              errors_count         UInt16,
+              utm_source           Nullable(String),
+              utm_medium           Nullable(String),
+              utm_campaign         Nullable(String),
+              user_id              Nullable(String),
+              user_anonymous_id    Nullable(String),
+              issue_types          Array(LowCardinality(String)),
+              referrer             Nullable(String),
+              base_referrer        Nullable(String) MATERIALIZED lower(concat(domain(referrer), path(referrer))),
+              screen_width         Nullable(Int16),
+              screen_height        Nullable(Int16),
+              metadata_1           Nullable(String),
+              metadata_2           Nullable(String),
+              metadata_3           Nullable(String),
+              metadata_4           Nullable(String),
+              metadata_5           Nullable(String),
+              metadata_6           Nullable(String),
+              metadata_7           Nullable(String),
+              metadata_8           Nullable(String),
+              metadata_9           Nullable(String),
+              metadata_10          Nullable(String),
+              _timestamp           DateTime                  DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp)
+                PARTITION BY toYYYYMMDD(datetime)
+                ORDER BY (project_id, datetime, session_id)
+                SETTINGS index_granularity = 512;
+          
+          CREATE TABLE IF NOT EXISTS experimental.user_favorite_sessions
+          (
+              project_id UInt16,
+              user_id    UInt32,
+              session_id UInt64,
+              _timestamp DateTime DEFAULT now(),
+              sign       Int8
+          ) ENGINE = CollapsingMergeTree(sign)
+                PARTITION BY toYYYYMM(_timestamp)
+                ORDER BY (project_id, user_id, session_id);
+          
+          CREATE TABLE IF NOT EXISTS experimental.user_viewed_sessions
+          (
+              project_id UInt16,
+              user_id    UInt32,
+              session_id UInt64,
+              _timestamp DateTime DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp)
+                PARTITION BY toYYYYMM(_timestamp)
+                ORDER BY (project_id, user_id, session_id);
+          
+          CREATE TABLE IF NOT EXISTS experimental.user_viewed_errors
+          (
+              project_id UInt16,
+              user_id    UInt32,
+              error_id   String,
+              _timestamp DateTime DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp)
+                PARTITION BY toYYYYMM(_timestamp)
+                ORDER BY (project_id, user_id, error_id);
+          
+          CREATE TABLE IF NOT EXISTS experimental.issues
+          (
+              project_id     UInt16,
+              issue_id       String,
+              type           Enum8('click_rage'=1,'dead_click'=2,'excessive_scrolling'=3,'bad_request'=4,'missing_resource'=5,'memory'=6,'cpu'=7,'slow_resource'=8,'slow_page_load'=9,'crash'=10,'ml_cpu'=11,'ml_memory'=12,'ml_dead_click'=13,'ml_click_rage'=14,'ml_mouse_thrashing'=15,'ml_excessive_scrolling'=16,'ml_slow_resources'=17,'custom'=18,'js_exception'=19,'mouse_thrashing'=20,'app_crash'=21,'incident'=22),
+              context_string String,
+              context_keys   Array(String),
+              context_values Array(Nullable(String)),
+              _timestamp     DateTime DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp)
+                PARTITION BY toYYYYMM(_timestamp)
+                ORDER BY (project_id, issue_id, type);
+          
+          CREATE TABLE IF NOT EXISTS experimental.ios_events
+          (
+              session_id     UInt64,
+              project_id     UInt16,
+              event_type     Enum8('TAP'=0, 'INPUT'=1, 'SWIPE'=2, 'VIEW'=3,'REQUEST'=4,'CRASH'=5,'CUSTOM'=6, 'STATEACTION'=8, 'ISSUE'=9),
+              datetime       DateTime,
+              label          Nullable(String),
+              name           Nullable(String),
+              payload        Nullable(String),
+              level          Nullable(Enum8('info'=0, 'error'=1)) DEFAULT if(event_type == 'CUSTOM', 'info', null),
+              context        Nullable(Enum8('unknown'=0, 'self'=1, 'same-origin-ancestor'=2, 'same-origin-descendant'=3, 'same-origin'=4, 'cross-origin-ancestor'=5, 'cross-origin-descendant'=6, 'cross-origin-unreachable'=7, 'multiple-contexts'=8)),
+              url            Nullable(String),
+              url_host       Nullable(String) MATERIALIZED lower(domain(url)),
+              url_path       Nullable(String),
+              url_hostpath   Nullable(String) MATERIALIZED concat(url_host, url_path),
+              request_start  Nullable(UInt16),
+              response_start Nullable(UInt16),
+              response_end   Nullable(UInt16),
+              method         Nullable(Enum8('GET' = 0, 'HEAD' = 1, 'POST' = 2, 'PUT' = 3, 'DELETE' = 4, 'CONNECT' = 5, 'OPTIONS' = 6, 'TRACE' = 7, 'PATCH' = 8)),
+              status         Nullable(UInt16),
+              duration       Nullable(UInt16),
+              success        Nullable(UInt8),
+              request_body   Nullable(String),
+              response_body  Nullable(String),
+              issue_type     Nullable(Enum8('tap_rage'=1,'dead_click'=2,'excessive_scrolling'=3,'bad_request'=4,'missing_resource'=5,'memory'=6,'cpu'=7,'slow_resource'=8,'slow_page_load'=9,'crash'=10,'ml_cpu'=11,'ml_memory'=12,'ml_dead_click'=13,'ml_click_rage'=14,'ml_mouse_thrashing'=15,'ml_excessive_scrolling'=16,'ml_slow_resources'=17,'custom'=18,'js_exception'=19,'mouse_thrashing'=20,'app_crash'=21)),
+              issue_id       Nullable(String),
+              transfer_size  Nullable(UInt32),
+              direction      Nullable(String),
+              reason         Nullable(String),
+              stacktrace     Nullable(String),
+              message_id     UInt64                               DEFAULT 0,
+              _timestamp     DateTime                             DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp)
+                PARTITION BY toYYYYMM(datetime)
+                ORDER BY (project_id, datetime, event_type, session_id, message_id);
+          
+          
+          SET allow_experimental_json_type = 1;
+          SET enable_json_type = 1;
+          
+          CREATE DATABASE IF NOT EXISTS product_analytics;
+          
+          -- The table of identified users
+          CREATE TABLE IF NOT EXISTS product_analytics.users
+          (
+              project_id           UInt16,
+              "$user_id"           String,
+              "$email"             String DEFAULT '',
+              "$name"              String DEFAULT '',
+              "$first_name"        String DEFAULT '',
+              "$last_name"         String DEFAULT '',
+              "$phone"             String DEFAULT '',
+              "$avatar"            String DEFAULT '',
+              "$created_at"        DateTime DEFAULT now(),
+              properties           JSON DEFAULT '{}',
+              group_id1            Array(String) DEFAULT [],
+              group_id2            Array(String) DEFAULT [],
+              group_id3            Array(String) DEFAULT [],
+              group_id4            Array(String) DEFAULT [],
+              group_id5            Array(String) DEFAULT [],
+              group_id6            Array(String) DEFAULT [],
+          
+              "$sdk_edition"       LowCardinality(String),
+              "$sdk_version"       LowCardinality(String),
+              "$current_url"       String DEFAULT '',
+              "$current_path"      String MATERIALIZED path("$current_url"),
+              "$initial_referrer"  String DEFAULT '',
+              "$referring_domain"  String DEFAULT '',
+              initial_utm_source   String DEFAULT '',
+              initial_utm_medium   String DEFAULT '',
+              initial_utm_campaign String DEFAULT '',
+              "$country"           Enum8('UN'=-128, 'RW'=-127, 'SO'=-126, 'YE'=-125, 'IQ'=-124, 'SA'=-123, 'IR'=-122, 'CY'=-121, 'TZ'=-120, 'SY'=-119, 'AM'=-118, 'KE'=-117, 'CD'=-116, 'DJ'=-115, 'UG'=-114, 'CF'=-113, 'SC'=-112, 'JO'=-111, 'LB'=-110, 'KW'=-109, 'OM'=-108, 'QA'=-107, 'BH'=-106, 'AE'=-105, 'IL'=-104, 'TR'=-103, 'ET'=-102, 'ER'=-101, 'EG'=-100, 'SD'=-99, 'GR'=-98, 'BI'=-97, 'EE'=-96, 'LV'=-95, 'AZ'=-94, 'LT'=-93, 'SJ'=-92, 'GE'=-91, 'MD'=-90, 'BY'=-89, 'FI'=-88, 'AX'=-87, 'UA'=-86, 'MK'=-85, 'HU'=-84, 'BG'=-83, 'AL'=-82, 'PL'=-81, 'RO'=-80, 'XK'=-79, 'ZW'=-78, 'ZM'=-77, 'KM'=-76, 'MW'=-75, 'LS'=-74, 'BW'=-73, 'MU'=-72, 'SZ'=-71, 'RE'=-70, 'ZA'=-69, 'YT'=-68, 'MZ'=-67, 'MG'=-66, 'AF'=-65, 'PK'=-64, 'BD'=-63, 'TM'=-62, 'TJ'=-61, 'LK'=-60, 'BT'=-59, 'IN'=-58, 'MV'=-57, 'IO'=-56, 'NP'=-55, 'MM'=-54, 'UZ'=-53, 'KZ'=-52, 'KG'=-51, 'TF'=-50, 'HM'=-49, 'CC'=-48, 'PW'=-47, 'VN'=-46, 'TH'=-45, 'ID'=-44, 'LA'=-43, 'TW'=-42, 'PH'=-41, 'MY'=-40, 'CN'=-39, 'HK'=-38, 'BN'=-37, 'MO'=-36, 'KH'=-35, 'KR'=-34, 'JP'=-33, 'KP'=-32, 'SG'=-31, 'CK'=-30, 'TL'=-29, 'RU'=-28, 'MN'=-27, 'AU'=-26, 'CX'=-25, 'MH'=-24, 'FM'=-23, 'PG'=-22, 'SB'=-21, 'TV'=-20, 'NR'=-19, 'VU'=-18, 'NC'=-17, 'NF'=-16, 'NZ'=-15, 'FJ'=-14, 'LY'=-13, 'CM'=-12, 'SN'=-11, 'CG'=-10, 'PT'=-9, 'LR'=-8, 'CI'=-7, 'GH'=-6, 'GQ'=-5, 'NG'=-4, 'BF'=-3, 'TG'=-2, 'GW'=-1, 'MR'=0, 'BJ'=1, 'GA'=2, 'SL'=3, 'ST'=4, 'GI'=5, 'GM'=6, 'GN'=7, 'TD'=8, 'NE'=9, 'ML'=10, 'EH'=11, 'TN'=12, 'ES'=13, 'MA'=14, 'MT'=15, 'DZ'=16, 'FO'=17, 'DK'=18, 'IS'=19, 'GB'=20, 'CH'=21, 'SE'=22, 'NL'=23, 'AT'=24, 'BE'=25, 'DE'=26, 'LU'=27, 'IE'=28, 'MC'=29, 'FR'=30, 'AD'=31, 'LI'=32, 'JE'=33, 'IM'=34, 'GG'=35, 'SK'=36, 'CZ'=37, 'NO'=38, 'VA'=39, 'SM'=40, 'IT'=41, 'SI'=42, 'ME'=43, 'HR'=44, 'BA'=45, 'AO'=46, 'NA'=47, 'SH'=48, 'BV'=49, 'BB'=50, 'CV'=51, 'GY'=52, 'GF'=53, 'SR'=54, 'PM'=55, 'GL'=56, 'PY'=57, 'UY'=58, 'BR'=59, 'FK'=60, 'GS'=61, 'JM'=62, 'DO'=63, 'CU'=64, 'MQ'=65, 'BS'=66, 'BM'=67, 'AI'=68, 'TT'=69, 'KN'=70, 'DM'=71, 'AG'=72, 'LC'=73, 'TC'=74, 'AW'=75, 'VG'=76, 'VC'=77, 'MS'=78, 'MF'=79, 'BL'=80, 'GP'=81, 'GD'=82, 'KY'=83, 'BZ'=84, 'SV'=85, 'GT'=86, 'HN'=87, 'NI'=88, 'CR'=89, 'VE'=90, 'EC'=91, 'CO'=92, 'PA'=93, 'HT'=94, 'AR'=95, 'CL'=96, 'BO'=97, 'PE'=98, 'MX'=99, 'PF'=100, 'PN'=101, 'KI'=102, 'TK'=103, 'TO'=104, 'WF'=105, 'WS'=106, 'NU'=107, 'MP'=108, 'GU'=109, 'PR'=110, 'VI'=111, 'UM'=112, 'AS'=113, 'CA'=114, 'US'=115, 'PS'=116, 'RS'=117, 'AQ'=118, 'SX'=119, 'CW'=120, 'BQ'=121, 'SS'=122,'BU'=123, 'VD'=124, 'YD'=125, 'DD'=126, ''=127) DEFAULT '',
+              "$state"             LowCardinality(String) DEFAULT '',
+              "$city"              LowCardinality(String) DEFAULT '',
+              "$or_api_endpoint"   LowCardinality(String),
+              "$timezone"          Int8 DEFAULT 0 COMMENT 'timezone will be x10 in order to take into consideration countries with tz=N,5H',
+          
+              "$first_event_at"    DateTime DEFAULT '1970-01-01 00:00:00',
+              "$last_seen"         DateTime DEFAULT now() COMMENT 'the last time the person was identified',
+          
+              _deleted_at          DateTime DEFAULT '1970-01-01 00:00:00',
+              _is_deleted          UInt8 DEFAULT 0,
+              _timestamp           DateTime DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp, _is_deleted)
+                ORDER BY (project_id, "$user_id")
+                PARTITION BY toYYYYMM(_timestamp)
+                TTL _deleted_at + INTERVAL 1 DAY DELETE WHERE _deleted_at != '1970-01-01 00:00:00'
+                SETTINGS allow_experimental_json_type = 1, enable_json_type = 1;
+          
+          
+          CREATE TABLE IF NOT EXISTS product_analytics.devices
+          (
+              project_id         UInt16,
+              "$device_id"       String,
+              "$device"          String                 DEFAULT '',
+              "$screen_height"   UInt16                 DEFAULT 0,
+              "$screen_width"    UInt16                 DEFAULT 0,
+              "$os"              LowCardinality(String) DEFAULT '',
+              "$os_version"      LowCardinality(String) DEFAULT '',
+              "$browser"         LowCardinality(String) DEFAULT '',
+              "$browser_version" String                 DEFAULT '',
+          
+              _deleted_at        DateTime               DEFAULT '1970-01-01 00:00:00',
+              _timestamp         DateTime               DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp)
+                ORDER BY (project_id, "$device_id")
+                TTL _deleted_at + INTERVAL 1 DAY DELETE WHERE _deleted_at != '1970-01-01 00:00:00';
+          
+          -- This table is used in order to identify all devices used by a specific user
+          CREATE TABLE IF NOT EXISTS product_analytics.user_devices
+          (
+              project_id   UInt16,
+              "$device_id" String,
+              "$user_id"   String,
+          
+              _deleted_at  DateTime DEFAULT '1970-01-01 00:00:00',
+              _is_deleted  UInt8    DEFAULT 0,
+              _timestamp   DateTime DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp, _is_deleted)
+                ORDER BY (project_id, "$device_id", "$user_id")
+                TTL _deleted_at + INTERVAL 1 DAY DELETE WHERE _deleted_at != '1970-01-01 00:00:00';
+          
+          
+          -- This table is used in order to relate a distinct_id to an identified user.
+          -- The data in this table will be used to propagate changes of user_id in events table
+          CREATE TABLE IF NOT EXISTS product_analytics.users_distinct_id
+          (
+              project_id  UInt16,
+              distinct_id String COMMENT 'this is the event\'s distinct_id',
+              "$user_id"  String,
+          
+              _deleted_at DateTime DEFAULT '1970-01-01 00:00:00',
+              _is_deleted UInt8    DEFAULT 0,
+              _timestamp  DateTime DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp, _is_deleted)
+                ORDER BY (project_id, distinct_id)
+                PARTITION BY toMonday(_timestamp)
+                TTL _deleted_at WHERE _deleted_at != '1970-01-01 00:00:00';
+          
+          
+          CREATE TABLE IF NOT EXISTS product_analytics.events
+          (
+              project_id                  UInt16,
+              event_id                    UUID,
+              "$event_name"               String,
+              created_at                  DateTime64,
+              distinct_id                 String,
+              "$user_id"                  String,
+              "$device_id"                String,
+              session_id                  UInt64 DEFAULT 0,
+              "$time"                     UInt32 DEFAULT 0 COMMENT 'the time of the event in EPOCH, if not provided, the time of arrival to the server',
+              "$source"                   LowCardinality(String) DEFAULT '' COMMENT 'the name of the integration that sent the event',
+              "$duration_s"               UInt16 DEFAULT 0 COMMENT 'the duration from session-start in seconds',
+              properties                  JSON DEFAULT '{}',
+              "$properties"               JSON DEFAULT '{}' COMMENT 'these properties belongs to the auto-captured events',
+              description                 String DEFAULT '',
+              group_id1                   Array(String) DEFAULT [],
+              group_id2                   Array(String) DEFAULT [],
+              group_id3                   Array(String) DEFAULT [],
+              group_id4                   Array(String) DEFAULT [],
+              group_id5                   Array(String) DEFAULT [],
+              group_id6                   Array(String) DEFAULT [],
+          
+              "$auto_captured"            BOOL DEFAULT FALSE,
+              "$sdk_edition"              LowCardinality(String),
+              "$sdk_version"              LowCardinality(String),
+              "$os"                       LowCardinality(String) DEFAULT '',
+              "$os_version"               LowCardinality(String) DEFAULT '',
+              "$browser"                  LowCardinality(String) DEFAULT '',
+              "$browser_version"          String DEFAULT '',
+              "$device"                   LowCardinality(String) DEFAULT '' COMMENT 'in session, it is platform; web/mobile',
+              "$screen_height"            UInt16 DEFAULT 0,
+              "$screen_width"             UInt16 DEFAULT 0,
+              "$current_url"              String DEFAULT '',
+              "$current_path"             String MATERIALIZED path("$current_url"),
+              "$initial_referrer"         String DEFAULT '',
+              "$referring_domain"         String DEFAULT '',
+              "$referrer"                 String DEFAULT '',
+              "$initial_referring_domain" String DEFAULT '',
+              "$search_engine"            LowCardinality(String) DEFAULT '',
+              "$search_engine_keyword"    String DEFAULT '',
+              "utm_source"                String DEFAULT '',
+              "utm_medium"                String DEFAULT '',
+              "utm_campaign"              String DEFAULT '',
+              "$country"                  Enum8('UN'=-128, 'RW'=-127, 'SO'=-126, 'YE'=-125, 'IQ'=-124, 'SA'=-123, 'IR'=-122, 'CY'=-121, 'TZ'=-120, 'SY'=-119, 'AM'=-118, 'KE'=-117, 'CD'=-116, 'DJ'=-115, 'UG'=-114, 'CF'=-113, 'SC'=-112, 'JO'=-111, 'LB'=-110, 'KW'=-109, 'OM'=-108, 'QA'=-107, 'BH'=-106, 'AE'=-105, 'IL'=-104, 'TR'=-103, 'ET'=-102, 'ER'=-101, 'EG'=-100, 'SD'=-99, 'GR'=-98, 'BI'=-97, 'EE'=-96, 'LV'=-95, 'AZ'=-94, 'LT'=-93, 'SJ'=-92, 'GE'=-91, 'MD'=-90, 'BY'=-89, 'FI'=-88, 'AX'=-87, 'UA'=-86, 'MK'=-85, 'HU'=-84, 'BG'=-83, 'AL'=-82, 'PL'=-81, 'RO'=-80, 'XK'=-79, 'ZW'=-78, 'ZM'=-77, 'KM'=-76, 'MW'=-75, 'LS'=-74, 'BW'=-73, 'MU'=-72, 'SZ'=-71, 'RE'=-70, 'ZA'=-69, 'YT'=-68, 'MZ'=-67, 'MG'=-66, 'AF'=-65, 'PK'=-64, 'BD'=-63, 'TM'=-62, 'TJ'=-61, 'LK'=-60, 'BT'=-59, 'IN'=-58, 'MV'=-57, 'IO'=-56, 'NP'=-55, 'MM'=-54, 'UZ'=-53, 'KZ'=-52, 'KG'=-51, 'TF'=-50, 'HM'=-49, 'CC'=-48, 'PW'=-47, 'VN'=-46, 'TH'=-45, 'ID'=-44, 'LA'=-43, 'TW'=-42, 'PH'=-41, 'MY'=-40, 'CN'=-39, 'HK'=-38, 'BN'=-37, 'MO'=-36, 'KH'=-35, 'KR'=-34, 'JP'=-33, 'KP'=-32, 'SG'=-31, 'CK'=-30, 'TL'=-29, 'RU'=-28, 'MN'=-27, 'AU'=-26, 'CX'=-25, 'MH'=-24, 'FM'=-23, 'PG'=-22, 'SB'=-21, 'TV'=-20, 'NR'=-19, 'VU'=-18, 'NC'=-17, 'NF'=-16, 'NZ'=-15, 'FJ'=-14, 'LY'=-13, 'CM'=-12, 'SN'=-11, 'CG'=-10, 'PT'=-9, 'LR'=-8, 'CI'=-7, 'GH'=-6, 'GQ'=-5, 'NG'=-4, 'BF'=-3, 'TG'=-2, 'GW'=-1, 'MR'=0, 'BJ'=1, 'GA'=2, 'SL'=3, 'ST'=4, 'GI'=5, 'GM'=6, 'GN'=7, 'TD'=8, 'NE'=9, 'ML'=10, 'EH'=11, 'TN'=12, 'ES'=13, 'MA'=14, 'MT'=15, 'DZ'=16, 'FO'=17, 'DK'=18, 'IS'=19, 'GB'=20, 'CH'=21, 'SE'=22, 'NL'=23, 'AT'=24, 'BE'=25, 'DE'=26, 'LU'=27, 'IE'=28, 'MC'=29, 'FR'=30, 'AD'=31, 'LI'=32, 'JE'=33, 'IM'=34, 'GG'=35, 'SK'=36, 'CZ'=37, 'NO'=38, 'VA'=39, 'SM'=40, 'IT'=41, 'SI'=42, 'ME'=43, 'HR'=44, 'BA'=45, 'AO'=46, 'NA'=47, 'SH'=48, 'BV'=49, 'BB'=50, 'CV'=51, 'GY'=52, 'GF'=53, 'SR'=54, 'PM'=55, 'GL'=56, 'PY'=57, 'UY'=58, 'BR'=59, 'FK'=60, 'GS'=61, 'JM'=62, 'DO'=63, 'CU'=64, 'MQ'=65, 'BS'=66, 'BM'=67, 'AI'=68, 'TT'=69, 'KN'=70, 'DM'=71, 'AG'=72, 'LC'=73, 'TC'=74, 'AW'=75, 'VG'=76, 'VC'=77, 'MS'=78, 'MF'=79, 'BL'=80, 'GP'=81, 'GD'=82, 'KY'=83, 'BZ'=84, 'SV'=85, 'GT'=86, 'HN'=87, 'NI'=88, 'CR'=89, 'VE'=90, 'EC'=91, 'CO'=92, 'PA'=93, 'HT'=94, 'AR'=95, 'CL'=96, 'BO'=97, 'PE'=98, 'MX'=99, 'PF'=100, 'PN'=101, 'KI'=102, 'TK'=103, 'TO'=104, 'WF'=105, 'WS'=106, 'NU'=107, 'MP'=108, 'GU'=109, 'PR'=110, 'VI'=111, 'UM'=112, 'AS'=113, 'CA'=114, 'US'=115, 'PS'=116, 'RS'=117, 'AQ'=118, 'SX'=119, 'CW'=120, 'BQ'=121, 'SS'=122,'BU'=123, 'VD'=124, 'YD'=125, 'DD'=126, ''=127) DEFAULT '',
+              "$state"                    LowCardinality(String) DEFAULT '',
+              "$city"                     LowCardinality(String) DEFAULT '',
+              "$or_api_endpoint"          LowCardinality(String),
+              "$timezone"                 Int8 DEFAULT 0 COMMENT 'timezone will be x10 in order to take into consideration countries with tz=N,5H',
+              issue_type                  Enum8(''=0,'click_rage'=1,'dead_click'=2,'excessive_scrolling'=3,'bad_request'=4,'missing_resource'=5,'memory'=6,'cpu'=7,'slow_resource'=8,'slow_page_load'=9,'crash'=10,'ml_cpu'=11,'ml_memory'=12,'ml_dead_click'=13,'ml_click_rage'=14,'ml_mouse_thrashing'=15,'ml_excessive_scrolling'=16,'ml_slow_resources'=17,'custom'=18,'js_exception'=19,'mouse_thrashing'=20,'app_crash'=21,'incident'=22) DEFAULT '',
+              issue_id                    String DEFAULT '',
+              error_id                    String DEFAULT '',
+              -- Created by the backend
+              "$tags"                     Array(String) DEFAULT [] COMMENT 'tags are used to filter events',
+              "$import"                   BOOL DEFAULT FALSE,
+              _deleted_at                 DateTime DEFAULT '1970-01-01 00:00:00',
+              _timestamp                  DateTime DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp)
+                ORDER BY (project_id, "$event_name", created_at, session_id)
+                TTL _deleted_at + INTERVAL 1 DAY DELETE WHERE _deleted_at != '1970-01-01 00:00:00'
+                SETTINGS allow_experimental_json_type = 1, enable_json_type = 1;
+          
+          -- The list of events that should not be ingested,
+          -- according to a specific event_name and optional properties
+          CREATE TABLE IF NOT EXISTS product_analytics.dropped_events
+          (
+              project_id UInt16,
+              event_name String,
+              created_at DateTime64,
+              -- conditions = {prop_name:{"operator":"less","value":"XYZ"}}
+              -- example: {"person_id":{"operator":"equal","value":"taha"},"_country":{"operator":"equal","value":"FR"}}
+              conditions JSON     DEFAULT '{}' COMMENT 'properties will have all constraints',
+          
+              _sign      Int8     DEFAULT 1,
+              _timestamp DateTime DEFAULT now()
+          ) ENGINE = CollapsingMergeTree(_sign)
+                ORDER BY (project_id, event_name)
+                SETTINGS allow_experimental_json_type = 1, enable_json_type = 1;
+          
+          -- The list of properties that should not be ingested in ALL events,
+          -- according to a specific rule
+          CREATE TABLE IF NOT EXISTS product_analytics.dropped_properties
+          (
+              project_id    UInt16,
+              property_name String,
+              created_at    DateTime64,
+              -- example: {"operator":"equal","value":"taha"}
+              conditions    JSON     DEFAULT '{}' COMMENT 'in the form {"operator":"less","value":"XYZ"}',
+          
+              _sign         Int8     DEFAULT 1,
+              _timestamp    DateTime DEFAULT now()
+          ) ENGINE = CollapsingMergeTree(_sign)
+                ORDER BY (project_id, property_name)
+                SETTINGS allow_experimental_json_type = 1, enable_json_type = 1;
+          
+          
+          -- The list of events that should be hidden in the UI
+          CREATE TABLE IF NOT EXISTS product_analytics.hidden_events
+          (
+              project_id UInt16,
+              event_name String,
+              created_at DateTime64,
+          
+              _sign      Int8     DEFAULT 1,
+              _timestamp DateTime DEFAULT now()
+          ) ENGINE = CollapsingMergeTree(_sign)
+                ORDER BY (project_id, event_name);
+          
+          -- The list of properties that should be hidden in the UI
+          CREATE TABLE IF NOT EXISTS product_analytics.hidden_properties
+          (
+              project_id    UInt16,
+              property_name String,
+              created_at    DateTime64,
+          
+              _sign         Int8     DEFAULT 1,
+              _timestamp    DateTime DEFAULT now()
+          ) ENGINE = CollapsingMergeTree(_sign)
+                ORDER BY (project_id, property_name);
+          
+          -- The list created event's tags
+          CREATE TABLE IF NOT EXISTS product_analytics.tags
+          (
+              project_id UInt16,
+              tag_name   String,
+              created_at DateTime64,
+          
+              _sign      Int8     DEFAULT 1,
+              _timestamp DateTime DEFAULT now()
+          ) ENGINE = CollapsingMergeTree(_sign)
+                ORDER BY (project_id, tag_name, created_at);
+          
+          
+          -- A cohort is a group of events-properties during a specific time period,
+          -- related with an AND condition to identify users
+          CREATE TABLE IF NOT EXISTS product_analytics.cohorts
+          (
+              project_id  UInt16,
+              cohort_id   UUID     DEFAULT generateUUIDv4(),
+              name        String,
+              description String   DEFAULT '',
+              created_at  DateTime64,
+              created_by  UInt16 COMMENT 'the OpenReplay user who created this custom event',
+              visibility  String   DEFAULT 'no' COMMENT 'if this custom event is public to the team: no/read-only/read-write',
+              -- definition is the list of filter to use in this cohort during a specific time period, should have the form:
+              -- {filter JSON COMMENT 'the filter to apply to the selected event_name',time_range  LowCardinality(String)}
+              definition  Array(JSON),
+              count       UInt32   DEFAULT 0 COMMENT 'the number of users in this cohort',
+          
+              _sign       Int8     DEFAULT 1,
+              _timestamp  DateTime DEFAULT now()
+          ) ENGINE = CollapsingMergeTree(_sign)
+                ORDER BY (project_id, cohort_id)
+                SETTINGS allow_experimental_json_type = 1, enable_json_type = 1;
+          
+          -- Mapping between group_id and group_key
+          CREATE TABLE IF NOT EXISTS product_analytics.groups
+          (
+              project_id              UInt16,
+              group_key1              String        DEFAULT '',
+              group_key1_display_name String        DEFAULT '',
+              group_key1_properties   Array(String) DEFAULT [],
+              group_key2              String        DEFAULT '',
+              group_key2_display_name String        DEFAULT '',
+              group_key2_properties   Array(String) DEFAULT [],
+              group_key3              String        DEFAULT '',
+              group_key3_display_name String        DEFAULT '',
+              group_key3_properties   Array(String) DEFAULT [],
+              group_key4              String        DEFAULT '',
+              group_key4_display_name String        DEFAULT '',
+              group_key4_properties   Array(String) DEFAULT [],
+              group_key5              String        DEFAULT '',
+              group_key5_display_name String        DEFAULT '',
+              group_key5_properties   Array(String) DEFAULT [],
+              group_key6              String        DEFAULT '',
+              group_key6_display_name String        DEFAULT '',
+              group_key6_properties   Array(String) DEFAULT [],
+          
+              created_at              DateTime64,
+              _timestamp              DateTime      DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp)
+                ORDER BY (project_id);
+          
+          -- The list of property-values of a specific group key-id
+          CREATE TABLE IF NOT EXISTS product_analytics.group_properties
+          (
+              project_id UInt16,
+              group_key  String   DEFAULT '',
+              group_id   String   DEFAULT '',
+              -- example: group_key: color, group_id: red properties: {"hex":"#123","name":"magenta"}
+              properties JSON     DEFAULT '{}',
+          
+              created_at DateTime64,
+              _timestamp DateTime DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp)
+                ORDER BY (project_id, group_key, group_id)
+                SETTINGS allow_experimental_json_type = 1, enable_json_type = 1;
+          
+          
+          -- The full list of events
+          -- Experimental: This table is filled by an incremental materialized view
+          CREATE TABLE IF NOT EXISTS product_analytics.all_events
+          (
+              project_id          UInt16,
+              auto_captured       BOOL     DEFAULT FALSE,
+              event_name          String,
+              event_count_l30days UInt32   DEFAULT 0,
+              query_count_l30days UInt32   DEFAULT 0,
+          
+              created_at          DateTime64,
+              _timestamp          DateTime DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp)
+                ORDER BY (project_id, auto_captured, event_name);
+          
+          CREATE TABLE IF NOT EXISTS product_analytics.all_events_customized
+          (
+              project_id    UInt16,
+              auto_captured BOOL                   DEFAULT FALSE,
+              event_name    String,
+              display_name  String                 DEFAULT '',
+              description   String                 DEFAULT '',
+              status        LowCardinality(String) DEFAULT 'visible' COMMENT 'visible/hidden/dropped',
+          
+              created_at    DateTime64,
+              _deleted_at   Nullable(DateTime64),
+              _is_deleted   BOOL                   DEFAULT FALSE,
+              _timestamp    DateTime               DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp, _is_deleted)
+                ORDER BY (project_id, auto_captured, event_name);
+          
+          CREATE OR REPLACE FUNCTION or_event_display_name AS(event_name)->multiIf(
+                  event_name == 'CLICK', 'Click',
+                  event_name == 'INPUT', 'Text Input',
+                  event_name == 'LOCATION', 'Page View',
+                  event_name == 'ERROR', 'Error',
+                  event_name == 'REQUEST', 'Network Request',
+                  event_name == 'PERFORMANCE', 'Performance',
+                  event_name == 'ISSUE', 'Issue',
+                  event_name == 'INCIDENT', 'Incident',
+                  event_name == 'TAG_TRIGGER', 'Tag',
+                  '');
+          
+          CREATE OR REPLACE FUNCTION or_event_description AS(event_name)->multiIf(
+                  event_name == 'CLICK',
+                  'Represents a user click on a webpage element. Tracked automatically with property $auto_captured set to TRUE and $event_name set to "CLICK".\n\nContains element selector, text content, 鈥? timestamp.',
+                  event_name == 'INPUT',
+                  'Represents text input by a user in form fields or editable elements. Tracked automatically with property $auto_captured set to TRUE and $event_name set to "INPUT".\n\nContains the element selector, 鈥?. and timestamp (actual text content may be masked for privacy).',
+                  event_name == 'LOCATION',
+                  'Represents a page navigation or URL change within your application. Tracked automatically with property $auto_captured set to TRUE and $event_name set to "LOCATION".\n\nContains the full URL, 鈥? referrer information, UTM parameters and timestamp.',
+                  event_name == 'ERROR',
+                  'Represents JavaScript errors and console error messages captured from the application. Tracked automatically with property $auto_captured set to TRUE and $event_name set to "error".\n\nContains error message,鈥?, and timestamp.',
+                  event_name == 'REQUEST',
+                  'Represents HTTP/HTTPS network activity from the application. Tracked automatically with property $auto_captured set to TRUE and $event_name set to "fetch".\n\nContains URL, method, status code, duration, and timestamp',
+                  ''
+                                                                          );
+          
+          -- The full list of event-properties (used to tell which property belongs to which event)
+          -- Experimental: This table is filled by an incremental materialized view
+          CREATE TABLE IF NOT EXISTS product_analytics.event_properties
+          (
+              project_id             UInt16,
+              event_name             String,
+              property_name          String,
+              value_type             String,
+              auto_captured_event    BOOL,
+              auto_captured_property BOOL,
+          
+              created_at             DateTime64,
+              _timestamp             DateTime DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp)
+                ORDER BY (project_id, event_name, property_name, value_type, auto_captured_event, auto_captured_property);
+          
+          
+          -- The full list of properties (events and users)
+          -- Experimental: This table is filled by an incremental materialized view
+          CREATE TABLE IF NOT EXISTS product_analytics.all_properties
+          (
+              project_id        UInt16,
+              source            Enum8('sessions'=0,'users'=1,'events'=2),
+              property_name     String,
+              is_event_property BOOL,
+              auto_captured     BOOL,
+              data_count        UInt32   DEFAULT 1,
+              query_count       UInt32   DEFAULT 0,
+          
+              created_at        DateTime64,
+              _timestamp        DateTime DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp)
+                PARTITION BY toYYYYMM(_timestamp)
+                ORDER BY (project_id, source, property_name, is_event_property, auto_captured);
+          
+          CREATE TABLE IF NOT EXISTS product_analytics.all_properties_customized
+          (
+              project_id    UInt16,
+              source        Enum8('sessions'=0,'users'=1,'events'=2),
+              property_name String,
+              auto_captured BOOL,
+              display_name  String                 DEFAULT '',
+              description   String                 DEFAULT '',
+              status        LowCardinality(String) DEFAULT 'visible' COMMENT 'visible/hidden/dropped',
+          
+              created_at    DateTime64,
+              _deleted_at   Nullable(DateTime64),
+              _is_deleted   BOOL                   DEFAULT FALSE,
+              _timestamp    DateTime               DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp, _is_deleted)
+                ORDER BY (project_id, source, property_name, auto_captured);
+          
+          CREATE OR REPLACE FUNCTION or_property_display_name AS(property_name)->multiIf(
+                  property_name == 'label', 'Label',
+                  property_name == 'hesitation_time', 'Hesitation Time',
+                  property_name == 'name', 'Name',
+                  property_name == 'payload', 'Payload',
+                  property_name == 'level', 'Level',
+                  property_name == 'source', 'Source',
+                  property_name == 'duration', 'Duration',
+                  property_name == 'context', 'Context',
+                  property_name == 'url_host', 'Hostname',
+                  property_name == 'url_path', 'Path',
+                  property_name == 'url_hostpath', 'URL Host and Path',
+                  property_name == 'request_start', 'Request Start',
+                  property_name == 'response_start', 'Response Start',
+                  property_name == 'response_end', 'Response End',
+                  property_name == 'dom_content_loaded_event_start', 'DOM Content Loaded Event Start',
+                  property_name == 'dom_content_loaded_event_end', 'DOM Content Loaded Event End',
+                  property_name == 'load_event_start', 'Load Event Start',
+                  property_name == 'load_event_end', 'Load Event End',
+                  property_name == 'first_paint', 'First Paint',
+                  property_name == 'first_contentful_paint_time', 'First Contentful-paint Time',
+                  property_name == 'speed_index', 'Speed Index',
+                  property_name == 'visually_complete', 'Visually Complete',
+                  property_name == 'time_to_interactive', 'Time To Interactive',
+                  property_name == 'ttfb', 'Time To First Byte',
+                  property_name == 'ttlb', 'Time To Last Byte',
+                  property_name == 'response_time', 'Response Time',
+                  property_name == 'dom_building_time', 'DOM Building Time',
+                  property_name == 'dom_content_loaded_event_time', 'DOM Content Loaded Event Time',
+                  property_name == 'load_event_time', 'Load Event Time',
+                  property_name == 'min_fps', 'Minimum Frame Rate',
+                  property_name == 'avg_fps', 'Average Frame Rate',
+                  property_name == 'max_fps', 'Maximum Frame Rate',
+                  property_name == 'min_cpu', 'Minimum CPU',
+                  property_name == 'avg_cpu', 'Average CPU',
+                  property_name == 'max_cpu', 'Maximum CPU',
+                  property_name == 'min_total_js_heap_size', 'Minimum Total JS Heap Size',
+                  property_name == 'avg_total_js_heap_size', 'Average Total JS Heap Size',
+                  property_name == 'max_total_js_heap_size', 'Maximum Total JS Heap Size',
+                  property_name == 'min_used_js_heap_size', 'Minimum Used JS Heap Size',
+                  property_name == 'avg_used_js_heap_size', 'Average Used JS Heap Size',
+                  property_name == 'max_used_js_heap_size', 'Maximum Used JS Heap Size',
+                  property_name == 'success', 'Success',
+                  property_name == 'request_body', 'Request Body',
+                  property_name == 'response_body', 'Response Body',
+                  property_name == 'transfer_size', 'Transfer Size',
+                  property_name == 'selector', 'CSS Selector',
+                  property_name == 'normalized_x', 'Normalized X',
+                  property_name == 'normalized_y', 'Normalized Y',
+                  property_name == 'message_id', 'Message ID',
+                  property_name == 'cls', 'Cumulative Layout Shift',
+                  property_name == 'lcp', 'Largest Contentful Paint',
+                  property_name == 'issue_type', 'Issue Type',
+                  property_name == 'url', 'URL',
+                  property_name == 'user_device', 'Device',
+                  property_name == 'user_device_type', 'Platform',
+                  property_name == 'message', 'Error Message',
+                  property_name == 'method', 'HTTP Method',
+                  property_name == 'status', 'Status Code',
+                  property_name == 'userState', 'State/Province',
+                  property_name == 'incident', 'Incident Reported By User',
+                  property_name == 'page_title', 'Page Title',
+                  '');
+          
+          CREATE OR REPLACE FUNCTION or_property_visibility AS(property_name)->multiIf(
+                  property_name == 'label', 'visible',
+                  property_name == 'tag_id', 'hidden',
+                  property_name == 'inp', 'hidden',
+                  property_name == 'web_vitals', 'hidden',
+                  property_name = 'duration', 'visible',
+                  property_name = 'avg_cpu', 'hidden',
+                  property_name = 'avg_fps', 'hidden',
+                  property_name = 'avg_total_js_heap_size', 'hidden',
+                  property_name = 'avg_used_js_heap_size', 'hidden',
+                  property_name = 'dom_building_time', 'hidden',
+                  property_name = 'dom_content_loaded_event_end', 'hidden',
+                  property_name = 'dom_content_loaded_event_start', 'hidden',
+                  property_name = 'dom_content_loaded_event_time', 'hidden',
+                  property_name = 'first_paint', 'hidden',
+                  property_name = 'load_event_end', 'hidden',
+                  property_name = 'load_event_start', 'hidden',
+                  property_name = 'load_event_time', 'hidden',
+                  property_name = 'url_hostpath', 'hidden',
+                  property_name = 'visually_complete', 'hidden',
+                  property_name = 'time_to_interactive', 'hidden',
+                  property_name = 'ttlb', 'hidden',
+                  property_name = 'transfer_size', 'hidden',
+                  property_name = 'source', 'hidden',
+                  property_name = 'request_start', 'hidden',
+                  property_name = 'response_end', 'hidden',
+                  property_name = 'response_start', 'hidden',
+                  property_name = 'response_time', 'hidden',
+                  property_name = 'normalized_x', 'visible',
+                  property_name = 'normalized_y', 'visible',
+                  property_name = 'max_total_js_heap_size', 'hidden',
+                  property_name = 'min_total_js_heap_size', 'hidden',
+                  property_name = 'userAnonymousId', 'hidden',
+                  property_name = 'user_device', 'hidden',
+                  'visible');
+          
+          -- Autocomplete
+          
+          CREATE TABLE IF NOT EXISTS product_analytics.autocomplete_events_grouped
+          (
+              project_id UInt16,
+              value      String COMMENT 'The $event_name',
+              data_count AggregateFunction(sum, UInt16) COMMENT 'The number of appearance during the past month',
+              _timestamp DateTime DEFAULT now()
+          ) ENGINE = AggregatingMergeTree()
+                ORDER BY (project_id, value)
+                PARTITION BY toYYYYMM(_timestamp)
+                TTL _timestamp + INTERVAL 1 MONTH;
+          
+          
+          CREATE TABLE IF NOT EXISTS product_analytics.autocomplete_event_properties_grouped
+          (
+              project_id    UInt16,
+              event_name    String COMMENT 'The $event_name',
+              property_name String,
+              value         String COMMENT 'The property-value as a string',
+              data_count    AggregateFunction(sum, UInt16) COMMENT 'The number of appearance during the past month',
+              _timestamp    DateTime DEFAULT now()
+          ) ENGINE = AggregatingMergeTree()
+                ORDER BY (project_id, event_name, property_name, value)
+                PARTITION BY toYYYYMM(_timestamp)
+                TTL _timestamp + INTERVAL 1 MONTH;
+          
+          
+          CREATE TABLE IF NOT EXISTS experimental.parsed_errors
+          (
+              project_id           UInt16,
+              error_id             String,
+              stacktrace           String,
+              stacktrace_parsed_at DateTime DEFAULT now(),
+              is_deleted           UInt8
+          ) ENGINE = ReplacingMergeTree(stacktrace_parsed_at, is_deleted)
+                ORDER BY (project_id, error_id);
+          
+          
+          -- Autocomplete for all values not related to events (browser/metadata/country/...)
+          CREATE TABLE IF NOT EXISTS product_analytics.autocomplete_simple
+          (
+              project_id    UInt16,
+              auto_captured bool,
+              source        Enum8('sessions'=0,'users'=1,'events'=2),
+              name          LowCardinality(String),
+              value         String,
+              data_count    AggregateFunction(sum, UInt16) COMMENT 'The number of appearance during the past month',
+              _timestamp    DateTime
+          ) ENGINE = AggregatingMergeTree()
+                ORDER BY (project_id, auto_captured, source, name, value)
+                PARTITION BY toYYYYMM(_timestamp)
+                TTL _timestamp + INTERVAL 1 MONTH;
+          
+          CREATE TABLE IF NOT EXISTS product_analytics.user_properties
+          (
+              project_id             UInt16,
+              user_id                String,
+              property_name          String,
+              value_type             String,
+              auto_captured_property BOOL,
+          
+              _timestamp             DateTime DEFAULT now()
+          ) ENGINE = ReplacingMergeTree(_timestamp)
+                PARTITION BY toYYYYMM(_timestamp)
+                ORDER BY (project_id, user_id, property_name, value_type, auto_captured_property);
+          
+          CREATE TABLE IF NOT EXISTS product_analytics.autocomplete_user_properties_grouped
+          (
+              project_id    UInt16,
+              user_id       String,
+              property_name String,
+              value         String COMMENT 'The property-value as a string',
+              data_count    AggregateFunction(sum, UInt16) COMMENT 'The number of appearance during the past month',
+              _timestamp    DateTime DEFAULT now()
+          ) ENGINE = AggregatingMergeTree()
+                ORDER BY (project_id, user_id, property_name, value)
+                PARTITION BY toYYYYMM(_timestamp)
+                TTL _timestamp + INTERVAL 1 MONTH;
+          
+          
+          -- =====================================================================================
+          -- MATERIALIZED VIEWS
+          -- All materialized views are placed at the end of the script to ensure
+          -- all referenced tables and functions exist before the views are created.
+          -- =====================================================================================
+          
+          CREATE MATERIALIZED VIEW IF NOT EXISTS product_analytics.all_events_extractor_mv
+              TO product_analytics.all_events AS
+          SELECT project_id,
+                 `$auto_captured` AS auto_captured,
+                 `$event_name`    AS event_name,
+                 created_at       AS created_at
+          FROM product_analytics.events
+          GROUP BY ALL;
+          
+          -- Incremental materialized view to fill event_properties using $properties & properties
+          CREATE MATERIALIZED VIEW IF NOT EXISTS product_analytics.event_dproperties_extractor_mv
+              TO product_analytics.event_properties AS
+          SELECT project_id,
+                 `$event_name`    AS event_name,
+                 a.1              AS property_name,
+                 a.2              AS value_type,
+                 `$auto_captured` AS auto_captured_event,
+                 TRUE             AS auto_captured_property,
+                 created_at
+          FROM product_analytics.events
+                   ARRAY JOIN JSONAllPathsWithTypes(`$properties`) AS a
+          GROUP BY ALL;
+          
+          CREATE MATERIALIZED VIEW IF NOT EXISTS product_analytics.event_properties_extractor_mv
+              TO product_analytics.event_properties AS
+          SELECT project_id,
+                 `$event_name`    AS event_name,
+                 a.1              AS property_name,
+                 a.2              AS value_type,
+                 `$auto_captured` AS auto_captured_event,
+                 FALSE            AS auto_captured_property,
+                 created_at
+          FROM product_analytics.events
+                   ARRAY JOIN JSONAllPathsWithTypes(`properties`) AS a
+          GROUP BY ALL;
+          
+          -- Incremental materialized view to fill all_properties
+          CREATE MATERIALIZED VIEW IF NOT EXISTS product_analytics.events_all_properties_extractor_mv
+              TO product_analytics.all_properties AS
+          SELECT project_id,
+                 'events'                    AS source,
+                 property_name,
+                 TRUE                        AS is_event_property,
+                 auto_captured_property      AS auto_captured,
+                 0                           AS data_count,
+                 0                           AS query_count,
+                 event_properties.created_at AS created_at
+          FROM product_analytics.event_properties;
+          
+          CREATE MATERIALIZED VIEW IF NOT EXISTS product_analytics.users_all_properties_extractor_mv
+              TO product_analytics.all_properties AS
+          SELECT project_id,
+                 'users'                AS source,
+                 property_name,
+                 FALSE                  AS is_event_property,
+                 auto_captured_property AS auto_captured,
+                 0                      AS data_count,
+                 0                      AS query_count,
+                 _timestamp             AS created_at
+          FROM product_analytics.user_properties;
+          
+          CREATE MATERIALIZED VIEW IF NOT EXISTS product_analytics.autocomplete_events_grouped_mv
+              TO product_analytics.autocomplete_events_grouped AS
+          SELECT project_id,
+                 `$event_name`         AS value,
+                 sumState(toUInt16(1)) AS data_count
+          FROM product_analytics.events
+          WHERE value != ''
+          GROUP BY ALL;
+          
+          CREATE MATERIALIZED VIEW IF NOT EXISTS product_analytics.autocomplete_event_properties_grouped_mv
+              TO product_analytics.autocomplete_event_properties_grouped AS
+          SELECT project_id,
+                 `$event_name`         AS event_name,
+                 a.1                   AS property_name,
+                 a.2                   AS value,
+                 sumState(toUInt16(1)) AS data_count
+          FROM product_analytics.events
+                   ARRAY JOIN JSONExtractKeysAndValues(toString(`properties`), 'String') AS a
+          WHERE length(a.1) > 0
+            AND isNull(toFloat64OrNull(a.1))
+          GROUP BY ALL;
+          
+          CREATE MATERIALIZED VIEW IF NOT EXISTS product_analytics.autocomplete_event_dproperties_grouped_mv
+              TO product_analytics.autocomplete_event_properties_grouped AS
+          SELECT project_id,
+                 `$event_name`         AS event_name,
+                 a.1                   AS property_name,
+                 a.2                   AS value,
+                 sumState(toUInt16(1)) AS data_count
+          FROM product_analytics.events
+                   ARRAY JOIN JSONExtractKeysAndValues(toString(`$properties`), 'String') AS a
+          WHERE length(a.1) > 0
+            AND isNull(toFloat64OrNull(a.1))
+          GROUP BY ALL;
+          
+          CREATE MATERIALIZED VIEW IF NOT EXISTS product_analytics.autocomplete_simple_sessions_mv
+              TO product_analytics.autocomplete_simple AS
+          SELECT project_id,
+                 t.3                   AS auto_captured,
+                 'sessions'            AS source,
+                 t.1                   AS name,
+                 toString(t.2)         AS value,
+                 sumState(toUInt16(1)) AS data_count,
+                 _timestamp
+          FROM experimental.sessions
+                   ARRAY JOIN
+               [--(name,column,auto-captured)
+                   ('user_browser', user_browser, TRUE),
+                   ('user_browser_version', user_browser_version, TRUE),
+                   ('user_country', user_country, TRUE),
+                   ('user_state', user_state, TRUE),
+                   ('user_city', user_city, TRUE),
+                   ('user_device', user_device, TRUE),
+                   ('rev_id', rev_id, TRUE),
+                   ('referrer', referrer, TRUE),
+                   ('utm_source', utm_source, TRUE),
+                   ('utm_medium', utm_medium, TRUE),
+                   ('utm_campaign', utm_campaign, TRUE),
+                   ('user_id', user_id, FALSE),
+                   ('user_anonymous_id', user_anonymous_id, FALSE),
+                   ('metadata_1', metadata_1, FALSE),
+                   ('metadata_2', metadata_2, FALSE),
+                   ('metadata_3', metadata_3, FALSE),
+                   ('metadata_4', metadata_4, FALSE),
+                   ('metadata_5', metadata_5, FALSE),
+                   ('metadata_6', metadata_6, FALSE),
+                   ('metadata_7', metadata_7, FALSE),
+                   ('metadata_8', metadata_8, FALSE),
+                   ('metadata_9', metadata_9, FALSE),
+                   ('metadata_10', metadata_10, FALSE)
+                   ] AS t
+          WHERE isNotNull(t.2)
+            AND notEmpty(toString(t.2))
+          GROUP BY ALL;
+          
+          CREATE MATERIALIZED VIEW IF NOT EXISTS product_analytics.user_properties_extractor_mv
+              TO product_analytics.user_properties AS
+          SELECT project_id,
+                 `$user_id` AS user_id,
+                 a.1        AS property_name,
+                 a.2        AS value_type,
+                 FALSE      AS auto_captured_property
+          FROM product_analytics.users
+                   ARRAY JOIN JSONAllPathsWithTypes(`properties`) AS a
+          GROUP BY ALL;
+          
+          CREATE MATERIALIZED VIEW IF NOT EXISTS product_analytics.autocomplete_user_properties_grouped_mv
+              TO product_analytics.autocomplete_user_properties_grouped AS
+          SELECT project_id,
+                 `$user_id`            AS user_id,
+                 a.1                   AS property_name,
+                 a.2                   AS value,
+                 sumState(toUInt16(1)) AS data_count
+          FROM product_analytics.users
+                   ARRAY JOIN JSONExtractKeysAndValues(toString(`properties`), 'String') AS a
+          WHERE length(a.1) > 0
+            AND isNull(toFloat64OrNull(a.1))
+          GROUP BY ALL;
+          
+          CREATE MATERIALIZED VIEW IF NOT EXISTS product_analytics.autocomplete_simple_events_mv
+              TO product_analytics.autocomplete_simple AS
+          SELECT project_id,
+                 t.3                   AS auto_captured,
+                 'events'              AS source,
+                 t.1                   AS name,
+                 toString(t.2)         AS value,
+                 sumState(toUInt16(1)) AS data_count,
+                 _timestamp
+          FROM product_analytics.events
+                   ARRAY JOIN
+               [--(name,column,auto-captured)
+                   ('$user_id', "$user_id", FALSE),
+                   ('$sdk_edition', "$sdk_edition", TRUE),
+                   ('$sdk_version', "$sdk_version", TRUE),
+                   ('$current_url', "$current_url", TRUE),
+                   ('$current_path', "$current_path", TRUE),
+                   ('$initial_referrer', "$initial_referrer", TRUE),
+                   ('$referring_domain', "$referring_domain", TRUE),
+                   ('$country', "$country", TRUE),
+                   ('$state', "$state", TRUE),
+                   ('$city', "$city", TRUE),
+                   ('$or_api_endpoint', "$or_api_endpoint", TRUE)
+                   ] AS t
+          WHERE isNotNull(t.2)
+            AND notEmpty(toString(t.2))
+          GROUP BY ALL;
+          
+          CREATE MATERIALIZED VIEW IF NOT EXISTS product_analytics.autocomplete_simple_users_mv
+              TO product_analytics.autocomplete_simple AS
+          SELECT project_id,
+                 t.3                   AS auto_captured,
+                 'users'               AS source,
+                 t.1                   AS name,
+                 toString(t.2)         AS value,
+                 sumState(toUInt16(1)) AS data_count,
+                 _timestamp
+          FROM product_analytics.users
+                   ARRAY JOIN
+               [--(name,column,auto-captured)
+                   ('$user_id', "$user_id", FALSE),
+                   ('$email', "$email", FALSE),
+                   ('$name', "$name", FALSE),
+                   ('$first_name', "$first_name", FALSE),
+                   ('$last_name', "$last_name", FALSE),
+                   ('$phone', "$phone", FALSE),
+                   ('$sdk_edition', "$sdk_edition", TRUE),
+                   ('$sdk_version', "$sdk_version", TRUE),
+                   ('$current_url', "$current_url", TRUE),
+                   ('$current_path', "$current_path", TRUE),
+                   ('$initial_referrer', "$initial_referrer", TRUE),
+                   ('$referring_domain', "$referring_domain", TRUE),
+                   ('initial_utm_source', initial_utm_source, TRUE),
+                   ('initial_utm_medium', initial_utm_medium, TRUE),
+                   ('initial_utm_campaign', initial_utm_campaign, TRUE),
+                   ('$country', "$country", TRUE),
+                   ('$state', "$state", TRUE),
+                   ('$city', "$city", TRUE),
+                   ('$or_api_endpoint', "$or_api_endpoint", TRUE)
+                   ] AS t
+          WHERE isNotNull(t.2)
+            AND notEmpty(toString(t.2))
+          GROUP BY ALL;
+          CREATE OR REPLACE FUNCTION openreplay_migration_state AS() -> -1;
+    environment:
+      CH_HOST: "clickhouse-openreplay-clickhouse.db.svc.cluster.local"
+      CH_PORT: "9000"
+      CH_PORT_HTTP: "8123"
+      CH_USERNAME: "default"
+      CH_PASSWORD: ""
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+          # Checking variable is empty. Shell independant method.
+          # Wait for Minio to be ready
+          until nc -z -v -w30 clickhouse-openreplay-clickhouse.db.svc.cluster.local 9000; do
+              echo "Waiting for Minio server to be ready..."
+              sleep 1
+          done
+
+          echo "clickhouse is up - executing command"
+          clickhouse-client -h clickhouse-openreplay-clickhouse.db.svc.cluster.local --user default --port 9000 --multiquery < /tmp/init_schema.sql || true
+  
+  alerts-openreplay:
+    image: public.ecr.aws/p1t3u8a3/alerts:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - alerts-openreplay
+          - alerts-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'version_number=v1.26.0'
+      - 'pg_host=postgresql.db.svc.cluster.local'
+      - 'pg_port=5432'
+      - 'pg_dbname=postgres'
+      - 'ch_host=clickhouse-openreplay-clickhouse.db.svc.cluster.local'
+      - 'ch_port=9000'
+      - 'ch_port_http=8123'
+      - 'ch_username=default'
+      - 'ch_password='
+      - 'pg_user=postgres'
+      - 'pg_password=${SERVICE_PASSWORD_POSTGRES}'
+      - 'SITE_URL=$SERVICE_URL_OPENREPLAY_80'
+      - 'S3_HOST=$SERVICE_URL_OPENREPLAY_80'
+      - 'S3_KEY=${SERVICE_USER_MINIO}'
+      - 'S3_SECRET=${SERVICE_PASSWORD_MINIO}'
+      - 'AWS_DEFAULT_REGION=us-east-1'
+      - 'EMAIL_HOST='
+      - 'EMAIL_PORT=587'
+      - 'EMAIL_USER='
+      - 'EMAIL_PASSWORD='
+      - 'EMAIL_USE_TLS=true'
+      - 'EMAIL_USE_SSL=false'
+      - 'EMAIL_SSL_KEY='
+      - 'EMAIL_SSL_CERT='
+      - 'EMAIL_FROM=OpenReplay<do-not-reply@openreplay.com>'
+      - 'LOGLEVEL=INFO'
+      - 'PYTHONUNBUFFERED=0'
+    restart: unless-stopped
+  
+  
+  api-openreplay:
+    image: public.ecr.aws/p1t3u8a3/api:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - api-openreplay
+          - api-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'TOKEN_SECRET=${SERVICE_PASSWORD_64_TOKEN}'
+      - 'ch_db=default'
+      - 'KAFKA_SERVERS=kafka.db.svc.cluster.local:9092'
+      - 'KAFKA_USE_SSL=false'
+      - 'JWT_SECRET=${SERVICE_PASSWORD_64_JWT}'
+      - 'ASSIST_JWT_SECRET=${SERVICE_PASSWORD_64_ASSISTJWT}'
+      - 'AWS_ACCESS_KEY_ID=${SERVICE_USER_MINIO}'
+      - 'AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}'
+      - 'AWS_ENDPOINT=$SERVICE_URL_OPENREPLAY_80'
+      - 'AWS_REGION=us-east-1'
+      - 'BUCKET_NAME=mobs'
+      - 'CH_USERNAME=default'
+      - 'CH_PASSWORD='
+      - 'CLICKHOUSE_STRING=clickhouse-openreplay-clickhouse.db.svc.cluster.local:9000/default'
+      - 'CLICKHOUSE_HTTP_STRING=clickhouse-openreplay-clickhouse.db.svc.cluster.local:8123/default'
+      - 'pg_password=${SERVICE_PASSWORD_POSTGRES}'
+      - 'POSTGRES_STRING=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@postgresql.db.svc.cluster.local:5432/postgres?sslmode=disable'
+      - 'ASSIST_URL=http://assist-openreplay.app.svc.cluster.local:9001/assist/%s'
+      - 'ASSIST_KEY=${SERVICE_PASSWORD_64_ASSISTKEY}'
+      - 'REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379'
+    restart: unless-stopped
+  
+  
+  http-openreplay:
+    image: public.ecr.aws/p1t3u8a3/http:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - http-openreplay
+          - http-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'BUCKET_NAME=uxtesting-records'
+      - 'CACHE_ASSETS=true'
+      - 'AWS_ACCESS_KEY_ID=${SERVICE_USER_MINIO}'
+      - 'AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}'
+      - 'AWS_REGION=us-east-1'
+      - 'AWS_ENDPOINT=$SERVICE_URL_OPENREPLAY_80'
+      - 'LICENSE_KEY='
+      - 'KAFKA_SERVERS=kafka.db.svc.cluster.local:9092'
+      - 'KAFKA_USE_SSL=false'
+      - 'pg_password=${SERVICE_PASSWORD_POSTGRES}'
+      - 'POSTGRES_STRING=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@postgresql.db.svc.cluster.local:5432/postgres?sslmode=disable'
+      - 'REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379'
+      - 'JWT_SECRET=${SERVICE_PASSWORD_64_JWT}'
+      - 'JWT_SPOT_SECRET=${SERVICE_PASSWORD_64_JWTSPOT}'
+      - 'TOKEN_SECRET=${SERVICE_PASSWORD_64_TOKEN}'
+    restart: unless-stopped
+  
+  
+  images-openreplay:
+    image: public.ecr.aws/p1t3u8a3/images:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - images-openreplay
+          - images-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'AWS_ACCESS_KEY_ID=${SERVICE_USER_MINIO}'
+      - 'AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}'
+      - 'AWS_ENDPOINT=$SERVICE_URL_OPENREPLAY_80'
+      - 'AWS_REGION=us-east-1'
+      - 'BUCKET_NAME=mobs'
+      - 'LICENSE_KEY='
+      - 'KAFKA_SERVERS=kafka.db.svc.cluster.local:9092'
+      - 'KAFKA_USE_SSL=false'
+      - 'REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379'
+      - 'FS_CLEAN_HRS=24'
+    restart: unless-stopped
+  
+  
+  integrations-openreplay:
+    image: public.ecr.aws/p1t3u8a3/integrations:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - integrations-openreplay
+          - integrations-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'AWS_ACCESS_KEY_ID=${SERVICE_USER_MINIO}'
+      - 'AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}'
+      - 'AWS_ENDPOINT=$SERVICE_URL_OPENREPLAY_80'
+      - 'AWS_REGION=us-east-1'
+      - 'BUCKET_NAME=mobs'
+      - 'JWT_SECRET=${SERVICE_PASSWORD_64_JWT}'
+      - 'LICENSE_KEY='
+      - 'KAFKA_SERVERS=kafka.db.svc.cluster.local:9092'
+      - 'KAFKA_USE_SSL=false'
+      - 'pg_password=${SERVICE_PASSWORD_POSTGRES}'
+      - 'POSTGRES_STRING=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@postgresql.db.svc.cluster.local:5432/postgres?sslmode=disable'
+      - 'REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379'
+      - 'TOKEN_SECRET=${SERVICE_PASSWORD_64_TOKEN}'
+    restart: unless-stopped
+  
+  
+  sink-openreplay:
+    image: public.ecr.aws/p1t3u8a3/sink:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - sink-openreplay
+          - sink-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'LICENSE_KEY='
+      - 'KAFKA_SERVERS=kafka.db.svc.cluster.local:9092'
+      - 'KAFKA_USE_SSL=false'
+      - 'ASSETS_ORIGIN=$SERVICE_URL_OPENREPLAY_80/sessions-assets'
+      - 'REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379'
+    restart: unless-stopped
+  
+  
+  sourcemapreader-openreplay:
+    image: public.ecr.aws/p1t3u8a3/sourcemapreader:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - sourcemapreader-openreplay
+          - sourcemapreader-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'SMR_HOST=0.0.0.0'
+      - 'S3_HOST=http://minio.db.svc.cluster.local:9000'
+      - 'S3_KEY=${SERVICE_USER_MINIO}'
+      - 'S3_SECRET=${SERVICE_PASSWORD_MINIO}'
+      - 'AWS_REGION=us-east-1'
+      - 'LICENSE_KEY='
+      - 'ASSETS_ORIGIN=$SERVICE_URL_OPENREPLAY_80/sessions-assets'
+    restart: unless-stopped
+  
+  
+  spot-openreplay:
+    image: public.ecr.aws/p1t3u8a3/spot:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - spot-openreplay
+          - spot-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'CACHE_ASSETS=true'
+      - 'FS_CLEAN_HRS=24'
+      - 'TOKEN_SECRET=${SERVICE_PASSWORD_64_TOKEN}'
+      - 'AWS_ACCESS_KEY_ID=${SERVICE_USER_MINIO}'
+      - 'AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}'
+      - 'BUCKET_NAME=spots'
+      - 'AWS_REGION=us-east-1'
+      - 'AWS_ENDPOINT=$SERVICE_URL_OPENREPLAY_80'
+      - 'LICENSE_KEY='
+      - 'KAFKA_SERVERS=kafka.db.svc.cluster.local:9092'
+      - 'KAFKA_USE_SSL=false'
+      - 'JWT_SECRET=${SERVICE_PASSWORD_64_JWT}'
+      - 'JWT_SPOT_SECRET=${SERVICE_PASSWORD_64_JWTSPOT}'
+      - 'pg_password=${SERVICE_PASSWORD_POSTGRES}'
+      - 'POSTGRES_STRING=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@postgresql.db.svc.cluster.local:5432/postgres?sslmode=disable'
+      - 'REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379'
+    restart: unless-stopped
+  
+  
+  storage-openreplay:
+    image: public.ecr.aws/p1t3u8a3/storage:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - storage-openreplay
+          - storage-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'AWS_ACCESS_KEY_ID=${SERVICE_USER_MINIO}'
+      - 'AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}'
+      - 'AWS_ENDPOINT=$SERVICE_URL_OPENREPLAY_80'
+      - 'AWS_REGION=us-east-1'
+      - 'BUCKET_NAME=mobs'
+      - 'LICENSE_KEY='
+      - 'KAFKA_SERVERS=kafka.db.svc.cluster.local:9092'
+      - 'KAFKA_USE_SSL=false'
+      - 'REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379'
+      - 'FS_CLEAN_HRS=24'
+    restart: unless-stopped
+  
+  
+  assets-openreplay:
+    image: public.ecr.aws/p1t3u8a3/assets:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - assets-openreplay
+          - assets-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'AWS_ACCESS_KEY_ID=${SERVICE_USER_MINIO}'
+      - 'AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}'
+      - 'BUCKET_NAME=sessions-assets'
+      - 'LICENSE_KEY='
+      - 'AWS_ENDPOINT=$SERVICE_URL_OPENREPLAY_80'
+      - 'AWS_REGION=us-east-1'
+      - 'KAFKA_SERVERS=kafka.db.svc.cluster.local:9092'
+      - 'KAFKA_USE_SSL=false'
+      - 'ASSETS_ORIGIN=$SERVICE_URL_OPENREPLAY_80/sessions-assets'
+      - 'REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379'
+    restart: unless-stopped
+  
+  
+  assist-openreplay:
+    image: public.ecr.aws/p1t3u8a3/assist:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - assist-openreplay
+          - assist-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'ASSIST_JWT_SECRET=${SERVICE_PASSWORD_64_ASSISTJWT}'
+      - 'ASSIST_KEY=${SERVICE_PASSWORD_64_ASSISTKEY}'
+      - 'AWS_DEFAULT_REGION=us-east-1'
+      - 'REDIS_URL=redis-master.db.svc.cluster.local'
+      - 'CLEAR_SOCKET_TIME=720'
+      - 'debug=0'
+      - 'redis=false'
+    restart: unless-stopped
+  
+  
+  canvases-openreplay:
+    image: public.ecr.aws/p1t3u8a3/canvases:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - canvases-openreplay
+          - canvases-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'AWS_ACCESS_KEY_ID=${SERVICE_USER_MINIO}'
+      - 'AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}'
+      - 'AWS_ENDPOINT=$SERVICE_URL_OPENREPLAY_80'
+      - 'AWS_REGION=us-east-1'
+      - 'BUCKET_NAME=mobs'
+      - 'LICENSE_KEY='
+      - 'KAFKA_SERVERS=kafka.db.svc.cluster.local:9092'
+      - 'KAFKA_USE_SSL=false'
+      - 'REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379'
+      - 'FS_CLEAN_HRS=24'
+    restart: unless-stopped
+  
+  
+  chalice-openreplay:
+    image: public.ecr.aws/p1t3u8a3/chalice:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - chalice-openreplay
+          - chalice-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379'
+      - 'KAFKA_SERVERS=kafka.db.svc.cluster.local'
+      - 'ch_username=default'
+      - 'ch_password='
+      - 'ch_host=clickhouse-openreplay-clickhouse.db.svc.cluster.local'
+      - 'ch_port=9000'
+      - 'ch_port_http=8123'
+      - 'sourcemaps_reader=http://sourcemapreader-openreplay.app.svc.cluster.local:9000/{}/sourcemaps'
+      - 'ASSIST_URL=http://assist-openreplay.app.svc.cluster.local:9001/assist/%s'
+      - 'JWT_REFRESH_SECRET=${SERVICE_PASSWORD_64_JWTREFRESH}'
+      - 'JWT_SPOT_REFRESH_SECRET=${SERVICE_PASSWORD_64_JWTSPOTREFRESH}'
+      - 'ASSIST_JWT_SECRET=${SERVICE_PASSWORD_64_ASSISTJWT}'
+      - 'JWT_SECRET=${SERVICE_PASSWORD_64_JWT}'
+      - 'ASSIST_KEY=${SERVICE_PASSWORD_64_ASSISTKEY}'
+      - 'JWT_SPOT_SECRET=${SERVICE_PASSWORD_64_JWTSPOT}'
+      - 'LICENSE_KEY='
+      - 'version_number=v1.26.0'
+      - 'pg_host=postgresql.db.svc.cluster.local'
+      - 'pg_port=5432'
+      - 'pg_dbname=postgres'
+      - 'pg_user=postgres'
+      - 'pg_password=${SERVICE_PASSWORD_POSTGRES}'
+      - 'SITE_URL=$SERVICE_URL_OPENREPLAY_80'
+      - 'S3_HOST=$SERVICE_URL_OPENREPLAY_80'
+      - 'S3_KEY=${SERVICE_USER_MINIO}'
+      - 'S3_SECRET=${SERVICE_PASSWORD_MINIO}'
+      - 'AWS_DEFAULT_REGION=us-east-1'
+      - 'sessions_region=us-east-1'
+      - 'ASSIST_RECORDS_BUCKET=records'
+      - 'sessions_bucket=mobs'
+      - 'IOS_VIDEO_BUCKET=mobs'
+      - 'sourcemaps_bucket=sourcemaps'
+      - 'js_cache_bucket=sessions-assets'
+      - 'EMAIL_HOST='
+      - 'EMAIL_PORT=587'
+      - 'EMAIL_USER='
+      - 'EMAIL_PASSWORD='
+      - 'EMAIL_USE_TLS=true'
+      - 'EMAIL_USE_SSL=false'
+      - 'EMAIL_SSL_KEY='
+      - 'EMAIL_SSL_CERT='
+      - 'EMAIL_FROM=OpenReplay<do-not-reply@openreplay.com>'
+      - 'SCIM_ACCESS_SECRET_KEY=${SERVICE_PASSWORD_64_SCIMACCESS}'
+      - 'SCIM_REFRESH_SECRET_KEY=${SERVICE_PASSWORD_64_SCIMREFRESH}'
+      - 'CH_COMPRESSION=false'
+      - 'CLUSTER_URL=svc.cluster.local'
+      - 'JWT_EXPIRATION=86400'
+      - 'LOGLEVEL=INFO'
+      - 'PYTHONUNBUFFERED=0'
+      - 'SAML2_MD_URL='
+      - 'SCIM_ACCESS_TOKEN_EXPIRE_SECONDS=86400'
+      - 'announcement_url='
+      - 'assist_secret='
+      - 'async_Token='
+      - 'captcha_key='
+      - 'captcha_server='
+      - 'iceServers='
+      - 'idp_entityId='
+      - 'idp_name='
+      - 'idp_sls_url='
+      - 'idp_sso_url='
+      - 'idp_tenantKey='
+      - 'idp_x509cert='
+      - 'jwt_algorithm=HS512'
+      - 'root_path=/api'
+    restart: unless-stopped
+  
+  
+  db-openreplay:
+    image: public.ecr.aws/p1t3u8a3/db:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - db-openreplay
+          - db-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'CH_USERNAME=default'
+      - 'CH_PASSWORD='
+      - 'CLICKHOUSE_STRING=clickhouse-openreplay-clickhouse.db.svc.cluster.local:9000/default'
+      - 'LICENSE_KEY='
+      - 'KAFKA_SERVERS=kafka.db.svc.cluster.local:9092'
+      - 'KAFKA_USE_SSL=false'
+      - 'pg_password=${SERVICE_PASSWORD_POSTGRES}'
+      - 'POSTGRES_STRING=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@postgresql.db.svc.cluster.local:5432/postgres?sslmode=disable'
+      - 'REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379'
+      - 'ch_db=default'
+    restart: unless-stopped
+  
+  
+  ender-openreplay:
+    image: public.ecr.aws/p1t3u8a3/ender:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - ender-openreplay
+          - ender-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'LICENSE_KEY='
+      - 'KAFKA_SERVERS=kafka.db.svc.cluster.local:9092'
+      - 'KAFKA_USE_SSL=false'
+      - 'pg_password=${SERVICE_PASSWORD_POSTGRES}'
+      - 'POSTGRES_STRING=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@postgresql.db.svc.cluster.local:5432/postgres?sslmode=disable'
+      - 'REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379'
+    restart: unless-stopped
+  
+  
+  frontend-openreplay:
+    image: public.ecr.aws/p1t3u8a3/frontend:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - frontend-openreplay
+          - frontend-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'TRACKER_HOST=$SERVICE_URL_OPENREPLAY_80/script'
+      - 'HTTP_PORT=80'
+    restart: unless-stopped
+  
+  
+  heuristics-openreplay:
+    image: public.ecr.aws/p1t3u8a3/heuristics:${OPENREPLAY_VERSION:-v1.23.0}
+    domainname: app.svc.cluster.local
+    networks:
+      openreplay-net:
+        aliases:
+          - heuristics-openreplay
+          - heuristics-openreplay.app.svc.cluster.local
+    volumes:
+      - shared-volume:/mnt/efs
+    environment:
+      - 'LICENSE_KEY='
+      - 'KAFKA_SERVERS=kafka.db.svc.cluster.local:9092'
+      - 'KAFKA_USE_SSL=false'
+      - 'REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379'
+    restart: unless-stopped
+  
+
+  nginx-openreplay:
+    image: nginx:latest
+    networks:
+      - openreplay-net
+    environment:
+      - SERVICE_URL_OPENREPLAY_80
+    volumes:
+      - type: bind
+        source: ./nginx.conf
+        target: /etc/nginx/conf.d/default.conf
+        content: |
+          # Extract sessionid from peerId, it'll be used for sticky sessions.
+          map $arg_peerId $sessionid {
+            default "";
+            "~.*-(\d+)(?:-.*|$)" $1;
+          }
+          
+          map $http_x_forwarded_for $real_ip {
+              ~^(\d+\.\d+\.\d+\.\d+) $1;
+              default $remote_addr;
+          }
+          map $http_upgrade $connection_upgrade {
+            default upgrade;
+            '' close;
+          }
+          map $http_x_forwarded_proto $origin_proto {
+            default $http_x_forwarded_proto;
+            '' $scheme;
+          }
+          
+          server {
+              listen 80;
+          
+              # Match ingress-nginx defaults used by OpenReplay helm chart
+              client_body_buffer_size 512k;
+              client_max_body_size 10m;
+          
+              proxy_buffer_size 64k;
+              proxy_buffers 32 64k;
+              proxy_busy_buffers_size 128k;
+              proxy_max_temp_file_size 2048m;
+              proxy_buffering on;
+          
+              proxy_connect_timeout 120s;
+              proxy_read_timeout 300s;
+              proxy_send_timeout 300s;
+          
+              # Trust upstream/load-balancer forwarded headers
+              real_ip_header X-Forwarded-For;
+              set_real_ip_from 0.0.0.0/0;
+              real_ip_recursive on;
+          
+              # Security headers
+              add_header X-XSS-Protection "1; mode=block" always;
+              add_header X-Content-Type-Options "nosniff" always;
+              add_header Referrer-Policy "same-origin" always;
+          
+              server_tokens off;
+          
+              location ~ ^/(mobs|sessions-assets|frontend|static|sourcemaps|ios-images|uxtesting-records|records|spots)/ {
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header Host $http_host;
+          
+                proxy_connect_timeout 300;
+                # Default is HTTP/1, keepalive is only enabled in HTTP/1.1
+                proxy_http_version 1.1;
+                proxy_set_header Connection "";
+                chunked_transfer_encoding off;
+          
+                proxy_pass http://minio:9000;
+              }
+          
+              location /minio/ {
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "Upgrade";
+                proxy_set_header Host $host;
+                proxy_pass http://minio:9000;
+              }
+              location /ingest/ {
+                rewrite ^/ingest/(.*) /$1 break;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "Upgrade";
+                proxy_set_header X-Forwarded-For $real_ip;
+                proxy_set_header X-Forwarded-Host $host;
+                proxy_set_header X-Real-IP $real_ip;
+                proxy_set_header Host $host;
+                proxy_pass http://http-openreplay:8080;
+                proxy_read_timeout 300s;
+                proxy_connect_timeout 120s;
+                proxy_send_timeout 300s;
+          
+                # CORS Headers
+                add_header 'Access-Control-Allow-Origin' '*' always;
+                add_header 'Access-Control-Allow-Methods' 'POST' always;
+                add_header 'Access-Control-Allow-Headers' 'Content-Type,Authorization,Content-Encoding' always;
+                add_header 'Access-Control-Expose-Headers' 'Content-Length' always;
+              }
+              location /integrations/ {
+                rewrite ^/integrations/(.*) /$1 break;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "Upgrade";
+                proxy_set_header X-Forwarded-For $real_ip;
+                proxy_set_header X-Forwarded-Host $host;
+                proxy_set_header X-Real-IP $real_ip;
+                proxy_set_header Host $host;
+                proxy_pass http://integrations-openreplay:8080;
+                proxy_read_timeout 300s;
+                proxy_connect_timeout 120s;
+                proxy_send_timeout 300s;
+          
+                # CORS Headers
+                add_header 'Access-Control-Allow-Origin' '*' always;
+                add_header 'Access-Control-Allow-Methods' 'POST,PATCH,OPTIONS,DELETE' always;
+                add_header 'Access-Control-Allow-Headers' 'Content-Type,Authorization,Content-Encoding,X-Openreplay-Batch' always;
+                add_header 'Access-Control-Expose-Headers' 'Content-Length' always;
+              }
+          
+              # New Go-based API (v2) - takes precedence over legacy /api
+              location /v2/api/ {
+                rewrite ^/v2/api/(.*) /$1 break;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "Upgrade";
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-Proto $origin_proto;
+                proxy_set_header X-Forwarded-For $real_ip;
+                proxy_set_header X-Real-IP $real_ip;
+                proxy_pass http://api-openreplay:8080;
+                proxy_read_timeout 300s;
+                proxy_connect_timeout 120s;
+                proxy_send_timeout 300s;
+          
+                # CORS Headers
+                add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+                add_header 'Access-Control-Allow-Methods' 'POST, GET, PATCH, DELETE, OPTIONS, PUT' always;
+                add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch' always;
+                add_header 'Access-Control-Expose-Headers' 'Content-Length' always;
+                add_header 'Access-Control-Max-Age' '3600' always;
+                add_header 'Access-Control-Allow-Credentials' 'true' always;
+          
+                # Handle preflight
+                if ($request_method = 'OPTIONS') {
+                  add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+                  add_header 'Access-Control-Allow-Methods' 'POST, GET, PATCH, DELETE, OPTIONS, PUT' always;
+                  add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch' always;
+                  add_header 'Access-Control-Max-Age' '3600' always;
+                  add_header 'Content-Length' '0';
+                  add_header 'Content-Type' 'text/plain';
+                  return 204;
+                }
+              }
+          
+              # Legacy Python API (chalice)
+              location /api/ {
+                rewrite ^/api/(.*) /$1 break;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "Upgrade";
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-Proto $origin_proto;
+                proxy_set_header X-Forwarded-For $real_ip;
+                proxy_pass http://chalice-openreplay:8000;
+                
+                # Cache control headers
+                add_header Cache-Control "no-store,no-cache" always;
+                add_header Pragma "no-cache" always;
+              }
+          
+              # Spot service (UX testing)
+              location /spot/ {
+                rewrite ^/spot/(.*) /$1 break;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "Upgrade";
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-Proto $origin_proto;
+                proxy_set_header X-Forwarded-For $real_ip;
+                proxy_set_header X-Real-IP $real_ip;
+                proxy_pass http://spot-openreplay:8080;
+                proxy_read_timeout 300s;
+                proxy_connect_timeout 120s;
+                proxy_send_timeout 300s;
+          
+                # CORS Headers
+                add_header 'Access-Control-Allow-Origin' '*' always;
+                add_header 'Access-Control-Allow-Methods' 'POST, PATCH, DELETE, OPTIONS' always;
+                add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch' always;
+                add_header 'Access-Control-Expose-Headers' 'Content-Length' always;
+          
+                # Handle preflight
+                if ($request_method = 'OPTIONS') {
+                  add_header 'Access-Control-Allow-Origin' '*' always;
+                  add_header 'Access-Control-Allow-Methods' 'POST, PATCH, DELETE, OPTIONS' always;
+                  add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch' always;
+                  add_header 'Access-Control-Max-Age' '3600';
+                  add_header 'Content-Type' 'text/plain charset=UTF-8';
+                  add_header 'Content-Length' 0;
+                  return 204;
+                }
+              }
+          
+              location /assist/ {
+                rewrite ^/assist/(.*) /$1 break;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $real_ip;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $origin_proto;
+                
+                # WebSocket specific
+                proxy_read_timeout 3600s;
+                proxy_send_timeout 3600s;
+                proxy_connect_timeout 75s;
+                
+                # Disable buffering for WebSocket
+                proxy_buffering off;
+                
+                proxy_pass http://assist-openreplay:9001;
+              }
+              
+              location /ws-assist/ {
+                rewrite ^/ws-assist/(.*) /$1 break;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $real_ip;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $origin_proto;
+                
+                # WebSocket specific
+                proxy_read_timeout 3600s;
+                proxy_send_timeout 3600s;
+                proxy_connect_timeout 120s;
+                
+                # Disable buffering for WebSocket
+                proxy_buffering off;
+                
+                # CORS for WebSocket
+                add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+                add_header 'Access-Control-Allow-Methods' 'GET, OPTIONS' always;
+                add_header 'Access-Control-Allow-Headers' 'sessionid, Content-Type, Authorization' always;
+                add_header 'Access-Control-Max-Age' '1728000' always;
+                add_header 'X-Debug-Session-ID' $sessionid always;
+                
+                proxy_pass http://assist-openreplay:9001;
+              }
+              # OpenReplay tracker script proxy
+              location /script/ {
+                rewrite ^/script/(.*)/openreplay(.*).js$ /$1/openreplay$2.js break;
+                proxy_http_version 1.1;
+                proxy_ssl_protocols TLSv1.2 TLSv1.3;
+                proxy_ssl_server_name on;
+                proxy_set_header Host static.openreplay.com;
+                proxy_pass https://static.openreplay.com;
+                proxy_read_timeout 300s;
+                proxy_connect_timeout 120s;
+                proxy_send_timeout 300s;
+                
+                # Enable buffering for static assets
+                proxy_buffering on;
+                client_max_body_size 8m;
+              }
+          
+              # Frontend SPA (catch-all)
+              location / {
+                index /index.html;
+                rewrite ^((?!.(js|css|png|svg|jpg|woff|woff2)).)*$ /index.html break;
+                proxy_set_header Host $http_host;
+                proxy_set_header X-Forwarded-For $real_ip;
+                proxy_set_header X-Forwarded-Proto $origin_proto;
+                proxy_pass http://frontend-openreplay:8080;
+                proxy_intercept_errors on; # see http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_intercept_errors
+                error_page 404 =200 /index.html;
+              }
+            }
+    restart: unless-stopped
+
+
+
+volumes:
+  pgdata:
+  clickhouse:
+  redisdata:
+  kafka-data:
+  miniodata:
+  shared-volume:
+
+networks:
+  openreplay-net:
