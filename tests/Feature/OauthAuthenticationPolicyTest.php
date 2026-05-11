@@ -3,6 +3,7 @@
 use App\Models\InstanceSettings;
 use App\Models\OauthSetting;
 use App\Models\User;
+use Illuminate\Contracts\Auth\PasswordBroker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Once;
@@ -100,4 +101,28 @@ it('blocks password reset for oauth only accounts', function () {
         ])
         ->assertRedirect('/forgot-password')
         ->assertSessionHasErrors('email');
+});
+
+it('allows password reset for oauth accounts when oauth only mode is disabled', function () {
+    $user = User::factory()->create([
+        'email' => 'oauth-password@example.com',
+        'password' => null,
+        'oauth_provider' => 'google',
+        'is_oauth_only' => false,
+    ]);
+
+    $broker = Mockery::mock(PasswordBroker::class);
+    $broker->shouldReceive('sendResetLink')
+        ->once()
+        ->with(['email' => $user->email])
+        ->andReturn(Password::RESET_LINK_SENT);
+
+    Password::shouldReceive('broker')
+        ->once()
+        ->with(config('fortify.passwords'))
+        ->andReturn($broker);
+
+    $this->post(route('password.forgot'), [
+        'email' => $user->email,
+    ])->assertSessionHas('status');
 });

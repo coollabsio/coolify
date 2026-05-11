@@ -51,8 +51,21 @@ class OauthController extends Controller
                         'is_oauth_only' => $settings->is_oauth_only_auth_enabled,
                     ]);
                 }
-            } elseif ($user->oauth_provider === $provider && instanceSettings()->is_oauth_only_auth_enabled && ! $user->is_oauth_only) {
-                $user->update(['is_oauth_only' => true]);
+            } else {
+                $settings = instanceSettings();
+                $updates = [];
+
+                if ($user->oauth_provider !== $provider) {
+                    $updates['oauth_provider'] = $provider;
+                }
+
+                if ($settings->is_oauth_only_auth_enabled && ! $user->is_oauth_only) {
+                    $updates['is_oauth_only'] = true;
+                }
+
+                if ($updates !== []) {
+                    $user->update($updates);
+                }
             }
             Auth::login($user);
 
