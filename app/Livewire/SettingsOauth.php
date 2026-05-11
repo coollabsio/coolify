@@ -2,16 +2,21 @@
 
 namespace App\Livewire;
 
+use App\Models\InstanceSettings;
 use App\Models\OauthSetting;
 use Livewire\Component;
 
 class SettingsOauth extends Component
 {
+    public InstanceSettings $settings;
+
     public $oauth_settings_map;
+
+    public bool $is_oauth_registration_enabled;
 
     protected function rules()
     {
-        return OauthSetting::all()->reduce(function ($carry, $setting) {
+        $rules = OauthSetting::all()->reduce(function ($carry, $setting) {
             $carry["oauth_settings_map.$setting->provider.enabled"] = 'required';
             $carry["oauth_settings_map.$setting->provider.client_id"] = 'nullable';
             $carry["oauth_settings_map.$setting->provider.client_secret"] = 'nullable';
@@ -21,6 +26,10 @@ class SettingsOauth extends Component
 
             return $carry;
         }, []);
+
+        $rules['is_oauth_registration_enabled'] = 'boolean';
+
+        return $rules;
     }
 
     public function mount()
@@ -28,6 +37,8 @@ class SettingsOauth extends Component
         if (! isInstanceAdmin()) {
             return redirect()->route('home');
         }
+        $this->settings = instanceSettings();
+        $this->is_oauth_registration_enabled = $this->settings->is_oauth_registration_enabled;
         $this->oauth_settings_map = OauthSetting::all()->sortBy('provider')->reduce(function ($carry, $setting) {
             $carry[$setting->provider] = [
                 'id' => $setting->id,
@@ -42,6 +53,12 @@ class SettingsOauth extends Component
 
             return $carry;
         }, []);
+    }
+
+    private function updateInstanceSettings()
+    {
+        $this->settings->is_oauth_registration_enabled = $this->is_oauth_registration_enabled;
+        $this->settings->save();
     }
 
     private function updateOauthSettings(?string $provider = null)
@@ -137,8 +154,21 @@ class SettingsOauth extends Component
         }
     }
 
+    public function instantSaveOauthRegistration()
+    {
+        try {
+            $this->validateOnly('is_oauth_registration_enabled');
+            $this->updateInstanceSettings();
+            $this->dispatch('success', 'OAuth registration settings updated successfully!');
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function submit()
     {
+        $this->validate();
+        $this->updateInstanceSettings();
         $this->updateOauthSettings();
         $this->dispatch('success', 'Instance settings updated successfully!');
     }

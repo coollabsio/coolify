@@ -13,6 +13,11 @@
             </div>
             <div class="pb-4 ">Custom authentication (OAuth) configurations.</div>
         </div>
+        <div class="pb-4 md:w-96">
+            <x-forms.checkbox instantSave="instantSaveOauthRegistration" id="is_oauth_registration_enabled"
+                helper="Allow users who authenticate with an enabled OAuth provider to create an account even when regular registration is disabled. OAuth-created accounts cannot create or use passwords."
+                label="OAuth Registration Allowed" />
+        </div>
         <div class="flex flex-col gap-2 pt-4">
             @foreach ($oauth_settings_map as $oauth_setting)
                 <div class="p-4 border dark:border-coolgray-300 border-neutral-200">

@@ -487,4 +487,9 @@ class User extends Authenticatable implements SendsEmail
     {
         return ! empty($this->password);
     }
+
+    public function isOauthOnly(): bool
+    {
+        return filled($this->oauth_provider) && ! $this->hasPassword();
+    }
 }

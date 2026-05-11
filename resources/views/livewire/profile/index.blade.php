@@ -55,20 +55,30 @@
             </form>
         @endif
     </div>
-    <form wire:submit='resetPassword' class="flex flex-col pt-4">
+    <div class="flex flex-col pt-4">
         <div class="flex items-center gap-2 pb-2">
             <h2>Change Password</h2>
-            <x-forms.button type="submit" label="Save">Save</x-forms.button>
+            @if (!request()->user()->isOauthOnly())
+                <x-forms.button form="change-password-form" type="submit" label="Save">Save</x-forms.button>
+            @endif
         </div>
-        <div class="text-xs font-bold dark:text-warning pb-2">Resetting the password will logout all sessions.</div>
-        <div class="flex flex-col gap-2">
-            <x-forms.input id="current_password" label="Current Password" required type="password" />
-            <div class="flex gap-2">
-                <x-forms.input id="new_password" label="New Password" required type="password" />
-                <x-forms.input id="new_password_confirmation" label="New Password Again" required type="password" />
+        @if (request()->user()->isOauthOnly())
+            <div class="text-xs font-bold dark:text-warning pb-2">
+                Password login is disabled for this OAuth account. Please sign in with your OAuth provider.
             </div>
-        </div>
-    </form>
+        @else
+            <form id="change-password-form" wire:submit='resetPassword'>
+                <div class="text-xs font-bold dark:text-warning pb-2">Resetting the password will logout all sessions.</div>
+                <div class="flex flex-col gap-2">
+                    <x-forms.input id="current_password" label="Current Password" required type="password" />
+                    <div class="flex gap-2">
+                        <x-forms.input id="new_password" label="New Password" required type="password" />
+                        <x-forms.input id="new_password_confirmation" label="New Password Again" required type="password" />
+                    </div>
+                </div>
+            </form>
+        @endif
+    </div>
     <h2 class="py-4">Two-factor Authentication</h2>
     @if (session('status') == 'two-factor-authentication-enabled')
         <div class="mb-4 font-medium">

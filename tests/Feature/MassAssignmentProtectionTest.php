@@ -94,6 +94,7 @@ describe('mass assignment protection', function () {
         expect($user->isFillable('id'))->toBeFalse('User id should not be fillable');
         expect($user->isFillable('email_verified_at'))->toBeFalse('email_verified_at should not be fillable');
         expect($user->isFillable('remember_token'))->toBeFalse('remember_token should not be fillable');
+        expect($user->isFillable('oauth_provider'))->toBeFalse('oauth_provider should not be fillable');
         expect($user->isFillable('two_factor_secret'))->toBeFalse('two_factor_secret should not be fillable');
         expect($user->isFillable('two_factor_recovery_codes'))->toBeFalse('two_factor_recovery_codes should not be fillable');
         expect($user->isFillable('pending_email'))->toBeFalse('pending_email should not be fillable');
