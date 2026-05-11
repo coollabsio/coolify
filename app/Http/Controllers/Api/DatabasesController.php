@@ -18,6 +18,7 @@ use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
+use App\Models\ServiceDatabase;
 use App\Models\StandalonePostgresql;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
@@ -641,6 +642,9 @@ class DatabasesController extends Controller
                         'frequency' => ['type' => 'string', 'description' => 'Backup frequency (cron expression or: every_minute, hourly, daily, weekly, monthly, yearly)'],
                         'enabled' => ['type' => 'boolean', 'description' => 'Whether the backup is enabled', 'default' => true],
                         'save_s3' => ['type' => 'boolean', 'description' => 'Whether to save backups to S3', 'default' => false],
+                        'backup_method' => ['type' => 'string', 'enum' => ['dump', 'pgbackrest'], 'description' => 'Backup engine. Use pgbackrest for incremental PostgreSQL backups to S3.', 'default' => 'dump'],
+                        'pgbackrest_backup_type' => ['type' => 'string', 'enum' => ['full', 'diff', 'incr'], 'description' => 'pgBackRest backup type when backup_method is pgbackrest.', 'default' => 'incr'],
+                        'pgbackrest_require_wal_archive' => ['type' => 'boolean', 'description' => 'Require PostgreSQL WAL archive verification for pgBackRest backups. When false, Coolify runs pgBackRest with --archive-check=n if WAL archiving is not configured.', 'default' => true],
                         's3_storage_uuid' => ['type' => 'string', 'description' => 'S3 storage UUID (required if save_s3 is true)'],
                         'databases_to_backup' => ['type' => 'string', 'description' => 'Comma separated list of databases to backup'],
                         'dump_all' => ['type' => 'boolean', 'description' => 'Whether to dump all databases', 'default' => false],
@@ -688,7 +692,7 @@ class DatabasesController extends Controller
     )]
     public function create_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout'];
+        $backupConfigFields = ['save_s3', 'backup_method', 'pgbackrest_backup_type', 'pgbackrest_require_wal_archive', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -705,6 +709,9 @@ class DatabasesController extends Controller
             'frequency' => 'required|string',
             'enabled' => 'boolean',
             'save_s3' => 'boolean',
+            'backup_method' => 'string|in:dump,pgbackrest',
+            'pgbackrest_backup_type' => 'string|in:full,diff,incr',
+            'pgbackrest_require_wal_archive' => 'boolean',
             'dump_all' => 'boolean',
             'backup_now' => 'boolean|nullable',
             's3_storage_uuid' => 'string|exists:s3_storages,uuid|nullable',
@@ -805,6 +812,11 @@ class DatabasesController extends Controller
             }
         }
 
+        $pgBackRestValidation = $this->validatePgBackRestBackupConfiguration($database, $backupData);
+        if ($pgBackRestValidation instanceof JsonResponse) {
+            return $pgBackRestValidation;
+        }
+
         // Validate databases_to_backup input
         if (! empty($backupData['databases_to_backup'])) {
             try {
@@ -887,6 +899,9 @@ class DatabasesController extends Controller
                     type: 'object',
                     properties: [
                         'save_s3' => ['type' => 'boolean', 'description' => 'Whether data is saved in s3 or not'],
+                        'backup_method' => ['type' => 'string', 'enum' => ['dump', 'pgbackrest'], 'description' => 'Backup engine. Use pgbackrest for incremental PostgreSQL backups to S3.'],
+                        'pgbackrest_backup_type' => ['type' => 'string', 'enum' => ['full', 'diff', 'incr'], 'description' => 'pgBackRest backup type when backup_method is pgbackrest.'],
+                        'pgbackrest_require_wal_archive' => ['type' => 'boolean', 'description' => 'Require PostgreSQL WAL archive verification for pgBackRest backups. When false, Coolify runs pgBackRest with --archive-check=n if WAL archiving is not configured.'],
                         's3_storage_uuid' => ['type' => 'string', 'description' => 'S3 storage UUID'],
                         'backup_now' => ['type' => 'boolean', 'description' => 'Whether to take a backup now or not'],
                         'enabled' => ['type' => 'boolean', 'description' => 'Whether the backup is enabled or not'],
@@ -929,7 +944,7 @@ class DatabasesController extends Controller
     )]
     public function update_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout'];
+        $backupConfigFields = ['save_s3', 'backup_method', 'pgbackrest_backup_type', 'pgbackrest_require_wal_archive', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -945,6 +960,9 @@ class DatabasesController extends Controller
             'backup_now' => 'boolean|nullable',
             'enabled' => 'boolean',
             'dump_all' => 'boolean',
+            'backup_method' => 'string|in:dump,pgbackrest',
+            'pgbackrest_backup_type' => 'string|in:full,diff,incr',
+            'pgbackrest_require_wal_archive' => 'boolean',
             's3_storage_uuid' => 'string|exists:s3_storages,uuid|nullable',
             'databases_to_backup' => 'string|nullable',
             'frequency' => 'string',
@@ -1042,6 +1060,11 @@ class DatabasesController extends Controller
                 ], 422);
             }
             unset($backupData['s3_storage_uuid']);
+        }
+
+        $pgBackRestValidation = $this->validatePgBackRestBackupConfiguration($database, $backupData, $backupConfig);
+        if ($pgBackRestValidation instanceof JsonResponse) {
+            return $pgBackRestValidation;
         }
 
         // Validate databases_to_backup input
@@ -2413,15 +2436,28 @@ class DatabasesController extends Controller
             DB::beginTransaction();
             // Get all executions for this backup configuration
             $executions = $backup->executions()->get();
+            $server = $backup->server();
+            $usesPgBackRest = data_get($backup, 'backup_method') === 'pgbackrest';
+
+            $deletedFilenames = [];
+            if ($usesPgBackRest && $deleteS3 && $backup->s3) {
+                $repositoryPrefix = pgBackRestRepositoryKeyPrefix($backup);
+                if ($repositoryPrefix) {
+                    deleteBackupsS3Prefix($repositoryPrefix, $backup->s3);
+                }
+            }
 
             // Delete all execution files (locally and optionally from S3)
             foreach ($executions as $execution) {
-                if ($execution->filename) {
-                    deleteBackupsLocally($execution->filename, $database->destination->server);
+                if ($execution->filename && ! in_array($execution->filename, $deletedFilenames, true)) {
+                    if (! $usesPgBackRest && $server) {
+                        deleteBackupsLocally($execution->filename, $server);
+                    }
 
-                    if ($deleteS3 && $backup->s3) {
+                    if (! $usesPgBackRest && $deleteS3 && $backup->s3) {
                         deleteBackupsS3($execution->filename, $backup->s3);
                     }
+                    $deletedFilenames[] = $execution->filename;
                 }
 
                 $execution->delete();
@@ -2549,12 +2585,22 @@ class DatabasesController extends Controller
         }
 
         $deleteS3 = $request->boolean('delete_s3', false);
+        $usesPgBackRest = data_get($backup, 'backup_method') === 'pgbackrest';
+        if ($usesPgBackRest && $deleteS3) {
+            return response()->json([
+                'message' => 'A single pgBackRest execution cannot be deleted from S3 because executions share one repository. Delete the scheduled backup with delete_s3=true to remove the repository.',
+            ], 422);
+        }
 
         try {
             if ($execution->filename) {
-                deleteBackupsLocally($execution->filename, $database->destination->server);
+                $server = $backup->server();
 
-                if ($deleteS3 && $backup->s3) {
+                if (! $usesPgBackRest && $server) {
+                    deleteBackupsLocally($execution->filename, $server);
+                }
+
+                if (! $usesPgBackRest && $deleteS3 && $backup->s3) {
                     deleteBackupsS3($execution->filename, $backup->s3);
                 }
             }
@@ -4070,5 +4116,51 @@ class DatabasesController extends Controller
         ]);
 
         return response()->json(['message' => 'Storage deleted.']);
+    }
+
+    private function validatePgBackRestBackupConfiguration($database, array &$backupData, ?ScheduledDatabaseBackup $existingBackup = null): ?JsonResponse
+    {
+        $backupMethod = $backupData['backup_method'] ?? data_get($existingBackup, 'backup_method', 'dump');
+        if ($backupMethod !== 'pgbackrest') {
+            return null;
+        }
+
+        $databaseType = $database instanceof ServiceDatabase ? $database->databaseType() : $database->type();
+        if (! str($databaseType)->contains('postgres')) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['backup_method' => ['pgBackRest backups are only supported for PostgreSQL databases.']],
+            ], 422);
+        }
+
+        $saveS3 = array_key_exists('save_s3', $backupData) ? (bool) $backupData['save_s3'] : (bool) data_get($existingBackup, 'save_s3', false);
+        $s3StorageId = $backupData['s3_storage_id'] ?? data_get($existingBackup, 's3_storage_id');
+
+        if (! $saveS3 || blank($s3StorageId)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    'backup_method' => ['pgBackRest backups require S3 storage because pgBackRest writes an incremental repository instead of a single local dump file.'],
+                    'save_s3' => ['The save_s3 field must be true when backup_method is pgbackrest.'],
+                    's3_storage_uuid' => ['The s3_storage_uuid field is required when backup_method is pgbackrest.'],
+                ],
+            ], 422);
+        }
+
+        $backupData['backup_method'] = 'pgbackrest';
+        $backupData['pgbackrest_backup_type'] = $backupData['pgbackrest_backup_type'] ?? data_get($existingBackup, 'pgbackrest_backup_type', 'incr');
+        $pgBackRestRequireWalArchive = array_key_exists('pgbackrest_require_wal_archive', $backupData)
+            ? $backupData['pgbackrest_require_wal_archive']
+            : data_get($existingBackup, 'pgbackrest_require_wal_archive');
+        $backupData['pgbackrest_require_wal_archive'] = $pgBackRestRequireWalArchive === null ? true : (bool) $pgBackRestRequireWalArchive;
+        $backupData['dump_all'] = true;
+        $backupData['databases_to_backup'] = null;
+        $backupData['disable_local_backup'] = true;
+        $backupData['database_backup_retention_amount_locally'] = 0;
+        $backupData['database_backup_retention_days_locally'] = 0;
+        $backupData['database_backup_retention_max_storage_locally'] = 0;
+        $backupData['database_backup_retention_max_storage_s3'] = 0;
+
+        return null;
     }
 }

@@ -2,6 +2,7 @@
 
 use App\Models\EnvironmentVariable;
 use App\Models\S3Storage;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
@@ -188,7 +189,14 @@ function deleteBackupsLocally(string|array|null $filenames, Server $server): voi
     if (is_string($filenames)) {
         $filenames = [$filenames];
     }
-    $quotedFiles = array_map(fn ($file) => "\"$file\"", $filenames);
+    $filenames = collect($filenames)
+        ->filter(fn ($file) => is_string($file) && str_starts_with($file, '/'))
+        ->values()
+        ->all();
+    if (empty($filenames)) {
+        return;
+    }
+    $quotedFiles = array_map(fn ($file) => escapeshellarg($file), $filenames);
     instant_remote_process(['rm -f '.implode(' ', $quotedFiles)], $server, throwError: false);
 
     $foldersToCheck = collect($filenames)->map(fn ($file) => dirname($file))->unique();
@@ -218,6 +226,71 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
     $disk->delete($filenames);
 }
 
+function deleteBackupsS3Prefix(?string $prefix, S3Storage $s3): void
+{
+    if (blank($prefix) || ! $s3) {
+        return;
+    }
+
+    $prefix = trim($prefix);
+    $backupBase = trim(backup_dir(), '/').'/';
+    if (
+        ! str_starts_with($prefix, $backupBase) ||
+        ! str_ends_with($prefix, '/') ||
+        ! preg_match('#/pgbackrest/coolify-[A-Za-z0-9_-]+/$#', $prefix) ||
+        str_contains($prefix, '..')
+    ) {
+        throw new InvalidArgumentException('Invalid pgBackRest S3 repository prefix.');
+    }
+
+    $disk = Storage::build([
+        'driver' => 's3',
+        'key' => $s3->key,
+        'secret' => $s3->secret,
+        'region' => $s3->region,
+        'bucket' => $s3->bucket,
+        'endpoint' => $s3->endpoint,
+        'use_path_style_endpoint' => true,
+        'aws_url' => $s3->awsUrl(),
+    ]);
+
+    $disk->deleteDirectory(rtrim($prefix, '/'));
+}
+
+function pgBackRestRepositoryKeyPrefix(ScheduledDatabaseBackup $backup): ?string
+{
+    $database = $backup->database;
+    $team = $backup->team;
+    if (! $database || ! $team) {
+        return null;
+    }
+
+    $stanza = Str::of('coolify-'.$backup->uuid)
+        ->replaceMatches('/[^A-Za-z0-9_-]/', '-')
+        ->lower()
+        ->limit(63, '')
+        ->value();
+
+    if ($database instanceof ServiceDatabase) {
+        $serviceUuid = $database->service->uuid;
+        $serviceName = str($database->service->name)->slug();
+        $containerName = "{$database->name}-$serviceUuid";
+        $directoryName = $serviceName.'-'.$containerName;
+    } else {
+        $containerName = $database->uuid;
+        $directoryName = str($database->name)->slug()->value().'-'.$containerName;
+    }
+
+    $backupDir = backup_dir().'/databases/'.str($team->name)->slug().'-'.$team->id.'/'.$directoryName;
+    if ($database->name === 'coolify-db') {
+        $server = $backup->server();
+        $ip = Str::slug($server?->ip ?? 'unknown');
+        $backupDir = backup_dir().'/coolify'."/coolify-db-$ip";
+    }
+
+    return trim($backupDir, '/').'/pgbackrest/'.$stanza.'/';
+}
+
 function deleteEmptyBackupFolder($folderPath, Server $server): void
 {
     $escapedPath = escapeshellarg($folderPath);
@@ -237,6 +310,10 @@ function deleteEmptyBackupFolder($folderPath, Server $server): void
 function removeOldBackups($backup): void
 {
     try {
+        if (data_get($backup, 'backup_method') === 'pgbackrest') {
+            return;
+        }
+
         if ($backup->executions) {
             // Delete old local backups (only if local backup is NOT disabled)
             // Note: When disable_local_backup is enabled, each execution already marks its own

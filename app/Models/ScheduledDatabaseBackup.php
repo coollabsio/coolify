@@ -13,6 +13,11 @@ class ScheduledDatabaseBackup extends BaseModel
         return [
             'database_backup_retention_max_storage_locally' => 'float',
             'database_backup_retention_max_storage_s3' => 'float',
+            'save_s3' => 'boolean',
+            'enabled' => 'boolean',
+            'dump_all' => 'boolean',
+            'disable_local_backup' => 'boolean',
+            'pgbackrest_require_wal_archive' => 'boolean',
         ];
     }
 
@@ -22,6 +27,9 @@ class ScheduledDatabaseBackup extends BaseModel
         'description',
         'enabled',
         'save_s3',
+        'backup_method',
+        'pgbackrest_backup_type',
+        'pgbackrest_require_wal_archive',
         'frequency',
         'database_backup_retention_amount_locally',
         'database_type',

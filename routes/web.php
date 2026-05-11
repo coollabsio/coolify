@@ -33,7 +33,6 @@ use App\Livewire\Project\Service\DatabaseBackups as ServiceDatabaseBackups;
 use App\Livewire\Project\Service\Index as ServiceIndex;
 use App\Livewire\Project\Shared\ExecuteContainerCommand;
 use App\Livewire\Project\Shared\Logs;
-use App\Livewire\Project\Shared\ScheduledTask\Show as ScheduledTaskShow;
 use App\Livewire\Project\Show as ProjectShow;
 use App\Livewire\Security\ApiTokens;
 use App\Livewire\Security\CloudInitScripts;
@@ -349,6 +348,9 @@ Route::middleware(['auth'])->group(function () {
                 }
             }
             $filename = data_get($execution, 'filename');
+            if (data_get($execution->scheduledDatabaseBackup, 'backup_method') === 'pgbackrest') {
+                return response()->json(['message' => 'pgBackRest backups are stored as an S3 repository and cannot be downloaded as a single dump file.'], 404);
+            }
             if ($execution->scheduledDatabaseBackup->database->getMorphClass() === ServiceDatabase::class) {
                 $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
             } else {

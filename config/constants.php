@@ -10,6 +10,7 @@ return [
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
         'registry_url' => env('REGISTRY_URL', 'ghcr.io'),
         'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/coollabsio/coolify-helper'),
+        'pgbackrest_image' => env('PGBACKREST_IMAGE', 'docker.io/woblerr/pgbackrest@sha256:c85089eaa46a12b1b158886a6f1fff98101ca28be4927c67b4e3431ce79c0d19'),
         'realtime_image' => env('REALTIME_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/coollabsio/coolify-realtime'),
         'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
         'cdn_url' => env('CDN_URL', 'https://cdn.coollabs.io'),

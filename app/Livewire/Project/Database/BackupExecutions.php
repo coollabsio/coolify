@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ServiceDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
@@ -78,15 +79,24 @@ class BackupExecutions extends Component
             return;
         }
 
-        $server = $execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class
+        $server = $execution->scheduledDatabaseBackup->database->getMorphClass() === ServiceDatabase::class
             ? $execution->scheduledDatabaseBackup->database->service->destination->server
             : $execution->scheduledDatabaseBackup->database->destination->server;
 
         try {
-            if ($execution->filename) {
-                deleteBackupsLocally($execution->filename, $server);
+            $usesPgBackRest = data_get($execution->scheduledDatabaseBackup, 'backup_method') === 'pgbackrest';
+            if ($usesPgBackRest && $this->delete_backup_s3) {
+                $this->dispatch('error', 'A single pgBackRest execution cannot be deleted from S3 because executions share one repository. Delete the scheduled backup and choose the S3 repository option to remove it.');
 
-                if ($this->delete_backup_s3 && $execution->scheduledDatabaseBackup->s3) {
+                return true;
+            }
+
+            if ($execution->filename) {
+                if (! $usesPgBackRest) {
+                    deleteBackupsLocally($execution->filename, $server);
+                }
+
+                if (! $usesPgBackRest && $this->delete_backup_s3 && $execution->scheduledDatabaseBackup->s3) {
                     deleteBackupsS3($execution->filename, $execution->scheduledDatabaseBackup->s3);
                 }
             }
@@ -185,7 +195,7 @@ class BackupExecutions extends Component
         if ($this->database) {
             $server = null;
 
-            if ($this->database instanceof \App\Models\ServiceDatabase) {
+            if ($this->database instanceof ServiceDatabase) {
                 $server = $this->database->service->destination->server;
             } elseif ($this->database->destination && $this->database->destination->server) {
                 $server = $this->database->destination->server;

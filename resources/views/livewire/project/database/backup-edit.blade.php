@@ -21,12 +21,15 @@
     <div class="w-64 pb-2">
         <x-forms.checkbox instantSave label="Backup Enabled" id="backupEnabled" />
         @if ($s3s->count() > 0)
-            <x-forms.checkbox instantSave label="S3 Enabled" id="saveS3" />
+            <x-forms.checkbox instantSave label="S3 Enabled" id="saveS3" :disabled="$backupMethod === 'pgbackrest'" />
         @else
             <x-forms.checkbox instantSave helper="No validated S3 storage available." label="S3 Enabled" id="saveS3"
                 disabled />
         @endif
-        @if ($backup->save_s3)
+        @if ($backupMethod === 'pgbackrest')
+            <x-forms.checkbox disabled label="Disable Local Backup" id="disableLocalBackup"
+                helper="pgBackRest writes directly to an incremental S3 repository, so there is no local dump file to keep." />
+        @elseif ($backup->save_s3)
             <x-forms.checkbox instantSave label="Disable Local Backup" id="disableLocalBackup"
                 helper="When enabled, backup files will be deleted from local storage immediately after uploading to S3. This requires S3 backup to be enabled." />
         @else
@@ -34,7 +37,7 @@
                 helper="When enabled, backup files will be deleted from local storage immediately after uploading to S3. This requires S3 backup to be enabled." />
         @endif
     </div>
-    @if ($backup->save_s3)
+    @if ($saveS3 || $backupMethod === 'pgbackrest')
         <div class="pb-6">
             <x-forms.select id="s3StorageId" label="S3 Storage" required>
                 <option value="default" disabled>Select a S3 storage</option>
@@ -46,12 +49,34 @@
     @endif
     <div class="flex flex-col gap-2">
         <h3>Settings</h3>
+        @if ($isPostgres)
+            <div class="flex gap-2">
+                <x-forms.select id="backupMethod" label="Backup Method" wire:model.live="backupMethod" wire:change="instantSave"
+                    helper="pgBackRest stores incremental PostgreSQL backups in S3 and is recommended for large databases.">
+                    <option value="dump">pg_dump</option>
+                    <option value="pgbackrest">pgBackRest (incremental, S3 required)</option>
+                </x-forms.select>
+                @if ($backupMethod === 'pgbackrest')
+                    <x-forms.select id="pgBackRestBackupType" label="pgBackRest Backup Type" wire:model.live="pgBackRestBackupType" wire:change="instantSave"
+                        helper="Use incr for scheduled incremental backups. pgBackRest will create a full backup automatically when needed.">
+                        <option value="incr">Incremental</option>
+                        <option value="diff">Differential</option>
+                        <option value="full">Full</option>
+                    </x-forms.select>
+                    <x-forms.checkbox id="pgBackRestRequireWalArchive" label="Require WAL archive verification" instantSave
+                        helper="Recommended. Requires archive_mode=on and archive_command using pgbackrest archive-push. If disabled, Coolify may run pgBackRest with --archive-check=n when WAL archiving is not configured." />
+                @endif
+            </div>
+            @if ($backupMethod === 'pgbackrest')
+                <div class="text-xs text-warning">pgBackRest backs up the whole PostgreSQL cluster and manages retention with pgBackRest expire. Database selection and local retention are disabled for this method. WAL archive verification is strongly recommended for recoverable/PITR-safe backups.</div>
+            @endif
+        @endif
         <div class="flex gap-2 flex-col ">
             @if ($backup->database_type === 'App\Models\StandalonePostgresql' && $backup->database_id !== 0)
                 <div class="w-48">
-                    <x-forms.checkbox label="Backup All Databases" id="dumpAll" instantSave />
+                    <x-forms.checkbox label="Backup All Databases" id="dumpAll" instantSave :disabled="$backupMethod === 'pgbackrest'" />
                 </div>
-                @if (!$backup->dump_all)
+                @if (!$backup->dump_all && $backupMethod !== 'pgbackrest')
                     <x-forms.input label="Databases To Backup"
                         helper="Comma separated list of databases to backup. Empty will include the default one."
                         id="databasesToBackup" />
@@ -96,22 +121,24 @@
         </div>
 
         <div class="flex gap-6 flex-col">
-            <div>
-                <h4 class="mb-3 font-medium">Local Backup Retention</h4>
-                <div class="flex gap-2">
-                    <x-forms.input label="Number of backups to keep" id="databaseBackupRetentionAmountLocally"
-                        type="number" min="0"
-                        helper="Keeps only the specified number of most recent backups on the server. Set to 0 for unlimited backups." required />
-                    <x-forms.input label="Days to keep backups" id="databaseBackupRetentionDaysLocally" type="number"
-                        min="0"
-                        helper="Automatically removes backups older than the specified number of days. Set to 0 for no time limit." required />
-                    <x-forms.input label="Maximum storage (GB)" id="databaseBackupRetentionMaxStorageLocally"
-                        type="number" min="0" step="any"
-                        helper="When total size of all backups in the current backup job exceeds this limit in GB, the oldest backups will be removed. Decimal values are supported (e.g. 0.001 for 1MB). Set to 0 for unlimited storage." required />
+            @if ($backupMethod !== 'pgbackrest')
+                <div>
+                    <h4 class="mb-3 font-medium">Local Backup Retention</h4>
+                    <div class="flex gap-2">
+                        <x-forms.input label="Number of backups to keep" id="databaseBackupRetentionAmountLocally"
+                            type="number" min="0"
+                            helper="Keeps only the specified number of most recent backups on the server. Set to 0 for unlimited backups." required />
+                        <x-forms.input label="Days to keep backups" id="databaseBackupRetentionDaysLocally" type="number"
+                            min="0"
+                            helper="Automatically removes backups older than the specified number of days. Set to 0 for no time limit." required />
+                        <x-forms.input label="Maximum storage (GB)" id="databaseBackupRetentionMaxStorageLocally"
+                            type="number" min="0" step="any"
+                            helper="When total size of all backups in the current backup job exceeds this limit in GB, the oldest backups will be removed. Decimal values are supported (e.g. 0.001 for 1MB). Set to 0 for unlimited storage." required />
+                    </div>
                 </div>
-            </div>
+            @endif
 
-            @if ($backup->save_s3)
+            @if ($saveS3 || $backupMethod === 'pgbackrest')
                 <div>
                     <h4 class="mb-3 font-medium">S3 Storage Retention</h4>
                     <div class="flex gap-2">
@@ -121,10 +148,15 @@
                         <x-forms.input label="Days to keep backups" id="databaseBackupRetentionDaysS3" type="number"
                             min="0"
                             helper="Automatically removes S3 backups older than the specified number of days. Set to 0 for no time limit." required />
-                        <x-forms.input label="Maximum storage (GB)" id="databaseBackupRetentionMaxStorageS3"
-                            type="number" min="0" step="any"
-                            helper="When total size of all backups in the current backup job exceeds this limit in GB, the oldest backups will be removed. Decimal values are supported (e.g. 0.5 for 500MB). Set to 0 for unlimited storage." required />
+                        @if ($backupMethod !== 'pgbackrest')
+                            <x-forms.input label="Maximum storage (GB)" id="databaseBackupRetentionMaxStorageS3"
+                                type="number" min="0" step="any"
+                                helper="When total size of all backups in the current backup job exceeds this limit in GB, the oldest backups will be removed. Decimal values are supported (e.g. 0.5 for 500MB). Set to 0 for unlimited storage." required />
+                        @endif
                     </div>
+                    @if ($backupMethod === 'pgbackrest')
+                        <div class="mt-2 text-xs text-neutral-500">pgBackRest retention supports count and time policies through pgbackrest expire. Maximum storage cleanup is not applied to pgBackRest repositories.</div>
+                    @endif
                 </div>
             @endif
         </div>

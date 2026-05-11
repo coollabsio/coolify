@@ -65,6 +65,14 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?string $postgres_password = null;
 
+    public ?string $postgres_data_path = null;
+
+    public ?string $postgres_pgdata_path = null;
+
+    public ?string $postgres_uid = null;
+
+    public ?string $postgres_gid = null;
+
     public ?string $mongo_root_username = null;
 
     public ?string $mongo_root_password = null;
@@ -158,6 +166,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     } else {
                         $databasesToBackup = $this->database->postgres_user;
                     }
+                    $this->database->postgres_db = $databasesToBackup;
                     $this->postgres_password = $envs->filter(function ($env) {
                         return str($env)->startsWith('POSTGRES_PASSWORD=');
                     })->first();
@@ -260,6 +269,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->container_name = $this->database->uuid;
                 $this->directory_name = $databaseName.'-'.$this->container_name;
                 $databaseType = $this->database->type();
+                if (str($databaseType)->contains('postgres')) {
+                    $this->postgres_password = data_get($this->database, 'postgres_password');
+                }
                 $databasesToBackup = data_get($this->backup, 'databases_to_backup');
             }
             if (blank($databasesToBackup)) {
@@ -305,6 +317,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $ip = Str::slug($this->server->ip);
                 $this->backup_dir = backup_dir().'/coolify'."/coolify-db-$ip";
             }
+            $usesPgBackRest = $this->usesPgBackRest($databaseType);
+            if ($usesPgBackRest) {
+                $databasesToBackup = ['postgres-cluster'];
+            }
             foreach ($databasesToBackup as $database) {
                 // Generate unique UUID for each database backup execution
                 $attempts = 0;
@@ -324,11 +340,17 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 // Step 1: Create local backup
                 try {
                     if (str($databaseType)->contains('postgres')) {
-                        $this->backup_file = "/pg-dump-$database-".Carbon::now()->timestamp.'.dmp';
-                        if ($this->backup->dump_all) {
-                            $this->backup_file = '/pg-dump-all-'.Carbon::now()->timestamp.'.gz';
+                        if ($usesPgBackRest) {
+                            $stanza = $this->pgBackRestStanzaName();
+                            $this->backup_file = '/pgbackrest-'.$stanza.'-'.Carbon::now()->timestamp;
+                            $this->backup_location = $this->pgBackRestRepositoryKeyPrefix($stanza);
+                        } else {
+                            $this->backup_file = "/pg-dump-$database-".Carbon::now()->timestamp.'.dmp';
+                            if ($this->backup->dump_all) {
+                                $this->backup_file = '/pg-dump-all-'.Carbon::now()->timestamp.'.gz';
+                            }
+                            $this->backup_location = $this->backup_dir.$this->backup_file;
                         }
-                        $this->backup_location = $this->backup_dir.$this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
                             'uuid' => $this->backup_log_uuid,
                             'database_name' => $database,
@@ -336,7 +358,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'scheduled_database_backup_id' => $this->backup->id,
                             'local_storage_deleted' => false,
                         ]);
-                        $this->backup_standalone_postgresql($database);
+                        if ($usesPgBackRest) {
+                            $this->backup_standalone_postgresql_pgbackrest($stanza);
+                        } else {
+                            $this->backup_standalone_postgresql($database);
+                        }
                     } elseif (str($databaseType)->contains('mongo')) {
                         if ($database === '*') {
                             $database = 'all';
@@ -390,10 +416,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         throw new \Exception('Unsupported database type');
                     }
 
-                    $size = $this->calculate_size();
+                    $size = $usesPgBackRest ? $this->calculate_pgbackrest_size() : $this->calculate_size();
 
                     // Verify local backup succeeded
-                    if ($size > 0) {
+                    if ($usesPgBackRest || $size > 0) {
                         $localBackupSucceeded = true;
                     } else {
                         throw new \Exception('Local backup file is empty or was not created');
@@ -423,8 +449,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 }
 
                 // Step 2: Upload to S3 if enabled (independent of local backup)
-                $localStorageDeleted = false;
-                if ($this->backup->save_s3 && $localBackupSucceeded) {
+                $localStorageDeleted = $usesPgBackRest;
+                if (! $usesPgBackRest && $this->backup->save_s3 && $localBackupSucceeded) {
                     try {
                         $this->upload_to_s3();
 
@@ -474,7 +500,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
             }
-            if ($this->backup_log && $this->backup_log->status === 'success') {
+            if ($this->backup_log && $this->backup_log->status === 'success' && ! $usesPgBackRest) {
                 removeOldBackups($this->backup);
             }
         } catch (Throwable $e) {
@@ -594,6 +620,384 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    private function backup_standalone_postgresql_pgbackrest(string $stanza): void
+    {
+        if (! $this->backup->save_s3) {
+            throw new \Exception('pgBackRest backups require S3 storage because pgBackRest writes an incremental repository instead of a single local dump file.');
+        }
+
+        if (is_null($this->s3)) {
+            throw new \Exception('S3 storage configuration is required for pgBackRest backups.');
+        }
+
+        $remoteEnvFile = null;
+        try {
+            $this->s3->testConnection(shouldSave: true);
+            $this->postgres_data_path = $this->discoverPostgresDataPathOnHost();
+            instant_remote_process(['mkdir -p '.escapeshellarg($this->backup_dir)], $this->server, true, false, $this->timeout, disableMultiplexing: true);
+
+            $archiveCheckEnabled = $this->pgBackRestArchiveCheckEnabled();
+            $requiresWalArchive = $this->pgBackRestRequiresWalArchive();
+            if (! $archiveCheckEnabled && $requiresWalArchive) {
+                throw new \Exception('pgBackRest WAL archive verification is required for this backup, but PostgreSQL is not configured with archive_mode=on and archive_command using pgbackrest archive-push. Configure WAL archiving or disable WAL archive verification for this schedule to run pgBackRest with --archive-check=n.');
+            }
+            $archiveCheckWarning = $archiveCheckEnabled ? null : 'Warning: PostgreSQL WAL archiving is not configured for pgBackRest on this database, so Coolify ran pgBackRest with --archive-check=n. Configure archive_mode=on and archive_command=pgbackrest archive-push for WAL-verified/PITR backups.';
+            $remoteEnvFile = $this->pgBackRestUploadEnvFile();
+
+            $commands = [];
+            $commands[] = 'docker rm -f '.escapeshellarg('pgbackrest-of-'.$this->backup_log_uuid).' >/dev/null 2>&1 || true';
+
+            $stanzaCreate = $this->pgBackRestDockerCommand($stanza, 'stanza-create', [], $remoteEnvFile);
+            $stanzaInfo = $this->pgBackRestDockerCommand($stanza, 'info', [], $remoteEnvFile);
+            $backupOptions = [
+                '--type='.escapeshellarg($this->pgBackRestBackupType()),
+                '--start-fast=y',
+                '--expire-auto=n',
+            ];
+            if (! $archiveCheckEnabled) {
+                $backupOptions[] = '--archive-check=n';
+            }
+            $backup = $this->pgBackRestDockerCommand($stanza, 'backup', $backupOptions, $remoteEnvFile);
+
+            $commands[] = "($stanzaCreate) || ($stanzaInfo)";
+            if ($archiveCheckEnabled) {
+                $commands[] = $this->pgBackRestDockerCommand($stanza, 'check', [], $remoteEnvFile);
+            }
+            $commands[] = $backup;
+
+            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = trim($this->backup_output);
+
+            $expireWarning = null;
+            if (! empty($this->pgBackRestRetentionOptions())) {
+                try {
+                    $expireOutput = instant_remote_process([$this->pgBackRestDockerCommand($stanza, 'expire', $this->pgBackRestRetentionOptions(), $remoteEnvFile)], $this->server, true, false, $this->timeout, disableMultiplexing: true);
+                    $expireOutput = trim($expireOutput);
+                    if ($expireOutput !== '') {
+                        $this->backup_output = $this->backup_output === '' ? $expireOutput : $this->backup_output."\n".$expireOutput;
+                    }
+                } catch (Throwable $expireException) {
+                    $expireWarning = 'Warning: pgBackRest backup completed but retention expire failed: '.$expireException->getMessage();
+                    Log::channel('scheduled-errors')->warning('pgBackRest expire failed after successful backup', [
+                        'backup_id' => $this->backup->uuid,
+                        'error' => $expireException->getMessage(),
+                    ]);
+                }
+            }
+
+            foreach ([$archiveCheckWarning, $expireWarning] as $warning) {
+                if ($warning) {
+                    $this->backup_output = $this->backup_output === '' ? $warning : $warning."\n\n".$this->backup_output;
+                }
+            }
+            if ($this->backup_output === '') {
+                $this->backup_output = 'pgBackRest backup completed successfully.';
+            }
+            $this->s3_uploaded = true;
+        } catch (Throwable $e) {
+            $this->s3_uploaded = false;
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
+        } finally {
+            if ($remoteEnvFile) {
+                try {
+                    $this->pgBackRestCleanupRemoteEnvFile($remoteEnvFile);
+                } catch (Throwable $cleanupException) {
+                    Log::channel('scheduled-errors')->warning('Unable to remove temporary pgBackRest environment file', [
+                        'backup_id' => $this->backup->uuid,
+                        'error' => $cleanupException->getMessage(),
+                    ]);
+                }
+            }
+        }
+    }
+
+    private function usesPgBackRest(string $databaseType): bool
+    {
+        return str($databaseType)->contains('postgres') && data_get($this->backup, 'backup_method', 'dump') === 'pgbackrest';
+    }
+
+    private function pgBackRestStanzaName(): string
+    {
+        $stanza = Str::of('coolify-'.$this->backup->uuid)
+            ->replaceMatches('/[^A-Za-z0-9_-]/', '-')
+            ->lower()
+            ->limit(63, '')
+            ->value();
+
+        validateShellSafePath($stanza, 'pgBackRest stanza');
+
+        return $stanza;
+    }
+
+    private function pgBackRestBackupType(): string
+    {
+        $type = data_get($this->backup, 'pgbackrest_backup_type', 'incr');
+
+        return in_array($type, ['full', 'diff', 'incr'], true) ? $type : 'incr';
+    }
+
+    private function pgBackRestRepositoryPath(string $stanza): string
+    {
+        return '/'.trim($this->backup_dir, '/').'/pgbackrest/'.$stanza;
+    }
+
+    private function pgBackRestRepositoryKeyPrefix(string $stanza): string
+    {
+        return trim($this->pgBackRestRepositoryPath($stanza), '/').'/';
+    }
+
+    private function pgBackRestDockerCommand(string $stanza, string $command, array $extraOptions, string $envFilePath): string
+    {
+        $network = data_get($this->backup, 'database_type') === ServiceDatabase::class
+            ? $this->database->service->destination->network
+            : $this->database->destination->network;
+
+        $dockerName = escapeshellarg('pgbackrest-of-'.$this->backup_log_uuid);
+        $safeNetwork = escapeshellarg($network);
+        $image = escapeshellarg(config('constants.coolify.pgbackrest_image'));
+        $pgDataPath = $this->postgres_pgdata_path ?: '/var/lib/postgresql/data';
+        $dataVolume = escapeshellarg($this->postgres_data_path.':'.$pgDataPath.':ro');
+        $envFile = ' --env-file '.escapeshellarg($envFilePath);
+
+        $options = array_merge($this->pgBackRestBaseOptions($stanza), $extraOptions);
+
+        return "docker run --rm --network {$safeNetwork} --name {$dockerName}{$envFile} -v {$dataVolume} {$image} pgbackrest ".implode(' ', $options).' '.$command;
+    }
+
+    private function pgBackRestUploadEnvFile(): string
+    {
+        $remoteEnvDirectory = $this->pgBackRestRemoteEnvDirectory();
+        $remoteEnvFile = $this->pgBackRestRemoteEnvFilePath();
+
+        $localEnvDirectory = storage_path('app/pgbackrest-env');
+        if (! is_dir($localEnvDirectory) && ! mkdir($localEnvDirectory, 0700, true) && ! is_dir($localEnvDirectory)) {
+            throw new \Exception('Unable to create local temporary directory for pgBackRest environment file.');
+        }
+
+        $localEnvFile = tempnam($localEnvDirectory, 'pgbackrest-');
+        if ($localEnvFile === false) {
+            throw new \Exception('Unable to create local temporary pgBackRest environment file.');
+        }
+
+        try {
+            $bytesWritten = file_put_contents($localEnvFile, $this->pgBackRestEnvFileContents());
+            if ($bytesWritten === false) {
+                throw new \Exception('Unable to write local temporary pgBackRest environment file.');
+            }
+            chmod($localEnvFile, 0600);
+            instant_remote_process(['mkdir -m 700 '.escapeshellarg($remoteEnvDirectory)], $this->server, true, true, $this->timeout, disableMultiplexing: true);
+            instant_scp($localEnvFile, $remoteEnvFile, $this->server);
+            instant_remote_process(['chmod 600 '.escapeshellarg($remoteEnvFile)], $this->server, true, true, $this->timeout, disableMultiplexing: true);
+        } catch (Throwable $e) {
+            try {
+                $this->pgBackRestCleanupRemoteEnvFile($remoteEnvFile);
+            } catch (Throwable) {
+            }
+            throw $e;
+        } finally {
+            if (file_exists($localEnvFile)) {
+                unlink($localEnvFile);
+            }
+        }
+
+        return $remoteEnvFile;
+    }
+
+    private function pgBackRestRemoteEnvDirectory(): string
+    {
+        if (blank($this->backup_log_uuid)) {
+            throw new \Exception('Missing pgBackRest backup execution UUID for temporary environment file.');
+        }
+
+        $directory = '/tmp/coolify-pgbackrest-'.$this->backup_log_uuid;
+        validateShellSafePath($directory, 'pgBackRest environment directory path');
+
+        return $directory;
+    }
+
+    private function pgBackRestRemoteEnvFilePath(): string
+    {
+        $path = $this->pgBackRestRemoteEnvDirectory().'/pgbackrest.env';
+        validateShellSafePath($path, 'pgBackRest environment file path');
+
+        return $path;
+    }
+
+    private function pgBackRestCleanupRemoteEnvFile(string $remoteEnvFile): void
+    {
+        validateShellSafePath($remoteEnvFile, 'pgBackRest environment file path');
+        $remoteEnvDirectory = dirname($remoteEnvFile);
+        validateShellSafePath($remoteEnvDirectory, 'pgBackRest environment directory path');
+
+        instant_remote_process([
+            'rm -f '.escapeshellarg($remoteEnvFile).' && rmdir '.escapeshellarg($remoteEnvDirectory).' 2>/dev/null || true',
+        ], $this->server, false, true, $this->timeout, disableMultiplexing: true);
+    }
+
+    private function pgBackRestEnvFileContents(): string
+    {
+        $lines = array_filter([
+            $this->pgBackRestEnvFileLine('PGHOST', $this->container_name),
+            $this->pgBackRestEnvFileLine('PGPORT', '5432'),
+            $this->postgres_password ? $this->pgBackRestEnvFileLine('PGPASSWORD', $this->postgres_password) : null,
+            filled($this->postgres_uid) && ctype_digit($this->postgres_uid) ? $this->pgBackRestEnvFileLine('BACKREST_UID', $this->postgres_uid) : null,
+            filled($this->postgres_gid) && ctype_digit($this->postgres_gid) ? $this->pgBackRestEnvFileLine('BACKREST_GID', $this->postgres_gid) : null,
+            $this->pgBackRestEnvFileLine('PGBACKREST_REPO1_S3_KEY', $this->s3->key),
+            $this->pgBackRestEnvFileLine('PGBACKREST_REPO1_S3_KEY_SECRET', $this->s3->secret),
+        ]);
+
+        return implode("\n", $lines)."\n";
+    }
+
+    private function pgBackRestEnvFileLine(string $key, ?string $value): string
+    {
+        if (! preg_match('/^[A-Z0-9_]+$/', $key)) {
+            throw new \Exception('Invalid pgBackRest environment variable name.');
+        }
+
+        $value = (string) $value;
+        if (str_contains($value, "\0") || str_contains($value, "\n") || str_contains($value, "\r")) {
+            throw new \Exception("pgBackRest environment value for {$key} contains unsupported control characters.");
+        }
+
+        return "{$key}={$value}";
+    }
+
+    private function pgBackRestBaseOptions(string $stanza): array
+    {
+        $database = data_get($this->database, 'postgres_db') ?: 'postgres';
+        $username = data_get($this->database, 'postgres_user') ?: 'postgres';
+        $pgDataPath = $this->postgres_pgdata_path ?: '/var/lib/postgresql/data';
+
+        return [
+            '--stanza='.escapeshellarg($stanza),
+            '--pg1-path='.escapeshellarg($pgDataPath),
+            '--pg1-user='.escapeshellarg($username),
+            '--pg1-database='.escapeshellarg($database),
+            '--repo1-type=s3',
+            '--repo1-path='.escapeshellarg($this->pgBackRestRepositoryPath($stanza)),
+            '--repo1-s3-bucket='.escapeshellarg($this->s3->bucket),
+            '--repo1-s3-endpoint='.escapeshellarg($this->normalizedS3Endpoint()),
+            '--repo1-s3-region='.escapeshellarg($this->s3->region ?: 'us-east-1'),
+            '--repo1-s3-uri-style=path',
+            '--log-level-console=info',
+            '--process-max=2',
+        ];
+    }
+
+    private function pgBackRestRetentionOptions(): array
+    {
+        $retentionAmount = (int) data_get($this->backup, 'database_backup_retention_amount_s3', 0);
+        $retentionDays = (int) data_get($this->backup, 'database_backup_retention_days_s3', 0);
+
+        if ($retentionAmount > 0) {
+            return [
+                '--repo1-retention-full='.escapeshellarg((string) $retentionAmount),
+                '--repo1-retention-full-type=count',
+            ];
+        }
+
+        if ($retentionDays > 0) {
+            return [
+                '--repo1-retention-full='.escapeshellarg((string) $retentionDays),
+                '--repo1-retention-full-type=time',
+            ];
+        }
+
+        return [];
+    }
+
+    private function pgBackRestArchiveCheckEnabled(): bool
+    {
+        $archiveMode = strtolower($this->postgresPsqlValue('SHOW archive_mode;'));
+        $archiveCommand = strtolower($this->postgresPsqlValue('SHOW archive_command;'));
+
+        return in_array($archiveMode, ['on', 'always'], true)
+            && str_contains($archiveCommand, 'pgbackrest')
+            && str_contains($archiveCommand, 'archive-push');
+    }
+
+    private function pgBackRestRequiresWalArchive(): bool
+    {
+        $value = data_get($this->backup, 'pgbackrest_require_wal_archive');
+
+        return $value === null ? true : (bool) $value;
+    }
+
+    private function postgresPsqlValue(string $sql): string
+    {
+        return trim(instant_remote_process([$this->postgresPsqlCommand($sql).' 2>/dev/null || true'], $this->server, false, false, null, disableMultiplexing: true));
+    }
+
+    private function postgresPsqlCommand(string $sql): string
+    {
+        $container = escapeshellarg($this->container_name);
+        $username = escapeshellarg(data_get($this->database, 'postgres_user') ?: 'postgres');
+        $database = escapeshellarg(data_get($this->database, 'postgres_db') ?: 'postgres');
+        $command = 'export PGPASSWORD="${PGPASSWORD:-${POSTGRES_PASSWORD:-}}"; exec psql -tA -v ON_ERROR_STOP=1 -U '.$username.' -d '.$database.' -c '.escapeshellarg($sql);
+
+        return "docker exec {$container} sh -lc ".escapeshellarg($command);
+    }
+
+    private function discoverPostgresDataPathOnHost(): string
+    {
+        $container = escapeshellarg($this->container_name);
+        $pgData = $this->postgresPsqlValue('SHOW data_directory;');
+        if ($pgData === '') {
+            $pgData = trim(instant_remote_process(["docker exec {$container} printenv PGDATA || true"], $this->server, false, false, null, disableMultiplexing: true));
+        }
+        if ($pgData === '') {
+            $pgData = '/var/lib/postgresql/data';
+        }
+        $this->postgres_pgdata_path = rtrim($pgData, '/');
+        $this->postgres_uid = trim(instant_remote_process(["docker exec {$container} sh -lc 'id -u postgres 2>/dev/null || id -u'"], $this->server, false, false, null, disableMultiplexing: true));
+        $this->postgres_gid = trim(instant_remote_process(["docker exec {$container} sh -lc 'id -g postgres 2>/dev/null || id -g'"], $this->server, false, false, null, disableMultiplexing: true));
+
+        $mounts = instant_remote_process(["docker inspect --format '{{range .Mounts}}{{printf \"%s|%s\\n\" .Destination .Source}}{{end}}' {$container}"], $this->server, true, false, null, disableMultiplexing: true);
+        $bestDestination = null;
+        $bestSource = null;
+
+        foreach (explode("\n", trim($mounts)) as $line) {
+            if (! str_contains($line, '|')) {
+                continue;
+            }
+            [$destination, $source] = array_pad(explode('|', $line, 2), 2, null);
+            $destination = rtrim((string) $destination, '/');
+            $source = rtrim((string) $source, '/');
+            if ($destination === '' || $source === '') {
+                continue;
+            }
+            if ($this->postgres_pgdata_path === $destination || str_starts_with($this->postgres_pgdata_path, $destination.'/')) {
+                if ($bestDestination === null || strlen($destination) > strlen($bestDestination)) {
+                    $bestDestination = $destination;
+                    $bestSource = $source;
+                }
+            }
+        }
+
+        if ($bestDestination === null || $bestSource === null) {
+            throw new \Exception("Unable to find a Docker volume or bind mount for PostgreSQL PGDATA path {$pgData}. pgBackRest requires access to the database data directory.");
+        }
+
+        $relative = ltrim(substr($this->postgres_pgdata_path, strlen($bestDestination)), '/');
+
+        return $bestSource.($relative ? '/'.$relative : '');
+    }
+
+    private function normalizedS3Endpoint(): string
+    {
+        $endpoint = (string) $this->s3->endpoint;
+        $host = parse_url($endpoint, PHP_URL_HOST);
+        $port = parse_url($endpoint, PHP_URL_PORT);
+
+        if ($host) {
+            return $host.($port ? ':'.$port : '');
+        }
+
+        return rtrim(preg_replace('#^https?://#', '', $endpoint), '/');
+    }
+
     private function backup_standalone_mysql(string $database): void
     {
         try {
@@ -662,7 +1066,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private function calculate_size()
     {
-        return instant_remote_process(["du -b $this->backup_location | cut -f1"], $this->server, false, false, null, disableMultiplexing: true);
+        return instant_remote_process(['du -sb '.escapeshellarg($this->backup_location).' | cut -f1'], $this->server, false, false, null, disableMultiplexing: true);
+    }
+
+    private function calculate_pgbackrest_size(): int
+    {
+        return 0;
     }
 
     private function upload_to_s3(): void

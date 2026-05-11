@@ -155,9 +155,11 @@
                         </div>
                     @endif
                     <div class="flex gap-2 mt-4">
-                        @if (data_get($execution, 'status') === 'success')
+                        @if (data_get($execution, 'status') === 'success' && data_get($backup, 'backup_method') !== 'pgbackrest')
                             <x-forms.button class="dark:hover:bg-coolgray-400"
                                 x-on:click="download_file('{{ data_get($execution, 'id') }}')">Download</x-forms.button>
+                        @elseif (data_get($execution, 'status') === 'success' && data_get($backup, 'backup_method') === 'pgbackrest')
+                            <span class="text-xs text-warning">pgBackRest backups are stored as an S3 repository and cannot be downloaded as a single dump file.</span>
                         @endif
                         @php
                             $executionCheckboxes = [];
@@ -167,7 +169,7 @@
                                 $deleteActions[] = 'This backup will be permanently deleted from local storage.';
                             }
 
-                            if (data_get($execution, 's3_uploaded') === true && !data_get($execution, 's3_storage_deleted', false)) {
+                            if (data_get($backup, 'backup_method') !== 'pgbackrest' && data_get($execution, 's3_uploaded') === true && !data_get($execution, 's3_storage_deleted', false)) {
                                 $executionCheckboxes[] = ['id' => 'delete_backup_s3', 'label' => 'Delete the selected backup permanently from S3 Storage'];
                             }
 
