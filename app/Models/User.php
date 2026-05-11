@@ -48,6 +48,7 @@ class User extends Authenticatable implements SendsEmail
         'email',
         'password',
         'force_password_reset',
+        'is_oauth_user',
         'marketing_emails',
         'pending_email',
         'email_change_code',
@@ -64,6 +65,7 @@ class User extends Authenticatable implements SendsEmail
     protected $casts = [
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',
+        'is_oauth_user' => 'boolean',
         'show_boarding' => 'boolean',
         'email_change_code_expires_at' => 'datetime',
     ];
@@ -486,5 +488,10 @@ class User extends Authenticatable implements SendsEmail
     public function hasPassword(): bool
     {
         return ! empty($this->password);
+    }
+
+    public function isOauthUser(): bool
+    {
+        return $this->is_oauth_user || ! $this->hasPassword();
     }
 }

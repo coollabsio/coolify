@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\ResetsUserPasswords;
 
 class ResetUserPassword implements ResetsUserPasswords
@@ -17,6 +18,12 @@ class ResetUserPassword implements ResetsUserPasswords
      */
     public function reset(User $user, array $input): void
     {
+        if (instanceSettings()->disable_password_auth_for_oauth_users && $user->isOauthUser()) {
+            throw ValidationException::withMessages([
+                'password' => __('Password authentication is disabled for OAuth users.'),
+            ]);
+        }
+
         Validator::make($input, [
             'password' => ['required', Password::defaults(), 'confirmed'],
         ])->validate();
