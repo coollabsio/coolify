@@ -1400,23 +1400,23 @@ function generateEnvValue(string $command, Service|Application|null $service = n
             break;
             // This is base64,
         case 'REALBASE64_64':
-            $generatedValue = base64_encode(Str::random(64));
+            $generatedValue = base64_encode(random_bytes(64));
             break;
         case 'REALBASE64_128':
-            $generatedValue = base64_encode(Str::random(128));
+            $generatedValue = base64_encode(random_bytes(128));
             break;
         case 'REALBASE64':
         case 'REALBASE64_32':
-            $generatedValue = base64_encode(Str::random(32));
+            $generatedValue = base64_encode(random_bytes(32));
             break;
         case 'HEX_32':
-            $generatedValue = bin2hex(Str::random(32));
+            $generatedValue = bin2hex(random_bytes(16));
             break;
         case 'HEX_64':
-            $generatedValue = bin2hex(Str::random(64));
+            $generatedValue = bin2hex(random_bytes(32));
             break;
         case 'HEX_128':
-            $generatedValue = bin2hex(Str::random(128));
+            $generatedValue = bin2hex(random_bytes(64));
             break;
         case 'USER':
             $generatedValue = Str::random(16);
