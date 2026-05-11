@@ -2,7 +2,6 @@
 # slogan: A scalable, distributed, collaborative, document-graph database for the realtime web.
 # category: database
 # tags: database, nosql, realtime, graph, document, rocksdb
-# logo: svgs/default.webp
 # port: 8000
 
 services:

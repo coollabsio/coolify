@@ -2,7 +2,6 @@
 # slogan: A scalable SurrealDB deployment backed by a single-node TiKV cluster.
 # category: database
 # tags: database, nosql, realtime, graph, document, tikv
-# logo: svgs/default.webp
 # port: 8000
 
 services:
