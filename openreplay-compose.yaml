@@ -1,0 +1,108 @@
+services:
+  openreplay-minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  openreplay-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_DB}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_DB}
+      - POSTGRES_DB=openreplay
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SERVICE_USER_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  openreplay-redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  openreplay-backend:
+    image: openreplay/backend:latest
+    depends_on:
+      openreplay-db:
+        condition: service_healthy
+      openreplay-redis:
+        condition: service_healthy
+      openreplay-minio:
+        condition: service_healthy
+    environment:
+      - DOMAIN=${SERVICE_DOMAIN}
+      - HTTP_PORT=3030
+      - HTTPS_PORT=3031
+      - POSTGRES_USER=${SERVICE_USER_DB}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_DB}
+      - POSTGRES_DB=openreplay
+      - POSTGRES_HOST=openreplay-db
+      - REDIS_HOST=openreplay-redis
+      - REDIS_PORT=6379
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+      - MINIO_ENDPOINT=openreplay-minio:9000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3030/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  openreplay-frontend:
+    image: openreplay/frontend:latest
+    depends_on:
+      openreplay-backend:
+        condition: service_healthy
+    environment:
+      - DOMAIN=${SERVICE_DOMAIN}
+      - HTTP_PORT=3030
+      - HTTPS_PORT=3031
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3030"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  openreplay-nginx:
+    image: openreplay/nginx:latest
+    depends_on:
+      openreplay-backend:
+        condition: service_healthy
+      openreplay-frontend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${SERVICE_DOMAIN}
+    volumes:
+      - nginx-data:/var/log/nginx
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  minio-data:
+  postgres-data:
+  redis-data:
+  nginx-data:
