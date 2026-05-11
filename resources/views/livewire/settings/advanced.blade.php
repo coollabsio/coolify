@@ -41,6 +41,17 @@
                                 shortConfirmationLabel="Confirmation text" />
                         </div>
                     @endif
+                    <h4 class="pt-4">Authentication Settings</h4>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                            helper="Allow enabled OAuth providers to create new users even when normal registration is disabled."
+                            label="OAuth Registration Allowed" />
+                    </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_password_login_enabled_for_oauth_users"
+                            helper="When disabled, users linked to an OAuth provider must continue signing in with OAuth and cannot use or create a password."
+                            label="Password Login for OAuth Users" />
+                    </div>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."
