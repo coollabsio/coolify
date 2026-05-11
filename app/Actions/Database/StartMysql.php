@@ -175,7 +175,7 @@ class StartMysql
             );
         }
 
-        if (! is_null($this->database->mysql_conf) || ! empty($this->database->mysql_conf)) {
+        if (! is_null($this->database->mysql_conf) && ! empty($this->database->mysql_conf)) {
             $docker_compose['services'][$container_name]['volumes'] = array_merge(
                 $docker_compose['services'][$container_name]['volumes'] ?? [],
                 [
@@ -215,7 +215,8 @@ class StartMysql
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
 
         if ($this->database->enable_ssl) {
-            $this->commands[] = executeInDocker($this->database->uuid, "chown {$this->database->mysql_user}:{$this->database->mysql_user} /etc/mysql/certs/server.crt /etc/mysql/certs/server.key");
+            $mysqlUser = escapeshellarg($this->database->mysql_user);
+            $this->commands[] = executeInDocker($this->database->uuid, "chown {$mysqlUser}:{$mysqlUser} /etc/mysql/certs/server.crt /etc/mysql/certs/server.key");
         }
 
         $this->commands[] = "echo 'Database started.'";

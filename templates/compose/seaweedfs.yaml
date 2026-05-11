@@ -7,7 +7,7 @@
 
 services:
   seaweedfs-master:
-    image: chrislusf/seaweedfs:4.05
+    image: chrislusf/seaweedfs:4.13
     environment:
       - SERVICE_URL_S3_8333
       - AWS_ACCESS_KEY_ID=${SERVICE_USER_S3}
@@ -61,7 +61,7 @@ services:
       retries: 10
 
   seaweedfs-admin:
-    image: chrislusf/seaweedfs:4.05
+    image: chrislusf/seaweedfs:4.13
     environment:
       - SERVICE_URL_ADMIN_23646
       - SEAWEED_USER_ADMIN=${SERVICE_USER_ADMIN}

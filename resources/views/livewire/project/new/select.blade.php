@@ -173,6 +173,34 @@
                                         </template>
                                     </x-slot:logo>
                                 </x-resource-view>
+                                <template x-if="service.amd_only">
+                                    <div class="absolute top-2 right-10 group">
+                                        <span
+                                            class="px-2 py-0.5 text-xs rounded bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 cursor-pointer">
+                                            AMD only
+                                        </span>
+                                        <div class="info-helper-popup right-0 w-sm">
+                                            <div class="p-4">
+                                                This service only supports AMD64/x86_64 architecture. It will not work
+                                                on ARM-based servers (e.g., Apple Silicon, Raspberry Pi, AWS Graviton).
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                                <template x-if="service.arm_only">
+                                    <div class="absolute top-2 right-10 group">
+                                        <span
+                                            class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 cursor-pointer">
+                                            ARM only
+                                        </span>
+                                        <div class="info-helper-popup right-0 w-sm">
+                                            <div class="p-4">
+                                                This service only supports ARM64/aarch64 architecture. It will not work
+                                                on AMD64/x86_64-based servers.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
                                 <template x-if="shouldShowDocIcon(service)">
                                     <a :href="getDocLink(service) || coolifyDocsUrl(service.name)" target="_blank"
                                         @click.stop @mouseenter="resolveDocLink(service)"
@@ -424,6 +452,7 @@
                         <div class="flex flex-col mx-6">
                             <div class="font-bold dark:group-hover:text-white">
                                 Swarm Docker <span class="text-xs">({{ $swarmDocker->name }})</span>
+                                <x-deprecated-badge />
                             </div>
                         </div>
                     </div>

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 
 class SshMultiplexingHelper
 {
@@ -70,7 +71,7 @@ class SshMultiplexingHelper
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
         $muxSocket = $sshConfig['muxFilename'];
-        $connectionTimeout = config('constants.ssh.connection_timeout');
+        $connectionTimeout = self::getConnectionTimeout($server);
         $serverInterval = config('constants.ssh.server_interval');
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
@@ -139,7 +140,7 @@ class SshMultiplexingHelper
             $scp_command .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
 
-        $scp_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'), isScp: true);
+        $scp_command .= self::getCommonSshOptions($server, $sshKeyLocation, self::getConnectionTimeout($server), config('constants.ssh.server_interval'), isScp: true);
         if ($server->isIpv6()) {
             $scp_command .= "{$source} ".escapeshellarg($server->user).'@['.escapeshellarg($server->ip)."]:{$dest}";
         } else {
@@ -183,7 +184,7 @@ class SshMultiplexingHelper
             $ssh_command .= "-o ProxyCommand='cloudflared access ssh --hostname %h' ";
         }
 
-        $ssh_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'));
+        $ssh_command .= self::getCommonSshOptions($server, $sshKeyLocation, self::getConnectionTimeout($server), config('constants.ssh.server_interval'));
 
         $delimiter = Hash::make($command);
         $delimiter = base64_encode($delimiter);
@@ -209,12 +210,46 @@ class SshMultiplexingHelper
     private static function validateSshKey(PrivateKey $privateKey): void
     {
         $keyLocation = $privateKey->getKeyLocation();
-        $checkKeyCommand = "ls $keyLocation 2>/dev/null";
-        $keyCheckProcess = Process::run($checkKeyCommand);
+        $filename = "ssh_key@{$privateKey->uuid}";
+        $disk = Storage::disk('ssh-keys');
 
-        if ($keyCheckProcess->exitCode() !== 0) {
+        $needsRewrite = false;
+
+        if (! $disk->exists($filename)) {
+            $needsRewrite = true;
+        } else {
+            $diskContent = $disk->get($filename);
+            if ($diskContent !== $privateKey->private_key) {
+                Log::warning('SSH key file content does not match database, resyncing', [
+                    'key_uuid' => $privateKey->uuid,
+                ]);
+                $needsRewrite = true;
+            }
+        }
+
+        if ($needsRewrite) {
             $privateKey->storeInFileSystem();
         }
+
+        // Ensure correct permissions (SSH requires 0600)
+        if (file_exists($keyLocation)) {
+            $currentPerms = fileperms($keyLocation) & 0777;
+            if ($currentPerms !== 0600 && ! chmod($keyLocation, 0600)) {
+                Log::warning('Failed to set SSH key file permissions to 0600', [
+                    'key_uuid' => $privateKey->uuid,
+                    'path' => $keyLocation,
+                ]);
+            }
+        }
+    }
+
+    public static function getConnectionTimeout(Server $server): int
+    {
+        $timeout = data_get($server, 'settings.connection_timeout');
+
+        return is_numeric($timeout) && (int) $timeout > 0
+            ? (int) $timeout
+            : (int) config('constants.ssh.connection_timeout');
     }
 
     private static function getCommonSshOptions(Server $server, string $sshKeyLocation, int $connectionTimeout, int $serverInterval, bool $isScp = false): string

@@ -27,7 +27,7 @@
                     <div class="mt-1 mb-6">Configure Docker cleanup settings for your server.</div>
                 </div>
 
-                @if ($this->isCleanupStale)
+                @if (!isCloud() && $this->isCleanupStale)
                     <div class="mb-4">
                         <x-callout type="warning" title="Docker Cleanup May Be Stalled">
                             <p>The last Docker cleanup ran {{ $this->lastExecutionTime ?? 'unknown time' }} ago,

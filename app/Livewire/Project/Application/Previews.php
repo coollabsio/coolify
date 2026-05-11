@@ -35,8 +35,17 @@ class Previews extends Component
 
     public array $previewFqdns = [];
 
+    public array $previewDockerTags = [];
+
+    public ?int $manualPullRequestId = null;
+
+    public ?string $manualDockerTag = null;
+
     protected $rules = [
         'previewFqdns.*' => 'string|nullable',
+        'previewDockerTags.*' => 'string|nullable',
+        'manualPullRequestId' => 'integer|min:1|nullable',
+        'manualDockerTag' => 'string|nullable',
     ];
 
     public function mount()
@@ -53,12 +62,17 @@ class Previews extends Component
                 $preview = $this->application->previews->get($key);
                 if ($preview) {
                     $preview->fqdn = $fqdn;
+                    if ($this->application->build_pack === 'dockerimage') {
+                        $preview->docker_registry_image_tag = $this->previewDockerTags[$key] ?? null;
+                    }
                 }
             }
         } else {
             $this->previewFqdns = [];
+            $this->previewDockerTags = [];
             foreach ($this->application->previews as $key => $preview) {
                 $this->previewFqdns[$key] = $preview->fqdn;
+                $this->previewDockerTags[$key] = $preview->docker_registry_image_tag;
             }
         }
     }
@@ -174,7 +188,7 @@ class Previews extends Component
         }
     }
 
-    public function add(int $pull_request_id, ?string $pull_request_html_url = null)
+    public function add(int $pull_request_id, ?string $pull_request_html_url = null, ?string $docker_registry_image_tag = null)
     {
         try {
             $this->authorize('update', $this->application);
@@ -195,12 +209,17 @@ class Previews extends Component
             } else {
                 $this->setDeploymentUuid();
                 $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
-                if (! $found && ! is_null($pull_request_html_url)) {
+                if (! $found && (! is_null($pull_request_html_url) || ($this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()))) {
                     $found = ApplicationPreview::create([
                         'application_id' => $this->application->id,
                         'pull_request_id' => $pull_request_id,
-                        'pull_request_html_url' => $pull_request_html_url,
+                        'pull_request_html_url' => $pull_request_html_url ?? '',
+                        'docker_registry_image_tag' => $docker_registry_image_tag,
                     ]);
+                }
+                if ($found && $this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()) {
+                    $found->docker_registry_image_tag = $docker_registry_image_tag;
+                    $found->save();
                 }
                 $found->generate_preview_fqdn();
                 $this->application->refresh();
@@ -217,30 +236,42 @@ class Previews extends Component
     {
         $this->authorize('deploy', $this->application);
 
-        $this->deploy($pull_request_id, $pull_request_html_url, force_rebuild: true);
+        $dockerRegistryImageTag = null;
+        if ($this->application->build_pack === 'dockerimage') {
+            $dockerRegistryImageTag = $this->application->previews()
+                ->where('pull_request_id', $pull_request_id)
+                ->value('docker_registry_image_tag');
+        }
+
+        $this->deploy($pull_request_id, $pull_request_html_url, force_rebuild: true, docker_registry_image_tag: $dockerRegistryImageTag);
     }
 
-    public function add_and_deploy(int $pull_request_id, ?string $pull_request_html_url = null)
+    public function add_and_deploy(int $pull_request_id, ?string $pull_request_html_url = null, ?string $docker_registry_image_tag = null)
     {
         $this->authorize('deploy', $this->application);
 
-        $this->add($pull_request_id, $pull_request_html_url);
-        $this->deploy($pull_request_id, $pull_request_html_url);
+        $this->add($pull_request_id, $pull_request_html_url, $docker_registry_image_tag);
+        $this->deploy($pull_request_id, $pull_request_html_url, force_rebuild: false, docker_registry_image_tag: $docker_registry_image_tag);
     }
 
-    public function deploy(int $pull_request_id, ?string $pull_request_html_url = null, bool $force_rebuild = false)
+    public function deploy(int $pull_request_id, ?string $pull_request_html_url = null, bool $force_rebuild = false, ?string $docker_registry_image_tag = null)
     {
         $this->authorize('deploy', $this->application);
 
         try {
             $this->setDeploymentUuid();
             $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
-            if (! $found && ! is_null($pull_request_html_url)) {
-                ApplicationPreview::create([
+            if (! $found && (! is_null($pull_request_html_url) || ($this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()))) {
+                $found = ApplicationPreview::create([
                     'application_id' => $this->application->id,
                     'pull_request_id' => $pull_request_id,
-                    'pull_request_html_url' => $pull_request_html_url,
+                    'pull_request_html_url' => $pull_request_html_url ?? '',
+                    'docker_registry_image_tag' => $docker_registry_image_tag,
                 ]);
+            }
+            if ($found && $this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()) {
+                $found->docker_registry_image_tag = $docker_registry_image_tag;
+                $found->save();
             }
             $result = queue_application_deployment(
                 application: $this->application,
@@ -248,6 +279,7 @@ class Previews extends Component
                 force_rebuild: $force_rebuild,
                 pull_request_id: $pull_request_id,
                 git_type: $found->git_type ?? null,
+                docker_registry_image_tag: $docker_registry_image_tag,
             );
             if ($result['status'] === 'queue_full') {
                 $this->dispatch('error', 'Deployment queue full', $result['message']);
@@ -275,6 +307,32 @@ class Previews extends Component
     {
         $this->deployment_uuid = new Cuid2;
         $this->parameters['deployment_uuid'] = $this->deployment_uuid;
+    }
+
+    public function addDockerImagePreview()
+    {
+        $this->authorize('deploy', $this->application);
+        $this->validateOnly('manualPullRequestId');
+        $this->validateOnly('manualDockerTag');
+
+        if ($this->application->build_pack !== 'dockerimage') {
+            $this->dispatch('error', 'Manual Docker Image previews are only available for Docker Image applications.');
+
+            return;
+        }
+
+        if ($this->manualPullRequestId === null || str($this->manualDockerTag)->isEmpty()) {
+            $this->dispatch('error', 'Both pull request id and docker tag are required.');
+
+            return;
+        }
+
+        $dockerTag = str($this->manualDockerTag)->trim()->value();
+
+        $this->add_and_deploy($this->manualPullRequestId, null, $dockerTag);
+
+        $this->manualPullRequestId = null;
+        $this->manualDockerTag = null;
     }
 
     private function stopContainers(array $containers, $server)

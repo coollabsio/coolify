@@ -24,7 +24,12 @@ class Project extends BaseModel
     use HasFactory;
     use HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+        'team_id',
+        'uuid',
+    ];
 
     /**
      * Get query builder for projects owned by current team.
@@ -69,7 +74,7 @@ class Project extends BaseModel
 
     public function environment_variables()
     {
-        return $this->hasMany(SharedEnvironmentVariable::class);
+        return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'project');
     }
 
     public function environments()

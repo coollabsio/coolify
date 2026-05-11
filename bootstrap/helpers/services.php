@@ -128,6 +128,11 @@ function replaceVariables(string $variable): Stringable
         return $str->replaceFirst('{', '')->before('}');
     }
 
+    // Handle bare $VAR format (no braces)
+    if ($str->startsWith('$')) {
+        return $str->replaceFirst('$', '');
+    }
+
     return $str;
 }
 

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Url\Url;
+use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
@@ -47,7 +48,22 @@ class Service extends BaseModel
 
     private static $parserVersion = '5';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'uuid',
+        'name',
+        'description',
+        'docker_compose_raw',
+        'docker_compose',
+        'connect_to_docker_network',
+        'service_type',
+        'config_hash',
+        'compose_parsing_version',
+        'is_container_label_escape_enabled',
+        'environment_id',
+        'server_id',
+        'destination_id',
+        'destination_type',
+    ];
 
     protected $appends = ['server_status', 'status'];
 
@@ -1552,7 +1568,7 @@ class Service extends BaseModel
         // Generate SERVICE_NAME_* environment variables from docker-compose services
         if ($this->docker_compose) {
             try {
-                $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($this->docker_compose);
+                $dockerCompose = Yaml::parse($this->docker_compose);
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
                     $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);

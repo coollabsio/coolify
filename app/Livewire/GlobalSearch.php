@@ -1203,7 +1203,7 @@ class GlobalSearch extends Component
     public function loadDestinations()
     {
         $this->loadingDestinations = true;
-        $server = Server::find($this->selectedServerId);
+        $server = Server::ownedByCurrentTeam()->find($this->selectedServerId);
 
         if (! $server) {
             $this->loadingDestinations = false;
@@ -1280,7 +1280,7 @@ class GlobalSearch extends Component
     public function loadEnvironments()
     {
         $this->loadingEnvironments = true;
-        $project = Project::where('uuid', $this->selectedProjectUuid)->first();
+        $project = Project::ownedByCurrentTeam()->where('uuid', $this->selectedProjectUuid)->first();
 
         if (! $project) {
             $this->loadingEnvironments = false;
@@ -1496,7 +1496,10 @@ class GlobalSearch extends Component
                 'category' => 'Services',
                 'resourceType' => 'service',
                 'logo' => data_get($service, 'logo'),
-            ]);
+            ] + array_filter([
+                'amd_only' => data_get($service, 'amd_only') ? true : null,
+                'arm_only' => data_get($service, 'arm_only') ? true : null,
+            ]));
         }
 
         $cachedServices = $items->toArray();

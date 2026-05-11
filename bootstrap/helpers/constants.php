@@ -1,7 +1,26 @@
 <?php
 
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
+
 const REDACTED = '<REDACTED>';
 const DATABASE_TYPES = ['postgresql', 'redis', 'mongodb', 'mysql', 'mariadb', 'keydb', 'dragonfly', 'clickhouse'];
+const STANDALONE_DATABASE_MODELS = [
+    'postgresql' => StandalonePostgresql::class,
+    'redis' => StandaloneRedis::class,
+    'mongodb' => StandaloneMongodb::class,
+    'mysql' => StandaloneMysql::class,
+    'mariadb' => StandaloneMariadb::class,
+    'keydb' => StandaloneKeydb::class,
+    'dragonfly' => StandaloneDragonfly::class,
+    'clickhouse' => StandaloneClickhouse::class,
+];
 const VALID_CRON_STRINGS = [
     'every_minute' => '* * * * *',
     'hourly' => '0 * * * *',
@@ -81,4 +100,4 @@ const NEEDS_TO_DISABLE_GZIP = [
 const NEEDS_TO_DISABLE_STRIPPREFIX = [
     'appwrite' => ['appwrite', 'appwrite-console', 'appwrite-realtime'],
 ];
-const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment'];
+const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment', 'server'];

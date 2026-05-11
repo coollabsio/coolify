@@ -8,7 +8,10 @@ class Tag extends BaseModel
 {
     use HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'team_id',
+    ];
 
     protected function customizeName($value)
     {

@@ -1,4 +1,4 @@
-<div>
+<div class="flex h-[calc(100vh-10rem)] min-h-[50rem] flex-col overflow-hidden">
     <x-slot:title>
         {{ data_get_str($application, 'name')->limit(10) }} > Deployment | Coolify
         </x-slot>
@@ -9,6 +9,9 @@
         fullscreen: @entangle('fullscreen'),
         alwaysScroll: {{ $isKeepAliveOn ? 'true' : 'false' }},
         rafId: null,
+        scrollDebounce: null,
+        isScrolling: false,
+        lastTouchY: 0,
         showTimestamps: true,
         searchQuery: '',
         matchCount: 0,
@@ -19,8 +22,53 @@
         scrollToBottom() {
             const logsContainer = document.getElementById('logsContainer');
             if (logsContainer) {
+                this.isScrolling = true;
                 logsContainer.scrollTop = logsContainer.scrollHeight;
+                setTimeout(() => { this.isScrolling = false; }, 50);
             }
+        },
+        disableFollow() {
+            if (!this.alwaysScroll) return;
+            this.alwaysScroll = false;
+            if (this.rafId) {
+                cancelAnimationFrame(this.rafId);
+                this.rafId = null;
+            }
+        },
+        handleWheel(event) {
+            if (this.alwaysScroll && event.deltaY < 0) {
+                this.disableFollow();
+            }
+        },
+        handleTouchStart(event) {
+            this.lastTouchY = event.touches[0].clientY;
+        },
+        handleTouchMove(event) {
+            if (!this.alwaysScroll) return;
+            const currentY = event.touches[0].clientY;
+            if (currentY > this.lastTouchY) {
+                this.disableFollow();
+            }
+            this.lastTouchY = currentY;
+        },
+        handleKeyScroll(event) {
+            if (!this.alwaysScroll) return;
+            const upKeys = ['ArrowUp', 'PageUp', 'Home'];
+            if (upKeys.includes(event.key)) {
+                this.disableFollow();
+            }
+        },
+        handleScroll(event) {
+            if (this.isScrolling) return;
+            clearTimeout(this.scrollDebounce);
+            this.scrollDebounce = setTimeout(() => {
+                const el = event.target;
+                const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+                if (!this.alwaysScroll && distanceFromBottom <= 10) {
+                    this.alwaysScroll = true;
+                    this.scheduleScroll();
+                }
+            }, 150);
         },
         scheduleScroll() {
             if (!this.alwaysScroll) return;
@@ -107,9 +155,9 @@
 
             this.matchCount = query ? count : 0;
         },
-        downloadLogs() {
+        collectVisibleLogs() {
             const logs = document.getElementById('logs');
-            if (!logs) return;
+            if (!logs) return '';
             const visibleLines = logs.querySelectorAll('[data-log-line]:not(.hidden)');
             let content = '';
             visibleLines.forEach(line => {
@@ -118,6 +166,17 @@
                     content += text + String.fromCharCode(10);
                 }
             });
+            return content;
+        },
+        copyLogs() {
+            const content = this.collectVisibleLogs();
+            if (!content) return;
+            navigator.clipboard.writeText(content);
+            Livewire.dispatch('success', ['Logs copied to clipboard.']);
+        },
+        downloadLogs() {
+            const content = this.collectVisibleLogs();
+            if (!content) return;
             const blob = new Blob([content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -165,13 +224,13 @@
                 this.scheduleScroll();
             }
         }
-    }">
+    }" class="flex flex-1 min-h-0 flex-col overflow-hidden">
             <livewire:project.application.deployment-navbar
                 :application_deployment_queue="$application_deployment_queue" />
-            <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-4 relative'">
+            <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-4 flex flex-1 min-h-0 flex-col overflow-hidden'">
                 <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
-                    class="flex flex-col w-full bg-white dark:text-white dark:bg-coolgray-100 dark:border-coolgray-300"
-                    :class="fullscreen ? 'h-full' : 'border border-dotted rounded-sm'">
+                    class="flex min-h-0 flex-col w-full overflow-hidden bg-white dark:text-white dark:bg-coolgray-100 dark:border-coolgray-300"
+                    :class="fullscreen ? 'h-full' : 'flex-1 border border-dotted rounded-sm'">
                     <div
                         class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
                         <div class="flex items-center gap-3">
@@ -210,12 +269,7 @@
                             </div>
                             <div class="flex flex-wrap items-center gap-1">
                                 <button
-                                    x-on:click="
-                                    $wire.copyLogs().then(logs => {
-                                        navigator.clipboard.writeText(logs);
-                                        Livewire.dispatch('success', ['Logs copied to clipboard.']);
-                                    });
-                                "
+                                    x-on:click="copyLogs()"
                                 title="Copy Logs"
                                 class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                                 <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -327,10 +381,10 @@
                             </div>
                         </div>
                     </div>
-                    <div id="logsContainer"
-                        class="flex flex-col overflow-y-auto p-2 px-4 min-h-4 scrollbar"
-                        :class="fullscreen ? 'flex-1' : 'max-h-[30rem]'">
-                        <div id="logs" class="flex flex-col font-mono">
+                    <div id="logsContainer" @scroll="handleScroll" @wheel="handleWheel"
+                        @touchstart="handleTouchStart" @touchmove="handleTouchMove" @keydown="handleKeyScroll" tabindex="0"
+                        class="flex min-h-40 flex-1 flex-col overflow-y-auto p-2 px-4 scrollbar">
+                        <div id="logs" class="flex flex-col font-logs">
                             <div x-show="searchQuery.trim() && matchCount === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
                                 No matches found.
@@ -356,7 +410,7 @@
                                         ])>{{ $lineContent }}</span>
                                 </div>
                             @empty
-                                <span class="font-mono text-neutral-400 mb-2">No logs yet.</span>
+                                <span class="font-logs text-neutral-400 mb-2">No logs yet.</span>
                             @endforelse
                         </div>
                     </div>

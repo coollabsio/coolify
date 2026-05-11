@@ -1,0 +1,75 @@
+# documentation: https://docs.espocrm.com
+# slogan: EspoCRM is a free and open-source CRM platform.
+# category: productivity
+# tags: crm, self-hosted, open-source, workflow, automation, project management
+# logo: svgs/espocrm.svg
+# port: 80
+
+services:
+  espocrm:
+    image: espocrm/espocrm:9
+    environment:
+      - SERVICE_URL_ESPOCRM
+      - ESPOCRM_ADMIN_USERNAME=${ESPOCRM_ADMIN_USERNAME:-admin}
+      - ESPOCRM_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - ESPOCRM_DATABASE_PLATFORM=Mysql
+      - ESPOCRM_DATABASE_HOST=espocrm-db
+      - ESPOCRM_DATABASE_NAME=${MARIADB_DATABASE:-espocrm}
+      - ESPOCRM_DATABASE_USER=${SERVICE_USER_MARIADB}
+      - ESPOCRM_DATABASE_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+      - ESPOCRM_SITE_URL=${SERVICE_URL_ESPOCRM}
+    volumes:
+      - espocrm:/var/www/html
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 2s
+      start_period: 60s
+      timeout: 10s
+      retries: 15
+    depends_on:
+      espocrm-db:
+        condition: service_healthy
+
+  espocrm-daemon:
+    image: espocrm/espocrm:9
+    container_name: espocrm-daemon
+    volumes:
+      - espocrm:/var/www/html
+    restart: always
+    entrypoint: docker-daemon.sh
+    depends_on:
+      espocrm:
+        condition: service_healthy
+
+  espocrm-websocket:
+    image: espocrm/espocrm:9
+    container_name: espocrm-websocket
+    environment:
+      - SERVICE_URL_ESPOCRM_WEBSOCKET_8080
+      - ESPOCRM_CONFIG_USE_WEB_SOCKET=true
+      - ESPOCRM_CONFIG_WEB_SOCKET_URL=$SERVICE_URL_ESPOCRM_WEBSOCKET
+      - ESPOCRM_CONFIG_WEB_SOCKET_ZERO_M_Q_SUBSCRIBER_DSN=tcp://*:7777
+      - ESPOCRM_CONFIG_WEB_SOCKET_ZERO_M_Q_SUBMISSION_DSN=tcp://espocrm-websocket:7777
+    volumes:
+      - espocrm:/var/www/html
+    restart: always
+    entrypoint: docker-websocket.sh
+    depends_on:
+      espocrm:
+        condition: service_healthy
+
+  espocrm-db:
+    image: mariadb:11.8
+    environment:
+      - MARIADB_DATABASE=${MARIADB_DATABASE:-espocrm}
+      - MARIADB_USER=${SERVICE_USER_MARIADB}
+      - MARIADB_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+      - MARIADB_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+    volumes:
+      - espocrm-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 20s
+      start_period: 10s
+      timeout: 10s
+      retries: 3

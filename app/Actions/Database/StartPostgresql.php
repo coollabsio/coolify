@@ -111,10 +111,7 @@ class StartPostgresql
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => [
-                        'test' => [
-                            'CMD-SHELL',
-                            "psql -U {$this->database->postgres_user} -d {$this->database->postgres_db} -c 'SELECT 1' || exit 1",
-                        ],
+                        'test' => ['CMD', 'psql', '-U', (string) $this->database->postgres_user, '-d', (string) $this->database->postgres_db, '-c', 'SELECT 1'],
                         'interval' => '5s',
                         'timeout' => '5s',
                         'retries' => 10,
@@ -227,7 +224,8 @@ class StartPostgresql
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         if ($this->database->enable_ssl) {
-            $this->commands[] = executeInDocker($this->database->uuid, "chown {$this->database->postgres_user}:{$this->database->postgres_user} /var/lib/postgresql/certs/server.key /var/lib/postgresql/certs/server.crt");
+            $postgresUser = escapeshellarg($this->database->postgres_user);
+            $this->commands[] = executeInDocker($this->database->uuid, "chown {$postgresUser}:{$postgresUser} /var/lib/postgresql/certs/server.key /var/lib/postgresql/certs/server.crt");
         }
         $this->commands[] = "echo 'Database started.'";
 
@@ -304,9 +302,18 @@ class StartPostgresql
         foreach ($this->database->init_scripts as $init_script) {
             $filename = data_get($init_script, 'filename');
             $content = data_get($init_script, 'content');
+
+            // Normalise filename without rejecting legacy values so previously created
+            // init scripts keep deploying. basename() strips any directory components
+            // (path traversal) and escapeshellarg() contains every shell metacharacter
+            // in the tee target. Livewire / API validate new filenames up front.
+            $filename = basename((string) $filename);
+
+            $target_path = "$this->configuration_dir/docker-entrypoint-initdb.d/{$filename}";
+            $escaped_target = escapeshellarg($target_path);
             $content_base64 = base64_encode($content);
-            $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/docker-entrypoint-initdb.d/{$filename} > /dev/null";
-            $this->init_scripts[] = "$this->configuration_dir/docker-entrypoint-initdb.d/{$filename}";
+            $this->commands[] = "echo '{$content_base64}' | base64 -d | tee {$escaped_target} > /dev/null";
+            $this->init_scripts[] = $target_path;
         }
     }
 

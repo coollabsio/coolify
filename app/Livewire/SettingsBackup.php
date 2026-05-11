@@ -6,6 +6,7 @@ use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -82,7 +83,8 @@ class SettingsBackup extends Component
             $postgres_password = $envs['POSTGRES_PASSWORD'];
             $postgres_user = $envs['POSTGRES_USER'];
             $postgres_db = $envs['POSTGRES_DB'];
-            $this->database = StandalonePostgresql::create([
+            $this->database = new StandalonePostgresql;
+            $this->database->forceFill([
                 'id' => 0,
                 'name' => 'coolify-db',
                 'description' => 'Coolify database',
@@ -90,16 +92,17 @@ class SettingsBackup extends Component
                 'postgres_password' => $postgres_password,
                 'postgres_db' => $postgres_db,
                 'status' => 'running',
-                'destination_type' => \App\Models\StandaloneDocker::class,
+                'destination_type' => StandaloneDocker::class,
                 'destination_id' => 0,
             ]);
+            $this->database->save();
             $this->backup = ScheduledDatabaseBackup::create([
                 'id' => 0,
                 'enabled' => true,
                 'save_s3' => false,
                 'frequency' => '0 0 * * *',
                 'database_id' => $this->database->id,
-                'database_type' => \App\Models\StandalonePostgresql::class,
+                'database_type' => StandalonePostgresql::class,
                 'team_id' => currentTeam()->id,
             ]);
             $this->database->refresh();

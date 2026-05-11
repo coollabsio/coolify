@@ -44,7 +44,7 @@
                     @endif
                 </div>
                 <div class="flex flex-col gap-2">
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$server" wire:model.live="isSentinelEnabled"
                             label="Enable Sentinel" />
                         @if ($server->isSentinelEnabled())
@@ -91,13 +91,14 @@
 
                         <div class="flex flex-col gap-2">
                             <div class="flex flex-wrap gap-2 sm:flex-nowrap">
-                                <x-forms.input canGate="update" :canResource="$server"
+                                <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
                                     id="sentinelMetricsRefreshRateSeconds" label="Metrics rate (seconds)" required
                                     helper="Interval used for gathering metrics. Lower values result in more disk space usage." />
-                                <x-forms.input canGate="update" :canResource="$server" id="sentinelMetricsHistoryDays"
+                                <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
+                                    id="sentinelMetricsHistoryDays"
                                     label="Metrics history (days)" required
                                     helper="Number of days to retain metrics data for." />
-                                <x-forms.input canGate="update" :canResource="$server"
+                                <x-forms.input canGate="update" :canResource="$server" type="number" min="10"
                                     id="sentinelPushIntervalSeconds" label="Push interval (seconds)" required
                                     helper="Interval at which metrics data is sent to the collector." />
                             </div>

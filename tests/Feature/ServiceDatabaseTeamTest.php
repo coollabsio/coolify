@@ -7,6 +7,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -14,18 +15,18 @@ it('returns the correct team through the service relationship chain', function (
     $team = Team::factory()->create();
 
     $project = Project::create([
-        'uuid' => (string) Illuminate\Support\Str::uuid(),
+        'uuid' => (string) Str::uuid(),
         'name' => 'Test Project',
         'team_id' => $team->id,
     ]);
 
     $environment = Environment::create([
-        'name' => 'test-env-'.Illuminate\Support\Str::random(8),
+        'name' => 'test-env-'.Str::random(8),
         'project_id' => $project->id,
     ]);
 
     $service = Service::create([
-        'uuid' => (string) Illuminate\Support\Str::uuid(),
+        'uuid' => (string) Str::uuid(),
         'name' => 'supabase',
         'environment_id' => $environment->id,
         'destination_id' => 1,
@@ -34,7 +35,7 @@ it('returns the correct team through the service relationship chain', function (
     ]);
 
     $serviceDatabase = ServiceDatabase::create([
-        'uuid' => (string) Illuminate\Support\Str::uuid(),
+        'uuid' => (string) Str::uuid(),
         'name' => 'supabase-db',
         'service_id' => $service->id,
     ]);
@@ -47,18 +48,18 @@ it('returns the correct team for ServiceApplication through the service relation
     $team = Team::factory()->create();
 
     $project = Project::create([
-        'uuid' => (string) Illuminate\Support\Str::uuid(),
+        'uuid' => (string) Str::uuid(),
         'name' => 'Test Project',
         'team_id' => $team->id,
     ]);
 
     $environment = Environment::create([
-        'name' => 'test-env-'.Illuminate\Support\Str::random(8),
+        'name' => 'test-env-'.Str::random(8),
         'project_id' => $project->id,
     ]);
 
     $service = Service::create([
-        'uuid' => (string) Illuminate\Support\Str::uuid(),
+        'uuid' => (string) Str::uuid(),
         'name' => 'supabase',
         'environment_id' => $environment->id,
         'destination_id' => 1,
@@ -67,7 +68,7 @@ it('returns the correct team for ServiceApplication through the service relation
     ]);
 
     $serviceApplication = ServiceApplication::create([
-        'uuid' => (string) Illuminate\Support\Str::uuid(),
+        'uuid' => (string) Str::uuid(),
         'name' => 'supabase-studio',
         'service_id' => $service->id,
     ]);

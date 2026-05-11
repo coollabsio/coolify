@@ -19,7 +19,7 @@ class RefundSubscription
     /**
      * Check if the team's subscription is eligible for a refund.
      *
-     * @return array{eligible: bool, days_remaining: int, reason: string}
+     * @return array{eligible: bool, days_remaining: int, reason: string, current_period_end: int|null}
      */
     public function checkEligibility(Team $team): array
     {
@@ -43,8 +43,10 @@ class RefundSubscription
             return $this->ineligible('Subscription not found in Stripe.');
         }
 
+        $currentPeriodEnd = $stripeSubscription->current_period_end;
+
         if (! in_array($stripeSubscription->status, ['active', 'trialing'])) {
-            return $this->ineligible("Subscription status is '{$stripeSubscription->status}'.");
+            return $this->ineligible("Subscription status is '{$stripeSubscription->status}'.", $currentPeriodEnd);
         }
 
         $startDate = \Carbon\Carbon::createFromTimestamp($stripeSubscription->start_date);
@@ -52,13 +54,14 @@ class RefundSubscription
         $daysRemaining = self::REFUND_WINDOW_DAYS - $daysSinceStart;
 
         if ($daysRemaining <= 0) {
-            return $this->ineligible('The 30-day refund window has expired.');
+            return $this->ineligible('The 30-day refund window has expired.', $currentPeriodEnd);
         }
 
         return [
             'eligible' => true,
             'days_remaining' => $daysRemaining,
             'reason' => 'Eligible for refund.',
+            'current_period_end' => $currentPeriodEnd,
         ];
     }
 
@@ -99,16 +102,27 @@ class RefundSubscription
                 'payment_intent' => $paymentIntentId,
             ]);
 
-            $this->stripe->subscriptions->cancel($subscription->stripe_subscription_id);
+            // Record refund immediately so it cannot be retried if cancel fails
+            $subscription->update([
+                'stripe_refunded_at' => now(),
+                'stripe_feedback' => 'Refund requested by user',
+                'stripe_comment' => 'Full refund processed within 30-day window at '.now()->toDateTimeString(),
+            ]);
+
+            try {
+                $this->stripe->subscriptions->cancel($subscription->stripe_subscription_id);
+            } catch (\Exception $e) {
+                \Log::critical("Refund succeeded but subscription cancel failed for team {$team->id}: ".$e->getMessage());
+                send_internal_notification(
+                    "CRITICAL: Refund succeeded but cancel failed for subscription {$subscription->stripe_subscription_id}, team {$team->id}. Manual intervention required."
+                );
+            }
 
             $subscription->update([
                 'stripe_cancel_at_period_end' => false,
                 'stripe_invoice_paid' => false,
                 'stripe_trial_already_ended' => false,
                 'stripe_past_due' => false,
-                'stripe_feedback' => 'Refund requested by user',
-                'stripe_comment' => 'Full refund processed within 30-day window at '.now()->toDateTimeString(),
-                'stripe_refunded_at' => now(),
             ]);
 
             $team->subscriptionEnded();
@@ -128,14 +142,15 @@ class RefundSubscription
     }
 
     /**
-     * @return array{eligible: bool, days_remaining: int, reason: string}
+     * @return array{eligible: bool, days_remaining: int, reason: string, current_period_end: int|null}
      */
-    private function ineligible(string $reason): array
+    private function ineligible(string $reason, ?int $currentPeriodEnd = null): array
     {
         return [
             'eligible' => false,
             'days_remaining' => 0,
             'reason' => $reason,
+            'current_period_end' => $currentPeriodEnd,
         ];
     }
 }

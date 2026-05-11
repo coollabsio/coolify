@@ -40,7 +40,10 @@ jobs:
           max-emoji-count: 2
           max-code-references: 5
           require-linked-issue: false
-          blocked-terms: "STRAWBERRY"
+          blocked-terms:  |
+            STRAWBERRY
+            🤖 Generated with Claude Code
+            Generated with Claude Code
           blocked-issue-numbers: 8154
 
           # PR Template Checks
@@ -97,7 +100,7 @@ jobs:
           exempt-pr-milestones: ""
 
           # PR Success Actions
-          success-add-pr-labels: "quality/verified"
+          success-add-pr-labels: ""
 
           # PR Failure Actions
           failure-remove-pr-labels: ""

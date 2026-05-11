@@ -3,6 +3,7 @@
 namespace App\Livewire\Settings;
 
 use App\Models\InstanceSettings;
+use App\Rules\ValidDnsServers;
 use App\Rules\ValidIpOrCidr;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -20,7 +21,6 @@ class Advanced extends Component
     #[Validate('boolean')]
     public bool $is_dns_validation_enabled;
 
-    #[Validate('nullable|string')]
     public ?string $custom_dns_servers = null;
 
     #[Validate('boolean')]
@@ -37,18 +37,22 @@ class Advanced extends Component
     #[Validate('boolean')]
     public bool $is_wire_navigate_enabled;
 
+    #[Validate('boolean')]
+    public bool $is_mcp_server_enabled;
+
     public function rules()
     {
         return [
             'is_registration_enabled' => 'boolean',
             'do_not_track' => 'boolean',
             'is_dns_validation_enabled' => 'boolean',
-            'custom_dns_servers' => 'nullable|string',
+            'custom_dns_servers' => ['nullable', 'string', new ValidDnsServers],
             'is_api_enabled' => 'boolean',
             'allowed_ips' => ['nullable', 'string', new ValidIpOrCidr],
             'is_sponsorship_popup_enabled' => 'boolean',
             'disable_two_step_confirmation' => 'boolean',
             'is_wire_navigate_enabled' => 'boolean',
+            'is_mcp_server_enabled' => 'boolean',
         ];
     }
 
@@ -67,6 +71,7 @@ class Advanced extends Component
         $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
         $this->is_sponsorship_popup_enabled = $this->settings->is_sponsorship_popup_enabled;
         $this->is_wire_navigate_enabled = $this->settings->is_wire_navigate_enabled ?? true;
+        $this->is_mcp_server_enabled = $this->settings->is_mcp_server_enabled ?? false;
     }
 
     public function submit()
@@ -150,11 +155,25 @@ class Advanced extends Component
             $this->settings->is_sponsorship_popup_enabled = $this->is_sponsorship_popup_enabled;
             $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation;
             $this->settings->is_wire_navigate_enabled = $this->is_wire_navigate_enabled;
+            $this->settings->is_mcp_server_enabled = $this->is_mcp_server_enabled;
             $this->settings->save();
             $this->dispatch('success', 'Settings updated!');
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function toggleRegistration($password): bool
+    {
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return false;
+        }
+
+        $this->settings->is_registration_enabled = $this->is_registration_enabled = true;
+        $this->settings->save();
+        $this->dispatch('success', 'Registration has been enabled.');
+
+        return true;
     }
 
     public function toggleTwoStepConfirmation($password): bool

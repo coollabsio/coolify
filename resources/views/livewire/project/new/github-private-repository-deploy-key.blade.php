@@ -52,6 +52,7 @@
                     <x-forms.input id="branch" required label="Branch" />
                     <x-forms.select wire:model.live="build_pack" label="Build Pack" required>
                         <option value="nixpacks">Nixpacks</option>
+                        <option value="railpack">Railpack (Beta)</option>
                         <option value="static">Static</option>
                         <option value="dockerfile">Dockerfile</option>
                         <option value="dockercompose">Docker Compose</option>
@@ -60,6 +61,14 @@
                         <x-forms.input id="publish_directory" required label="Publish Directory" />
                     @endif
                 </div>
+                @if ($build_pack === 'railpack')
+                    <div>
+                        <span
+                            class="px-2 py-1 text-xs font-bold uppercase tracking-wide bg-coollabs/10 dark:bg-warning/20 text-coollabs dark:text-warning rounded">
+                            Beta
+                        </span>
+                    </div>
+                @endif
                 @if ($build_pack === 'dockercompose')
                     <div x-data="{
                         baseDir: '{{ $base_directory }}',

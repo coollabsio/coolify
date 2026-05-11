@@ -22,7 +22,7 @@
 
 ## Preview
 
-<!-- Screenshot or short video showing your changes in action. Mandatory for bounty claims and new features. -->
+<!-- Screenshot or short video showing your changes in action. Mandatory for new features. -->
 
 ## AI Assistance
 
