@@ -17,6 +17,14 @@ class UpdateUserPassword implements UpdatesUserPasswords
      */
     public function update(User $user, array $input): void
     {
+        if (instanceSettings()->is_oauth_login_only_enabled && $user->isOauthUser()) {
+            $validator = Validator::make([], []);
+            $validator->after(function ($validator) {
+                $validator->errors()->add('password', __('Password changes are disabled for OAuth users.'));
+            });
+            $validator->validateWithBag('updatePassword');
+        }
+
         Validator::make($input, [
             'current_password' => ['required', 'string', 'current_password:web'],
             'password' => ['required', Password::defaults(), 'confirmed'],
