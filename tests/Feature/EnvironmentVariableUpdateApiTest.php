@@ -15,7 +15,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0]));
+    config(['app.maintenance.driver' => 'file']);
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -187,6 +188,86 @@ describe('PATCH /api/v1/applications/{uuid}/envs', function () {
         ]);
         $response->assertJsonFragment(['key' => 'APP_IMAGE_TAG']);
         $response->assertJsonMissing(['message' => 'Environment variable updated.']);
+    });
+
+    test('preserves existing value and omitted flags when updating application env flags', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $env = EnvironmentVariable::create([
+            'key' => 'NEXTAUTH_SECRET',
+            'value' => 'stored-secret',
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
+            'is_preview' => false,
+            'is_literal' => true,
+            'is_multiline' => true,
+            'is_shown_once' => true,
+            'is_runtime' => true,
+            'is_buildtime' => true,
+            'comment' => 'Existing comment',
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->patchJson("/api/v1/applications/{$application->uuid}/envs", [
+            'key' => 'NEXTAUTH_SECRET',
+            'is_buildtime' => false,
+        ]);
+
+        $response->assertStatus(201);
+
+        $env->refresh();
+
+        expect($env->value)->toBe('stored-secret');
+        expect((bool) $env->is_buildtime)->toBeFalse();
+        expect((bool) $env->is_runtime)->toBeTrue();
+        expect((bool) $env->is_literal)->toBeTrue();
+        expect((bool) $env->is_multiline)->toBeTrue();
+        expect((bool) $env->is_shown_once)->toBeTrue();
+        expect($env->comment)->toBe('Existing comment');
+    });
+
+    test('preserves existing preview value when updating application preview env flags', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $env = EnvironmentVariable::create([
+            'key' => 'PREVIEW_SECRET',
+            'value' => 'preview-secret',
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
+            'is_preview' => true,
+            'is_literal' => true,
+            'is_runtime' => true,
+            'is_buildtime' => true,
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->patchJson("/api/v1/applications/{$application->uuid}/envs", [
+            'key' => 'PREVIEW_SECRET',
+            'is_preview' => true,
+            'is_runtime' => false,
+        ]);
+
+        $response->assertStatus(201);
+
+        $env->refresh();
+
+        expect($env->value)->toBe('preview-secret');
+        expect((bool) $env->is_preview)->toBeTrue();
+        expect((bool) $env->is_runtime)->toBeFalse();
+        expect((bool) $env->is_buildtime)->toBeTrue();
+        expect((bool) $env->is_literal)->toBeTrue();
     });
 
     test('returns 404 when environment variable does not exist', function () {

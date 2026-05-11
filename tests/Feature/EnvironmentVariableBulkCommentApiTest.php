@@ -15,7 +15,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0]));
+    config(['app.maintenance.driver' => 'file']);
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -150,6 +151,53 @@ describe('PATCH /api/v1/applications/{uuid}/envs/bulk', function () {
 
         expect($env->value)->toBe('new-secret');
         expect($env->comment)->toBe('Keep this comment');
+    });
+
+    test('preserves existing application env value when omitted in bulk update', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $env = EnvironmentVariable::create([
+            'key' => 'NEXTAUTH_SECRET',
+            'value' => 'stored-secret',
+            'comment' => 'Old comment',
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
+            'is_preview' => false,
+            'is_literal' => true,
+            'is_multiline' => true,
+            'is_shown_once' => true,
+            'is_runtime' => true,
+            'is_buildtime' => true,
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->patchJson("/api/v1/applications/{$application->uuid}/envs/bulk", [
+            'data' => [
+                [
+                    'key' => 'NEXTAUTH_SECRET',
+                    'is_buildtime' => false,
+                    'comment' => 'Updated comment',
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(201);
+
+        $env->refresh();
+
+        expect($env->value)->toBe('stored-secret');
+        expect((bool) $env->is_buildtime)->toBeFalse();
+        expect((bool) $env->is_runtime)->toBeTrue();
+        expect((bool) $env->is_literal)->toBeTrue();
+        expect((bool) $env->is_multiline)->toBeTrue();
+        expect((bool) $env->is_shown_once)->toBeTrue();
+        expect($env->comment)->toBe('Updated comment');
     });
 
     test('rejects comment exceeding 256 characters', function () {

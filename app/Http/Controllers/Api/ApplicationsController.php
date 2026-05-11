@@ -3085,22 +3085,23 @@ class ApplicationsController extends Controller
             ], 422);
         }
         $is_preview = $request->is_preview ?? false;
-        $is_literal = $request->is_literal ?? false;
         $key = str($request->key)->trim()->replace(' ', '_')->value;
         if ($is_preview) {
             $env = $application->environment_variables_preview->where('key', $key)->first();
             if ($env) {
-                $env->value = $request->value;
-                if ($env->is_literal != $is_literal) {
-                    $env->is_literal = $is_literal;
+                if ($request->has('value')) {
+                    $env->value = $request->value;
+                }
+                if ($request->has('is_literal') && $env->is_literal != $request->is_literal) {
+                    $env->is_literal = $request->is_literal;
                 }
                 if ($env->is_preview != $is_preview) {
                     $env->is_preview = $is_preview;
                 }
-                if ($env->is_multiline != $request->is_multiline) {
+                if ($request->has('is_multiline') && $env->is_multiline != $request->is_multiline) {
                     $env->is_multiline = $request->is_multiline;
                 }
-                if ($env->is_shown_once != $request->is_shown_once) {
+                if ($request->has('is_shown_once') && $env->is_shown_once != $request->is_shown_once) {
                     $env->is_shown_once = $request->is_shown_once;
                 }
                 if ($request->has('is_runtime') && $env->is_runtime != $request->is_runtime) {
@@ -3131,17 +3132,19 @@ class ApplicationsController extends Controller
         } else {
             $env = $application->environment_variables->where('key', $key)->first();
             if ($env) {
-                $env->value = $request->value;
-                if ($env->is_literal != $is_literal) {
-                    $env->is_literal = $is_literal;
+                if ($request->has('value')) {
+                    $env->value = $request->value;
+                }
+                if ($request->has('is_literal') && $env->is_literal != $request->is_literal) {
+                    $env->is_literal = $request->is_literal;
                 }
                 if ($env->is_preview != $is_preview) {
                     $env->is_preview = $is_preview;
                 }
-                if ($env->is_multiline != $request->is_multiline) {
+                if ($request->has('is_multiline') && $env->is_multiline != $request->is_multiline) {
                     $env->is_multiline = $request->is_multiline;
                 }
-                if ($env->is_shown_once != $request->is_shown_once) {
+                if ($request->has('is_shown_once') && $env->is_shown_once != $request->is_shown_once) {
                     $env->is_shown_once = $request->is_shown_once;
                 }
                 if ($request->has('is_runtime') && $env->is_runtime != $request->is_runtime) {
@@ -3311,15 +3314,17 @@ class ApplicationsController extends Controller
             if ($is_preview) {
                 $env = $application->environment_variables_preview->where('key', $key)->first();
                 if ($env) {
-                    $env->value = $item->get('value');
-
-                    if ($env->is_literal != $is_literal) {
-                        $env->is_literal = $is_literal;
+                    if ($item->has('value')) {
+                        $env->value = $item->get('value');
                     }
-                    if ($env->is_multiline != $item->get('is_multiline')) {
+
+                    if ($item->has('is_literal') && $env->is_literal != $item->get('is_literal')) {
+                        $env->is_literal = $item->get('is_literal');
+                    }
+                    if ($item->has('is_multiline') && $env->is_multiline != $item->get('is_multiline')) {
                         $env->is_multiline = $item->get('is_multiline');
                     }
-                    if ($env->is_shown_once != $item->get('is_shown_once')) {
+                    if ($item->has('is_shown_once') && $env->is_shown_once != $item->get('is_shown_once')) {
                         $env->is_shown_once = $item->get('is_shown_once');
                     }
                     if ($item->has('is_runtime') && $env->is_runtime != $item->get('is_runtime')) {
@@ -3350,14 +3355,16 @@ class ApplicationsController extends Controller
             } else {
                 $env = $application->environment_variables->where('key', $key)->first();
                 if ($env) {
-                    $env->value = $item->get('value');
-                    if ($env->is_literal != $is_literal) {
-                        $env->is_literal = $is_literal;
+                    if ($item->has('value')) {
+                        $env->value = $item->get('value');
                     }
-                    if ($env->is_multiline != $item->get('is_multiline')) {
+                    if ($item->has('is_literal') && $env->is_literal != $item->get('is_literal')) {
+                        $env->is_literal = $item->get('is_literal');
+                    }
+                    if ($item->has('is_multiline') && $env->is_multiline != $item->get('is_multiline')) {
                         $env->is_multiline = $item->get('is_multiline');
                     }
-                    if ($env->is_shown_once != $item->get('is_shown_once')) {
+                    if ($item->has('is_shown_once') && $env->is_shown_once != $item->get('is_shown_once')) {
                         $env->is_shown_once = $item->get('is_shown_once');
                     }
                     if ($item->has('is_runtime') && $env->is_runtime != $item->get('is_runtime')) {
