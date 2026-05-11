@@ -44,6 +44,8 @@ services:
       - 'KONG_STORAGE_READ_TIMEOUT=${KONG_STORAGE_READ_TIMEOUT:-3600}'
       - 'KONG_STORAGE_REQUEST_BUFFERING=${KONG_STORAGE_REQUEST_BUFFERING:-false}'
       - 'KONG_STORAGE_RESPONSE_BUFFERING=${KONG_STORAGE_RESPONSE_BUFFERING:-false}'
+      - 'SUPABASE_MCP_ENABLED=${SUPABASE_MCP_ENABLED:-false}'
+      - 'SUPABASE_MCP_ALLOWED_IPS=${SUPABASE_MCP_ALLOWED_IPS:-127.0.0.1,::1}'
     volumes:
       - type: bind
         source: ./volumes/api/kong-entrypoint.sh
@@ -61,7 +63,47 @@ services:
               export LUA_RT_WS_EXPR="\$(query_params.apikey)"
           fi
 
+          build_mcp_allow_list() {
+            old_ifs="$IFS"
+            IFS=","
+            count=0
+            for ip in ${SUPABASE_MCP_ALLOWED_IPS:-127.0.0.1,::1}; do
+              ip="$(printf '%s' "$ip" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+              if [ -n "$ip" ]; then
+                printf '                      - "%s"\n' "$ip"
+                count=$((count + 1))
+              fi
+            done
+            IFS="$old_ifs"
+            if [ "$count" -eq 0 ]; then
+              printf '                      - "127.0.0.1"\n'
+            fi
+          }
+
+          case "${SUPABASE_MCP_ENABLED:-false}" in
+            true|TRUE|1|yes|YES)
+              export KONG_MCP_PLUGINS="$(printf '%s\n' \
+                '                - name: cors' \
+                '                - name: ip-restriction' \
+                '                  config:' \
+                '                    allow:' \
+                "$(build_mcp_allow_list)" \
+                '                    deny: []')"
+              ;;
+            *)
+              export KONG_MCP_PLUGINS="$(printf '%s\n' \
+                '                - name: request-termination' \
+                '                  config:' \
+                '                    status_code: 403' \
+                '                    message: "Access is forbidden."')"
+              ;;
+          esac
+
           awk '{
+            if ($0 ~ /__KONG_MCP_PLUGINS__/) {
+              print ENVIRON["KONG_MCP_PLUGINS"]
+              next
+            }
             result = ""
             rest = $0
             while (match(rest, /\$[A-Za-z_][A-Za-z_0-9]*/)) {
@@ -436,22 +478,9 @@ services:
                   paths:
                     - /mcp
               plugins:
-                # Block access to /mcp by default
-                - name: request-termination
-                  config:
-                    status_code: 403
-                    message: "Access is forbidden."
-                # Enable local access (danger zone!)
-                # 1. Comment out the 'request-termination' section above
-                # 2. Uncomment the entire section below, including 'deny'
-                # 3. Add your local IPs to the 'allow' list
-                #- name: cors
-                #- name: ip-restriction
-                #  config:
-                #    allow:
-                #      - 127.0.0.1
-                #      - ::1
-                #    deny: []
+                # Default-deny. Set SUPABASE_MCP_ENABLED=true and restrict
+                # SUPABASE_MCP_ALLOWED_IPS to VPN, SSH tunnel, or LAN sources.
+                __KONG_MCP_PLUGINS__
 
             ## Protected Dashboard - catch all remaining routes
             - name: dashboard
