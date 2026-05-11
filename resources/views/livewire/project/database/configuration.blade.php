@@ -14,6 +14,8 @@
             <a class='sub-menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.database.servers', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"><span class="menu-item-label">Servers</span></a>
             <a class='sub-menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
+                href="{{ route('project.database.container-info', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"><span class="menu-item-label">Container Info</span></a>
+            <a class='sub-menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.database.persistent-storage', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"><span class="menu-item-label">Persistent Storage</span></a>
             @can('update', $database)
                 <a class='sub-menu-item' wire:current.exact="menu-item-active"
@@ -55,6 +57,8 @@
                 <livewire:project.shared.environment-variable.all :resource="$database" />
             @elseif ($currentRoute === 'project.database.servers')
                 <livewire:project.shared.destination :resource="$database" />
+            @elseif ($currentRoute === 'project.database.container-info')
+                <livewire:project.shared.container-info :resource="$database" />
             @elseif ($currentRoute === 'project.database.persistent-storage')
                 <livewire:project.service.storage :resource="$database" />
             @elseif ($currentRoute === 'project.database.import-backup')

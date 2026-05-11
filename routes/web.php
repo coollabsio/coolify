@@ -219,6 +219,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/persistent-storage', ApplicationConfiguration::class)->name('project.application.persistent-storage');
         Route::get('/source', ApplicationConfiguration::class)->name('project.application.source');
         Route::get('/servers', ApplicationConfiguration::class)->name('project.application.servers');
+        Route::get('/container-info', ApplicationConfiguration::class)->name('project.application.container-info');
         Route::get('/scheduled-tasks', ApplicationConfiguration::class)->name('project.application.scheduled-tasks.show');
         Route::get('/webhooks', ApplicationConfiguration::class)->name('project.application.webhooks');
         Route::get('/preview-deployments', ApplicationConfiguration::class)->name('project.application.preview-deployments');
@@ -240,6 +241,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', DatabaseConfiguration::class)->name('project.database.configuration');
         Route::get('/environment-variables', DatabaseConfiguration::class)->name('project.database.environment-variables');
         Route::get('/servers', DatabaseConfiguration::class)->name('project.database.servers');
+        Route::get('/container-info', DatabaseConfiguration::class)->name('project.database.container-info');
         Route::get('/import-backup', DatabaseConfiguration::class)->name('project.database.import-backup')->middleware('can.update.resource');
         Route::get('/persistent-storage', DatabaseConfiguration::class)->name('project.database.persistent-storage');
         Route::get('/webhooks', DatabaseConfiguration::class)->name('project.database.webhooks');
@@ -261,6 +263,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/storages', ServiceConfiguration::class)->name('project.service.storages');
         Route::get('/scheduled-tasks', ServiceConfiguration::class)->name('project.service.scheduled-tasks.show');
         Route::get('/webhooks', ServiceConfiguration::class)->name('project.service.webhooks');
+        Route::get('/container-info', ServiceConfiguration::class)->name('project.service.container-info');
         Route::get('/resource-operations', ServiceConfiguration::class)->name('project.service.resource-operations');
         Route::get('/tags', ServiceConfiguration::class)->name('project.service.tags');
         Route::get('/danger', ServiceConfiguration::class)->name('project.service.danger');
