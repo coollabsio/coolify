@@ -3434,6 +3434,21 @@
         "minversion": "0.0.0",
         "port": "8080"
     },
+    "openlitespeed": {
+        "documentation": "https://docs.litespeedtech.com/cloud/docker/openlitespeed/?utm_source=coolify.io",
+        "slogan": "OpenLiteSpeed is an open-source, high-performance HTTP server with built-in PHP support.",
+        "compose": "c2VydmljZXM6CiAgb3BlbmxpdGVzcGVlZDoKICAgIGltYWdlOiBsaXRlc3BlZWR0ZWNoL29wZW5saXRlc3BlZWQ6MS45LjAtbHNwaHA4NAogICAgdm9sdW1lczoKICAgICAgLSBvcGVubGl0ZXNwZWVkLXNpdGVzOi92YXIvd3d3L3Zob3N0cwogICAgICAtIG9wZW5saXRlc3BlZWQtY29uZjovdXNyL2xvY2FsL2xzd3MvY29uZgogICAgICAtIG9wZW5saXRlc3BlZWQtYWRtaW4tY29uZjovdXNyL2xvY2FsL2xzd3MvYWRtaW4vY29uZgogICAgICAtIG9wZW5saXRlc3BlZWQtbG9nczovdXNyL2xvY2FsL2xzd3MvbG9ncwogICAgICAtIG9wZW5saXRlc3BlZWQtYWNtZTovcm9vdC8uYWNtZS5zaAogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX09QRU5MSVRFU1BFRUQKICAgICAgLSBUWj0ke1RaOi1VVEN9CiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDogWyJDTUQiLCAiY3VybCIsICItZiIsICJodHRwOi8vMTI3LjAuMC4xIl0KICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "tags": [
+            "webserver",
+            "php",
+            "openlitespeed",
+            "litespeed"
+        ],
+        "category": "webserver",
+        "logo": "svgs/default.webp",
+        "minversion": "0.0.0",
+        "port": "80"
+    },
     "openclaw": {
         "documentation": "https://coolify.io/docs/services/openclaw?utm_source=coolify.io",
         "slogan": "AI-powered coding assistant with multi-provider support and browser automation.",
