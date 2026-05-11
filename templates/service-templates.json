@@ -5225,6 +5225,23 @@
         "logo": "svgs/wordpress.svg",
         "minversion": "0.0.0"
     },
+    "wordpress-with-openlitespeed": {
+        "documentation": "https://docs.litespeedtech.com/cloud/docker/?utm_source=coolify.io",
+        "slogan": "Run WordPress on OpenLiteSpeed with MariaDB for a high-performance PHP hosting stack.",
+        "compose": "c2VydmljZXM6CiAgb3BlbmxpdGVzcGVlZDoKICAgIGltYWdlOiBsaXRlc3BlZWR0ZWNoL29wZW5saXRlc3BlZWQ6MS44LjUtbHNwaHA4MwogICAgdm9sdW1lczoKICAgIC0gd29yZHByZXNzLWZpbGVzOi92YXIvd3d3L3Zob3N0cy9sb2NhbGhvc3QvaHRtbAogICAgLSBvcGVubGl0ZXNwZWVkLWNvbmY6L3Vzci9sb2NhbC9sc3dzL2NvbmYKICAgIC0gb3BlbmxpdGVzcGVlZC1hZG1pbi1jb25mOi91c3IvbG9jYWwvbHN3cy9hZG1pbi9jb25mCiAgICAtIG9wZW5saXRlc3BlZWQtbG9nczovdXNyL2xvY2FsL2xzd3MvbG9ncwogICAgZW52aXJvbm1lbnQ6CiAgICAtIFNFUlZJQ0VfRlFETl9PUEVOTElURVNQRUVEXzgwCiAgICAtIFdPUkRQUkVTU19EQl9IT1NUPW1hcmlhZGI6MzMwNgogICAgLSBXT1JEUFJFU1NfREJfTkFNRT13b3JkcHJlc3MKICAgIC0gV09SRFBSRVNTX0RCX1VTRVI9JFNFUlZJQ0VfVVNFUl9XT1JEUFJFU1MKICAgIC0gV09SRFBSRVNTX0RCX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX1dPUkRQUkVTUwogICAgZGVwZW5kc19vbjoKICAgIC0gbWFyaWFkYgogICAgY29tbWFuZDoKICAgIC0gc2gKICAgIC0gIi1jIgogICAgLSB8CiAgICAgIHVudGlsIG15c3FsYWRtaW4gcGluZyAtaCBtYXJpYWRiIC11IiRXT1JEUFJFU1NfREJfVVNFUiIgLXAiJFdPUkRQUkVTU19EQl9QQVNTV09SRCIgLS1zaWxlbnQ7IGRvCiAgICAgICAgc2xlZXAgMgogICAgICBkb25lCiAgICAgIGNkIC92YXIvd3d3L3Zob3N0cy9sb2NhbGhvc3QvaHRtbAogICAgICBpZiBbICEgLWYgd3AtbG9hZC5waHAgXTsgdGhlbgogICAgICAgIHdwIGNvcmUgZG93bmxvYWQgLS1hbGxvdy1yb290CiAgICAgIGZpCiAgICAgIGlmIFsgISAtZiB3cC1jb25maWcucGhwIF07IHRoZW4KICAgICAgICB3cCBjb25maWcgY3JlYXRlIFwKICAgICAgICAgIC0tZGJuYW1lPSIkV09SRFBSRVNTX0RCX05BTUUiIFwKICAgICAgICAgIC0tZGJ1c2VyPSIkV09SRFBSRVNTX0RCX1VTRVIiIFwKICAgICAgICAgIC0tZGJwYXNzPSIkV09SRFBSRVNTX0RCX1BBU1NXT1JEIiBcCiAgICAgICAgICAtLWRiaG9zdD0iJFdPUkRQUkVTU19EQl9IT1NUIiBcCiAgICAgICAgICAtLWFsbG93LXJvb3QKICAgICAgZmkKICAgICAgY2hvd24gLVIgbm9ib2R5Om5vZ3JvdXAgL3Zhci93d3cvdmhvc3RzL2xvY2FsaG9zdC9odG1sCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgLSBDTUQKICAgICAgLSBjdXJsCiAgICAgIC0gIi1mIgogICAgICAtIGh0dHA6Ly8xMjcuMC4wLjEKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAogIG1hcmlhZGI6CiAgICBpbWFnZTogbWFyaWFkYjoxMQogICAgdm9sdW1lczoKICAgIC0gbWFyaWFkYi1kYXRhOi92YXIvbGliL215c3FsCiAgICBlbnZpcm9ubWVudDoKICAgIC0gTVlTUUxfUk9PVF9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9ST09UCiAgICAtIE1ZU1FMX0RBVEFCQVNFPXdvcmRwcmVzcwogICAgLSBNWVNRTF9VU0VSPSRTRVJWSUNFX1VTRVJfV09SRFBSRVNTCiAgICAtIE1ZU1FMX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX1dPUkRQUkVTUwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgIC0gQ01ECiAgICAgIC0gaGVhbHRoY2hlY2suc2gKICAgICAgLSAiLS1jb25uZWN0IgogICAgICAtICItLWlubm9kYl9pbml0aWFsaXplZCIKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "tags": [
+          "cms",
+          "blog",
+          "content",
+          "management",
+          "wordpress",
+          "openlitespeed",
+          "mariadb"
+        ],
+        "category": "cms",
+        "logo": "svgs/wordpress.svg",
+        "minversion": "0.0.0"
+    },
     "wordpress-without-database": {
         "documentation": "https://wordpress.org?utm_source=coolify.io",
         "slogan": "WordPress is open source software you can use to create a beautiful website, blog, or app.",

@@ -1,0 +1,61 @@
+# documentation: https://docs.litespeedtech.com/cloud/docker/
+# slogan: Run WordPress on OpenLiteSpeed with MariaDB for a high-performance PHP hosting stack.
+# category: cms
+# tags: cms, blog, content, management, wordpress, openlitespeed, mariadb
+# logo: svgs/wordpress.svg
+
+services:
+  openlitespeed:
+    image: litespeedtech/openlitespeed:1.8.5-lsphp83
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost/html
+      - openlitespeed-conf:/usr/local/lsws/conf
+      - openlitespeed-admin-conf:/usr/local/lsws/admin/conf
+      - openlitespeed-logs:/usr/local/lsws/logs
+    environment:
+      - SERVICE_URL_OPENLITESPEED_80
+      - WORDPRESS_DB_HOST=mariadb:3306
+      - WORDPRESS_DB_NAME=wordpress
+      - WORDPRESS_DB_USER=$SERVICE_USER_WORDPRESS
+      - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    depends_on:
+      - mariadb
+    command:
+      - sh
+      - -c
+      - |
+        until mysqladmin ping -h mariadb -u"$WORDPRESS_DB_USER" -p"$WORDPRESS_DB_PASSWORD" --silent; do
+          sleep 2
+        done
+        cd /var/www/vhosts/localhost/html
+        if [ ! -f wp-load.php ]; then
+          wp core download --allow-root
+        fi
+        if [ ! -f wp-config.php ]; then
+          wp config create \
+            --dbname="$WORDPRESS_DB_NAME" \
+            --dbuser="$WORDPRESS_DB_USER" \
+            --dbpass="$WORDPRESS_DB_PASSWORD" \
+            --dbhost="$WORDPRESS_DB_HOST" \
+            --allow-root
+        fi
+        chown -R nobody:nogroup /var/www/vhosts/localhost/html
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
