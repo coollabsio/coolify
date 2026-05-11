@@ -69,6 +69,7 @@ Thank you so much!
 * [Arcjet](https://arcjet.com?ref=coolify.io) - Advanced web security and performance solutions
 * [BC Direct](https://bc.direct?ref=coolify.io) - Your trusted technology consulting partner
 * [Blacksmith](https://blacksmith.sh?ref=coolify.io) - Infrastructure automation platform
+* [Capture.page](https://capture.page/?ref=coolify.io) - Fast & Reliable Screenshot API for Developers
 * [Context.dev](https://context.dev?ref=coolify.io) - API to personalize your product with logos, colors, and company info from any domain
 * [ByteBase](https://www.bytebase.com?ref=coolify.io) - Database CI/CD and Security at Scale
 * [CodeRabbit](https://coderabbit.ai?ref=coolify.io) - Cut Code Review Time & Bugs in Half
@@ -87,6 +88,7 @@ Thank you so much!
 * [Juxtdigital](https://juxtdigital.com?ref=coolify.io) - Digital PR & AI Authority Building Agency
 * [LiquidWeb](https://liquidweb.com?ref=coolify.io) - Premium managed hosting solutions
 * [Logto](https://logto.io?ref=coolify.io) - The better identity infrastructure for developers
+* [LumaDock](https://lumadock.com/vps-hosting/coolify?utm_source=coolify&utm_medium=sponsorship&utm_campaign=coolify_oss_sponsor_2026&utm_content=github_readme) - Fast and reliable virtual server hosting
 * [Macarne](https://macarne.com?ref=coolify.io) - Best IP Transit & Carrier Ethernet Solutions for Simplified Network Connectivity
 * [Mobb](https://vibe.mobb.ai/?ref=coolify.io) - Secure Your AI-Generated Code to Unlock Dev Productivity
 * [PetroSky Cloud](https://petrosky.io?ref=coolify.io) - Open source cloud deployment solutions

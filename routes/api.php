@@ -35,6 +35,8 @@ Route::group([
 ], function () {
     Route::get('/enable', [OtherController::class, 'enable_api']);
     Route::get('/disable', [OtherController::class, 'disable_api']);
+    Route::post('/mcp/enable', [OtherController::class, 'enable_mcp']);
+    Route::post('/mcp/disable', [OtherController::class, 'disable_mcp']);
 });
 Route::group([
     'middleware' => ['auth:sanctum', ApiAllowed::class, 'api.sensitive'],

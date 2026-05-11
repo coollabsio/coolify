@@ -3,9 +3,12 @@
 namespace App\Providers;
 
 use App\Contracts\CustomJobRepositoryInterface;
+use App\Exceptions\DeploymentException;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\User;
 use App\Repositories\CustomJobRepository;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Horizon\Contracts\JobRepository;
@@ -46,6 +49,26 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
                 $deploymentQueue->update([
                     'horizon_job_id' => $id,
                 ]);
+            }
+        });
+
+        Event::listen(function (JobFailed $event) {
+            if (! isCloud()) {
+                return;
+            }
+
+            $exception = $event->exception;
+            if (! ($exception instanceof DeploymentException) && ! ($exception instanceof TimeoutExceededException)) {
+                return;
+            }
+
+            try {
+                $uuid = $event->job->uuid();
+                if ($uuid) {
+                    app(JobRepository::class)->deleteFailed($uuid);
+                }
+            } catch (\Throwable $e) {
+                // Best-effort scrub; never mask the original failure.
             }
         });
     }

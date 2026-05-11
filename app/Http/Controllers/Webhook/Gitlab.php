@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Webhook;
 
 use App\Actions\Application\CleanupPreviewDeployment;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Exception;
@@ -13,6 +14,8 @@ use Visus\Cuid2\Cuid2;
 
 class Gitlab extends Controller
 {
+    use DetectsSkipDeployCommits;
+
     public function manual(Request $request)
     {
         try {
@@ -61,6 +64,7 @@ class Gitlab extends Controller
                 $removed_files = data_get($payload, 'commits.*.removed');
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
+                $skip_deploy_commits = self::shouldSkipDeploy(data_get($payload, 'commits.*.message', []));
             }
             if ($x_gitlab_event === 'merge_request') {
                 $action = data_get($payload, 'object_attributes.action');
@@ -69,6 +73,9 @@ class Gitlab extends Controller
                 $full_name = data_get($payload, 'project.path_with_namespace');
                 $pull_request_id = data_get($payload, 'object_attributes.iid');
                 $pull_request_html_url = data_get($payload, 'object_attributes.url');
+                $pull_request_title = data_get($payload, 'object_attributes.title');
+                $latest_commit_message = data_get($payload, 'object_attributes.last_commit.message');
+                $skip_deploy_pr = self::shouldSkipDeployAny([$pull_request_title, $latest_commit_message]);
                 if (! $branch) {
                     $return_payloads->push([
                         'status' => 'failed',
@@ -147,6 +154,17 @@ class Gitlab extends Controller
                     if ($application->isDeployable()) {
                         $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
                         if ($is_watch_path_triggered || blank($application->watch_paths)) {
+                            if ($skip_deploy_commits ?? false) {
+                                $return_payloads->push([
+                                    'application' => $application->name,
+                                    'status' => 'skipped',
+                                    'message' => 'All commits contain [skip cd] or [skip ci]. Skipping deployment.',
+                                    'application_uuid' => $application->uuid,
+                                    'application_name' => $application->name,
+                                ]);
+
+                                continue;
+                            }
                             $deployment_uuid = new Cuid2;
                             $result = queue_application_deployment(
                                 application: $application,
@@ -206,6 +224,15 @@ class Gitlab extends Controller
                 if ($x_gitlab_event === 'merge_request') {
                     if ($action === 'open' || $action === 'opened' || $action === 'synchronize' || $action === 'reopened' || $action === 'reopen' || $action === 'update') {
                         if ($application->isPRDeployable()) {
+                            if ($skip_deploy_pr ?? false) {
+                                $return_payloads->push([
+                                    'application' => $application->name,
+                                    'status' => 'skipped',
+                                    'message' => 'PR title or latest commit contains [skip cd] or [skip ci]. Skipping preview deployment.',
+                                ]);
+
+                                continue;
+                            }
                             $deployment_uuid = new Cuid2;
                             $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                             if (! $found) {

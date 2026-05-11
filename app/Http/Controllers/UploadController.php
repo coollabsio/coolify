@@ -29,6 +29,7 @@ class UploadController extends BaseController
         'archive.gz',
         'bz2',
         'xz',
+        'dmp',
     ];
 
     public function upload(Request $request)
