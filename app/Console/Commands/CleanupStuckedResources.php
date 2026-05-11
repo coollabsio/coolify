@@ -128,6 +128,7 @@ class CleanupStuckedResources extends Command
         }
         try {
             $keydbs = StandaloneKeydb::withTrashed()->whereNotNull('deleted_at')->get();
+            $surrealDbs = StandaloneSurrealDB::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($keydbs as $keydb) {
                 echo "Deleting stuck keydb: {$keydb->name}\n";
                 DeleteResourceJob::dispatch($keydb);

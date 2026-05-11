@@ -13,6 +13,7 @@ use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
+use AppModelsStandaloneSurrealDB;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -47,6 +48,7 @@ class CleanupNames extends Command
         'StandaloneMongodb' => StandaloneMongodb::class,
         'StandaloneMariadb' => StandaloneMariadb::class,
         'StandaloneKeydb' => StandaloneKeydb::class,
+        'StandaloneSurrealDB' => StandaloneSurrealDB::class,
         'StandaloneDragonfly' => StandaloneDragonfly::class,
         'StandaloneClickhouse' => StandaloneClickhouse::class,
         'S3Storage' => S3Storage::class,

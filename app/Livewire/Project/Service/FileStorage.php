@@ -7,6 +7,7 @@ use App\Models\LocalFileVolume;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneSurrealDB;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
@@ -24,7 +25,7 @@ class FileStorage extends Component
 
     public LocalFileVolume $fileStorage;
 
-    public ServiceApplication|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase|Application $resource;
+    public ServiceApplication|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSurrealDB|ServiceDatabase|Application $resource;
 
     public string $fs_path;
 

@@ -151,6 +151,7 @@ class ServicesDelete extends Command
 
         // Add KeyDB databases
         foreach (StandaloneKeydb::all() as $db) {
+        foreach (StandaloneSurrealDB::all() as $db) {
             $key = "keydb_{$db->id}";
             $allDatabases->put($key, $db);
             $databaseOptions->put($key, "{$db->name} (KeyDB)");

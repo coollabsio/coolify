@@ -243,6 +243,12 @@ class Select extends Component
                 'description' => 'ClickHouse is a column-oriented database that supports real-time analytics, business intelligence, observability, ML and GenAI, and more.',
                 'logo' => '<div class="w-[4.5rem] h-[4.5rem] p-2 transition-all duration-200 bg-black/10 dark:bg-white/10"><svg width="215" height="90" viewBox="0 0 100 43" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_378_10860)"><rect x="2.70837" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="7.2085" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="11.7086" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="16.2076" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="20.7087" y="10.7502" width="2.24992" height="4.49985" rx="0.236664" fill="currentColor"/></g></svg></div>',
             ],
+            [
+                'id' => 'surrealdb',
+                'name' => 'SurrealDB',
+                'description' => 'SurrealDB is a multi-model database (document, graph, and key-value) designed for modern applications with real-time capabilities.',
+                'logo' => '<div class="w-[4.5rem] h-[4.5rem] p-2 transition-all duration-200 bg-black/10 dark:bg-white/10 flex items-center justify-center text-2xl font-bold text-gray-400">SDB</div>',
+            ],
 
         ];
 
@@ -285,6 +291,7 @@ class Select extends Component
             case 'dragonfly':
             case 'clickhouse':
             case 'mongodb':
+            case 'surrealdb':
                 $this->isDatabase = true;
                 $this->includeSwarm = false;
                 if ($this->allServers instanceof Collection) {

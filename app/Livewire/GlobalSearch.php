@@ -454,6 +454,7 @@ class GlobalSearch extends Component
             // KeyDB
             $databases = $databases->merge(
                 StandaloneKeydb::ownedByCurrentTeam()
+                    ->union(StandaloneSurrealDB::ownedByCurrentTeam()
                     ->with(['environment.project'])
                     ->get()
                     ->map(function ($db) {
