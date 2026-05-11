@@ -18,7 +18,7 @@ class StartDatabase
 
     public string $jobQueue = 'high';
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database)
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSurrealDB $database)
     {
         $server = $database->destination->server;
         if (! $server->isFunctional()) {
@@ -47,6 +47,9 @@ class StartDatabase
                 $activity = StartDragonfly::run($database);
                 break;
             case \App\Models\StandaloneClickhouse::class:
+            case AppModelsStandaloneSurrealDB::class:
+                $activity = StartSurrealDB::run($database);
+                break;
                 $activity = StartClickhouse::run($database);
                 break;
         }

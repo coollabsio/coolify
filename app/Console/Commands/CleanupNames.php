@@ -47,6 +47,7 @@ class CleanupNames extends Command
         'StandaloneMongodb' => StandaloneMongodb::class,
         'StandaloneMariadb' => StandaloneMariadb::class,
         'StandaloneKeydb' => StandaloneKeydb::class,
+        'StandaloneSurrealDB' => StandaloneSurrealDB::class,
         'StandaloneDragonfly' => StandaloneDragonfly::class,
         'StandaloneClickhouse' => StandaloneClickhouse::class,
         'S3Storage' => S3Storage::class,
