@@ -19,7 +19,7 @@ class CreateNewUser implements CreatesNewUsers
     public function create(array $input): User
     {
         $settings = instanceSettings();
-        if (! $settings->is_registration_enabled) {
+        if (! $settings->is_registration_enabled || $settings->is_password_auth_disabled) {
             abort(403);
         }
         Validator::make($input, [
