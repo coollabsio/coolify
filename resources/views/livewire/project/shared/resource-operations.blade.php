@@ -1,6 +1,7 @@
 <div>
     <h2>Resource Operations</h2>
     <div>You can easily make different kind of operations on this resource.</div>
+    <livewire:project.shared.container-info :resource="$resource" />
 
     <div x-data="{
         selectedCloneServer: null,
