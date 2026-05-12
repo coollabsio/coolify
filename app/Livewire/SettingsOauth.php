@@ -9,10 +9,28 @@ class SettingsOauth extends Component
 {
     public $oauth_settings_map;
 
+    private function mapOauthSetting(OauthSetting $setting): array
+    {
+        return [
+            'id' => $setting->id,
+            'provider' => $setting->provider,
+            'enabled' => $setting->enabled,
+            'allow_registration' => $setting->allow_registration,
+            'disable_password_login' => $setting->disable_password_login,
+            'client_id' => $setting->client_id,
+            'client_secret' => $setting->client_secret,
+            'redirect_uri' => $setting->redirect_uri,
+            'tenant' => $setting->tenant,
+            'base_url' => $setting->base_url,
+        ];
+    }
+
     protected function rules()
     {
         return OauthSetting::all()->reduce(function ($carry, $setting) {
             $carry["oauth_settings_map.$setting->provider.enabled"] = 'required';
+            $carry["oauth_settings_map.$setting->provider.allow_registration"] = 'required|boolean';
+            $carry["oauth_settings_map.$setting->provider.disable_password_login"] = 'required|boolean';
             $carry["oauth_settings_map.$setting->provider.client_id"] = 'nullable';
             $carry["oauth_settings_map.$setting->provider.client_secret"] = 'nullable';
             $carry["oauth_settings_map.$setting->provider.redirect_uri"] = 'nullable';
@@ -29,16 +47,7 @@ class SettingsOauth extends Component
             return redirect()->route('home');
         }
         $this->oauth_settings_map = OauthSetting::all()->sortBy('provider')->reduce(function ($carry, $setting) {
-            $carry[$setting->provider] = [
-                'id' => $setting->id,
-                'provider' => $setting->provider,
-                'enabled' => $setting->enabled,
-                'client_id' => $setting->client_id,
-                'client_secret' => $setting->client_secret,
-                'redirect_uri' => $setting->redirect_uri,
-                'tenant' => $setting->tenant,
-                'base_url' => $setting->base_url,
-            ];
+            $carry[$setting->provider] = $this->mapOauthSetting($setting);
 
             return $carry;
         }, []);
@@ -56,6 +65,8 @@ class SettingsOauth extends Component
 
             $oauth->fill([
                 'enabled' => $oauthData['enabled'],
+                'allow_registration' => $oauthData['allow_registration'],
+                'disable_password_login' => $oauthData['disable_password_login'],
                 'client_id' => $oauthData['client_id'],
                 'client_secret' => $oauthData['client_secret'],
                 'redirect_uri' => $oauthData['redirect_uri'],
@@ -63,23 +74,14 @@ class SettingsOauth extends Component
                 'base_url' => $oauthData['base_url'],
             ]);
 
-            if (! $oauth->couldBeEnabled()) {
+            if ($oauthData['enabled'] && ! $oauth->couldBeEnabled()) {
                 $oauth->update(['enabled' => false]);
                 throw new \Exception('OAuth settings are not complete for '.$oauth->provider.'.<br/>Please fill in all required fields.');
             }
             $oauth->save();
 
             // Update the array with fresh data
-            $this->oauth_settings_map[$provider] = [
-                'id' => $oauth->id,
-                'provider' => $oauth->provider,
-                'enabled' => $oauth->enabled,
-                'client_id' => $oauth->client_id,
-                'client_secret' => $oauth->client_secret,
-                'redirect_uri' => $oauth->redirect_uri,
-                'tenant' => $oauth->tenant,
-                'base_url' => $oauth->base_url,
-            ];
+            $this->oauth_settings_map[$provider] = $this->mapOauthSetting($oauth);
 
             $this->dispatch('success', 'OAuth settings for '.$oauth->provider.' updated successfully!');
         } else {
@@ -95,6 +97,8 @@ class SettingsOauth extends Component
 
                 $oauth->fill([
                     'enabled' => $settingData['enabled'],
+                    'allow_registration' => $settingData['allow_registration'],
+                    'disable_password_login' => $settingData['disable_password_login'],
                     'client_id' => $settingData['client_id'],
                     'client_secret' => $settingData['client_secret'],
                     'redirect_uri' => $settingData['redirect_uri'],
@@ -110,16 +114,7 @@ class SettingsOauth extends Component
                 $oauth->save();
 
                 // Update the array with fresh data
-                $this->oauth_settings_map[$oauth->provider] = [
-                    'id' => $oauth->id,
-                    'provider' => $oauth->provider,
-                    'enabled' => $oauth->enabled,
-                    'client_id' => $oauth->client_id,
-                    'client_secret' => $oauth->client_secret,
-                    'redirect_uri' => $oauth->redirect_uri,
-                    'tenant' => $oauth->tenant,
-                    'base_url' => $oauth->base_url,
-                ];
+                $this->oauth_settings_map[$oauth->provider] = $this->mapOauthSetting($oauth);
             }
 
             if (! empty($errors)) {

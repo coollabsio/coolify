@@ -17,9 +17,23 @@
             @foreach ($oauth_settings_map as $oauth_setting)
                 <div class="p-4 border dark:border-coolgray-300 border-neutral-200">
                     <h3>{{ ucfirst($oauth_setting['provider']) }}</h3>
-                    <div class="w-32">
-                        <x-forms.checkbox instantSave="instantSave('{{ $oauth_setting['provider'] }}')"
-                            id="oauth_settings_map.{{ $oauth_setting['provider'] }}.enabled" label="Enabled" />
+                    <div class="flex flex-wrap gap-x-6 gap-y-2">
+                        <div class="w-32">
+                            <x-forms.checkbox instantSave="instantSave('{{ $oauth_setting['provider'] }}')"
+                                id="oauth_settings_map.{{ $oauth_setting['provider'] }}.enabled" label="Enabled" />
+                        </div>
+                        <div class="w-56">
+                            <x-forms.checkbox
+                                id="oauth_settings_map.{{ $oauth_setting['provider'] }}.allow_registration"
+                                label="Allow Registration"
+                                helper="Allow this provider to create new users even when password registration is disabled." />
+                        </div>
+                        <div class="w-64">
+                            <x-forms.checkbox
+                                id="oauth_settings_map.{{ $oauth_setting['provider'] }}.disable_password_login"
+                                label="Disable Password Login"
+                                helper="New users created by this provider can only sign in with OAuth." />
+                        </div>
                     </div>
                     <div class="flex flex-col w-full gap-2 xl:flex-row">
                         <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.client_id"
