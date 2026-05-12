@@ -1,0 +1,54 @@
+# documentation: https://github.com/luizeof/dockerpress
+# slogan: WordPress running on OpenLiteSpeed with LiteSpeed Cache and MariaDB.
+# category: cms
+# tags: cms, wordpress, openlitespeed, litespeed, blog, content, management, mariadb
+# logo: svgs/wordpress.svg
+# port: 80
+
+services:
+  wordpress:
+    image: luizeof/dockerpress:latest
+    environment:
+      - SERVICE_URL_WORDPRESS_80
+      - VIRTUAL_HOST=${SERVICE_FQDN_WORDPRESS}
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_PORT=3306
+      - WORDPRESS_DB_NAME=${WORDPRESS_DB_NAME:-wordpress}
+      - WORDPRESS_DB_USER=${SERVICE_USER_WORDPRESS}
+      - WORDPRESS_DB_PASSWORD=${SERVICE_PASSWORD_WORDPRESS}
+      - WORDPRESS_DB_PREFIX=${WORDPRESS_DB_PREFIX:-wp_}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+      - ADMIN_USER=${SERVICE_USER_ADMIN}
+      - ADMIN_PASS=${SERVICE_PASSWORD_ADMIN}
+      - ADMIN_PASSWORD=${SERVICE_PASSWORD_OPENLITESPEED}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      - WP_LOCALE=${WP_LOCALE:-en_US}
+      - WP_DEBUG=${WP_DEBUG:-false}
+      - DISABLE_WP_CRON=${DISABLE_WP_CRON:-false}
+    volumes:
+      - wordpress-files:/var/www/html
+      - openlitespeed-logs:/var/log/litespeed
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1/ || exit 1"]
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 60s
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+      - MYSQL_DATABASE=${WORDPRESS_DB_NAME:-wordpress}
+      - MYSQL_USER=${SERVICE_USER_WORDPRESS}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_WORDPRESS}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
