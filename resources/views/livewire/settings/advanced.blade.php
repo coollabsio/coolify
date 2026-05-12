@@ -42,6 +42,37 @@
                         </div>
                     @endif
                     <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                            helper="Allow users to self-register with enabled OAuth providers even when password registration is disabled."
+                            label="OAuth Registration Allowed" />
+                    </div>
+                    @if ($is_password_login_enabled)
+                        <div class="flex items-center justify-between gap-2 md:w-96"
+                            wire:key="password-login-enabled">
+                            <label class="flex items-center gap-2">
+                                Password Login
+                                <x-helper
+                                    helper="Allow users to sign in and self-register with email and password. Disabling this makes enabled OAuth providers the only login option.">
+                                </x-helper>
+                            </label>
+                            <x-modal-confirmation title="Disable Password Login?" buttonTitle="Disable" isErrorButton
+                                submitAction="togglePasswordLogin" :actions="[
+                                    'Password login and password registration will be disabled.',
+                                    'Users must sign in with an enabled OAuth provider.',
+                                ]"
+                                warningMessage="Make sure at least one OAuth provider is enabled and your admin account can use it before continuing."
+                                confirmationText="DISABLE PASSWORD LOGIN"
+                                confirmationLabel="Please type the confirmation text to disable password login."
+                                shortConfirmationLabel="Confirmation text" />
+                        </div>
+                    @else
+                        <div class="md:w-96" wire:key="password-login-disabled">
+                            <x-forms.checkbox instantSave id="is_password_login_enabled"
+                                helper="Allow users to sign in and self-register with email and password."
+                                label="Password Login" />
+                        </div>
+                    @endif
+                    <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."
                             label="Do Not Track" />
