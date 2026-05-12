@@ -7,6 +7,7 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\OauthSetting;
+use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -47,7 +48,7 @@ class FortifyServiceProvider extends ServiceProvider
             $isFirstUser = User::count() === 0;
 
             $settings = instanceSettings();
-            if (! $settings->is_registration_enabled) {
+            if (! $isFirstUser && (! $settings->is_registration_enabled || ! $settings->is_password_authentication_enabled)) {
                 return redirect()->route('login');
             }
 
@@ -67,11 +68,16 @@ class FortifyServiceProvider extends ServiceProvider
 
             return view('auth.login', [
                 'is_registration_enabled' => $settings->is_registration_enabled,
+                'is_password_authentication_enabled' => $settings->is_password_authentication_enabled,
                 'enabled_oauth_providers' => $enabled_oauth_providers,
             ]);
         });
 
         Fortify::authenticateUsing(function (Request $request) {
+            if (! instanceSettings()->is_password_authentication_enabled) {
+                return null;
+            }
+
             $email = strtolower($request->email);
             $user = User::where('email', $email)->with('teams')->first();
             if (
@@ -82,7 +88,7 @@ class FortifyServiceProvider extends ServiceProvider
                 $user->save();
 
                 // Check if user has a pending invitation they haven't accepted yet
-                $invitation = \App\Models\TeamInvitation::whereEmail($email)->first();
+                $invitation = TeamInvitation::whereEmail($email)->first();
                 if ($invitation && $invitation->isValid()) {
                     // User is logging in for the first time after being invited
                     // Attach them to the invited team if not already attached
