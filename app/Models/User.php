@@ -47,6 +47,7 @@ class User extends Authenticatable implements SendsEmail
         'name',
         'email',
         'password',
+        'oauth_provider',
         'force_password_reset',
         'marketing_emails',
         'pending_email',
@@ -486,5 +487,15 @@ class User extends Authenticatable implements SendsEmail
     public function hasPassword(): bool
     {
         return ! empty($this->password);
+    }
+
+    public function isOAuthUser(): bool
+    {
+        return ! empty($this->oauth_provider) || ! $this->hasPassword();
+    }
+
+    public function mustUseOAuthLogin(): bool
+    {
+        return $this->isOAuthUser() && instanceSettings()->is_oauth_password_login_disabled;
     }
 }

@@ -391,6 +391,8 @@ CREATE TABLE IF NOT EXISTS "instance_settings" (
     "do_not_track" INTEGER DEFAULT false NOT NULL,
     "is_auto_update_enabled" INTEGER DEFAULT true NOT NULL,
     "is_registration_enabled" INTEGER DEFAULT true NOT NULL,
+    "is_oauth_registration_enabled" INTEGER DEFAULT false NOT NULL,
+    "is_oauth_password_login_disabled" INTEGER DEFAULT false NOT NULL,
     "created_at" TEXT,
     "updated_at" TEXT,
     "next_channel" INTEGER DEFAULT false NOT NULL,
@@ -1308,6 +1310,7 @@ CREATE TABLE IF NOT EXISTS "users" (
     "email" TEXT NOT NULL,
     "email_verified_at" TEXT,
     "password" TEXT,
+    "oauth_provider" TEXT,
     "remember_token" TEXT,
     "created_at" TEXT,
     "updated_at" TEXT,
@@ -1752,3 +1755,4 @@ INSERT INTO "migrations" ("id", "migration", "batch") VALUES (311, '2025_12_10_1
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (312, '2025_12_15_143052_trim_s3_storage_credentials', 312);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (313, '2025_12_17_000001_add_is_wire_navigate_enabled_to_instance_settings_table', 313);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (314, '2025_12_17_000002_add_restart_tracking_to_standalone_databases', 314);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (315, '2026_05_12_000000_add_oauth_only_authentication_settings', 315);

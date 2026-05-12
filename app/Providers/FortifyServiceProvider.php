@@ -76,6 +76,8 @@ class FortifyServiceProvider extends ServiceProvider
             $user = User::where('email', $email)->with('teams')->first();
             if (
                 $user &&
+                $user->hasPassword() &&
+                ! $user->mustUseOAuthLogin() &&
                 Hash::check($request->password, $user->password)
             ) {
                 $user->updated_at = now();
