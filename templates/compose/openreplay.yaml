@@ -14,6 +14,8 @@ services:
       - MINIO_ACCESS_KEY=$SERVICE_PASSWORD_64
       - MINIO_SECRET_KEY=$SERVICE_PASSWORD_64_MINIO
       - DOMAIN_NAME=$SERVICE_FQDN_HOSTNAME
+      - JWT_SECRET=$SERVICE_PASSWORD_64_JWT
+      - ASSIST_JWT_SECRET=$SERVICE_PASSWORD_64_ASSIST
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
