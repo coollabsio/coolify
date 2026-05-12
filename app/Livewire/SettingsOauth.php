@@ -18,6 +18,8 @@ class SettingsOauth extends Component
             $carry["oauth_settings_map.$setting->provider.redirect_uri"] = 'nullable';
             $carry["oauth_settings_map.$setting->provider.tenant"] = 'nullable';
             $carry["oauth_settings_map.$setting->provider.base_url"] = 'nullable';
+            $carry["oauth_settings_map.$setting->provider.allow_registration"] = 'required';
+            $carry["oauth_settings_map.$setting->provider.force_oauth_only"] = 'required';
 
             return $carry;
         }, []);
@@ -38,6 +40,8 @@ class SettingsOauth extends Component
                 'redirect_uri' => $setting->redirect_uri,
                 'tenant' => $setting->tenant,
                 'base_url' => $setting->base_url,
+                'allow_registration' => $setting->allow_registration,
+                'force_oauth_only' => $setting->force_oauth_only,
             ];
 
             return $carry;
@@ -61,6 +65,8 @@ class SettingsOauth extends Component
                 'redirect_uri' => $oauthData['redirect_uri'],
                 'tenant' => $oauthData['tenant'],
                 'base_url' => $oauthData['base_url'],
+                'allow_registration' => $oauthData['allow_registration'],
+                'force_oauth_only' => $oauthData['force_oauth_only'],
             ]);
 
             if (! $oauth->couldBeEnabled()) {
@@ -79,6 +85,8 @@ class SettingsOauth extends Component
                 'redirect_uri' => $oauth->redirect_uri,
                 'tenant' => $oauth->tenant,
                 'base_url' => $oauth->base_url,
+                'allow_registration' => $oauth->allow_registration,
+                'force_oauth_only' => $oauth->force_oauth_only,
             ];
 
             $this->dispatch('success', 'OAuth settings for '.$oauth->provider.' updated successfully!');
@@ -100,6 +108,8 @@ class SettingsOauth extends Component
                     'redirect_uri' => $settingData['redirect_uri'],
                     'tenant' => $settingData['tenant'],
                     'base_url' => $settingData['base_url'],
+                    'allow_registration' => $settingData['allow_registration'],
+                    'force_oauth_only' => $settingData['force_oauth_only'],
                 ]);
 
                 if ($settingData['enabled'] && ! $oauth->couldBeEnabled()) {
@@ -119,6 +129,8 @@ class SettingsOauth extends Component
                     'redirect_uri' => $oauth->redirect_uri,
                     'tenant' => $oauth->tenant,
                     'base_url' => $oauth->base_url,
+                    'allow_registration' => $oauth->allow_registration,
+                    'force_oauth_only' => $oauth->force_oauth_only,
                 ];
             }
 

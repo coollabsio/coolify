@@ -6,6 +6,7 @@ use App\Models\ApplicationSetting;
 use App\Models\CloudProviderToken;
 use App\Models\Environment;
 use App\Models\GithubApp;
+use App\Models\OauthSetting;
 use App\Models\Project;
 use App\Models\ProjectSetting;
 use App\Models\ScheduledDatabaseBackup;
@@ -49,6 +50,7 @@ it('creates User with all fillable attributes', function () {
         'email' => 'fillable-test@example.com',
         'password' => bcrypt('password123'),
         'force_password_reset' => true,
+        'oauth_only' => true,
         'marketing_emails' => false,
         'pending_email' => 'newemail@example.com',
         'email_change_code' => 'ABC123',
@@ -59,10 +61,30 @@ it('creates User with all fillable attributes', function () {
     expect($user->name)->toBe('Test User');
     expect($user->email)->toBe('fillable-test@example.com');
     expect($user->force_password_reset)->toBeTrue();
+    expect($user->oauth_only)->toBeTrue();
     expect($user->marketing_emails)->toBeFalse();
     expect($user->pending_email)->toBe('newemail@example.com');
     expect($user->email_change_code)->toBe('ABC123');
     expect($user->email_change_code_expires_at)->not->toBeNull();
+});
+
+it('creates OauthSetting with all fillable attributes', function () {
+    $setting = OauthSetting::create([
+        'provider' => 'test-provider',
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'redirect_uri' => 'https://example.com/callback',
+        'tenant' => 'example.com',
+        'base_url' => 'https://auth.example.com',
+        'enabled' => true,
+        'allow_registration' => true,
+        'force_oauth_only' => true,
+    ]);
+
+    expect($setting->exists)->toBeTrue();
+    expect($setting->enabled)->toBeTrue();
+    expect($setting->allow_registration)->toBeTrue();
+    expect($setting->force_oauth_only)->toBeTrue();
 });
 
 it('creates Server with all fillable attributes', function () {

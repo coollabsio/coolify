@@ -21,6 +21,14 @@
                         <x-forms.checkbox instantSave="instantSave('{{ $oauth_setting['provider'] }}')"
                             id="oauth_settings_map.{{ $oauth_setting['provider'] }}.enabled" label="Enabled" />
                     </div>
+                    <div class="flex flex-col gap-2 py-2 md:flex-row md:gap-6">
+                        <x-forms.checkbox instantSave="instantSave('{{ $oauth_setting['provider'] }}')"
+                            id="oauth_settings_map.{{ $oauth_setting['provider'] }}.allow_registration"
+                            label="Allow OAuth registration" />
+                        <x-forms.checkbox instantSave="instantSave('{{ $oauth_setting['provider'] }}')"
+                            id="oauth_settings_map.{{ $oauth_setting['provider'] }}.force_oauth_only"
+                            label="OAuth-only accounts" />
+                    </div>
                     <div class="flex flex-col w-full gap-2 xl:flex-row">
                         <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.client_id"
                             label="Client ID" />
