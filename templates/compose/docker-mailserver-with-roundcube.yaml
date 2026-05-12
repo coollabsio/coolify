@@ -1,0 +1,65 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Self-hosted mail server stack with SMTP/IMAP and Roundcube webmail.
+# category: communication
+# tags: email,smtp,imap,mailserver,roundcube,domain
+# logo: svgs/default.webp
+# port: 80
+
+services:
+  mailserver:
+    image: 'ghcr.io/docker-mailserver/docker-mailserver:latest'
+    hostname: '${MAIL_HOSTNAME:-mail}'
+    domainname: '${MAIL_DOMAIN:?}'
+    environment:
+      - 'OVERRIDE_HOSTNAME=${MAIL_FQDN:-mail.example.com}'
+      - 'POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS:-postmaster@example.com}'
+      - 'ENABLE_RSPAMD=${ENABLE_RSPAMD:-1}'
+      - 'ENABLE_CLAMAV=${ENABLE_CLAMAV:-1}'
+      - 'ENABLE_FAIL2BAN=${ENABLE_FAIL2BAN:-1}'
+      - 'SSL_TYPE=${SSL_TYPE:-manual}'
+      - 'SSL_CERT_PATH=${SSL_CERT_PATH:-/etc/ssl/mail/tls.crt}'
+      - 'SSL_KEY_PATH=${SSL_KEY_PATH:-/etc/ssl/mail/tls.key}'
+      - 'TZ=${TZ:-UTC}'
+    volumes:
+      - 'mail-data:/var/mail'
+      - 'mail-state:/var/mail-state'
+      - 'mail-logs:/var/log/mail'
+      - 'mail-config:/tmp/docker-mailserver'
+      - 'mail-certs:/etc/ssl/mail:ro'
+    ports:
+      - '25:25'
+      - '465:465'
+      - '587:587'
+      - '993:993'
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'ss -lnt | grep -q ":25"'
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  roundcube:
+    image: 'roundcube/roundcubemail:latest'
+    depends_on:
+      mailserver:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_ROUNDCUBE_80
+      - 'ROUNDCUBEMAIL_DEFAULT_HOST=tls://${MAIL_FQDN:-mail.example.com}'
+      - 'ROUNDCUBEMAIL_SMTP_SERVER=tls://${MAIL_FQDN:-mail.example.com}'
+      - 'ROUNDCUBEMAIL_UPLOAD_MAX_FILESIZE=${ROUNDCUBEMAIL_UPLOAD_MAX_FILESIZE:-20M}'
+      - 'ROUNDCUBEMAIL_DB_TYPE=sqlite'
+    volumes:
+      - 'roundcube-data:/var/roundcube/db'
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1/'
+      interval: 10s
+      timeout: 5s
+      retries: 10
