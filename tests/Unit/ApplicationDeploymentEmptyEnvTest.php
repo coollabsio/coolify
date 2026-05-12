@@ -3,16 +3,15 @@
 /**
  * Test to verify that empty .env files are created for build packs that require them.
  *
- * This test verifies the fix for the issue where deploying a Docker image without
- * environment variables would fail because Docker Compose expects a .env file
- * when env_file: ['.env'] is specified in the compose file.
+ * Both 'dockerimage' and 'dockercompose' build packs need the .env file to exist:
+ *  - 'dockerimage': uses env_file: ['.env'] in its generated single-container compose file.
+ *  - 'dockercompose': passes --env-file .env to docker compose for variable interpolation.
  *
- * The fix ensures that for 'dockerimage' and 'dockercompose' build packs,
- * an empty .env file is created even when there are no environment variables defined.
+ * The fix ensures that for both build packs an empty .env file is created even when
+ * there are no environment variables defined, so docker compose does not fail.
  */
 it('determines which build packs require empty .env file creation', function () {
-    // Build packs that set env_file: ['.env'] in the generated compose file
-    // and thus require an empty .env file even when no environment variables are defined
+    // Build packs that need the .env file to exist (for env_file: or --env-file interpolation)
     $buildPacksRequiringEnvFile = ['dockerimage', 'dockercompose'];
 
     // Build packs that don't use env_file in the compose file
