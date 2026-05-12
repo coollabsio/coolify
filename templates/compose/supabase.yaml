@@ -44,6 +44,9 @@ services:
       - 'KONG_STORAGE_READ_TIMEOUT=${KONG_STORAGE_READ_TIMEOUT:-3600}'
       - 'KONG_STORAGE_REQUEST_BUFFERING=${KONG_STORAGE_REQUEST_BUFFERING:-false}'
       - 'KONG_STORAGE_RESPONSE_BUFFERING=${KONG_STORAGE_RESPONSE_BUFFERING:-false}'
+      # Supabase MCP is blocked by default. Enable only for private VPN, WireGuard, or SSH tunnel source IPs.
+      - SUPABASE_MCP_ENABLED=${SUPABASE_MCP_ENABLED:-false}
+      - SUPABASE_MCP_IP_ALLOWLIST=${SUPABASE_MCP_IP_ALLOWLIST:-127.0.0.1,::1}
     volumes:
       - type: bind
         source: ./volumes/api/kong-entrypoint.sh
@@ -59,6 +62,43 @@ services:
           else
               export LUA_AUTH_EXPR="\$((headers.authorization ~= nil and headers.authorization:sub(1, 10) ~= 'Bearer sb_' and headers.authorization) or headers.apikey)"
               export LUA_RT_WS_EXPR="\$(query_params.apikey)"
+          fi
+
+          build_mcp_allowlist() {
+              local allowlist="${SUPABASE_MCP_IP_ALLOWLIST:-127.0.0.1,::1}"
+              local yaml=""
+              IFS=',' read -ra ips <<< "$allowlist"
+
+              for ip in "${ips[@]}"; do
+                  ip="$(echo "$ip" | xargs)"
+                  if [ -n "$ip" ]; then
+                      yaml="${yaml}
+          - \"$ip\""
+                  fi
+              done
+
+              if [ -z "$yaml" ]; then
+                  yaml='
+          - "127.0.0.1"
+          - "::1"'
+              fi
+
+              printf '%s' "$yaml"
+          }
+
+          if [ "$SUPABASE_MCP_ENABLED" = "true" ]; then
+              export SUPABASE_MCP_PLUGINS="plugins:
+    - name: cors
+    - name: ip-restriction
+      config:
+        allow:$(build_mcp_allowlist)
+        deny: []"
+          else
+              export SUPABASE_MCP_PLUGINS='plugins:
+    - name: request-termination
+      config:
+        status_code: 403
+        message: "Supabase MCP access is disabled."'
           fi
 
           awk '{
@@ -368,6 +408,17 @@ services:
                     - /functions/v1/
               plugins:
                 - name: cors
+
+            ## MCP endpoint
+            - name: mcp
+              _comment: 'MCP: /mcp -> http://supabase-studio:3000/api/mcp. SUPABASE_MCP_IP_ALLOWLIST controls access from VPN, WireGuard, or SSH tunnel client IPs.'
+              url: http://supabase-studio:3000/api/mcp
+              routes:
+                - name: mcp
+                  strip_path: true
+                  paths:
+                    - /mcp
+              $SUPABASE_MCP_PLUGINS
 
             ## OAuth 2.0 Authorization Server Metadata (RFC 8414)
             - name: well-known-oauth
