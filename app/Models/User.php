@@ -52,6 +52,7 @@ class User extends Authenticatable implements SendsEmail
         'pending_email',
         'email_change_code',
         'email_change_code_expires_at',
+        'oauth_provider',
     ];
 
     protected $hidden = [
@@ -486,5 +487,15 @@ class User extends Authenticatable implements SendsEmail
     public function hasPassword(): bool
     {
         return ! empty($this->password);
+    }
+
+    public function isOauthUser(): bool
+    {
+        return ! empty($this->oauth_provider);
+    }
+
+    public function isOauthPasswordAuthDisabled(): bool
+    {
+        return $this->isOauthUser() && (bool) instanceSettings()->is_oauth_password_auth_disabled;
     }
 }

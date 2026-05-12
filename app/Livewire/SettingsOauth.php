@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Models\InstanceSettings;
 use App\Models\OauthSetting;
 use Livewire\Component;
 
@@ -9,8 +10,19 @@ class SettingsOauth extends Component
 {
     public $oauth_settings_map;
 
+    public InstanceSettings $settings;
+
+    public bool $is_oauth_registration_enabled;
+
+    public bool $is_oauth_password_auth_disabled;
+
     protected function rules()
     {
+        $rules = [
+            'is_oauth_registration_enabled' => 'boolean',
+            'is_oauth_password_auth_disabled' => 'boolean',
+        ];
+
         return OauthSetting::all()->reduce(function ($carry, $setting) {
             $carry["oauth_settings_map.$setting->provider.enabled"] = 'required';
             $carry["oauth_settings_map.$setting->provider.client_id"] = 'nullable';
@@ -20,7 +32,7 @@ class SettingsOauth extends Component
             $carry["oauth_settings_map.$setting->provider.base_url"] = 'nullable';
 
             return $carry;
-        }, []);
+        }, $rules);
     }
 
     public function mount()
@@ -28,6 +40,9 @@ class SettingsOauth extends Component
         if (! isInstanceAdmin()) {
             return redirect()->route('home');
         }
+        $this->settings = instanceSettings();
+        $this->is_oauth_registration_enabled = $this->settings->is_oauth_registration_enabled;
+        $this->is_oauth_password_auth_disabled = $this->settings->is_oauth_password_auth_disabled;
         $this->oauth_settings_map = OauthSetting::all()->sortBy('provider')->reduce(function ($carry, $setting) {
             $carry[$setting->provider] = [
                 'id' => $setting->id,
@@ -139,7 +154,27 @@ class SettingsOauth extends Component
 
     public function submit()
     {
+        $this->validate();
+        $this->settings->is_oauth_registration_enabled = $this->is_oauth_registration_enabled;
+        $this->settings->is_oauth_password_auth_disabled = $this->is_oauth_password_auth_disabled;
+        $this->settings->save();
         $this->updateOauthSettings();
         $this->dispatch('success', 'Instance settings updated successfully!');
+    }
+
+    public function instantSaveOauthRegistration()
+    {
+        $this->validateOnly('is_oauth_registration_enabled');
+        $this->settings->is_oauth_registration_enabled = $this->is_oauth_registration_enabled;
+        $this->settings->save();
+        $this->dispatch('success', 'OAuth registration setting updated successfully!');
+    }
+
+    public function instantSaveOauthPasswordAuth()
+    {
+        $this->validateOnly('is_oauth_password_auth_disabled');
+        $this->settings->is_oauth_password_auth_disabled = $this->is_oauth_password_auth_disabled;
+        $this->settings->save();
+        $this->dispatch('success', 'OAuth password authentication setting updated successfully!');
     }
 }
