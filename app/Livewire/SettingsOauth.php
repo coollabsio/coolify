@@ -9,9 +9,13 @@ class SettingsOauth extends Component
 {
     public $oauth_settings_map;
 
+    public bool $is_oauth_registration_enabled = false;
+
+    public bool $disable_password_auth_for_oauth_users = false;
+
     protected function rules()
     {
-        return OauthSetting::all()->reduce(function ($carry, $setting) {
+        $rules = OauthSetting::all()->reduce(function ($carry, $setting) {
             $carry["oauth_settings_map.$setting->provider.enabled"] = 'required';
             $carry["oauth_settings_map.$setting->provider.client_id"] = 'nullable';
             $carry["oauth_settings_map.$setting->provider.client_secret"] = 'nullable';
@@ -21,6 +25,11 @@ class SettingsOauth extends Component
 
             return $carry;
         }, []);
+
+        return array_merge($rules, [
+            'is_oauth_registration_enabled' => 'boolean',
+            'disable_password_auth_for_oauth_users' => 'boolean',
+        ]);
     }
 
     public function mount()
@@ -28,6 +37,9 @@ class SettingsOauth extends Component
         if (! isInstanceAdmin()) {
             return redirect()->route('home');
         }
+        $settings = instanceSettings();
+        $this->is_oauth_registration_enabled = $settings->is_oauth_registration_enabled;
+        $this->disable_password_auth_for_oauth_users = $settings->disable_password_auth_for_oauth_users;
         $this->oauth_settings_map = OauthSetting::all()->sortBy('provider')->reduce(function ($carry, $setting) {
             $carry[$setting->provider] = [
                 'id' => $setting->id,
@@ -128,6 +140,14 @@ class SettingsOauth extends Component
         }
     }
 
+    private function updateInstanceSettings(): void
+    {
+        $settings = instanceSettings();
+        $settings->is_oauth_registration_enabled = $this->is_oauth_registration_enabled;
+        $settings->disable_password_auth_for_oauth_users = $this->disable_password_auth_for_oauth_users;
+        $settings->save();
+    }
+
     public function instantSave(string $provider)
     {
         try {
@@ -139,6 +159,7 @@ class SettingsOauth extends Component
 
     public function submit()
     {
+        $this->updateInstanceSettings();
         $this->updateOauthSettings();
         $this->dispatch('success', 'Instance settings updated successfully!');
     }

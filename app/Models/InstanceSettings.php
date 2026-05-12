@@ -18,6 +18,8 @@ class InstanceSettings extends Model
         'do_not_track',
         'is_auto_update_enabled',
         'is_registration_enabled',
+        'is_oauth_registration_enabled',
+        'disable_password_auth_for_oauth_users',
         'next_channel',
         'smtp_enabled',
         'smtp_from_address',
@@ -64,6 +66,8 @@ class InstanceSettings extends Model
 
         'allowed_ip_ranges' => 'array',
         'is_auto_update_enabled' => 'boolean',
+        'is_oauth_registration_enabled' => 'boolean',
+        'disable_password_auth_for_oauth_users' => 'boolean',
         'auto_update_frequency' => 'string',
         'update_check_frequency' => 'string',
         'sentinel_token' => 'encrypted',
