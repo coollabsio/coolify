@@ -18,6 +18,8 @@ class InstanceSettings extends Model
         'do_not_track',
         'is_auto_update_enabled',
         'is_registration_enabled',
+        'is_oauth_registration_enabled',
+        'is_password_authentication_enabled',
         'next_channel',
         'smtp_enabled',
         'smtp_from_address',
@@ -67,6 +69,8 @@ class InstanceSettings extends Model
         'update_check_frequency' => 'string',
         'sentinel_token' => 'encrypted',
         'is_wire_navigate_enabled' => 'boolean',
+        'is_oauth_registration_enabled' => 'boolean',
+        'is_password_authentication_enabled' => 'boolean',
     ];
 
     protected static function booted(): void

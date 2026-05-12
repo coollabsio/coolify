@@ -19,7 +19,8 @@ class CreateNewUser implements CreatesNewUsers
     public function create(array $input): User
     {
         $settings = instanceSettings();
-        if (! $settings->is_registration_enabled) {
+        $isFirstUser = User::count() == 0;
+        if (! $isFirstUser && (! $settings->is_registration_enabled || ! $settings->is_password_authentication_enabled)) {
             abort(403);
         }
         Validator::make($input, [
@@ -34,7 +35,7 @@ class CreateNewUser implements CreatesNewUsers
             'password' => ['required', Password::defaults(), 'confirmed'],
         ])->validate();
 
-        if (User::count() == 0) {
+        if ($isFirstUser) {
             // If this is the first user, make them the root user
             // Team is already created in the database/seeders/ProductionSeeder.php
             $user = (new User)->forceFill([
