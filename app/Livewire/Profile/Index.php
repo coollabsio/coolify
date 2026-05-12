@@ -240,6 +240,10 @@ class Index extends Component
     public function resetPassword()
     {
         try {
+            if (! (instanceSettings()->is_password_authentication_enabled ?? true)) {
+                abort(403);
+            }
+
             $this->validate([
                 'current_password' => ['required'],
                 'new_password' => ['required', Password::defaults(), 'confirmed'],

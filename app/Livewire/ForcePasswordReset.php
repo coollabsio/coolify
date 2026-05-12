@@ -40,6 +40,10 @@ class ForcePasswordReset extends Component
 
     public function submit()
     {
+        if (! (instanceSettings()->is_password_authentication_enabled ?? true)) {
+            abort(403);
+        }
+
         if (auth()->user()->force_password_reset === false) {
             return redirect()->route('dashboard');
         }

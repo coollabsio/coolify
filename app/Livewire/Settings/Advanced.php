@@ -3,6 +3,7 @@
 namespace App\Livewire\Settings;
 
 use App\Models\InstanceSettings;
+use App\Models\OauthSetting;
 use App\Rules\ValidDnsServers;
 use App\Rules\ValidIpOrCidr;
 use Livewire\Attributes\Validate;
@@ -14,6 +15,12 @@ class Advanced extends Component
 
     #[Validate('boolean')]
     public bool $is_registration_enabled;
+
+    #[Validate('boolean')]
+    public bool $is_oauth_registration_enabled;
+
+    #[Validate('boolean')]
+    public bool $is_password_authentication_enabled;
 
     #[Validate('boolean')]
     public bool $do_not_track;
@@ -44,6 +51,8 @@ class Advanced extends Component
     {
         return [
             'is_registration_enabled' => 'boolean',
+            'is_oauth_registration_enabled' => 'boolean',
+            'is_password_authentication_enabled' => 'boolean',
             'do_not_track' => 'boolean',
             'is_dns_validation_enabled' => 'boolean',
             'custom_dns_servers' => ['nullable', 'string', new ValidDnsServers],
@@ -66,6 +75,8 @@ class Advanced extends Component
         $this->allowed_ips = $this->settings->allowed_ips;
         $this->do_not_track = $this->settings->do_not_track;
         $this->is_registration_enabled = $this->settings->is_registration_enabled;
+        $this->is_oauth_registration_enabled = $this->settings->is_oauth_registration_enabled ?? false;
+        $this->is_password_authentication_enabled = $this->settings->is_password_authentication_enabled ?? true;
         $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
         $this->is_api_enabled = $this->settings->is_api_enabled;
         $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
@@ -146,7 +157,20 @@ class Advanced extends Component
     public function instantSave()
     {
         try {
+            if (
+                ! $this->is_password_authentication_enabled &&
+                ($this->settings->is_password_authentication_enabled ?? true) &&
+                OauthSetting::where('enabled', true)->doesntExist()
+            ) {
+                $this->is_password_authentication_enabled = $this->settings->is_password_authentication_enabled ?? true;
+                $this->dispatch('error', 'Enable at least one OAuth provider before disabling password authentication.');
+
+                return;
+            }
+
             $this->settings->is_registration_enabled = $this->is_registration_enabled;
+            $this->settings->is_oauth_registration_enabled = $this->is_oauth_registration_enabled;
+            $this->settings->is_password_authentication_enabled = $this->is_password_authentication_enabled;
             $this->settings->do_not_track = $this->do_not_track;
             $this->settings->is_dns_validation_enabled = $this->is_dns_validation_enabled;
             $this->settings->custom_dns_servers = $this->custom_dns_servers;

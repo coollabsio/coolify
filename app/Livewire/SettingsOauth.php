@@ -9,6 +9,26 @@ class SettingsOauth extends Component
 {
     public $oauth_settings_map;
 
+    private function oauthDataCouldBeEnabled(array $settingData): bool
+    {
+        if (! ($settingData['enabled'] ?? false)) {
+            return false;
+        }
+
+        return match ($settingData['provider']) {
+            'azure' => filled($settingData['client_id']) && filled($settingData['client_secret']) && filled($settingData['tenant']),
+            'authentik', 'clerk' => filled($settingData['client_id']) && filled($settingData['client_secret']) && filled($settingData['base_url']),
+            default => filled($settingData['client_id']) && filled($settingData['client_secret']),
+        };
+    }
+
+    private function hasEnabledOauthProviderInMap(): bool
+    {
+        return collect($this->oauth_settings_map)->contains(
+            fn ($settingData) => $this->oauthDataCouldBeEnabled($settingData)
+        );
+    }
+
     protected function rules()
     {
         return OauthSetting::all()->reduce(function ($carry, $setting) {
@@ -46,6 +66,19 @@ class SettingsOauth extends Component
 
     private function updateOauthSettings(?string $provider = null)
     {
+        if (
+            ! (instanceSettings()->is_password_authentication_enabled ?? true) &&
+            ! $this->hasEnabledOauthProviderInMap()
+        ) {
+            if ($provider) {
+                $this->oauth_settings_map[$provider]['enabled'] = true;
+            }
+
+            $this->dispatch('error', 'At least one OAuth provider must remain enabled while password authentication is disabled.');
+
+            return;
+        }
+
         if ($provider) {
             $oauthData = $this->oauth_settings_map[$provider];
             $oauth = OauthSetting::find($oauthData['id']);

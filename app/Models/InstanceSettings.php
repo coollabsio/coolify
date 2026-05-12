@@ -18,6 +18,8 @@ class InstanceSettings extends Model
         'do_not_track',
         'is_auto_update_enabled',
         'is_registration_enabled',
+        'is_oauth_registration_enabled',
+        'is_password_authentication_enabled',
         'next_channel',
         'smtp_enabled',
         'smtp_from_address',
@@ -59,6 +61,9 @@ class InstanceSettings extends Model
         'smtp_password' => 'encrypted',
         'smtp_timeout' => 'integer',
 
+        'is_registration_enabled' => 'boolean',
+        'is_oauth_registration_enabled' => 'boolean',
+        'is_password_authentication_enabled' => 'boolean',
         'resend_enabled' => 'boolean',
         'resend_api_key' => 'encrypted',
 

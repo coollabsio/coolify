@@ -19,28 +19,37 @@
                     @if ($is_registration_enabled)
                         <div class="md:w-96" wire:key="registration-enabled">
                             <x-forms.checkbox instantSave id="is_registration_enabled"
-                                helper="Allow users to self-register. If disabled, only administrators can create accounts."
-                                label="Registration Allowed" />
+                                helper="Allow users to self-register with email and password."
+                                label="Password Registration Allowed" />
                         </div>
                     @else
                         <div class="flex items-center justify-between gap-2 md:w-96"
                             wire:key="registration-disabled">
                             <label class="flex items-center gap-2">
-                                Registration Allowed
-                                <x-helper
-                                    helper="Allow users to self-register. If disabled, only administrators can create accounts.">
+                                Password Registration Allowed
+                                <x-helper helper="Allow users to self-register with email and password.">
                                 </x-helper>
                             </label>
-                            <x-modal-confirmation title="Enable Registration?" buttonTitle="Enable" isErrorButton
+                            <x-modal-confirmation title="Enable Password Registration?" buttonTitle="Enable" isErrorButton
                                 submitAction="toggleRegistration" :actions="[
-                                    'Enables registration for everyone',
+                                    'Enables email/password registration for everyone',
                                 ]"
-                                warningMessage="Enabling registration allows anyone to create an account on this instance. Make sure you understand the implications before proceeding."
+                                warningMessage="Enabling password registration allows anyone to create an account on this instance with email and password. Make sure you understand the implications before proceeding."
                                 confirmationText="ENABLE REGISTRATION"
-                                confirmationLabel="Please type the confirmation text to enable registration."
+                                confirmationLabel="Please type the confirmation text to enable password registration."
                                 shortConfirmationLabel="Confirmation text" />
                         </div>
                     @endif
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                            helper="Allow users to self-register through enabled OAuth providers, even when password registration is disabled."
+                            label="OAuth Registration Allowed" />
+                    </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_password_authentication_enabled"
+                            helper="Allow email/password login, password registration, and password reset. Disable this only after configuring OAuth access."
+                            label="Password Authentication Allowed" />
+                    </div>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."
