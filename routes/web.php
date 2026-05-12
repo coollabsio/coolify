@@ -80,6 +80,7 @@ use App\Livewire\Storage\Index as StorageIndex;
 use App\Livewire\Storage\Show as StorageShow;
 use App\Livewire\Subscription\Index as SubscriptionIndex;
 use App\Livewire\Subscription\Show as SubscriptionShow;
+use App\Livewire\Deployment\Index as DeploymentGlobalIndex;
 use App\Livewire\Tags\Show as TagsShow;
 use App\Livewire\Team\AdminView as TeamAdminView;
 use App\Livewire\Team\Index as TeamIndex;
@@ -129,6 +130,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('tags')->group(function () {
         Route::get('/{tagName?}', TagsShow::class)->name('tags.show');
     });
+
+    Route::get('/deployments', DeploymentGlobalIndex::class)->name('deployments.index');
 
     Route::prefix('notifications')->group(function () {
         Route::get('/email', NotificationEmail::class)->name('notifications.email');
