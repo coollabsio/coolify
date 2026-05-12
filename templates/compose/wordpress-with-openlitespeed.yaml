@@ -1,0 +1,62 @@
+# documentation: https://docs.litespeedtech.com/cloud/docker/ols-wordpress/
+# slogan: Run WordPress on OpenLiteSpeed with persistent files and MariaDB storage.
+# category: cms
+# tags: cms, blog, content, management, wordpress, openlitespeed, mariadb
+# logo: svgs/wordpress.svg
+# port: 80
+
+services:
+  wordpress:
+    image: litespeedtech/openlitespeed:1.9.0-lsphp83
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost/html
+      - openlitespeed-conf:/usr/local/lsws/conf
+      - openlitespeed-admin-conf:/usr/local/lsws/admin/conf
+      - openlitespeed-logs:/usr/local/lsws/logs
+    environment:
+      - SERVICE_URL_WORDPRESS_80
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_USER=${SERVICE_USER_WORDPRESS}
+      - WORDPRESS_DB_PASSWORD=${SERVICE_PASSWORD_WORDPRESS}
+      - WORDPRESS_DB_NAME=${MARIADB_DATABASE:-wordpress}
+    command:
+      - bash
+      - -lc
+      - |
+        set -e
+        cd /var/www/vhosts/localhost/html
+        if [ ! -f wp-settings.php ]; then
+          wp core download --allow-root
+        fi
+        if [ ! -f wp-config.php ]; then
+          wp config create --allow-root --skip-check \
+            --dbhost="${WORDPRESS_DB_HOST}" \
+            --dbname="${WORDPRESS_DB_NAME}" \
+            --dbuser="${WORDPRESS_DB_USER}" \
+            --dbpass="${WORDPRESS_DB_PASSWORD}"
+        fi
+        chown -R 1000:1000 /var/www/vhosts/localhost/html
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  mariadb:
+    image: mariadb:11.4
+    command: ["--max-allowed-packet=512M"]
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+      - MYSQL_DATABASE=${MARIADB_DATABASE:-wordpress}
+      - MYSQL_USER=${SERVICE_USER_WORDPRESS}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_WORDPRESS}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
