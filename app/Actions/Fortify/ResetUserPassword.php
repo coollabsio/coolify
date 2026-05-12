@@ -17,6 +17,10 @@ class ResetUserPassword implements ResetsUserPasswords
      */
     public function reset(User $user, array $input): void
     {
+        if (! instanceSettings()->is_password_login_enabled) {
+            abort(403);
+        }
+
         Validator::make($input, [
             'password' => ['required', Password::defaults(), 'confirmed'],
         ])->validate();

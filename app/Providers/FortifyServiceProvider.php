@@ -47,7 +47,7 @@ class FortifyServiceProvider extends ServiceProvider
             $isFirstUser = User::count() === 0;
 
             $settings = instanceSettings();
-            if (! $settings->is_registration_enabled) {
+            if (! $settings->is_registration_enabled || ! $settings->is_password_login_enabled) {
                 return redirect()->route('login');
             }
 
@@ -60,18 +60,23 @@ class FortifyServiceProvider extends ServiceProvider
             $settings = instanceSettings();
             $enabled_oauth_providers = OauthSetting::where('enabled', true)->get();
             $users = User::count();
-            if ($users == 0) {
+            if ($users == 0 && $settings->is_registration_enabled && $settings->is_password_login_enabled) {
                 // If there are no users, redirect to registration
                 return redirect()->route('register');
             }
 
             return view('auth.login', [
                 'is_registration_enabled' => $settings->is_registration_enabled,
+                'is_password_login_enabled' => $settings->is_password_login_enabled,
                 'enabled_oauth_providers' => $enabled_oauth_providers,
             ]);
         });
 
         Fortify::authenticateUsing(function (Request $request) {
+            if (! instanceSettings()->is_password_login_enabled) {
+                return null;
+            }
+
             $email = strtolower($request->email);
             $user = User::where('email', $email)->with('teams')->first();
             if (

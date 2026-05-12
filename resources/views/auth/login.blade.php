@@ -29,33 +29,35 @@
                         </div>
                     @endif
 
-                    <form action="/login" method="POST" class="flex flex-col gap-4">
-                        @csrf
-                        @env('local')
-                            <x-forms.input value="test@example.com" type="email" autocomplete="email" name="email" required
-                                label="{{ __('input.email') }}" />
-                            <x-forms.input value="password" type="password" autocomplete="current-password" name="password"
-                                required label="{{ __('input.password') }}" />
-                        @else
-                            <x-forms.input type="email" name="email" autocomplete="email" required
-                                label="{{ __('input.email') }}" />
-                            <x-forms.input type="password" name="password" autocomplete="current-password" required
-                                label="{{ __('input.password') }}" />
-                        @endenv
+                    @if ($is_password_login_enabled)
+                        <form action="/login" method="POST" class="flex flex-col gap-4">
+                            @csrf
+                            @env('local')
+                                <x-forms.input value="test@example.com" type="email" autocomplete="email" name="email" required
+                                    label="{{ __('input.email') }}" />
+                                <x-forms.input value="password" type="password" autocomplete="current-password" name="password"
+                                    required label="{{ __('input.password') }}" />
+                            @else
+                                <x-forms.input type="email" name="email" autocomplete="email" required
+                                    label="{{ __('input.email') }}" />
+                                <x-forms.input type="password" name="password" autocomplete="current-password" required
+                                    label="{{ __('input.password') }}" />
+                            @endenv
 
-                        <div class="flex items-center justify-between">
-                            <a href="/forgot-password"
-                                class="text-sm dark:text-neutral-400 hover:text-coollabs dark:hover:text-warning hover:underline transition-colors">
-                                {{ __('auth.forgot_password_link') }}
-                            </a>
-                        </div>
+                            <div class="flex items-center justify-between">
+                                <a href="/forgot-password"
+                                    class="text-sm dark:text-neutral-400 hover:text-coollabs dark:hover:text-warning hover:underline transition-colors">
+                                    {{ __('auth.forgot_password_link') }}
+                                </a>
+                            </div>
 
-                        <x-forms.button class="w-full justify-center py-3 box-boarding" type="submit" isHighlighted>
-                            {{ __('auth.login') }}
-                        </x-forms.button>
-                    </form>
+                            <x-forms.button class="w-full justify-center py-3 box-boarding" type="submit" isHighlighted>
+                                {{ __('auth.login') }}
+                            </x-forms.button>
+                        </form>
+                    @endif
 
-                    @if ($is_registration_enabled)
+                    @if ($is_registration_enabled && $is_password_login_enabled)
                         <div class="relative my-6">
                             <div class="absolute inset-0 flex items-center">
                                 <div class="w-full border-t border-neutral-300 dark:border-coolgray-400"></div>

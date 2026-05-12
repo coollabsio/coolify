@@ -391,6 +391,8 @@ CREATE TABLE IF NOT EXISTS "instance_settings" (
     "do_not_track" INTEGER DEFAULT false NOT NULL,
     "is_auto_update_enabled" INTEGER DEFAULT true NOT NULL,
     "is_registration_enabled" INTEGER DEFAULT true NOT NULL,
+    "is_oauth_registration_enabled" INTEGER DEFAULT false NOT NULL,
+    "is_password_login_enabled" INTEGER DEFAULT true NOT NULL,
     "created_at" TEXT,
     "updated_at" TEXT,
     "next_channel" INTEGER DEFAULT false NOT NULL,
