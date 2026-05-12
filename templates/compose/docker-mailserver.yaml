@@ -1,0 +1,45 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Production-ready self-hosted mail server with SMTP, IMAP, antispam, antivirus, and persistent mailbox storage.
+# category: email
+# tags: email,smtp,imap,mailserver,postfix,dovecot,rspamd
+# logo: svgs/default.webp
+# port: 25
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: ${MAIL_HOSTNAME:-mail.example.com}
+    environment:
+      - OVERRIDE_HOSTNAME=${MAIL_HOSTNAME:-mail.example.com}
+      - POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS:-postmaster@example.com}
+      - SSL_TYPE=${SSL_TYPE:-self-signed}
+      - TLS_LEVEL=${TLS_LEVEL:-modern}
+      - ENABLE_RSPAMD=${ENABLE_RSPAMD:-1}
+      - ENABLE_CLAMAV=${ENABLE_CLAMAV:-0}
+      - ENABLE_FAIL2BAN=${ENABLE_FAIL2BAN:-1}
+      - ENABLE_POSTGREY=${ENABLE_POSTGREY:-0}
+      - ONE_DIR=${ONE_DIR:-1}
+      - PERMIT_DOCKER=${PERMIT_DOCKER:-network}
+      - SPOOF_PROTECTION=${SPOOF_PROTECTION:-1}
+      - POSTFIX_MESSAGE_SIZE_LIMIT=${POSTFIX_MESSAGE_SIZE_LIMIT:-10240000}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    ports:
+      - "25:25"
+      - "143:143"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    volumes:
+      - mailserver-mail-data:/var/mail/
+      - mailserver-mail-state:/var/mail-state/
+      - mailserver-mail-logs:/var/log/mail/
+      - mailserver-config:/tmp/docker-mailserver/
+      - mailserver-certs:/etc/letsencrypt/
+      - /etc/localtime:/etc/localtime:ro
+    stop_grace_period: 1m
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD-SHELL", "ss --listening --ipv4 --tcp | grep --silent ':smtp' || exit 1"]
+      timeout: 3s
+      retries: 0

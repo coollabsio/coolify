@@ -870,6 +870,24 @@
         "logo": "svgs/diun.svg",
         "minversion": "0.0.0"
     },
+    "docker-mailserver": {
+        "documentation": "https://docker-mailserver.github.io/docker-mailserver/latest/?utm_source=coolify.io",
+        "slogan": "Production-ready self-hosted mail server with SMTP, IMAP, antispam, antivirus, and persistent mailbox storage.",
+        "compose": "c2VydmljZXM6CiAgbWFpbHNlcnZlcjoKICAgIGltYWdlOiBnaGNyLmlvL2RvY2tlci1tYWlsc2VydmVyL2RvY2tlci1tYWlsc2VydmVyOmxhdGVzdAogICAgaG9zdG5hbWU6ICR7TUFJTF9IT1NUTkFNRTotbWFpbC5leGFtcGxlLmNvbX0KICAgIGVudmlyb25tZW50OgogICAgICAtIE9WRVJSSURFX0hPU1ROQU1FPSR7TUFJTF9IT1NUTkFNRTotbWFpbC5leGFtcGxlLmNvbX0KICAgICAgLSBQT1NUTUFTVEVSX0FERFJFU1M9JHtQT1NUTUFTVEVSX0FERFJFU1M6LXBvc3RtYXN0ZXJAZXhhbXBsZS5jb219CiAgICAgIC0gU1NMX1RZUEU9JHtTU0xfVFlQRTotc2VsZi1zaWduZWR9CiAgICAgIC0gVExTX0xFVkVMPSR7VExTX0xFVkVMOi1tb2Rlcm59CiAgICAgIC0gRU5BQkxFX1JTUEFNRD0ke0VOQUJMRV9SU1BBTUQ6LTF9CiAgICAgIC0gRU5BQkxFX0NMQU1BVj0ke0VOQUJMRV9DTEFNQVY6LTB9CiAgICAgIC0gRU5BQkxFX0ZBSUwyQkFOPSR7RU5BQkxFX0ZBSUwyQkFOOi0xfQogICAgICAtIEVOQUJMRV9QT1NUR1JFWT0ke0VOQUJMRV9QT1NUR1JFWTotMH0KICAgICAgLSBPTkVfRElSPSR7T05FX0RJUjotMX0KICAgICAgLSBQRVJNSVRfRE9DS0VSPSR7UEVSTUlUX0RPQ0tFUjotbmV0d29ya30KICAgICAgLSBTUE9PRl9QUk9URUNUSU9OPSR7U1BPT0ZfUFJPVEVDVElPTjotMX0KICAgICAgLSBQT1NURklYX01FU1NBR0VfU0laRV9MSU1JVD0ke1BPU1RGSVhfTUVTU0FHRV9TSVpFX0xJTUlUOi0xMDI0MDAwMH0KICAgICAgLSBMT0dfTEVWRUw9JHtMT0dfTEVWRUw6LWluZm99CiAgICBwb3J0czoKICAgICAgLSAiMjU6MjUiCiAgICAgIC0gIjE0MzoxNDMiCiAgICAgIC0gIjQ2NTo0NjUiCiAgICAgIC0gIjU4Nzo1ODciCiAgICAgIC0gIjk5Mzo5OTMiCiAgICB2b2x1bWVzOgogICAgICAtIG1haWxzZXJ2ZXItbWFpbC1kYXRhOi92YXIvbWFpbC8KICAgICAgLSBtYWlsc2VydmVyLW1haWwtc3RhdGU6L3Zhci9tYWlsLXN0YXRlLwogICAgICAtIG1haWxzZXJ2ZXItbWFpbC1sb2dzOi92YXIvbG9nL21haWwvCiAgICAgIC0gbWFpbHNlcnZlci1jb25maWc6L3RtcC9kb2NrZXItbWFpbHNlcnZlci8KICAgICAgLSBtYWlsc2VydmVyLWNlcnRzOi9ldGMvbGV0c2VuY3J5cHQvCiAgICAgIC0gL2V0Yy9sb2NhbHRpbWU6L2V0Yy9sb2NhbHRpbWU6cm8KICAgIHN0b3BfZ3JhY2VfcGVyaW9kOiAxbQogICAgY2FwX2FkZDoKICAgICAgLSBORVRfQURNSU4KICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRC1TSEVMTCIsICJzcyAtLWxpc3RlbmluZyAtLWlwdjQgLS10Y3AgfCBncmVwIC0tc2lsZW50ICc6c210cCcgfHwgZXhpdCAxIl0KICAgICAgdGltZW91dDogM3MKICAgICAgcmV0cmllczogMAo=",
+        "tags": [
+            "email",
+            "smtp",
+            "imap",
+            "mailserver",
+            "postfix",
+            "dovecot",
+            "rspamd"
+        ],
+        "category": "email",
+        "logo": "svgs/default.webp",
+        "minversion": "0.0.0",
+        "port": "25"
+    },
     "docker-registry": {
         "documentation": "https://distribution.github.io/distribution/?utm_source=coolify.io",
         "slogan": "The Docker Registry lets you distribute Docker images.",
