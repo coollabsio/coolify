@@ -426,7 +426,7 @@ services:
                     status_code: 403
                     message: "Access is forbidden."
 
-            ## MCP endpoint - local access
+            ## MCP endpoint - private/local access only
             - name: mcp
               _comment: 'MCP: /mcp -> http://supabase-studio:3000/api/mcp (local access)'
               url: http://supabase-studio:3000/api/mcp
@@ -441,10 +441,12 @@ services:
                   config:
                     status_code: 403
                     message: "Access is forbidden."
-                # Enable local access (danger zone!)
+                # Enable private access only (danger zone!)
                 # 1. Comment out the 'request-termination' section above
                 # 2. Uncomment the entire section below, including 'deny'
-                # 3. Add your local IPs to the 'allow' list
+                # 3. Add only your private tunnel, WireGuard, or Docker gateway IPs to 'allow'
+                # 4. Keep one tunnel/local port per Supabase instance to avoid connecting to the wrong project
+                # See the Supabase service documentation for the complete MCP workaround guide.
                 #- name: cors
                 #- name: ip-restriction
                 #  config:
