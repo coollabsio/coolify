@@ -27,7 +27,7 @@ class OauthController extends Controller
             $user = User::whereEmail($email)->first();
             if (! $user) {
                 $settings = instanceSettings();
-                if (! $settings->is_registration_enabled) {
+                if (! $settings->is_registration_enabled && ! ($settings->is_oauth_registration_enabled ?? false)) {
                     abort(403, 'Registration is disabled');
                 }
 
