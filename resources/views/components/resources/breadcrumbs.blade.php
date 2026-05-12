@@ -242,16 +242,75 @@
         </li>
 
         <!-- Resource Level -->
-        <li class="inline-flex items-center mr-2">
-            <a class="text-xs truncate lg:text-sm hover:text-warning" {{ wireNavigate() }}
-                href="{{ $isApplication
-                    ? route('project.application.configuration', $routeParams)
-                    : ($isService
-                        ? route('project.service.configuration', $routeParams)
-                        : route('project.database.configuration', $routeParams)) }}"
-                title="{{ data_get($resource, 'name') }}{{ $serverName ? ' ('.$serverName.')' : '' }}">
-                {{ data_get($resource, 'name') }}@if($serverName) <span class="text-xs text-neutral-400">({{ $serverName }})</span>@endif
-            </a>
+        <li class="inline-flex items-center mr-2" x-data="{ resourceOpen: false, closeTimeout: null, toggle() { this.resourceOpen = !this.resourceOpen }, open() { clearTimeout(this.closeTimeout); this.resourceOpen = true }, close() { this.closeTimeout = setTimeout(() => { this.resourceOpen = false }, 100) } }">
+            <div class="flex items-center relative" @mouseenter="open()" @mouseleave="close()">
+                <a class="text-xs truncate lg:text-sm hover:text-warning" {{ wireNavigate() }}
+                    href="{{ $isApplication
+                        ? route('project.application.configuration', $routeParams)
+                        : ($isService
+                            ? route('project.service.configuration', $routeParams)
+                            : route('project.database.configuration', $routeParams)) }}"
+                    title="{{ data_get($resource, 'name') }}{{ $serverName ? ' ('.$serverName.')' : '' }}">
+                    {{ data_get($resource, 'name') }}@if ($serverName)
+                        <span class="text-xs text-neutral-400">({{ $serverName }})</span>
+                    @endif
+                </a>
+                <button type="button" @click.stop="toggle()" class="px-1 text-warning">
+                    <svg class="w-3 h-3 transition-transform" :class="{ 'rotate-down': resourceOpen }" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+
+                <!-- Resource Sections Dropdown -->
+                <div x-show="resourceOpen" @click.outside="close()" x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100 scale-100"
+                    x-transition:leave-end="opacity-0 scale-95"
+                    class="absolute z-20 top-full mt-1 w-56 -ml-2 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
+                    @php
+                        $currentRoute = Route::currentRouteName();
+                        $sections = [];
+                        if ($isApplication) {
+                            $sections = [
+                                'Configuration' => 'project.application.configuration',
+                                'Deployments' => 'project.application.deployment.index',
+                                'Logs' => 'project.application.logs',
+                                'Environment Variables' => 'project.application.environment-variables',
+                                'Persistent Storage' => 'project.application.persistent-storage',
+                                'Servers' => 'project.application.servers',
+                                'Webhooks' => 'project.application.webhooks',
+                                'Healthcheck' => 'project.application.healthcheck',
+                                'Rollback' => 'project.application.rollback',
+                                'Resource Limits' => 'project.application.resource-limits',
+                                'Metrics' => 'project.application.metrics',
+                                'Danger Zone' => 'project.application.danger',
+                            ];
+                        } elseif ($isService) {
+                            $sections = [
+                                'Configuration' => 'project.service.configuration',
+                                'Logs' => 'project.service.logs',
+                            ];
+                        } elseif ($isDatabase) {
+                            $sections = [
+                                'Configuration' => 'project.database.configuration',
+                                'Logs' => 'project.database.logs',
+                                'Backups' => 'project.database.backups.index',
+                            ];
+                        }
+                    @endphp
+
+                    @foreach ($sections as $name => $route)
+                        @if (Route::has($route))
+                            <a href="{{ route($route, $routeParams) }}" {{ wireNavigate() }}
+                                class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 {{ $currentRoute === $route ? 'dark:text-warning font-semibold' : '' }}"
+                                title="{{ $name }}">
+                                {{ $name }}
+                            </a>
+                        @endif
+                    @endforeach
+                </div>
+            </div>
         </li>
 
         <!-- Current Section Status -->
