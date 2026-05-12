@@ -1,0 +1,20 @@
+# documentation: https://surrealdb.com
+# slogan: SurrealDB is a scalable, distributed, collaborative document-graph database for the realtime web.
+# category: database
+# tags: database, nosql, graph, document, realtime, surrealdb
+# logo: svgs/surrealdb.svg
+# port: 8000
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    command: start --user $SERVICE_USER_SURREALDB --pass $SERVICE_PASSWORD_SURREALDB rocksdb:/data/database.db
+    volumes:
+      - surrealdb-data:/data
+    environment:
+      - SERVICE_FQDN_SURREALDB_8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
