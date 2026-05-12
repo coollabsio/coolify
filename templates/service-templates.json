@@ -5239,6 +5239,24 @@
         "logo": "svgs/wordpress.svg",
         "minversion": "0.0.0"
     },
+    "wordpress-with-openlitespeed": {
+        "documentation": "https://docs.litespeedtech.com/cloud/docker/ols-wordpress/?utm_source=coolify.io",
+        "slogan": "Run WordPress on OpenLiteSpeed with persistent files and MariaDB storage.",
+        "compose": "c2VydmljZXM6CiAgd29yZHByZXNzOgogICAgaW1hZ2U6IGxpdGVzcGVlZHRlY2gvb3BlbmxpdGVzcGVlZDoxLjkuMC1sc3BocDgzCiAgICB2b2x1bWVzOgogICAgICAtIHdvcmRwcmVzcy1maWxlczovdmFyL3d3dy92aG9zdHMvbG9jYWxob3N0L2h0bWwKICAgICAgLSBvcGVubGl0ZXNwZWVkLWNvbmY6L3Vzci9sb2NhbC9sc3dzL2NvbmYKICAgICAgLSBvcGVubGl0ZXNwZWVkLWFkbWluLWNvbmY6L3Vzci9sb2NhbC9sc3dzL2FkbWluL2NvbmYKICAgICAgLSBvcGVubGl0ZXNwZWVkLWxvZ3M6L3Vzci9sb2NhbC9sc3dzL2xvZ3MKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9XT1JEUFJFU1NfODAKICAgICAgLSBXT1JEUFJFU1NfREJfSE9TVD1tYXJpYWRiCiAgICAgIC0gV09SRFBSRVNTX0RCX1VTRVI9JHtTRVJWSUNFX1VTRVJfV09SRFBSRVNTfQogICAgICAtIFdPUkRQUkVTU19EQl9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfV09SRFBSRVNTfQogICAgICAtIFdPUkRQUkVTU19EQl9OQU1FPSR7TUFSSUFEQl9EQVRBQkFTRTotd29yZHByZXNzfQogICAgY29tbWFuZDoKICAgICAgLSBiYXNoCiAgICAgIC0gLWxjCiAgICAgIC0gfAogICAgICAgIHNldCAtZQogICAgICAgIGNkIC92YXIvd3d3L3Zob3N0cy9sb2NhbGhvc3QvaHRtbAogICAgICAgIGlmIFsgISAtZiB3cC1zZXR0aW5ncy5waHAgXTsgdGhlbgogICAgICAgICAgd3AgY29yZSBkb3dubG9hZCAtLWFsbG93LXJvb3QKICAgICAgICBmaQogICAgICAgIGlmIFsgISAtZiB3cC1jb25maWcucGhwIF07IHRoZW4KICAgICAgICAgIHdwIGNvbmZpZyBjcmVhdGUgLS1hbGxvdy1yb290IC0tc2tpcC1jaGVjayBcCiAgICAgICAgICAgIC0tZGJob3N0PSIke1dPUkRQUkVTU19EQl9IT1NUfSIgXAogICAgICAgICAgICAtLWRibmFtZT0iJHtXT1JEUFJFU1NfREJfTkFNRX0iIFwKICAgICAgICAgICAgLS1kYnVzZXI9IiR7V09SRFBSRVNTX0RCX1VTRVJ9IiBcCiAgICAgICAgICAgIC0tZGJwYXNzPSIke1dPUkRQUkVTU19EQl9QQVNTV09SRH0iCiAgICAgICAgZmkKICAgICAgICBjaG93biAtUiAxMDAwOjEwMDAgL3Zhci93d3cvdmhvc3RzL2xvY2FsaG9zdC9odG1sCiAgICBkZXBlbmRzX29uOgogICAgICBtYXJpYWRiOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDogWyJDTUQiLCAiY3VybCIsICItZiIsICJodHRwOi8vMTI3LjAuMC4xIl0KICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAoKICBtYXJpYWRiOgogICAgaW1hZ2U6IG1hcmlhZGI6MTEuNAogICAgY29tbWFuZDogWyItLW1heC1hbGxvd2VkLXBhY2tldD01MTJNIl0KICAgIHZvbHVtZXM6CiAgICAgIC0gbWFyaWFkYi1kYXRhOi92YXIvbGliL215c3FsCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBNWVNRTF9ST09UX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9ST09UfQogICAgICAtIE1ZU1FMX0RBVEFCQVNFPSR7TUFSSUFEQl9EQVRBQkFTRTotd29yZHByZXNzfQogICAgICAtIE1ZU1FMX1VTRVI9JHtTRVJWSUNFX1VTRVJfV09SRFBSRVNTfQogICAgICAtIE1ZU1FMX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9XT1JEUFJFU1N9CiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDogWyJDTUQiLCAiaGVhbHRoY2hlY2suc2giLCAiLS1jb25uZWN0IiwgIi0taW5ub2RiX2luaXRpYWxpemVkIl0KICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "tags": [
+            "cms",
+            "blog",
+            "content",
+            "management",
+            "wordpress",
+            "openlitespeed",
+            "mariadb"
+        ],
+        "category": "cms",
+        "logo": "svgs/wordpress.svg",
+        "minversion": "0.0.0",
+        "port": "80"
+    },
     "yamtrack-with-postgresql": {
         "documentation": "https://github.com/FuzzyGrim/Yamtrack/wiki?utm_source=coolify.io",
         "slogan": "Yamtrack is a self hosted media tracker for movies, tv shows, anime, manga, video games and books.",
