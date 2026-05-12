@@ -189,3 +189,20 @@ it('identifies none as not predefined (per codebase pattern)', function () {
     // only filters 'default' and 'host', so we maintain consistency
     expect(isDockerPredefinedNetwork('none'))->toBeFalse();
 });
+
+it('creates standalone docker networks with ipv6 fallback', function () {
+    $command = dockerNetworkCreateCommand('coolify');
+    $safe = escapeshellarg('coolify');
+
+    expect($command)->toContain("docker network inspect {$safe}")
+        ->and($command)->toContain("docker network create --attachable --ipv6 {$safe}")
+        ->and($command)->toContain("docker network create --attachable {$safe}");
+});
+
+it('keeps swarm docker network creation on overlay without ipv6 fallback', function () {
+    $command = dockerNetworkCreateCommand('coolify-overlay', isSwarm: true);
+    $safe = escapeshellarg('coolify-overlay');
+
+    expect($command)->toContain("docker network create --driver overlay --attachable {$safe}")
+        ->and($command)->not->toContain('--ipv6');
+});
