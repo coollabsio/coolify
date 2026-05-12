@@ -5340,5 +5340,22 @@
         "logo": "svgs/cells.svg",
         "minversion": "0.0.0",
         "port": "8080"
+    },
+    "wordpress-with-openlitespeed": {
+        "documentation": "https://openlitespeed.org?utm_source=coolify.io",
+        "slogan": "High-performance WordPress hosting with OpenLiteSpeed web server and MariaDB.",
+        "compose": "# documentation: https://openlitespeed.org\n# slogan: High-performance WordPress hosting with OpenLiteSpeed web server and MariaDB.\n# category: cms\n# tags: cms, blog, wordpress, openlitespeed, litespeed, mariadb\n# logo: svgs/wordpress.svg\n# port: 8088\n\nservices:\n  wordpress:\n    image: litespeedtech/openlitespeed-wordpress:latest\n    volumes:\n      - wordpress-files:/var/www/vhosts/localhost\n      - lsws-config:/usr/local/lsws/conf\n    environment:\n      - SERVICE_FQDN_WORDPRESS_8088\n      - WORDPRESS_DB_HOST=mariadb\n      - WORDPRESS_DB_USER=$SERVICE_USER_WORDPRESS\n      - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS\n      - WORDPRESS_DB_NAME=wordpress\n    depends_on:\n      mariadb:\n        condition: service_healthy\n    healthcheck:\n      test: [\"CMD\", \"curl\", \"-f\", \"http://127.0.0.1:8088\"]\n      interval: 5s\n      timeout: 10s\n      retries: 10\n  mariadb:\n    image: mariadb:11\n    volumes:\n      - mariadb-data:/var/lib/mysql\n    environment:\n      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT\n      - MYSQL_DATABASE=wordpress\n      - MYSQL_USER=$SERVICE_USER_WORDPRESS\n      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS\n    healthcheck:\n      test: [\"CMD\", \"healthcheck.sh\", \"--connect\", \"--innodb_initialized\"]\n      interval: 5s\n      timeout: 20s\n      retries: 10\n",
+        "tags": [
+            "cms",
+            "blog",
+            "wordpress",
+            "openlitespeed",
+            "litespeed",
+            "mariadb"
+        ],
+        "category": "cms",
+        "logo": "svgs/wordpress.svg",
+        "minversion": "0.0.0",
+        "port": "8088"
     }
 }
