@@ -44,6 +44,8 @@ class InstanceSettings extends Model
         'disable_two_step_confirmation',
         'is_sponsorship_popup_enabled',
         'dev_helper_version',
+        'is_force_oauth_login_enabled',
+        'is_oauth_registration_enabled',
         'is_wire_navigate_enabled',
     ];
 
@@ -67,6 +69,8 @@ class InstanceSettings extends Model
         'update_check_frequency' => 'string',
         'sentinel_token' => 'encrypted',
         'is_wire_navigate_enabled' => 'boolean',
+        'is_force_oauth_login_enabled' => 'boolean',
+        'is_oauth_registration_enabled' => 'boolean',
     ];
 
     protected static function booted(): void

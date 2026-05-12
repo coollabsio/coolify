@@ -52,6 +52,7 @@ class User extends Authenticatable implements SendsEmail
         'pending_email',
         'email_change_code',
         'email_change_code_expires_at',
+        'force_oauth_only',
     ];
 
     protected $hidden = [
@@ -66,6 +67,7 @@ class User extends Authenticatable implements SendsEmail
         'force_password_reset' => 'boolean',
         'show_boarding' => 'boolean',
         'email_change_code_expires_at' => 'datetime',
+        'force_oauth_only' => 'boolean',
     ];
 
     /**
