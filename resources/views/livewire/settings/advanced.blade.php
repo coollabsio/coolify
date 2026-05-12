@@ -41,6 +41,36 @@
                                 shortConfirmationLabel="Confirmation text" />
                         </div>
                     @endif
+                    @if ($is_oauth_registration_enabled)
+                        <div class="md:w-96" wire:key="oauth-registration-enabled">
+                            <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                                helper="Allow enabled OAuth providers to create new user accounts even when regular registration is disabled."
+                                label="OAuth Registration Allowed" />
+                        </div>
+                    @else
+                        <div class="flex items-center justify-between gap-2 md:w-96"
+                            wire:key="oauth-registration-disabled">
+                            <label class="flex items-center gap-2">
+                                OAuth Registration Allowed
+                                <x-helper
+                                    helper="Allow enabled OAuth providers to create new user accounts even when regular registration is disabled.">
+                                </x-helper>
+                            </label>
+                            <x-modal-confirmation title="Enable OAuth Registration?" buttonTitle="Enable" isErrorButton
+                                submitAction="toggleOauthRegistration" :actions="[
+                                    'Enables registration through configured OAuth providers',
+                                ]"
+                                warningMessage="Enabling OAuth registration allows anyone accepted by a configured OAuth provider to create an account on this instance."
+                                confirmationText="ENABLE OAUTH REGISTRATION"
+                                confirmationLabel="Please type the confirmation text to enable OAuth registration."
+                                shortConfirmationLabel="Confirmation text" />
+                        </div>
+                    @endif
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_password_login_enabled"
+                            helper="Allow OAuth users to sign in with, create, or reset a local password. Disable this to keep OAuth-created users restricted to OAuth sign-in."
+                            label="Allow Passwords for OAuth Users" />
+                    </div>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."

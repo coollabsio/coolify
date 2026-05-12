@@ -31,6 +31,7 @@ use OpenApi\Attributes as OA;
         'id' => ['type' => 'integer', 'description' => 'The user identifier in the database.'],
         'name' => ['type' => 'string', 'description' => 'The user name.'],
         'email' => ['type' => 'string', 'description' => 'The user email.'],
+        'oauth_provider' => ['type' => 'string', 'description' => 'The OAuth provider used to create the user.'],
         'email_verified_at' => ['type' => 'string', 'description' => 'The date when the user email was verified.'],
         'created_at' => ['type' => 'string', 'description' => 'The date when the user was created.'],
         'updated_at' => ['type' => 'string', 'description' => 'The date when the user was updated.'],
@@ -47,6 +48,7 @@ class User extends Authenticatable implements SendsEmail
         'name',
         'email',
         'password',
+        'oauth_provider',
         'force_password_reset',
         'marketing_emails',
         'pending_email',
@@ -486,5 +488,19 @@ class User extends Authenticatable implements SendsEmail
     public function hasPassword(): bool
     {
         return ! empty($this->password);
+    }
+
+    public function isOauthUser(): bool
+    {
+        return ! empty($this->oauth_provider);
+    }
+
+    public function canUsePasswordAuthentication(): bool
+    {
+        if (! $this->isOauthUser() && $this->hasPassword()) {
+            return true;
+        }
+
+        return instanceSettings()->is_oauth_password_login_enabled ?? true;
     }
 }
