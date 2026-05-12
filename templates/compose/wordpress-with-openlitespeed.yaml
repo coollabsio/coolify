@@ -15,18 +15,35 @@ services:
       - openlitespeed-logs:/usr/local/lsws/logs
     environment:
       - SERVICE_URL_WORDPRESS_80
+    depends_on:
+      wordpress-installer:
+        condition: service_completed_successfully
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  wordpress-installer:
+    image: litespeedtech/openlitespeed:1.9.0-lsphp83
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost/html
+    environment:
       - WORDPRESS_DB_HOST=mariadb
       - WORDPRESS_DB_USER=${SERVICE_USER_WORDPRESS}
       - WORDPRESS_DB_PASSWORD=${SERVICE_PASSWORD_WORDPRESS}
       - WORDPRESS_DB_NAME=${MARIADB_DATABASE:-wordpress}
-    command:
+    entrypoint:
       - bash
       - -lc
+    command:
       - |
         set -e
         cd /var/www/vhosts/localhost/html
         if [ ! -f wp-settings.php ]; then
-          wp core download --allow-root
+          wp core download --version=6.9.4 --allow-root
         fi
         if [ ! -f wp-config.php ]; then
           wp config create --allow-root --skip-check \
@@ -39,11 +56,7 @@ services:
     depends_on:
       mariadb:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
-      interval: 5s
-      timeout: 20s
-      retries: 10
+    restart: "no"
 
   mariadb:
     image: mariadb:11.4
