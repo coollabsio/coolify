@@ -1,0 +1,60 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Full-stack mail server with SMTP, IMAP, DKIM, DMARC, and spam filtering.
+# category: email
+# tags: docker-mailserver,email,smtp,imap,postfix,dovecot,dkim,dmarc,rspamd
+# ports: 25, 143, 465, 587, 993 tcp
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: ${MAILSERVER_HOSTNAME:?mail.example.com}
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - ACCOUNT_PROVISIONER=${ACCOUNT_PROVISIONER:-}
+      - POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS:-}
+      - PERMIT_DOCKER=${PERMIT_DOCKER:-none}
+      - TZ=${TZ:-UTC}
+      - SPOOF_PROTECTION=${SPOOF_PROTECTION:-1}
+      - ENABLE_OPENDKIM=${ENABLE_OPENDKIM:-0}
+      - ENABLE_OPENDMARC=${ENABLE_OPENDMARC:-0}
+      - ENABLE_POLICYD_SPF=${ENABLE_POLICYD_SPF:-0}
+      - ENABLE_POP3=${ENABLE_POP3:-0}
+      - ENABLE_IMAP=${ENABLE_IMAP:-1}
+      - ENABLE_CLAMAV=${ENABLE_CLAMAV:-0}
+      - ENABLE_RSPAMD=${ENABLE_RSPAMD:-1}
+      - ENABLE_AMAVIS=${ENABLE_AMAVIS:-0}
+      - ENABLE_FAIL2BAN=${ENABLE_FAIL2BAN:-1}
+      - ENABLE_QUOTAS=${ENABLE_QUOTAS:-1}
+      - ENABLE_SPAMASSASSIN=${ENABLE_SPAMASSASSIN:-0}
+      - SSL_TYPE=${SSL_TYPE:-}
+      - TLS_LEVEL=${TLS_LEVEL:-modern}
+    ports:
+      - "${SMTP_PORT:-25}:25"
+      - "${IMAP_PORT:-143}:143"
+      - "${SUBMISSIONS_PORT:-465}:465"
+      - "${SUBMISSION_PORT:-587}:587"
+      - "${IMAPS_PORT:-993}:993"
+    volumes:
+      - mailserver-mail-data:/var/mail/
+      - mailserver-mail-state:/var/mail-state/
+      - mailserver-mail-logs:/var/log/mail/
+      - mailserver-config:/tmp/docker-mailserver/
+      - mailserver-certificates:/etc/letsencrypt/
+      - /etc/localtime:/etc/localtime:ro
+    cap_add:
+      - NET_ADMIN
+    restart: always
+    stop_grace_period: 1m
+    healthcheck:
+      test: "ss --listening --ipv4 --tcp | grep --silent ':smtp' || exit 1"
+      timeout: 3s
+      retries: 10
+      interval: 30s
+      start_period: 120s
+
+volumes:
+  mailserver-mail-data:
+  mailserver-mail-state:
+  mailserver-mail-logs:
+  mailserver-config:
+  mailserver-certificates:
