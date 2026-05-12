@@ -1,0 +1,86 @@
+# documentation: https://docs.litespeedtech.com/cloud/docker/ols-wordpress/
+# slogan: WordPress powered by OpenLiteSpeed with MariaDB and Redis.
+# category: cms
+# tags: cms, blog, content, management, wordpress, openlitespeed, litespeed, mariadb, redis
+# logo: svgs/wordpress.svg
+# port: 80
+
+services:
+  wordpress:
+    image: litespeedtech/openlitespeed:latest
+    environment:
+      - SERVICE_URL_WORDPRESS_80
+      - TZ=${TZ:-UTC}
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost/html
+      - openlitespeed-logs:/usr/local/lsws/logs
+    depends_on:
+      wordpress-init:
+        condition: service_completed_successfully
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  wordpress-init:
+    image: wordpress:cli
+    user: root
+    restart: "no"
+    exclude_from_hc: true
+    volumes:
+      - wordpress-files:/var/www/html
+    environment:
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_USER=$SERVICE_USER_WORDPRESS
+      - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+      - WORDPRESS_DB_NAME=wordpress
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        if [ ! -f wp-config.php ]; then
+          wp core download --allow-root
+          wp config create --allow-root --dbname="$${WORDPRESS_DB_NAME}" --dbuser="$${WORDPRESS_DB_USER}" --dbpass="$${WORDPRESS_DB_PASSWORD}" --dbhost="$${WORDPRESS_DB_HOST}"
+          wp config set WP_CACHE true --raw --allow-root
+          wp config set WP_REDIS_HOST redis --allow-root
+          wp config set WP_REDIS_PORT 6379 --raw --allow-root
+          wp plugin install litespeed-cache --allow-root
+        fi
+        chown -R 1000:1000 /var/www/html
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
