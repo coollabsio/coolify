@@ -21,6 +21,15 @@ function isDockerPredefinedNetwork(string $network): bool
     return in_array($network, ['default', 'host'], true);
 }
 
+function dockerNetworkCreateCommand(string $network, bool $isSwarm = false, bool $quiet = false): string
+{
+    $safe = escapeshellarg($network);
+    $driver = $isSwarm ? '--driver overlay ' : '';
+    $fallbackOutput = $quiet ? ' >/dev/null 2>&1' : '';
+
+    return "docker network create --ipv6 {$driver}--attachable {$safe} >/dev/null 2>&1 || docker network create {$driver}--attachable {$safe}{$fallbackOutput}";
+}
+
 function collectProxyDockerNetworksByServer(Server $server)
 {
     if (! $server->isFunctional()) {
@@ -111,7 +120,7 @@ function connectProxyToNetworks(Server $server)
         $commands = $networks->map(function ($network) {
             $safe = escapeshellarg($network);
             return [
-                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --driver overlay --attachable {$safe} >/dev/null",
+                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || ".dockerNetworkCreateCommand($network, isSwarm: true, quiet: true),
                 "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
@@ -120,7 +129,7 @@ function connectProxyToNetworks(Server $server)
         $commands = $networks->map(function ($network) {
             $safe = escapeshellarg($network);
             return [
-                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --attachable {$safe} >/dev/null",
+                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || ".dockerNetworkCreateCommand($network, quiet: true),
                 "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
@@ -146,7 +155,7 @@ function ensureProxyNetworksExist(Server $server)
             $safe = escapeshellarg($network);
             return [
                 "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable {$safe}",
+                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || ".dockerNetworkCreateCommand($network, isSwarm: true),
             ];
         });
     } else {
@@ -154,7 +163,7 @@ function ensureProxyNetworksExist(Server $server)
             $safe = escapeshellarg($network);
             return [
                 "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable {$safe}",
+                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || ".dockerNetworkCreateCommand($network),
             ];
         });
     }

@@ -189,3 +189,34 @@ it('identifies none as not predefined (per codebase pattern)', function () {
     // only filters 'default' and 'host', so we maintain consistency
     expect(isDockerPredefinedNetwork('none'))->toBeFalse();
 });
+
+
+it('builds standalone network create commands with IPv6 fallback', function () {
+    $command = dockerNetworkCreateCommand('coolify');
+
+    expect($command)
+        ->toContain('docker network create --ipv6 --attachable coolify >/dev/null 2>&1')
+        ->toContain('|| docker network create --attachable coolify');
+});
+
+it('builds swarm overlay network create commands with IPv6 fallback', function () {
+    $command = dockerNetworkCreateCommand('coolify-overlay', isSwarm: true);
+
+    expect($command)
+        ->toContain('docker network create --ipv6 --driver overlay --attachable coolify-overlay >/dev/null 2>&1')
+        ->toContain('|| docker network create --driver overlay --attachable coolify-overlay');
+});
+
+it('can silence the fallback network create command', function () {
+    $command = dockerNetworkCreateCommand('coolify', quiet: true);
+
+    expect($command)->toEndWith('|| docker network create --attachable coolify >/dev/null 2>&1');
+});
+
+it('shell escapes network names in network create commands', function () {
+    $command = dockerNetworkCreateCommand('app network');
+
+    expect($command)
+        ->toContain("docker network create --ipv6 --attachable 'app network'")
+        ->toContain("|| docker network create --attachable 'app network'");
+});
