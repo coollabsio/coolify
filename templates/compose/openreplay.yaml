@@ -1,0 +1,29 @@
+# OpenReplay Service Template for Coolify
+# Target: coolify/templates/compose/openreplay.yaml
+# Bounty: $5 (Issue #8232)
+
+version: "3.8"
+services:
+  openreplay:
+    image: openreplay/openreplay:latest
+    container_name: openreplay
+    environment:
+      - SERVICE_FQDN=${SERVICE_FQDN}
+      - APP_NAME=${APP_NAME:-OpenReplay}
+      - MINIO_ACCESS_KEY=${SERVICE_PASSWORD_64}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_64}
+      - DOMAIN_NAME=${SERVICE_FQDN_HOSTNAME}
+    ports:
+      - "8080:8080"
+    volumes:
+      - openreplay_data:/var/lib/openreplay
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+
+volumes:
+  openreplay_data:
+    driver: local
