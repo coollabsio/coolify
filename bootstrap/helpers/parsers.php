@@ -122,7 +122,7 @@ function parseDockerVolumeString(string $volumeString): array
 
     // First, check if the source contains an environment variable with default value
     // This needs to be done before counting colons because ${VAR:-value} contains a colon
-    $envVarPattern = '/^\$\{[^}]+:-[^}]*\}/';
+    $envVarPattern = '/^\$\{[^}]+:-[^}]*\}[^:]*/';
     $hasEnvVarWithDefault = false;
     $envVarEndPos = 0;
 
@@ -321,8 +321,9 @@ function parseDockerVolumeString(string $volumeString): array
         // Pattern 2: ${WORD_CHARS}/path/to/file (env var with path concatenation)
         $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceStr);
         $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceStr);
+        $isEnvVarWithDefault = preg_match('/^\\$\\{[^}]+:-[^}]*\\}[\/\\w\.\\-]*$/', $sourceStr);
 
-        if (! $isSimpleEnvVar && ! $isEnvVarWithPath) {
+        if (! $isSimpleEnvVar && ! $isEnvVarWithPath && ! $isEnvVarWithDefault) {
             try {
                 validateShellSafePath($sourceStr, 'volume source');
             } catch (Exception $e) {

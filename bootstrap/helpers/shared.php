@@ -1315,7 +1315,7 @@ function getTopLevelNetworks(Service|Application $resource)
 }
 function sourceIsLocal(Stringable $source)
 {
-    if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~') || $source->startsWith('..') || $source->startsWith('~/') || $source->startsWith('../')) {
+    if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~') || $source->startsWith('..') || $source->startsWith('~/') || $source->startsWith('../') || $source->startsWith('$')) {
         return true;
     }
 
