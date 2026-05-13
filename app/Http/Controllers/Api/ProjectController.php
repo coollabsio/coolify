@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Project;
+use App\Models\ProjectMember;
+use App\Models\User;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -727,4 +729,121 @@ class ProjectController extends Controller
 
         return response()->json(['message' => 'Environment deleted.']);
     }
+
+    public function list_members(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
+            return response()->json(['message' => 'Project not found.'], 404);
+        }
+
+        $members = $project->members()->with('user:id,name,email')->get()
+            ->map(fn ($m) => [
+                'id' => $m->id,
+                'user_id' => $m->user_id,
+                'name' => $m->user?->name,
+                'email' => $m->user?->email,
+                'role' => $m->role,
+            ]);
+
+        return response()->json(serializeApiResponse($members));
+    }
+
+    public function add_member(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
+            return response()->json(['message' => 'Project not found.'], 404);
+        }
+
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'email' => ['required', 'email'],
+            'role' => ['required', 'in:member,admin'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
+        }
+
+        $user = User::whereEmail(strtolower($request->email))->first();
+        if (! $user) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+
+        if ($project->isProjectMember($user->id)) {
+            return response()->json(['message' => 'User is already a project member.'], 409);
+        }
+
+        $member = ProjectMember::create([
+            'project_id' => $project->id,
+            'user_id' => $user->id,
+            'role' => $request->role,
+            'invited_by' => auth()->id(),
+        ]);
+
+        return response()->json(['id' => $member->id, 'message' => 'Member added.'])->setStatusCode(201);
+    }
+
+    public function update_member(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
+            return response()->json(['message' => 'Project not found.'], 404);
+        }
+
+        $member = ProjectMember::where('project_id', $project->id)->where('user_id', $request->userId)->first();
+        if (! $member) {
+            return response()->json(['message' => 'Member not found.'], 404);
+        }
+
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'role' => ['required', 'in:member,admin'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
+        }
+
+        $member->update(['role' => $request->role]);
+
+        return response()->json(['message' => 'Member role updated.']);
+    }
+
+    public function remove_member(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
+            return response()->json(['message' => 'Project not found.'], 404);
+        }
+
+        $member = ProjectMember::where('project_id', $project->id)->where('user_id', $request->userId)->first();
+        if (! $member) {
+            return response()->json(['message' => 'Member not found.'], 404);
+        }
+
+        $member->delete();
+
+        return response()->json(['message' => 'Member removed.']);
+    }
 }
+
