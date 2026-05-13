@@ -17,6 +17,8 @@
                 <a class="sub-menu-item" wire:current.exact="menu-item-active" {{ wireNavigate() }}
                     href="{{ route('project.service.index', $parameters) }}"><span class="menu-item-label">General</span></a>
                 <a class="sub-menu-item" wire:current.exact="menu-item-active" {{ wireNavigate() }}
+                    href="{{ route('project.service.index.info', $parameters) }}"><span class="menu-item-label">Container Info</span></a>
+                <a class="sub-menu-item" wire:current.exact="menu-item-active" {{ wireNavigate() }}
                     href="{{ route('project.service.index.advanced', $parameters) }}"><span class="menu-item-label">Advanced</span></a>
             </div>
         @endif
@@ -26,7 +28,12 @@
                     {{ data_get_str($service, 'name')->limit(10) }} >
                     {{ data_get_str($serviceApplication, 'name')->limit(10) }} | Coolify
                 </x-slot>
-                @if ($currentRoute === 'project.service.index.advanced')
+                @if ($currentRoute === 'project.service.index.info')
+                    @include('livewire.project.service.partials.container-info', [
+                        'containerInfo' => $containerInfo,
+                        'containerInfoError' => $containerInfoError,
+                    ])
+                @elseif ($currentRoute === 'project.service.index.advanced')
                     <h2>Advanced</h2>
                     <div class="w-full sm:w-96 flex flex-col gap-1 pt-4">
                         @if (str($serviceApplication->image)->contains('pocketbase'))
@@ -184,6 +191,11 @@
                 </x-slot>
                 @if ($currentRoute === 'project.service.database.import')
                     <livewire:project.database.import :resource="$serviceDatabase" :key="'import-' . $serviceDatabase->uuid" />
+                @elseif ($currentRoute === 'project.service.index.info')
+                    @include('livewire.project.service.partials.container-info', [
+                        'containerInfo' => $containerInfo,
+                        'containerInfoError' => $containerInfoError,
+                    ])
                 @elseif ($currentRoute === 'project.service.index.advanced')
                     <h2>Advanced</h2>
                     <div class="w-full sm:w-96 flex flex-col gap-1 pt-4">

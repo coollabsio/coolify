@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Support\ContainerInfoPresenter;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -84,6 +85,10 @@ class Index extends Component
 
     public bool $isStripprefixEnabled = false;
 
+    public ?array $containerInfo = null;
+
+    public ?string $containerInfoError = null;
+
     protected $listeners = ['generateDockerCompose', 'refreshScheduledBackups' => '$refresh', 'refreshFileStorages'];
 
     protected $rules = [
@@ -131,6 +136,9 @@ class Index extends Component
                 $this->resourceType = 'database';
                 $this->serviceDatabase->getFilesFromServer();
                 $this->initializeDatabaseProperties();
+            }
+            if ($this->currentRoute === 'project.service.index.info') {
+                $this->loadContainerInfo();
             }
             $this->s3s = currentTeam()->s3s;
         } catch (\Throwable $e) {
@@ -558,5 +566,33 @@ class Index extends Component
     public function render()
     {
         return view('livewire.project.service.index');
+    }
+
+    private function loadContainerInfo(): void
+    {
+        $containerName = $this->resourceType === 'application'
+            ? "{$this->serviceApplication->name}-{$this->service->uuid}"
+            : "{$this->serviceDatabase->name}-{$this->service->uuid}";
+
+        $server = $this->resourceType === 'application'
+            ? $this->serviceApplication->service->destination->server
+            : $this->serviceDatabase->service->destination->server;
+
+        $inspect = getContainerStatus($server, $containerName, true, false);
+
+        if (! is_array($inspect)) {
+            $this->containerInfoError = 'Live container metadata is unavailable right now. The container may not exist yet or the server is unreachable.';
+            $this->containerInfo = [
+                'container_id' => $containerName,
+                'container_name' => $containerName,
+                'status' => is_string($inspect) ? $inspect : null,
+                'restart_count' => 0,
+                'networks' => [],
+            ];
+
+            return;
+        }
+
+        $this->containerInfo = ContainerInfoPresenter::fromInspect($inspect, $containerName);
     }
 }
