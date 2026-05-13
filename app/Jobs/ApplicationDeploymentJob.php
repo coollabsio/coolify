@@ -352,6 +352,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 } else {
                     $this->build_server = $buildServers->random();
                     $this->application_deployment_queue->build_server_id = $this->build_server->id;
+                    // Persist build_server_id BEFORE addLogEntry(): addLogEntry() calls
+                    // $this->refresh() internally, which would otherwise reload the row
+                    // from the database and discard this in-memory assignment, then
+                    // saveQuietly() would persist NULL for build_server_id. As a result
+                    // CleanupHelperContainersJob never sees the build-server linkage and
+                    // would treat every helper container on the build server as
+                    // orphaned. See #7649 / #6648 / #7566.
+                    $this->application_deployment_queue->save();
                     $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
                     $this->use_build_server = true;
                 }
