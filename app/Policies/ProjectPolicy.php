@@ -7,65 +7,34 @@ use App\Models\User;
 
 class ProjectPolicy
 {
-    /**
-     * Determine whether the user can view any models.
-     */
-    public function viewAny(User $user): bool
-    {
-        return true;
-    }
-
-    /**
-     * Determine whether the user can view the model.
-     */
     public function view(User $user, Project $project): bool
     {
-        // return $user->teams->contains('id', $project->team_id);
-        return true;
+        if ($project->team_id === currentTeam()->id) {
+            return true;
+        }
+
+        return $project->isProjectMember($user->id);
     }
 
-    /**
-     * Determine whether the user can create models.
-     */
-    public function create(User $user): bool
-    {
-        // return $user->isAdmin();
-        return true;
-    }
-
-    /**
-     * Determine whether the user can update the model.
-     */
     public function update(User $user, Project $project): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $project->team_id);
-        return true;
+        if ($project->team_id !== currentTeam()->id) {
+            return false;
+        }
+
+        $role = auth()->user()?->role();
+
+        return in_array($role, ['owner', 'admin'], true);
     }
 
-    /**
-     * Determine whether the user can delete the model.
-     */
-    public function delete(User $user, Project $project): bool
+    public function manageMembers(User $user, Project $project): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $project->team_id);
-        return true;
-    }
+        if ($project->team_id !== currentTeam()->id) {
+            return false;
+        }
 
-    /**
-     * Determine whether the user can restore the model.
-     */
-    public function restore(User $user, Project $project): bool
-    {
-        // return $user->isAdmin() && $user->teams->contains('id', $project->team_id);
-        return true;
-    }
+        $role = auth()->user()?->role();
 
-    /**
-     * Determine whether the user can permanently delete the model.
-     */
-    public function forceDelete(User $user, Project $project): bool
-    {
-        // return $user->isAdmin() && $user->teams->contains('id', $project->team_id);
-        return true;
+        return in_array($role, ['owner', 'admin'], true);
     }
 }

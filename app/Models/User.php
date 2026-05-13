@@ -234,6 +234,16 @@ class User extends Authenticatable implements SendsEmail
         return $this->belongsToMany(Team::class)->withPivot('role');
     }
 
+    public function projectMemberships()
+    {
+        return $this->hasMany(ProjectMember::class);
+    }
+
+    public function isProjectMember(int $projectId): bool
+    {
+        return $this->projectMemberships()->where('project_id', $projectId)->exists();
+    }
+
     public function changelogReads()
     {
         return $this->hasMany(UserChangelogRead::class);

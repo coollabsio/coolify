@@ -92,6 +92,26 @@ class Project extends BaseModel
         return $this->belongsTo(Team::class);
     }
 
+    public function members()
+    {
+        return $this->hasMany(ProjectMember::class);
+    }
+
+    public function invitations()
+    {
+        return $this->hasMany(ProjectInvitation::class);
+    }
+
+    public function isProjectMember(int $userId): bool
+    {
+        return $this->members()->where('user_id', $userId)->exists();
+    }
+
+    public function projectRole(int $userId): ?string
+    {
+        return $this->members()->where('user_id', $userId)->value('role');
+    }
+
     public function services()
     {
         return $this->hasManyThrough(Service::class, Environment::class);
