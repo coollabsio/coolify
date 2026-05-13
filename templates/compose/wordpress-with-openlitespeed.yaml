@@ -1,0 +1,95 @@
+# documentation: https://docs.litespeedtech.com/cloud/docker/ols-wordpress/
+# slogan: WordPress with OpenLiteSpeed for fast, cache-friendly self-hosted sites.
+# category: cms
+# tags: cms, blog, content, management, wordpress, openlitespeed, mariadb
+# logo: svgs/wordpress.svg
+# port: 80
+
+services:
+  wordpress:
+    image: litespeedtech/openlitespeed:latest
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost/html
+      - openlitespeed-conf:/usr/local/lsws/conf
+      - openlitespeed-admin-conf:/usr/local/lsws/admin/conf
+      - openlitespeed-logs:/usr/local/lsws/logs
+    environment:
+      - SERVICE_URL_WORDPRESS_80
+      - TZ=${TZ:-UTC}
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_NAME=${WORDPRESS_DB_NAME:-wordpress}
+      - WORDPRESS_DB_USER=${SERVICE_USER_WORDPRESS}
+      - WORDPRESS_DB_PASSWORD=${SERVICE_PASSWORD_WORDPRESS}
+      - WORDPRESS_TABLE_PREFIX=${WORDPRESS_TABLE_PREFIX:-wp_}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+
+        if [ -z "$(ls -A -- "/usr/local/lsws/conf/")" ]; then
+          cp -R /usr/local/lsws/.conf/* /usr/local/lsws/conf/
+        fi
+
+        if [ -z "$(ls -A -- "/usr/local/lsws/admin/conf/")" ]; then
+          cp -R /usr/local/lsws/admin/.conf/* /usr/local/lsws/admin/conf/
+        fi
+
+        mkdir -p /var/www/vhosts/localhost/html
+
+        if [ ! -f /var/www/vhosts/localhost/html/wp-config.php ]; then
+          rm -f /var/www/vhosts/localhost/html/index.html
+
+          if [ ! -f /var/www/vhosts/localhost/html/wp-load.php ]; then
+            wp core download --path=/var/www/vhosts/localhost/html --allow-root
+          fi
+
+          until mysqladmin ping -h "$(printenv WORDPRESS_DB_HOST)" -u"$(printenv WORDPRESS_DB_USER)" -p"$(printenv WORDPRESS_DB_PASSWORD)" --silent; do
+            sleep 2
+          done
+
+          wp config create \
+            --path=/var/www/vhosts/localhost/html \
+            --dbname="$(printenv WORDPRESS_DB_NAME)" \
+            --dbuser="$(printenv WORDPRESS_DB_USER)" \
+            --dbpass="$(printenv WORDPRESS_DB_PASSWORD)" \
+            --dbhost="$(printenv WORDPRESS_DB_HOST)" \
+            --dbprefix="$(printenv WORDPRESS_TABLE_PREFIX)" \
+            --skip-check \
+            --allow-root
+        fi
+
+        chown 994:994 /usr/local/lsws/conf -R
+        chown 994:1001 /usr/local/lsws/admin/conf -R
+        chown -R 1000:1000 /var/www/vhosts/localhost/html
+
+        /usr/local/lsws/bin/lswsctrl start
+
+        while true; do
+          if ! /usr/local/lsws/bin/lswsctrl status | /usr/bin/grep 'litespeed is running with PID *' > /dev/null; then
+            break
+          fi
+          sleep 60
+        done
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+      - MYSQL_DATABASE=${WORDPRESS_DB_NAME:-wordpress}
+      - MYSQL_USER=${SERVICE_USER_WORDPRESS}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_WORDPRESS}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
