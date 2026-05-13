@@ -127,6 +127,27 @@ function format_docker_envs_to_json($rawOutput)
         return collect([]);
     }
 }
+
+function dockerNetworkCreateCommand(string $network, bool $isSwarm = false, bool $quiet = false): string
+{
+    $safeNetwork = escapeshellarg($network);
+    $redirect = $quiet ? ' >/dev/null 2>&1' : '';
+    $inspect = "docker network inspect {$safeNetwork} >/dev/null 2>&1";
+
+    if ($isSwarm) {
+        return "{$inspect} || docker network create --driver overlay --attachable {$safeNetwork}{$redirect}";
+    }
+
+    $existingNetworkCheck = $inspect;
+    if (! $quiet) {
+        $ipv6Enabled = "[ \"$(docker network inspect --format '{{.EnableIPv6}}' {$safeNetwork} 2>/dev/null)\" = \"true\" ]";
+        $ipv6Warning = "echo 'Existing Docker network does not have IPv6 enabled; recreate it to preserve IPv6 client IPs.' >&2";
+        $existingNetworkCheck = "{$inspect} && ({$ipv6Enabled} || {$ipv6Warning})";
+    }
+
+    return "{$existingNetworkCheck} || docker network create --attachable --ipv6 {$safeNetwork} >/dev/null 2>&1 || {$inspect} || docker network create --attachable {$safeNetwork}{$redirect}";
+}
+
 function checkMinimumDockerEngineVersion($dockerVersion)
 {
     $majorDockerVersion = (int) str($dockerVersion)->before('.')->value();
