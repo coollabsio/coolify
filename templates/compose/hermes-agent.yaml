@@ -1,0 +1,41 @@
+# documentation: https://hermes-agent.nousresearch.com/docs/user-guide/docker
+# slogan: Self-hosted AI agent from Nous Research, exposing an OpenAI-compatible API gateway.
+# category: ai
+# tags: ai, llm, agent, openai, openai-compatible, gateway, nous-research, hermes
+# logo: svgs/hermes-agent.svg
+# port: 8642
+
+# The bundled web dashboard is intentionally NOT enabled here: Hermes has no
+# native auth for it, so exposing it publicly leaks API keys and sessions.
+# To enable, set HERMES_DASHBOARD=1, add SERVICE_FQDN_HERMESDASHBOARD_9119,
+# and put it behind Authentik / oauth2-proxy or a VPN.
+
+services:
+  hermes-agent:
+    image: nousresearch/hermes-agent:latest
+    command: gateway run
+    environment:
+      - SERVICE_FQDN_HERMESAGENT_8642
+      - API_SERVER_ENABLED=${API_SERVER_ENABLED:-true}
+      - API_SERVER_HOST=${API_SERVER_HOST:-0.0.0.0}
+      - API_SERVER_KEY=${SERVICE_PASSWORD_64_HERMESAPIKEY}
+      - HERMES_HOME=/opt/data
+      - HERMES_UID=${HERMES_UID:-10000}
+      - HERMES_GID=${HERMES_GID:-10000}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+    volumes:
+      - hermes-data:/opt/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8642/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: ${HERMES_MEMORY_LIMIT:-4G}
+          cpus: "${HERMES_CPU_LIMIT:-2.0}"
