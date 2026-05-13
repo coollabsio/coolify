@@ -189,3 +189,27 @@ it('identifies none as not predefined (per codebase pattern)', function () {
     // only filters 'default' and 'host', so we maintain consistency
     expect(isDockerPredefinedNetwork('none'))->toBeFalse();
 });
+
+it('creates bridge networks with ipv6 fallback', function () {
+    $command = dockerNetworkCreateCommand('coolify', suppressOutput: true);
+
+    expect($command)
+        ->toContain('docker network create --ipv6 --attachable coolify >/dev/null 2>/dev/null')
+        ->toContain('|| docker network create --attachable coolify >/dev/null');
+});
+
+it('creates overlay networks with ipv6 fallback', function () {
+    $command = dockerNetworkCreateCommand('coolify-overlay', overlay: true);
+
+    expect($command)
+        ->toContain('docker network create --driver overlay --ipv6 --attachable coolify-overlay 2>/dev/null')
+        ->toContain('|| docker network create --driver overlay --attachable coolify-overlay');
+});
+
+it('shell escapes network names in network creation fallback commands', function () {
+    $command = dockerNetworkCreateCommand('custom network', suppressOutput: true);
+
+    expect($command)
+        ->toContain("docker network create --ipv6 --attachable 'custom network' >/dev/null 2>/dev/null")
+        ->toContain("|| docker network create --attachable 'custom network' >/dev/null");
+});
