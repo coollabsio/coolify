@@ -17,6 +17,8 @@
     <a class="sub-menu-item" wire:current.exact="menu-item-active" {{ wireNavigate() }}
         href="{{ route('project.service.index', $parameters) }}"><span class="menu-item-label">General</span></a>
     <a class="sub-menu-item" wire:current.exact="menu-item-active" {{ wireNavigate() }}
+        href="{{ route('project.service.index.info', $parameters) }}"><span class="menu-item-label">Container Info</span></a>
+    <a class="sub-menu-item" wire:current.exact="menu-item-active" {{ wireNavigate() }}
         href="{{ route('project.service.index.advanced', $parameters) }}"><span class="menu-item-label">Advanced</span></a>
     @if ($serviceDatabase?->isBackupSolutionAvailable() || $serviceDatabase?->is_migrated)
         <a class="sub-menu-item" wire:current.exact="menu-item-active" {{ wireNavigate() }}
