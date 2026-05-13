@@ -9,6 +9,7 @@ use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Support\ContainerInfoPresenter;
+use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -568,27 +569,74 @@ class Index extends Component
         return view('livewire.project.service.index');
     }
 
+    protected function containerInfoServer(): ?Server
+    {
+        return $this->resourceType === 'application'
+            ? $this->serviceApplication?->service?->destination?->server
+            : $this->serviceDatabase?->service?->destination?->server;
+    }
+
+    protected function containerInfoIdentifier(): ?string
+    {
+        $resourceName = $this->resourceType === 'application'
+            ? $this->serviceApplication?->name
+            : $this->serviceDatabase?->name;
+
+        if (blank($resourceName) || blank($this->service?->uuid)) {
+            return null;
+        }
+
+        return "{$resourceName}-{$this->service->uuid}";
+    }
+
+    protected function fetchContainerStatus(Server $server, string $containerName, bool $allData = false): array|string
+    {
+        return getContainerStatus($server, $containerName, $allData, false);
+    }
+
+    protected function unavailableContainerInfo(string $containerName, ?string $status = null): array
+    {
+        return [
+            'container_id' => $containerName,
+            'container_name' => $containerName,
+            'status' => $status,
+            'restart_count' => 0,
+            'networks' => [],
+        ];
+    }
+
     private function loadContainerInfo(): void
     {
-        $containerName = $this->resourceType === 'application'
-            ? "{$this->serviceApplication->name}-{$this->service->uuid}"
-            : "{$this->serviceDatabase->name}-{$this->service->uuid}";
+        $containerName = $this->containerInfoIdentifier();
+        $server = $this->containerInfoServer();
 
-        $server = $this->resourceType === 'application'
-            ? $this->serviceApplication->service->destination->server
-            : $this->serviceDatabase->service->destination->server;
+        if (! $server || blank($containerName)) {
+            $this->containerInfoError = 'Live container metadata is unavailable right now. The container could not be identified for this resource.';
+            $this->containerInfo = $this->unavailableContainerInfo('unavailable');
 
-        $inspect = getContainerStatus($server, $containerName, true, false);
+            return;
+        }
+
+        if (! ValidationPatterns::isValidContainerName($containerName)) {
+            $this->containerInfoError = 'Live container metadata is unavailable right now. The container identifier is invalid.';
+            $this->containerInfo = $this->unavailableContainerInfo($containerName);
+
+            return;
+        }
+
+        if ($server->isSwarm()) {
+            $status = $this->fetchContainerStatus($server, $containerName);
+            $this->containerInfoError = 'Live container metadata is unavailable for Docker Swarm deployments right now.';
+            $this->containerInfo = $this->unavailableContainerInfo($containerName, is_string($status) ? $status : null);
+
+            return;
+        }
+
+        $inspect = $this->fetchContainerStatus($server, $containerName, true);
 
         if (! is_array($inspect)) {
             $this->containerInfoError = 'Live container metadata is unavailable right now. The container may not exist yet or the server is unreachable.';
-            $this->containerInfo = [
-                'container_id' => $containerName,
-                'container_name' => $containerName,
-                'status' => is_string($inspect) ? $inspect : null,
-                'restart_count' => 0,
-                'networks' => [],
-            ];
+            $this->containerInfo = $this->unavailableContainerInfo($containerName, is_string($inspect) ? $inspect : null);
 
             return;
         }
