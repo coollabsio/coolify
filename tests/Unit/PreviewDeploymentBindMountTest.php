@@ -70,6 +70,13 @@ describe('sourceIsLocal', function () {
     it('returns false for named volumes', function () {
         expect(sourceIsLocal(str('myvolume')))->toBeFalse();
     });
+
+    it('detects env-var-with-default sources as local', function () {
+        // ${BASE_DIR:-$PWD}/data starts with $ and is a bind-mount path, not a named volume
+        expect(sourceIsLocal(str('${BASE_DIR:-$PWD}/data')))->toBeTrue();
+        expect(sourceIsLocal(str('${BASE_DIR:-/opt/app}/servers')))->toBeTrue();
+        expect(sourceIsLocal(str('${VOLUMES_PATH}/mysql')))->toBeTrue();
+    });
 });
 
 describe('replaceLocalSource', function () {

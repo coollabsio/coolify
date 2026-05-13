@@ -142,6 +142,29 @@ test('parseDockerVolumeString accepts environment variables with safe defaults',
     }
 });
 
+test('parseDockerVolumeString accepts env var with default and path suffix outside braces', function () {
+    // Pattern: ${VAR:-default}/sub-path:/container-path
+    // The /sub-path suffix sits OUTSIDE the ${...} braces. Docker Compose handles
+    // the variable substitution; Coolify must not strip the suffix or reject the source.
+    $volumes = [
+        '${BASE_DIR:-$PWD}/data:/app/data',
+        '${BASE_DIR:-$PWD}/servers:/app/servers',
+        '${BASE_DIR:-/opt/app}/config:/app/config:ro',
+        '${DATA_DIR:-/home/user}/db:/var/lib/db',
+    ];
+
+    foreach ($volumes as $volume) {
+        $result = parseDockerVolumeString($volume);
+        expect($result)->toBeArray();
+        expect($result['source'])->not->toBeNull();
+    }
+
+    // Verify source is preserved verbatim (not truncated at the closing brace)
+    $result = parseDockerVolumeString('${BASE_DIR:-$PWD}/data:/app/data');
+    expect($result['source']->value())->toBe('${BASE_DIR:-$PWD}/data');
+    expect($result['target']->value())->toBe('/app/data');
+});
+
 test('parseDockerVolumeString rejects injection in target path', function () {
     // While target paths are less dangerous, we should still validate them
     $maliciousVolumes = [

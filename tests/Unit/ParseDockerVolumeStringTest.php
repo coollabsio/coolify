@@ -86,6 +86,28 @@ test('parses volumes with environment variables', function () {
     expect($result['mode']->value())->toBe('ro');
 });
 
+test('parses env var with default and path suffix outside braces', function () {
+    // ${BASE_DIR:-$PWD}/data:/app/data — the /data suffix is OUTSIDE the braces.
+    // Coolify must preserve the full source (including /data) so Docker Compose
+    // can resolve the variable and append the suffix at runtime.
+    $result = parseDockerVolumeString('${BASE_DIR:-$PWD}/data:/app/data');
+    expect($result['source']->value())->toBe('${BASE_DIR:-$PWD}/data');
+    expect($result['target']->value())->toBe('/app/data');
+    expect($result['mode'])->toBeNull();
+
+    // With a servers sub-path
+    $result = parseDockerVolumeString('${BASE_DIR:-$PWD}/servers:/app/servers');
+    expect($result['source']->value())->toBe('${BASE_DIR:-$PWD}/servers');
+    expect($result['target']->value())->toBe('/app/servers');
+    expect($result['mode'])->toBeNull();
+
+    // With a mode flag
+    $result = parseDockerVolumeString('${BASE_DIR:-/opt/app}/config:/app/config:ro');
+    expect($result['source']->value())->toBe('${BASE_DIR:-/opt/app}/config');
+    expect($result['target']->value())->toBe('/app/config');
+    expect($result['mode']->value())->toBe('ro');
+});
+
 test('parses Windows paths', function () {
     // Windows absolute path
     $result = parseDockerVolumeString('C:/Users/data:/data');
