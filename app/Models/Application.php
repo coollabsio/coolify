@@ -1514,6 +1514,7 @@ class Application extends BaseModel
         // Check if shallow clone is enabled
         $isShallowCloneEnabled = $this->settings?->is_git_shallow_clone_enabled ?? false;
         $depthFlag = $isShallowCloneEnabled ? ' --depth=1' : '';
+        $httpVersionFlag = ' -c http.version=HTTP/1.1';
 
         $submoduleFlags = '';
         if ($this->settings->is_git_submodules_enabled) {
@@ -1523,9 +1524,9 @@ class Application extends BaseModel
             }
         }
 
-        $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} -b {$escapedBranch}";
+        $git_clone_command = "git{$httpVersionFlag} clone{$depthFlag}{$submoduleFlags} -b {$escapedBranch}";
         if ($only_checkout) {
-            $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} --no-checkout -b {$escapedBranch}";
+            $git_clone_command = "git{$httpVersionFlag} clone{$depthFlag}{$submoduleFlags} --no-checkout -b {$escapedBranch}";
         }
         if ($pull_request_id !== 0) {
             $pr_branch_name = "pr-{$pull_request_id}-coolify";
