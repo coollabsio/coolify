@@ -111,8 +111,18 @@
             return logsContainer.contains(range.commonAncestorContainer);
         },
         decodeHtml(text) {
-            const doc = new DOMParser().parseFromString(text, 'text/html');
-            return doc.documentElement.textContent;
+            let decoded = text;
+            let prev = '';
+            let iterations = 0;
+            const maxIterations = 3;
+
+            while (decoded !== prev && iterations < maxIterations) {
+                prev = decoded;
+                const doc = new DOMParser().parseFromString(decoded, 'text/html');
+                decoded = doc.documentElement.textContent;
+                iterations++;
+            }
+            return decoded;
         },
         applySearch() {
             const logs = document.getElementById('logs');
