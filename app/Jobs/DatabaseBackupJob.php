@@ -276,7 +276,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 } elseif (str($databaseType)->contains('mongo')) {
                     $databasesToBackup = ['*'];
-                    $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName.'-'.$this->container_name;
 
                     // Try to extract MongoDB credentials from environment variables

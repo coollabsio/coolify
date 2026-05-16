@@ -41,7 +41,7 @@ class StartDatabaseProxy
                     $application = $database->application;
                     $network = data_get($application, 'destination.network');
                     $server = data_get($application, 'destination.server');
-                    $compose = \Symfony\Component\Yaml\Yaml::parse($application?->docker_compose ?: '') ?: [];
+                    $compose = Yaml::parse($application?->docker_compose ?: '') ?: [];
                     $containerName = data_get($compose, 'services.' . $database->name . '.container_name');
                     if (! $containerName) {
                         $containerName = "{$database->name}-" . generateApplicationContainerName($application);
@@ -51,7 +51,7 @@ class StartDatabaseProxy
                     $application = $preview?->application;
                     $network = data_get($application, 'destination.network');
                     $server = data_get($application, 'destination.server');
-                    $compose = \Symfony\Component\Yaml\Yaml::parse($application?->docker_compose ?: '') ?: [];
+                    $compose = Yaml::parse($application?->docker_compose ?: '') ?: [];
                     $containerName = data_get($compose, 'services.' . $database->name . '.container_name');
                     if (! $containerName) {
                         $containerName = $preview && $application

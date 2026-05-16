@@ -103,16 +103,7 @@ class ScheduledDatabaseBackup extends BaseModel
         if ($this->database) {
             $server = null;
             if ($this->database instanceof ServiceDatabase) {
-                if ($this->database->service_id) {
-                    $destination = data_get($this->database->service, 'destination');
-                    $server = data_get($destination, 'server');
-                } elseif ($this->database->application_id) {
-                    $destination = data_get($this->database->application, 'destination');
-                    $server = data_get($destination, 'server');
-                } elseif ($this->database->application_preview_id) {
-                    $destination = data_get($this->database->application_preview?->application, 'destination');
-                    $server = data_get($destination, 'server');
-                }
+                $server = $this->database->server;
             } else {
                 $destination = data_get($this->database, 'destination');
                 $server = data_get($destination, 'server');

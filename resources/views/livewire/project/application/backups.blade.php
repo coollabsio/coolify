@@ -18,7 +18,7 @@
                         <h4 class="text-lg font-semibold text-white">Scheduled Backups</h4>
                         @can('update', $database)
                             <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup" canGate="update" :canResource="$database">
-                                <livewire:project.database.create-scheduled-backup :database="$database" />
+                                <livewire:project.database.create-scheduled-backup :database="$database" :key="'create-scheduled-backup-'.$database->id" />
                             </x-modal-input>
                         @endcan
                     </div>

@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Symfony\Component\Yaml\Yaml;
 
 class ServiceDatabase extends BaseModel
 {
@@ -91,21 +93,40 @@ class ServiceDatabase extends BaseModel
 
     public function restart()
     {
-        $server = null;
-        $container_id = null;
-        if ($this->service_id) {
-            $container_id = $this->name.'-'.$this->service->uuid;
-            $server = $this->service->server;
-        } elseif ($this->application_id) {
-            $container_id = generateApplicationContainerName($this->application);
-            $server = $this->application->destination->server;
-        } elseif ($this->application_preview_id) {
-            $container_id = generateApplicationContainerName($this->application_preview->application, $this->application_preview->pull_request_id);
-            $server = $this->application_preview->application->destination->server;
-        }
+        $server = $this->server;
+        $container_id = $this->resolveContainerName();
+
         if ($container_id && $server) {
             remote_process(["docker restart {$container_id}"], $server);
         }
+    }
+
+    public function resolveContainerName(): ?string
+    {
+        if ($this->service_id) {
+            return $this->name.'-'.$this->service->uuid;
+        }
+
+        if ($this->application_id) {
+            $application = $this->application;
+            $compose = Yaml::parse($application?->docker_compose ?: '') ?: [];
+            $containerName = data_get($compose, 'services.'.$this->name.'.container_name');
+
+            return $containerName ?: "{$this->name}-".generateApplicationContainerName($application);
+        }
+
+        if ($this->application_preview_id) {
+            $preview = $this->application_preview;
+            $application = $preview?->application;
+            $compose = Yaml::parse($application?->docker_compose ?: '') ?: [];
+            $containerName = data_get($compose, 'services.'.$this->name.'.container_name');
+
+            return $containerName ?: ($preview && $application
+                ? "{$this->name}-".generateApplicationContainerName($application, $preview->pull_request_id)
+                : null);
+        }
+
+        return null;
     }
 
     public function getServerAttribute(): ?Server
@@ -234,12 +255,12 @@ class ServiceDatabase extends BaseModel
         return $this->belongsTo(Service::class);
     }
 
-    public function application()
+    public function application(): BelongsTo
     {
         return $this->belongsTo(Application::class);
     }
 
-    public function application_preview()
+    public function application_preview(): BelongsTo
     {
         return $this->belongsTo(ApplicationPreview::class);
     }
