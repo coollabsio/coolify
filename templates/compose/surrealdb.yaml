@@ -1,0 +1,28 @@
+# documentation: https://surrealdb.com/docs
+# slogan: The ultimate multi-model cloud database for tomorrow's applications — document, graph, and SQL in one.
+# category: database
+# tags: database, surrealdb, multi-model, graph, document, sql, nosql, newsql, rocksdb
+# logo: svgs/surrealdb.svg
+# port: 8000
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    user: "0:0"
+    environment:
+      - SERVICE_URL_SURREALDB_8000
+      - SURREAL_USER=${SURREAL_USER:-root}
+      - SURREAL_PASS=${SURREAL_PASS:-root}
+      - SURREAL_LOG=${SURREAL_LOG:-info}
+      - SURREAL_PATH=${SURREAL_PATH:-rocksdb:/data/mydatabase.db}
+    volumes:
+      - surrealdb-data:/data
+    command:
+      - start
+      - --log
+      - ${SURREAL_LOG:-info}
+      - --user
+      - ${SURREAL_USER:-root}
+      - --pass
+      - ${SURREAL_PASS:-root}
+      - ${SURREAL_PATH:-rocksdb:/data/mydatabase.db}
