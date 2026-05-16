@@ -64,6 +64,23 @@
                 <div class="pt-4">
                     <h3 class="pb-2">Change Git Source</h3>
                     <div class="grid grid-cols-1 gap-2">
+                        @if ($application->source_id)
+                            <div>
+                                <x-modal-confirmation title="Switch to Public Repository"
+                                    :actions="['The application will no longer use a GitHub App or deploy key.', 'Make sure the repository is publicly accessible before redeploying.']"
+                                    :buttonFullWidth="true"
+                                    submitAction="switchToPublic"
+                                    :confirmWithText="false" :confirmWithPassword="false"
+                                    step2ButtonText="Switch to Public">
+                                    <x-slot:customButton>
+                                        <div class="flex items-center gap-2">
+                                            <div class="box-title">Public Repository</div>
+                                            <div class="box-description">No GitHub App or deploy key</div>
+                                        </div>
+                                    </x-slot:customButton>
+                                </x-modal-confirmation>
+                            </div>
+                        @endif
                         @forelse ($sources as $source)
                             <div wire:key="{{ $source->name }}">
                                 <x-modal-confirmation title="Change Git Source" :actions="['Change git source to ' . $source->name]" :buttonFullWidth="true"
@@ -88,7 +105,9 @@
                                 </x-modal-confirmation>
                             </div>
                         @empty
-                            <div>No other sources found</div>
+                            @if (!$application->source_id)
+                                <div>No other sources found</div>
+                            @endif
                         @endforelse
                     </div>
                 </div>

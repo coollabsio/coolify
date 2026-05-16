@@ -8,20 +8,21 @@
                         <x-forms.button canGate="update" :canResource="$github_app" type="submit">Save</x-forms.button>
                     @endif
                     @can('delete', $github_app)
-                        @if ($applications->count() > 0)
-                            <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
-                                submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']" confirmationText="{{ data_get($github_app, 'name') }}"
-                                confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                                shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
-                                step2ButtonText="Permanently Delete" />
-                        @else
-                            <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
-                                submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']"
-                                confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                                shortConfirmationLabel="GitHub App Name"
-                                confirmationText="{{ data_get($github_app, 'name') }}" :confirmWithPassword="false"
-                                step2ButtonText="Permanently Delete" />
-                        @endif
+                        @php
+                            $deleteActions = ['The selected GitHub App will be permanently deleted.'];
+                            if ($applications->count() > 0) {
+                                $deleteActions[] = $applications->count() . ' application(s) will be disconnected from their source and will need to be reconfigured:';
+                                foreach ($applications as $linkedApp) {
+                                    $deleteActions[] = '→ ' . $linkedApp->name;
+                                }
+                            }
+                        @endphp
+                        <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
+                            submitAction="delete" :actions="$deleteActions"
+                            confirmationText="{{ data_get($github_app, 'name') }}"
+                            confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
+                            shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
+                            step2ButtonText="Permanently Delete" />
                     @endcan
                 </div>
             </div>
@@ -208,8 +209,18 @@
             <h1>GitHub App</h1>
             <div class="flex gap-2">
                 @can('delete', $github_app)
+                    @php
+                        $deleteActions = ['The selected GitHub App will be permanently deleted.'];
+                        if ($applications->count() > 0) {
+                            $deleteActions[] = $applications->count() . ' application(s) will be disconnected from their source and will need to be reconfigured:';
+                            foreach ($applications as $linkedApp) {
+                                $deleteActions[] = '→ ' . $linkedApp->name;
+                            }
+                        }
+                    @endphp
                     <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
-                        submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']" confirmationText="{{ data_get($github_app, 'name') }}"
+                        submitAction="delete" :actions="$deleteActions"
+                        confirmationText="{{ data_get($github_app, 'name') }}"
                         confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
                         shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
                         step2ButtonText="Permanently Delete" />

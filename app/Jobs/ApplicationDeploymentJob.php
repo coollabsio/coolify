@@ -1184,6 +1184,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry("Image not found ({$this->production_image_name}). Building new image.");
         }
         if ($this->restart_only) {
+            $this->application_deployment_queue->addLogEntry("Image not found locally or in registry. Falling back to full redeploy to rebuild it.");
             $this->restart_only = false;
             $this->decide_what_to_do();
         }

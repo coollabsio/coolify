@@ -44,14 +44,12 @@ class GithubApp extends BaseModel
     protected static function booted(): void
     {
         static::deleting(function (GithubApp $github_app) {
-            $applications_count = Application::where('source_id', $github_app->id)->count();
-            if ($applications_count > 0) {
-                throw new \Exception('You cannot delete this GitHub App because it is in use by '.$applications_count.' application(s). Delete them first.');
-            }
+            Application::where('source_id', $github_app->id)
+                ->where('source_type', $github_app->getMorphClass())
+                ->update(['source_id' => null, 'source_type' => null]);
 
             $privateKey = $github_app->privateKey;
             if ($privateKey) {
-                // Check if key is used by anything EXCEPT this GitHub app
                 $isUsedElsewhere = $privateKey->servers()->exists()
                     || $privateKey->applications()->exists()
                     || $privateKey->githubApps()->where('id', '!=', $github_app->id)->exists()
@@ -59,7 +57,6 @@ class GithubApp extends BaseModel
 
                 if (! $isUsedElsewhere) {
                     $privateKey->delete();
-                } else {
                 }
             }
         });

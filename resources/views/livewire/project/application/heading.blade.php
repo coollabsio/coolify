@@ -55,8 +55,8 @@
                                         Update Service
                                     </div>
                                 @else
-                                    <div class="dropdown-item dropdown-item-touch" wire:click='restart'>
-                                        Restart
+                                    <div class="dropdown-item dropdown-item-touch" wire:click='restart' title="Restart without git pull or rebuild">
+                                        Restart (no rebuild)
                                     </div>
                                 @endif
                             @endif

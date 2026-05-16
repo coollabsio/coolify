@@ -129,6 +129,26 @@ class Source extends Component
         }
     }
 
+    public function switchToPublic()
+    {
+        try {
+            $this->authorize('update', $this->application);
+            $this->application->update([
+                'source_id' => null,
+                'source_type' => null,
+                'private_key_id' => null,
+            ]);
+            $this->application->refresh();
+            $this->syncData(false);
+            $this->privateKeyId = null;
+            $this->privateKeyName = null;
+            $this->getSources();
+            $this->dispatch('success', 'Switched to public repository.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function changeSource($sourceId, $sourceType)
     {
 

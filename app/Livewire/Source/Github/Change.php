@@ -373,13 +373,6 @@ class Change extends Component
     {
         try {
             $this->authorize('delete', $this->github_app);
-
-            if ($this->github_app->applications->isNotEmpty()) {
-                $this->dispatch('error', 'This source is being used by an application. Please delete all applications first.');
-                $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
-
-                return;
-            }
             $this->github_app->delete();
 
             return redirect()->route('source.all');
