@@ -1978,6 +1978,25 @@
         "logo": "svgs/heimdall.svg",
         "minversion": "0.0.0"
     },
+    "hermes-agent": {
+        "documentation": "https://github.com/nesquena/hermes-webui?utm_source=coolify.io",
+        "slogan": "Hermes Agent \u2014 autonomous AI agent with persistent memory, scheduling, and a self-hosted web chat UI.",
+        "compose": "c2VydmljZXM6CiAgaGVybWVzLWFnZW50OgogICAgaW1hZ2U6ICdub3VzcmVzZWFyY2gvaGVybWVzLWFnZW50OmxhdGVzdCcKICAgIGNvbW1hbmQ6ICdnYXRld2F5IHJ1bicKICAgIGVudmlyb25tZW50OgogICAgICAtIEhFUk1FU19IT01FPS9ob21lL2hlcm1lcy8uaGVybWVzCiAgICAgIC0gSEVSTUVTX1VJRD0xMDAwCiAgICAgIC0gSEVSTUVTX0dJRD0xMDAwCiAgICAgIC0gJ09QRU5ST1VURVJfQVBJX0tFWT0ke09QRU5ST1VURVJfQVBJX0tFWX0nCiAgICAgIC0gJ0FOVEhST1BJQ19BUElfS0VZPSR7QU5USFJPUElDX0FQSV9LRVl9JwogICAgICAtICdPUEVOQUlfQVBJX0tFWT0ke09QRU5BSV9BUElfS0VZfScKICAgICAgLSAnR09PR0xFX0FQSV9LRVk9JHtHT09HTEVfQVBJX0tFWX0nCiAgICB2b2x1bWVzOgogICAgICAtICdoZXJtZXMtaG9tZTovaG9tZS9oZXJtZXMvLmhlcm1lcycKICAgICAgLSAnaGVybWVzLWFnZW50LXNyYzovb3B0L2hlcm1lcycKICAgIHJlc3RhcnQ6IHVubGVzcy1zdG9wcGVkCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ3Rlc3QgLWQgL2hvbWUvaGVybWVzLy5oZXJtZXMgfHwgZXhpdCAxJwogICAgICBpbnRlcnZhbDogMTBzCiAgICAgIHRpbWVvdXQ6IDVzCiAgICAgIHJldHJpZXM6IDUKICBoZXJtZXMtd2VidWk6CiAgICBpbWFnZTogJ2doY3IuaW8vbmVzcXVlbmEvaGVybWVzLXdlYnVpOmxhdGVzdCcKICAgIGRlcGVuZHNfb246CiAgICAgIC0gaGVybWVzLWFnZW50CiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fSEVSTUVTV0VCVUlfODc4NwogICAgICAtIEhFUk1FU19XRUJVSV9IT1NUPTAuMC4wLjAKICAgICAgLSBIRVJNRVNfV0VCVUlfUE9SVD04Nzg3CiAgICAgIC0gSEVSTUVTX1dFQlVJX1NUQVRFX0RJUj0vaG9tZS9oZXJtZXN3ZWJ1aS8uaGVybWVzL3dlYnVpCiAgICAgIC0gV0FOVEVEX1VJRD0xMDAwCiAgICAgIC0gV0FOVEVEX0dJRD0xMDAwCiAgICAgIC0gJ0hFUk1FU19XRUJVSV9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfSEVSTUVTV0VCVUl9JwogICAgdm9sdW1lczoKICAgICAgLSAnaGVybWVzLWhvbWU6L2hvbWUvaGVybWVzd2VidWkvLmhlcm1lcycKICAgICAgLSAnaGVybWVzLWFnZW50LXNyYzovaG9tZS9oZXJtZXN3ZWJ1aS8uaGVybWVzL2hlcm1lcy1hZ2VudCcKICAgICAgLSAnaGVybWVzLXdvcmtzcGFjZTovd29ya3NwYWNlJwogICAgcmVzdGFydDogdW5sZXNzLXN0b3BwZWQKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo4Nzg3L2hlYWx0aCcKICAgICAgaW50ZXJ2YWw6IDMwcwogICAgICB0aW1lb3V0OiA1cwogICAgICByZXRyaWVzOiAzCnZvbHVtZXM6CiAgaGVybWVzLWhvbWU6IG51bGwKICBoZXJtZXMtYWdlbnQtc3JjOiBudWxsCiAgaGVybWVzLXdvcmtzcGFjZTogbnVsbAo=",
+        "tags": [
+            "ai",
+            "agent",
+            "llm",
+            "chatbot",
+            "hermes",
+            "openrouter",
+            "anthropic",
+            "openai"
+        ],
+        "category": "ai",
+        "logo": "svgs/default.webp",
+        "minversion": "0.0.0",
+        "port": "8787"
+    },
     "heyform": {
         "documentation": "https://docs.heyform.net/open-source/self-hosting?utm_source=coolify.io",
         "slogan": "Allows anyone to create engaging conversational forms for surveys, questionnaires, quizzes, and polls. No coding skills required.",

@@ -1,0 +1,74 @@
+# documentation: https://github.com/nesquena/hermes-webui
+# slogan: Hermes Agent — autonomous AI agent with persistent memory, scheduling, and a self-hosted web chat UI.
+# category: ai
+# tags: ai, agent, llm, chatbot, hermes, openrouter, anthropic, openai
+# logo: svgs/default.webp
+# port: 8787
+
+# NOTE: Hermes uses an embedded SQLite store (state.db / kanban.db / sessions.db)
+# inside HERMES_HOME — no external database service is required. The named
+# volume `hermes-home` persists it across deploys. Do NOT point hermes-home at
+# an NFS/SMB/FUSE-backed volume: SQLite WAL mode is unreliable there and every
+# session/kanban feature breaks. Coolify's default local Docker volume is fine.
+
+services:
+  hermes-agent:
+    image: nousresearch/hermes-agent:latest
+    command: gateway run
+    environment:
+      - HERMES_HOME=/home/hermes/.hermes
+      # Align with WebUI's WANTED_UID/GID so files in the shared volume stay readable.
+      - HERMES_UID=1000
+      - HERMES_GID=1000
+      # Provider keys — set at least one in the Coolify UI. Hermes defaults to
+      # OpenRouter; the others are optional alternative providers.
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    volumes:
+      # Config, sessions, skills, memory + the SQLite databases. Shared with WebUI.
+      - hermes-home:/home/hermes/.hermes
+      # Agent source — WebUI installs the agent's Python deps from here at startup.
+      - hermes-agent-src:/opt/hermes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "test -d /home/hermes/.hermes || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hermes-webui:
+    image: ghcr.io/nesquena/hermes-webui:latest
+    depends_on:
+      - hermes-agent
+    environment:
+      # Coolify generates an HTTPS domain + Traefik route to this service:8787.
+      - SERVICE_FQDN_HERMESWEBUI_8787
+      - HERMES_WEBUI_HOST=0.0.0.0
+      - HERMES_WEBUI_PORT=8787
+      - HERMES_WEBUI_STATE_DIR=/home/hermeswebui/.hermes/webui
+      - WANTED_UID=1000
+      - WANTED_GID=1000
+      # Password auth is mandatory because the UI is exposed on a public domain.
+      # Coolify auto-generates this secret (visible in the UI after deploy).
+      - HERMES_WEBUI_PASSWORD=${SERVICE_PASSWORD_HERMESWEBUI}
+    volumes:
+      # Same HERMES_HOME as the agent — shared config, sessions, SQLite store.
+      - hermes-home:/home/hermeswebui/.hermes
+      # Agent source mounted where docker_init.bash expects it; the WebUI runs
+      # `uv pip install` against it on startup.
+      - hermes-agent-src:/home/hermeswebui/.hermes/hermes-agent
+      # Workspace browsed/edited from the WebUI file panel.
+      - hermes-workspace:/workspace
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8787/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  hermes-home:
+  hermes-agent-src:
+  hermes-workspace:
