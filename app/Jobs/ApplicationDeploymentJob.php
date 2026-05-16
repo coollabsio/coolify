@@ -1131,20 +1131,27 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $this->application_deployment_queue->addLogEntry("Restarting {$this->customRepository}:{$this->application->git_branch} on {$this->server->name}.");
 
-        // Restart doesn't need the build server — disable it so the helper container
-        // is created on the deployment server with the correct network/flags.
+        $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+        $runningContainers = $containers->filter(fn ($c) => data_get($c, 'State') === 'running');
+
+        if ($runningContainers->isNotEmpty()) {
+            $names = $runningContainers->map(fn ($c) => data_get($c, 'Names'))->implode(' ');
+            $this->application_deployment_queue->addLogEntry("Restarting container(s): {$names}.");
+            $this->execute_remote_command(["docker restart {$names}"]);
+            $this->application_deployment_queue->addLogEntry('Restart completed.');
+            $this->completeDeployment();
+
+            return;
+        }
+
+        $this->application_deployment_queue->addLogEntry('No running containers found. Attempting to start from existing image.');
         $originalUseBuildServer = $this->use_build_server;
         $this->use_build_server = false;
-
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->generate_image_names();
         $this->check_image_locally_or_remotely();
-
-        // Restore before should_skip_build() — it may re-enter decide_what_to_do()
-        // for a full rebuild which needs the build server.
         $this->use_build_server = $originalUseBuildServer;
-
         $this->should_skip_build();
         $this->completeDeployment();
     }
@@ -1184,7 +1191,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry("Image not found ({$this->production_image_name}). Building new image.");
         }
         if ($this->restart_only) {
-            $this->application_deployment_queue->addLogEntry("Image not found locally or in registry. Falling back to full redeploy to rebuild it.");
             $this->restart_only = false;
             $this->decide_what_to_do();
         }
