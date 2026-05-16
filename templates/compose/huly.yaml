@@ -1,123 +1,234 @@
-# ignore: true
-# documentation: https://huly.io/
-# category: cms
-# slogan: Open Source All-in-One Project Management Platform
-# tags: linear,jira,slack,project,management,notion,motion
-# port: 8080
+# documentation: https://docs.huly.io/self-host
+# slogan: Huly is an open-source project management platform, an alternative to Jira/Linear/Notion.
+# category: project-management
+# tags: project-management,jira,linear,notion,team-collaboration,task-tracking
+# logo: svgs/huly.svg
+# port: 8087
 
 services:
-  mongodb:
-    image: "mongo:7-jammy"
-    container_name: mongodb
+  cockroach:
+    image: cockroachdb/cockroach:latest-v24.2
+    command: start-single-node --accept-sql-without-tls
     environment:
-      - PUID=1000
-      - PGID=1000
+      - COCKROACH_DATABASE=${CR_DATABASE:-huly}
+      - COCKROACH_USER=${CR_USERNAME:-huly}
+      - COCKROACH_PASSWORD=$SERVICE_PASSWORD_COCKROACH
     volumes:
-      - huly-db:/data/db
+      - cr_data:/cockroach/cockroach-data
+      - cr_certs:/cockroach/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.3.6
+    command:
+      - redpanda
+      - start
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+      - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
+      - --advertise-pandaproxy-addr internal://redpanda:8082,external://localhost:18082
+      - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:18081
+      - --rpc-addr redpanda:33145
+      - --advertise-rpc-addr redpanda:33145
+      - --mode dev-container
+      - --smp 1
+      - --default-log-level=info
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "info"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   minio:
-    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
+    image: minio/minio
     command: server /data --address ":9000" --console-address ":9001"
     volumes:
-      - huly-files:/data      
+      - minio_data:/data
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s
-      timeout: 20s
       retries: 10
+    restart: unless-stopped
+
   elastic:
-    image: "elasticsearch:7.14.2"
-    command: |
+    image: elasticsearch:7.14.2
+    command: >
       /bin/sh -c "./bin/elasticsearch-plugin list | grep -q ingest-attachment || yes | ./bin/elasticsearch-plugin install --silent ingest-attachment;
       /usr/local/bin/docker-entrypoint.sh eswrapper"
     volumes:
-      - huly-elastic:/usr/share/elasticsearch/data
+      - elastic_data:/usr/share/elasticsearch/data
     environment:
-      - ELASTICSEARCH_PORT_NUMBER=9200
-      - BITNAMI_DEBUG=true
       - discovery.type=single-node
       - ES_JAVA_OPTS=-Xms1024m -Xmx1024m
       - http.cors.enabled=true
       - http.cors.allow-origin=http://localhost:8082
+      - xpack.security.enabled=false
     healthcheck:
-      test: curl -s http://127.0.0.1:9200/_cluster/health | grep -vq '"status":"red"'
-      interval: 5s
+      test: ["CMD", "curl", "-s", "http://localhost:9200/_cluster/health"]
+      interval: 20s
       retries: 10
-  account:
-    image: hardcoreeng/account:v0.6.246
-    environment:
-      - SERVICE_URL_HULY_3000
-      - SERVER_PORT=3000
-      - SERVER_SECRET=$SERVICE_PASSWORD_SECRET
-      - MONGO_URL=mongodb://mongodb:27017
-      - TRANSACTOR_URL=ws://transactor:3333
-      - ENDPOINT_URL=ws://transactor:3333
-      - MINIO_ENDPOINT=minio
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - FRONT_URL=http://front:8080
-      - INIT_WORKSPACE=demo-tracker
-      - MODEL_ENABLED=*
-      - ACCOUNTS_URL=http://localhost:3000
-  front:
-    image: hardcoreeng/front:v0.6.246
-    environment:
-      - SERVICE_URL_HULY_8080
-      - MONGO_URL=mongodb://mongodb:27017
-      - SERVER_PORT=8080
-      - SERVER_SECRET=$SERVICE_PASSWORD_SECRET
-      - ACCOUNTS_URL=http://account:3000
-      - REKONI_URL=http://rekoni:4004
-      - CALENDAR_URL=http://localhost:8095
-      - GMAIL_URL=http://localhost:8088
-      - TELEGRAM_URL=http://localhost:8086
-      - UPLOAD_URL=/files
-      - TRANSACTOR_URL=ws://transactor:3333
-      - ELASTIC_URL=http://elastic:9200
-      - COLLABORATOR_URL=ws://collaborator:3078
-      - COLLABORATOR_API_URL=http://collaborator:3078
-      - MINIO_ENDPOINT=minio
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - TITLE=Huly Self Hosted
-      - DEFAULT_LANGUAGE=en
-      - LAST_NAME_FIRST=true
     restart: unless-stopped
-  collaborator:
-    image: hardcoreeng/collaborator:v0.6.246
-    environment:
-      - COLLABORATOR_PORT=3078
-      - SECRET=secret
-      - ACCOUNTS_URL=http://account:3000
-      - TRANSACTOR_URL=ws://transactor:3333
-      - UPLOAD_URL=/files
-      - MONGO_URL=mongodb://mongodb:27017
-      - MINIO_ENDPOINT=minio
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-  transactor:
-    image: hardcoreeng/transactor:v0.6.246
-    environment:
-      - SERVER_PORT=3333
-      - ELASTIC_INDEX_NAME=huly
-      - SERVER_SECRET=$SERVICE_PASSWORD_SECRET
-      - SERVER_CURSOR_MAXTIMEMS=30000
-      - ELASTIC_URL=http://elastic:9200
-      - MONGO_URL=mongodb://mongodb:27017
-      - METRICS_CONSOLE=false
-      - METRICS_FILE=metrics.txt
-      - MINIO_ENDPOINT=minio
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - REKONI_URL=http://rekoni:4004
-      - FRONT_URL=http://localhost:8087
-      - SERVER_PROVIDER=ws
-      - ACCOUNTS_URL=http://account:3000
-      - LAST_NAME_FIRST=true
-      - UPLOAD_URL=/files
-    restart: unless-stopped
+
   rekoni:
-    image: hardcoreeng/rekoni-service:latest
+    image: hardcoreeng/rekoni-service:${HULY_VERSION:-latest}
+    environment:
+      - SECRET=$SERVICE_PASSWORD_REKONI
     deploy:
       resources:
         limits:
           memory: 500M
+    restart: unless-stopped
+
+  transactor:
+    image: hardcoreeng/transactor:${HULY_VERSION:-latest}
+    depends_on:
+      cockroach:
+        condition: service_started
+      redpanda:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    environment:
+      - SERVER_PORT=3333
+      - SERVER_SECRET=$SERVICE_PASSWORD_TRANSACTOR
+      - DB_URL=postgresql://${CR_USERNAME:-huly}:$SERVICE_PASSWORD_COCKROACH@cockroach:26257/${CR_DATABASE:-huly}?sslmode=disable
+      - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=$SERVICE_PASSWORD_MINIO
+      - FRONT_URL=$SERVICE_FQDN_FRONT_8087
+      - ACCOUNTS_URL=http://account:3000
+      - FULLTEXT_URL=http://fulltext:4700
+      - STATS_URL=http://stats:4900
+      - LAST_NAME_FIRST=${LAST_NAME_FIRST:-true}
+      - QUEUE_CONFIG=redpanda:9092
+    restart: unless-stopped
+
+  collaborator:
+    image: hardcoreeng/collaborator:${HULY_VERSION:-latest}
+    environment:
+      - COLLABORATOR_PORT=3078
+      - SECRET=$SERVICE_PASSWORD_TRANSACTOR
+      - ACCOUNTS_URL=http://account:3000
+      - STATS_URL=http://stats:4900
+      - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=$SERVICE_PASSWORD_MINIO
+    restart: unless-stopped
+
+  account:
+    image: hardcoreeng/account:${HULY_VERSION:-latest}
+    depends_on:
+      cockroach:
+        condition: service_started
+      transactor:
+        condition: service_started
+    environment:
+      - SERVER_PORT=3000
+      - SERVER_SECRET=$SERVICE_PASSWORD_TRANSACTOR
+      - DB_URL=postgresql://${CR_USERNAME:-huly}:$SERVICE_PASSWORD_COCKROACH@cockroach:26257/${CR_DATABASE:-huly}?sslmode=disable
+      - TRANSACTOR_URL=ws://transactor:3333
+      - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=$SERVICE_PASSWORD_MINIO
+      - FRONT_URL=$SERVICE_FQDN_FRONT_8087
+      - STATS_URL=$SERVICE_FQDN_FRONT_8087/_stats
+      - MODEL_ENABLED=*
+      - ACCOUNTS_URL=$SERVICE_FQDN_FRONT_8087/_accounts
+      - ACCOUNT_PORT=3000
+      - QUEUE_CONFIG=redpanda:9092
+    restart: unless-stopped
+
+  workspace:
+    image: hardcoreeng/workspace:${HULY_VERSION:-latest}
+    depends_on:
+      cockroach:
+        condition: service_started
+      transactor:
+        condition: service_started
+    environment:
+      - SERVER_SECRET=$SERVICE_PASSWORD_TRANSACTOR
+      - DB_URL=postgresql://${CR_USERNAME:-huly}:$SERVICE_PASSWORD_COCKROACH@cockroach:26257/${CR_DATABASE:-huly}?sslmode=disable
+      - TRANSACTOR_URL=ws://transactor:3333
+      - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=$SERVICE_PASSWORD_MINIO
+      - MODEL_ENABLED=*
+      - ACCOUNTS_URL=http://account:3000
+      - STATS_URL=http://stats:4900
+      - QUEUE_CONFIG=redpanda:9092
+      - ACCOUNTS_DB_URL=postgresql://${CR_USERNAME:-huly}:$SERVICE_PASSWORD_COCKROACH@cockroach:26257/${CR_DATABASE:-huly}?sslmode=disable
+    restart: unless-stopped
+
+  front:
+    image: hardcoreeng/front:${HULY_VERSION:-latest}
+    depends_on:
+      account:
+        condition: service_started
+      workspace:
+        condition: service_started
+    environment:
+      - SERVER_PORT=8080
+      - SERVER_SECRET=$SERVICE_PASSWORD_TRANSACTOR
+      - LOVE_ENDPOINT=$SERVICE_FQDN_FRONT_8087/_love
+      - ACCOUNTS_URL=$SERVICE_FQDN_FRONT_8087/_accounts
+      - ACCOUNTS_URL_INTERNAL=http://account:3000
+      - REKONI_URL=$SERVICE_FQDN_FRONT_8087/_rekoni
+      - CALENDAR_URL=$SERVICE_FQDN_FRONT_8087/_calendar
+      - GMAIL_URL=$SERVICE_FQDN_FRONT_8087/_gmail
+      - TELEGRAM_URL=$SERVICE_FQDN_FRONT_8087/_telegram
+      - STATS_URL=$SERVICE_FQDN_FRONT_8087/_stats
+      - UPLOAD_URL=/files
+      - ELASTIC_URL=http://elastic:9200
+      - COLLABORATOR_URL=ws://collaborator:3078
+      - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=$SERVICE_PASSWORD_MINIO
+      - TITLE=${TITLE:-Huly Self Host}
+      - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-en}
+      - LAST_NAME_FIRST=${LAST_NAME_FIRST:-true}
+      - DISABLED_FEATURES=auto-translate,mailboxes
+    restart: unless-stopped
+
+  fulltext:
+    image: hardcoreeng/fulltext:${HULY_VERSION:-latest}
+    depends_on:
+      elastic:
+        condition: service_healthy
+      cockroach:
+        condition: service_started
+    environment:
+      - SERVER_SECRET=$SERVICE_PASSWORD_TRANSACTOR
+      - DB_URL=postgresql://${CR_USERNAME:-huly}:$SERVICE_PASSWORD_COCKROACH@cockroach:26257/${CR_DATABASE:-huly}?sslmode=disable
+      - FULLTEXT_DB_URL=http://elastic:9200
+      - ELASTIC_INDEX_NAME=huly_storage_index
+      - STORAGE_CONFIG=minio|minio?accessKey=minioadmin&secretKey=$SERVICE_PASSWORD_MINIO
+      - REKONI_URL=http://rekoni:4004
+      - ACCOUNTS_URL=http://account:3000
+      - STATS_URL=http://stats:4900
+      - QUEUE_CONFIG=redpanda:9092
+    restart: unless-stopped
+
+  stats:
+    image: hardcoreeng/stats:${HULY_VERSION:-latest}
+    environment:
+      - PORT=4900
+      - SERVER_SECRET=$SERVICE_PASSWORD_TRANSACTOR
+    restart: unless-stopped
+
+  kvs:
+    image: hardcoreeng/hulykvs:${HULY_VERSION:-latest}
+    depends_on:
+      cockroach:
+        condition: service_started
+    environment:
+      - HULY_DB_CONNECTION=postgresql://${CR_USERNAME:-huly}:$SERVICE_PASSWORD_COCKROACH@cockroach:26257/${CR_DATABASE:-huly}?sslmode=disable
+      - HULY_TOKEN_SECRET=$SERVICE_PASSWORD_TRANSACTOR
+    restart: unless-stopped
+
+volumes:
+  cr_data:
+  cr_certs:
+  redpanda_data:
+  minio_data:
+  elastic_data:
