@@ -97,12 +97,14 @@ class InstallDocker
                 'systemctl restart docker',
             ]);
             if ($server->isSwarm()) {
+                $createNetworkCommand = dockerNetworkCreateCommand('coolify-overlay', isSwarm: true, enableIpv6: shouldEnableDockerNetworkIpv6($server));
                 $command = $command->merge([
-                    'docker network create --attachable --driver overlay coolify-overlay >/dev/null 2>&1 || true',
+                    "{$createNetworkCommand} >/dev/null 2>&1 || true",
                 ]);
             } else {
+                $createNetworkCommand = dockerNetworkCreateCommand('coolify', enableIpv6: shouldEnableDockerNetworkIpv6($server));
                 $command = $command->merge([
-                    'docker network create --attachable coolify >/dev/null 2>&1 || true',
+                    "{$createNetworkCommand} >/dev/null 2>&1 || true",
                 ]);
                 $command = $command->merge([
                     "echo 'Done!'",

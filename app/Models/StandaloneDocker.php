@@ -24,8 +24,9 @@ class StandaloneDocker extends BaseModel
         static::created(function ($newStandaloneDocker) {
             $server = $newStandaloneDocker->server;
             $safeNetwork = escapeshellarg($newStandaloneDocker->network);
+            $createNetworkCommand = dockerNetworkCreateCommand($newStandaloneDocker->network, isSwarm: true, enableIpv6: shouldEnableDockerNetworkIpv6($server));
             instant_remote_process([
-                "docker network inspect {$safeNetwork} >/dev/null 2>&1 || docker network create --driver overlay --attachable {$safeNetwork} >/dev/null",
+                "docker network inspect {$safeNetwork} >/dev/null 2>&1 || {$createNetworkCommand} >/dev/null",
             ], $server, false);
             ConnectProxyToNetworksJob::dispatchSync($server);
         });

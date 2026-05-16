@@ -1406,9 +1406,13 @@ $schema://$host {
             return;
         }
         if ($isSwarm) {
-            return instant_remote_process(['docker network create --attachable --driver overlay coolify-overlay >/dev/null 2>&1 || true'], $this, false);
+            $createNetworkCommand = dockerNetworkCreateCommand('coolify-overlay', isSwarm: true, enableIpv6: shouldEnableDockerNetworkIpv6($this));
+
+            return instant_remote_process(["{$createNetworkCommand} >/dev/null 2>&1 || true"], $this, false);
         } else {
-            return instant_remote_process(['docker network create coolify --attachable >/dev/null 2>&1 || true'], $this, false);
+            $createNetworkCommand = dockerNetworkCreateCommand('coolify', enableIpv6: shouldEnableDockerNetworkIpv6($this));
+
+            return instant_remote_process(["{$createNetworkCommand} >/dev/null 2>&1 || true"], $this, false);
         }
     }
 

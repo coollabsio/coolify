@@ -787,8 +787,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->server->isSwarm()) {
             // TODO
         } else {
+            $createNetworkCommand = dockerNetworkCreateCommand($networkId, enableIpv6: shouldEnableDockerNetworkIpv6($this->server));
             $this->execute_remote_command([
-                "docker network inspect '{$networkId}' >/dev/null 2>&1 || docker network create --attachable '{$networkId}' >/dev/null || true",
+                "docker network inspect '{$networkId}' >/dev/null 2>&1 || {$createNetworkCommand} >/dev/null || true",
                 'hidden' => true,
                 'ignore_errors' => true,
             ], [

@@ -3,6 +3,7 @@
 use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Application;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Yaml\Yaml;
@@ -19,6 +20,33 @@ function isDockerPredefinedNetwork(string $network): bool
     // Only filter 'default' and 'host' to match existing codebase patterns
     // See: bootstrap/helpers/parsers.php:891, bootstrap/helpers/shared.php:689,748
     return in_array($network, ['default', 'host'], true);
+}
+
+function shouldEnableDockerNetworkIpv6(Server $server, ?string $instancePublicIpv6 = null): bool
+{
+    if ($instancePublicIpv6 === null && $server->isLocalhost()) {
+        try {
+            $instancePublicIpv6 = data_get(InstanceSettings::get(), 'public_ipv6');
+        } catch (\Throwable) {
+            $instancePublicIpv6 = null;
+        }
+    }
+
+    return ($server->isLocalhost() && filled($instancePublicIpv6))
+        || filter_var($server->ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+}
+
+function dockerNetworkCreateCommand(string $network, bool $isSwarm = false, bool $enableIpv6 = false): string
+{
+    $safe = escapeshellarg($network);
+    $driver = $isSwarm ? '--driver overlay ' : '';
+    $command = "docker network create {$driver}--attachable {$safe}";
+
+    if (! $enableIpv6) {
+        return $command;
+    }
+
+    return "(docker network create {$driver}--ipv6 --attachable {$safe} 2>/dev/null || {$command})";
 }
 
 function collectProxyDockerNetworksByServer(Server $server)
@@ -107,20 +135,25 @@ function collectDockerNetworksByServer(Server $server)
 function connectProxyToNetworks(Server $server)
 {
     ['networks' => $networks] = collectDockerNetworksByServer($server);
+    $enableIpv6 = shouldEnableDockerNetworkIpv6($server);
     if ($server->isSwarm()) {
-        $commands = $networks->map(function ($network) {
+        $commands = $networks->map(function ($network) use ($enableIpv6) {
             $safe = escapeshellarg($network);
+            $createNetworkCommand = dockerNetworkCreateCommand($network, isSwarm: true, enableIpv6: $enableIpv6);
+
             return [
-                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --driver overlay --attachable {$safe} >/dev/null",
+                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || {$createNetworkCommand} >/dev/null",
                 "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
         });
     } else {
-        $commands = $networks->map(function ($network) {
+        $commands = $networks->map(function ($network) use ($enableIpv6) {
             $safe = escapeshellarg($network);
+            $createNetworkCommand = dockerNetworkCreateCommand($network, enableIpv6: $enableIpv6);
+
             return [
-                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --attachable {$safe} >/dev/null",
+                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || {$createNetworkCommand} >/dev/null",
                 "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
@@ -140,21 +173,26 @@ function connectProxyToNetworks(Server $server)
 function ensureProxyNetworksExist(Server $server)
 {
     ['allNetworks' => $networks] = collectDockerNetworksByServer($server);
+    $enableIpv6 = shouldEnableDockerNetworkIpv6($server);
 
     if ($server->isSwarm()) {
-        $commands = $networks->map(function ($network) {
+        $commands = $networks->map(function ($network) use ($enableIpv6) {
             $safe = escapeshellarg($network);
+            $createNetworkCommand = dockerNetworkCreateCommand($network, isSwarm: true, enableIpv6: $enableIpv6);
+
             return [
                 "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable {$safe}",
+                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || {$createNetworkCommand}",
             ];
         });
     } else {
-        $commands = $networks->map(function ($network) {
+        $commands = $networks->map(function ($network) use ($enableIpv6) {
             $safe = escapeshellarg($network);
+            $createNetworkCommand = dockerNetworkCreateCommand($network, enableIpv6: $enableIpv6);
+
             return [
                 "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable {$safe}",
+                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || {$createNetworkCommand}",
             ];
         });
     }

@@ -14,6 +14,7 @@ class StartService
 
     public function handle(Service $service, bool $pullLatestImages = false, bool $stopBeforeStart = false)
     {
+        $server = $service->server;
         $service->parse();
         if ($stopBeforeStart) {
             StopService::run(service: $service, dockerCleanup: false);
@@ -32,8 +33,10 @@ class StartService
             $commands[] = "docker compose --project-directory {$workdir} pull";
         }
         if ($service->networks()->count() > 0) {
+            $safeServiceNetwork = escapeshellarg($service->uuid);
+            $createNetworkCommand = dockerNetworkCreateCommand($service->uuid, enableIpv6: shouldEnableDockerNetworkIpv6($server));
             $commands[] = "echo 'Creating Docker network.'";
-            $commands[] = "docker network inspect $service->uuid >/dev/null 2>&1 || docker network create --attachable $service->uuid";
+            $commands[] = "docker network inspect {$safeServiceNetwork} >/dev/null 2>&1 || {$createNetworkCommand}";
         }
         $commands[] = 'echo Starting service.';
         $commands[] = "docker compose --project-directory {$workdir} -f {$workdir}/docker-compose.yml --project-name {$service->uuid} up -d --remove-orphans --force-recreate --build";
@@ -47,6 +50,6 @@ class StartService
             }
         }
 
-        return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
+        return remote_process($commands, $server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
     }
 }

@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Server;
+use App\Models\ServerSetting;
 use Illuminate\Support\Facades\Log;
 
 beforeEach(function () {
@@ -188,4 +190,51 @@ it('identifies none as not predefined (per codebase pattern)', function () {
     // 'none' is technically a Docker predefined network, but existing codebase
     // only filters 'default' and 'host', so we maintain consistency
     expect(isDockerPredefinedNetwork('none'))->toBeFalse();
+});
+
+it('creates standalone proxy networks with ipv6 when requested', function () {
+    $command = dockerNetworkCreateCommand('coolify', isSwarm: false, enableIpv6: true);
+
+    expect($command)
+        ->toContain('docker network create')
+        ->toContain('--attachable')
+        ->toContain('--ipv6')
+        ->toContain('||')
+        ->toContain('coolify');
+});
+
+it('keeps standalone proxy network creation unchanged when ipv6 is not requested', function () {
+    $command = dockerNetworkCreateCommand('coolify', isSwarm: false, enableIpv6: false);
+
+    expect($command)
+        ->toContain('docker network create')
+        ->toContain('--attachable')
+        ->not->toContain('--ipv6')
+        ->toContain('coolify');
+});
+
+it('creates swarm proxy networks with ipv6 when requested', function () {
+    $command = dockerNetworkCreateCommand('coolify-overlay', isSwarm: true, enableIpv6: true);
+
+    expect($command)
+        ->toContain('docker network create')
+        ->toContain('--driver overlay')
+        ->toContain('--attachable')
+        ->toContain('--ipv6')
+        ->toContain('coolify-overlay');
+});
+
+it('enables docker network ipv6 for ipv6 server addresses', function () {
+    $server = new Server(['ip' => '2001:db8::10']);
+    $server->setRelation('settings', new ServerSetting);
+
+    expect(shouldEnableDockerNetworkIpv6($server))->toBeTrue();
+});
+
+it('enables docker network ipv6 when the local instance has a public ipv6 address', function () {
+    $server = new Server(['ip' => '192.0.2.10']);
+    $server->id = 0;
+    $server->setRelation('settings', new ServerSetting);
+
+    expect(shouldEnableDockerNetworkIpv6($server, '2001:db8::20'))->toBeTrue();
 });
