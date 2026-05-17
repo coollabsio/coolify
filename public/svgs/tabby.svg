@@ -1,4 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <rect width="128" height="128" rx="24" fill="#6C5CE7"/>
-  <text x="64" y="84" text-anchor="middle" font-family="monospace" font-weight="bold" font-size="56" fill="#FFF">T</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <circle cx="64" cy="64" r="60" fill="#6C5CE7"/>
+  <path d="M18 52 L38 18 L52 46Z" fill="#6C5CE7"/>
+  <path d="M110 52 L90 18 L76 46Z" fill="#6C5CE7"/>
+  <ellipse cx="64" cy="72" rx="34" ry="30" fill="#FFF"/>
+  <ellipse cx="50" cy="63" rx="6" ry="7" fill="#6C5CE7"/>
+  <ellipse cx="78" cy="63" rx="6" ry="7" fill="#6C5CE7"/>
+  <circle cx="52" cy="61" r="2.5" fill="#FFF"/>
+  <circle cx="80" cy="61" r="2.5" fill="#FFF"/>
+  <path d="M61 72 L64 76 L67 72Z" fill="#FF6B9D"/>
+  <path d="M55 79 Q64 87 73 79" stroke="#6C5CE7" stroke-width="2" fill="none"/>
+  <line x1="18" y1="68" x2="44" y2="73" stroke="#6C5CE7" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="18" y1="79" x2="44" y2="78" stroke="#6C5CE7" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="110" y1="68" x2="84" y2="73" stroke="#6C5CE7" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="110" y1="79" x2="84" y2="78" stroke="#6C5CE7" stroke-width="1.5" stroke-linecap="round"/>
 </svg>
