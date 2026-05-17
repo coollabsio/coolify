@@ -1,0 +1,365 @@
+# documentation: https://payloadcms.com/docs/production/deployment
+# slogan: Next.js-native headless CMS and application framework.
+# category: cms
+# tags: payload, payloadcms, cms, headless, mongodb, nextjs
+# logo: svgs/default.webp
+# port: 3000
+
+services:
+  payloadcms:
+    image: node:24-alpine
+    working_dir: /home/node/app
+    environment:
+      - SERVICE_URL_PAYLOADCMS_3000
+      - DATABASE_URL=mongodb://mongodb:27017/${MONGODB_DATABASE:-payload}
+      - PAYLOAD_SECRET=$SERVICE_PASSWORD_64_PAYLOADSECRET
+      - NEXT_PUBLIC_SERVER_URL=$SERVICE_URL_PAYLOADCMS_3000
+      - NEXT_TELEMETRY_DISABLED=1
+      - NODE_ENV=production
+    volumes:
+      - payloadcms-app:/home/node/app
+      - payloadcms-cache:/home/node/app/.next
+      - payloadcms-node-modules:/home/node/app/node_modules
+      - payloadcms-media:/home/node/app/media
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+
+        if [ ! -f package.json ]; then
+          mkdir -p src/app/\(frontend\) src/app/\(payload\)/admin/\[\[...segments\]\] src/app/\(payload\)/api/\[...slug\] src/app/\(payload\)/api/graphql src/app/\(payload\)/api/graphql-playground src/collections
+
+          cat > package.json <<'EOF'
+        {
+          "name": "coolify-payloadcms",
+          "version": "1.0.0",
+          "private": true,
+          "type": "module",
+          "scripts": {
+            "build": "next build",
+            "dev": "next dev -H 0.0.0.0",
+            "generate:importmap": "payload generate:importmap",
+            "generate:types": "payload generate:types",
+            "payload": "payload",
+            "start": "next start -H 0.0.0.0"
+          },
+          "dependencies": {
+            "@payloadcms/db-mongodb": "latest",
+            "@payloadcms/next": "latest",
+            "@payloadcms/richtext-lexical": "latest",
+            "@payloadcms/ui": "latest",
+            "graphql": "^16.8.1",
+            "next": "16.2.3",
+            "payload": "latest",
+            "react": "19.2.4",
+            "react-dom": "19.2.4",
+            "sharp": "0.34.2"
+          },
+          "devDependencies": {
+            "@types/node": "22.19.9",
+            "@types/react": "19.2.14",
+            "@types/react-dom": "19.2.3",
+            "typescript": "5.7.3"
+          }
+        }
+        EOF
+
+          cat > .npmrc <<'EOF'
+        legacy-peer-deps=true
+        EOF
+
+          cat > tsconfig.json <<'EOF'
+        {
+          "compilerOptions": {
+            "baseUrl": ".",
+            "lib": ["DOM", "DOM.Iterable", "ES2022"],
+            "allowJs": true,
+            "skipLibCheck": true,
+            "strict": true,
+            "noEmit": true,
+            "esModuleInterop": true,
+            "module": "esnext",
+            "moduleResolution": "bundler",
+            "resolveJsonModule": true,
+            "isolatedModules": true,
+            "jsx": "react-jsx",
+            "incremental": true,
+            "plugins": [{ "name": "next" }],
+            "paths": {
+              "@/*": ["./src/*"],
+              "@payload-config": ["./src/payload.config.ts"]
+            },
+            "target": "ES2022"
+          },
+          "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", ".next/dev/types/**/*.ts"],
+          "exclude": ["node_modules"]
+        }
+        EOF
+
+          cat > next.config.ts <<'EOF'
+        import { withPayload } from '@payloadcms/next/withPayload'
+        import type { NextConfig } from 'next'
+        import path from 'path'
+        import { fileURLToPath } from 'url'
+
+        const filename = fileURLToPath(import.meta.url)
+        const dirname = path.dirname(filename)
+
+        const nextConfig: NextConfig = {
+          images: {
+            localPatterns: [
+              {
+                pathname: '/api/media/file/**',
+              },
+            ],
+          },
+          turbopack: {
+            root: path.resolve(dirname),
+          },
+          webpack: (webpackConfig) => {
+            webpackConfig.resolve.extensionAlias = {
+              '.cjs': ['.cts', '.cjs'],
+              '.js': ['.ts', '.tsx', '.js', '.jsx'],
+              '.mjs': ['.mts', '.mjs'],
+            }
+
+            return webpackConfig
+          },
+        }
+
+        export default withPayload(nextConfig, { devBundleServerPackages: false })
+        EOF
+
+          cat > src/payload.config.ts <<'EOF'
+        import { mongooseAdapter } from '@payloadcms/db-mongodb'
+        import { lexicalEditor } from '@payloadcms/richtext-lexical'
+        import path from 'path'
+        import { buildConfig } from 'payload'
+        import { fileURLToPath } from 'url'
+        import sharp from 'sharp'
+
+        import { Media } from './collections/Media'
+        import { Users } from './collections/Users'
+
+        const filename = fileURLToPath(import.meta.url)
+        const dirname = path.dirname(filename)
+
+        export default buildConfig({
+          admin: {
+            user: Users.slug,
+            importMap: {
+              baseDir: path.resolve(dirname),
+            },
+          },
+          collections: [Users, Media],
+          db: mongooseAdapter({
+            url: process.env.DATABASE_URL || '',
+          }),
+          editor: lexicalEditor(),
+          secret: process.env.PAYLOAD_SECRET || '',
+          serverURL: process.env.NEXT_PUBLIC_SERVER_URL,
+          sharp,
+          typescript: {
+            outputFile: path.resolve(dirname, 'payload-types.ts'),
+          },
+        })
+        EOF
+
+          cat > src/collections/Users.ts <<'EOF'
+        import type { CollectionConfig } from 'payload'
+
+        export const Users: CollectionConfig = {
+          slug: 'users',
+          admin: {
+            useAsTitle: 'email',
+          },
+          auth: true,
+          fields: [],
+        }
+        EOF
+
+          cat > src/collections/Media.ts <<'EOF'
+        import type { CollectionConfig } from 'payload'
+
+        export const Media: CollectionConfig = {
+          slug: 'media',
+          access: {
+            read: () => true,
+          },
+          fields: [
+            {
+              name: 'alt',
+              type: 'text',
+              required: true,
+            },
+          ],
+          upload: {
+            staticDir: 'media',
+          },
+        }
+        EOF
+
+          cat > src/app/\(frontend\)/page.tsx <<'EOF'
+        export default function HomePage() {
+          return (
+            <main
+              style={{
+                alignItems: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                fontFamily: 'system-ui, sans-serif',
+                justifyContent: 'center',
+                minHeight: '100vh',
+                padding: '2rem',
+                textAlign: 'center',
+              }}
+            >
+              <h1>Payload CMS</h1>
+              <p>Your Payload instance is running.</p>
+              <a href="/admin">Open admin panel</a>
+            </main>
+          )
+        }
+        EOF
+
+          cat > src/app/\(payload\)/layout.tsx <<'EOF'
+        import config from '@payload-config'
+        import '@payloadcms/next/css'
+        import type { ServerFunctionClient } from 'payload'
+        import { handleServerFunctions, RootLayout } from '@payloadcms/next/layouts'
+        import React from 'react'
+
+        import { importMap } from './admin/importMap.js'
+
+        type Args = {
+          children: React.ReactNode
+        }
+
+        const serverFunction: ServerFunctionClient = async function (args) {
+          'use server'
+          return handleServerFunctions({
+            ...args,
+            config,
+            importMap,
+          })
+        }
+
+        const Layout = ({ children }: Args) => (
+          <RootLayout config={config} importMap={importMap} serverFunction={serverFunction}>
+            {children}
+          </RootLayout>
+        )
+
+        export default Layout
+        EOF
+
+          cat > src/app/\(payload\)/admin/importMap.js <<'EOF'
+        import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
+
+        export const importMap = {
+          '@payloadcms/next/rsc#CollectionCards': CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
+        }
+        EOF
+
+          cat > src/app/\(payload\)/admin/\[\[...segments\]\]/page.tsx <<'EOF'
+        import type { Metadata } from 'next'
+
+        import config from '@payload-config'
+        import { generatePageMetadata, RootPage } from '@payloadcms/next/views'
+        import { importMap } from '../importMap'
+
+        type Args = {
+          params: Promise<{
+            segments: string[]
+          }>
+          searchParams: Promise<{
+            [key: string]: string | string[]
+          }>
+        }
+
+        export const generateMetadata = ({ params, searchParams }: Args): Promise<Metadata> =>
+          generatePageMetadata({ config, params, searchParams })
+
+        const Page = ({ params, searchParams }: Args) =>
+          RootPage({ config, params, searchParams, importMap })
+
+        export default Page
+        EOF
+
+          cat > src/app/\(payload\)/api/\[...slug\]/route.ts <<'EOF'
+        import config from '@payload-config'
+        import {
+          REST_DELETE,
+          REST_GET,
+          REST_OPTIONS,
+          REST_PATCH,
+          REST_POST,
+          REST_PUT,
+        } from '@payloadcms/next/routes'
+
+        export const GET = REST_GET(config)
+        export const POST = REST_POST(config)
+        export const DELETE = REST_DELETE(config)
+        export const PATCH = REST_PATCH(config)
+        export const PUT = REST_PUT(config)
+        export const OPTIONS = REST_OPTIONS(config)
+        EOF
+
+          cat > src/app/\(payload\)/api/graphql/route.ts <<'EOF'
+        import config from '@payload-config'
+        import { GRAPHQL_POST, REST_OPTIONS } from '@payloadcms/next/routes'
+
+        export const POST = GRAPHQL_POST(config)
+        export const OPTIONS = REST_OPTIONS(config)
+        EOF
+
+          cat > src/app/\(payload\)/api/graphql-playground/route.ts <<'EOF'
+        import config from '@payload-config'
+        import { GRAPHQL_PLAYGROUND_GET } from '@payloadcms/next/routes'
+
+        export const GET = GRAPHQL_PLAYGROUND_GET(config)
+        EOF
+        fi
+
+        if [ ! -d node_modules/payload ]; then
+          npm install --include=dev --no-audit --no-fund
+        fi
+
+        npm run generate:importmap
+
+        if [ ! -f .next/BUILD_ID ]; then
+          npm run build
+        fi
+
+        exec npm run start
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/admin"]
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 10m
+    depends_on:
+      mongodb:
+        condition: service_healthy
+  mongodb:
+    image: mongo:7
+    command: ["--storageEngine=wiredTiger"]
+    volumes:
+      - payloadcms-mongodb-data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok' localhost:27017/test | grep 1",
+        ]
+      interval: 10s
+      timeout: 20s
+      retries: 10
+
+volumes:
+  payloadcms-app:
+  payloadcms-cache:
+  payloadcms-node-modules:
+  payloadcms-media:
+  payloadcms-mongodb-data:
