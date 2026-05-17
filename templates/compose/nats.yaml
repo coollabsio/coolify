@@ -1,0 +1,16 @@
+# documentation: https://docs.nats.io
+# slogan: High-performance cloud native messaging system — connective technology for modern distributed systems.
+# category: infrastructure
+# tags: nats, messaging, pubsub, jetstream, microservices, cloud-native, cncf, streaming
+# logo: svgs/nats.svg
+# port: 8222
+
+services:
+  nats:
+    image: nats:latest
+    command: --jetstream --store_dir /data
+    volumes:
+      - nats-data:/data
+    environment:
+      - SERVICE_URL_NATS_4222
+      - SERVICE_URL_NATS_8222
