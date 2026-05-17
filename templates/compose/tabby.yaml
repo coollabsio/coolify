@@ -1,0 +1,23 @@
+# documentation: https://tabby.tabbyml.com
+# slogan: Self-hosted AI coding assistant — an open-source and on-premises alternative to GitHub Copilot.
+# category: ai
+# tags: tabby, ai, coding-assistant, copilot, code-completion, llm, self-hosted, gpu
+# logo: svgs/tabby.svg
+# port: 8080
+
+services:
+  tabby:
+    image: tabbyml/tabby:latest
+    volumes:
+      - tabby-data:/data
+    environment:
+      - SERVICE_URL_TABBY_8080
+      - TABBY_ROOT=/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities:
+                - gpu
