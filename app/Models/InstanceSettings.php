@@ -9,10 +9,15 @@ use Spatie\Url\Url;
 
 class InstanceSettings extends Model
 {
+    public const DEFAULT_INSTANCE_DOMAIN_CERTIFICATE_RESOLVER = 'letsencrypt';
+
+    public const INSTANCE_DOMAIN_CERTIFICATE_RESOLVER_REGEX = '/^[A-Za-z0-9_.-]+$/';
+
     protected $fillable = [
         'public_ipv4',
         'public_ipv6',
         'fqdn',
+        'instance_domain_certificate_resolver',
         'public_port_min',
         'public_port_max',
         'do_not_track',
@@ -96,6 +101,38 @@ class InstanceSettings extends Model
                 }
             }
         );
+    }
+
+    public function instanceDomainCertificateResolver(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                if (is_null($value)) {
+                    return null;
+                }
+
+                $value = trim((string) $value);
+
+                return $value === '' ? null : $value;
+            }
+        );
+    }
+
+    public function getInstanceDomainCertificateResolver(): string
+    {
+        $resolver = $this->instance_domain_certificate_resolver;
+
+        if (! is_string($resolver)) {
+            return self::DEFAULT_INSTANCE_DOMAIN_CERTIFICATE_RESOLVER;
+        }
+
+        $resolver = trim($resolver);
+
+        if ($resolver === '' || ! preg_match(self::INSTANCE_DOMAIN_CERTIFICATE_RESOLVER_REGEX, $resolver)) {
+            return self::DEFAULT_INSTANCE_DOMAIN_CERTIFICATE_RESOLVER;
+        }
+
+        return $resolver;
     }
 
     public function updateCheckFrequency(): Attribute

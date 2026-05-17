@@ -17,6 +17,9 @@ class Index extends Component
     #[Validate('nullable|string|max:255|url')]
     public ?string $fqdn = null;
 
+    #[Validate(['nullable', 'string', 'max:255', 'regex:/^[A-Za-z0-9_.-]+$/'])]
+    public ?string $instance_domain_certificate_resolver = null;
+
     #[Validate('required|integer|min:1025|max:65535')]
     public int $public_port_min;
 
@@ -49,6 +52,7 @@ class Index extends Component
     protected array $messages = [
         'fqdn.url' => 'Invalid instance URL.',
         'fqdn.max' => 'URL must not exceed 255 characters.',
+        'instance_domain_certificate_resolver.regex' => 'Instance TLS certificate resolver may only contain letters, numbers, _, ., and -.',
         'dev_helper_version.regex' => 'Dev helper version must match Docker tag format (alphanumeric, _, ., -; first char cannot be . or -).',
     ];
 
@@ -67,6 +71,7 @@ class Index extends Component
             $this->server = Server::findOrFail(0);
         }
         $this->fqdn = $this->settings->fqdn;
+        $this->instance_domain_certificate_resolver = $this->settings->instance_domain_certificate_resolver;
         $this->public_port_min = $this->settings->public_port_min;
         $this->public_port_max = $this->settings->public_port_max;
         $this->instance_name = $this->settings->instance_name;
@@ -87,8 +92,10 @@ class Index extends Component
 
     public function instantSave($isSave = true)
     {
+        $this->normalizeInstanceDomainCertificateResolver();
         $this->validate();
         $this->settings->fqdn = $this->fqdn ? trim($this->fqdn) : $this->fqdn;
+        $this->settings->instance_domain_certificate_resolver = $this->instance_domain_certificate_resolver;
         $this->settings->public_port_min = $this->public_port_min;
         $this->settings->public_port_max = $this->public_port_max;
         $this->settings->instance_name = $this->instance_name;
@@ -132,6 +139,7 @@ class Index extends Component
             if ($this->fqdn) {
                 $this->fqdn = trim($this->fqdn);
             }
+            $this->normalizeInstanceDomainCertificateResolver();
 
             $this->validate();
 
@@ -168,6 +176,16 @@ class Index extends Component
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function normalizeInstanceDomainCertificateResolver(): void
+    {
+        if (is_null($this->instance_domain_certificate_resolver)) {
+            return;
+        }
+
+        $resolver = trim($this->instance_domain_certificate_resolver);
+        $this->instance_domain_certificate_resolver = $resolver === '' ? null : $resolver;
     }
 
     public function buildHelperImage()
