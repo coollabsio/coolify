@@ -1,0 +1,15 @@
+# documentation: https://www.dragonflydb.io
+# slogan: A modern Redis replacement — 25x faster, fully compatible, designed for cloud-native workloads.
+# category: database
+# tags: dragonflydb, redis, cache, key-value, in-memory, database
+# logo: svgs/dragonfly.svg
+# port: 6379
+
+services:
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
+    volumes:
+      - dragonfly-data:/data
+    environment:
+      - SERVICE_URL_DRAGONFLY_6379
+    command: dragonfly --logtostderr --requirepass=${DRAGONFLY_PASSWORD:-} --dir /data
