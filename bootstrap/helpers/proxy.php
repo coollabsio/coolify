@@ -195,6 +195,7 @@ function extractCustomProxyCommands(Server $server, string $existing_config): ar
             '--providers.docker',
             '--providers.swarm',
             '--log.level=',
+            '--accesslog=',
             '--accesslog.',
         ];
 
@@ -325,6 +326,14 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
         } else {
             $config['services']['traefik']['command'][] = '--api.insecure=false';
             $config['services']['traefik']['volumes'][] = "{$proxy_path}:/traefik";
+
+            // JSON access logs, re-applied from the setting on every regenerate.
+            if (data_get($server, 'proxy.access_log_enabled', false)) {
+                $config['services']['traefik']['command'][] = '--accesslog=true';
+                $config['services']['traefik']['command'][] = '--accesslog.filepath=/traefik/access.log';
+                $config['services']['traefik']['command'][] = '--accesslog.format=json';
+                $config['services']['traefik']['command'][] = '--accesslog.bufferingsize=100';
+            }
         }
         if ($server->isSwarm()) {
             data_forget($config, 'services.traefik.container_name');
