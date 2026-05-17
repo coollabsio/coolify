@@ -24,6 +24,8 @@ class Proxy extends Component
 
     public ?string $redirectUrl = null;
 
+    public bool $accessLogEnabled = false;
+
     public bool $generateExactLabels = false;
 
     /**
@@ -55,6 +57,7 @@ class Proxy extends Component
         $this->selectedProxy = $this->server->proxyType();
         $this->redirectEnabled = data_get($this->server, 'proxy.redirect_enabled', true);
         $this->redirectUrl = data_get($this->server, 'proxy.redirect_url');
+        $this->accessLogEnabled = data_get($this->server, 'proxy.access_log_enabled', false);
         $this->syncData(false);
         $this->loadProxyConfiguration();
     }
@@ -143,6 +146,24 @@ class Proxy extends Component
             $this->server->save();
             $this->server->setupDefaultRedirect();
             $this->dispatch('success', 'Proxy configuration saved.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function instantSaveAccessLog()
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $this->server->proxy->access_log_enabled = $this->accessLogEnabled;
+            $this->server->save();
+            // The access log is a static Traefik command, so the compose must be
+            // regenerated for it to take effect. forceRegenerate preserves custom
+            // proxy commands and re-applies the access log flag from the setting.
+            $this->proxySettings = GetProxyConfiguration::run($this->server, forceRegenerate: true);
+            SaveProxyConfiguration::run($this->server, $this->proxySettings);
+            $this->server->save();
+            $this->dispatch('success', 'Access log setting saved. Restart the proxy to apply the change.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

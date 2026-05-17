@@ -43,6 +43,12 @@
                             <x-forms.input canGate="update" :canResource="$server" placeholder="https://app.coolify.io"
                                 id="redirectUrl" label="Redirect to (optional)" />
                         @endif
+                        @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
+                            <x-forms.checkbox canGate="update" :canResource="$server"
+                                instantSave="instantSaveAccessLog" id="accessLogEnabled"
+                                label="Enable access logs (JSON)"
+                                helper="Writes Traefik access logs in JSON format to /data/coolify/proxy/access.log. Required for CrowdSec, Fail2ban, or traffic analytics. Restart the proxy after changing this." />
+                        @endif
                     </div>
                     @php
                         $proxyTitle =
