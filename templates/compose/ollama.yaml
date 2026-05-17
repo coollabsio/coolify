@@ -1,0 +1,29 @@
+# documentation: https://ollama.com
+# slogan: Get up and running with large language models locally — run Llama, Mistral, Gemma, and more.
+# category: ai
+# tags: ollama, llm, ai, local, models, llama, mistral, inference
+# logo: svgs/ollama.svg
+# port: 11434
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - SERVICE_URL_OLLAMA_11434
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-5m}
+      - OLLAMA_HOST=${OLLAMA_HOST:-0.0.0.0}
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 30s
+      retries: 5
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities:
+                - gpu
