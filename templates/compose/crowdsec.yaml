@@ -1,0 +1,52 @@
+# documentation: https://docs.crowdsec.net/
+# slogan: CrowdSec engine plus a Traefik forwardAuth bouncer to detect and block malicious IPs hitting the Coolify proxy.
+# category: security
+# tags: crowdsec, security, waf, traefik, fail2ban, intrusion-detection, bouncer
+# logo: svgs/default.webp
+
+services:
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
+    environment:
+      - GID=1000
+      - COLLECTIONS=crowdsecurity/traefik crowdsecurity/base-http-scenarios crowdsecurity/http-cve
+      - BOUNCER_KEY_traefik=${SERVICE_PASSWORD_CROWDSECBOUNCER}
+    volumes:
+      - crowdsec-config:/etc/crowdsec
+      - crowdsec-data:/var/lib/crowdsec/data
+      - /data/coolify/proxy/access.log:/var/log/traefik/access.log:ro
+      - type: bind
+        source: ./acquis.yaml
+        target: /etc/crowdsec/acquis.d/traefik.yaml
+        is_directory: false
+        content: |
+          filenames:
+            - /var/log/traefik/access.log
+          labels:
+            type: traefik
+    healthcheck:
+      test: ["CMD", "cscli", "lapi", "status"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
+  bouncer-traefik:
+    image: crowdsecurity/cs-traefik-bouncer:latest
+    environment:
+      - CROWDSEC_BOUNCER_API_KEY=${SERVICE_PASSWORD_CROWDSECBOUNCER}
+      - CROWDSEC_AGENT_HOST=crowdsec:8080
+    depends_on:
+      - crowdsec
+    restart: unless-stopped
+    networks:
+      - default
+      - coolify
+
+networks:
+  coolify:
+    external: true
+
+volumes:
+  crowdsec-config:
+  crowdsec-data:
