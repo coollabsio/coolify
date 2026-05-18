@@ -175,7 +175,7 @@ class StartMariadb
             );
         }
 
-        if (! is_null($this->database->mariadb_conf) || ! empty($this->database->mariadb_conf)) {
+        if (! is_null($this->database->mariadb_conf) && ! empty($this->database->mariadb_conf)) {
             $docker_compose['services'][$container_name]['volumes'] = array_merge(
                 $docker_compose['services'][$container_name]['volumes'],
                 [

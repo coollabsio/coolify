@@ -1,6 +1,10 @@
 <div>
     <div class="flex flex-col gap-4 p-4 bg-white border dark:bg-base dark:border-coolgray-300 border-neutral-200">
-        @if ($isReadOnly)
+        @if ($fileStorage->is_too_large)
+            <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
+                File on server exceeds 5 MB and cannot be edited from the UI. Edit it directly on the server.
+            </div>
+        @elseif ($isReadOnly)
             <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
                 @if ($fileStorage->is_directory)
                     This directory is mounted as read-only and cannot be modified from the UI.
@@ -44,7 +48,7 @@
                                 confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
                                 shortConfirmationLabel="Filepath" />
                         @else
-                            @if (!$fileStorage->is_binary)
+                            @if (!$fileStorage->is_binary && !$fileStorage->is_too_large)
                                 <x-modal-confirmation :ignoreWire="false" title="Confirm File Conversion to Directory?"
                                     buttonTitle="Convert to directory" submitAction="convertToDirectory" :actions="[
                                         'The selected file will be permanently deleted and an empty directory will be created in its place.',
@@ -76,8 +80,8 @@
                             label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
                             helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
                             rows="20" id="content"
-                            readonly="{{ $fileStorage->is_based_on_git || $fileStorage->is_binary }}"></x-forms.textarea>
-                        @if (!$fileStorage->is_based_on_git && !$fileStorage->is_binary)
+                            readonly="{{ $fileStorage->is_based_on_git || $fileStorage->is_binary || $fileStorage->is_too_large }}"></x-forms.textarea>
+                        @if (!$fileStorage->is_based_on_git && !$fileStorage->is_binary && !$fileStorage->is_too_large)
                             <x-forms.button class="w-full" type="submit">Save</x-forms.button>
                         @endif
                     @else

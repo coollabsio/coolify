@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
+use App\Models\Application;
 use App\Models\EnvironmentVariable;
+use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -38,7 +40,7 @@ class All extends Component
         $this->is_env_sorting_enabled = data_get($this->resource, 'settings.is_env_sorting_enabled', false);
         $this->use_build_secrets = data_get($this->resource, 'settings.use_build_secrets', false);
         $this->resourceClass = get_class($this->resource);
-        $resourceWithPreviews = [\App\Models\Application::class];
+        $resourceWithPreviews = [Application::class];
         $simpleDockerfile = filled(data_get($this->resource, 'dockerfile'));
         if (str($this->resourceClass)->contains($resourceWithPreviews) && ! $simpleDockerfile) {
             $this->showPreview = true;
@@ -194,7 +196,7 @@ class All extends Component
 
     private function updateOrder()
     {
-        $variables = parseEnvFormatToArray($this->variables);
+        $variables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables));
         $order = 1;
         foreach ($variables as $key => $value) {
             $env = $this->resource->environment_variables()->where('key', $key)->first();
@@ -206,7 +208,7 @@ class All extends Component
         }
 
         if ($this->showPreview) {
-            $previewVariables = parseEnvFormatToArray($this->variablesPreview);
+            $previewVariables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variablesPreview));
             $order = 1;
             foreach ($previewVariables as $key => $value) {
                 $env = $this->resource->environment_variables_preview()->where('key', $key)->first();
@@ -221,7 +223,7 @@ class All extends Component
 
     private function handleBulkSubmit()
     {
-        $variables = parseEnvFormatToArray($this->variables);
+        $variables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables));
         $changesMade = false;
         $errorOccurred = false;
 
@@ -241,7 +243,7 @@ class All extends Component
         }
 
         if ($this->showPreview) {
-            $previewVariables = parseEnvFormatToArray($this->variablesPreview);
+            $previewVariables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variablesPreview));
 
             // Try to delete removed preview variables
             $deletedPreviewCount = $this->deleteRemovedVariables(true, $previewVariables);
@@ -267,6 +269,7 @@ class All extends Component
 
     private function handleSingleSubmit($data)
     {
+        $data['key'] = ValidationPatterns::validatedEnvironmentVariableKey($data['key']);
         $found = $this->resource->environment_variables()->where('key', $data['key'])->first();
         if ($found) {
             $this->dispatch('error', 'Environment variable already exists.');
@@ -332,6 +335,23 @@ class All extends Component
         $this->resource->$method()->whereNotIn('key', array_keys($variables))->delete();
 
         return $variablesToDelete->count();
+    }
+
+    private function normalizeEnvironmentVariables(array $variables): array
+    {
+        $normalizedVariables = [];
+
+        foreach ($variables as $key => $data) {
+            $normalizedKey = ValidationPatterns::validatedEnvironmentVariableKey((string) $key);
+
+            if (array_key_exists($normalizedKey, $normalizedVariables)) {
+                throw new \InvalidArgumentException("Duplicate environment variable key after normalization: {$normalizedKey}.");
+            }
+
+            $normalizedVariables[$normalizedKey] = $data;
+        }
+
+        return $normalizedVariables;
     }
 
     private function updateOrCreateVariables($isPreview, $variables)

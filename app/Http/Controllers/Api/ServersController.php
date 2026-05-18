@@ -13,6 +13,7 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
 use App\Rules\ValidServerIp;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 use Stringable;
@@ -477,7 +478,7 @@ class ServersController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = customApiValidator($request->all(), [
@@ -564,6 +565,14 @@ class ServersController extends Controller
             ValidateServer::dispatch($server);
         }
 
+        auditLog('api.server.created', [
+            'team_id' => $teamId,
+            'server_uuid' => $server->uuid,
+            'server_name' => $server->name,
+            'ip' => $server->ip,
+            'is_build_server' => (bool) $request->is_build_server,
+        ]);
+
         return response()->json([
             'uuid' => $server->uuid,
         ])->setStatusCode(201);
@@ -603,6 +612,7 @@ class ServersController extends Controller
                         'deployment_queue_limit' => ['type' => 'integer', 'description' => 'Maximum number of queued deployments.'],
                         'server_disk_usage_notification_threshold' => ['type' => 'integer', 'description' => 'Server disk usage notification threshold (%).'],
                         'server_disk_usage_check_frequency' => ['type' => 'string', 'description' => 'Cron expression for disk usage check frequency.'],
+                        'connection_timeout' => ['type' => 'integer', 'description' => 'SSH connection timeout in seconds (1-300). Default: 10.'],
                     ],
                 ),
             ),
@@ -639,7 +649,7 @@ class ServersController extends Controller
     )]
     public function update_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'connection_timeout'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -647,7 +657,7 @@ class ServersController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = customApiValidator($request->all(), [
@@ -665,6 +675,7 @@ class ServersController extends Controller
             'deployment_queue_limit' => 'integer|min:1',
             'server_disk_usage_notification_threshold' => 'integer|min:1|max:100',
             'server_disk_usage_check_frequency' => 'string',
+            'connection_timeout' => 'integer|min:1|max:300',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -709,7 +720,7 @@ class ServersController extends Controller
             ], 422);
         }
 
-        $advancedSettings = $request->only(['concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency']);
+        $advancedSettings = $request->only(['concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'connection_timeout']);
         if (! empty($advancedSettings)) {
             $server->settings()->update(array_filter($advancedSettings, fn ($value) => ! is_null($value)));
         }
@@ -717,6 +728,13 @@ class ServersController extends Controller
         if ($request->instant_validate) {
             ValidateServer::dispatch($server);
         }
+
+        auditLog('api.server.updated', [
+            'team_id' => $teamId,
+            'server_uuid' => $server->uuid,
+            'server_name' => $server->name,
+            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
+        ]);
 
         return response()->json([
             'uuid' => $server->uuid,
@@ -807,6 +825,9 @@ class ServersController extends Controller
             }
         }
 
+        $deletedUuid = $server->uuid;
+        $deletedName = $server->name;
+        $deletedIp = $server->ip;
         $server->delete();
         DeleteServer::dispatch(
             $server->id,
@@ -815,6 +836,14 @@ class ServersController extends Controller
             $server->cloud_provider_token_id,
             $server->team_id
         );
+
+        auditLog('api.server.deleted', [
+            'team_id' => $teamId,
+            'server_uuid' => $deletedUuid,
+            'server_name' => $deletedName,
+            'ip' => $deletedIp,
+            'force' => $force,
+        ]);
 
         return response()->json(['message' => 'Server deleted.']);
     }
@@ -880,6 +909,12 @@ class ServersController extends Controller
             return response()->json(['message' => 'Server not found.'], 404);
         }
         ValidateServer::dispatch($server);
+
+        auditLog('api.server.validated', [
+            'team_id' => $teamId,
+            'server_uuid' => $server->uuid,
+            'server_name' => $server->name,
+        ]);
 
         return response()->json(['message' => 'Validation started.'], 201);
     }

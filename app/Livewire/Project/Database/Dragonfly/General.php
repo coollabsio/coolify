@@ -89,7 +89,9 @@ class General extends Component
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'dragonflyPassword' => 'required|string',
+            'dragonflyPassword' => ValidationPatterns::databasePasswordRules(
+                enforcePattern: $this->dragonflyPassword !== $this->database->dragonfly_password,
+            ),
             'image' => 'required|string',
             'portsMappings' => ValidationPatterns::portMappingRules(),
             'isPublic' => 'nullable|boolean',
@@ -109,8 +111,7 @@ class General extends Component
             ValidationPatterns::combinedMessages(),
             ValidationPatterns::portMappingMessages(),
             [
-                'dragonflyPassword.required' => 'The Dragonfly Password field is required.',
-                'dragonflyPassword.string' => 'The Dragonfly Password must be a string.',
+                ...ValidationPatterns::databasePasswordMessages('dragonflyPassword', 'Dragonfly Password'),
                 'image.required' => 'The Docker Image field is required.',
                 'image.string' => 'The Docker Image must be a string.',
                 'publicPort.integer' => 'The Public Port must be an integer.',

@@ -2,9 +2,7 @@
 
 namespace App\Livewire\Destination;
 
-use App\Models\Server;
 use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -29,16 +27,8 @@ class Show extends Component
     public function mount(string $destination_uuid)
     {
         try {
-            $destination = StandaloneDocker::whereUuid($destination_uuid)->first() ??
-                SwarmDocker::whereUuid($destination_uuid)->firstOrFail();
-
-            $ownedByTeam = Server::ownedByCurrentTeam()->each(function ($server) use ($destination) {
-                if ($server->standaloneDockers->contains($destination) || $server->swarmDockers->contains($destination)) {
-                    $this->destination = $destination;
-                    $this->syncData();
-                }
-            });
-            if ($ownedByTeam === false) {
+            $destination = find_destination_for_current_team($destination_uuid);
+            if (! $destination) {
                 return redirect()->route('destination.index');
             }
             $this->destination = $destination;
@@ -80,7 +70,7 @@ class Show extends Component
         try {
             $this->authorize('delete', $this->destination);
 
-            if ($this->destination->getMorphClass() === \App\Models\StandaloneDocker::class) {
+            if ($this->destination->getMorphClass() === StandaloneDocker::class) {
                 if ($this->destination->attachedTo()) {
                     return $this->dispatch('error', 'You must delete all resources before deleting this destination.');
                 }

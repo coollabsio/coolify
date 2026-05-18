@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Events\ServerReachabilityChanged;
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
 use App\Services\ConfigurationRepository;
@@ -43,6 +44,9 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle()
     {
+        $wasReachable = (bool) $this->server->settings->is_reachable;
+        $wasNotified = (bool) $this->server->unreachable_notification_sent;
+
         try {
             // Check if server is disabled
             if ($this->server->settings->force_disabled) {
@@ -84,6 +88,8 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                     'server_ip' => $this->server->ip,
                 ]);
 
+                $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, false);
+
                 return;
             }
 
@@ -99,6 +105,8 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 $this->server->update(['unreachable_count' => 0]);
             }
 
+            $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, true);
+
         } catch (\Throwable $e) {
 
             Log::error('ServerConnectionCheckJob failed', [
@@ -111,6 +119,8 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             ]);
             $this->server->increment('unreachable_count');
 
+            $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, false);
+
             return;
         }
     }
@@ -118,14 +128,38 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
     public function failed(?\Throwable $exception): void
     {
         if ($exception instanceof TimeoutExceededException) {
+            $wasReachable = (bool) $this->server->settings->is_reachable;
+            $wasNotified = (bool) $this->server->unreachable_notification_sent;
+
             $this->server->settings->update([
                 'is_reachable' => false,
                 'is_usable' => false,
             ]);
             $this->server->increment('unreachable_count');
 
+            $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, false);
+
             // Delete the queue job so it doesn't appear in Horizon's failed list.
             $this->job?->delete();
+        }
+    }
+
+    /**
+     * Fire ServerReachabilityChanged when state crosses the unreachable threshold (count >= 2)
+     * or when a previously-notified server recovers. Skips noise from single transient flaps.
+     */
+    private function dispatchReachabilityChangedIfNeeded(bool $wasReachable, bool $wasNotified, bool $isReachable): void
+    {
+        if ($isReachable) {
+            if (! $wasReachable || $wasNotified) {
+                ServerReachabilityChanged::dispatch($this->server);
+            }
+
+            return;
+        }
+
+        if ($this->server->unreachable_count >= 2 && ! $wasNotified) {
+            ServerReachabilityChanged::dispatch($this->server);
         }
     }
 

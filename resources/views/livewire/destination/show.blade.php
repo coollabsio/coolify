@@ -16,7 +16,9 @@
         @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')
             <div class="subtitle ">A simple Docker network.</div>
         @else
-            <div class="subtitle ">A swarm Docker network. WIP</div>
+            <div class="subtitle flex items-center gap-2">A swarm Docker network.
+                <x-deprecated-badge />
+            </div>
         @endif
         <div class="flex gap-2">
             <x-forms.input canGate="update" :canResource="$destination" id="name" label="Name" />

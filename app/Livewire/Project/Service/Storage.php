@@ -69,7 +69,11 @@ class Storage extends Component
 
     public function refreshStorages()
     {
-        $this->fileStorage = $this->resource->fileStorages()->get();
+        $this->fileStorage = $this->resource->fileStorages()->get()->each(function (LocalFileVolume $fs) {
+            if (strlen((string) $fs->content) > LocalFileVolume::MAX_CONTENT_SIZE) {
+                $fs->content = LocalFileVolume::TOO_LARGE_PLACEHOLDER;
+            }
+        });
         $this->resource->load('persistentStorages.resource');
     }
 
@@ -106,8 +110,12 @@ class Storage extends Component
             $this->validate([
                 'name' => ValidationPatterns::volumeNameRules(),
                 'mount_path' => 'required|string',
-                'host_path' => $this->isSwarm ? 'required|string' : 'string|nullable',
-            ], ValidationPatterns::volumeNameMessages());
+                'host_path' => $this->isSwarm
+                    ? ['required', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN]
+                    : ['nullable', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
+            ], array_merge(ValidationPatterns::volumeNameMessages(), [
+                'host_path.regex' => 'Host path must start with / and only contain safe path characters.',
+            ]));
 
             $name = $this->resource->uuid.'-'.$this->name;
 

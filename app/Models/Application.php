@@ -4,6 +4,9 @@ namespace App\Models;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Services\ConfigurationGenerator;
+use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
+use App\Services\DeploymentConfiguration\ConfigurationDiff;
+use App\Services\DeploymentConfiguration\ConfigurationDiffer;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
 use App\Traits\HasMetrics;
@@ -39,7 +42,7 @@ use Visus\Cuid2\Cuid2;
         'git_full_url' => ['type' => 'string', 'nullable' => true, 'description' => 'Git full URL.'],
         'docker_registry_image_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker registry image name.'],
         'docker_registry_image_tag' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker registry image tag.'],
-        'build_pack' => ['type' => 'string', 'description' => 'Build pack.', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose']],
+        'build_pack' => ['type' => 'string', 'description' => 'Build pack.', 'enum' => ['nixpacks', 'railpack', 'static', 'dockerfile', 'dockercompose']],
         'static_image' => ['type' => 'string', 'description' => 'Static image used when static site is deployed.'],
         'install_command' => ['type' => 'string', 'description' => 'Install command.'],
         'build_command' => ['type' => 'string', 'description' => 'Build command.'],
@@ -215,14 +218,27 @@ class Application extends BaseModel
 
     protected $appends = ['server_status'];
 
-    protected $casts = [
-        'http_basic_auth_password' => 'encrypted',
-        'restart_count' => 'integer',
-        'last_restart_at' => 'datetime',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'http_basic_auth_password' => 'encrypted',
+            'manual_webhook_secret_github' => 'encrypted',
+            'manual_webhook_secret_gitlab' => 'encrypted',
+            'manual_webhook_secret_bitbucket' => 'encrypted',
+            'manual_webhook_secret_gitea' => 'encrypted',
+            'restart_count' => 'integer',
+            'last_restart_at' => 'datetime',
+        ];
+    }
 
     protected static function booted()
     {
+        static::creating(function ($application) {
+            $application->manual_webhook_secret_github ??= Str::random(40);
+            $application->manual_webhook_secret_gitlab ??= Str::random(40);
+            $application->manual_webhook_secret_bitbucket ??= Str::random(40);
+            $application->manual_webhook_secret_gitea ??= Str::random(40);
+        });
         static::addGlobalScope('withRelations', function ($builder) {
             $builder->withCount([
                 'additional_servers',
@@ -707,14 +723,14 @@ class Application extends BaseModel
         return Attribute::make(
             set: function ($value) {
                 if (is_null($value) || $value === '') {
-                    return '/Dockerfile';
-                } else {
-                    if ($value !== '/') {
-                        return Str::start(Str::replaceEnd('/', '', $value), '/');
-                    }
-
-                    return Str::start($value, '/');
+                    return $this->build_pack === 'dockerfile' ? '/Dockerfile' : null;
                 }
+
+                if ($value !== '/') {
+                    return Str::start(Str::replaceEnd('/', '', $value), '/');
+                }
+
+                return Str::start($value, '/');
             }
         );
     }
@@ -873,8 +889,8 @@ class Application extends BaseModel
     public function customNginxConfiguration(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => base64_encode($value),
-            get: fn ($value) => base64_decode($value),
+            set: fn ($value) => is_null($value) ? null : base64_encode($value),
+            get: fn ($value) => is_null($value) ? null : base64_decode($value),
         );
     }
 
@@ -947,7 +963,7 @@ class Application extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', false)
-            ->where('key', 'not like', 'NIXPACKS_%');
+            ->withoutBuildpackControlVariables();
     }
 
     public function nixpacks_environment_variables()
@@ -955,6 +971,13 @@ class Application extends BaseModel
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', false)
             ->where('key', 'like', 'NIXPACKS_%');
+    }
+
+    public function railpack_environment_variables()
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', false)
+            ->where('key', 'like', 'RAILPACK_%');
     }
 
     public function environment_variables_preview()
@@ -975,7 +998,7 @@ class Application extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', true)
-            ->where('key', 'not like', 'NIXPACKS_%');
+            ->withoutBuildpackControlVariables();
     }
 
     public function nixpacks_environment_variables_preview()
@@ -983,6 +1006,13 @@ class Application extends BaseModel
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', true)
             ->where('key', 'like', 'NIXPACKS_%');
+    }
+
+    public function railpack_environment_variables_preview()
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', true)
+            ->where('key', 'like', 'RAILPACK_%');
     }
 
     public function scheduled_tasks(): HasMany
@@ -1032,7 +1062,7 @@ class Application extends BaseModel
 
     public function get_last_successful_deployment()
     {
-        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', ApplicationDeploymentStatus::FINISHED)->where('pull_request_id', 0)->orderBy('created_at', 'desc')->first();
+        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', ApplicationDeploymentStatus::FINISHED->value)->where('pull_request_id', 0)->orderBy('created_at', 'desc')->first();
     }
 
     public function get_last_days_deployments()
@@ -1104,7 +1134,7 @@ class Application extends BaseModel
 
     public function could_set_build_commands(): bool
     {
-        if ($this->build_pack === 'nixpacks') {
+        if ($this->build_pack === 'nixpacks' || $this->build_pack === 'railpack') {
             return true;
         }
 
@@ -1144,32 +1174,91 @@ class Application extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
+        $configurationDiff = $this->pendingDeploymentConfigurationDiff();
+
+        if ($save) {
+            $this->markDeploymentConfigurationApplied();
+        }
+
+        return $configurationDiff->isChanged();
+    }
+
+    public function pendingDeploymentConfigurationDiff(): ConfigurationDiff
+    {
+        $currentSnapshot = $this->deploymentConfigurationSnapshot();
+        $lastDeployment = $this->get_last_successful_deployment();
+
+        if ($lastDeployment?->configuration_snapshot) {
+            return app(ConfigurationDiffer::class)->diff($lastDeployment->configuration_snapshot, $currentSnapshot);
+        }
+
+        $oldConfigHash = data_get($this, 'config_hash');
+
+        if ($oldConfigHash === null) {
+            return ConfigurationDiff::legacy(true);
+        }
+
+        return ConfigurationDiff::legacy($oldConfigHash !== $this->legacyConfigurationHash());
+    }
+
+    public function hasPendingDeploymentConfigurationChanges(): bool
+    {
+        return $this->pendingDeploymentConfigurationDiff()->isChanged();
+    }
+
+    public function deploymentConfigurationSnapshot(): array
+    {
+        return (new ApplicationConfigurationSnapshot($this))->toArray();
+    }
+
+    public function deploymentConfigurationHash(): string
+    {
+        return ApplicationConfigurationSnapshot::hashSnapshot($this->deploymentConfigurationSnapshot());
+    }
+
+    public function markDeploymentConfigurationApplied(?ApplicationDeploymentQueue $deployment = null): void
+    {
+        $this->refresh();
+
+        if (! $deployment) {
+            $this->forceFill(['config_hash' => $this->legacyConfigurationHash()])->save();
+
+            return;
+        }
+
+        $snapshot = $this->deploymentConfigurationSnapshot();
+        $hash = ApplicationConfigurationSnapshot::hashSnapshot($snapshot);
+
+        $previousDeployment = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->id)
+            ->where('status', ApplicationDeploymentStatus::FINISHED->value)
+            ->where('pull_request_id', $deployment->pull_request_id ?? 0)
+            ->where('id', '!=', $deployment->id)
+            ->whereNotNull('configuration_snapshot')
+            ->latest()
+            ->first();
+
+        $deployment->update([
+            'configuration_hash' => $hash,
+            'configuration_snapshot' => $snapshot,
+            'configuration_diff' => $previousDeployment?->configuration_snapshot
+                ? app(ConfigurationDiffer::class)->diff($previousDeployment->configuration_snapshot, $snapshot)->toArray()
+                : null,
+        ]);
+
+        $this->forceFill(['config_hash' => $hash])->save();
+    }
+
+    private function legacyConfigurationHash(): string
+    {
         $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->custom_network_aliases.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->settings?->use_build_secrets.$this->settings?->inject_build_args_to_dockerfile.$this->settings?->include_source_commit_in_build);
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
             $newConfigHash .= json_encode($this->environment_variables()->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
         } else {
-            $newConfigHash .= json_encode($this->environment_variables_preview->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
+            $newConfigHash .= json_encode($this->environment_variables_preview()->get(['value', 'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
         }
-        $newConfigHash = md5($newConfigHash);
-        $oldConfigHash = data_get($this, 'config_hash');
-        if ($oldConfigHash === null) {
-            if ($save) {
-                $this->config_hash = $newConfigHash;
-                $this->save();
-            }
 
-            return true;
-        }
-        if ($oldConfigHash === $newConfigHash) {
-            return false;
-        } else {
-            if ($save) {
-                $this->config_hash = $newConfigHash;
-                $this->save();
-            }
-
-            return true;
-        }
+        return md5($newConfigHash);
     }
 
     public function customRepository()

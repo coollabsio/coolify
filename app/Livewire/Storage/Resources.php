@@ -25,7 +25,9 @@ class Resources extends Component
 
     public function disableS3(int $backupId): void
     {
-        $backup = ScheduledDatabaseBackup::findOrFail($backupId);
+        $backup = ScheduledDatabaseBackup::where('id', $backupId)
+            ->where('s3_storage_id', $this->storage->id)
+            ->firstOrFail();
 
         $backup->update([
             'save_s3' => false,
@@ -39,7 +41,9 @@ class Resources extends Component
 
     public function moveBackup(int $backupId): void
     {
-        $backup = ScheduledDatabaseBackup::findOrFail($backupId);
+        $backup = ScheduledDatabaseBackup::where('id', $backupId)
+            ->where('s3_storage_id', $this->storage->id)
+            ->firstOrFail();
         $newStorageId = $this->selectedStorages[$backupId] ?? null;
 
         if (! $newStorageId || (int) $newStorageId === $this->storage->id) {

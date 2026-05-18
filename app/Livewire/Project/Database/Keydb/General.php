@@ -92,7 +92,9 @@ class General extends Component
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
             'keydbConf' => 'nullable|string',
-            'keydbPassword' => 'required|string',
+            'keydbPassword' => ValidationPatterns::databasePasswordRules(
+                enforcePattern: $this->keydbPassword !== $this->database->keydb_password,
+            ),
             'image' => 'required|string',
             'portsMappings' => ValidationPatterns::portMappingRules(),
             'isPublic' => 'nullable|boolean',
@@ -114,8 +116,7 @@ class General extends Component
             ValidationPatterns::combinedMessages(),
             ValidationPatterns::portMappingMessages(),
             [
-                'keydbPassword.required' => 'The KeyDB Password field is required.',
-                'keydbPassword.string' => 'The KeyDB Password must be a string.',
+                ...ValidationPatterns::databasePasswordMessages('keydbPassword', 'KeyDB Password'),
                 'image.required' => 'The Docker Image field is required.',
                 'image.string' => 'The Docker Image must be a string.',
                 'publicPort.integer' => 'The Public Port must be an integer.',

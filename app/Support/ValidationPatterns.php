@@ -36,15 +36,31 @@ class ValidationPatterns
     public const DOCKER_TARGET_PATTERN = '/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/';
 
     /**
-     * Pattern for shell-safe command strings (docker compose commands, docker run options)
-     * Blocks dangerous shell metacharacters: ; | ` $ ( ) > < newlines and carriage returns
-     * Allows & for command chaining (&&) which is common in multi-step build commands
-     * Allows double quotes for build args with spaces (e.g. --build-arg KEY="value")
-     * Blocks backslashes to prevent escape-sequence attacks
-     * Allows single and double quotes for quoted arguments (e.g. --entrypoint "sh -c 'npm start'")
-     * Uses [ \t] instead of \s to explicitly exclude \n and \r (which act as command separators)
+     * Token-aware pattern for shell-safe command strings (docker compose commands, docker run options).
+     *
+     * Accepts a sequence of the following tokens only:
+     *   [ \t]+          — whitespace (space / tab)
+     *   &&              — logical AND (matched before bare & can match anything)
+     *   ||              — logical OR  (matched before bare | can match anything)
+     *   "[^"$`\\\n\r]*" — balanced double-quoted string; blocks $, backtick, \, newlines inside
+     *   '[^'\n\r]*'     — balanced single-quoted string; blocks newlines inside (all else literal)
+     *   [safe-chars]+   — unquoted alphanumerics + safe path/arg chars (includes glob *, ?, and !)
+     *
+     * Blocked everywhere (outside and inside unquoted tokens):
+     *   bare & (background op), bare |, ;, $, `, (, ), <, >, \, newline, CR
+     *
+     * Blocked inside double-quoted spans specifically:
+     *   $ (variable/command expansion), ` (command substitution), \ (escape)
+     *
+     * Legitimate use cases preserved:
+     *   docker compose build && docker tag x && docker push y
+     *   make build || make clean
+     *   rm *.tmp      cp src/?.js dist/
+     *   ! grep -q foo && echo missing
+     *   docker compose up -d --build-arg VERSION="1.0.0"
+     *   --entrypoint "sh -c 'npm start'"
      */
-    public const SHELL_SAFE_COMMAND_PATTERN = '/^[a-zA-Z0-9 \t._\-\/=:@,+\[\]{}#%^~&"\']+$/';
+    public const SHELL_SAFE_COMMAND_PATTERN = '/^(?:[ \t]+|&&|\|\||"[^"$`\\\\\n\r]*"|\'[^\'\n\r]*\'|[a-zA-Z0-9._\-\/=:@,+\[\]{}#%^~*?!]+)+$/';
 
     /**
      * Pattern for Docker volume names
@@ -65,6 +81,179 @@ class ValidationPatterns
      * Matches Docker's network naming rules and prevents shell injection
      */
     public const DOCKER_NETWORK_PATTERN = '/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/';
+
+    /**
+     * Pattern for Docker-compatible environment variable keys.
+     * Docker environment entries are KEY=value strings, so keys must be non-empty and cannot contain '=' or NUL.
+     */
+    public const ENVIRONMENT_VARIABLE_KEY_PATTERN = '/\A[^=\x00]+\z/u';
+
+    /**
+     * Pattern for SQL-safe unquoted database identifiers (usernames, database names).
+     * Allows letters, digits, underscore; first char must be letter or underscore.
+     * Excludes all shell metacharacters. Max 63 chars (Postgres identifier limit).
+     */
+    public const DB_IDENTIFIER_PATTERN = '/^[A-Za-z_][A-Za-z0-9_]{0,62}$/';
+
+    /**
+     * Pattern for database passwords.
+     * Excludes shell-dangerous characters: backtick, $, ;, |, &, <, >, \, ', ", space, newline, CR, tab, null.
+     * Allows a broad set of printable characters so passwords remain strong.
+     */
+    public const DB_PASSWORD_PATTERN = '/^[A-Za-z0-9!@#%^*()_+\-=\[\]{}:,.?\/~]+$/';
+
+    /**
+     * Normalize environment variable keys before validation and storage.
+     */
+    public static function normalizeEnvironmentVariableKey(string $value): string
+    {
+        return str($value)->trim()->value;
+    }
+
+    /**
+     * Get validation rules for environment variable keys.
+     */
+    public static function environmentVariableKeyRules(bool $required = true, int $maxLength = 255): array
+    {
+        $rules = [];
+
+        if ($required) {
+            $rules[] = 'required';
+        } else {
+            $rules[] = 'nullable';
+        }
+
+        $rules[] = 'string';
+        $rules[] = "max:$maxLength";
+        $rules[] = 'regex:'.self::ENVIRONMENT_VARIABLE_KEY_PATTERN;
+
+        return $rules;
+    }
+
+    /**
+     * Get validation messages for environment variable key fields.
+     */
+    public static function environmentVariableKeyMessages(string $field = 'key', string $label = 'key'): array
+    {
+        return [
+            "{$field}.regex" => "The {$label} must be a non-empty Docker-compatible environment variable key and cannot contain '=' or NUL characters.",
+            "{$field}.max" => "The {$label} may not be greater than :max characters.",
+        ];
+    }
+
+    /**
+     * Check if a string is a valid environment variable key.
+     */
+    public static function isValidEnvironmentVariableKey(string $value): bool
+    {
+        return preg_match(self::ENVIRONMENT_VARIABLE_KEY_PATTERN, $value) === 1;
+    }
+
+    /**
+     * Normalize and validate an environment variable key.
+     */
+    public static function validatedEnvironmentVariableKey(string $value, string $label = 'key'): string
+    {
+        $key = self::normalizeEnvironmentVariableKey($value);
+
+        if (! self::isValidEnvironmentVariableKey($key)) {
+            throw new \InvalidArgumentException(self::environmentVariableKeyMessages(label: $label)['key.regex']);
+        }
+
+        return $key;
+    }
+
+    /**
+     * Get validation rules for database identifier fields (username, database name).
+     *
+     * Set $enforcePattern to false to skip the regex check (for example when
+     * re-validating a legacy value on an existing record that has not been
+     * changed by the user). The length and type rules are always applied.
+     */
+    public static function databaseIdentifierRules(bool $required = true, int $minLength = 1, int $maxLength = 63, bool $enforcePattern = true): array
+    {
+        $rules = [];
+
+        if ($required) {
+            $rules[] = 'required';
+        } else {
+            $rules[] = 'nullable';
+        }
+
+        $rules[] = 'string';
+        $rules[] = "min:$minLength";
+        $rules[] = "max:$maxLength";
+
+        if ($enforcePattern) {
+            $rules[] = 'regex:'.self::DB_IDENTIFIER_PATTERN;
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Get validation messages for database identifier fields.
+     */
+    public static function databaseIdentifierMessages(string $field, string $label = ''): array
+    {
+        $label = $label ?: $field;
+
+        return [
+            "{$field}.regex" => "The {$label} may only contain letters, digits, and underscores, and must start with a letter or underscore.",
+            "{$field}.min" => "The {$label} must be at least :min character.",
+            "{$field}.max" => "The {$label} may not be greater than :max characters.",
+        ];
+    }
+
+    /**
+     * Get validation rules for database password fields.
+     *
+     * Set $enforcePattern to false to skip the regex check (for example when
+     * re-validating a legacy value on an existing record that has not been
+     * changed by the user). The length and type rules are always applied.
+     */
+    public static function databasePasswordRules(bool $required = true, int $minLength = 1, int $maxLength = 128, bool $enforcePattern = true): array
+    {
+        $rules = [];
+
+        if ($required) {
+            $rules[] = 'required';
+        } else {
+            $rules[] = 'nullable';
+        }
+
+        $rules[] = 'string';
+        $rules[] = "min:$minLength";
+        $rules[] = "max:$maxLength";
+
+        if ($enforcePattern) {
+            $rules[] = 'regex:'.self::DB_PASSWORD_PATTERN;
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Get validation messages for database password fields.
+     */
+    public static function databasePasswordMessages(string $field, string $label = ''): array
+    {
+        $label = $label ?: $field;
+
+        return [
+            "{$field}.regex" => "The {$label} may not contain shell-unsafe characters (backtick, \$, ;, |, &, <, >, \\, quotes, spaces, or control characters).",
+            "{$field}.min" => "The {$label} must be at least :min character.",
+            "{$field}.max" => "The {$label} may not be greater than :max characters.",
+        ];
+    }
+
+    /**
+     * Check if a string is a valid database identifier.
+     */
+    public static function isValidDatabaseIdentifier(string $value): bool
+    {
+        return preg_match(self::DB_IDENTIFIER_PATTERN, $value) === 1;
+    }
 
     /**
      * Get validation rules for name fields
