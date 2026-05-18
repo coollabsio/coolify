@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Shared;
 use App\Actions\Application\StopApplicationOneServer;
 use App\Actions\Docker\GetContainersStatus;
 use App\Events\ApplicationStatusChanged;
+use App\Models\KubernetesCluster;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use Illuminate\Support\Collection;
@@ -36,6 +37,12 @@ class Destination extends Component
 
     public function loadData()
     {
+        if ($this->resource->destination instanceof KubernetesCluster) {
+            $this->networks = collect([]);
+
+            return;
+        }
+
         $all_networks = collect([]);
         $all_networks = $all_networks->push($this->resource->destination);
         $all_networks = $all_networks->merge($this->resource->additional_networks);

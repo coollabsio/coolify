@@ -17,7 +17,11 @@
                     Server: {{ data_get($resource, 'destination.server.name') }}
                 </div>
                 <div class="box-description">
-                    Network: {{ data_get($resource, 'destination.network') }}
+                    @if ($resource->destination->getMorphClass() === 'App\Models\KubernetesCluster')
+                        Namespace: {{ data_get($resource, 'destination.namespace') }}
+                    @else
+                        Network: {{ data_get($resource, 'destination.network') }}
+                    @endif
                 </div>
             </div>
             @if ($resource?->additional_networks?->count() > 0)

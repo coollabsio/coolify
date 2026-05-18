@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Application\StopApplication;
 use App\Actions\Docker\GetContainersStatus;
 use App\Models\Application;
+use App\Models\KubernetesCluster;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
@@ -51,6 +52,12 @@ class Heading extends Component
 
     public function checkStatus()
     {
+        if ($this->application->destination instanceof KubernetesCluster) {
+            $this->dispatch('success', 'Kubernetes status is updated during deployments.');
+
+            return;
+        }
+
         if ($this->application->destination->server->isFunctional()) {
             GetContainersStatus::dispatch($this->application->destination->server);
         } else {
@@ -81,6 +88,21 @@ class Heading extends Component
         }
         if ($this->application->destination->server->isSwarm() && str($this->application->docker_registry_image_name)->isEmpty()) {
             $this->dispatch('error', 'Failed to deploy.', 'To deploy to a Swarm cluster you must set a Docker image name first.');
+
+            return;
+        }
+        if ($this->application->destination instanceof KubernetesCluster && $this->application->build_pack === 'dockercompose') {
+            $this->dispatch('error', 'Failed to deploy.', 'Kubernetes destinations do not support Docker Compose applications yet.');
+
+            return;
+        }
+        if ($this->application->destination instanceof KubernetesCluster && $this->application->persistentStorages()->count() > 0) {
+            $this->dispatch('error', 'Failed to deploy.', 'Kubernetes destinations do not support Coolify persistent storage volumes yet.');
+
+            return;
+        }
+        if ($this->application->destination instanceof KubernetesCluster && $this->application->build_pack !== 'dockerimage' && str($this->application->docker_registry_image_name)->isEmpty()) {
+            $this->dispatch('error', 'Failed to deploy.', 'To deploy built applications to Kubernetes you must set a Docker image name first.');
 
             return;
         }
@@ -137,6 +159,16 @@ class Heading extends Component
     {
         $this->authorize('deploy', $this->application);
 
+        if ($this->application->destination instanceof KubernetesCluster && $this->application->build_pack === 'dockercompose') {
+            $this->dispatch('error', 'Failed to deploy.', 'Kubernetes destinations do not support Docker Compose applications yet.');
+
+            return;
+        }
+        if ($this->application->destination instanceof KubernetesCluster && $this->application->build_pack !== 'dockerimage' && str($this->application->docker_registry_image_name)->isEmpty()) {
+            $this->dispatch('error', 'Failed to deploy.', 'To deploy built applications to Kubernetes you must set a Docker image name first.');
+
+            return;
+        }
         if ($this->application->additional_servers->count() > 0 && str($this->application->docker_registry_image_name)->isEmpty()) {
             $this->dispatch('error', 'Failed to deploy', 'Before deploying to multiple servers, you must first set a Docker image in the General tab.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/multiple-servers">documentation</a>');
 

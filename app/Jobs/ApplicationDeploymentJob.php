@@ -14,11 +14,14 @@ use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\KubernetesCluster;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Services\Kubernetes\KubernetesApplicationManifestGenerator;
+use App\Services\Kubernetes\KubernetesKubectlCommandBuilder;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\ExecuteRemoteCommand;
@@ -85,7 +88,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private GithubApp|GitlabApp|string $source = 'other';
 
-    private StandaloneDocker|SwarmDocker $destination;
+    private StandaloneDocker|SwarmDocker|KubernetesCluster $destination;
 
     // Deploy to Server
     private Server $server;
@@ -189,6 +192,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private Collection|string $build_secrets;
 
+    private bool $helperContainerStarted = false;
+
     public function tags()
     {
         // Do not remove this one, it needs to properly identify which worker is running the job
@@ -229,7 +234,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         $this->server = Server::find($this->application_deployment_queue->server_id);
         $this->timeout = $this->server->settings->dynamic_timeout;
-        $this->destination = $this->server->destinations()->where('id', $this->application_deployment_queue->destination_id)->first();
+        if ((int) $this->application->destination_id === (int) $this->application_deployment_queue->destination_id) {
+            $destination = $this->application->destination;
+        } else {
+            $destination = $this->server->destinations()
+                ->first(fn ($destination) => (int) $destination->id === (int) $this->application_deployment_queue->destination_id);
+        }
+        if (! $destination) {
+            throw new DeploymentException('Deployment destination not found.');
+        }
+        $this->destination = $destination;
         $this->server = $this->mainServer = $this->destination->server;
         $this->serverUser = $this->server->user;
         $this->is_this_additional_server = $this->application->additional_servers()->wherePivot('server_id', $this->server->id)->count() > 0;
@@ -302,34 +316,36 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         try {
             // Make sure the private key is stored in the filesystem
             $this->server->privateKey->storeInFileSystem();
-            // Generate custom host<->ip mapping
-            $safeNetwork = escapeshellarg($this->destination->network);
-            $allContainers = instant_remote_process(["docker network inspect {$safeNetwork} -f '{{json .Containers}}' "], $this->server);
+            if (! ($this->destination instanceof KubernetesCluster)) {
+                // Generate custom host<->ip mapping
+                $safeNetwork = escapeshellarg($this->destination->network);
+                $allContainers = instant_remote_process(["docker network inspect {$safeNetwork} -f '{{json .Containers}}' "], $this->server);
 
-            if (! is_null($allContainers)) {
-                $allContainers = format_docker_command_output_to_json($allContainers);
-                $ips = collect([]);
-                if (count($allContainers) > 0) {
-                    $allContainers = $allContainers[0];
-                    $allContainers = collect($allContainers)->sort()->values();
-                    foreach ($allContainers as $container) {
-                        $containerName = data_get($container, 'Name');
-                        if ($containerName === 'coolify-proxy') {
-                            continue;
-                        }
-                        if (preg_match('/-(\d{12})/', $containerName)) {
-                            continue;
-                        }
-                        $containerIp = data_get($container, 'IPv4Address');
-                        if ($containerName && $containerIp) {
-                            $containerIp = str($containerIp)->before('/');
-                            $ips->put($containerName, $containerIp->value());
+                if (! is_null($allContainers)) {
+                    $allContainers = format_docker_command_output_to_json($allContainers);
+                    $ips = collect([]);
+                    if (count($allContainers) > 0) {
+                        $allContainers = $allContainers[0];
+                        $allContainers = collect($allContainers)->sort()->values();
+                        foreach ($allContainers as $container) {
+                            $containerName = data_get($container, 'Name');
+                            if ($containerName === 'coolify-proxy') {
+                                continue;
+                            }
+                            if (preg_match('/-(\d{12})/', $containerName)) {
+                                continue;
+                            }
+                            $containerIp = data_get($container, 'IPv4Address');
+                            if ($containerName && $containerIp) {
+                                $containerIp = str($containerIp)->before('/');
+                                $ips->put($containerName, $containerIp->value());
+                            }
                         }
                     }
+                    $this->addHosts = $ips->map(function ($ip, $name) {
+                        return "--add-host $name:$ip";
+                    })->implode(' ');
                 }
-                $this->addHosts = $ips->map(function ($ip, $name) {
-                    return "--add-host $name:$ip";
-                })->implode(' ');
             }
 
             if ($this->application->dockerfile_target_build) {
@@ -390,8 +406,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             try {
-                $this->application_deployment_queue->addLogEntry("Gracefully shutting down build container: {$this->deployment_uuid}");
-                $this->graceful_shutdown_container($this->deployment_uuid, skipRemove: true);
+                if ($this->helperContainerStarted) {
+                    $this->application_deployment_queue->addLogEntry("Gracefully shutting down build container: {$this->deployment_uuid}");
+                    $this->graceful_shutdown_container($this->deployment_uuid, skipRemove: true);
+                }
             } catch (Exception $e) {
                 // Log but don't fail - container cleanup errors are expected when container is already gone
                 \Log::warning('Failed to shutdown container '.$this->deployment_uuid.': '.$e->getMessage());
@@ -516,7 +534,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Then handle side effects - these should not fail the deployment
         try {
-            GetContainersStatus::dispatch($this->server);
+            if (! ($this->destination instanceof KubernetesCluster)) {
+                GetContainersStatus::dispatch($this->server);
+            }
         } catch (Exception $e) {
             \Log::warning('Failed to dispatch GetContainersStatus for deployment '.$this->deployment_uuid.': '.$e->getMessage());
         }
@@ -532,7 +552,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         try {
-            $this->run_post_deployment_command();
+            if (! ($this->destination instanceof KubernetesCluster)) {
+                $this->run_post_deployment_command();
+            } elseif (filled($this->application->post_deployment_command)) {
+                $this->application_deployment_queue->addLogEntry('Post-deployment command skipped for Kubernetes destinations.');
+            }
         } catch (Exception $e) {
             \Log::warning('Post deployment command failed for '.$this->deployment_uuid.': '.$e->getMessage());
         }
@@ -581,6 +605,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->application_deployment_queue->addLogEntry("Starting deployment of {$displayName} to {$this->server->name}.");
         $this->generate_image_names();
+        if ($this->destination instanceof KubernetesCluster) {
+            $this->rolling_update();
+
+            return;
+        }
+
         $this->prepare_builder_image();
         $this->generate_compose_file();
 
@@ -1197,6 +1227,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function just_restart()
     {
+        if ($this->destination instanceof KubernetesCluster) {
+            $this->restart_kubernetes_deployment();
+            $this->completeDeployment();
+
+            return;
+        }
+
         $this->application_deployment_queue->addLogEntry("Restarting {$this->customRepository}:{$this->application->git_branch} on {$this->server->name}.");
 
         // Restart doesn't need the build server — disable it so the helper container
@@ -1215,6 +1252,36 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->should_skip_build();
         $this->completeDeployment();
+    }
+
+    private function restart_kubernetes_deployment(): void
+    {
+        $cluster = $this->destination;
+        $builder = new KubernetesKubectlCommandBuilder;
+        $generator = new KubernetesApplicationManifestGenerator;
+        $resourceName = $generator->resourceName($this->application);
+        $kubeconfigPath = $cluster->effectiveKubeconfigPath();
+        $commands = [
+            ['command' => 'mkdir -p '.escapeshellarg($cluster->configurationDirectory()), 'hidden' => true],
+        ];
+
+        if (filled($cluster->kubeconfig)) {
+            $commands[] = ['command' => $builder->writeKubeconfig($cluster->storedKubeconfigPath(), $cluster->kubeconfig), 'hidden' => true];
+            $kubeconfigPath = $cluster->storedKubeconfigPath();
+        }
+
+        if (blank($kubeconfigPath)) {
+            throw new DeploymentException('Kubernetes kubeconfig is not configured.');
+        }
+
+        $this->server = $this->mainServer;
+        $this->application_deployment_queue->addLogEntry("Restarting Kubernetes deployment {$resourceName}.");
+        $this->execute_remote_command(
+            ...array_merge($commands, [
+                ['command' => $builder->rolloutRestart($cluster, $resourceName, $kubeconfigPath), 'type' => 'stdout'],
+                ['command' => $builder->rolloutStatus($cluster, $resourceName, $this->timeout, $kubeconfigPath), 'type' => 'stdout'],
+            ])
+        );
     }
 
     private function should_skip_build()
@@ -1879,6 +1946,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $this->checkForCancellation();
+            if ($this->destination instanceof KubernetesCluster) {
+                $this->deploy_to_kubernetes();
+
+                return;
+            }
+
             if ($this->server->isSwarm()) {
                 $this->application_deployment_queue->addLogEntry('Rolling update started.');
                 $this->execute_remote_command(
@@ -1924,6 +1997,89 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Exception $e) {
             throw new DeploymentException('Rolling update failed ('.get_class($e).'): '.$e->getMessage(), $e->getCode(), $e);
         }
+    }
+
+    private function deploy_to_kubernetes(): void
+    {
+        if ($this->application->build_pack === 'dockercompose') {
+            throw new DeploymentException('Kubernetes destinations do not support Docker Compose applications yet.');
+        }
+
+        if ($this->application->persistentStorages()->count() > 0) {
+            throw new DeploymentException('Kubernetes destinations do not support Coolify persistent storage volumes yet.');
+        }
+
+        if ($this->build_pack !== 'dockerimage' && blank($this->application->docker_registry_image_name)) {
+            throw new DeploymentException('Kubernetes build deployments require a Docker registry image name.');
+        }
+
+        $this->server = $this->mainServer;
+        $cluster = $this->destination;
+        if (! ($cluster instanceof KubernetesCluster)) {
+            throw new DeploymentException('Invalid Kubernetes destination.');
+        }
+
+        $builder = new KubernetesKubectlCommandBuilder;
+        $generator = new KubernetesApplicationManifestGenerator;
+        $resourceName = $generator->resourceName($this->application);
+        $manifestDirectory = "{$this->configuration_dir}/kubernetes";
+        $manifestPath = "{$manifestDirectory}/manifest-{$this->deployment_uuid}.yaml";
+        $kubeconfigPath = $cluster->effectiveKubeconfigPath();
+        $manifestYaml = $generator->toYaml($this->application, [
+            'namespace' => $cluster->namespace,
+            'ingress_class' => $cluster->ingress_class,
+            'service_type' => $cluster->service_type,
+            'replicas' => $cluster->replicas,
+            'autoscaling' => $cluster->autoscaling_enabled,
+            'min_replicas' => $cluster->min_replicas,
+            'max_replicas' => $cluster->max_replicas,
+            'target_cpu_utilization_percentage' => $cluster->target_cpu_utilization_percentage,
+            'image' => $this->production_image_name,
+            'deployment_uuid' => $this->deployment_uuid,
+            'environment' => $this->kubernetesRuntimeEnvironment(),
+        ]);
+
+        $commands = [
+            ['command' => 'mkdir -p '.escapeshellarg($manifestDirectory), 'hidden' => true],
+            ['command' => 'mkdir -p '.escapeshellarg($cluster->configurationDirectory()), 'hidden' => true],
+            ['command' => $builder->writeManifest($manifestPath, $manifestYaml), 'hidden' => true],
+        ];
+
+        if (filled($cluster->kubeconfig)) {
+            $commands[] = ['command' => $builder->writeKubeconfig($cluster->storedKubeconfigPath(), $cluster->kubeconfig), 'hidden' => true];
+            $kubeconfigPath = $cluster->storedKubeconfigPath();
+        }
+
+        if (blank($kubeconfigPath)) {
+            throw new DeploymentException('Kubernetes kubeconfig is not configured.');
+        }
+
+        $this->application_deployment_queue->addLogEntry('----------------------------------------');
+        $this->application_deployment_queue->addLogEntry("Applying Kubernetes manifests to namespace {$cluster->namespace}.");
+        $this->execute_remote_command(
+            ...array_merge($commands, [
+                ['command' => $builder->version($cluster, $kubeconfigPath), 'hidden' => true],
+                ['command' => $builder->serverSideDryRun($cluster, $manifestPath, $kubeconfigPath), 'hidden' => true],
+                ['command' => $builder->apply($cluster, $manifestPath, $kubeconfigPath), 'type' => 'stdout'],
+                ['command' => $builder->rolloutStatus($cluster, $resourceName, $this->timeout, $kubeconfigPath), 'type' => 'stdout'],
+            ])
+        );
+        $this->application->update(['status' => 'running']);
+        $this->application_deployment_queue->addLogEntry('Kubernetes rollout completed.');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function kubernetesRuntimeEnvironment(): array
+    {
+        return $this->generate_runtime_environment_variables()
+            ->mapWithKeys(function (string $line) {
+                [$key, $value] = array_pad(explode('=', $line, 2), 2, '');
+
+                return [$key => $value];
+            })
+            ->toArray();
     }
 
     private function health_check()
@@ -2112,12 +2268,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             $runCommand = "docker run -d --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
         } else {
+            $networkOption = '';
+            if (! ($this->destination instanceof KubernetesCluster)) {
+                $networkOption = ' --network '.escapeshellarg($this->destination->network);
+            }
             if ($this->dockerConfigFileExists === 'OK') {
-                $safeNetwork = escapeshellarg($this->destination->network);
-                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+                $runCommand = "docker run -d{$networkOption} --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
             } else {
-                $safeNetwork = escapeshellarg($this->destination->network);
-                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+                $runCommand = "docker run -d{$networkOption} --name {$this->deployment_uuid} {$env_flags} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
             }
         }
         if ($firstTry) {
@@ -2136,6 +2294,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 'command' => executeInDocker($this->deployment_uuid, "mkdir -p {$this->basedir}"),
             ],
         );
+        $this->helperContainerStarted = true;
         $this->run_pre_deployment_command();
     }
 
@@ -3042,6 +3201,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function generate_compose_file()
     {
+        if ($this->destination instanceof KubernetesCluster) {
+            $this->prepare_kubernetes_build_context();
+
+            return;
+        }
+
         $this->checkForCancellation();
         $this->create_workdir();
         $ports = $this->application->main_port();
@@ -3280,6 +3445,22 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->docker_compose_base64 = base64_encode($this->docker_compose);
         $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}/docker-compose.yaml > /dev/null"), 'hidden' => true]);
+    }
+
+    private function prepare_kubernetes_build_context(): void
+    {
+        $this->checkForCancellation();
+        $this->create_workdir();
+
+        if ($this->application->build_pack === 'dockerfile' || $this->application->dockerfile) {
+            $this->execute_remote_command([
+                executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"),
+                'hidden' => true,
+                'save' => 'dockerfile_from_repo',
+                'ignore_errors' => true,
+            ]);
+            $this->application->parseHealthcheckFromDockerfile($this->saved_outputs->get('dockerfile_from_repo'));
+        }
     }
 
     private function generate_local_persistent_volumes()
@@ -4259,6 +4440,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function modify_dockerfiles_for_compose($composeFile)
     {
+        if ($this->destination instanceof KubernetesCluster) {
+            return;
+        }
+
         if ($this->application->build_pack !== 'dockercompose') {
             return;
         }
@@ -4820,6 +5005,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->application_deployment_queue->addLogEntry("  {$traceLine}", 'stderr', hidden: true);
         }
         $this->application_deployment_queue->addLogEntry('========================================', 'stderr');
+
+        if ($this->destination instanceof KubernetesCluster) {
+            return;
+        }
 
         if ($this->application->build_pack !== 'dockercompose') {
             $code = $exception->getCode();

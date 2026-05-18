@@ -469,6 +469,17 @@
                         </div>
                     </div>
                 @endforeach
+                @foreach ($kubernetesClusters ?? [] as $kubernetesCluster)
+                    <div class="w-full coolbox group" wire:click="setDestination('{{ $kubernetesCluster->uuid }}')">
+                        <div class="flex flex-col mx-6">
+                            <div class="box-title">
+                                Kubernetes <span class="text-xs">({{ $kubernetesCluster->name }})</span>
+                            </div>
+                            <div class="box-description">
+                                Namespace: {{ $kubernetesCluster->namespace }}</div>
+                        </div>
+                    </div>
+                @endforeach
             @endif
         </div>
     @endif

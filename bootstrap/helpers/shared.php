@@ -10,6 +10,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
+use App\Models\KubernetesCluster;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\Server;
@@ -328,14 +329,15 @@ function currentTeam()
     return Auth::user()?->currentTeam() ?? null;
 }
 
-function find_destination_for_current_team(?string $uuid): StandaloneDocker|SwarmDocker|null
+function find_destination_for_current_team(?string $uuid): StandaloneDocker|SwarmDocker|KubernetesCluster|null
 {
     if (blank($uuid) || ! currentTeam()) {
         return null;
     }
 
     return StandaloneDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first()
-        ?? SwarmDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first();
+        ?? SwarmDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first()
+        ?? KubernetesCluster::ownedByCurrentTeam()->where('uuid', $uuid)->first();
 }
 
 function showBoarding(): bool

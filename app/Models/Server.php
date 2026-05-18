@@ -23,6 +23,7 @@ use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -313,7 +314,7 @@ class Server extends BaseModel
         $teamId = currentTeam()->id;
         $selectArray = collect($select)->concat(['id']);
 
-        return Server::whereTeamId($teamId)->with('settings', 'swarmDockers', 'standaloneDockers')->select($selectArray->all())->orderBy('name');
+        return Server::whereTeamId($teamId)->with('settings', 'swarmDockers', 'standaloneDockers', 'kubernetesClusters')->select($selectArray->all())->orderBy('name');
     }
 
     /**
@@ -994,8 +995,9 @@ $schema://$host {
     {
         $standalone_docker = $this->hasMany(StandaloneDocker::class)->get();
         $swarm_docker = $this->hasMany(SwarmDocker::class)->get();
+        $kubernetes_clusters = $this->hasMany(KubernetesCluster::class)->get();
 
-        return $standalone_docker->concat($swarm_docker);
+        return $standalone_docker->concat($swarm_docker)->concat($kubernetes_clusters);
     }
 
     public function standaloneDockers()
@@ -1006,6 +1008,11 @@ $schema://$host {
     public function swarmDockers()
     {
         return $this->hasMany(SwarmDocker::class);
+    }
+
+    public function kubernetesClusters(): HasMany
+    {
+        return $this->hasMany(KubernetesCluster::class);
     }
 
     public function privateKey()

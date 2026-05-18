@@ -11,7 +11,16 @@
                     <h2>Destinations</h2>
                     @can('update', $server)
                         <x-modal-input buttonTitle="+ Add" title="New Destination">
-                            <livewire:destination.new.docker :server_id="$server->id" />
+                            <div class="flex flex-col gap-8">
+                                <div>
+                                    <h3 class="pb-2">Docker</h3>
+                                    <livewire:destination.new.docker :server_id="$server->id" />
+                                </div>
+                                <div>
+                                    <h3 class="pb-2">Kubernetes</h3>
+                                    <livewire:destination.new.kubernetes :server_id="$server->id" />
+                                </div>
+                            </div>
                         </x-modal-input>
                     @endcan
                     <x-forms.button canGate="update" :canResource="$server" isHighlighted wire:click='scan'>Scan for Destinations</x-forms.button>
@@ -27,6 +36,11 @@
                     @foreach ($server->swarmDockers as $docker)
                         <a href="{{ route('destination.show', ['destination_uuid' => data_get($docker, 'uuid')]) }}" {{ wireNavigate() }}>
                             <x-forms.button>{{ data_get($docker, 'network') }} </x-forms.button>
+                        </a>
+                    @endforeach
+                    @foreach ($server->kubernetesClusters as $cluster)
+                        <a href="{{ route('destination.show', ['destination_uuid' => data_get($cluster, 'uuid')]) }}" {{ wireNavigate() }}>
+                            <x-forms.button>{{ data_get($cluster, 'namespace') }} </x-forms.button>
                         </a>
                     @endforeach
                 </div>

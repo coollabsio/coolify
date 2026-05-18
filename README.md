@@ -15,6 +15,8 @@ It helps you manage your servers, applications, and databases on your own hardwa
 
 Imagine having the ease of a cloud but with your own servers. That is **Coolify**.
 
+Kubernetes deployment-target work is tracked in [docs/specs/20260518-kubernetes-destination-foundation.md](./docs/specs/20260518-kubernetes-destination-foundation.md). It includes Kubernetes destinations, UI create/edit/select flows, manifest generation, encrypted kubeconfig support, server-side dry-runs, `kubectl apply`, rollout status, restart, and stop-by-scale.
+
 No vendor lock-in, which means that all the configurations for your applications/databases/etc are saved to your server. So, if you decide to stop using Coolify (oh nooo), you could still manage your running resources. You lose the automations and all the magic. 🪄️
 
 For more information, take a look at our landing page at [coolify.io](https://coolify.io).

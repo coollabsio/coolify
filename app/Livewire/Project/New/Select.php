@@ -29,6 +29,8 @@ class Select extends Component
 
     public ?Collection $swarmDockers;
 
+    public ?Collection $kubernetesClusters;
+
     public array $parameters;
 
     public Collection|array $services = [];
@@ -329,11 +331,12 @@ class Select extends Component
         $this->server = $server;
         $this->standaloneDockers = $server->standaloneDockers;
         $this->swarmDockers = $server->swarmDockers;
-        $count = count($this->standaloneDockers) + count($this->swarmDockers);
+        $this->kubernetesClusters = $this->isDatabase ? collect([]) : $server->kubernetesClusters;
+        $count = count($this->standaloneDockers) + count($this->swarmDockers) + count($this->kubernetesClusters);
         if ($count === 1) {
-            $docker = $this->standaloneDockers->first() ?? $this->swarmDockers->first();
-            if ($docker) {
-                $this->setDestination($docker->uuid);
+            $destination = $this->standaloneDockers->first() ?? $this->swarmDockers->first() ?? $this->kubernetesClusters->first();
+            if ($destination) {
+                $this->setDestination($destination->uuid);
 
                 return $this->whatToDoNext();
             }

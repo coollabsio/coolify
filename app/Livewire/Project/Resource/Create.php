@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Resource;
 
 use App\Models\EnvironmentVariable;
+use App\Models\KubernetesCluster;
 use App\Models\Service;
 use Livewire\Component;
 
@@ -34,6 +35,13 @@ class Create extends Component
                 return redirect()->route('dashboard');
             }
             $services = get_service_templates();
+
+            if ($destination instanceof KubernetesCluster && (in_array($type, DATABASE_TYPES) || $type->startsWith('one-click-service-') || $type->startsWith('docker-compose-empty'))) {
+                return redirect()->route('project.resource.create', [
+                    'project_uuid' => $project->uuid,
+                    'environment_uuid' => $environment->uuid,
+                ]);
+            }
 
             if (in_array($type, DATABASE_TYPES)) {
                 if ($type->value() === 'postgresql') {
