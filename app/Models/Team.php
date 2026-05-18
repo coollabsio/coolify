@@ -40,7 +40,13 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 {
     use HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+        'personal_team',
+        'show_boarding',
+        'custom_server_limit',
+    ];
 
     protected $casts = [
         'personal_team' => 'boolean',
@@ -65,34 +71,43 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             }
         });
 
-        static::deleting(function ($team) {
-            $keys = $team->privateKeys;
-            foreach ($keys as $key) {
+        static::deleting(function (Team $team) {
+            foreach ($team->privateKeys as $key) {
                 $key->delete();
             }
-            $sources = $team->sources();
-            foreach ($sources as $source) {
+
+            // Transfer instance-wide sources to root team so they remain available
+            GithubApp::where('team_id', $team->id)->where('is_system_wide', true)->update(['team_id' => 0]);
+            GitlabApp::where('team_id', $team->id)->where('is_system_wide', true)->update(['team_id' => 0]);
+
+            // Delete non-instance-wide sources owned by this team
+            $teamSources = GithubApp::where('team_id', $team->id)->get()
+                ->merge(GitlabApp::where('team_id', $team->id)->get());
+            foreach ($teamSources as $source) {
                 $source->delete();
             }
-            $tags = Tag::whereTeamId($team->id)->get();
-            foreach ($tags as $tag) {
+
+            foreach (Tag::whereTeamId($team->id)->get() as $tag) {
                 $tag->delete();
             }
-            $shared_variables = $team->environment_variables();
-            foreach ($shared_variables as $shared_variable) {
-                $shared_variable->delete();
+
+            foreach ($team->environment_variables()->get() as $sharedVariable) {
+                $sharedVariable->delete();
             }
-            $s3s = $team->s3s;
-            foreach ($s3s as $s3) {
+
+            foreach ($team->s3s as $s3) {
                 $s3->delete();
             }
         });
     }
 
-    public static function serverLimitReached()
+    public static function serverLimitReached(?Team $team = null)
     {
-        $serverLimit = Team::serverLimit();
-        $team = currentTeam();
+        $team = $team ?? currentTeam();
+        if (! $team) {
+            return true;
+        }
+        $serverLimit = Team::serverLimit($team);
         $servers = $team->servers->count();
 
         return $servers >= $serverLimit;
@@ -109,19 +124,23 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     public function serverOverflow()
     {
-        if ($this->serverLimit() < $this->servers->count()) {
+        if (Team::serverLimit($this) < $this->servers->count()) {
             return true;
         }
 
         return false;
     }
 
-    public static function serverLimit()
+    public static function serverLimit(?Team $team = null)
     {
-        if (currentTeam()->id === 0 && isDev()) {
+        $team = $team ?? currentTeam();
+        if (! $team) {
+            return 0;
+        }
+        if ($team->id === 0 && isDev()) {
             return 9999999;
         }
-        $team = Team::find(currentTeam()->id);
+        $team = Team::find($team->id);
         if (! $team) {
             return 0;
         }
@@ -197,6 +216,10 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     public function subscriptionEnded()
     {
+        if (! $this->subscription) {
+            return;
+        }
+
         $this->subscription->update([
             'stripe_subscription_id' => null,
             'stripe_cancel_at_period_end' => false,
@@ -210,12 +233,15 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
                 'is_reachable' => false,
             ]);
             ServerReachabilityChanged::dispatch($server);
+            $server->unreachable_count = 3;
+            $server->unreachable_notification_sent = true;
+            $server->save();
         }
     }
 
     public function environment_variables()
     {
-        return $this->hasMany(SharedEnvironmentVariable::class)->whereNull('project_id')->whereNull('environment_id');
+        return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'team');
     }
 
     public function members()

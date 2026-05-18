@@ -1,4 +1,4 @@
-<div>
+<div class="flex h-[calc(100vh-10rem)] min-h-[50rem] flex-col overflow-hidden">
     <x-slot:title>
         {{ data_get_str($application, 'name')->limit(10) }} > Deployment | Coolify
         </x-slot>
@@ -165,13 +165,13 @@
                 this.scheduleScroll();
             }
         }
-    }">
+    }" class="flex flex-1 min-h-0 flex-col overflow-hidden">
             <livewire:project.application.deployment-navbar
                 :application_deployment_queue="$application_deployment_queue" />
-            <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-4 relative'">
+            <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-4 flex flex-1 min-h-0 flex-col overflow-hidden'">
                 <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
-                    class="flex flex-col w-full bg-white dark:text-white dark:bg-coolgray-100 dark:border-coolgray-300"
-                    :class="fullscreen ? 'h-full' : 'border border-dotted rounded-sm'">
+                    class="flex min-h-0 flex-col w-full overflow-hidden bg-white dark:text-white dark:bg-coolgray-100 dark:border-coolgray-300"
+                    :class="fullscreen ? 'h-full' : 'flex-1 border border-dotted rounded-sm'">
                     <div
                         class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
                         <div class="flex items-center gap-3">
@@ -328,9 +328,8 @@
                         </div>
                     </div>
                     <div id="logsContainer"
-                        class="flex flex-col overflow-y-auto p-2 px-4 min-h-4 scrollbar"
-                        :class="fullscreen ? 'flex-1' : 'max-h-[30rem]'">
-                        <div id="logs" class="flex flex-col font-mono">
+                        class="flex min-h-40 flex-1 flex-col overflow-y-auto p-2 px-4 scrollbar">
+                        <div id="logs" class="flex flex-col font-logs">
                             <div x-show="searchQuery.trim() && matchCount === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
                                 No matches found.
@@ -356,7 +355,7 @@
                                         ])>{{ $lineContent }}</span>
                                 </div>
                             @empty
-                                <span class="font-mono text-neutral-400 mb-2">No logs yet.</span>
+                                <span class="font-logs text-neutral-400 mb-2">No logs yet.</span>
                             @endforelse
                         </div>
                     </div>

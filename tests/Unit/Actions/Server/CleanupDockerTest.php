@@ -8,9 +8,7 @@ afterEach(function () {
     Mockery::close();
 });
 
-it('categorizes images correctly into PR and regular images', function () {
-    // Test the image categorization logic
-    // Build images (*-build) are excluded from retention and handled by docker image prune
+it('categorizes images correctly into PR, build, and regular images', function () {
     $images = collect([
         ['repository' => 'app-uuid', 'tag' => 'abc123', 'created_at' => '2024-01-01', 'image_ref' => 'app-uuid:abc123'],
         ['repository' => 'app-uuid', 'tag' => 'def456', 'created_at' => '2024-01-02', 'image_ref' => 'app-uuid:def456'],
@@ -24,6 +22,11 @@ it('categorizes images correctly into PR and regular images', function () {
     $prImages = $images->filter(fn ($image) => str_starts_with($image['tag'], 'pr-'));
     expect($prImages)->toHaveCount(2);
     expect($prImages->pluck('tag')->toArray())->toContain('pr-123', 'pr-456');
+
+    // Build images (tags ending with '-build', excluding PR builds)
+    $buildImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && str_ends_with($image['tag'], '-build'));
+    expect($buildImages)->toHaveCount(2);
+    expect($buildImages->pluck('tag')->toArray())->toContain('abc123-build', 'def456-build');
 
     // Regular images (neither PR nor build) - these are subject to retention policy
     $regularImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && ! str_ends_with($image['tag'], '-build'));
@@ -339,4 +342,129 @@ it('protects current infrastructure images from any registry even when no applic
 
     // Other images should not be protected
     expect(preg_match($pattern, 'nginx:alpine'))->toBe(0);
+});
+
+it('deletes build images not matching retained regular images', function () {
+    // Simulates the Nixpacks scenario from issue #8765:
+    // Many -build images accumulate because they were excluded from both cleanup paths
+    $images = collect([
+        ['repository' => 'app-uuid', 'tag' => 'commit1', 'created_at' => '2024-01-01 10:00:00', 'image_ref' => 'app-uuid:commit1'],
+        ['repository' => 'app-uuid', 'tag' => 'commit2', 'created_at' => '2024-01-02 10:00:00', 'image_ref' => 'app-uuid:commit2'],
+        ['repository' => 'app-uuid', 'tag' => 'commit3', 'created_at' => '2024-01-03 10:00:00', 'image_ref' => 'app-uuid:commit3'],
+        ['repository' => 'app-uuid', 'tag' => 'commit4', 'created_at' => '2024-01-04 10:00:00', 'image_ref' => 'app-uuid:commit4'],
+        ['repository' => 'app-uuid', 'tag' => 'commit5', 'created_at' => '2024-01-05 10:00:00', 'image_ref' => 'app-uuid:commit5'],
+        ['repository' => 'app-uuid', 'tag' => 'commit1-build', 'created_at' => '2024-01-01 09:00:00', 'image_ref' => 'app-uuid:commit1-build'],
+        ['repository' => 'app-uuid', 'tag' => 'commit2-build', 'created_at' => '2024-01-02 09:00:00', 'image_ref' => 'app-uuid:commit2-build'],
+        ['repository' => 'app-uuid', 'tag' => 'commit3-build', 'created_at' => '2024-01-03 09:00:00', 'image_ref' => 'app-uuid:commit3-build'],
+        ['repository' => 'app-uuid', 'tag' => 'commit4-build', 'created_at' => '2024-01-04 09:00:00', 'image_ref' => 'app-uuid:commit4-build'],
+        ['repository' => 'app-uuid', 'tag' => 'commit5-build', 'created_at' => '2024-01-05 09:00:00', 'image_ref' => 'app-uuid:commit5-build'],
+    ]);
+
+    $currentTag = 'commit5';
+    $imagesToKeep = 2;
+
+    $buildImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && str_ends_with($image['tag'], '-build'));
+    $regularImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && ! str_ends_with($image['tag'], '-build'));
+
+    $sortedRegularImages = $regularImages
+        ->filter(fn ($image) => $image['tag'] !== $currentTag)
+        ->sortByDesc('created_at')
+        ->values();
+
+    // Determine kept tags: current + N newest rollback
+    $keptTags = $sortedRegularImages->take($imagesToKeep)->pluck('tag');
+    if (! empty($currentTag)) {
+        $keptTags = $keptTags->push($currentTag);
+    }
+
+    // Kept tags should be: commit5 (running), commit4, commit3 (2 newest rollback)
+    expect($keptTags->toArray())->toContain('commit5', 'commit4', 'commit3');
+
+    // Build images to delete: those whose base tag is NOT in keptTags
+    $buildImagesToDelete = $buildImages->filter(function ($image) use ($keptTags) {
+        $baseTag = preg_replace('/-build$/', '', $image['tag']);
+
+        return ! $keptTags->contains($baseTag);
+    });
+
+    // Should delete commit1-build and commit2-build (their base tags are not kept)
+    expect($buildImagesToDelete)->toHaveCount(2);
+    expect($buildImagesToDelete->pluck('tag')->toArray())->toContain('commit1-build', 'commit2-build');
+
+    // Should keep commit3-build, commit4-build, commit5-build (matching retained images)
+    $buildImagesToKeep = $buildImages->filter(function ($image) use ($keptTags) {
+        $baseTag = preg_replace('/-build$/', '', $image['tag']);
+
+        return $keptTags->contains($baseTag);
+    });
+    expect($buildImagesToKeep)->toHaveCount(3);
+    expect($buildImagesToKeep->pluck('tag')->toArray())->toContain('commit5-build', 'commit4-build', 'commit3-build');
+});
+
+it('deletes all build images when retention is disabled', function () {
+    $images = collect([
+        ['repository' => 'app-uuid', 'tag' => 'commit1', 'created_at' => '2024-01-01 10:00:00', 'image_ref' => 'app-uuid:commit1'],
+        ['repository' => 'app-uuid', 'tag' => 'commit2', 'created_at' => '2024-01-02 10:00:00', 'image_ref' => 'app-uuid:commit2'],
+        ['repository' => 'app-uuid', 'tag' => 'commit1-build', 'created_at' => '2024-01-01 09:00:00', 'image_ref' => 'app-uuid:commit1-build'],
+        ['repository' => 'app-uuid', 'tag' => 'commit2-build', 'created_at' => '2024-01-02 09:00:00', 'image_ref' => 'app-uuid:commit2-build'],
+    ]);
+
+    $currentTag = 'commit2';
+    $imagesToKeep = 0; // Retention disabled
+
+    $buildImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && str_ends_with($image['tag'], '-build'));
+    $regularImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && ! str_ends_with($image['tag'], '-build'));
+
+    $sortedRegularImages = $regularImages
+        ->filter(fn ($image) => $image['tag'] !== $currentTag)
+        ->sortByDesc('created_at')
+        ->values();
+
+    // With imagesToKeep=0, only current tag is kept
+    $keptTags = $sortedRegularImages->take($imagesToKeep)->pluck('tag');
+    if (! empty($currentTag)) {
+        $keptTags = $keptTags->push($currentTag);
+    }
+
+    $buildImagesToDelete = $buildImages->filter(function ($image) use ($keptTags) {
+        $baseTag = preg_replace('/-build$/', '', $image['tag']);
+
+        return ! $keptTags->contains($baseTag);
+    });
+
+    // commit1-build should be deleted (not retained), commit2-build kept (matches running)
+    expect($buildImagesToDelete)->toHaveCount(1);
+    expect($buildImagesToDelete->pluck('tag')->toArray())->toContain('commit1-build');
+});
+
+it('preserves build image for currently running tag', function () {
+    $images = collect([
+        ['repository' => 'app-uuid', 'tag' => 'commit1', 'created_at' => '2024-01-01 10:00:00', 'image_ref' => 'app-uuid:commit1'],
+        ['repository' => 'app-uuid', 'tag' => 'commit1-build', 'created_at' => '2024-01-01 09:00:00', 'image_ref' => 'app-uuid:commit1-build'],
+    ]);
+
+    $currentTag = 'commit1';
+    $imagesToKeep = 2;
+
+    $buildImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && str_ends_with($image['tag'], '-build'));
+    $regularImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && ! str_ends_with($image['tag'], '-build'));
+
+    $sortedRegularImages = $regularImages
+        ->filter(fn ($image) => $image['tag'] !== $currentTag)
+        ->sortByDesc('created_at')
+        ->values();
+
+    $keptTags = $sortedRegularImages->take($imagesToKeep)->pluck('tag');
+    if (! empty($currentTag)) {
+        $keptTags = $keptTags->push($currentTag);
+    }
+
+    $buildImagesToDelete = $buildImages->filter(function ($image) use ($keptTags) {
+        $baseTag = preg_replace('/-build$/', '', $image['tag']);
+
+        return ! $keptTags->contains($baseTag);
+    });
+
+    // Build image for running tag should NOT be deleted
+    expect($buildImagesToDelete)->toHaveCount(0);
 });

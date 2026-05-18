@@ -483,6 +483,22 @@ class Show extends Component
         }
     }
 
+    public function refreshServerMetadata(): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $result = $this->server->gatherServerMetadata();
+            if ($result) {
+                $this->server->refresh();
+                $this->dispatch('success', 'Server details refreshed.');
+            } else {
+                $this->dispatch('error', 'Could not fetch server details. Is the server reachable?');
+            }
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
     public function submit()
     {
         try {

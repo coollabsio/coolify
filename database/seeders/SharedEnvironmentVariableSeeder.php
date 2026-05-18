@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Server;
 use App\Models\SharedEnvironmentVariable;
 use Illuminate\Database\Seeder;
 
@@ -32,5 +33,29 @@ class SharedEnvironmentVariableSeeder extends Seeder
             'project_id' => 1,
             'team_id' => 0,
         ]);
+
+        // Add predefined server variables to all existing servers
+        $servers = \App\Models\Server::all();
+        foreach ($servers as $server) {
+            SharedEnvironmentVariable::firstOrCreate([
+                'key' => 'COOLIFY_SERVER_UUID',
+                'type' => 'server',
+                'server_id' => $server->id,
+                'team_id' => $server->team_id,
+            ], [
+                'value' => $server->uuid,
+                'is_literal' => true,
+            ]);
+
+            SharedEnvironmentVariable::firstOrCreate([
+                'key' => 'COOLIFY_SERVER_NAME',
+                'type' => 'server',
+                'server_id' => $server->id,
+                'team_id' => $server->team_id,
+            ], [
+                'value' => $server->name,
+                'is_literal' => true,
+            ]);
+        }
     }
 }

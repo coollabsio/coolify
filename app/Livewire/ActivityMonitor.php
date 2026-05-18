@@ -2,7 +2,9 @@
 
 namespace App\Livewire;
 
+use App\Models\Server;
 use App\Models\User;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
 
@@ -10,6 +12,7 @@ class ActivityMonitor extends Component
 {
     public ?string $header = null;
 
+    #[Locked]
     public $activityId = null;
 
     public $eventToDispatch = 'activityFinished';
@@ -55,16 +58,49 @@ class ActivityMonitor extends Component
             return;
         }
 
-        $this->activity = Activity::find($this->activityId);
-    }
+        $activity = Activity::find($this->activityId);
 
-    public function updatedActivityId($value)
-    {
-        if ($value) {
-            $this->hydrateActivity();
-            $this->isPollingActive = true;
-            self::$eventDispatched = false;
+        if (! $activity) {
+            $this->activity = null;
+
+            return;
         }
+
+        $currentTeamId = currentTeam()?->id;
+
+        // Check team_id stored directly in activity properties
+        $activityTeamId = data_get($activity, 'properties.team_id');
+        if ($activityTeamId !== null) {
+            if ((int) $activityTeamId !== (int) $currentTeamId) {
+                $this->activity = null;
+
+                return;
+            }
+
+            $this->activity = $activity;
+
+            return;
+        }
+
+        // Fallback: verify ownership via the server that ran the command
+        $serverUuid = data_get($activity, 'properties.server_uuid');
+        if ($serverUuid) {
+            $server = Server::where('uuid', $serverUuid)->first();
+            if ($server && (int) $server->team_id !== (int) $currentTeamId) {
+                $this->activity = null;
+
+                return;
+            }
+
+            if ($server) {
+                $this->activity = $activity;
+
+                return;
+            }
+        }
+
+        // Fail closed: no team_id and no server_uuid means we cannot verify ownership
+        $this->activity = null;
     }
 
     public function polling()

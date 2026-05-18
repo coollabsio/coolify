@@ -123,7 +123,7 @@ return [
             'driver' => 'daily',
             'path' => storage_path('logs/scheduled.log'),
             'level' => 'debug',
-            'days' => 1,
+            'days' => 7,
         ],
 
         'scheduled-errors' => [

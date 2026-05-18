@@ -11,6 +11,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
+use App\Support\ValidationPatterns;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Spatie\Url\Url;
@@ -57,16 +58,6 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     private ?string $git_repository = null;
 
-    protected $rules = [
-        'repository_url' => ['required', 'string'],
-        'branch' => ['required', 'string'],
-        'port' => 'required|numeric',
-        'is_static' => 'required|boolean',
-        'publish_directory' => 'nullable|string',
-        'build_pack' => 'required|string',
-        'docker_compose_location' => ['nullable', 'string', 'max:255', 'regex:/^\/[a-zA-Z0-9._\-\/]+$/'],
-    ];
-
     protected function rules()
     {
         return [
@@ -76,7 +67,7 @@ class GithubPrivateRepositoryDeployKey extends Component
             'is_static' => 'required|boolean',
             'publish_directory' => 'nullable|string',
             'build_pack' => 'required|string',
-            'docker_compose_location' => ['nullable', 'string', 'max:255', 'regex:/^\/[a-zA-Z0-9._\-\/]+$/'],
+            'docker_compose_location' => ValidationPatterns::filePathRules(),
         ];
     }
 
@@ -154,8 +145,8 @@ class GithubPrivateRepositoryDeployKey extends Component
             // Note: git_repository has already been validated and transformed in get_git_source()
             // It may now be in SSH format (git@host:repo.git) which is valid for deploy keys
 
-            $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-            $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
+            $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
+            $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
             if ($this->git_source === 'other') {
                 $application_init = [
                     'name' => generate_random_name(),

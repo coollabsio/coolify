@@ -145,6 +145,10 @@
     @apply flex relative gap-2 justify-start items-center py-1 pr-4 pl-2 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50 focus-visible:bg-neutral-100 dark:focus-visible:bg-coollabs;
 }
 
+@utility dropdown-item-touch {
+    @apply min-h-10 px-3 py-2 text-sm;
+}
+
 @utility dropdown-item-no-padding {
     @apply flex relative gap-2 justify-start items-center py-1 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50 focus-visible:bg-neutral-100 dark:focus-visible:bg-coollabs;
 }

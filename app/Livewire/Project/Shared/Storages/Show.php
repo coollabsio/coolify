@@ -29,10 +29,13 @@ class Show extends Component
 
     public ?string $hostPath = null;
 
+    public bool $isPreviewSuffixEnabled = true;
+
     protected $rules = [
         'name' => 'required|string',
         'mountPath' => 'required|string',
         'hostPath' => 'string|nullable',
+        'isPreviewSuffixEnabled' => 'required|boolean',
     ];
 
     protected $validationAttributes = [
@@ -53,11 +56,13 @@ class Show extends Component
             $this->storage->name = $this->name;
             $this->storage->mount_path = $this->mountPath;
             $this->storage->host_path = $this->hostPath;
+            $this->storage->is_preview_suffix_enabled = $this->isPreviewSuffixEnabled;
         } else {
             // Sync FROM model (on load/refresh)
             $this->name = $this->storage->name;
             $this->mountPath = $this->storage->mount_path;
             $this->hostPath = $this->storage->host_path;
+            $this->isPreviewSuffixEnabled = $this->storage->is_preview_suffix_enabled ?? true;
         }
     }
 
@@ -65,6 +70,16 @@ class Show extends Component
     {
         $this->syncData(false);
         $this->isReadOnly = $this->storage->shouldBeReadOnlyInUI();
+    }
+
+    public function instantSave(): void
+    {
+        $this->authorize('update', $this->resource);
+        $this->validate();
+
+        $this->syncData(true);
+        $this->storage->save();
+        $this->dispatch('success', 'Storage updated successfully');
     }
 
     public function submit()
@@ -77,15 +92,17 @@ class Show extends Component
         $this->dispatch('success', 'Storage updated successfully');
     }
 
-    public function delete($password)
+    public function delete($password, $selectedActions = [])
     {
         $this->authorize('update', $this->resource);
 
         if (! verifyPasswordConfirmation($password, $this)) {
-            return;
+            return 'The provided password is incorrect.';
         }
 
         $this->storage->delete();
         $this->dispatch('refreshStorages');
+
+        return true;
     }
 }

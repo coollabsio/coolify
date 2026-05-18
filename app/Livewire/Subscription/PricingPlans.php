@@ -11,6 +11,12 @@ class PricingPlans extends Component
 {
     public function subscribeStripe($type)
     {
+        if (currentTeam()->subscription?->stripe_invoice_paid) {
+            $this->dispatch('error', 'Team already has an active subscription.');
+
+            return;
+        }
+
         Stripe::setApiKey(config('subscription.stripe_api_key'));
 
         $priceId = match ($type) {

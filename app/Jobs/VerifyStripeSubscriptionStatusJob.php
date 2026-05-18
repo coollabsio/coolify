@@ -4,12 +4,13 @@ namespace App\Jobs;
 
 use App\Models\Subscription;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class VerifyStripeSubscriptionStatusJob implements ShouldQueue
+class VerifyStripeSubscriptionStatusJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -81,12 +82,9 @@ class VerifyStripeSubscriptionStatusJob implements ShouldQueue
                         'stripe_past_due' => false,
                     ]);
 
-                    // Trigger subscription ended logic if canceled
-                    if ($stripeSubscription->status === 'canceled') {
-                        $team = $this->subscription->team;
-                        if ($team) {
-                            $team->subscriptionEnded();
-                        }
+                    $team = $this->subscription->team;
+                    if ($team) {
+                        $team->subscriptionEnded();
                     }
                     break;
 

@@ -242,14 +242,14 @@
                             <div class="flex flex-col sm:flex-row items-start sm:items-end gap-2">
                                 <x-forms.select wire:model.live='webhook_endpoint' label="Webhook Endpoint"
                                     helper="All Git webhooks will be sent to this endpoint. <br><br>If you would like to use domain instead of IP address, set your Coolify instance's FQDN in the Settings menu.">
+                                    @if ($fqdn)
+                                        <option value="{{ $fqdn }}">Use {{ $fqdn }}</option>
+                                    @endif
                                     @if ($ipv4)
                                         <option value="{{ $ipv4 }}">Use {{ $ipv4 }}</option>
                                     @endif
                                     @if ($ipv6)
                                         <option value="{{ $ipv6 }}">Use {{ $ipv6 }}</option>
-                                    @endif
-                                    @if ($fqdn)
-                                        <option value="{{ $fqdn }}">Use {{ $fqdn }}</option>
                                     @endif
                                     @if (config('app.url'))
                                         <option value="{{ config('app.url') }}">Use {{ config('app.url') }}</option>
@@ -271,7 +271,7 @@
                             <div>You need to register a GitHub App before using this source.</div>
                         @endif
 
-                        <div class="flex flex-col gap-2 pt-4 w-96">
+                        <div class="flex w-full flex-col gap-2 pt-4 sm:w-96">
                             <x-forms.checkbox disabled id="default_permissions" label="Mandatory"
                                 helper="Contents: read<br>Metadata: read<br>Email: read" />
                             <x-forms.checkbox id="preview_deployment_permissions" label="Preview Deployments "

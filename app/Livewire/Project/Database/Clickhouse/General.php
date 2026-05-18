@@ -34,7 +34,9 @@ class General extends Component
 
     public ?bool $isPublic = null;
 
-    public ?int $publicPort = null;
+    public mixed $publicPort = null;
+
+    public mixed $publicPortTimeout = 3600;
 
     public ?string $customDockerRunOptions = null;
 
@@ -77,9 +79,10 @@ class General extends Component
             'clickhouseAdminUser' => 'required|string',
             'clickhouseAdminPassword' => 'required|string',
             'image' => 'required|string',
-            'portsMappings' => 'nullable|string',
+            'portsMappings' => ValidationPatterns::portMappingRules(),
             'isPublic' => 'nullable|boolean',
-            'publicPort' => 'nullable|integer',
+            'publicPort' => 'nullable|integer|min:1|max:65535',
+            'publicPortTimeout' => 'nullable|integer|min:1',
             'customDockerRunOptions' => 'nullable|string',
             'dbUrl' => 'nullable|string',
             'dbUrlPublic' => 'nullable|string',
@@ -91,6 +94,7 @@ class General extends Component
     {
         return array_merge(
             ValidationPatterns::combinedMessages(),
+            ValidationPatterns::portMappingMessages(),
             [
                 'clickhouseAdminUser.required' => 'The Admin User field is required.',
                 'clickhouseAdminUser.string' => 'The Admin User must be a string.',
@@ -99,6 +103,10 @@ class General extends Component
                 'image.required' => 'The Docker Image field is required.',
                 'image.string' => 'The Docker Image must be a string.',
                 'publicPort.integer' => 'The Public Port must be an integer.',
+                'publicPort.min' => 'The Public Port must be at least 1.',
+                'publicPort.max' => 'The Public Port must not exceed 65535.',
+                'publicPortTimeout.integer' => 'The Public Port Timeout must be an integer.',
+                'publicPortTimeout.min' => 'The Public Port Timeout must be at least 1.',
             ]
         );
     }
@@ -114,7 +122,8 @@ class General extends Component
             $this->database->image = $this->image;
             $this->database->ports_mappings = $this->portsMappings;
             $this->database->is_public = $this->isPublic;
-            $this->database->public_port = $this->publicPort;
+            $this->database->public_port = $this->publicPort ?: null;
+            $this->database->public_port_timeout = $this->publicPortTimeout ?: null;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->save();
@@ -130,6 +139,7 @@ class General extends Component
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
             $this->publicPort = $this->database->public_port;
+            $this->publicPortTimeout = $this->database->public_port_timeout;
             $this->customDockerRunOptions = $this->database->custom_docker_run_options;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
             $this->dbUrl = $this->database->internal_db_url;
@@ -200,6 +210,9 @@ class General extends Component
         try {
             $this->authorize('update', $this->database);
 
+            if ($this->portsMappings) {
+                $this->portsMappings = str($this->portsMappings)->replace(' ', '')->trim()->toString();
+            }
             if (str($this->publicPort)->isEmpty()) {
                 $this->publicPort = null;
             }

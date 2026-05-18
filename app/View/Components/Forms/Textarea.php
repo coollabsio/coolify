@@ -32,10 +32,11 @@ class Textarea extends Component
         public bool $allowTab = false,
         public bool $spellcheck = false,
         public bool $autofocus = false,
+        public bool $monospace = false,
         public ?string $helper = null,
         public bool $realtimeValidation = false,
         public bool $allowToPeak = true,
-        public string $defaultClass = 'input scrollbar font-mono',
+        public string $defaultClass = 'input scrollbar',
         public string $defaultClassInput = 'input',
         public ?int $minlength = null,
         public ?int $maxlength = null,
@@ -79,6 +80,10 @@ class Textarea extends Component
 
         if (is_null($this->name)) {
             $this->name = $this->modelBinding !== 'null' ? $this->modelBinding : (string) $this->id;
+        }
+
+        if ($this->monospace) {
+            $this->defaultClass .= ' font-mono';
         }
 
         // $this->label = Str::title($this->label);

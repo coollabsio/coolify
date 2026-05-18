@@ -12,13 +12,21 @@ use App\Enums\NewDatabaseTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DeleteResourceJob;
+<<<<<<< HEAD
 use App\Models\DatabaseRestore;
+=======
+use App\Models\EnvironmentVariable;
+use App\Models\LocalFileVolume;
+use App\Models\LocalPersistentVolume;
+>>>>>>> origin/next
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
+use App\Support\ValidationPatterns;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
@@ -307,6 +315,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'public_port_timeout' => ['type' => 'integer', 'description' => 'Public port timeout in seconds (default: 3600)'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -370,7 +379,7 @@ class DatabasesController extends Controller
     )]
     public function update_by_uuid(Request $request)
     {
-        $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
+        $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
@@ -378,7 +387,7 @@ class DatabasesController extends Controller
 
         // this check if the request is a valid json
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = customApiValidator($request->all(), [
@@ -387,6 +396,7 @@ class DatabasesController extends Controller
             'image' => 'string',
             'is_public' => 'boolean',
             'public_port' => 'numeric|nullable',
+            'public_port_timeout' => 'integer|nullable|min:1',
             'limits_memory' => 'string',
             'limits_memory_swap' => 'string',
             'limits_memory_swappiness' => 'numeric',
@@ -418,7 +428,7 @@ class DatabasesController extends Controller
         }
         switch ($database->type()) {
             case 'standalone-postgresql':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf'];
                 $validator = customApiValidator($request->all(), [
                     'postgres_user' => 'string',
                     'postgres_password' => 'string',
@@ -449,20 +459,20 @@ class DatabasesController extends Controller
                 }
                 break;
             case 'standalone-clickhouse':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'clickhouse_admin_user', 'clickhouse_admin_password'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'clickhouse_admin_user', 'clickhouse_admin_password'];
                 $validator = customApiValidator($request->all(), [
                     'clickhouse_admin_user' => 'string',
                     'clickhouse_admin_password' => 'string',
                 ]);
                 break;
             case 'standalone-dragonfly':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'dragonfly_password'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'dragonfly_password'];
                 $validator = customApiValidator($request->all(), [
                     'dragonfly_password' => 'string',
                 ]);
                 break;
             case 'standalone-redis':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'redis_password', 'redis_conf'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'redis_password', 'redis_conf'];
                 $validator = customApiValidator($request->all(), [
                     'redis_password' => 'string',
                     'redis_conf' => 'string',
@@ -489,7 +499,7 @@ class DatabasesController extends Controller
                 }
                 break;
             case 'standalone-keydb':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'keydb_password', 'keydb_conf'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'keydb_password', 'keydb_conf'];
                 $validator = customApiValidator($request->all(), [
                     'keydb_password' => 'string',
                     'keydb_conf' => 'string',
@@ -516,7 +526,7 @@ class DatabasesController extends Controller
                 }
                 break;
             case 'standalone-mariadb':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database'];
                 $validator = customApiValidator($request->all(), [
                     'mariadb_conf' => 'string',
                     'mariadb_root_password' => 'string',
@@ -546,7 +556,7 @@ class DatabasesController extends Controller
                 }
                 break;
             case 'standalone-mongodb':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database'];
                 $validator = customApiValidator($request->all(), [
                     'mongo_conf' => 'string',
                     'mongo_initdb_root_username' => 'string',
@@ -576,7 +586,7 @@ class DatabasesController extends Controller
 
                 break;
             case 'standalone-mysql':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
                 $validator = customApiValidator($request->all(), [
                     'mysql_root_password' => 'string',
                     'mysql_password' => 'string',
@@ -684,12 +694,16 @@ class DatabasesController extends Controller
                         'database_backup_retention_amount_s3' => ['type' => 'integer', 'description' => 'Number of backups to retain in S3'],
                         'database_backup_retention_days_s3' => ['type' => 'integer', 'description' => 'Number of days to retain backups in S3'],
                         'database_backup_retention_max_storage_s3' => ['type' => 'integer', 'description' => 'Max storage (MB) for S3 backups'],
+<<<<<<< HEAD
                         'engine' => ['type' => 'string', 'description' => 'Backup engine: native (pg_dump) or pgbackrest (PostgreSQL only)', 'enum' => ['native', 'pgbackrest'], 'default' => 'native'],
                         'pgbackrest_backup_type' => ['type' => 'string', 'description' => 'pgBackRest backup type', 'enum' => ['full', 'diff', 'incr']],
                         'pgbackrest_compress_type' => ['type' => 'string', 'description' => 'pgBackRest compression type', 'enum' => ['lz4', 'gzip', 'zstd', 'none']],
                         'pgbackrest_compress_level' => ['type' => 'integer', 'description' => 'pgBackRest compression level (0-9)'],
                         'pgbackrest_log_level' => ['type' => 'string', 'description' => 'pgBackRest log level', 'enum' => ['off', 'error', 'warn', 'info', 'detail', 'debug', 'trace']],
                         'pgbackrest_archive_mode' => ['type' => 'string', 'description' => 'pgBackRest archive mode for WAL archiving', 'enum' => ['standard', 'reduced', 'minimal']],
+=======
+                        'timeout' => ['type' => 'integer', 'description' => 'Backup job timeout in seconds (min: 60, max: 36000)', 'default' => 3600],
+>>>>>>> origin/next
                     ],
                 ),
             )
@@ -726,7 +740,11 @@ class DatabasesController extends Controller
     )]
     public function create_backup(Request $request)
     {
+<<<<<<< HEAD
         $backupConfigFields = $this->getBackupConfigFields();
+=======
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout'];
+>>>>>>> origin/next
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -734,7 +752,7 @@ class DatabasesController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
 
@@ -752,12 +770,16 @@ class DatabasesController extends Controller
             'database_backup_retention_amount_s3' => 'integer|min:0',
             'database_backup_retention_days_s3' => 'integer|min:0',
             'database_backup_retention_max_storage_s3' => 'integer|min:0',
+<<<<<<< HEAD
             'engine' => 'string|in:native,pgbackrest|nullable',
             'pgbackrest_backup_type' => 'string|in:full,diff,incr|nullable',
             'pgbackrest_compress_type' => 'string|in:lz4,gzip,zstd,none|nullable',
             'pgbackrest_compress_level' => 'integer|min:0|max:9|nullable',
             'pgbackrest_log_level' => 'string|in:off,error,warn,info,detail,debug,trace|nullable',
             'pgbackrest_archive_mode' => 'string|in:standard,reduced,minimal|nullable',
+=======
+            'timeout' => 'integer|min:60|max:36000',
+>>>>>>> origin/next
         ]);
 
         if ($validator->fails()) {
@@ -845,6 +867,18 @@ class DatabasesController extends Controller
             }
         }
 
+        // Validate databases_to_backup input
+        if (! empty($backupData['databases_to_backup'])) {
+            try {
+                validateDatabasesBackupInput($backupData['databases_to_backup']);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['databases_to_backup' => [$e->getMessage()]],
+                ], 422);
+            }
+        }
+
         // Add required fields
         $backupData['database_id'] = $database->id;
         $backupData['database_type'] = $database->getMorphClass();
@@ -918,12 +952,16 @@ class DatabasesController extends Controller
                         'database_backup_retention_amount_s3' => ['type' => 'integer', 'description' => 'Retention amount of the backup in s3'],
                         'database_backup_retention_days_s3' => ['type' => 'integer', 'description' => 'Retention days of the backup in s3'],
                         'database_backup_retention_max_storage_s3' => ['type' => 'integer', 'description' => 'Max storage of the backup in S3'],
+<<<<<<< HEAD
                         'engine' => ['type' => 'string', 'description' => 'Backup engine: native (pg_dump) or pgbackrest (PostgreSQL only)', 'enum' => ['native', 'pgbackrest']],
                         'pgbackrest_backup_type' => ['type' => 'string', 'description' => 'pgBackRest backup type', 'enum' => ['full', 'diff', 'incr']],
                         'pgbackrest_compress_type' => ['type' => 'string', 'description' => 'pgBackRest compression type', 'enum' => ['lz4', 'gzip', 'zstd', 'none']],
                         'pgbackrest_compress_level' => ['type' => 'integer', 'description' => 'pgBackRest compression level (0-9)'],
                         'pgbackrest_log_level' => ['type' => 'string', 'description' => 'pgBackRest log level', 'enum' => ['off', 'error', 'warn', 'info', 'detail', 'debug', 'trace']],
                         'pgbackrest_archive_mode' => ['type' => 'string', 'description' => 'pgBackRest archive mode for WAL archiving', 'enum' => ['standard', 'reduced', 'minimal']],
+=======
+                        'timeout' => ['type' => 'integer', 'description' => 'Backup job timeout in seconds (min: 60, max: 36000)', 'default' => 3600],
+>>>>>>> origin/next
                     ],
                 ),
             )
@@ -953,7 +991,11 @@ class DatabasesController extends Controller
     )]
     public function update_backup(Request $request)
     {
+<<<<<<< HEAD
         $backupConfigFields = $this->getBackupConfigFields();
+=======
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout'];
+>>>>>>> origin/next
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -961,7 +1003,7 @@ class DatabasesController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
 
@@ -972,19 +1014,23 @@ class DatabasesController extends Controller
             'dump_all' => 'boolean',
             's3_storage_uuid' => 'string|exists:s3_storages,uuid|nullable',
             'databases_to_backup' => 'string|nullable',
-            'frequency' => 'string|in:every_minute,hourly,daily,weekly,monthly,yearly',
+            'frequency' => 'string',
             'database_backup_retention_amount_locally' => 'integer|min:0',
             'database_backup_retention_days_locally' => 'integer|min:0',
             'database_backup_retention_max_storage_locally' => 'integer|min:0',
             'database_backup_retention_amount_s3' => 'integer|min:0',
             'database_backup_retention_days_s3' => 'integer|min:0',
             'database_backup_retention_max_storage_s3' => 'integer|min:0',
+<<<<<<< HEAD
             'engine' => 'string|in:native,pgbackrest|nullable',
             'pgbackrest_backup_type' => 'string|in:full,diff,incr|nullable',
             'pgbackrest_compress_type' => 'string|in:lz4,gzip,zstd,none|nullable',
             'pgbackrest_compress_level' => 'integer|min:0|max:9|nullable',
             'pgbackrest_log_level' => 'string|in:off,error,warn,info,detail,debug,trace|nullable',
             'pgbackrest_archive_mode' => 'string|in:standard,reduced,minimal|nullable',
+=======
+            'timeout' => 'integer|min:60|max:36000',
+>>>>>>> origin/next
         ]);
 
         if ($validator->fails()) {
@@ -1011,12 +1057,24 @@ class DatabasesController extends Controller
 
         $this->authorize('update', $database);
 
+<<<<<<< HEAD
         // Validate pgBackRest can only be used with PostgreSQL
         if ($request->input('engine') === 'pgbackrest' && $database->type() !== 'standalone-postgresql') {
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => ['engine' => ['pgBackRest engine is only supported for PostgreSQL databases.']],
             ], 422);
+=======
+        // Validate frequency is a valid cron expression
+        if ($request->filled('frequency')) {
+            $isValid = validate_cron_expression($request->frequency);
+            if (! $isValid) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['frequency' => ['Invalid cron expression or frequency format.']],
+                ], 422);
+            }
+>>>>>>> origin/next
         }
 
         if ($request->boolean('save_s3') && ! $request->filled('s3_storage_uuid')) {
@@ -1061,6 +1119,18 @@ class DatabasesController extends Controller
             return $result['error'];
         }
         $backupData = $result['data'];
+
+        // Validate databases_to_backup input
+        if (! empty($backupData['databases_to_backup'])) {
+            try {
+                validateDatabasesBackupInput($backupData['databases_to_backup']);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['databases_to_backup' => [$e->getMessage()]],
+                ], 422);
+            }
+        }
 
         $backupConfig->update($backupData);
 
@@ -1108,6 +1178,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'public_port_timeout' => ['type' => 'integer', 'description' => 'Public port timeout in seconds (default: 3600)'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -1175,6 +1246,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'public_port_timeout' => ['type' => 'integer', 'description' => 'Public port timeout in seconds (default: 3600)'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -1241,6 +1313,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'public_port_timeout' => ['type' => 'integer', 'description' => 'Public port timeout in seconds (default: 3600)'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -1308,6 +1381,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'public_port_timeout' => ['type' => 'integer', 'description' => 'Public port timeout in seconds (default: 3600)'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -1375,6 +1449,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'public_port_timeout' => ['type' => 'integer', 'description' => 'Public port timeout in seconds (default: 3600)'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -1445,6 +1520,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'public_port_timeout' => ['type' => 'integer', 'description' => 'Public port timeout in seconds (default: 3600)'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -1515,6 +1591,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'public_port_timeout' => ['type' => 'integer', 'description' => 'Public port timeout in seconds (default: 3600)'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -1582,6 +1659,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'public_port_timeout' => ['type' => 'integer', 'description' => 'Public port timeout in seconds (default: 3600)'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -1620,7 +1698,7 @@ class DatabasesController extends Controller
 
     public function create_database(Request $request, NewDatabaseTypes $type)
     {
-        $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
+        $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -1631,7 +1709,7 @@ class DatabasesController extends Controller
         $this->authorize('create', StandalonePostgresql::class);
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
 
@@ -1710,6 +1788,7 @@ class DatabasesController extends Controller
             'destination_uuid' => 'string',
             'is_public' => 'boolean',
             'public_port' => 'numeric|nullable',
+            'public_port_timeout' => 'integer|nullable|min:1',
             'limits_memory' => 'string',
             'limits_memory_swap' => 'string',
             'limits_memory_swappiness' => 'numeric',
@@ -1736,7 +1815,7 @@ class DatabasesController extends Controller
             }
         }
         if ($type === NewDatabaseTypes::POSTGRESQL) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf'];
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf'];
             $validator = customApiValidator($request->all(), [
                 'postgres_user' => 'string',
                 'postgres_password' => 'string',
@@ -1780,7 +1859,7 @@ class DatabasesController extends Controller
                 }
                 $request->offsetSet('postgres_conf', $postgresConf);
             }
-            $database = create_standalone_postgresql($environment->id, $destination->uuid, $request->all());
+            $database = create_standalone_postgresql($environment->id, $destination->uuid, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
@@ -1795,7 +1874,7 @@ class DatabasesController extends Controller
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         } elseif ($type === NewDatabaseTypes::MARIADB) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database'];
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database'];
             $validator = customApiValidator($request->all(), [
                 'clickhouse_admin_user' => 'string',
                 'clickhouse_admin_password' => 'string',
@@ -1835,7 +1914,7 @@ class DatabasesController extends Controller
                 }
                 $request->offsetSet('mariadb_conf', $mariadbConf);
             }
-            $database = create_standalone_mariadb($environment->id, $destination->uuid, $request->all());
+            $database = create_standalone_mariadb($environment->id, $destination->uuid, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
@@ -1851,7 +1930,7 @@ class DatabasesController extends Controller
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         } elseif ($type === NewDatabaseTypes::MYSQL) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
             $validator = customApiValidator($request->all(), [
                 'mysql_root_password' => 'string',
                 'mysql_password' => 'string',
@@ -1894,7 +1973,7 @@ class DatabasesController extends Controller
                 }
                 $request->offsetSet('mysql_conf', $mysqlConf);
             }
-            $database = create_standalone_mysql($environment->id, $destination->uuid, $request->all());
+            $database = create_standalone_mysql($environment->id, $destination->uuid, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
@@ -1910,7 +1989,7 @@ class DatabasesController extends Controller
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         } elseif ($type === NewDatabaseTypes::REDIS) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'redis_password', 'redis_conf'];
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'redis_password', 'redis_conf'];
             $validator = customApiValidator($request->all(), [
                 'redis_password' => 'string',
                 'redis_conf' => 'string',
@@ -1950,7 +2029,7 @@ class DatabasesController extends Controller
                 }
                 $request->offsetSet('redis_conf', $redisConf);
             }
-            $database = create_standalone_redis($environment->id, $destination->uuid, $request->all());
+            $database = create_standalone_redis($environment->id, $destination->uuid, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
@@ -1966,7 +2045,7 @@ class DatabasesController extends Controller
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         } elseif ($type === NewDatabaseTypes::DRAGONFLY) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares',  'dragonfly_password'];
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares',  'dragonfly_password'];
             $validator = customApiValidator($request->all(), [
                 'dragonfly_password' => 'string',
             ]);
@@ -1987,7 +2066,7 @@ class DatabasesController extends Controller
             }
 
             removeUnnecessaryFieldsFromRequest($request);
-            $database = create_standalone_dragonfly($environment->id, $destination->uuid, $request->all());
+            $database = create_standalone_dragonfly($environment->id, $destination->uuid, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
@@ -1996,7 +2075,7 @@ class DatabasesController extends Controller
                 'uuid' => $database->uuid,
             ]))->setStatusCode(201);
         } elseif ($type === NewDatabaseTypes::KEYDB) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'keydb_password', 'keydb_conf'];
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'keydb_password', 'keydb_conf'];
             $validator = customApiValidator($request->all(), [
                 'keydb_password' => 'string',
                 'keydb_conf' => 'string',
@@ -2036,7 +2115,7 @@ class DatabasesController extends Controller
                 }
                 $request->offsetSet('keydb_conf', $keydbConf);
             }
-            $database = create_standalone_keydb($environment->id, $destination->uuid, $request->all());
+            $database = create_standalone_keydb($environment->id, $destination->uuid, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
@@ -2052,7 +2131,7 @@ class DatabasesController extends Controller
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         } elseif ($type === NewDatabaseTypes::CLICKHOUSE) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares',  'clickhouse_admin_user', 'clickhouse_admin_password'];
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares',  'clickhouse_admin_user', 'clickhouse_admin_password'];
             $validator = customApiValidator($request->all(), [
                 'clickhouse_admin_user' => 'string',
                 'clickhouse_admin_password' => 'string',
@@ -2072,7 +2151,7 @@ class DatabasesController extends Controller
                 ], 422);
             }
             removeUnnecessaryFieldsFromRequest($request);
-            $database = create_standalone_clickhouse($environment->id, $destination->uuid, $request->all());
+            $database = create_standalone_clickhouse($environment->id, $destination->uuid, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
@@ -2088,7 +2167,7 @@ class DatabasesController extends Controller
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         } elseif ($type === NewDatabaseTypes::MONGODB) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database'];
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database'];
             $validator = customApiValidator($request->all(), [
                 'mongo_conf' => 'string',
                 'mongo_initdb_root_username' => 'string',
@@ -2130,7 +2209,7 @@ class DatabasesController extends Controller
                 }
                 $request->offsetSet('mongo_conf', $mongoConf);
             }
-            $database = create_standalone_mongodb($environment->id, $destination->uuid, $request->all());
+            $database = create_standalone_mongodb($environment->id, $destination->uuid, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
@@ -2671,6 +2750,15 @@ class DatabasesController extends Controller
                     type: 'string',
                 )
             ),
+            new OA\Parameter(
+                name: 'docker_cleanup',
+                in: 'query',
+                description: 'Perform docker cleanup (prune networks, volumes, etc.).',
+                schema: new OA\Schema(
+                    type: 'boolean',
+                    default: true,
+                )
+            ),
         ],
         responses: [
             new OA\Response(
@@ -2722,7 +2810,9 @@ class DatabasesController extends Controller
         if (str($database->status)->contains('stopped') || str($database->status)->contains('exited')) {
             return response()->json(['message' => 'Database is already stopped.'], 400);
         }
-        StopDatabase::dispatch($database);
+
+        $dockerCleanup = $request->boolean('docker_cleanup', true);
+        StopDatabase::dispatch($database, $dockerCleanup);
 
         return response()->json(
             [
@@ -2809,11 +2899,36 @@ class DatabasesController extends Controller
         );
     }
 
+<<<<<<< HEAD
     #[OA\Post(
         summary: 'Restore Database',
         description: 'Restore a PostgreSQL database from a PgBackRest backup.',
         path: '/databases/{uuid}/restore',
         operationId: 'restore-database',
+=======
+    private function removeSensitiveEnvData($env)
+    {
+        $env->makeHidden([
+            'id',
+            'resourceable',
+            'resourceable_id',
+            'resourceable_type',
+        ]);
+        if (request()->attributes->get('can_read_sensitive', false) === false) {
+            $env->makeHidden([
+                'value',
+                'real_value',
+            ]);
+        }
+
+        return serializeApiResponse($env);
+    }
+
+    #[OA\Get(
+        summary: 'List Envs',
+        description: 'List all envs by database UUID.',
+        path: '/databases/{uuid}/envs',
+        operationId: 'list-envs-by-database-uuid',
         security: [
             ['bearerAuth' => []],
         ],
@@ -2826,11 +2941,84 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Environment variables.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/EnvironmentVariable')
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function envs(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('view', $database);
+
+        $envs = $database->environment_variables->map(function ($env) {
+            return $this->removeSensitiveEnvData($env);
+        });
+
+        return response()->json($envs);
+    }
+
+    #[OA\Patch(
+        summary: 'Update Env',
+        description: 'Update env by database UUID.',
+        path: '/databases/{uuid}/envs',
+        operationId: 'update-env-by-database-uuid',
+>>>>>>> origin/next
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+<<<<<<< HEAD
                     format: 'uuid',
+=======
+>>>>>>> origin/next
                 )
             ),
         ],
         requestBody: new OA\RequestBody(
+<<<<<<< HEAD
             required: false,
             content: new OA\JsonContent(
                 type: 'object',
@@ -2844,14 +3032,406 @@ class DatabasesController extends Controller
             new OA\Response(
                 response: 200,
                 description: 'Restore initiated',
+=======
+            description: 'Env updated.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['key', 'value'],
+                        properties: [
+                            'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
+                            'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
+                            'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
+                            'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
+                            'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                        ],
+                    ),
+                ),
+            ],
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Environment variable updated.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            ref: '#/components/schemas/EnvironmentVariable'
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function update_env_by_uuid(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->route('uuid'), $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('manageEnvironment', $database);
+
+        $validator = customApiValidator($request->all(), [
+            'key' => 'string|required',
+            'value' => 'string|nullable',
+            'is_literal' => 'boolean',
+            'is_multiline' => 'boolean',
+            'is_shown_once' => 'boolean',
+            'comment' => 'string|nullable|max:256',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $key = str($request->key)->trim()->replace(' ', '_')->value;
+        $env = $database->environment_variables()->where('key', $key)->first();
+        if (! $env) {
+            return response()->json(['message' => 'Environment variable not found.'], 404);
+        }
+
+        $env->value = $request->value;
+        if ($request->has('is_literal')) {
+            $env->is_literal = $request->is_literal;
+        }
+        if ($request->has('is_multiline')) {
+            $env->is_multiline = $request->is_multiline;
+        }
+        if ($request->has('is_shown_once')) {
+            $env->is_shown_once = $request->is_shown_once;
+        }
+        if ($request->has('comment')) {
+            $env->comment = $request->comment;
+        }
+        $env->save();
+
+        return response()->json($this->removeSensitiveEnvData($env))->setStatusCode(201);
+    }
+
+    #[OA\Patch(
+        summary: 'Update Envs (Bulk)',
+        description: 'Update multiple envs by database UUID.',
+        path: '/databases/{uuid}/envs/bulk',
+        operationId: 'update-envs-by-database-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Bulk envs updated.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['data'],
+                        properties: [
+                            'data' => [
+                                'type' => 'array',
+                                'items' => new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
+                                        'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
+                                        'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
+                                        'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
+                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                                    ],
+                                ),
+                            ],
+                        ],
+                    ),
+                ),
+            ],
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Environment variables updated.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/EnvironmentVariable')
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function create_bulk_envs(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->route('uuid'), $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('manageEnvironment', $database);
+
+        $bulk_data = $request->get('data');
+        if (! $bulk_data) {
+            return response()->json(['message' => 'Bulk data is required.'], 400);
+        }
+
+        $updatedEnvs = collect();
+        foreach ($bulk_data as $item) {
+            $validator = customApiValidator($item, [
+                'key' => 'string|required',
+                'value' => 'string|nullable',
+                'is_literal' => 'boolean',
+                'is_multiline' => 'boolean',
+                'is_shown_once' => 'boolean',
+                'comment' => 'string|nullable|max:256',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+            $key = str($item['key'])->trim()->replace(' ', '_')->value;
+            $env = $database->environment_variables()->updateOrCreate(
+                ['key' => $key],
+                $item
+            );
+
+            $updatedEnvs->push($this->removeSensitiveEnvData($env));
+        }
+
+        return response()->json($updatedEnvs)->setStatusCode(201);
+    }
+
+    #[OA\Post(
+        summary: 'Create Env',
+        description: 'Create env by database UUID.',
+        path: '/databases/{uuid}/envs',
+        operationId: 'create-env-by-database-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            description: 'Env created.',
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
+                        'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
+                        'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
+                        'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
+                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                    ],
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Environment variable created.',
+>>>>>>> origin/next
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',
                         schema: new OA\Schema(
                             type: 'object',
                             properties: [
+<<<<<<< HEAD
                                 'message' => ['type' => 'string', 'example' => 'Database restore initiated.'],
                                 'restore_uuid' => ['type' => 'string', 'example' => 'abc123'],
+=======
+                                'uuid' => ['type' => 'string', 'example' => 'nc0k04gk8g0cgsk440g0koko'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function create_env(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->route('uuid'), $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('manageEnvironment', $database);
+
+        $validator = customApiValidator($request->all(), [
+            'key' => 'string|required',
+            'value' => 'string|nullable',
+            'is_literal' => 'boolean',
+            'is_multiline' => 'boolean',
+            'is_shown_once' => 'boolean',
+            'comment' => 'string|nullable|max:256',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $key = str($request->key)->trim()->replace(' ', '_')->value;
+        $existingEnv = $database->environment_variables()->where('key', $key)->first();
+        if ($existingEnv) {
+            return response()->json([
+                'message' => 'Environment variable already exists. Use PATCH request to update it.',
+            ], 409);
+        }
+
+        $env = $database->environment_variables()->create([
+            'key' => $key,
+            'value' => $request->value,
+            'is_literal' => $request->is_literal ?? false,
+            'is_multiline' => $request->is_multiline ?? false,
+            'is_shown_once' => $request->is_shown_once ?? false,
+            'comment' => $request->comment ?? null,
+        ]);
+
+        return response()->json($this->removeSensitiveEnvData($env))->setStatusCode(201);
+    }
+
+    #[OA\Delete(
+        summary: 'Delete Env',
+        description: 'Delete env by UUID.',
+        path: '/databases/{uuid}/envs/{env_uuid}',
+        operationId: 'delete-env-by-database-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+            new OA\Parameter(
+                name: 'env_uuid',
+                in: 'path',
+                description: 'UUID of the environment variable.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Environment variable deleted.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Environment variable deleted.'],
+>>>>>>> origin/next
                             ]
                         )
                     ),
@@ -2871,13 +3451,18 @@ class DatabasesController extends Controller
             ),
         ]
     )]
+<<<<<<< HEAD
     public function restore_database(Request $request)
+=======
+    public function delete_env_by_uuid(Request $request)
+>>>>>>> origin/next
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
 
+<<<<<<< HEAD
         $uuid = $request->route('uuid');
         if (! $uuid) {
             return response()->json(['message' => 'UUID is required.'], 400);
@@ -2896,10 +3481,362 @@ class DatabasesController extends Controller
         }
 
         $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
+=======
+        $database = queryDatabaseByUuidWithinTeam($request->route('uuid'), $teamId);
         if (! $database) {
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
+        $this->authorize('manageEnvironment', $database);
+
+        $env = EnvironmentVariable::where('uuid', $request->route('env_uuid'))
+            ->where('resourceable_type', get_class($database))
+            ->where('resourceable_id', $database->id)
+            ->first();
+
+        if (! $env) {
+            return response()->json(['message' => 'Environment variable not found.'], 404);
+        }
+
+        $env->forceDelete();
+
+        return response()->json(['message' => 'Environment variable deleted.']);
+    }
+
+    #[OA\Get(
+        summary: 'List Storages',
+        description: 'List all persistent storages and file storages by database UUID.',
+        path: '/databases/{uuid}/storages',
+        operationId: 'list-storages-by-database-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'All storages by database UUID.',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'persistent_storages', type: 'array', items: new OA\Items(type: 'object')),
+                        new OA\Property(property: 'file_storages', type: 'array', items: new OA\Items(type: 'object')),
+                    ],
+                ),
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function storages(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('view', $database);
+
+        $persistentStorages = $database->persistentStorages->sortBy('id')->values();
+        $fileStorages = $database->fileStorages->sortBy('id')->values();
+
+        return response()->json([
+            'persistent_storages' => $persistentStorages,
+            'file_storages' => $fileStorages,
+        ]);
+    }
+
+    #[OA\Post(
+        summary: 'Create Storage',
+        description: 'Create a persistent storage or file storage for a database.',
+        path: '/databases/{uuid}/storages',
+        operationId: 'create-storage-by-database-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['type', 'mount_path'],
+                        properties: [
+                            'type' => ['type' => 'string', 'enum' => ['persistent', 'file'], 'description' => 'The type of storage.'],
+                            'name' => ['type' => 'string', 'description' => 'Volume name (persistent only, required for persistent).'],
+                            'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
+                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, optional).'],
+                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
+                            'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
+                            'fs_path' => ['type' => 'string', 'description' => 'Host directory path (required when is_directory is true).'],
+                        ],
+                        additionalProperties: false,
+                    ),
+                ),
+            ],
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Storage created.',
+                content: new OA\JsonContent(type: 'object'),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function create_storage(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('update', $database);
+
+        $validator = customApiValidator($request->all(), [
+            'type' => 'required|string|in:persistent,file',
+            'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
+            'mount_path' => 'required|string',
+            'host_path' => 'string|nullable',
+            'content' => 'string|nullable',
+            'is_directory' => 'boolean',
+            'fs_path' => 'string',
+        ]);
+
+        $allAllowedFields = ['type', 'name', 'mount_path', 'host_path', 'content', 'is_directory', 'fs_path'];
+        $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        if ($request->type === 'persistent') {
+            if (! $request->name) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['name' => 'The name field is required for persistent storages.'],
+                ], 422);
+            }
+
+            $typeSpecificInvalidFields = array_intersect(['content', 'is_directory', 'fs_path'], array_keys($request->all()));
+            if (! empty($typeSpecificInvalidFields)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => collect($typeSpecificInvalidFields)
+                        ->mapWithKeys(fn ($field) => [$field => "Field '{$field}' is not valid for type 'persistent'."]),
+                ], 422);
+            }
+
+            $storage = LocalPersistentVolume::create([
+                'name' => $database->uuid.'-'.$request->name,
+                'mount_path' => $request->mount_path,
+                'host_path' => $request->host_path,
+                'resource_id' => $database->id,
+                'resource_type' => $database->getMorphClass(),
+            ]);
+
+            return response()->json($storage, 201);
+        }
+
+        // File storage
+        $typeSpecificInvalidFields = array_intersect(['name', 'host_path'], array_keys($request->all()));
+        if (! empty($typeSpecificInvalidFields)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => collect($typeSpecificInvalidFields)
+                    ->mapWithKeys(fn ($field) => [$field => "Field '{$field}' is not valid for type 'file'."]),
+            ], 422);
+        }
+
+        $isDirectory = $request->boolean('is_directory', false);
+
+        if ($isDirectory) {
+            if (! $request->fs_path) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['fs_path' => 'The fs_path field is required for directory mounts.'],
+                ], 422);
+            }
+
+            $fsPath = str($request->fs_path)->trim()->start('/')->value();
+            $mountPath = str($request->mount_path)->trim()->start('/')->value();
+
+            validateShellSafePath($fsPath, 'storage source path');
+            validateShellSafePath($mountPath, 'storage destination path');
+
+            $storage = LocalFileVolume::create([
+                'fs_path' => $fsPath,
+                'mount_path' => $mountPath,
+                'is_directory' => true,
+                'resource_id' => $database->id,
+                'resource_type' => get_class($database),
+            ]);
+        } else {
+            $mountPath = str($request->mount_path)->trim()->start('/')->value();
+
+            validateShellSafePath($mountPath, 'file storage path');
+
+            $fsPath = database_configuration_dir().'/'.$database->uuid.$mountPath;
+
+            $storage = LocalFileVolume::create([
+                'fs_path' => $fsPath,
+                'mount_path' => $mountPath,
+                'content' => $request->content,
+                'is_directory' => false,
+                'resource_id' => $database->id,
+                'resource_type' => get_class($database),
+            ]);
+        }
+
+        return response()->json($storage, 201);
+    }
+
+    #[OA\Patch(
+        summary: 'Update Storage',
+        description: 'Update a persistent storage or file storage by database UUID.',
+        path: '/databases/{uuid}/storages',
+        operationId: 'update-storage-by-database-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Storage updated. For read-only storages (from docker-compose or services), only is_preview_suffix_enabled can be updated.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['type'],
+                        properties: [
+                            'uuid' => ['type' => 'string', 'description' => 'The UUID of the storage (preferred).'],
+                            'id' => ['type' => 'integer', 'description' => 'The ID of the storage (deprecated, use uuid instead).'],
+                            'type' => ['type' => 'string', 'enum' => ['persistent', 'file'], 'description' => 'The type of storage: persistent or file.'],
+                            'is_preview_suffix_enabled' => ['type' => 'boolean', 'description' => 'Whether to add -pr-N suffix for preview deployments.'],
+                            'name' => ['type' => 'string', 'description' => 'The volume name (persistent only, not allowed for read-only storages).'],
+                            'mount_path' => ['type' => 'string', 'description' => 'The container mount path (not allowed for read-only storages).'],
+                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, not allowed for read-only storages).'],
+                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages).'],
+                        ],
+                        additionalProperties: false,
+                    ),
+                ),
+            ],
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Storage updated.',
+                content: new OA\JsonContent(type: 'object'),
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function update_storage(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->route('uuid'), $teamId);
+>>>>>>> origin/next
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+<<<<<<< HEAD
         if (! $database instanceof StandalonePostgresql) {
             return response()->json(['message' => 'PgBackRest restore is only available for PostgreSQL databases.'], 400);
         }
@@ -2944,6 +3881,125 @@ class DatabasesController extends Controller
         description: 'List all restore operations for a database.',
         path: '/databases/{uuid}/restores',
         operationId: 'list-database-restores',
+=======
+        $this->authorize('update', $database);
+
+        $validator = customApiValidator($request->all(), [
+            'uuid' => 'string',
+            'id' => 'integer',
+            'type' => 'required|string|in:persistent,file',
+            'is_preview_suffix_enabled' => 'boolean',
+            'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
+            'mount_path' => 'string',
+            'host_path' => 'string|nullable',
+            'content' => 'string|nullable',
+        ]);
+
+        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'host_path', 'content'];
+        $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $storageUuid = $request->input('uuid');
+        $storageId = $request->input('id');
+
+        if (! $storageUuid && ! $storageId) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['uuid' => 'Either uuid or id is required.'],
+            ], 422);
+        }
+
+        $lookupField = $storageUuid ? 'uuid' : 'id';
+        $lookupValue = $storageUuid ?? $storageId;
+
+        if ($request->type === 'persistent') {
+            $storage = $database->persistentStorages->where($lookupField, $lookupValue)->first();
+        } else {
+            $storage = $database->fileStorages->where($lookupField, $lookupValue)->first();
+        }
+
+        if (! $storage) {
+            return response()->json([
+                'message' => 'Storage not found.',
+            ], 404);
+        }
+
+        $isReadOnly = $storage->shouldBeReadOnlyInUI();
+        $editableOnlyFields = ['name', 'mount_path', 'host_path', 'content'];
+        $requestedEditableFields = array_intersect($editableOnlyFields, array_keys($request->all()));
+
+        if ($isReadOnly && ! empty($requestedEditableFields)) {
+            return response()->json([
+                'message' => 'This storage is read-only (managed by docker-compose or service definition). Only is_preview_suffix_enabled can be updated.',
+                'read_only_fields' => array_values($requestedEditableFields),
+            ], 422);
+        }
+
+        // Reject fields that don't apply to the given storage type
+        if (! $isReadOnly) {
+            $typeSpecificInvalidFields = $request->type === 'persistent'
+                ? array_intersect(['content'], array_keys($request->all()))
+                : array_intersect(['name', 'host_path'], array_keys($request->all()));
+
+            if (! empty($typeSpecificInvalidFields)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => collect($typeSpecificInvalidFields)
+                        ->mapWithKeys(fn ($field) => [$field => "Field '{$field}' is not valid for type '{$request->type}'."]),
+                ], 422);
+            }
+        }
+
+        // Always allowed
+        if ($request->has('is_preview_suffix_enabled')) {
+            $storage->is_preview_suffix_enabled = $request->is_preview_suffix_enabled;
+        }
+
+        // Only for editable storages
+        if (! $isReadOnly) {
+            if ($request->type === 'persistent') {
+                if ($request->has('name')) {
+                    $storage->name = $request->name;
+                }
+                if ($request->has('mount_path')) {
+                    $storage->mount_path = $request->mount_path;
+                }
+                if ($request->has('host_path')) {
+                    $storage->host_path = $request->host_path;
+                }
+            } else {
+                if ($request->has('mount_path')) {
+                    $storage->mount_path = $request->mount_path;
+                }
+                if ($request->has('content')) {
+                    $storage->content = $request->content;
+                }
+            }
+        }
+
+        $storage->save();
+
+        return response()->json($storage);
+    }
+
+    #[OA\Delete(
+        summary: 'Delete Storage',
+        description: 'Delete a persistent storage or file storage by database UUID.',
+        path: '/databases/{uuid}/storages/{storage_uuid}',
+        operationId: 'delete-storage-by-database-uuid',
+>>>>>>> origin/next
         security: [
             ['bearerAuth' => []],
         ],
@@ -2954,6 +4010,7 @@ class DatabasesController extends Controller
                 in: 'path',
                 description: 'UUID of the database.',
                 required: true,
+<<<<<<< HEAD
                 schema: new OA\Schema(
                     type: 'string',
                     format: 'uuid',
@@ -2977,22 +4034,50 @@ class DatabasesController extends Controller
         ]
     )]
     public function list_restores(Request $request)
+=======
+                schema: new OA\Schema(type: 'string')
+            ),
+            new OA\Parameter(
+                name: 'storage_uuid',
+                in: 'path',
+                description: 'UUID of the storage.',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Storage deleted.', content: new OA\JsonContent(
+                properties: [new OA\Property(property: 'message', type: 'string')],
+            )),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function delete_storage(Request $request): JsonResponse
+>>>>>>> origin/next
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
 
+<<<<<<< HEAD
         $uuid = $request->route('uuid');
         if (! $uuid) {
             return response()->json(['message' => 'UUID is required.'], 400);
         }
 
         $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
+=======
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+>>>>>>> origin/next
         if (! $database) {
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
+<<<<<<< HEAD
         $this->authorize('view', $database);
 
         $restores = DatabaseRestore::where('database_id', $database->id)
@@ -3080,5 +4165,33 @@ class DatabasesController extends Controller
         }
 
         return response()->json($restore);
+=======
+        $this->authorize('update', $database);
+
+        $storageUuid = $request->route('storage_uuid');
+
+        $storage = $database->persistentStorages->where('uuid', $storageUuid)->first();
+        if (! $storage) {
+            $storage = $database->fileStorages->where('uuid', $storageUuid)->first();
+        }
+
+        if (! $storage) {
+            return response()->json(['message' => 'Storage not found.'], 404);
+        }
+
+        if ($storage->shouldBeReadOnlyInUI()) {
+            return response()->json([
+                'message' => 'This storage is read-only (managed by docker-compose or service definition) and cannot be deleted.',
+            ], 422);
+        }
+
+        if ($storage instanceof LocalFileVolume) {
+            $storage->deleteStorageOnServer();
+        }
+
+        $storage->delete();
+
+        return response()->json(['message' => 'Storage deleted.']);
+>>>>>>> origin/next
     }
 }

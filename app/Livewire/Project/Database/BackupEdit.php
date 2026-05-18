@@ -82,7 +82,7 @@ class BackupEdit extends Component
     public bool $dumpAll = false;
 
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
-    public int $timeout = 3600;
+    public int|string $timeout = 3600;
 
     #[Validate(['required', 'string'])]
     public string $engine = 'native';
@@ -162,6 +162,7 @@ class BackupEdit extends Component
             $this->backup->frequency = $this->frequency;
             $this->backup->engine = $this->engine;
 
+<<<<<<< HEAD
             $this->backup->timeout = $this->timeout;
 
             if ($this->engine === 'pgbackrest') {
@@ -207,6 +208,13 @@ class BackupEdit extends Component
                         }
                     }
                 }
+=======
+            // Validate databases_to_backup to prevent command injection
+            // Handles all formats including MongoDB's "db:col1,col2|db2:col3"
+            if (filled($this->databasesToBackup)) {
+                validateDatabasesBackupInput($this->databasesToBackup);
+            }
+>>>>>>> origin/next
 
                 $this->backup->databases_to_backup = $this->databasesToBackup;
                 $this->backup->dump_all = $this->dumpAll;
@@ -247,6 +255,7 @@ class BackupEdit extends Component
         }
     }
 
+<<<<<<< HEAD
     private function loadPgbackrestRepos(): void
     {
         $localRepo = $this->backup->localRepo();
@@ -339,6 +348,14 @@ class BackupEdit extends Component
 
                 return;
             }
+=======
+    public function delete($password, $selectedActions = [])
+    {
+        $this->authorize('manageBackups', $this->backup->database);
+
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
+>>>>>>> origin/next
         }
 
         try {

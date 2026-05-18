@@ -79,7 +79,7 @@ services:
       retries: 10
       timeout: 2s
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
     pull_policy: always
     container_name: coolify-redis
     restart: always
@@ -96,7 +96,7 @@ services:
       retries: 10
       timeout: 2s
   soketi:
-    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.10'
+    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.13'
     pull_policy: always
     container_name: coolify-realtime
     restart: always
