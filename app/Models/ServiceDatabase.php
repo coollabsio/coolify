@@ -116,6 +116,7 @@ class ServiceDatabase extends BaseModel
         }
 
         return null;
+    }
 
 
     public function isRunning()
