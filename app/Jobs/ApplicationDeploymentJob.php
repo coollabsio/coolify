@@ -4440,7 +4440,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function modify_dockerfiles_for_compose($composeFile)
     {
-        if ($this->destination instanceof KubernetesCluster) {
+        if (isset($this->destination) && $this->destination instanceof KubernetesCluster) {
             return;
         }
 
@@ -5006,7 +5006,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
         $this->application_deployment_queue->addLogEntry('========================================', 'stderr');
 
-        if ($this->destination instanceof KubernetesCluster) {
+        if (isset($this->destination) && $this->destination instanceof KubernetesCluster) {
             return;
         }
 
