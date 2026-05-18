@@ -36,7 +36,7 @@
     <template x-teleport="body">
         <div x-show="modalOpen"
             x-init="$watch('modalOpen', value => { if(value) { $nextTick(() => { const firstInput = $el.querySelector('input, textarea, select'); firstInput?.focus(); }) } })"
-            class="fixed top-0 left-0 z-99 flex items-center justify-center w-screen h-screen p-4">
+            class="fixed top-0 left-0 z-99 flex items-center justify-center w-screen h-dvh p-2 sm:p-4">
             <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
                 x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
@@ -49,18 +49,20 @@
                 x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                class="relative flex flex-col w-full max-h-[calc(100vh-2rem)] min-h-0 border rounded-sm drop-shadow-sm lg:w-auto lg:min-w-2xl lg:max-w-4xl bg-white border-neutral-200 dark:bg-base dark:border-coolgray-300">
-                <div class="flex items-center justify-between py-6 px-6 shrink-0">
-                    <h3 class="text-2xl font-bold">{{ $title }}</h3>
+                class="relative flex flex-col w-full max-h-[calc(100dvh-1rem)] min-h-0 border rounded-sm drop-shadow-sm sm:max-h-[calc(100dvh-2rem)] lg:w-auto lg:min-w-2xl lg:max-w-4xl bg-white border-neutral-200 dark:bg-base dark:border-coolgray-300">
+                <div
+                    class="sticky top-0 z-10 flex items-center justify-between gap-4 px-4 py-4 border-b sm:px-6 sm:py-5 shrink-0 bg-white border-neutral-200 dark:bg-base dark:border-coolgray-300">
+                    <h3 class="text-xl font-bold leading-tight sm:text-2xl">{{ $title }}</h3>
                     <button @click="modalOpen=false"
-                        class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base">
+                        class="flex items-center justify-center w-8 h-8 rounded-full shrink-0 dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base">
                         <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                             stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
-                <div class="relative flex items-start justify-center w-full min-h-0 px-6 pb-6 overflow-y-auto">
+                <div
+                    class="relative flex items-start justify-center w-full min-h-0 px-4 py-4 overflow-y-auto overscroll-contain sm:px-6 sm:py-6">
                     {{ $slot }}
                 </div>
             </div>
