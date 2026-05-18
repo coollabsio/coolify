@@ -31,34 +31,20 @@ class StartDatabaseProxy
 
         if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
             $databaseType = $database->databaseType();
+            $containerName = resolveServiceDatabaseContainer($database);
             if ($database->service_id) {
                 $service = $database->service;
                 $network = $service?->uuid;
                 $server = data_get($service, 'destination.server');
-                $containerName = $service ? "{$database->name}-{$service->uuid}" : null;
-            } else {
-                if ($database->application_id) {
-                    $application = $database->application;
-                    $network = data_get($application, 'destination.network');
-                    $server = data_get($application, 'destination.server');
-                    $compose = Yaml::parse($application?->docker_compose ?: '') ?: [];
-                    $containerName = data_get($compose, 'services.' . $database->name . '.container_name');
-                    if (! $containerName) {
-                        $containerName = "{$database->name}-" . generateApplicationContainerName($application);
-                    }
-                } else {
-                    $preview = $database->application_preview;
-                    $application = $preview?->application;
-                    $network = data_get($application, 'destination.network');
-                    $server = data_get($application, 'destination.server');
-                    $compose = Yaml::parse($application?->docker_compose ?: '') ?: [];
-                    $containerName = data_get($compose, 'services.' . $database->name . '.container_name');
-                    if (! $containerName) {
-                        $containerName = $preview && $application
-                            ? "{$database->name}-" . generateApplicationContainerName($application, $preview->pull_request_id)
-                            : null;
-                    }
-                }
+            } elseif ($database->application_id) {
+                $application = $database->application;
+                $network = data_get($application, 'destination.network');
+                $server = data_get($application, 'destination.server');
+            } elseif ($database->application_preview_id) {
+                $preview = $database->application_preview;
+                $application = $preview?->application;
+                $network = data_get($application, 'destination.network');
+                $server = data_get($application, 'destination.server');
             }
 
             if (! $server || ! $network || ! $containerName) {

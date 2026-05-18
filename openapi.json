@@ -4230,10 +4230,66 @@
                                         "type": "number",
                                         "description": "Max storage (GB) for S3 backups"
                                     },
+<<<<<<< HEAD
+                                    "engine": {
+                                        "type": "string",
+                                        "description": "Backup engine: native (pg_dump) or pgbackrest (PostgreSQL only)",
+                                        "enum": [
+                                            "native",
+                                            "pgbackrest"
+                                        ],
+                                        "default": "native"
+                                    },
+                                    "pgbackrest_backup_type": {
+                                        "type": "string",
+                                        "description": "pgBackRest backup type",
+                                        "enum": [
+                                            "full",
+                                            "diff",
+                                            "incr"
+                                        ]
+                                    },
+                                    "pgbackrest_compress_type": {
+                                        "type": "string",
+                                        "description": "pgBackRest compression type",
+                                        "enum": [
+                                            "lz4",
+                                            "gzip",
+                                            "zstd",
+                                            "none"
+                                        ]
+                                    },
+                                    "pgbackrest_compress_level": {
+                                        "type": "integer",
+                                        "description": "pgBackRest compression level (0-9)"
+                                    },
+                                    "pgbackrest_log_level": {
+                                        "type": "string",
+                                        "description": "pgBackRest log level",
+                                        "enum": [
+                                            "off",
+                                            "error",
+                                            "warn",
+                                            "info",
+                                            "detail",
+                                            "debug",
+                                            "trace"
+                                        ]
+                                    },
+                                    "pgbackrest_archive_mode": {
+                                        "type": "string",
+                                        "description": "pgBackRest archive mode for WAL archiving",
+                                        "enum": [
+                                            "standard",
+                                            "reduced",
+                                            "minimal"
+                                        ]
+=======
                                     "timeout": {
                                         "type": "integer",
                                         "description": "Backup job timeout in seconds (min: 60, max: 36000)",
                                         "default": 3600
+>>>>>>> origin/next
                                     }
                                 },
                                 "type": "object"
@@ -4800,10 +4856,65 @@
                                         "type": "number",
                                         "description": "Max storage of the backup in S3"
                                     },
+<<<<<<< HEAD
+                                    "engine": {
+                                        "type": "string",
+                                        "description": "Backup engine: native (pg_dump) or pgbackrest (PostgreSQL only)",
+                                        "enum": [
+                                            "native",
+                                            "pgbackrest"
+                                        ]
+                                    },
+                                    "pgbackrest_backup_type": {
+                                        "type": "string",
+                                        "description": "pgBackRest backup type",
+                                        "enum": [
+                                            "full",
+                                            "diff",
+                                            "incr"
+                                        ]
+                                    },
+                                    "pgbackrest_compress_type": {
+                                        "type": "string",
+                                        "description": "pgBackRest compression type",
+                                        "enum": [
+                                            "lz4",
+                                            "gzip",
+                                            "zstd",
+                                            "none"
+                                        ]
+                                    },
+                                    "pgbackrest_compress_level": {
+                                        "type": "integer",
+                                        "description": "pgBackRest compression level (0-9)"
+                                    },
+                                    "pgbackrest_log_level": {
+                                        "type": "string",
+                                        "description": "pgBackRest log level",
+                                        "enum": [
+                                            "off",
+                                            "error",
+                                            "warn",
+                                            "info",
+                                            "detail",
+                                            "debug",
+                                            "trace"
+                                        ]
+                                    },
+                                    "pgbackrest_archive_mode": {
+                                        "type": "string",
+                                        "description": "pgBackRest archive mode for WAL archiving",
+                                        "enum": [
+                                            "standard",
+                                            "reduced",
+                                            "minimal"
+                                        ]
+=======
                                     "timeout": {
                                         "type": "integer",
                                         "description": "Backup job timeout in seconds (min: 60, max: 36000)",
                                         "default": 3600
+>>>>>>> origin/next
                                     }
                                 },
                                 "type": "object"
@@ -6261,6 +6372,16 @@
                 ]
             }
         },
+<<<<<<< HEAD
+        "\/databases\/{uuid}\/restore": {
+            "post": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Restore Database",
+                "description": "Restore a PostgreSQL database from a PgBackRest backup.",
+                "operationId": "restore-database",
+=======
         "\/databases\/{uuid}\/envs": {
             "get": {
                 "tags": [
@@ -6269,6 +6390,7 @@
                 "summary": "List Envs",
                 "description": "List all envs by database UUID.",
                 "operationId": "list-envs-by-database-uuid",
+>>>>>>> origin/next
                 "parameters": [
                     {
                         "name": "uuid",
@@ -6276,6 +6398,10 @@
                         "description": "UUID of the database.",
                         "required": true,
                         "schema": {
+<<<<<<< HEAD
+                            "type": "string",
+                            "format": "uuid"
+=======
                             "type": "string"
                         }
                     }
@@ -6325,16 +6451,30 @@
                         "required": true,
                         "schema": {
                             "type": "string"
+>>>>>>> origin/next
                         }
                     }
                 ],
                 "requestBody": {
+<<<<<<< HEAD
+                    "required": false,
+=======
                     "description": "Env created.",
                     "required": true,
+>>>>>>> origin/next
                     "content": {
                         "application\/json": {
                             "schema": {
                                 "properties": {
+<<<<<<< HEAD
+                                    "execution_uuid": {
+                                        "description": "UUID of backup execution to restore from (optional, uses latest if not specified)",
+                                        "type": "string"
+                                    },
+                                    "target_time": {
+                                        "description": "ISO 8601 timestamp for point-in-time recovery (optional)",
+                                        "type": "string"
+=======
                                     "key": {
                                         "type": "string",
                                         "description": "The key of the environment variable."
@@ -6354,6 +6494,7 @@
                                     "is_shown_once": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if the environment variable's value is shown on the UI."
+>>>>>>> origin/next
                                     }
                                 },
                                 "type": "object"
@@ -6362,6 +6503,10 @@
                     }
                 },
                 "responses": {
+<<<<<<< HEAD
+                    "200": {
+                        "description": "Restore initiated",
+=======
                     "201": {
                         "description": "Environment variable created.",
                         "content": {
@@ -6611,13 +6756,22 @@
                 "responses": {
                     "200": {
                         "description": "Environment variable deleted.",
+>>>>>>> origin/next
                         "content": {
                             "application\/json": {
                                 "schema": {
                                     "properties": {
                                         "message": {
                                             "type": "string",
+<<<<<<< HEAD
+                                            "example": "Database restore initiated."
+                                        },
+                                        "restore_uuid": {
+                                            "type": "string",
+                                            "example": "abc123"
+=======
                                             "example": "Environment variable deleted."
+>>>>>>> origin/next
                                         }
                                     },
                                     "type": "object"
@@ -6642,14 +6796,24 @@
                 ]
             }
         },
+<<<<<<< HEAD
+        "\/databases\/{uuid}\/restores": {
+=======
         "\/databases\/{uuid}\/storages": {
+>>>>>>> origin/next
             "get": {
                 "tags": [
                     "Databases"
                 ],
+<<<<<<< HEAD
+                "summary": "List Restores",
+                "description": "List all restore operations for a database.",
+                "operationId": "list-database-restores",
+=======
                 "summary": "List Storages",
                 "description": "List all persistent storages and file storages by database UUID.",
                 "operationId": "list-storages-by-database-uuid",
+>>>>>>> origin/next
                 "parameters": [
                     {
                         "name": "uuid",
@@ -6657,12 +6821,27 @@
                         "description": "UUID of the database.",
                         "required": true,
                         "schema": {
+<<<<<<< HEAD
+                            "type": "string",
+                            "format": "uuid"
+=======
                             "type": "string"
+>>>>>>> origin/next
                         }
                     }
                 ],
                 "responses": {
                     "200": {
+<<<<<<< HEAD
+                        "description": "List of restores",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object"
+                                    }
+=======
                         "description": "All storages by database UUID.",
                         "content": {
                             "application\/json": {
@@ -6682,6 +6861,7 @@
                                         }
                                     },
                                     "type": "object"
+>>>>>>> origin/next
                                 }
                             }
                         }
@@ -6689,9 +6869,12 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+<<<<<<< HEAD
+=======
                     "400": {
                         "$ref": "#\/components\/responses\/400"
                     },
+>>>>>>> origin/next
                     "404": {
                         "$ref": "#\/components\/responses\/404"
                     }
@@ -6701,6 +6884,18 @@
                         "bearerAuth": []
                     }
                 ]
+<<<<<<< HEAD
+            }
+        },
+        "\/databases\/{uuid}\/restores\/{restore_uuid}": {
+            "get": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Restore Status",
+                "description": "Get the status of a restore operation.",
+                "operationId": "get-restore-status",
+=======
             },
             "post": {
                 "tags": [
@@ -6709,6 +6904,7 @@
                 "summary": "Create Storage",
                 "description": "Create a persistent storage or file storage for a database.",
                 "operationId": "create-storage-by-database-uuid",
+>>>>>>> origin/next
                 "parameters": [
                     {
                         "name": "uuid",
@@ -6716,10 +6912,28 @@
                         "description": "UUID of the database.",
                         "required": true,
                         "schema": {
+<<<<<<< HEAD
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "restore_uuid",
+                        "in": "path",
+                        "description": "UUID of the restore operation.",
+                        "required": true,
+                        "schema": {
+=======
+>>>>>>> origin/next
                             "type": "string"
                         }
                     }
                 ],
+<<<<<<< HEAD
+                "responses": {
+                    "200": {
+                        "description": "Restore status",
+=======
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -6774,6 +6988,7 @@
                 "responses": {
                     "201": {
                         "description": "Storage created.",
+>>>>>>> origin/next
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -6785,6 +7000,10 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+<<<<<<< HEAD
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+=======
                     "400": {
                         "$ref": "#\/components\/responses\/400"
                     },
@@ -6960,6 +7179,7 @@
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
+>>>>>>> origin/next
                     }
                 },
                 "security": [

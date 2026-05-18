@@ -215,6 +215,35 @@ function get_port_from_dockerfile($dockerfile): ?int
     return null;
 }
 
+function resolveServiceDatabaseContainer(App\Models\ServiceDatabase $db): ?string
+{
+    if ($db->service_id) {
+        return "{$db->name}-{$db->service->uuid}";
+    }
+
+    if ($db->application_id) {
+        if (!empty($db->application->docker_compose)) {
+            $parsed = Yaml::parse($db->application->docker_compose);
+            if (isset($parsed['services'][$db->name]['container_name'])) {
+                return (string) $parsed['services'][$db->name]['container_name'];
+            }
+        }
+        return "{$db->name}-" . generateApplicationContainerName($db->application);
+    }
+
+    if ($db->application_preview_id) {
+        if (!empty($db->application_preview->application->docker_compose)) {
+            $parsed = Yaml::parse($db->application_preview->application->docker_compose);
+            if (isset($parsed['services'][$db->name]['container_name'])) {
+                return (string) $parsed['services'][$db->name]['container_name'];
+            }
+        }
+        return "{$db->name}-" . generateApplicationContainerName($db->application_preview->application, $db->application_preview->pull_request_id);
+    }
+
+    return null;
+}
+
 function defaultDatabaseLabels($database)
 {
     $labels = collect([]);

@@ -87,6 +87,14 @@ class StandalonePostgresql extends BaseModel
                 'resource_id' => $database->id,
                 'resource_type' => $database->getMorphClass(),
             ]);
+
+            LocalPersistentVolume::create([
+                'name' => 'postgres-pgbackrest-repo-'.$database->uuid,
+                'mount_path' => '/var/lib/pgbackrest',
+                'host_path' => null,
+                'resource_id' => $database->id,
+                'resource_type' => $database->getMorphClass(),
+            ]);
         });
         static::forceDeleting(function ($database) {
             $database->persistentStorages()->delete();
@@ -381,5 +389,37 @@ class StandalonePostgresql extends BaseModel
     public function isBackupSolutionAvailable()
     {
         return true;
+    }
+
+    public function hasPgBackrestBackups(): bool
+    {
+        return $this->scheduledBackups()
+            ->where('engine', 'pgbackrest')
+            ->where('enabled', true)
+            ->exists();
+    }
+
+    public function pgbackrestBackups()
+    {
+        return $this->scheduledBackups()->where('engine', 'pgbackrest');
+    }
+
+    public function restores()
+    {
+        return $this->morphMany(DatabaseRestore::class, 'database');
+    }
+
+    public function pgdataVolume(): ?LocalPersistentVolume
+    {
+        return $this->persistentStorages()
+            ->where('mount_path', '/var/lib/postgresql/data')
+            ->first();
+    }
+
+    public function pgbackrestRepoVolume(): ?LocalPersistentVolume
+    {
+        return $this->persistentStorages()
+            ->where('mount_path', '/var/lib/pgbackrest')
+            ->first();
     }
 }

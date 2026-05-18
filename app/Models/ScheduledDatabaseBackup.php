@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
@@ -44,6 +45,69 @@ class ScheduledDatabaseBackup extends BaseModel
         'timeout',
         'disable_local_backup',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'enabled' => 'boolean',
+            'save_s3' => 'boolean',
+            'dump_all' => 'boolean',
+            'disable_local_backup' => 'boolean',
+            'pgbackrest_compress_level' => 'integer',
+        ];
+    }
+
+    public function isPgBackrest(): bool
+    {
+        return $this->engine === 'pgbackrest';
+    }
+
+    public function isNative(): bool
+    {
+        return $this->engine === 'native' || $this->engine === null;
+    }
+
+    public function pgbackrestRepos(): HasMany
+    {
+        return $this->hasMany(PgbackrestRepo::class)->orderBy('repo_number');
+    }
+
+    public function enabledPgbackrestRepos(): HasMany
+    {
+        return $this->hasMany(PgbackrestRepo::class)->where('enabled', true)->orderBy('repo_number');
+    }
+
+    public function localRepo(): ?PgbackrestRepo
+    {
+        return $this->enabledPgbackrestRepos()->where('type', 'posix')->first()
+            ?? $this->pgbackrestRepos()->where('type', 'posix')->first();
+    }
+
+    public function s3Repo(): ?PgbackrestRepo
+    {
+        return $this->enabledPgbackrestRepos()->where('type', 's3')->first()
+            ?? $this->pgbackrestRepos()->where('type', 's3')->first();
+    }
+
+    public function hasLocalRepo(): bool
+    {
+        return $this->pgbackrestRepos()->where('type', 'posix')->where('enabled', true)->exists();
+    }
+
+    public function hasS3Repo(): bool
+    {
+        return $this->pgbackrestRepos()->where('type', 's3')->where('enabled', true)->exists();
+    }
+
+    public function restores(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            DatabaseRestore::class,
+            ScheduledDatabaseBackupExecution::class,
+            'scheduled_database_backup_id',
+            'scheduled_database_backup_execution_id'
+        );
+    }
 
     public static function ownedByCurrentTeam()
     {

@@ -93,41 +93,15 @@ class ServiceDatabase extends BaseModel
 
     public function restart()
     {
+        $container_id = resolveServiceDatabaseContainer($this);
         $server = $this->server;
-        $container_id = $this->resolveContainerName();
 
         if ($container_id && $server) {
             remote_process(["docker restart {$container_id}"], $server);
         }
     }
 
-    public function resolveContainerName(): ?string
-    {
-        if ($this->service_id) {
-            return $this->name.'-'.$this->service->uuid;
-        }
 
-        if ($this->application_id) {
-            $application = $this->application;
-            $compose = Yaml::parse($application?->docker_compose ?: '') ?: [];
-            $containerName = data_get($compose, 'services.'.$this->name.'.container_name');
-
-            return $containerName ?: "{$this->name}-".generateApplicationContainerName($application);
-        }
-
-        if ($this->application_preview_id) {
-            $preview = $this->application_preview;
-            $application = $preview?->application;
-            $compose = Yaml::parse($application?->docker_compose ?: '') ?: [];
-            $containerName = data_get($compose, 'services.'.$this->name.'.container_name');
-
-            return $containerName ?: ($preview && $application
-                ? "{$this->name}-".generateApplicationContainerName($application, $preview->pull_request_id)
-                : null);
-        }
-
-        return null;
-    }
 
     public function getServerAttribute(): ?Server
     {
@@ -142,7 +116,7 @@ class ServiceDatabase extends BaseModel
         }
 
         return null;
-    }
+
 
     public function isRunning()
     {

@@ -237,6 +237,10 @@ function deleteEmptyBackupFolder($folderPath, Server $server): void
 function removeOldBackups($backup): void
 {
     try {
+        if ($backup->isPgBackrest()) {
+            return;
+        }
+
         if ($backup->executions) {
             // Delete old local backups (only if local backup is NOT disabled)
             // Note: When disable_local_backup is enabled, each execution already marks its own

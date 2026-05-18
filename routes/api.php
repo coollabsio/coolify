@@ -171,6 +171,10 @@ Route::group([
     Route::match(['get', 'post'], '/databases/{uuid}/restart', [DatabasesController::class, 'action_restart'])->middleware(['api.ability:deploy']);
     Route::match(['get', 'post'], '/databases/{uuid}/stop', [DatabasesController::class, 'action_stop'])->middleware(['api.ability:deploy']);
 
+    Route::post('/databases/{uuid}/restore', [DatabasesController::class, 'restore_database'])->middleware(['api.ability:write']);
+    Route::get('/databases/{uuid}/restores', [DatabasesController::class, 'list_restores'])->middleware(['api.ability:read']);
+    Route::get('/databases/{uuid}/restores/{restore_uuid}', [DatabasesController::class, 'restore_status'])->middleware(['api.ability:read']);
+
     Route::get('/services', [ServicesController::class, 'services'])->middleware(['api.ability:read']);
     Route::post('/services', [ServicesController::class, 'create_service'])->middleware(['api.ability:write']);
 
