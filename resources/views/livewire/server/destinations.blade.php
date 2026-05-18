@@ -10,17 +10,11 @@
                 <div class="flex items-end gap-2">
                     <h2>Destinations</h2>
                     @can('update', $server)
-                        <x-modal-input buttonTitle="+ Add" title="New Destination">
-                            <div class="flex flex-col gap-8">
-                                <div>
-                                    <h3 class="pb-2">Docker</h3>
-                                    <livewire:destination.new.docker :server_id="$server->id" />
-                                </div>
-                                <div>
-                                    <h3 class="pb-2">Kubernetes</h3>
-                                    <livewire:destination.new.kubernetes :server_id="$server->id" />
-                                </div>
-                            </div>
+                        <x-modal-input buttonTitle="+ Docker" title="New Docker Destination">
+                            <livewire:destination.new.docker :server_id="$server->id" />
+                        </x-modal-input>
+                        <x-modal-input buttonTitle="+ Kubernetes" title="New Kubernetes Destination">
+                            <livewire:destination.new.kubernetes :server_id="$server->id" />
                         </x-modal-input>
                     @endcan
                     <x-forms.button canGate="update" :canResource="$server" isHighlighted wire:click='scan'>Scan for Destinations</x-forms.button>

@@ -6,17 +6,11 @@
         <h1>Destinations</h1>
         @if ($servers->count() > 0)
             @can('createAnyResource')
-                <x-modal-input buttonTitle="+ Add" title="New Destination">
-                    <div class="flex flex-col gap-8">
-                        <div>
-                            <h3 class="pb-2">Docker</h3>
-                            <livewire:destination.new.docker />
-                        </div>
-                        <div>
-                            <h3 class="pb-2">Kubernetes</h3>
-                            <livewire:destination.new.kubernetes />
-                        </div>
-                    </div>
+                <x-modal-input buttonTitle="+ Docker" title="New Docker Destination">
+                    <livewire:destination.new.docker />
+                </x-modal-input>
+                <x-modal-input buttonTitle="+ Kubernetes" title="New Kubernetes Destination">
+                    <livewire:destination.new.kubernetes />
                 </x-modal-input>
             @endcan
         @endif

@@ -49,7 +49,7 @@
                 x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                class="relative w-full lg:w-auto lg:min-w-2xl lg:max-w-4xl border rounded-sm drop-shadow-sm bg-white border-neutral-200 dark:bg-base dark:border-coolgray-300 flex flex-col">
+                class="relative flex flex-col w-full max-h-[calc(100vh-2rem)] min-h-0 border rounded-sm drop-shadow-sm lg:w-auto lg:min-w-2xl lg:max-w-4xl bg-white border-neutral-200 dark:bg-base dark:border-coolgray-300">
                 <div class="flex items-center justify-between py-6 px-6 shrink-0">
                     <h3 class="text-2xl font-bold">{{ $title }}</h3>
                     <button @click="modalOpen=false"
@@ -60,7 +60,7 @@
                         </svg>
                     </button>
                 </div>
-                <div class="relative flex items-center justify-center w-auto px-6 pb-6">
+                <div class="relative flex items-start justify-center w-full min-h-0 px-6 pb-6 overflow-y-auto">
                     {{ $slot }}
                 </div>
             </div>
