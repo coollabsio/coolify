@@ -10,6 +10,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSurrealdb;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StartDatabase
@@ -18,7 +19,7 @@ class StartDatabase
 
     public string $jobQueue = 'high';
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database)
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSurrealdb $database)
     {
         $server = $database->destination->server;
         if (! $server->isFunctional()) {
@@ -48,6 +49,9 @@ class StartDatabase
                 break;
             case \App\Models\StandaloneClickhouse::class:
                 $activity = StartClickhouse::run($database);
+                break;
+            case \App\Models\StandaloneSurrealdb::class:
+                $activity = StartSurrealdb::run($database);
                 break;
         }
         if ($database->is_public && $database->public_port) {

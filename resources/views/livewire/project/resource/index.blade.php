@@ -404,6 +404,7 @@
             keydbs: @js($keydbsJs),
             dragonflies: @js($dragonfliesJs),
             clickhouses: @js($clickhousesJs),
+            surrealdb: @js($surrealdbJs),
             services: @js($servicesJs),
             filterAndSort(items) {
                 if (this.search === '') {
@@ -430,6 +431,7 @@
                     this.keydbs,
                     this.dragonflies,
                     this.clickhouses,
+                    this.surrealdb,
                 ].flatMap((items) => this.filterAndSort(items))
             },
             get filteredServices() {

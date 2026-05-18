@@ -37,6 +37,8 @@ class Index extends Component
 
     protected Collection $clickhouses;
 
+    protected Collection $surrealdb;
+
     protected Collection $services;
 
     public function mount(): void
@@ -70,6 +72,7 @@ class Index extends Component
                 'keydbs:id,uuid,name,environment_id',
                 'dragonflies:id,uuid,name,environment_id',
                 'clickhouses:id,uuid,name,environment_id',
+                'standalone_surrealdb:id,uuid,name,environment_id',
             ])
             ->get();
 
@@ -81,6 +84,7 @@ class Index extends Component
             'keydbs',
             'dragonflies',
             'clickhouses',
+            'standalone_surrealdb',
             'mariadbs',
             'mongodbs',
             'services',
@@ -114,6 +118,7 @@ class Index extends Component
             'keydbs' => 'keydbs',
             'dragonflies' => 'dragonflies',
             'clickhouses' => 'clickhouses',
+            'surrealdb' => 'standalone_surrealdb',
         ];
 
         foreach ($databaseTypes as $property => $relation) {
@@ -160,6 +165,7 @@ class Index extends Component
             'keydbs' => $this->keydbs,
             'dragonflies' => $this->dragonflies,
             'clickhouses' => $this->clickhouses,
+            'surrealdb' => $this->surrealdb,
             'services' => $this->services,
             'applicationsJs' => $this->toSearchableArray($this->applications),
             'postgresqlsJs' => $this->toSearchableArray($this->postgresqls),
@@ -170,6 +176,7 @@ class Index extends Component
             'keydbsJs' => $this->toSearchableArray($this->keydbs),
             'dragonfliesJs' => $this->toSearchableArray($this->dragonflies),
             'clickhousesJs' => $this->toSearchableArray($this->clickhouses),
+            'surrealdbJs' => $this->toSearchableArray($this->surrealdb),
             'servicesJs' => $this->toSearchableArray($this->services),
         ]);
     }

@@ -243,6 +243,12 @@ class Select extends Component
                 'description' => 'ClickHouse is a column-oriented database that supports real-time analytics, business intelligence, observability, ML and GenAI, and more.',
                 'logo' => '<div class="w-[4.5rem] h-[4.5rem] p-2 transition-all duration-200 bg-black/10 dark:bg-white/10"><svg width="215" height="90" viewBox="0 0 100 43" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_378_10860)"><rect x="2.70837" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="7.2085" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="11.7086" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="16.2076" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="20.7087" y="10.7502" width="2.24992" height="4.49985" rx="0.236664" fill="currentColor"/></g></svg></div>',
             ],
+            [
+                'id' => 'surrealdb',
+                'name' => 'SurrealDB',
+                'description' => 'SurrealDB is an end-to-end cloud-native database for initial-stage startups to enterprise-level businesses.',
+                'logo' => '<div class="w-[4.5rem] h-[4.5rem] p-2 transition-all duration-200 bg-black/10 dark:bg-white/10"><svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M50 0C22.3858 0 0 22.3858 0 50C0 77.6142 22.3858 100 50 100C77.6142 100 100 77.6142 100 50C100 22.3858 77.6142 0 50 0ZM50 90C27.9086 90 10 72.0914 10 50C10 27.9086 27.9086 10 50 10C72.0914 10 90 27.9086 90 50C90 72.0914 72.0914 90 50 90ZM65 40C65 48.2843 58.2843 55 50 55C41.7157 55 35 48.2843 35 40C35 31.7157 41.7157 25 50 25C58.2843 25 65 31.7157 65 40ZM50 75C35 75 25 65 25 50H35C35 60 40 65 50 65C60 65 65 60 65 50H75C75 65 65 75 50 75Z" fill="currentColor"/></svg></div>',
+            ],
 
         ];
 
@@ -284,6 +290,7 @@ class Select extends Component
             case 'keydb':
             case 'dragonfly':
             case 'clickhouse':
+            case 'surrealdb':
             case 'mongodb':
                 $this->isDatabase = true;
                 $this->includeSwarm = false;

@@ -1,0 +1,248 @@
+<?php
+
+namespace App\Livewire\Project\Database\Surrealdb;
+
+use App\Actions\Database\StartDatabaseProxy;
+use App\Actions\Database\StopDatabaseProxy;
+use App\Models\Server;
+use App\Models\StandaloneSurrealdb;
+use App\Support\ValidationPatterns;
+use Exception;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Auth;
+use Livewire\Component;
+
+class General extends Component
+{
+    use AuthorizesRequests;
+
+    public ?Server $server = null;
+
+    public StandaloneSurrealdb $database;
+
+    public string $name;
+
+    public ?string $description = null;
+
+    public string $surrealUser;
+
+    public string $surrealPassword;
+
+    public string $surrealAuth;
+
+    public string $storageBackend;
+
+    public ?string $tikvEndpoint = null;
+
+    public string $image;
+
+    public ?string $portsMappings = null;
+
+    public ?bool $isPublic = null;
+
+    public mixed $publicPort = null;
+
+    public mixed $publicPortTimeout = 3600;
+
+    public ?string $customDockerRunOptions = null;
+
+    public ?string $dbUrl = null;
+
+    public ?string $dbUrlPublic = null;
+
+    public bool $isLogDrainEnabled = false;
+
+    public function getListeners()
+    {
+        $teamId = Auth::user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},DatabaseProxyStopped" => 'databaseProxyStopped',
+        ];
+    }
+
+    public function mount()
+    {
+        try {
+            $this->authorize('view', $this->database);
+            $this->syncData();
+            $this->server = data_get($this->database, 'destination.server');
+            if (! $this->server) {
+                $this->dispatch('error', 'Database destination server is not configured.');
+
+                return;
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    protected function rules(): array
+    {
+        return [
+            'name' => ValidationPatterns::nameRules(),
+            'description' => ValidationPatterns::descriptionRules(),
+            'surrealUser' => ValidationPatterns::databaseIdentifierRules(
+                enforcePattern: $this->surrealUser !== $this->database->surreal_user,
+            ),
+            'surrealPassword' => ValidationPatterns::databasePasswordRules(
+                enforcePattern: $this->surrealPassword !== $this->database->surreal_password,
+            ),
+            'surrealAuth' => 'required|string',
+            'storageBackend' => 'required|string',
+            'tikvEndpoint' => 'nullable|string',
+            'image' => 'required|string',
+            'portsMappings' => ValidationPatterns::portMappingRules(),
+            'isPublic' => 'nullable|boolean',
+            'publicPort' => 'nullable|integer|min:1|max:65535',
+            'publicPortTimeout' => 'nullable|integer|min:1',
+            'customDockerRunOptions' => 'nullable|string',
+            'dbUrl' => 'nullable|string',
+            'dbUrlPublic' => 'nullable|string',
+            'isLogDrainEnabled' => 'nullable|boolean',
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return array_merge(
+            ValidationPatterns::combinedMessages(),
+            ValidationPatterns::portMappingMessages(),
+            [
+                ...ValidationPatterns::databaseIdentifierMessages('surrealUser', 'User'),
+                ...ValidationPatterns::databasePasswordMessages('surrealPassword', 'Password'),
+                'image.required' => 'The Docker Image field is required.',
+                'image.string' => 'The Docker Image must be a string.',
+                'publicPort.integer' => 'The Public Port must be an integer.',
+                'publicPort.min' => 'The Public Port must be at least 1.',
+                'publicPort.max' => 'The Public Port must not exceed 65535.',
+                'publicPortTimeout.integer' => 'The Public Port Timeout must be an integer.',
+                'publicPortTimeout.min' => 'The Public Port Timeout must be at least 1.',
+            ]
+        );
+    }
+
+    public function syncData(bool $toModel = false)
+    {
+        if ($toModel) {
+            $this->validate();
+            $this->database->name = $this->name;
+            $this->database->description = $this->description;
+            $this->database->surreal_user = $this->surrealUser;
+            $this->database->surreal_password = $this->surrealPassword;
+            $this->database->surreal_auth = $this->surrealAuth;
+            $this->database->storage_backend = $this->storageBackend;
+            $this->database->tikv_endpoint = $this->tikvEndpoint;
+            $this->database->image = $this->image;
+            $this->database->ports_mappings = $this->portsMappings;
+            $this->database->is_public = $this->isPublic;
+            $this->database->public_port = $this->publicPort ?: null;
+            $this->database->public_port_timeout = $this->publicPortTimeout ?: null;
+            $this->database->custom_docker_run_options = $this->customDockerRunOptions;
+            $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
+            $this->database->save();
+
+            $this->dbUrl = $this->database->internal_db_url;
+            $this->dbUrlPublic = $this->database->external_db_url;
+        } else {
+            $this->name = $this->database->name;
+            $this->description = $this->database->description;
+            $this->surrealUser = $this->database->surreal_user;
+            $this->surrealPassword = $this->database->surreal_password;
+            $this->surrealAuth = $this->database->surreal_auth;
+            $this->storageBackend = $this->database->storage_backend;
+            $this->tikvEndpoint = $this->database->tikv_endpoint;
+            $this->image = $this->database->image;
+            $this->portsMappings = $this->database->ports_mappings;
+            $this->isPublic = $this->database->is_public;
+            $this->publicPort = $this->database->public_port;
+            $this->publicPortTimeout = $this->database->public_port_timeout;
+            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
+            $this->dbUrl = $this->database->internal_db_url;
+            $this->dbUrlPublic = $this->database->external_db_url;
+        }
+    }
+
+    public function instantSaveAdvanced()
+    {
+        try {
+            $this->authorize('update', $this->database);
+
+            if (! $this->server->isLogDrainEnabled()) {
+                $this->isLogDrainEnabled = false;
+                $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
+
+                return;
+            }
+            $this->syncData(true);
+
+            $this->dispatch('success', 'Database updated.');
+            $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function instantSave()
+    {
+        try {
+            $this->authorize('update', $this->database);
+
+            if ($this->isPublic && ! $this->publicPort) {
+                $this->dispatch('error', 'Public port is required.');
+                $this->isPublic = false;
+
+                return;
+            }
+            if ($this->isPublic && ! str($this->database->status)->startsWith('running')) {
+                $this->dispatch('error', 'Database must be started to be publicly accessible.');
+                $this->isPublic = false;
+
+                return;
+            }
+            $this->syncData(true);
+            if ($this->isPublic) {
+                StartDatabaseProxy::run($this->database);
+                $this->dispatch('success', 'Database is now publicly accessible.');
+            } else {
+                StopDatabaseProxy::run($this->database);
+                $this->dispatch('success', 'Database is no longer publicly accessible.');
+            }
+        } catch (\Throwable $e) {
+            $this->isPublic = ! $this->isPublic;
+            $this->syncData(true);
+
+            return handleError($e, $this);
+        }
+    }
+
+    public function databaseProxyStopped()
+    {
+        $this->syncData();
+    }
+
+    public function submit()
+    {
+        try {
+            $this->authorize('update', $this->database);
+
+            if ($this->portsMappings) {
+                $this->portsMappings = str($this->portsMappings)->replace(' ', '')->trim()->toString();
+            }
+            if (str($this->publicPort)->isEmpty()) {
+                $this->publicPort = null;
+            }
+            $this->syncData(true);
+            $this->dispatch('success', 'Database updated.');
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        } finally {
+            if (is_null($this->database->config_hash)) {
+                $this->database->isConfigurationChanged(true);
+            } else {
+                $this->dispatch('configurationChanged');
+            }
+        }
+    }
+}

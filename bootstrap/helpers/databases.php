@@ -13,6 +13,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSurrealdb;
 use App\Models\SwarmDocker;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
@@ -178,9 +179,27 @@ function create_standalone_clickhouse($environment_id, StandaloneDocker|SwarmDoc
     $database->save();
 
     return $database;
-}
+    }
 
-function deleteBackupsLocally(string|array|null $filenames, Server $server): void
+    function create_standalone_surrealdb($environment_id, StandaloneDocker|SwarmDocker $destination, ?array $otherData = null): StandaloneSurrealdb
+    {
+    $database = new StandaloneSurrealdb;
+    $database->uuid = (new Cuid2);
+    $database->name = 'surrealdb-database-'.$database->uuid;
+    $database->surreal_password = Str::password(length: 64, symbols: false);
+    $database->environment_id = $environment_id;
+    $database->destination_id = $destination->id;
+    $database->destination_type = $destination->getMorphClass();
+    if ($otherData) {
+        $database->fill($otherData);
+    }
+    $database->save();
+
+    return $database;
+    }
+
+    function deleteBackupsLocally
+(string|array|null $filenames, Server $server): void
 {
     if (empty($filenames)) {
         return;

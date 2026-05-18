@@ -106,12 +106,18 @@ class Environment extends BaseModel
         return $this->hasMany(StandaloneDragonfly::class);
     }
 
-    public function clickhouses()
+    public function standalone_clickhouses()
     {
         return $this->hasMany(StandaloneClickhouse::class);
     }
 
+    public function standalone_surrealdb()
+    {
+        return $this->hasMany(StandaloneSurrealdb::class);
+    }
+
     public function databases()
+
     {
         $postgresqls = $this->postgresqls;
         $redis = $this->redis;
@@ -121,8 +127,9 @@ class Environment extends BaseModel
         $keydbs = $this->keydbs;
         $dragonflies = $this->dragonflies;
         $clickhouses = $this->clickhouses;
+        $surrealdb = $this->standalone_surrealdb;
 
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses)->concat($surrealdb);
     }
 
     public function project()

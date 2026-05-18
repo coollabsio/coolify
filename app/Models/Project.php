@@ -136,30 +136,37 @@ class Project extends BaseModel
     {
         return $this->hasManyThrough(StandaloneMysql::class, Environment::class);
     }
+public function clickhouses()
+{
+    return $this->hasManyThrough(StandaloneClickhouse::class, Environment::class);
+}
 
-    public function mariadbs()
-    {
-        return $this->hasManyThrough(StandaloneMariadb::class, Environment::class);
-    }
+public function surrealdb()
+{
+    return $this->hasManyThrough(StandaloneSurrealdb::class, Environment::class);
+}
 
-    public function isEmpty()
-    {
-        return $this->applications()->count() == 0 &&
-            $this->redis()->count() == 0 &&
-            $this->postgresqls()->count() == 0 &&
-            $this->mysqls()->count() == 0 &&
-            $this->keydbs()->count() == 0 &&
-            $this->dragonflies()->count() == 0 &&
-            $this->clickhouses()->count() == 0 &&
-            $this->mariadbs()->count() == 0 &&
-            $this->mongodbs()->count() == 0 &&
-            $this->services()->count() == 0;
-    }
+public function mongodbs()
+...
+public function isEmpty()
+{
+    return $this->applications()->count() == 0 &&
+        $this->redis()->count() == 0 &&
+        $this->postgresqls()->count() == 0 &&
+        $this->mysqls()->count() == 0 &&
+        $this->keydbs()->count() == 0 &&
+        $this->dragonflies()->count() == 0 &&
+        $this->clickhouses()->count() == 0 &&
+        $this->surrealdb()->count() == 0 &&
+        $this->mariadbs()->count() == 0 &&
+        $this->mongodbs()->count() == 0 &&
+        $this->services()->count() == 0;
+}
 
-    public function databases()
-    {
-        return $this->postgresqls()->get()->merge($this->redis()->get())->merge($this->mongodbs()->get())->merge($this->mysqls()->get())->merge($this->mariadbs()->get())->merge($this->keydbs()->get())->merge($this->dragonflies()->get())->merge($this->clickhouses()->get());
-    }
+public function databases()
+{
+    return $this->postgresqls()->get()->merge($this->redis()->get())->merge($this->mongodbs()->get())->merge($this->mysqls()->get())->merge($this->mariadbs()->get())->merge($this->keydbs()->get())->merge($this->dragonflies()->get())->merge($this->clickhouses()->get())->merge($this->surrealdb()->get());
+}
 
     public function navigateTo()
     {

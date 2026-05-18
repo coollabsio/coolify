@@ -51,6 +51,11 @@ class SwarmDocker extends BaseModel
         return $this->morphMany(StandaloneClickhouse::class, 'destination');
     }
 
+    public function surrealdb()
+    {
+        return $this->morphMany(StandaloneSurrealdb::class, 'destination');
+    }
+
     public function mongodbs()
     {
         return $this->morphMany(StandaloneMongodb::class, 'destination');

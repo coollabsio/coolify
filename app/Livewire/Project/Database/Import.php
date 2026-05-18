@@ -362,7 +362,8 @@ EOD;
             $resource->getMorphClass() === \App\Models\StandaloneRedis::class ||
             $resource->getMorphClass() === \App\Models\StandaloneKeydb::class ||
             $resource->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
-            $resource->getMorphClass() === \App\Models\StandaloneClickhouse::class
+            $resource->getMorphClass() === \App\Models\StandaloneClickhouse::class ||
+            $resource->getMorphClass() === \App\Models\StandaloneSurrealdb::class
         ) {
             $this->unsupported = true;
         }

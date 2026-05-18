@@ -63,6 +63,8 @@ class Create extends Component
                     $database = create_standalone_dragonfly($environment->id, $destination);
                 } elseif ($type->value() === 'clickhouse') {
                     $database = create_standalone_clickhouse($environment->id, $destination);
+                } elseif ($type->value() === 'surrealdb') {
+                    $database = create_standalone_surrealdb($environment->id, $destination);
                 }
 
                 return redirect()->route('project.database.configuration', [
