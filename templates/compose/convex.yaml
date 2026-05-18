@@ -13,7 +13,7 @@ services:
     environment:
       - SERVICE_URL_BACKEND_3210
       - INSTANCE_NAME=${INSTANCE_NAME:-self-hosted-convex}
-      - INSTANCE_SECRET=${SERVICE_HEX_32_SECRET}
+      - INSTANCE_SECRET=${SERVICE_HEX_64_SECRET}
       - CONVEX_RELEASE_VERSION_DEV=${CONVEX_RELEASE_VERSION_DEV:-}
       - ACTIONS_USER_TIMEOUT_SECS=${ACTIONS_USER_TIMEOUT_SECS:-}
       # URL of the Convex API as accessed by the client/frontend.

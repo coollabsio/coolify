@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyTypes;
 use App\Exceptions\RateLimitException;
 use App\Http\Controllers\Controller;
@@ -12,6 +13,7 @@ use App\Models\Team;
 use App\Rules\ValidCloudInitYaml;
 use App\Rules\ValidHostname;
 use App\Services\HetznerService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
@@ -550,7 +552,7 @@ class HetznerController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
 
@@ -717,8 +719,16 @@ class HetznerController extends Controller
 
             // Validate server if requested
             if ($request->instant_validate) {
-                \App\Actions\Server\ValidateServer::dispatch($server);
+                ValidateServer::dispatch($server);
             }
+
+            auditLog('api.hetzner_server.created', [
+                'team_id' => $teamId,
+                'server_uuid' => $server->uuid,
+                'server_name' => $server->name,
+                'hetzner_server_id' => $hetznerServer['id'],
+                'ip' => $ipAddress,
+            ]);
 
             return response()->json([
                 'uuid' => $server->uuid,

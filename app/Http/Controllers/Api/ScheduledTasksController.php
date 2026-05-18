@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\ScheduledTask;
 use App\Models\Service;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
@@ -33,7 +34,7 @@ class ScheduledTasksController extends Controller
         return Service::whereRelation('environment.project.team', 'id', $teamId)->where('uuid', $request->uuid)->first();
     }
 
-    private function listTasks(Application|Service $resource): \Illuminate\Http\JsonResponse
+    private function listTasks(Application|Service $resource): JsonResponse
     {
         $this->authorize('view', $resource);
 
@@ -44,12 +45,12 @@ class ScheduledTasksController extends Controller
         return response()->json($tasks);
     }
 
-    private function createTask(Request $request, Application|Service $resource): \Illuminate\Http\JsonResponse
+    private function createTask(Request $request, Application|Service $resource): JsonResponse
     {
         $this->authorize('update', $resource);
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
 
@@ -105,15 +106,23 @@ class ScheduledTasksController extends Controller
 
         $task->save();
 
+        auditLog('api.scheduled_task.created', [
+            'team_id' => $teamId,
+            'task_uuid' => $task->uuid,
+            'task_name' => $task->name,
+            'resource_type' => $resource instanceof Application ? 'application' : 'service',
+            'resource_uuid' => $resource->uuid,
+        ]);
+
         return response()->json($this->removeSensitiveData($task), 201);
     }
 
-    private function updateTask(Request $request, Application|Service $resource): \Illuminate\Http\JsonResponse
+    private function updateTask(Request $request, Application|Service $resource): JsonResponse
     {
         $this->authorize('update', $resource);
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
 
@@ -161,22 +170,43 @@ class ScheduledTasksController extends Controller
 
         $task->update($request->only($allowedFields));
 
+        auditLog('api.scheduled_task.updated', [
+            'team_id' => getTeamIdFromToken(),
+            'task_uuid' => $task->uuid,
+            'task_name' => $task->name,
+            'resource_type' => $resource instanceof Application ? 'application' : 'service',
+            'resource_uuid' => $resource->uuid,
+            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
+        ]);
+
         return response()->json($this->removeSensitiveData($task), 200);
     }
 
-    private function deleteTask(Request $request, Application|Service $resource): \Illuminate\Http\JsonResponse
+    private function deleteTask(Request $request, Application|Service $resource): JsonResponse
     {
         $this->authorize('update', $resource);
 
-        $deleted = $resource->scheduled_tasks()->where('uuid', $request->task_uuid)->delete();
-        if (! $deleted) {
+        $task = $resource->scheduled_tasks()->where('uuid', $request->task_uuid)->first();
+        if (! $task) {
             return response()->json(['message' => 'Scheduled task not found.'], 404);
         }
+
+        $taskUuid = $task->uuid;
+        $taskName = $task->name;
+        $task->delete();
+
+        auditLog('api.scheduled_task.deleted', [
+            'team_id' => getTeamIdFromToken(),
+            'task_uuid' => $taskUuid,
+            'task_name' => $taskName,
+            'resource_type' => $resource instanceof Application ? 'application' : 'service',
+            'resource_uuid' => $resource->uuid,
+        ]);
 
         return response()->json(['message' => 'Scheduled task deleted.']);
     }
 
-    private function getExecutions(Request $request, Application|Service $resource): \Illuminate\Http\JsonResponse
+    private function getExecutions(Request $request, Application|Service $resource): JsonResponse
     {
         $this->authorize('view', $resource);
 
@@ -238,7 +268,7 @@ class ScheduledTasksController extends Controller
             ),
         ]
     )]
-    public function scheduled_tasks_by_application_uuid(Request $request): \Illuminate\Http\JsonResponse
+    public function scheduled_tasks_by_application_uuid(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -317,7 +347,7 @@ class ScheduledTasksController extends Controller
             ),
         ]
     )]
-    public function create_scheduled_task_by_application_uuid(Request $request): \Illuminate\Http\JsonResponse
+    public function create_scheduled_task_by_application_uuid(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -404,7 +434,7 @@ class ScheduledTasksController extends Controller
             ),
         ]
     )]
-    public function update_scheduled_task_by_application_uuid(Request $request): \Illuminate\Http\JsonResponse
+    public function update_scheduled_task_by_application_uuid(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -474,7 +504,7 @@ class ScheduledTasksController extends Controller
             ),
         ]
     )]
-    public function delete_scheduled_task_by_application_uuid(Request $request): \Illuminate\Http\JsonResponse
+    public function delete_scheduled_task_by_application_uuid(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -542,7 +572,7 @@ class ScheduledTasksController extends Controller
             ),
         ]
     )]
-    public function executions_by_application_uuid(Request $request): \Illuminate\Http\JsonResponse
+    public function executions_by_application_uuid(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -601,7 +631,7 @@ class ScheduledTasksController extends Controller
             ),
         ]
     )]
-    public function scheduled_tasks_by_service_uuid(Request $request): \Illuminate\Http\JsonResponse
+    public function scheduled_tasks_by_service_uuid(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -680,7 +710,7 @@ class ScheduledTasksController extends Controller
             ),
         ]
     )]
-    public function create_scheduled_task_by_service_uuid(Request $request): \Illuminate\Http\JsonResponse
+    public function create_scheduled_task_by_service_uuid(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -767,7 +797,7 @@ class ScheduledTasksController extends Controller
             ),
         ]
     )]
-    public function update_scheduled_task_by_service_uuid(Request $request): \Illuminate\Http\JsonResponse
+    public function update_scheduled_task_by_service_uuid(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -837,7 +867,7 @@ class ScheduledTasksController extends Controller
             ),
         ]
     )]
-    public function delete_scheduled_task_by_service_uuid(Request $request): \Illuminate\Http\JsonResponse
+    public function delete_scheduled_task_by_service_uuid(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -905,7 +935,7 @@ class ScheduledTasksController extends Controller
             ),
         ]
     )]
-    public function executions_by_service_uuid(Request $request): \Illuminate\Http\JsonResponse
+    public function executions_by_service_uuid(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {

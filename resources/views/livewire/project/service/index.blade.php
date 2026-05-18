@@ -123,7 +123,7 @@
                     @if ($showPortWarningModal)
                         <div x-data="{ modalOpen: true }" x-init="$nextTick(() => { modalOpen = true })"
                             @keydown.escape.window="modalOpen = false; $wire.call('cancelRemovePort')"
-                            :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
+                            :class="{ 'z-40': modalOpen }" class="relative">
                             <template x-teleport="body">
                                 <div x-show="modalOpen"
                                     class="fixed top-0 lg:pt-10 left-0 z-99 flex items-start justify-center w-screen h-screen" x-cloak>

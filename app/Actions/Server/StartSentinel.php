@@ -4,7 +4,6 @@ namespace App\Actions\Server;
 
 use App\Events\SentinelRestarted;
 use App\Models\Server;
-use App\Models\ServerSetting;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StartSentinel
@@ -23,10 +22,7 @@ class StartSentinel
         $metricsHistory = data_get($server, 'settings.sentinel_metrics_history_days');
         $refreshRate = data_get($server, 'settings.sentinel_metrics_refresh_rate_seconds');
         $pushInterval = data_get($server, 'settings.sentinel_push_interval_seconds');
-        $token = data_get($server, 'settings.sentinel_token');
-        if (! ServerSetting::isValidSentinelToken($token)) {
-            throw new \RuntimeException('Invalid sentinel token format. Token must contain only alphanumeric characters, dots, hyphens, and underscores.');
-        }
+        $token = $server->settings->ensureValidSentinelToken();
         $endpoint = data_get($server, 'settings.sentinel_custom_url');
         $debug = data_get($server, 'settings.is_sentinel_debug_enabled');
         $mountDir = '/data/coolify/sentinel';

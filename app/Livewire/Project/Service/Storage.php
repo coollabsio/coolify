@@ -69,7 +69,11 @@ class Storage extends Component
 
     public function refreshStorages()
     {
-        $this->fileStorage = $this->resource->fileStorages()->get();
+        $this->fileStorage = $this->resource->fileStorages()->get()->each(function (LocalFileVolume $fs) {
+            if (strlen((string) $fs->content) > LocalFileVolume::MAX_CONTENT_SIZE) {
+                $fs->content = LocalFileVolume::TOO_LARGE_PLACEHOLDER;
+            }
+        });
         $this->resource->load('persistentStorages.resource');
     }
 

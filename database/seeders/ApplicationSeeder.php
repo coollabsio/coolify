@@ -48,6 +48,22 @@ class ApplicationSeeder extends Seeder
             'source_type' => GithubApp::class,
         ]);
         Application::create([
+            'uuid' => 'railpack-nodejs',
+            'name' => 'Railpack NodeJS Fastify Example',
+            'fqdn' => 'http://railpack-nodejs.127.0.0.1.sslip.io',
+            'repository_project_id' => 603035348,
+            'git_repository' => 'coollabsio/coolify-examples',
+            'git_branch' => 'v4.x',
+            'base_directory' => '/nodejs',
+            'build_pack' => 'railpack',
+            'ports_exposes' => '3000',
+            'environment_id' => 1,
+            'destination_id' => 0,
+            'destination_type' => StandaloneDocker::class,
+            'source_id' => 1,
+            'source_type' => GithubApp::class,
+        ]);
+        Application::create([
             'uuid' => 'dockerfile',
             'name' => 'Dockerfile Example',
             'fqdn' => 'http://dockerfile.127.0.0.1.sslip.io',
@@ -144,6 +160,22 @@ CMD ["sh", "-c", "echo Crashing in 5 seconds... && sleep 5 && exit 1"]
             'destination_type' => StandaloneDocker::class,
             'source_id' => 1,
             'source_type' => GitlabApp::class,
+        ]);
+        Application::create([
+            'uuid' => 'railpack-static',
+            'name' => 'Railpack Static Example',
+            'fqdn' => 'http://railpack-static.127.0.0.1.sslip.io',
+            'repository_project_id' => 603035348,
+            'git_repository' => 'coollabsio/coolify-examples',
+            'git_branch' => 'v4.x',
+            'base_directory' => '/static',
+            'build_pack' => 'railpack',
+            'ports_exposes' => '80',
+            'environment_id' => 1,
+            'destination_id' => 0,
+            'destination_type' => StandaloneDocker::class,
+            'source_id' => 1,
+            'source_type' => GithubApp::class,
         ]);
     }
 }

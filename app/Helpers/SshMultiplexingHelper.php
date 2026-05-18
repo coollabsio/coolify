@@ -71,7 +71,7 @@ class SshMultiplexingHelper
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
         $muxSocket = $sshConfig['muxFilename'];
-        $connectionTimeout = config('constants.ssh.connection_timeout');
+        $connectionTimeout = self::getConnectionTimeout($server);
         $serverInterval = config('constants.ssh.server_interval');
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
@@ -140,7 +140,7 @@ class SshMultiplexingHelper
             $scp_command .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
 
-        $scp_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'), isScp: true);
+        $scp_command .= self::getCommonSshOptions($server, $sshKeyLocation, self::getConnectionTimeout($server), config('constants.ssh.server_interval'), isScp: true);
         if ($server->isIpv6()) {
             $scp_command .= "{$source} ".escapeshellarg($server->user).'@['.escapeshellarg($server->ip)."]:{$dest}";
         } else {
@@ -184,7 +184,7 @@ class SshMultiplexingHelper
             $ssh_command .= "-o ProxyCommand='cloudflared access ssh --hostname %h' ";
         }
 
-        $ssh_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'));
+        $ssh_command .= self::getCommonSshOptions($server, $sshKeyLocation, self::getConnectionTimeout($server), config('constants.ssh.server_interval'));
 
         $delimiter = Hash::make($command);
         $delimiter = base64_encode($delimiter);
@@ -241,6 +241,15 @@ class SshMultiplexingHelper
                 ]);
             }
         }
+    }
+
+    public static function getConnectionTimeout(Server $server): int
+    {
+        $timeout = data_get($server, 'settings.connection_timeout');
+
+        return is_numeric($timeout) && (int) $timeout > 0
+            ? (int) $timeout
+            : (int) config('constants.ssh.connection_timeout');
     }
 
     private static function getCommonSshOptions(Server $server, string $sshKeyLocation, int $connectionTimeout, int $serverInterval, bool $isScp = false): string

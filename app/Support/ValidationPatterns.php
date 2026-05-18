@@ -83,6 +83,12 @@ class ValidationPatterns
     public const DOCKER_NETWORK_PATTERN = '/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/';
 
     /**
+     * Pattern for Docker-compatible environment variable keys.
+     * Docker environment entries are KEY=value strings, so keys must be non-empty and cannot contain '=' or NUL.
+     */
+    public const ENVIRONMENT_VARIABLE_KEY_PATTERN = '/\A[^=\x00]+\z/u';
+
+    /**
      * Pattern for SQL-safe unquoted database identifiers (usernames, database names).
      * Allows letters, digits, underscore; first char must be letter or underscore.
      * Excludes all shell metacharacters. Max 63 chars (Postgres identifier limit).
@@ -95,6 +101,67 @@ class ValidationPatterns
      * Allows a broad set of printable characters so passwords remain strong.
      */
     public const DB_PASSWORD_PATTERN = '/^[A-Za-z0-9!@#%^*()_+\-=\[\]{}:,.?\/~]+$/';
+
+    /**
+     * Normalize environment variable keys before validation and storage.
+     */
+    public static function normalizeEnvironmentVariableKey(string $value): string
+    {
+        return str($value)->trim()->value;
+    }
+
+    /**
+     * Get validation rules for environment variable keys.
+     */
+    public static function environmentVariableKeyRules(bool $required = true, int $maxLength = 255): array
+    {
+        $rules = [];
+
+        if ($required) {
+            $rules[] = 'required';
+        } else {
+            $rules[] = 'nullable';
+        }
+
+        $rules[] = 'string';
+        $rules[] = "max:$maxLength";
+        $rules[] = 'regex:'.self::ENVIRONMENT_VARIABLE_KEY_PATTERN;
+
+        return $rules;
+    }
+
+    /**
+     * Get validation messages for environment variable key fields.
+     */
+    public static function environmentVariableKeyMessages(string $field = 'key', string $label = 'key'): array
+    {
+        return [
+            "{$field}.regex" => "The {$label} must be a non-empty Docker-compatible environment variable key and cannot contain '=' or NUL characters.",
+            "{$field}.max" => "The {$label} may not be greater than :max characters.",
+        ];
+    }
+
+    /**
+     * Check if a string is a valid environment variable key.
+     */
+    public static function isValidEnvironmentVariableKey(string $value): bool
+    {
+        return preg_match(self::ENVIRONMENT_VARIABLE_KEY_PATTERN, $value) === 1;
+    }
+
+    /**
+     * Normalize and validate an environment variable key.
+     */
+    public static function validatedEnvironmentVariableKey(string $value, string $label = 'key'): string
+    {
+        $key = self::normalizeEnvironmentVariableKey($value);
+
+        if (! self::isValidEnvironmentVariableKey($key)) {
+            throw new \InvalidArgumentException(self::environmentVariableKeyMessages(label: $label)['key.regex']);
+        }
+
+        return $key;
+    }
 
     /**
      * Get validation rules for database identifier fields (username, database name).

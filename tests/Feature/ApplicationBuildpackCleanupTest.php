@@ -78,26 +78,29 @@ describe('Application Model Buildpack Cleanup', function () {
 
         // Add environment variables that should be deleted
         EnvironmentVariable::create([
-            'application_id' => $application->id,
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
             'key' => 'SERVICE_FQDN_APP',
             'value' => 'app.example.com',
-            'is_build_time' => false,
+            'is_buildtime' => false,
             'is_preview' => false,
         ]);
 
         EnvironmentVariable::create([
-            'application_id' => $application->id,
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
             'key' => 'SERVICE_URL_APP',
             'value' => 'http://app.example.com',
-            'is_build_time' => false,
+            'is_buildtime' => false,
             'is_preview' => false,
         ]);
 
         EnvironmentVariable::create([
-            'application_id' => $application->id,
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
             'key' => 'REGULAR_VAR',
             'value' => 'should_remain',
-            'is_build_time' => false,
+            'is_buildtime' => false,
             'is_preview' => false,
         ]);
 
@@ -106,6 +109,87 @@ describe('Application Model Buildpack Cleanup', function () {
         $application->refresh();
 
         expect($application->build_pack)->toBe('nixpacks');
+        expect($application->docker_compose_domains)->toBeNull();
+        expect($application->docker_compose_raw)->toBeNull();
+
+        // Verify SERVICE_FQDN_* and SERVICE_URL_* were deleted
+        expect($application->environment_variables()->where('key', 'SERVICE_FQDN_APP')->count())->toBe(0);
+        expect($application->environment_variables()->where('key', 'SERVICE_URL_APP')->count())->toBe(0);
+
+        // Verify regular variables remain
+        expect($application->environment_variables()->where('key', 'REGULAR_VAR')->count())->toBe(1);
+    });
+
+    test('model clears dockerfile fields when build_pack changes from dockerfile to railpack', function () {
+        $team = Team::factory()->create();
+        $project = Project::factory()->create(['team_id' => $team->id]);
+        $environment = Environment::factory()->create(['project_id' => $project->id]);
+
+        $application = Application::factory()->create([
+            'environment_id' => $environment->id,
+            'build_pack' => 'dockerfile',
+            'dockerfile' => 'FROM node:18',
+            'dockerfile_location' => '/Dockerfile',
+            'dockerfile_target_build' => 'production',
+            'custom_healthcheck_found' => true,
+        ]);
+
+        $application->build_pack = 'railpack';
+        $application->save();
+        $application->refresh();
+
+        expect($application->build_pack)->toBe('railpack');
+        expect($application->dockerfile)->toBeNull();
+        expect($application->dockerfile_location)->toBeNull();
+        expect($application->dockerfile_target_build)->toBeNull();
+        expect($application->custom_healthcheck_found)->toBeFalse();
+    });
+
+    test('model clears dockercompose fields when build_pack changes from dockercompose to railpack', function () {
+        $team = Team::factory()->create();
+        $project = Project::factory()->create(['team_id' => $team->id]);
+        $environment = Environment::factory()->create(['project_id' => $project->id]);
+
+        $application = Application::factory()->create([
+            'environment_id' => $environment->id,
+            'build_pack' => 'dockercompose',
+            'docker_compose_domains' => '{"app": "example.com"}',
+            'docker_compose_raw' => 'version: "3.8"\nservices:\n  app:\n    image: nginx',
+        ]);
+
+        // Add environment variables that should be deleted
+        EnvironmentVariable::create([
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
+            'key' => 'SERVICE_FQDN_APP',
+            'value' => 'app.example.com',
+            'is_buildtime' => false,
+            'is_preview' => false,
+        ]);
+
+        EnvironmentVariable::create([
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
+            'key' => 'SERVICE_URL_APP',
+            'value' => 'http://app.example.com',
+            'is_buildtime' => false,
+            'is_preview' => false,
+        ]);
+
+        EnvironmentVariable::create([
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
+            'key' => 'REGULAR_VAR',
+            'value' => 'should_remain',
+            'is_buildtime' => false,
+            'is_preview' => false,
+        ]);
+
+        $application->build_pack = 'railpack';
+        $application->save();
+        $application->refresh();
+
+        expect($application->build_pack)->toBe('railpack');
         expect($application->docker_compose_domains)->toBeNull();
         expect($application->docker_compose_raw)->toBeNull();
 
@@ -154,6 +238,27 @@ describe('Application Model Buildpack Cleanup', function () {
 
         expect($application->build_pack)->toBe('static');
         expect($application->dockerfile)->toBeNull();
+    });
+
+    test('dockerfile location defaults only for dockerfile buildpack', function () {
+        $team = Team::factory()->create();
+        $project = Project::factory()->create(['team_id' => $team->id]);
+        $environment = Environment::factory()->create(['project_id' => $project->id]);
+
+        $nixpacksApplication = Application::factory()->create([
+            'environment_id' => $environment->id,
+            'build_pack' => 'nixpacks',
+            'dockerfile_location' => null,
+        ]);
+
+        $dockerfileApplication = Application::factory()->create([
+            'environment_id' => $environment->id,
+            'build_pack' => 'dockerfile',
+            'dockerfile_location' => null,
+        ]);
+
+        expect($nixpacksApplication->refresh()->dockerfile_location)->toBeNull();
+        expect($dockerfileApplication->refresh()->dockerfile_location)->toBe('/Dockerfile');
     });
 
     test('model does not trigger cleanup when build_pack is not changed', function () {

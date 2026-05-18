@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\EnvironmentVariable;
 use App\Support\ValidationPatterns;
 
 it('accepts valid names with common characters', function (string $name) {
@@ -129,4 +130,46 @@ it('generates nullable dockerNetworkRules when not required', function () {
 
     expect($rules)->toContain('nullable')
         ->not->toContain('required');
+});
+
+it('accepts Docker-compatible environment variable keys', function (string $key) {
+    expect(ValidationPatterns::isValidEnvironmentVariableKey($key))->toBeTrue();
+})->with([
+    'letters' => 'APP_ENV',
+    'leading underscore' => '_TOKEN',
+    'railpack control variable' => 'RAILPACK_NODE_VERSION',
+    'digits after first character' => 'NODE_VERSION_20',
+    'starts with digit' => '1BAD',
+    'hyphen' => 'BAD-KEY',
+    'dot' => 'node.name',
+    'uppercase dots' => 'XPACK.SECURITY.ENABLED',
+    'semicolon' => 'BAD;KEY',
+    'space' => 'BAD KEY',
+]);
+
+it('rejects environment variable keys Docker cannot represent', function (string $key) {
+    expect(ValidationPatterns::isValidEnvironmentVariableKey($key))->toBeFalse();
+})->with([
+    'equals' => 'BAD=KEY',
+    'empty' => '',
+]);
+
+it('generates environment variable key rules with correct defaults', function () {
+    $rules = ValidationPatterns::environmentVariableKeyRules();
+
+    expect($rules)->toContain('required')
+        ->toContain('string')
+        ->toContain('max:255')
+        ->toContain('regex:'.ValidationPatterns::ENVIRONMENT_VARIABLE_KEY_PATTERN);
+});
+
+it('normalizes environment variable keys by trimming surrounding whitespace', function () {
+    expect(ValidationPatterns::normalizeEnvironmentVariableKey(' node.name '))->toBe('node.name');
+});
+
+it('normalizes environment variable keys before model validation', function () {
+    $environmentVariable = new EnvironmentVariable;
+    $environmentVariable->key = ' APP_ENV ';
+
+    expect($environmentVariable->key)->toBe('APP_ENV');
 });

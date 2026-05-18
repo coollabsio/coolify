@@ -96,7 +96,7 @@ services:
       retries: 10
       timeout: 2s
   soketi:
-    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.13'
+    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.15'
     pull_policy: always
     container_name: coolify-realtime
     restart: always
