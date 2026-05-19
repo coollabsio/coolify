@@ -31,7 +31,7 @@ class KubernetesComposeManifestGenerator
         foreach ($this->services($compose) as $serviceName => $service) {
             $resources = [
                 ...$resources,
-                ...$this->serviceResources($application, $compose, (string) $serviceName, $service, $namespace, $options),
+                ...$this->serviceResources($application, (string) $serviceName, $service, $namespace, $options),
             ];
         }
 
@@ -45,22 +45,22 @@ class KubernetesComposeManifestGenerator
             ->implode("---\n");
     }
 
-    public function resourceNames(Application $application, array $compose): array
+    public function resourceNames(Application $application, array $compose, array $options = []): array
     {
         return collect($this->services($compose))
             ->keys()
-            ->map(fn (string $serviceName) => $this->resourceName($application, $serviceName))
+            ->map(fn (string $serviceName) => $this->resourceName($application, $serviceName, $options))
             ->values()
             ->toArray();
     }
 
-    private function serviceResources(Application $application, array $compose, string $serviceName, array $service, string $namespace, array $options): array
+    private function serviceResources(Application $application, string $serviceName, array $service, string $namespace, array $options): array
     {
-        $name = $this->resourceName($application, $serviceName);
-        $labels = $this->labels($application, $name, $serviceName);
+        $name = $this->resourceName($application, $serviceName, $options);
+        $labels = $this->labels($application, $name, $serviceName, $options);
         $port = $this->port($service);
         $environment = $this->environment($service, $options['environment'] ?? []);
-        $volumes = $this->volumes($application, $compose, $serviceName, $service, $name, $namespace, $labels, $options);
+        $volumes = $this->volumes($application, $service, $name, $namespace, $labels, $options);
         $resources = collect($volumes['claims']);
         $secret = $this->secret($name, $namespace, $labels, $environment);
 
@@ -146,7 +146,7 @@ class KubernetesComposeManifestGenerator
 
     private function ingress(Application $application, string $name, string $namespace, array $labels, string $serviceName, array $options): ?array
     {
-        $host = $this->host($application, $serviceName);
+        $host = $this->host($application, $serviceName, $options);
 
         if ($host === null) {
             return null;
@@ -227,7 +227,7 @@ class KubernetesComposeManifestGenerator
         ];
     }
 
-    private function volumes(Application $application, array $compose, string $serviceName, array $service, string $name, string $namespace, array $labels, array $options): array
+    private function volumes(Application $application, array $service, string $name, string $namespace, array $labels, array $options): array
     {
         $claims = [];
         $mounts = [];
@@ -245,7 +245,7 @@ class KubernetesComposeManifestGenerator
             }
 
             $volumeName = $this->data->dnsLabel($source, "storage-{$index}");
-            $claimName = $this->data->dnsLabel($this->resourceName($application, $source), 'storage');
+            $claimName = $this->data->dnsLabel($this->resourceName($application, $source, $options), 'storage');
             $mounts[] = ['name' => $volumeName, 'mountPath' => $target];
             $volumes[] = ['name' => $volumeName, 'persistentVolumeClaim' => ['claimName' => $claimName]];
 
@@ -359,9 +359,9 @@ class KubernetesComposeManifestGenerator
         return str_starts_with($source, '/') || str_starts_with($source, '.') || str_starts_with($source, '~');
     }
 
-    private function host(Application $application, string $serviceName): ?string
+    private function host(Application $application, string $serviceName, array $options): ?string
     {
-        $domains = json_decode((string) $application->docker_compose_domains, associative: true) ?: [];
+        $domains = json_decode((string) ($options['preview_compose_domains'] ?? $application->docker_compose_domains), associative: true) ?: [];
         $domain = $domains[$serviceName]['domain'] ?? null;
         $domain = trim(explode(',', (string) $domain)[0]);
 
@@ -372,7 +372,7 @@ class KubernetesComposeManifestGenerator
         return parse_url($domain, PHP_URL_HOST) ?: $domain;
     }
 
-    private function resourceName(Application $application, string $serviceName): string
+    private function resourceName(Application $application, string $serviceName, array $options = []): string
     {
         $base = str(($application->name ?: 'application').'-'.$serviceName)
             ->lower()
@@ -381,18 +381,31 @@ class KubernetesComposeManifestGenerator
             ->trim('-')
             ->toString();
 
-        return $this->data->dnsLabel($base.'-'.substr((string) $application->uuid, 0, 8), 'application');
+        return $this->data->dnsLabel($base.'-'.substr((string) $application->uuid, 0, 8).$this->previewSuffix($options), 'application');
     }
 
-    private function labels(Application $application, string $name, string $serviceName): array
+    private function labels(Application $application, string $name, string $serviceName, array $options): array
     {
-        return [
+        $labels = [
             'app.kubernetes.io/name' => $name,
             'app.kubernetes.io/managed-by' => 'coolify',
             'app.kubernetes.io/component' => 'compose-service',
             'coolify.io/application-uuid' => (string) $application->uuid,
             'coolify.io/compose-service' => $this->data->dnsLabel($serviceName, 'service'),
         ];
+
+        if ((int) ($options['pull_request_id'] ?? 0) !== 0) {
+            $labels['coolify.io/pull-request-id'] = (string) ((int) $options['pull_request_id']);
+        }
+
+        return $labels;
+    }
+
+    private function previewSuffix(array $options): string
+    {
+        $pullRequestId = (int) ($options['pull_request_id'] ?? 0);
+
+        return $pullRequestId === 0 ? '' : "-pr-{$pullRequestId}";
     }
 
     private function selector(string $name): array

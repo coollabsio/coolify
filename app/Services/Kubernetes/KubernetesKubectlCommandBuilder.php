@@ -97,11 +97,27 @@ class KubernetesKubectlCommandBuilder
             .' --ignore-not-found=true';
     }
 
+    public function deleteApplicationPreviewResources(KubernetesCluster $cluster, string $applicationUuid, int $pullRequestId, ?string $kubeconfigPath = null): string
+    {
+        return $this->base($cluster, $kubeconfigPath)
+            .' delete deployment,service,ingress,hpa,pdb,secret,serviceaccount'
+            .' --selector='.escapeshellarg($this->applicationPreviewSelector($applicationUuid, $pullRequestId))
+            .' --ignore-not-found=true';
+    }
+
     public function deleteApplicationPersistentVolumeClaims(KubernetesCluster $cluster, string $applicationUuid, ?string $kubeconfigPath = null): string
     {
         return $this->base($cluster, $kubeconfigPath)
             .' delete pvc'
             .' --selector='.escapeshellarg($this->applicationSelector($applicationUuid))
+            .' --ignore-not-found=true';
+    }
+
+    public function deleteApplicationPreviewPersistentVolumeClaims(KubernetesCluster $cluster, string $applicationUuid, int $pullRequestId, ?string $kubeconfigPath = null): string
+    {
+        return $this->base($cluster, $kubeconfigPath)
+            .' delete pvc'
+            .' --selector='.escapeshellarg($this->applicationPreviewSelector($applicationUuid, $pullRequestId))
             .' --ignore-not-found=true';
     }
 
@@ -176,6 +192,11 @@ class KubernetesKubectlCommandBuilder
     private function applicationSelector(string $applicationUuid): string
     {
         return 'app.kubernetes.io/managed-by=coolify,coolify.io/application-uuid='.$applicationUuid;
+    }
+
+    private function applicationPreviewSelector(string $applicationUuid, int $pullRequestId): string
+    {
+        return $this->applicationSelector($applicationUuid).',coolify.io/pull-request-id='.$pullRequestId;
     }
 
     private function serviceSelector(string $serviceUuid): string

@@ -108,6 +108,22 @@ it('adds runtime environment variables through an opaque secret', function () {
         ->toBe('deployment-123');
 });
 
+it('generates isolated preview resources for pull request deployments', function () {
+    $generator = new KubernetesApplicationManifestGenerator;
+
+    $resources = $generator->generate(kubernetesApplication(), [
+        'pull_request_id' => 42,
+        'preview_fqdn' => 'https://pr-42.example.com',
+    ]);
+
+    $deployment = $resources[0];
+    $ingress = $resources[2];
+
+    expect($deployment['metadata']['name'])->toBe('customer-api-ckv4a1b2-pr-42');
+    expect($deployment['metadata']['labels']['coolify.io/pull-request-id'])->toBe('42');
+    expect($ingress['spec']['rules'][0]['host'])->toBe('pr-42.example.com');
+});
+
 it('generates production resource primitives when configured', function () {
     $generator = new KubernetesApplicationManifestGenerator;
 

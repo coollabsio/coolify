@@ -10,10 +10,10 @@ class KubernetesApplicationManifestGenerator
 {
     public function generate(Application $application, array $options = []): array
     {
-        $name = $this->resourceName($application);
+        $name = $this->resourceName($application, $options);
         $namespace = $this->namespace($options['namespace'] ?? null);
         $port = $this->containerPort($application);
-        $labels = $this->labels($application, $name);
+        $labels = $this->labels($application, $name, $options);
         $extras = new KubernetesApplicationManifestExtras($application, $name, $namespace, $labels, $options);
 
         $resources = $extras->prefixResources();
@@ -50,7 +50,7 @@ class KubernetesApplicationManifestGenerator
             ->implode("---\n");
     }
 
-    public function resourceName(Application $application): string
+    public function resourceName(Application $application, array $options = []): string
     {
         $name = str($application->name ?: 'application')
             ->lower()
@@ -63,7 +63,7 @@ class KubernetesApplicationManifestGenerator
             $name = 'application';
         }
 
-        $suffix = substr((string) $application->uuid, 0, 8);
+        $suffix = substr((string) $application->uuid, 0, 8).$this->previewSuffix($options);
         $name = substr($name, 0, 54 - strlen($suffix));
 
         return trim($name, '-').'-'.$suffix;
@@ -203,7 +203,7 @@ class KubernetesApplicationManifestGenerator
 
     private function ingress(Application $application, string $name, string $namespace, array $labels, array $options, KubernetesApplicationManifestExtras $extras): ?array
     {
-        $host = $this->host($application);
+        $host = $this->host($application, $options);
 
         if ($host === null) {
             return null;
@@ -344,9 +344,12 @@ class KubernetesApplicationManifestGenerator
         return (int) ($ports->first() ?: 3000);
     }
 
-    private function host(Application $application): ?string
+    private function host(Application $application, array $options): ?string
     {
-        $fqdn = trim(explode(',', (string) $application->fqdn)[0]);
+        $fqdn = filled($options['preview_fqdn'] ?? null)
+            ? $options['preview_fqdn']
+            : $application->fqdn;
+        $fqdn = trim(explode(',', (string) $fqdn)[0]);
 
         if ($fqdn === '') {
             return null;
@@ -365,13 +368,26 @@ class KubernetesApplicationManifestGenerator
         return "{$name}-env";
     }
 
-    private function labels(Application $application, string $name): array
+    private function labels(Application $application, string $name, array $options): array
     {
-        return [
+        $labels = [
             'app.kubernetes.io/name' => $name,
             'app.kubernetes.io/managed-by' => 'coolify',
             'app.kubernetes.io/component' => 'application',
             'coolify.io/application-uuid' => (string) $application->uuid,
         ];
+
+        if ((int) ($options['pull_request_id'] ?? 0) !== 0) {
+            $labels['coolify.io/pull-request-id'] = (string) ((int) $options['pull_request_id']);
+        }
+
+        return $labels;
+    }
+
+    private function previewSuffix(array $options): string
+    {
+        $pullRequestId = (int) ($options['pull_request_id'] ?? 0);
+
+        return $pullRequestId === 0 ? '' : "-pr-{$pullRequestId}";
     }
 }

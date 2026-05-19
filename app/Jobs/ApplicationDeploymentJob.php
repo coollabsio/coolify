@@ -1266,9 +1266,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $builder = new KubernetesKubectlCommandBuilder;
         $generator = new KubernetesApplicationManifestGenerator;
         $composeGenerator = new KubernetesComposeManifestGenerator;
+        $options = ['pull_request_id' => $this->pull_request_id];
         $deploymentNames = $this->application->build_pack === 'dockercompose'
-            ? $composeGenerator->resourceNames($this->application, $this->kubernetesComposeFile())
-            : [$generator->resourceName($this->application)];
+            ? $composeGenerator->resourceNames($this->application, $this->kubernetesComposeFile(), $options)
+            : [$generator->resourceName($this->application, $options)];
         $kubeconfigPath = $cluster->effectiveKubeconfigPath();
         $commands = [
             ['command' => 'mkdir -p '.escapeshellarg($cluster->configurationDirectory()), 'hidden' => true],
@@ -2054,15 +2055,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             'image' => $this->production_image_name,
             'deployment_uuid' => $this->deployment_uuid,
             'environment' => $this->kubernetesRuntimeEnvironment(),
+            'pull_request_id' => $this->pull_request_id,
+            'preview_fqdn' => $this->pull_request_id !== 0 ? data_get($this->preview, 'fqdn') : null,
+            'preview_compose_domains' => $this->pull_request_id !== 0 ? data_get($this->preview, 'docker_compose_domains') : null,
         ];
 
         if ($this->application->build_pack === 'dockercompose') {
             $composeFile ??= $this->kubernetesComposeFile();
             $manifestYaml = $composeGenerator->toYaml($this->application, $composeFile, $manifestOptions);
-            $deploymentNames = $composeGenerator->resourceNames($this->application, $composeFile);
+            $deploymentNames = $composeGenerator->resourceNames($this->application, $composeFile, $manifestOptions);
         } else {
             $manifestYaml = $generator->toYaml($this->application, $manifestOptions);
-            $deploymentNames = [$generator->resourceName($this->application)];
+            $deploymentNames = [$generator->resourceName($this->application, $manifestOptions)];
         }
 
         $commands = [

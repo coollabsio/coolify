@@ -112,6 +112,33 @@ it('rejects compose services that require local builds', function () {
     ]))->toThrow(InvalidArgumentException::class, 'uses build');
 });
 
+it('generates isolated compose preview resources for pull request deployments', function () {
+    $generator = new KubernetesComposeManifestGenerator;
+    $compose = [
+        'services' => [
+            'api' => [
+                'image' => 'ghcr.io/example/api:1.0.0',
+                'ports' => ['8080:3000'],
+            ],
+        ],
+    ];
+
+    $resources = $generator->generate(kubernetesComposeApplication(), $compose, [
+        'pull_request_id' => 42,
+        'preview_compose_domains' => json_encode([
+            'api' => ['domain' => 'https://pr-42-api.example.com'],
+        ], JSON_THROW_ON_ERROR),
+    ]);
+
+    $deployment = collect($resources)->firstWhere('kind', 'Deployment');
+    $ingress = collect($resources)->firstWhere('kind', 'Ingress');
+
+    expect($generator->resourceNames(kubernetesComposeApplication(), $compose, ['pull_request_id' => 42]))
+        ->toBe(['customer-stack-api-ckv4a1b2-pr-42']);
+    expect($deployment['metadata']['labels']['coolify.io/pull-request-id'])->toBe('42');
+    expect($ingress['spec']['rules'][0]['host'])->toBe('pr-42-api.example.com');
+});
+
 it('rejects bind mounts for kubernetes compose deployments', function () {
     $generator = new KubernetesComposeManifestGenerator;
 

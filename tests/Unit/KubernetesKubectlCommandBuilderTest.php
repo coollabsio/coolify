@@ -42,8 +42,14 @@ it('builds escaped kubectl commands for a cluster destination', function () {
     expect($builder->deleteApplicationResources($cluster, 'app-uuid'))
         ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' delete deployment,service,ingress,hpa,pdb,secret,serviceaccount --selector='app.kubernetes.io/managed-by=coolify,coolify.io/application-uuid=app-uuid' --ignore-not-found=true");
 
+    expect($builder->deleteApplicationPreviewResources($cluster, 'app-uuid', 42))
+        ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' delete deployment,service,ingress,hpa,pdb,secret,serviceaccount --selector='app.kubernetes.io/managed-by=coolify,coolify.io/application-uuid=app-uuid,coolify.io/pull-request-id=42' --ignore-not-found=true");
+
     expect($builder->deleteApplicationPersistentVolumeClaims($cluster, 'app-uuid'))
         ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' delete pvc --selector='app.kubernetes.io/managed-by=coolify,coolify.io/application-uuid=app-uuid' --ignore-not-found=true");
+
+    expect($builder->deleteApplicationPreviewPersistentVolumeClaims($cluster, 'app-uuid', 42))
+        ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' delete pvc --selector='app.kubernetes.io/managed-by=coolify,coolify.io/application-uuid=app-uuid,coolify.io/pull-request-id=42' --ignore-not-found=true");
 
     expect($builder->deleteServiceResources($cluster, 'service-uuid'))
         ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' delete deployment,service,ingress,hpa,pdb,secret,serviceaccount --selector='app.kubernetes.io/managed-by=coolify,coolify.io/service-uuid=service-uuid' --ignore-not-found=true");

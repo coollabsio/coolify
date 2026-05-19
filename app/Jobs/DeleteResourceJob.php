@@ -21,6 +21,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Services\Kubernetes\KubernetesKubectlCommandBuilder;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -176,6 +177,13 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         try {
+            if ($application->destination instanceof KubernetesCluster) {
+                $this->deleteKubernetesApplicationPreview($application, $pull_request_id);
+                $this->resource->forceDelete();
+
+                return;
+            }
+
             if ($server->isSwarm()) {
                 $escapedStackName = escapeshellarg("{$application->uuid}-{$pull_request_id}");
                 instant_remote_process(["docker stack rm {$escapedStackName}"], $server);
@@ -190,6 +198,31 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
         // Finally, force delete to trigger resource cleanup
         $this->resource->forceDelete();
+    }
+
+    private function deleteKubernetesApplicationPreview(Application $application, int $pullRequestId): void
+    {
+        $cluster = $application->destination;
+        $builder = new KubernetesKubectlCommandBuilder;
+        $kubeconfigPath = $cluster->effectiveKubeconfigPath();
+        $commands = ['mkdir -p '.escapeshellarg($cluster->configurationDirectory())];
+
+        if (filled($cluster->kubeconfig)) {
+            $commands[] = $builder->writeKubeconfig($cluster->storedKubeconfigPath(), $cluster->kubeconfig);
+            $kubeconfigPath = $cluster->storedKubeconfigPath();
+        }
+
+        if (blank($kubeconfigPath)) {
+            return;
+        }
+
+        $commands[] = $builder->deleteApplicationPreviewResources($cluster, (string) $application->uuid, $pullRequestId, $kubeconfigPath);
+
+        if ($this->deleteVolumes) {
+            $commands[] = $builder->deleteApplicationPreviewPersistentVolumeClaims($cluster, (string) $application->uuid, $pullRequestId, $kubeconfigPath);
+        }
+
+        instant_remote_process($commands, $cluster->server, throwError: false);
     }
 
     private function stopPreviewContainers(array $containers, $server, int $timeout = 30)
