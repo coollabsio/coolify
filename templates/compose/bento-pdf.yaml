@@ -1,0 +1,17 @@
+# documentation: https://bentopdf.com/docs
+# slogan: Process PDFs entirely in your browser. No uploads. No servers. Complete privacy.
+# category: productivity
+# tags: pdf, manipulation, web, tool
+# logo: svgs/bento-pdf.png
+# port: 8080
+
+services:
+  bento-pdf:
+    image: ghcr.io/alam00000/bentopdf:v1.16.1
+    environment:
+      - SERVICE_URL_BENTOPDF_8080
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

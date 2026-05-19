@@ -30,7 +30,7 @@ class Source extends Component
     #[Validate(['required', 'string'])]
     public string $gitBranch;
 
-    #[Validate(['nullable', 'string'])]
+    #[Validate(['nullable', 'string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'])]
     public ?string $gitCommitSha = null;
 
     #[Locked]
@@ -109,6 +109,7 @@ class Source extends Component
             $this->application->refresh();
             $this->privateKeyName = $this->application->private_key->name;
             $this->dispatch('success', 'Private key updated!');
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -124,6 +125,7 @@ class Source extends Component
             }
             $this->syncData(true);
             $this->dispatch('success', 'Application source updated!');
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

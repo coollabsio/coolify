@@ -7,8 +7,29 @@
 
 services:
   strapi:
-    image: "elestio/strapi-development:latest"
+    image: "elestio/strapi-production:v5.33.4"
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        cat > /opt/app/src/admin/vite.config.js << 'EOFVITE'
+        const { mergeConfig } = require('vite');
+        module.exports = (config) => {
+          return mergeConfig(config, {
+            resolve: {
+              alias: {
+                '@': '/src',
+              },
+            },
+            server: {
+              allowedHosts: ['$SERVICE_FQDN_STRAPI']
+            }
+          });
+        };
+        EOFVITE
+        exec npm run develop
     environment:
+      - SERVICE_FQDN_STRAPI
       - SERVICE_URL_STRAPI_1337
       - DATABASE_CLIENT=postgres
       - DATABASE_HOST=postgresql

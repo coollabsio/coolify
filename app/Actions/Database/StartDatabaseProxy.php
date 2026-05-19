@@ -33,7 +33,6 @@ class StartDatabaseProxy
             $databaseType = $database->databaseType();
             $network = $database->service->uuid;
             $server = data_get($database, 'service.destination.server');
-            $proxyContainerName = "{$database->service->uuid}-proxy";
             $containerName = "{$database->name}-{$database->service->uuid}";
         }
         $internalPort = match ($databaseType) {
@@ -52,9 +51,11 @@ class StartDatabaseProxy
         }
 
         $configuration_dir = database_proxy_dir($database->uuid);
+        $host_configuration_dir = $configuration_dir;
         if (isDev()) {
-            $configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
+            $host_configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
         }
+        $timeoutConfig = $this->buildProxyTimeoutConfig($database->public_port_timeout);
         $nginxconf = <<<EOF
     user  nginx;
     worker_processes  auto;
@@ -68,6 +69,7 @@ class StartDatabaseProxy
        server {
             listen $database->public_port;
             proxy_pass $containerName:$internalPort;
+            $timeoutConfig
        }
     }
     EOF;
@@ -86,7 +88,7 @@ class StartDatabaseProxy
                     'volumes' => [
                         [
                             'type' => 'bind',
-                            'source' => "$configuration_dir/nginx.conf",
+                            'source' => "$host_configuration_dir/nginx.conf",
                             'target' => '/etc/nginx/nginx.conf',
                         ],
                     ],
@@ -113,12 +115,61 @@ class StartDatabaseProxy
         $dockercompose_base64 = base64_encode(Yaml::dump($docker_compose, 4, 2));
         $nginxconf_base64 = base64_encode($nginxconf);
         instant_remote_process(["docker rm -f $proxyContainerName"], $server, false);
-        instant_remote_process([
-            "mkdir -p $configuration_dir",
-            "echo '{$nginxconf_base64}' | base64 -d | tee $configuration_dir/nginx.conf > /dev/null",
-            "echo '{$dockercompose_base64}' | base64 -d | tee $configuration_dir/docker-compose.yaml > /dev/null",
-            "docker compose --project-directory {$configuration_dir} pull",
-            "docker compose --project-directory {$configuration_dir} up -d",
-        ], $server);
+
+        try {
+            instant_remote_process([
+                "mkdir -p $configuration_dir",
+                "echo '{$nginxconf_base64}' | base64 -d | tee $configuration_dir/nginx.conf > /dev/null",
+                "echo '{$dockercompose_base64}' | base64 -d | tee $configuration_dir/docker-compose.yaml > /dev/null",
+                "docker compose --project-directory {$configuration_dir} pull",
+                "docker compose --project-directory {$configuration_dir} up -d",
+            ], $server);
+        } catch (\RuntimeException $e) {
+            if ($this->isNonTransientError($e->getMessage())) {
+                $database->update(['is_public' => false]);
+
+                $team = data_get($database, 'environment.project.team')
+                    ?? data_get($database, 'service.environment.project.team');
+
+                $team?->notify(
+                    new \App\Notifications\Container\ContainerRestarted(
+                        "TCP Proxy for {$database->name} database has been disabled due to error: {$e->getMessage()}",
+                        $server,
+                    )
+                );
+
+                ray("Database proxy for {$database->name} disabled due to non-transient error: {$e->getMessage()}");
+
+                return;
+            }
+
+            throw $e;
+        }
+    }
+
+    private function isNonTransientError(string $message): bool
+    {
+        $nonTransientPatterns = [
+            'port is already allocated',
+            'address already in use',
+            'Bind for',
+        ];
+
+        foreach ($nonTransientPatterns as $pattern) {
+            if (str_contains($message, $pattern)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function buildProxyTimeoutConfig(?int $timeout): string
+    {
+        if ($timeout === null || $timeout < 1) {
+            $timeout = 3600;
+        }
+
+        return "proxy_timeout {$timeout}s;";
     }
 }

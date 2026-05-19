@@ -11,11 +11,14 @@ use App\Enums\ProxyTypes;
 use App\Events\ServerReachabilityChanged;
 use App\Helpers\SslHelper;
 use App\Jobs\CheckAndStartSentinelJob;
+use App\Jobs\CheckTraefikVersionForServerJob;
 use App\Jobs\RegenerateSslCertJob;
+use App\Livewire\Server\Proxy;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use App\Services\ConfigurationRepository;
 use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -24,12 +27,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Stringable;
 use OpenApi\Attributes as OA;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Spatie\Url\Url;
+use Stevebauman\Purify\Facades\Purify;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
@@ -75,8 +80,8 @@ use Visus\Cuid2\Cuid2;
  * - Traefik image uses the 'latest' tag (no fixed version tracking)
  * - No Traefik version detected on the server
  *
- * @see \App\Jobs\CheckTraefikVersionForServerJob Where this data is populated
- * @see \App\Livewire\Server\Proxy Where this data is read and displayed
+ * @see CheckTraefikVersionForServerJob Where this data is populated
+ * @see Proxy Where this data is read and displayed
  */
 #[OA\Schema(
     description: 'Server model',
@@ -103,9 +108,15 @@ use Visus\Cuid2\Cuid2;
 
 class Server extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasFactory, SchemalessAttributesTrait, SoftDeletes;
+    use ClearsGlobalSearchCache, HasFactory, HasMetrics, SchemalessAttributesTrait, SoftDeletes;
 
     public static $batch_counter = 0;
+
+    /**
+     * Identity map cache for request-scoped Server lookups.
+     * Prevents N+1 queries when the same Server is accessed multiple times.
+     */
+    private static ?array $identityMapCache = null;
 
     protected $appends = ['is_coolify_host'];
 
@@ -124,10 +135,10 @@ class Server extends BaseModel
                     $payload['ip_previous'] = $server->getOriginal('ip');
                 }
             }
-            $server->forceFill($payload);
+            $server->fill($payload);
         });
         static::saved(function ($server) {
-            if ($server->privateKey?->isDirty()) {
+            if ($server->wasChanged('private_key_id') || $server->privateKey?->isDirty()) {
                 refresh_server_connection($server->privateKey);
             }
         });
@@ -137,19 +148,14 @@ class Server extends BaseModel
             ]);
             if ($server->id === 0) {
                 if ($server->isSwarm()) {
-                    SwarmDocker::create([
+                    (new SwarmDocker)->forceFill([
                         'id' => 0,
                         'name' => 'coolify',
                         'network' => 'coolify-overlay',
                         'server_id' => $server->id,
-                    ]);
+                    ])->save();
                 } else {
-                    StandaloneDocker::create([
-                        'id' => 0,
-                        'name' => 'coolify',
-                        'network' => 'coolify',
-                        'server_id' => $server->id,
-                    ]);
+                    (new StandaloneDocker)->forceFill($server->defaultStandaloneDockerAttributes(id: 0))->saveQuietly();
                 }
             } else {
                 if ($server->isSwarm()) {
@@ -159,18 +165,32 @@ class Server extends BaseModel
                         'server_id' => $server->id,
                     ]);
                 } else {
-                    $standaloneDocker = new StandaloneDocker([
-                        'name' => 'coolify',
-                        'uuid' => (string) new Cuid2,
-                        'network' => 'coolify',
-                        'server_id' => $server->id,
-                    ]);
+                    $standaloneDocker = new StandaloneDocker;
+                    $standaloneDocker->forceFill($server->defaultStandaloneDockerAttributes());
                     $standaloneDocker->saveQuietly();
                 }
             }
             if (! isset($server->proxy->redirect_enabled)) {
                 $server->proxy->redirect_enabled = true;
             }
+
+            // Create predefined server shared variables
+            SharedEnvironmentVariable::create([
+                'key' => 'COOLIFY_SERVER_UUID',
+                'value' => $server->uuid,
+                'type' => 'server',
+                'server_id' => $server->id,
+                'team_id' => $server->team_id,
+                'is_literal' => true,
+            ]);
+            SharedEnvironmentVariable::create([
+                'key' => 'COOLIFY_SERVER_NAME',
+                'value' => $server->name,
+                'type' => 'server',
+                'server_id' => $server->id,
+                'team_id' => $server->team_id,
+                'is_literal' => true,
+            ]);
         });
         static::retrieved(function ($server) {
             if (! isset($server->proxy->redirect_enabled)) {
@@ -185,11 +205,46 @@ class Server extends BaseModel
             $server->settings()->delete();
             $server->sslCertificates()->delete();
         });
+
+        static::updated(function () {
+            static::flushIdentityMap();
+        });
+    }
+
+    /**
+     * Find a Server by ID using the identity map cache.
+     * This prevents N+1 queries when the same Server is accessed multiple times.
+     */
+    public static function findCached($id): ?static
+    {
+        if ($id === null) {
+            return null;
+        }
+
+        if (static::$identityMapCache === null) {
+            static::$identityMapCache = [];
+        }
+
+        if (! isset(static::$identityMapCache[$id])) {
+            static::$identityMapCache[$id] = static::query()->find($id);
+        }
+
+        return static::$identityMapCache[$id];
+    }
+
+    /**
+     * Flush the identity map cache.
+     * Called automatically on update, and should be called in tests.
+     */
+    public static function flushIdentityMap(): void
+    {
+        static::$identityMapCache = null;
     }
 
     protected $casts = [
         'proxy' => SchemalessAttributes::class,
         'traefik_outdated_info' => 'array',
+        'server_metadata' => 'array',
         'logdrain_axiom_api_key' => 'encrypted',
         'logdrain_newrelic_license_key' => 'encrypted',
         'delete_unused_volumes' => 'boolean',
@@ -217,11 +272,18 @@ class Server extends BaseModel
         'is_validating',
         'detected_traefik_version',
         'traefik_outdated_info',
+        'server_metadata',
+        'ip_previous',
     ];
 
-    protected $guarded = [];
-
     use HasSafeStringAttribute;
+
+    public function setValidationLogsAttribute($value): void
+    {
+        $this->attributes['validation_logs'] = $value !== null
+            ? Purify::config('validation_logs')->clean($value)
+            : null;
+    }
 
     public function type()
     {
@@ -267,15 +329,6 @@ class Server extends BaseModel
     public static function isUsable()
     {
         return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_swarm_worker', false)->whereRelation('settings', 'is_build_server', false)->whereRelation('settings', 'force_disabled', false);
-    }
-
-    public static function destinationsByServer(string $server_id)
-    {
-        $server = Server::ownedByCurrentTeam()->get()->where('id', $server_id)->firstOrFail();
-        $standaloneDocker = collect($server->standaloneDockers->all());
-        $swarmDocker = collect($server->swarmDockers->all());
-
-        return $standaloneDocker->concat($swarmDocker);
     }
 
     public function settings()
@@ -667,51 +720,6 @@ $schema://$host {
         CheckAndStartSentinelJob::dispatch($this);
     }
 
-    public function getCpuMetrics(int $mins = 5)
-    {
-        if ($this->isMetricsEnabled()) {
-            $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
-            if (str($cpu)->contains('error')) {
-                $error = json_decode($cpu, true);
-                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error === 'Unauthorized') {
-                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-                }
-                throw new \Exception($error);
-            }
-            $cpu = json_decode($cpu, true);
-
-            return collect($cpu)->map(function ($metric) {
-                return [(int) $metric['time'], (float) $metric['percent']];
-            });
-        }
-    }
-
-    public function getMemoryMetrics(int $mins = 5)
-    {
-        if ($this->isMetricsEnabled()) {
-            $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $memory = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/memory/history?from=$from'"], $this, false);
-            if (str($memory)->contains('error')) {
-                $error = json_decode($memory, true);
-                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error === 'Unauthorized') {
-                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-                }
-                throw new \Exception($error);
-            }
-            $memory = json_decode($memory, true);
-            $parsedCollection = collect($memory)->map(function ($metric) {
-                $usedPercent = $metric['usedPercent'] ?? 0.0;
-
-                return [(int) $metric['time'], (float) $usedPercent];
-            });
-
-            return $parsedCollection->toArray();
-        }
-    }
-
     public function getDiskUsage(): ?string
     {
         return instant_remote_process(['df / --output=pcent | tr -cd 0-9'], $this, false);
@@ -729,17 +737,17 @@ $schema://$host {
 
     public function stopUnmanaged($id)
     {
-        return instant_remote_process(["docker stop -t 0 $id"], $this);
+        return instant_remote_process(['docker stop -t 0 '.escapeshellarg($id)], $this);
     }
 
     public function restartUnmanaged($id)
     {
-        return instant_remote_process(["docker restart $id"], $this);
+        return instant_remote_process(['docker restart '.escapeshellarg($id)], $this);
     }
 
     public function startUnmanaged($id)
     {
-        return instant_remote_process(["docker start $id"], $this);
+        return instant_remote_process(['docker start '.escapeshellarg($id)], $this);
     }
 
     public function getContainers()
@@ -926,6 +934,9 @@ $schema://$host {
         return Attribute::make(
             get: function ($value) {
                 return (int) preg_replace('/[^0-9]/', '', $value);
+            },
+            set: function ($value) {
+                return (int) preg_replace('/[^0-9]/', '', (string) $value);
             }
         );
     }
@@ -935,6 +946,9 @@ $schema://$host {
         return Attribute::make(
             get: function ($value) {
                 return preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
+            },
+            set: function ($value) {
+                return preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
             }
         );
     }
@@ -943,6 +957,9 @@ $schema://$host {
     {
         return Attribute::make(
             get: function ($value) {
+                return preg_replace('/[^0-9a-zA-Z.:%-]/', '', $value);
+            },
+            set: function ($value) {
                 return preg_replace('/[^0-9a-zA-Z.:%-]/', '', $value);
             }
         );
@@ -1016,6 +1033,30 @@ $schema://$host {
         return $this->belongsTo(Team::class);
     }
 
+    /**
+     * @return array{id?: int, name: string, uuid: string, network: string, server_id: int}
+     */
+    public function defaultStandaloneDockerAttributes(?int $id = null): array
+    {
+        $attributes = [
+            'name' => 'coolify',
+            'uuid' => (string) new Cuid2,
+            'network' => 'coolify',
+            'server_id' => $this->id,
+        ];
+
+        if (! is_null($id)) {
+            $attributes['id'] = $id;
+        }
+
+        return $attributes;
+    }
+
+    public function environment_variables()
+    {
+        return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'server');
+    }
+
     public function isProxyShouldRun()
     {
         // TODO: Do we need "|| $this->proxy->force_stop" here?
@@ -1075,6 +1116,55 @@ $schema://$host {
             return str($supported->first());
         } else {
             return false;
+        }
+    }
+
+    public function gatherServerMetadata(): ?array
+    {
+        if (! $this->isFunctional()) {
+            return null;
+        }
+
+        try {
+            $output = instant_remote_process([
+                'echo "---PRETTY_NAME---" && grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\' && echo "---ARCH---" && uname -m && echo "---KERNEL---" && uname -r && echo "---CPUS---" && nproc && echo "---MEMORY---" && free -b | awk \'/Mem:/{print $2}\' && echo "---UPTIME_SINCE---" && uptime -s',
+            ], $this, false);
+
+            if (! $output) {
+                return null;
+            }
+
+            $sections = [];
+            $currentKey = null;
+            foreach (explode("\n", trim($output)) as $line) {
+                $line = trim($line);
+                if (preg_match('/^---(\w+)---$/', $line, $m)) {
+                    $currentKey = $m[1];
+                } elseif ($currentKey) {
+                    $sections[$currentKey] = $line;
+                }
+            }
+
+            $metadata = [
+                'os' => $sections['PRETTY_NAME'] ?? 'Unknown',
+                'arch' => $sections['ARCH'] ?? 'Unknown',
+                'kernel' => $sections['KERNEL'] ?? 'Unknown',
+                'cpus' => (int) ($sections['CPUS'] ?? 0),
+                'memory_bytes' => (int) ($sections['MEMORY'] ?? 0),
+                'uptime_since' => $sections['UPTIME_SINCE'] ?? null,
+                'collected_at' => now()->toIso8601String(),
+            ];
+
+            $this->update(['server_metadata' => $metadata]);
+
+            return $metadata;
+        } catch (\Throwable $e) {
+            Log::debug('Failed to gather server metadata', [
+                'server_id' => $this->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
         }
     }
 
@@ -1146,10 +1236,8 @@ $schema://$host {
         $this->refresh();
         $unreachableNotificationSent = (bool) $this->unreachable_notification_sent;
         $isReachable = (bool) $this->settings->is_reachable;
-        if ($isReachable === true) {
-            $this->unreachable_count = 0;
-            $this->save();
 
+        if ($isReachable === true) {
             if ($unreachableNotificationSent === true) {
                 $this->sendReachableNotification();
             }
@@ -1157,28 +1245,8 @@ $schema://$host {
             return;
         }
 
-        $this->increment('unreachable_count');
-
-        if ($this->unreachable_count === 1) {
-            $this->settings->is_reachable = true;
-            $this->settings->save();
-
-            return;
-        }
-
         if ($this->unreachable_count >= 2 && ! $unreachableNotificationSent) {
-            $failedChecks = 0;
-            for ($i = 0; $i < 3; $i++) {
-                $status = $this->serverStatus();
-                sleep(5);
-                if (! $status) {
-                    $failedChecks++;
-                }
-            }
-
-            if ($failedChecks === 3 && ! $unreachableNotificationSent) {
-                $this->sendUnreachableNotification();
-            }
+            $this->sendUnreachableNotification();
         }
     }
 
@@ -1412,7 +1480,7 @@ $schema://$host {
 
     public function restartContainer(string $containerName)
     {
-        return instant_remote_process(['docker restart '.$containerName], $this, false);
+        return instant_remote_process(['docker restart '.escapeshellarg($containerName)], $this, false);
     }
 
     public function changeProxy(string $proxyType, bool $async = true)
@@ -1423,6 +1491,9 @@ $schema://$host {
         if ($validProxyTypes->contains(str($proxyType)->lower())) {
             $this->proxy->set('type', str($proxyType)->upper());
             $this->proxy->set('status', 'exited');
+            $this->proxy->set('last_saved_proxy_configuration', null);
+            $this->proxy->set('last_saved_settings', null);
+            $this->proxy->set('last_applied_settings', null);
             $this->save();
             if ($this->proxySet()) {
                 if ($async) {
@@ -1465,12 +1536,14 @@ $schema://$host {
                 $certificateContent = $caCertificate->ssl_certificate;
                 $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
 
+                $base64Cert = base64_encode($certificateContent);
+
                 $commands = collect([
                     "mkdir -p $caCertPath",
                     "chown -R 9999:root $caCertPath",
                     "chmod -R 700 $caCertPath",
                     "rm -rf $caCertPath/coolify-ca.crt",
-                    "echo '{$certificateContent}' > $caCertPath/coolify-ca.crt",
+                    "echo '{$base64Cert}' | base64 -d | tee $caCertPath/coolify-ca.crt > /dev/null",
                     "chmod 644 $caCertPath/coolify-ca.crt",
                 ]);
 

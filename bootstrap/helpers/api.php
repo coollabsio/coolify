@@ -86,27 +86,32 @@ function sharedDataApplications()
         'git_branch' => 'string',
         'build_pack' => Rule::enum(BuildPackTypes::class),
         'is_static' => 'boolean',
+        'is_spa' => 'boolean',
+        'is_auto_deploy_enabled' => 'boolean',
+        'is_force_https_enabled' => 'boolean',
         'static_image' => Rule::enum(StaticImageTypes::class),
-        'domains' => 'string',
+        'domains' => 'string|nullable',
         'redirect' => Rule::enum(RedirectTypes::class),
-        'git_commit_sha' => 'string',
+        'git_commit_sha' => ['string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
         'docker_registry_image_name' => 'string|nullable',
         'docker_registry_image_tag' => 'string|nullable',
-        'install_command' => 'string|nullable',
-        'build_command' => 'string|nullable',
-        'start_command' => 'string|nullable',
+        'install_command' => \App\Support\ValidationPatterns::shellSafeCommandRules(),
+        'build_command' => \App\Support\ValidationPatterns::shellSafeCommandRules(),
+        'start_command' => \App\Support\ValidationPatterns::shellSafeCommandRules(),
         'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/',
         'ports_mappings' => 'string|regex:/^(\d+:\d+)(,\d+:\d+)*$/|nullable',
         'custom_network_aliases' => 'string|nullable',
-        'base_directory' => 'string|nullable',
-        'publish_directory' => 'string|nullable',
+        'base_directory' => \App\Support\ValidationPatterns::directoryPathRules(),
+        'publish_directory' => \App\Support\ValidationPatterns::directoryPathRules(),
         'health_check_enabled' => 'boolean',
-        'health_check_path' => 'string',
-        'health_check_port' => 'string|nullable',
-        'health_check_host' => 'string',
-        'health_check_method' => 'string',
+        'health_check_type' => 'string|in:http,cmd',
+        'health_check_command' => ['nullable', 'string', 'max:1000', 'regex:/^[a-zA-Z0-9 \-_.\/:=@,+]+$/'],
+        'health_check_path' => ['string', 'regex:#^[a-zA-Z0-9/\-_.~%,;]+$#'],
+        'health_check_port' => 'integer|nullable|min:1|max:65535',
+        'health_check_host' => ['string', 'regex:/^[a-zA-Z0-9.\-_]+$/'],
+        'health_check_method' => 'string|in:GET,HEAD,POST,OPTIONS',
         'health_check_return_code' => 'numeric',
-        'health_check_scheme' => 'string',
+        'health_check_scheme' => 'string|in:http,https',
         'health_check_response_text' => 'string|nullable',
         'health_check_interval' => 'numeric',
         'health_check_timeout' => 'numeric',
@@ -120,21 +125,26 @@ function sharedDataApplications()
         'limits_cpuset' => 'string|nullable',
         'limits_cpu_shares' => 'numeric',
         'custom_labels' => 'string|nullable',
-        'custom_docker_run_options' => 'string|nullable',
+        'custom_docker_run_options' => \App\Support\ValidationPatterns::shellSafeCommandRules(2000),
+        // Security: deployment commands are intentionally arbitrary shell (e.g. "php artisan migrate").
+        // Access is gated by API token authentication. Commands run inside the app container, not the host.
         'post_deployment_command' => 'string|nullable',
-        'post_deployment_command_container' => 'string',
+        'post_deployment_command_container' => \App\Support\ValidationPatterns::containerNameRules(),
         'pre_deployment_command' => 'string|nullable',
-        'pre_deployment_command_container' => 'string',
+        'pre_deployment_command_container' => \App\Support\ValidationPatterns::containerNameRules(),
         'manual_webhook_secret_github' => 'string|nullable',
         'manual_webhook_secret_gitlab' => 'string|nullable',
         'manual_webhook_secret_bitbucket' => 'string|nullable',
         'manual_webhook_secret_gitea' => 'string|nullable',
-        'docker_compose_location' => 'string',
+        'dockerfile_location' => \App\Support\ValidationPatterns::filePathRules(),
+        'dockerfile_target_build' => \App\Support\ValidationPatterns::dockerTargetRules(),
+        'docker_compose_location' => \App\Support\ValidationPatterns::filePathRules(),
         'docker_compose' => 'string|nullable',
-        'docker_compose_raw' => 'string|nullable',
         'docker_compose_domains' => 'array|nullable',
-        'docker_compose_custom_start_command' => 'string|nullable',
-        'docker_compose_custom_build_command' => 'string|nullable',
+        'docker_compose_custom_start_command' => \App\Support\ValidationPatterns::shellSafeCommandRules(),
+        'docker_compose_custom_build_command' => \App\Support\ValidationPatterns::shellSafeCommandRules(),
+        'is_container_label_escape_enabled' => 'boolean',
+        'is_preserve_repository_enabled' => 'boolean',
         'use_coolify_json' => 'boolean',
     ];
 }
@@ -178,7 +188,14 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('private_key_uuid');
     $request->offsetUnset('use_build_server');
     $request->offsetUnset('is_static');
+    $request->offsetUnset('is_spa');
+    $request->offsetUnset('is_auto_deploy_enabled');
+    $request->offsetUnset('is_force_https_enabled');
+    $request->offsetUnset('connect_to_docker_network');
     $request->offsetUnset('force_domain_override');
     $request->offsetUnset('autogenerate_domain');
     $request->offsetUnset('use_coolify_json');
+    $request->offsetUnset('is_container_label_escape_enabled');
+    $request->offsetUnset('is_preserve_repository_enabled');
+    $request->offsetUnset('docker_compose_raw');
 }

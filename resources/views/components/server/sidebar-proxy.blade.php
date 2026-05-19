@@ -1,16 +1,16 @@
-<div class="flex flex-col items-start gap-2 min-w-fit">
-    <a class="{{ request()->routeIs('server.proxy') ? 'menu-item menu-item-active' : 'menu-item' }}" {{ wireNavigate() }}
+<div class="sub-menu-wrapper">
+    <a class="{{ request()->routeIs('server.proxy') ? 'sub-menu-item menu-item-active' : 'sub-menu-item' }}" {{ wireNavigate() }}
         href="{{ route('server.proxy', $parameters) }}">
-        <button>Configuration</button>
+        <span class="menu-item-label">Configuration</span>
     </a>
     @if ($server->proxySet())
-        <a class="{{ request()->routeIs('server.proxy.dynamic-confs') ? 'menu-item menu-item-active' : 'menu-item' }}" {{ wireNavigate() }}
+        <a class="{{ request()->routeIs('server.proxy.dynamic-confs') ? 'sub-menu-item menu-item-active' : 'sub-menu-item' }}" {{ wireNavigate() }}
             href="{{ route('server.proxy.dynamic-confs', $parameters) }}">
-            <button>Dynamic Configurations</button>
+            <span class="menu-item-label">Dynamic Configurations</span>
         </a>
-        <a class="{{ request()->routeIs('server.proxy.logs') ? 'menu-item menu-item-active' : 'menu-item' }}"
+        <a class="{{ request()->routeIs('server.proxy.logs') ? 'sub-menu-item menu-item-active' : 'sub-menu-item' }}"
             href="{{ route('server.proxy.logs', $parameters) }}">
-            <button>Logs</button>
+            <span class="menu-item-label">Logs</span>
         </a>
     @endif
 </div>

@@ -260,7 +260,7 @@ class GlobalSearch extends Component
 
             // Get all applications
             $applications = Application::ownedByCurrentTeam()
-                ->with(['environment.project'])
+                ->with(['environment.project', 'previews:id,application_id,pull_request_id'])
                 ->get()
                 ->map(function ($app) {
                     // Collect all FQDNs from the application
@@ -289,6 +289,16 @@ class GlobalSearch extends Component
 
                     $fqdnsString = $fqdns->implode(' ');
 
+                    // Add PR search terms if preview is enabled
+                    $prSearchTerms = '';
+                    if ($app->preview_enabled ?? false) {
+                        $prIds = collect($app->previews ?? [])
+                            ->pluck('pull_request_id')
+                            ->map(fn ($id) => "pr-{$id} pr{$id} {$id}")
+                            ->implode(' ');
+                        $prSearchTerms = $prIds;
+                    }
+
                     return [
                         'id' => $app->id,
                         'name' => $app->name,
@@ -299,13 +309,13 @@ class GlobalSearch extends Component
                         'project' => $app->environment->project->name ?? null,
                         'environment' => $app->environment->name ?? null,
                         'fqdns' => $fqdns->take(2)->implode(', '), // Show first 2 FQDNs in UI
-                        'search_text' => strtolower($app->name.' '.$app->description.' '.$fqdnsString.' application applications app apps'),
+                        'search_text' => strtolower($app->name.' '.$app->description.' '.$fqdnsString.' '.$app->uuid.' '.$prSearchTerms.' application applications app apps'),
                     ];
                 });
 
             // Get all services
             $services = Service::ownedByCurrentTeam()
-                ->with(['environment.project', 'applications'])
+                ->with(['environment.project', 'applications', 'databases'])
                 ->get()
                 ->map(function ($service) {
                     // Collect all FQDNs from service applications
@@ -318,6 +328,10 @@ class GlobalSearch extends Component
                     }
                     $fqdnsString = $fqdns->implode(' ');
 
+                    // Collect service component names for container search
+                    $serviceAppNames = collect($service->applications ?? [])->pluck('name')->implode(' ');
+                    $serviceDbNames = collect($service->databases ?? [])->pluck('name')->implode(' ');
+
                     return [
                         'id' => $service->id,
                         'name' => $service->name,
@@ -328,7 +342,7 @@ class GlobalSearch extends Component
                         'project' => $service->environment->project->name ?? null,
                         'environment' => $service->environment->name ?? null,
                         'fqdns' => $fqdns->take(2)->implode(', '), // Show first 2 FQDNs in UI
-                        'search_text' => strtolower($service->name.' '.$service->description.' '.$fqdnsString.' service services'),
+                        'search_text' => strtolower($service->name.' '.$service->description.' '.$fqdnsString.' '.$service->uuid.' '.$serviceAppNames.' '.$serviceDbNames.' service services'),
                     ];
                 });
 
@@ -351,7 +365,7 @@ class GlobalSearch extends Component
                             'link' => $db->link(),
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' postgresql '.$db->description.' database databases db'),
+                            'search_text' => strtolower($db->name.' '.$db->uuid.' postgresql '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -372,7 +386,7 @@ class GlobalSearch extends Component
                             'link' => $db->link(),
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' mysql '.$db->description.' database databases db'),
+                            'search_text' => strtolower($db->name.' '.$db->uuid.' mysql '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -393,7 +407,7 @@ class GlobalSearch extends Component
                             'link' => $db->link(),
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' mariadb '.$db->description.' database databases db'),
+                            'search_text' => strtolower($db->name.' '.$db->uuid.' mariadb '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -414,7 +428,7 @@ class GlobalSearch extends Component
                             'link' => $db->link(),
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' mongodb '.$db->description.' database databases db'),
+                            'search_text' => strtolower($db->name.' '.$db->uuid.' mongodb '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -435,7 +449,7 @@ class GlobalSearch extends Component
                             'link' => $db->link(),
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' redis '.$db->description.' database databases db'),
+                            'search_text' => strtolower($db->name.' '.$db->uuid.' redis '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -456,7 +470,7 @@ class GlobalSearch extends Component
                             'link' => $db->link(),
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' keydb '.$db->description.' database databases db'),
+                            'search_text' => strtolower($db->name.' '.$db->uuid.' keydb '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -477,7 +491,7 @@ class GlobalSearch extends Component
                             'link' => $db->link(),
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' dragonfly '.$db->description.' database databases db'),
+                            'search_text' => strtolower($db->name.' '.$db->uuid.' dragonfly '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -498,7 +512,7 @@ class GlobalSearch extends Component
                             'link' => $db->link(),
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' clickhouse '.$db->description.' database databases db'),
+                            'search_text' => strtolower($db->name.' '.$db->uuid.' clickhouse '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -1201,7 +1215,7 @@ class GlobalSearch extends Component
     public function loadDestinations()
     {
         $this->loadingDestinations = true;
-        $server = Server::find($this->selectedServerId);
+        $server = Server::ownedByCurrentTeam()->find($this->selectedServerId);
 
         if (! $server) {
             $this->loadingDestinations = false;
@@ -1278,7 +1292,7 @@ class GlobalSearch extends Component
     public function loadEnvironments()
     {
         $this->loadingEnvironments = true;
-        $project = Project::where('uuid', $this->selectedProjectUuid)->first();
+        $project = Project::ownedByCurrentTeam()->where('uuid', $this->selectedProjectUuid)->first();
 
         if (! $project) {
             $this->loadingEnvironments = false;
@@ -1346,6 +1360,42 @@ class GlobalSearch extends Component
         $this->availableProjects = [];
         $this->availableEnvironments = [];
         $this->autoOpenResource = null;
+    }
+
+    public function goBack()
+    {
+        // From Environment Selection → go back to Project (if multiple) or further
+        if ($this->selectedProjectUuid !== null) {
+            $this->selectedProjectUuid = null;
+            $this->selectedEnvironmentUuid = null;
+            if (count($this->availableProjects) > 1) {
+                return; // Stop here - user can choose a project
+            }
+        }
+
+        // From Project Selection → go back to Destination (if multiple) or further
+        if ($this->selectedDestinationUuid !== null) {
+            $this->selectedDestinationUuid = null;
+            $this->selectedProjectUuid = null;
+            $this->selectedEnvironmentUuid = null;
+            if (count($this->availableDestinations) > 1) {
+                return; // Stop here - user can choose a destination
+            }
+        }
+
+        // From Destination Selection → go back to Server (if multiple) or cancel
+        if ($this->selectedServerId !== null) {
+            $this->selectedServerId = null;
+            $this->selectedDestinationUuid = null;
+            $this->selectedProjectUuid = null;
+            $this->selectedEnvironmentUuid = null;
+            if (count($this->availableServers) > 1) {
+                return; // Stop here - user can choose a server
+            }
+        }
+
+        // All previous steps were auto-selected, cancel entirely
+        $this->cancelResourceSelection();
     }
 
     public function getFilteredCreatableItemsProperty()
@@ -1457,7 +1507,11 @@ class GlobalSearch extends Component
                 'type' => 'one-click-service-'.$serviceKey,
                 'category' => 'Services',
                 'resourceType' => 'service',
-            ]);
+                'logo' => data_get($service, 'logo'),
+            ] + array_filter([
+                'amd_only' => data_get($service, 'amd_only') ? true : null,
+                'arm_only' => data_get($service, 'arm_only') ? true : null,
+            ]));
         }
 
         $cachedServices = $items->toArray();

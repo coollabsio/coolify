@@ -10,7 +10,7 @@ services:
     image: ghcr.io/wg-easy/wg-easy:latest
     environment:
       - SERVICE_URL_WIREGUARDEASY_51821
-      - WG_HOST=${SERVICE_URL_WIREGUARDEASY}
+      - WG_HOST=${SERVICE_FQDN_WIREGUARDEASY}
       - LANG=${LANG:-en}
       - WG_PORT=51820
       - _PASSWORD=${SERVICE_PASSWORD_ADMIN}

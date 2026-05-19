@@ -7,13 +7,13 @@
 
 services:
   uptime-kuma:
-    image: louislam/uptime-kuma:1
+    image: louislam/uptime-kuma:2
     environment:
       - SERVICE_URL_UPTIMEKUMA_3001
     volumes:
-      - uptime-kuma:/app/data
+      - uptime-kuma-data:/app/data
     healthcheck:
       test: ["CMD-SHELL", "extra/healthcheck"]
-      interval: 2s
-      timeout: 10s
-      retries: 15
+      interval: 5s
+      timeout: 5s
+      retries: 10

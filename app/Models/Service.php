@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Url\Url;
+use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
@@ -47,7 +48,22 @@ class Service extends BaseModel
 
     private static $parserVersion = '5';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'uuid',
+        'name',
+        'description',
+        'docker_compose_raw',
+        'docker_compose',
+        'connect_to_docker_network',
+        'service_type',
+        'config_hash',
+        'compose_parsing_version',
+        'is_container_label_escape_enabled',
+        'environment_id',
+        'server_id',
+        'destination_id',
+        'destination_type',
+    ];
 
     protected $appends = ['server_status', 'status'];
 
@@ -515,6 +531,31 @@ class Service extends BaseModel
                     }
                     $fields->put('RabbitMQ', $data->toArray());
                     break;
+                case $image->is('registry'):
+                    $data = collect([]);
+                    $registry_user = $this->environment_variables()->where('key', 'SERVICE_USER_REGISTRY')->first();
+                    $registry_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_REGISTRY')->first();
+                    if ($registry_user) {
+                        $data = $data->merge([
+                            'Registry User' => [
+                                'key' => data_get($registry_user, 'key'),
+                                'value' => data_get($registry_user, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($registry_password) {
+                        $data = $data->merge([
+                            'Registry Password' => [
+                                'key' => data_get($registry_password, 'key'),
+                                'value' => data_get($registry_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Docker Registry', $data->toArray());
+                    break;
                 case $image->contains('tolgee'):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_TOLGEE')->first();
@@ -844,6 +885,30 @@ class Service extends BaseModel
                     }
                     $fields->put('Meilisearch', $data->toArray());
                     break;
+                case $image->contains('linkding'):
+                    $data = collect([]);
+                    $SERVICE_USER_LINKDING = $this->environment_variables()->where('key', 'SERVICE_USER_LINKDING')->first();
+                    $SERVICE_PASSWORD_LINKDING = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_LINKDING')->first();
+                    if ($SERVICE_USER_LINKDING) {
+                        $data = $data->merge([
+                            'Superuser Name' => [
+                                'key' => data_get($SERVICE_USER_LINKDING, 'key'),
+                                'value' => data_get($SERVICE_USER_LINKDING, 'value'),
+                            ],
+                        ]);
+                    }
+                    if ($SERVICE_PASSWORD_LINKDING) {
+                        $data = $data->merge([
+                            'Superuser Password' => [
+                                'key' => data_get($SERVICE_PASSWORD_LINKDING, 'key'),
+                                'value' => data_get($SERVICE_PASSWORD_LINKDING, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+
+                    $fields->put('Linkding', $data->toArray());
+                    break;
                 case $image->contains('ghost'):
                     $data = collect([]);
                     $MAIL_OPTIONS_AUTH_PASS = $this->environment_variables()->where('key', 'MAIL_OPTIONS_AUTH_PASS')->first();
@@ -1043,6 +1108,65 @@ class Service extends BaseModel
                     }
 
                     $fields->put('Strapi', $data->toArray());
+                    break;
+                case $image->contains('marckohlbrugge/sessy'):
+                    $data = collect([]);
+                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_SESSY')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_SESSY')->first();
+                    if ($username) {
+                        $data = $data->merge([
+                            'HTTP Auth Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'HTTP Auth Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Sessy', $data->toArray());
+                    break;
+                case $image->contains('coollabsio/openclaw'):
+                    $data = collect([]);
+                    $username = $this->environment_variables()->where('key', 'AUTH_USERNAME')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_OPENCLAW')->first();
+                    $gateway_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_GATEWAYTOKEN')->first();
+                    if ($username) {
+                        $data = $data->merge([
+                            'Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'readonly' => true,
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($gateway_token) {
+                        $data = $data->merge([
+                            'Gateway Token' => [
+                                'key' => data_get($gateway_token, 'key'),
+                                'value' => data_get($gateway_token, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Openclaw', $data->toArray());
                     break;
                 default:
                     $data = collect([]);
@@ -1408,15 +1532,7 @@ class Service extends BaseModel
 
     public function environment_variables()
     {
-        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->orderByRaw("
-                CASE
-                    WHEN is_required = true THEN 1
-                    WHEN LOWER(key) LIKE 'service_%' THEN 2
-                    ELSE 3
-                END,
-                LOWER(key) ASC
-            ");
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
     }
 
     public function workdir()
@@ -1452,7 +1568,7 @@ class Service extends BaseModel
         // Generate SERVICE_NAME_* environment variables from docker-compose services
         if ($this->docker_compose) {
             try {
-                $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($this->docker_compose);
+                $dockerCompose = Yaml::parse($this->docker_compose);
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
                     $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);

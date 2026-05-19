@@ -364,6 +364,162 @@ class SyncBunny extends Command
     }
 
     /**
+     * Sync install.sh, docker-compose, and env files to GitHub repository via PR
+     */
+    private function syncFilesToGitHubRepo(array $files, bool $nightly = false): bool
+    {
+        $envLabel = $nightly ? 'NIGHTLY' : 'PRODUCTION';
+        $this->info("Syncing $envLabel files to GitHub repository...");
+        try {
+            $timestamp = time();
+            $tmpDir = sys_get_temp_dir().'/coolify-cdn-files-'.$timestamp;
+            $branchName = 'update-files-'.$timestamp;
+
+            // Clone the repository
+            $this->info('Cloning coolify-cdn repository...');
+            $output = [];
+            exec('gh repo clone coollabsio/coolify-cdn '.escapeshellarg($tmpDir).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to clone repository: '.implode("\n", $output));
+
+                return false;
+            }
+
+            // Create feature branch
+            $this->info('Creating feature branch...');
+            $output = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git checkout -b '.escapeshellarg($branchName).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to create branch: '.implode("\n", $output));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // Copy each file to its target path in the CDN repo
+            $copiedFiles = [];
+            foreach ($files as $sourceFile => $targetPath) {
+                if (! file_exists($sourceFile)) {
+                    $this->warn("Source file not found, skipping: $sourceFile");
+
+                    continue;
+                }
+
+                $destPath = "$tmpDir/$targetPath";
+                $destDir = dirname($destPath);
+
+                if (! is_dir($destDir)) {
+                    if (! mkdir($destDir, 0755, true)) {
+                        $this->error("Failed to create directory: $destDir");
+                        exec('rm -rf '.escapeshellarg($tmpDir));
+
+                        return false;
+                    }
+                }
+
+                if (copy($sourceFile, $destPath) === false) {
+                    $this->error("Failed to copy $sourceFile to $destPath");
+                    exec('rm -rf '.escapeshellarg($tmpDir));
+
+                    return false;
+                }
+
+                $copiedFiles[] = $targetPath;
+                $this->info("Copied: $targetPath");
+            }
+
+            if (empty($copiedFiles)) {
+                $this->warn('No files were copied. Nothing to commit.');
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return true;
+            }
+
+            // Stage all copied files
+            $this->info('Staging changes...');
+            $output = [];
+            $stageCmd = 'cd '.escapeshellarg($tmpDir).' && git add '.implode(' ', array_map('escapeshellarg', $copiedFiles)).' 2>&1';
+            exec($stageCmd, $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to stage changes: '.implode("\n", $output));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // Check for changes
+            $this->info('Checking for changes...');
+            $statusOutput = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git status --porcelain 2>&1', $statusOutput, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to check repository status: '.implode("\n", $statusOutput));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            if (empty(array_filter($statusOutput))) {
+                $this->info('All files are already up to date. No changes to commit.');
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return true;
+            }
+
+            // Commit changes
+            $commitMessage = "Update $envLabel files (install.sh, docker-compose, env) - ".date('Y-m-d H:i:s');
+            $output = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git commit -m '.escapeshellarg($commitMessage).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to commit changes: '.implode("\n", $output));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // Push to remote
+            $this->info('Pushing branch to remote...');
+            $output = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git push origin '.escapeshellarg($branchName).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to push branch: '.implode("\n", $output));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // Create pull request
+            $this->info('Creating pull request...');
+            $prTitle = "Update $envLabel files - ".date('Y-m-d H:i:s');
+            $fileList = implode("\n- ", $copiedFiles);
+            $prBody = "Automated update of $envLabel files:\n- $fileList";
+            $prCommand = 'gh pr create --repo coollabsio/coolify-cdn --title '.escapeshellarg($prTitle).' --body '.escapeshellarg($prBody).' --base main --head '.escapeshellarg($branchName).' 2>&1';
+            $output = [];
+            exec($prCommand, $output, $returnCode);
+
+            // Clean up
+            exec('rm -rf '.escapeshellarg($tmpDir));
+
+            if ($returnCode !== 0) {
+                $this->error('Failed to create PR: '.implode("\n", $output));
+
+                return false;
+            }
+
+            $this->info('Pull request created successfully!');
+            if (! empty($output)) {
+                $this->info('PR URL: '.implode("\n", $output));
+            }
+            $this->info('Files synced: '.count($copiedFiles));
+
+            return true;
+        } catch (\Throwable $e) {
+            $this->error('Error syncing files to GitHub: '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
      * Sync versions.json to GitHub repository via PR
      */
     private function syncVersionsToGitHubRepo(string $versionsLocation, bool $nightly = false): bool
@@ -581,11 +737,130 @@ class SyncBunny extends Command
                 $versions_location = "$parent_dir/other/nightly/$versions";
             }
             if (! $only_template && ! $only_version && ! $only_github_releases && ! $only_github_versions) {
+                $envLabel = $nightly ? 'NIGHTLY' : 'PRODUCTION';
+                $this->info("About to sync $envLabel files to BunnyCDN and create a GitHub PR for coolify-cdn.");
+                $this->newLine();
+
+                // Build file mapping for diff
                 if ($nightly) {
-                    $this->info('About to sync files NIGHTLY (docker-compose.prod.yaml, upgrade.sh, install.sh, etc) to BunnyCDN.');
+                    $fileMapping = [
+                        $compose_file_location => 'docker/nightly/docker-compose.yml',
+                        $compose_file_prod_location => 'docker/nightly/docker-compose.prod.yml',
+                        $production_env_location => 'environment/nightly/.env.production',
+                        $upgrade_script_location => 'scripts/nightly/upgrade.sh',
+                        $install_script_location => 'scripts/nightly/install.sh',
+                    ];
                 } else {
-                    $this->info('About to sync files PRODUCTION (docker-compose.yml, docker-compose.prod.yml, upgrade.sh, install.sh, etc) to BunnyCDN.');
+                    $fileMapping = [
+                        $compose_file_location => 'docker/docker-compose.yml',
+                        $compose_file_prod_location => 'docker/docker-compose.prod.yml',
+                        $production_env_location => 'environment/.env.production',
+                        $upgrade_script_location => 'scripts/upgrade.sh',
+                        $install_script_location => 'scripts/install.sh',
+                    ];
                 }
+
+                // BunnyCDN file mapping (local file => CDN URL path)
+                $bunnyFileMapping = [
+                    $compose_file_location => "$bunny_cdn/$bunny_cdn_path/$compose_file",
+                    $compose_file_prod_location => "$bunny_cdn/$bunny_cdn_path/$compose_file_prod",
+                    $production_env_location => "$bunny_cdn/$bunny_cdn_path/$production_env",
+                    $upgrade_script_location => "$bunny_cdn/$bunny_cdn_path/$upgrade_script",
+                    $install_script_location => "$bunny_cdn/$bunny_cdn_path/$install_script",
+                ];
+
+                $diffTmpDir = sys_get_temp_dir().'/coolify-cdn-diff-'.time();
+                @mkdir($diffTmpDir, 0755, true);
+                $hasChanges = false;
+
+                // Diff against BunnyCDN
+                $this->info('Fetching files from BunnyCDN to compare...');
+                foreach ($bunnyFileMapping as $localFile => $cdnUrl) {
+                    if (! file_exists($localFile)) {
+                        $this->warn('Local file not found: '.$localFile);
+
+                        continue;
+                    }
+
+                    $fileName = basename($cdnUrl);
+                    $remoteTmp = "$diffTmpDir/bunny-$fileName";
+
+                    try {
+                        $response = Http::timeout(10)->get($cdnUrl);
+                        if ($response->successful()) {
+                            file_put_contents($remoteTmp, $response->body());
+                            $diffOutput = [];
+                            exec('diff -u '.escapeshellarg($remoteTmp).' '.escapeshellarg($localFile).' 2>&1', $diffOutput, $diffCode);
+                            if ($diffCode !== 0) {
+                                $hasChanges = true;
+                                $this->newLine();
+                                $this->info("--- BunnyCDN: $bunny_cdn_path/$fileName");
+                                $this->info("+++ Local: $fileName");
+                                foreach ($diffOutput as $line) {
+                                    if (str_starts_with($line, '---') || str_starts_with($line, '+++')) {
+                                        continue;
+                                    }
+                                    $this->line($line);
+                                }
+                            }
+                        } else {
+                            $this->info("NEW on BunnyCDN: $bunny_cdn_path/$fileName (HTTP {$response->status()})");
+                            $hasChanges = true;
+                        }
+                    } catch (\Throwable $e) {
+                        $this->warn("Could not fetch $cdnUrl: {$e->getMessage()}");
+                    }
+                }
+
+                // Diff against GitHub coolify-cdn repo
+                $this->newLine();
+                $this->info('Fetching coolify-cdn repo to compare...');
+                $output = [];
+                exec('gh repo clone coollabsio/coolify-cdn '.escapeshellarg("$diffTmpDir/repo").' -- --depth 1 2>&1', $output, $returnCode);
+
+                if ($returnCode === 0) {
+                    foreach ($fileMapping as $localFile => $cdnPath) {
+                        $remotePath = "$diffTmpDir/repo/$cdnPath";
+                        if (! file_exists($localFile)) {
+                            continue;
+                        }
+                        if (! file_exists($remotePath)) {
+                            $this->info("NEW on GitHub: $cdnPath (does not exist in coolify-cdn yet)");
+                            $hasChanges = true;
+
+                            continue;
+                        }
+
+                        $diffOutput = [];
+                        exec('diff -u '.escapeshellarg($remotePath).' '.escapeshellarg($localFile).' 2>&1', $diffOutput, $diffCode);
+                        if ($diffCode !== 0) {
+                            $hasChanges = true;
+                            $this->newLine();
+                            $this->info("--- GitHub: $cdnPath");
+                            $this->info("+++ Local: $cdnPath");
+                            foreach ($diffOutput as $line) {
+                                if (str_starts_with($line, '---') || str_starts_with($line, '+++')) {
+                                    continue;
+                                }
+                                $this->line($line);
+                            }
+                        }
+                    }
+                } else {
+                    $this->warn('Could not fetch coolify-cdn repo for diff.');
+                }
+
+                exec('rm -rf '.escapeshellarg($diffTmpDir));
+
+                if (! $hasChanges) {
+                    $this->newLine();
+                    $this->info('No differences found. All files are already up to date.');
+
+                    return;
+                }
+
+                $this->newLine();
+
                 $confirmed = confirm('Are you sure you want to sync?');
                 if (! $confirmed) {
                     return;
@@ -692,7 +967,34 @@ class SyncBunny extends Command
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$upgrade_script"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$install_script"),
             ]);
-            $this->info('All files uploaded & purged...');
+            $this->info('All files uploaded & purged to BunnyCDN.');
+            $this->newLine();
+
+            // Sync files to GitHub CDN repository via PR
+            $this->info('Creating GitHub PR for coolify-cdn repository...');
+            if ($nightly) {
+                $files = [
+                    $compose_file_location => 'docker/nightly/docker-compose.yml',
+                    $compose_file_prod_location => 'docker/nightly/docker-compose.prod.yml',
+                    $production_env_location => 'environment/nightly/.env.production',
+                    $upgrade_script_location => 'scripts/nightly/upgrade.sh',
+                    $install_script_location => 'scripts/nightly/install.sh',
+                ];
+            } else {
+                $files = [
+                    $compose_file_location => 'docker/docker-compose.yml',
+                    $compose_file_prod_location => 'docker/docker-compose.prod.yml',
+                    $production_env_location => 'environment/.env.production',
+                    $upgrade_script_location => 'scripts/upgrade.sh',
+                    $install_script_location => 'scripts/install.sh',
+                ];
+            }
+
+            $githubSuccess = $this->syncFilesToGitHubRepo($files, $nightly);
+            $this->newLine();
+            $this->info('=== Summary ===');
+            $this->info('BunnyCDN sync: Complete');
+            $this->info('GitHub PR: '.($githubSuccess ? 'Created' : 'Failed'));
         } catch (\Throwable $e) {
             $this->error('Error: '.$e->getMessage());
         }

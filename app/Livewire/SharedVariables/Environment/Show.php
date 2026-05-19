@@ -40,6 +40,7 @@ class Show extends Component
                 'value' => $data['value'],
                 'is_multiline' => $data['is_multiline'],
                 'is_literal' => $data['is_literal'],
+                'comment' => $data['comment'] ?? null,
                 'type' => 'environment',
                 'team_id' => currentTeam()->id,
             ]);
@@ -50,11 +51,14 @@ class Show extends Component
         }
     }
 
-    public function mount()
+    public function mount(?string $project_uuid = null, ?string $environment_uuid = null)
     {
         $this->parameters = get_route_parameters();
-        $this->project = Project::ownedByCurrentTeam()->where('uuid', request()->route('project_uuid'))->firstOrFail();
-        $this->environment = $this->project->environments()->where('uuid', request()->route('environment_uuid'))->firstOrFail();
+        $projectUuid = $project_uuid ?? request()->route('project_uuid');
+        $environmentUuid = $environment_uuid ?? request()->route('environment_uuid');
+
+        $this->project = Project::ownedByCurrentTeam()->where('uuid', $projectUuid)->firstOrFail();
+        $this->environment = $this->project->environments()->where('uuid', $environmentUuid)->firstOrFail();
         $this->getDevView();
     }
 
@@ -138,7 +142,9 @@ class Show extends Component
     private function updateOrCreateVariables($variables)
     {
         $count = 0;
-        foreach ($variables as $key => $value) {
+        foreach ($variables as $key => $data) {
+            $value = is_array($data) ? ($data['value'] ?? '') : $data;
+
             $found = $this->environment->environment_variables()->where('key', $key)->first();
 
             if ($found) {

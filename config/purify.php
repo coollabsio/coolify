@@ -49,6 +49,17 @@ return [
             'AutoFormat.RemoveEmpty' => false,
         ],
 
+        'validation_logs' => [
+            'Core.Encoding' => 'utf-8',
+            'HTML.Doctype' => 'HTML 4.01 Transitional',
+            'HTML.Allowed' => 'a[href|title|target|class],br,div[class],pre[class],span[class],p[class]',
+            'HTML.ForbiddenElements' => '',
+            'CSS.AllowedProperties' => '',
+            'AutoFormat.AutoParagraph' => false,
+            'AutoFormat.RemoveEmpty' => false,
+            'Attr.AllowedFrameTargets' => ['_blank'],
+        ],
+
     ],
 
     /*

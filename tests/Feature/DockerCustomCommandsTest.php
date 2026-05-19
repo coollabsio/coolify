@@ -198,3 +198,20 @@ test('ConvertEntrypointSingleQuotedWithDoubleQuotesInside', function () {
         'entrypoint' => 'python -c "print(\"hi\")"',
     ]);
 });
+
+test('ConvertIp6', function () {
+    $input = '--ip6 2001:db8::1';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'ip6' => ['2001:db8::1'],
+    ]);
+});
+
+test('ConvertIpAndIp6Together', function () {
+    $input = '--ip 172.20.0.5 --ip6 2001:db8::1';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'ip' => ['172.20.0.5'],
+        'ip6' => ['2001:db8::1'],
+    ]);
+});

@@ -8,7 +8,6 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Spatie\Url\Url;
 
 class BackupEdit extends Component
 {
@@ -77,7 +76,7 @@ class BackupEdit extends Component
     public bool $dumpAll = false;
 
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
-    public int $timeout = 3600;
+    public int|string $timeout = 3600;
 
     public function mount()
     {
@@ -106,21 +105,9 @@ class BackupEdit extends Component
             $this->backup->s3_storage_id = $this->s3StorageId;
 
             // Validate databases_to_backup to prevent command injection
+            // Handles all formats including MongoDB's "db:col1,col2|db2:col3"
             if (filled($this->databasesToBackup)) {
-                $databases = str($this->databasesToBackup)->explode(',');
-                foreach ($databases as $index => $db) {
-                    $dbName = trim($db);
-                    try {
-                        validateShellSafePath($dbName, 'database name');
-                    } catch (\Exception $e) {
-                        // Provide specific error message indicating which database failed validation
-                        $position = $index + 1;
-                        throw new \Exception(
-                            "Database #{$position} ('{$dbName}') validation failed: ".
-                            $e->getMessage()
-                        );
-                    }
-                }
+                validateDatabasesBackupInput($this->databasesToBackup);
             }
 
             $this->backup->databases_to_backup = $this->databasesToBackup;
@@ -147,12 +134,12 @@ class BackupEdit extends Component
         }
     }
 
-    public function delete($password)
+    public function delete($password, $selectedActions = [])
     {
         $this->authorize('manageBackups', $this->backup->database);
 
         if (! verifyPasswordConfirmation($password, $this)) {
-            return;
+            return 'The provided password is incorrect.';
         }
 
         try {
@@ -184,13 +171,14 @@ class BackupEdit extends Component
             $this->backup->delete();
 
             if ($this->backup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $previousUrl = url()->previous();
-                $url = Url::fromString($previousUrl);
-                $url = $url->withoutQueryParameter('selectedBackupId');
-                $url = $url->withFragment('backups');
-                $url = $url->getPath()."#{$url->getFragment()}";
+                $serviceDatabase = $this->backup->database;
 
-                return redirect($url);
+                return redirect()->route('project.service.database.backups', [
+                    'project_uuid' => $this->parameters['project_uuid'],
+                    'environment_uuid' => $this->parameters['environment_uuid'],
+                    'service_uuid' => $serviceDatabase->service->uuid,
+                    'stack_service_uuid' => $serviceDatabase->uuid,
+                ]);
             } else {
                 return redirect()->route('project.database.backup.index', $this->parameters);
             }

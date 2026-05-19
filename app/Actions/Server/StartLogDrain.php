@@ -177,6 +177,19 @@ Files:
             $parsers_config = $config_path.'/parsers.conf';
             $compose_path = $config_path.'/docker-compose.yml';
             $readme_path = $config_path.'/README.md';
+            if ($type === 'newrelic') {
+                $envContent = "LICENSE_KEY={$license_key}\nBASE_URI={$base_uri}\n";
+            } elseif ($type === 'highlight') {
+                $envContent = "HIGHLIGHT_PROJECT_ID={$server->settings->logdrain_highlight_project_id}\n";
+            } elseif ($type === 'axiom') {
+                $envContent = "AXIOM_DATASET_NAME={$server->settings->logdrain_axiom_dataset_name}\nAXIOM_API_KEY={$server->settings->logdrain_axiom_api_key}\n";
+            } elseif ($type === 'custom') {
+                $envContent = '';
+            } else {
+                throw new \Exception('Unknown log drain type.');
+            }
+            $envEncoded = base64_encode($envContent);
+
             $command = [
                 "echo 'Saving configuration'",
                 "mkdir -p $config_path",
@@ -184,34 +197,10 @@ Files:
                 "echo '{$config}' | base64 -d | tee $fluent_bit_config > /dev/null",
                 "echo '{$compose}' | base64 -d | tee $compose_path > /dev/null",
                 "echo '{$readme}' | base64 -d | tee $readme_path > /dev/null",
-                "test -f $config_path/.env && rm $config_path/.env",
-            ];
-            if ($type === 'newrelic') {
-                $add_envs_command = [
-                    "echo LICENSE_KEY=$license_key >> $config_path/.env",
-                    "echo BASE_URI=$base_uri >> $config_path/.env",
-                ];
-            } elseif ($type === 'highlight') {
-                $add_envs_command = [
-                    "echo HIGHLIGHT_PROJECT_ID={$server->settings->logdrain_highlight_project_id} >> $config_path/.env",
-                ];
-            } elseif ($type === 'axiom') {
-                $add_envs_command = [
-                    "echo AXIOM_DATASET_NAME={$server->settings->logdrain_axiom_dataset_name} >> $config_path/.env",
-                    "echo AXIOM_API_KEY={$server->settings->logdrain_axiom_api_key} >> $config_path/.env",
-                ];
-            } elseif ($type === 'custom') {
-                $add_envs_command = [
-                    "touch $config_path/.env",
-                ];
-            } else {
-                throw new \Exception('Unknown log drain type.');
-            }
-            $restart_command = [
+                "echo '{$envEncoded}' | base64 -d | tee $config_path/.env > /dev/null",
                 "echo 'Starting Fluent Bit'",
                 "cd $config_path && docker compose up -d",
             ];
-            $command = array_merge($command, $add_envs_command, $restart_command);
 
             return instant_remote_process($command, $server);
         } catch (\Throwable $e) {

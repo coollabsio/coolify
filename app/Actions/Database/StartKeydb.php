@@ -109,7 +109,7 @@ class StartKeydb
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => [
-                        'test' => "keydb-cli --pass {$this->database->keydb_password} ping",
+                        'test' => ['CMD', 'keydb-cli', '--pass', (string) $this->database->keydb_password, 'ping'],
                         'interval' => '5s',
                         'timeout' => '5s',
                         'retries' => 10,
@@ -166,7 +166,7 @@ class StartKeydb
             $docker_compose['volumes'] = $volume_names;
         }
 
-        if (! is_null($this->database->keydb_conf) || ! empty($this->database->keydb_conf)) {
+        if (! is_null($this->database->keydb_conf) && ! empty($this->database->keydb_conf)) {
             $docker_compose['services'][$container_name]['volumes'] = array_merge(
                 $docker_compose['services'][$container_name]['volumes'] ?? [],
                 [
@@ -206,6 +206,9 @@ class StartKeydb
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         if ($this->database->enable_ssl) {
             $this->commands[] = "chown -R 999:999 $this->configuration_dir/ssl/server.key $this->configuration_dir/ssl/server.crt";
+        }
+        if (! is_null($this->database->keydb_conf) && ! empty($this->database->keydb_conf)) {
+            $this->commands[] = "chown 999:999 $this->configuration_dir/keydb.conf";
         }
         $this->commands[] = "docker stop -t 10 $container_name 2>/dev/null || true";
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";

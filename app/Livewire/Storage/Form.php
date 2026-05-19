@@ -3,9 +3,11 @@
 namespace App\Livewire\Storage;
 
 use App\Models\S3Storage;
+use App\Rules\SafeWebhookUrl;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Form extends Component
@@ -41,7 +43,7 @@ class Form extends Component
             'key' => 'required|max:255',
             'secret' => 'required|max:255',
             'bucket' => 'required|max:255',
-            'endpoint' => 'required|url|max:255',
+            'endpoint' => ['required', 'max:255', new SafeWebhookUrl],
         ];
     }
 
@@ -50,8 +52,6 @@ class Form extends Component
         return array_merge(
             ValidationPatterns::combinedMessages(),
             [
-                'name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
-                'description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
                 'region.required' => 'The Region field is required.',
                 'region.max' => 'The Region may not be greater than 255 characters.',
                 'key.required' => 'The Access Key field is required.',
@@ -61,7 +61,6 @@ class Form extends Component
                 'bucket.required' => 'The Bucket field is required.',
                 'bucket.max' => 'The Bucket may not be greater than 255 characters.',
                 'endpoint.required' => 'The Endpoint field is required.',
-                'endpoint.url' => 'The Endpoint must be a valid URL.',
                 'endpoint.max' => 'The Endpoint may not be greater than 255 characters.',
             ]
         );
@@ -133,19 +132,7 @@ class Form extends Component
         }
     }
 
-    public function delete()
-    {
-        try {
-            $this->authorize('delete', $this->storage);
-
-            $this->storage->delete();
-
-            return redirect()->route('storage.index');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
+    #[On('submitStorage')]
     public function submit()
     {
         try {

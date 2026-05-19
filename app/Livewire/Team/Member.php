@@ -71,11 +71,11 @@ class Member extends Component
                 || Role::from($this->getMemberRole())->gt(auth()->user()->role())) {
                 throw new \Exception('You are not authorized to perform this action.');
             }
+            $teamId = currentTeam()->id;
             $this->member->teams()->detach(currentTeam());
+            // Clear cache for the removed user - both old and new key formats
             Cache::forget("team:{$this->member->id}");
-            Cache::remember('team:'.$this->member->id, 3600, function () {
-                return $this->member->teams()->first();
-            });
+            Cache::forget("user:{$this->member->id}:team:{$teamId}");
             $this->dispatch('reloadWindow');
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());

@@ -129,18 +129,24 @@ function format_docker_envs_to_json($rawOutput)
 }
 function checkMinimumDockerEngineVersion($dockerVersion)
 {
-    $majorDockerVersion = str($dockerVersion)->before('.')->value();
-    $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.')->value();
+    $majorDockerVersion = (int) str($dockerVersion)->before('.')->value();
+    $requiredDockerVersion = (int) str(config('constants.docker.minimum_required_version'))->before('.')->value();
     if ($majorDockerVersion < $requiredDockerVersion) {
         $dockerVersion = null;
     }
 
     return $dockerVersion;
 }
+function escapeShellValue(string $value): string
+{
+    return "'".str_replace("'", "'\\''", $value)."'";
+}
+
 function executeInDocker(string $containerId, string $command)
 {
-    return "docker exec {$containerId} bash -c '{$command}'";
-    // return "docker exec {$this->deployment_uuid} bash -c '{$command} |& tee -a /proc/1/fd/1; [ \$PIPESTATUS -eq 0 ] || exit \$PIPESTATUS'";
+    $escapedCommand = str_replace("'", "'\\''", $command);
+
+    return "docker exec {$containerId} bash -c '{$escapedCommand}'";
 }
 
 function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
@@ -231,7 +237,7 @@ function defaultLabels($id, $name, string $projectName, string $resourceName, st
     $labels->push('coolify.version='.config('constants.coolify.version'));
     $labels->push('coolify.'.$type.'Id='.$id);
     $labels->push("coolify.type=$type");
-    $labels->push('coolify.name='.$name);
+    $labels->push('coolify.name='.Str::slug($name));
     $labels->push('coolify.resourceName='.Str::slug($resourceName));
     $labels->push('coolify.projectName='.Str::slug($projectName));
     $labels->push('coolify.serviceName='.Str::slug($subName ?? $resourceName));
@@ -1005,6 +1011,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--ulimit' => 'ulimits',
         '--privileged' => 'privileged',
         '--ip' => 'ip',
+        '--ip6' => 'ip6',
         '--shm-size' => 'shm_size',
         '--gpus' => 'gpus',
         '--hostname' => 'hostname',

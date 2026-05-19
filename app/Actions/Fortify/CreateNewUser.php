@@ -37,12 +37,13 @@ class CreateNewUser implements CreatesNewUsers
         if (User::count() == 0) {
             // If this is the first user, make them the root user
             // Team is already created in the database/seeders/ProductionSeeder.php
-            $user = User::create([
+            $user = (new User)->forceFill([
                 'id' => 0,
                 'name' => $input['name'],
                 'email' => $input['email'],
                 'password' => Hash::make($input['password']),
             ]);
+            $user->save();
             $team = $user->teams()->first();
 
             // Disable registration after first user is created

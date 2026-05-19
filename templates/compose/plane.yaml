@@ -1,6 +1,7 @@
 # documentation: https://docs.plane.so/self-hosting/methods/docker-compose
 # slogan: The open source project management tool
 # category: productivity
+# port: 80
 # tags: plane,project-management,tool,open,source,api,nextjs,redis,postgresql,django,pm
 # logo: svgs/plane.svg
 
@@ -29,6 +30,12 @@ x-aws-s3-env: &aws-s3-env
   AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-http://plane-minio:9000}
   AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-uploads}
 
+x-proxy-env: &proxy-env
+  APP_DOMAIN: ${SERVICE_URL_PLANE}
+  FILE_SIZE_LIMIT: ${FILE_SIZE_LIMIT:-5242880}
+  BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-uploads}
+  SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+
 x-mq-env: &mq-env # RabbitMQ Settings
   RABBITMQ_HOST: plane-mq
   RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
@@ -39,9 +46,10 @@ x-mq-env: &mq-env # RabbitMQ Settings
 
 x-live-env: &live-env
   API_BASE_URL: ${API_BASE_URL:-http://api:8000}
+  LIVE_SERVER_SECRET_KEY: $SERVICE_PASSWORD_64_LIVESECRET
 
 x-app-env: &app-env
-  APP_RELEASE: ${APP_RELEASE:-v1.0.0}
+  APP_RELEASE: ${APP_RELEASE:-v1.3.0}
   WEB_URL: ${SERVICE_URL_PLANE}
   DEBUG: ${DEBUG:-0}
   CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost}
@@ -52,16 +60,20 @@ x-app-env: &app-env
   AMQP_URL: amqp://${SERVICE_USER_RABBITMQ}:${SERVICE_PASSWORD_RABBITMQ}@plane-mq:${RABBITMQ_PORT:-5672}/plane
   API_KEY_RATE_LIMIT: ${API_KEY_RATE_LIMIT:-60/minute}
   MINIO_ENDPOINT_SSL: ${MINIO_ENDPOINT_SSL:-0}
+  LIVE_SERVER_SECRET_KEY: $SERVICE_PASSWORD_64_LIVESECRET
 
 services:
   proxy:
-    image: artifacts.plane.so/makeplane/plane-proxy:${APP_RELEASE:-v1.0.0}
+    image: makeplane/plane-proxy:${APP_RELEASE:-v1.3.0}
     environment:
       - SERVICE_URL_PLANE
       - APP_DOMAIN=${SERVICE_URL_PLANE}
       - SITE_ADDRESS=:80
       - FILE_SIZE_LIMIT=${FILE_SIZE_LIMIT:-5242880}
       - BUCKET_NAME=${AWS_S3_BUCKET_NAME:-uploads}
+    volumes:
+      - proxy_config:/config
+      - proxy_data:/data
     depends_on:
       - web
       - api
@@ -73,8 +85,9 @@ services:
       interval: 2s
       timeout: 10s
       retries: 15
+
   web:
-    image: artifacts.plane.so/makeplane/plane-frontend:${APP_RELEASE:-v1.0.0}
+    image: makeplane/plane-frontend:${APP_RELEASE:-v1.3.0}
     depends_on:
       - api
       - worker
@@ -85,7 +98,7 @@ services:
       retries: 15
 
   space:
-    image: artifacts.plane.so/makeplane/plane-space:${APP_RELEASE:-v1.0.0}
+    image: makeplane/plane-space:${APP_RELEASE:-v1.3.0}
     depends_on:
       - api
       - worker
@@ -97,7 +110,7 @@ services:
       retries: 15
 
   admin:
-    image: artifacts.plane.so/makeplane/plane-admin:${APP_RELEASE:-v1.0.0}
+    image: makeplane/plane-admin:${APP_RELEASE:-v1.3.0}
     depends_on:
       - api
       - web
@@ -108,13 +121,12 @@ services:
       retries: 15
 
   live:
-    image: artifacts.plane.so/makeplane/plane-live:${APP_RELEASE:-v1.0.0}
+    image: makeplane/plane-live:${APP_RELEASE:-v1.3.0}
     environment:
       <<: [*live-env, *redis-env]
     depends_on:
       - api
       - web
-      - plane-redis
     healthcheck:
       test: ["CMD", "echo", "hey whats up"]
       interval: 2s
@@ -122,12 +134,12 @@ services:
       retries: 15
 
   api:
-    image: artifacts.plane.so/makeplane/plane-backend:${APP_RELEASE:-v1.0.0}
+    image: makeplane/plane-backend:${APP_RELEASE:-v1.3.0}
     command: ./bin/docker-entrypoint-api.sh
     volumes:
       - logs_api:/code/plane/logs
     environment:
-      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *mq-env]
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env]
     depends_on:
       - plane-db
       - plane-redis
@@ -139,12 +151,12 @@ services:
       retries: 15
 
   worker:
-    image: artifacts.plane.so/makeplane/plane-backend:${APP_RELEASE:-v1.0.0}
+    image: makeplane/plane-backend:${APP_RELEASE:-v1.3.0}
     command: ./bin/docker-entrypoint-worker.sh
     volumes:
       - logs_worker:/code/plane/logs
     environment:
-      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *mq-env]
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env]
     depends_on:
       - api
       - plane-db
@@ -157,12 +169,12 @@ services:
       retries: 15
 
   beat-worker:
-    image: artifacts.plane.so/makeplane/plane-backend:${APP_RELEASE:-v1.0.0}
+    image: makeplane/plane-backend:${APP_RELEASE:-v1.3.0}
     command: ./bin/docker-entrypoint-beat.sh
     volumes:
       - logs_beat-worker:/code/plane/logs
     environment:
-      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *mq-env]
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env]
     depends_on:
       - api
       - plane-db
@@ -175,13 +187,13 @@ services:
       retries: 15
 
   migrator:
-    image: artifacts.plane.so/makeplane/plane-backend:${APP_RELEASE:-v1.0.0}
+    image: makeplane/plane-backend:${APP_RELEASE:-v1.3.0}
     restart: "no"
     command: ./bin/docker-entrypoint-migrator.sh
     volumes:
       - logs_migrator:/code/plane/logs
     environment:
-      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *mq-env]
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env]
     depends_on:
       - plane-db
       - plane-redis
@@ -201,7 +213,7 @@ services:
       retries: 10
 
   plane-redis:
-    image: valkey/valkey:7.2.5-alpine
+    image: valkey/valkey:7.2.11-alpine
     volumes:
       - redisdata:/data
     healthcheck:
@@ -212,7 +224,6 @@ services:
 
   plane-mq:
     image: rabbitmq:3.13.6-management-alpine
-    restart: always
     environment:
       <<: *mq-env
     volumes:
