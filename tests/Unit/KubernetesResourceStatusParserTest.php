@@ -27,6 +27,15 @@ it('parses coolify managed kubernetes resource status summaries', function () {
                 ],
             ],
             [
+                'kind' => 'StatefulSet',
+                'metadata' => [
+                    'name' => 'db',
+                    'namespace' => 'production',
+                ],
+                'spec' => ['replicas' => 1],
+                'status' => ['readyReplicas' => 1, 'availableReplicas' => 1],
+            ],
+            [
                 'kind' => 'HorizontalPodAutoscaler',
                 'metadata' => ['name' => 'api', 'namespace' => 'production'],
                 'status' => ['currentReplicas' => 1, 'desiredReplicas' => 2],
@@ -42,7 +51,7 @@ it('parses coolify managed kubernetes resource status summaries', function () {
 
     $resources = (new KubernetesResourceStatusParser)->parse($json);
 
-    expect($resources)->toHaveCount(4)
+    expect($resources)->toHaveCount(5)
         ->and($resources[0])->toMatchArray([
             'kind' => 'Deployment',
             'name' => 'api',
@@ -65,6 +74,11 @@ it('parses coolify managed kubernetes resource status summaries', function () {
             'kind' => 'Service',
             'status' => 'ClusterIP',
             'detail' => '80:3000',
+        ])
+        ->and($resources[4])->toMatchArray([
+            'kind' => 'StatefulSet',
+            'status' => 'Ready',
+            'detail' => 'ready 1/1, available 1',
         ]);
 });
 

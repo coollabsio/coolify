@@ -11,6 +11,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Models\KubernetesCluster;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
@@ -70,7 +71,12 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 case 'standalone-keydb':
                 case 'standalone-dragonfly':
                 case 'standalone-clickhouse':
-                    StopDatabase::run($this->resource, dockerCleanup: $this->dockerCleanup);
+                    StopDatabase::run(
+                        $this->resource,
+                        dockerCleanup: $this->dockerCleanup,
+                        deleteKubernetesResources: true,
+                        deleteKubernetesVolumes: $this->deleteVolumes,
+                    );
                     break;
                 case 'service':
                     StopService::run($this->resource, $this->deleteConnectedNetworks, $this->dockerCleanup);
@@ -82,7 +88,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->deleteConfigurations) {
                 $this->resource->deleteConfigurations();
             }
-            if ($this->deleteVolumes) {
+            if ($this->deleteVolumes && ! ($this->resource->destination instanceof KubernetesCluster)) {
                 $this->resource->deleteVolumes();
                 $this->resource->persistentStorages()->delete();
             }

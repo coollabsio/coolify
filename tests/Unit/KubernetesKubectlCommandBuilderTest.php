@@ -21,11 +21,14 @@ it('builds escaped kubectl commands for a cluster destination', function () {
     expect($builder->rolloutStatus($cluster, 'customer-api', 120))
         ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' rollout status 'deployment/customer-api' --timeout=120s");
 
+    expect($builder->rolloutStatusStatefulSet($cluster, 'customer-db', 120))
+        ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' rollout status 'statefulset/customer-db' --timeout=120s");
+
     expect($builder->getPods($cluster))
         ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' get pods --selector='app.kubernetes.io/managed-by=coolify' -o json");
 
     expect($builder->getResources($cluster))
-        ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' get deployment,service,ingress,hpa,pdb,pvc,secret,serviceaccount --selector='app.kubernetes.io/managed-by=coolify' -o json");
+        ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' get deployment,statefulset,service,ingress,hpa,pdb,pvc,secret,serviceaccount --selector='app.kubernetes.io/managed-by=coolify' -o json");
 
     expect($builder->getDeployment($cluster, 'customer-api'))
         ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' get 'deployment/customer-api' -o json");
@@ -47,6 +50,12 @@ it('builds escaped kubectl commands for a cluster destination', function () {
 
     expect($builder->deleteServicePersistentVolumeClaims($cluster, 'service-uuid'))
         ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' delete pvc --selector='app.kubernetes.io/managed-by=coolify,coolify.io/service-uuid=service-uuid' --ignore-not-found=true");
+
+    expect($builder->deleteDatabaseResources($cluster, 'database-uuid'))
+        ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' delete statefulset,service,secret --selector='app.kubernetes.io/managed-by=coolify,coolify.io/database-uuid=database-uuid' --ignore-not-found=true");
+
+    expect($builder->deleteDatabasePersistentVolumeClaims($cluster, 'database-uuid'))
+        ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' delete pvc --selector='app.kubernetes.io/managed-by=coolify,coolify.io/database-uuid=database-uuid' --ignore-not-found=true");
 });
 
 it('builds a base64 manifest write command', function () {
@@ -73,6 +82,9 @@ it('uses the explicit kubeconfig path for mutable kubernetes commands', function
 
     expect($builder->scaleDeployment($cluster, 'customer-api', 0, $kubeconfigPath))
         ->toBe("kubectl --kubeconfig='/run/coolify/kubeconfig' --context='iad-prod' --namespace='production' scale 'deployment/customer-api' --replicas=0");
+
+    expect($builder->scaleStatefulSet($cluster, 'customer-db', 0, $kubeconfigPath))
+        ->toBe("kubectl --kubeconfig='/run/coolify/kubeconfig' --context='iad-prod' --namespace='production' scale 'statefulset/customer-db' --replicas=0");
 });
 
 it('escapes shell metacharacters in kubernetes command arguments', function () {

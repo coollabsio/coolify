@@ -35,6 +35,11 @@ class KubernetesKubectlCommandBuilder
         return $this->base($cluster, $kubeconfigPath).' rollout status '.escapeshellarg("deployment/{$deploymentName}").' --timeout='.((int) $timeoutSeconds).'s';
     }
 
+    public function rolloutStatusStatefulSet(KubernetesCluster $cluster, string $statefulSetName, int $timeoutSeconds = 300, ?string $kubeconfigPath = null): string
+    {
+        return $this->base($cluster, $kubeconfigPath).' rollout status '.escapeshellarg("statefulset/{$statefulSetName}").' --timeout='.((int) $timeoutSeconds).'s';
+    }
+
     public function rolloutRestart(KubernetesCluster $cluster, string $deploymentName, ?string $kubeconfigPath = null): string
     {
         return $this->base($cluster, $kubeconfigPath).' rollout restart '.escapeshellarg("deployment/{$deploymentName}");
@@ -45,6 +50,11 @@ class KubernetesKubectlCommandBuilder
         return $this->base($cluster, $kubeconfigPath).' scale '.escapeshellarg("deployment/{$deploymentName}").' --replicas='.((int) $replicas);
     }
 
+    public function scaleStatefulSet(KubernetesCluster $cluster, string $statefulSetName, int $replicas, ?string $kubeconfigPath = null): string
+    {
+        return $this->base($cluster, $kubeconfigPath).' scale '.escapeshellarg("statefulset/{$statefulSetName}").' --replicas='.((int) $replicas);
+    }
+
     public function getPods(KubernetesCluster $cluster, string $selector = self::COOLIFY_POD_SELECTOR, ?string $kubeconfigPath = null): string
     {
         return $this->base($cluster, $kubeconfigPath).' get pods --selector='.escapeshellarg($selector).' -o json';
@@ -53,7 +63,7 @@ class KubernetesKubectlCommandBuilder
     public function getResources(KubernetesCluster $cluster, string $selector = self::COOLIFY_POD_SELECTOR, ?string $kubeconfigPath = null): string
     {
         return $this->base($cluster, $kubeconfigPath)
-            .' get deployment,service,ingress,hpa,pdb,pvc,secret,serviceaccount'
+            .' get deployment,statefulset,service,ingress,hpa,pdb,pvc,secret,serviceaccount'
             .' --selector='.escapeshellarg($selector)
             .' -o json';
     }
@@ -111,6 +121,22 @@ class KubernetesKubectlCommandBuilder
             .' --ignore-not-found=true';
     }
 
+    public function deleteDatabaseResources(KubernetesCluster $cluster, string $databaseUuid, ?string $kubeconfigPath = null): string
+    {
+        return $this->base($cluster, $kubeconfigPath)
+            .' delete statefulset,service,secret'
+            .' --selector='.escapeshellarg($this->databaseSelector($databaseUuid))
+            .' --ignore-not-found=true';
+    }
+
+    public function deleteDatabasePersistentVolumeClaims(KubernetesCluster $cluster, string $databaseUuid, ?string $kubeconfigPath = null): string
+    {
+        return $this->base($cluster, $kubeconfigPath)
+            .' delete pvc'
+            .' --selector='.escapeshellarg($this->databaseSelector($databaseUuid))
+            .' --ignore-not-found=true';
+    }
+
     public function writeManifest(string $manifestPath, string $manifestYaml): string
     {
         return $this->writeFile($manifestPath, $manifestYaml);
@@ -155,5 +181,10 @@ class KubernetesKubectlCommandBuilder
     private function serviceSelector(string $serviceUuid): string
     {
         return 'app.kubernetes.io/managed-by=coolify,coolify.io/service-uuid='.$serviceUuid;
+    }
+
+    private function databaseSelector(string $databaseUuid): string
+    {
+        return 'app.kubernetes.io/managed-by=coolify,coolify.io/database-uuid='.$databaseUuid;
     }
 }

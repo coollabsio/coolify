@@ -346,11 +346,7 @@ class Select extends Component
 
     private function supportsKubernetesDestination(): bool
     {
-        if (! $this->isDatabase) {
-            return true;
-        }
-
-        return str($this->type)->startsWith('one-click-service') || str($this->type)->startsWith('docker-compose-empty');
+        return true;
     }
 
     public function setDestination(string $destination_uuid)

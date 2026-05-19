@@ -51,7 +51,7 @@ class KubernetesResourceStatusParser
     private function status(string $kind, array $resource): string
     {
         return match ($kind) {
-            'Deployment' => $this->deploymentStatus($resource),
+            'Deployment', 'StatefulSet' => $this->workloadStatus($resource),
             'Service' => (string) data_get($resource, 'spec.type', 'Service'),
             'Ingress' => empty(data_get($resource, 'status.loadBalancer.ingress', [])) ? 'Pending' : 'Ready',
             'HorizontalPodAutoscaler' => $this->hpaStatus($resource),
@@ -65,7 +65,7 @@ class KubernetesResourceStatusParser
     private function detail(string $kind, array $resource): string
     {
         return match ($kind) {
-            'Deployment' => $this->deploymentDetail($resource),
+            'Deployment', 'StatefulSet' => $this->workloadDetail($resource),
             'Service' => $this->serviceDetail($resource),
             'Ingress' => $this->ingressDetail($resource),
             'HorizontalPodAutoscaler' => $this->hpaDetail($resource),
@@ -75,7 +75,7 @@ class KubernetesResourceStatusParser
         };
     }
 
-    private function deploymentStatus(array $resource): string
+    private function workloadStatus(array $resource): string
     {
         $desired = (int) data_get($resource, 'spec.replicas', 0);
         $available = (int) data_get($resource, 'status.availableReplicas', 0);
@@ -87,7 +87,7 @@ class KubernetesResourceStatusParser
         return $available >= $desired ? 'Ready' : 'Progressing';
     }
 
-    private function deploymentDetail(array $resource): string
+    private function workloadDetail(array $resource): string
     {
         $desired = (int) data_get($resource, 'spec.replicas', 0);
         $ready = (int) data_get($resource, 'status.readyReplicas', 0);
