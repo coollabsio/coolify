@@ -62,9 +62,6 @@ class KubernetesCluster extends BaseModel
         return static::whereHas('server', fn ($q) => $q->whereTeamId($teamId));
     }
 
-    /**
-     * Get the server attribute using identity map caching.
-     */
     public function getServerAttribute(): ?Server
     {
         if ($this->relationLoaded('server')) {

@@ -8,10 +8,6 @@ use Symfony\Component\Yaml\Yaml;
 
 class KubernetesApplicationManifestGenerator
 {
-    /**
-     * @param  array{namespace?: string, ingress_class?: string, service_type?: string, replicas?: int, min_replicas?: int, max_replicas?: int, autoscaling?: bool, target_cpu_utilization_percentage?: int, image?: string, environment?: array<string, string>, deployment_uuid?: string}  $options
-     * @return array<int, array<string, mixed>>
-     */
     public function generate(Application $application, array $options = []): array
     {
         $name = $this->resourceName($application);
@@ -42,9 +38,6 @@ class KubernetesApplicationManifestGenerator
         return $resources;
     }
 
-    /**
-     * @param  array{namespace?: string, ingress_class?: string, service_type?: string, replicas?: int, min_replicas?: int, max_replicas?: int, autoscaling?: bool, target_cpu_utilization_percentage?: int, image?: string, environment?: array<string, string>, deployment_uuid?: string}  $options
-     */
     public function toYaml(Application $application, array $options = []): string
     {
         return collect($this->generate($application, $options))
@@ -71,11 +64,6 @@ class KubernetesApplicationManifestGenerator
         return trim($name, '-').'-'.$suffix;
     }
 
-    /**
-     * @param  array<string, string>  $labels
-     * @param  array{replicas?: int, image?: string, deployment_uuid?: string}  $options
-     * @return array<string, mixed>
-     */
     private function deployment(Application $application, string $name, string $namespace, int $port, array $labels, array $options, bool $hasSecret): array
     {
         $container = [
@@ -157,11 +145,6 @@ class KubernetesApplicationManifestGenerator
         ];
     }
 
-    /**
-     * @param  array<string, string>  $labels
-     * @param  array{environment?: array<string, string>}  $options
-     * @return array<string, mixed>|null
-     */
     private function secret(string $name, string $namespace, array $labels, array $options): ?array
     {
         $environment = collect($options['environment'] ?? [])
@@ -185,11 +168,6 @@ class KubernetesApplicationManifestGenerator
         ];
     }
 
-    /**
-     * @param  array<string, string>  $labels
-     * @param  array{service_type?: string}  $options
-     * @return array<string, mixed>
-     */
     private function service(string $name, string $namespace, int $port, array $labels, array $options): array
     {
         return [
@@ -218,11 +196,6 @@ class KubernetesApplicationManifestGenerator
         ];
     }
 
-    /**
-     * @param  array<string, string>  $labels
-     * @param  array{ingress_class?: string}  $options
-     * @return array<string, mixed>|null
-     */
     private function ingress(Application $application, string $name, string $namespace, array $labels, array $options): ?array
     {
         $host = $this->host($application);
@@ -266,11 +239,6 @@ class KubernetesApplicationManifestGenerator
         ];
     }
 
-    /**
-     * @param  array<string, string>  $labels
-     * @param  array{min_replicas?: int, max_replicas?: int, target_cpu_utilization_percentage?: int}  $options
-     * @return array<string, mixed>
-     */
     private function horizontalPodAutoscaler(string $name, string $namespace, array $labels, array $options): array
     {
         return [
@@ -305,9 +273,6 @@ class KubernetesApplicationManifestGenerator
         ];
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
     private function httpHealthCheck(Application $application, int $port): ?array
     {
         if (! $application->health_check_enabled || $application->health_check_type === 'cmd') {
@@ -327,9 +292,6 @@ class KubernetesApplicationManifestGenerator
         ];
     }
 
-    /**
-     * @return array<string, array<string, string>>
-     */
     private function resources(Application $application): array
     {
         $limits = array_filter([
@@ -395,9 +357,6 @@ class KubernetesApplicationManifestGenerator
         return "{$name}-env";
     }
 
-    /**
-     * @return array<string, string>
-     */
     private function labels(Application $application, string $name): array
     {
         return [

@@ -317,7 +317,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             // Make sure the private key is stored in the filesystem
             $this->server->privateKey->storeInFileSystem();
             if (! ($this->destination instanceof KubernetesCluster)) {
-                // Generate custom host<->ip mapping
                 $safeNetwork = escapeshellarg($this->destination->network);
                 $allContainers = instant_remote_process(["docker network inspect {$safeNetwork} -f '{{json .Containers}}' "], $this->server);
 
@@ -2068,9 +2067,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue->addLogEntry('Kubernetes rollout completed.');
     }
 
-    /**
-     * @return array<string, string>
-     */
     private function kubernetesRuntimeEnvironment(): array
     {
         return $this->generate_runtime_environment_variables()
