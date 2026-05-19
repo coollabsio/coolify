@@ -24,6 +24,10 @@ class KubernetesComposeManifestGenerator
             $resources[] = $this->namespace($namespace);
         }
 
+        if ($serviceAccount = $this->serviceAccount($namespace, $options)) {
+            $resources[] = $serviceAccount;
+        }
+
         foreach ($this->services($compose) as $serviceName => $service) {
             $resources = [
                 ...$resources,
@@ -75,6 +79,10 @@ class KubernetesComposeManifestGenerator
             $resources->push($this->horizontalPodAutoscaler($name, $namespace, $labels, $options));
         }
 
+        if (($options['pod_disruption_budget_enabled'] ?? false) === true) {
+            $resources->push($this->podDisruptionBudget($name, $namespace, $labels, $options));
+        }
+
         return $resources->toArray();
     }
 
@@ -113,39 +121,27 @@ class KubernetesComposeManifestGenerator
             $podSpec['imagePullSecrets'] = collect($imagePullSecrets)->map(fn (string $secret) => ['name' => $secret])->values()->toArray();
         }
 
+        $nodeSelector = $this->data->keyValueMap($options['node_selector'] ?? null);
+        if ($nodeSelector !== []) {
+            $podSpec['nodeSelector'] = $nodeSelector;
+        }
+
+        $tolerations = $this->data->yamlList($options['tolerations'] ?? null);
+        if ($tolerations !== []) {
+            $podSpec['tolerations'] = $tolerations;
+        }
+
         return [
             'apiVersion' => 'apps/v1',
             'kind' => 'Deployment',
             'metadata' => ['name' => $name, 'namespace' => $namespace, 'labels' => $labels],
-            'spec' => [
-                'replicas' => (int) ($options['replicas'] ?? 1),
-                'revisionHistoryLimit' => 3,
-                'selector' => ['matchLabels' => $this->selector($name)],
-                'template' => [
-                    'metadata' => ['labels' => $labels],
-                    'spec' => $podSpec,
-                ],
-            ],
+            'spec' => ['replicas' => (int) ($options['replicas'] ?? 1), 'revisionHistoryLimit' => 3, 'selector' => ['matchLabels' => $this->selector($name)], 'template' => ['metadata' => ['labels' => $labels], 'spec' => $podSpec]],
         ];
     }
 
     private function service(string $name, string $namespace, array $labels, int $port, array $options): array
     {
-        return [
-            'apiVersion' => 'v1',
-            'kind' => 'Service',
-            'metadata' => ['name' => $name, 'namespace' => $namespace, 'labels' => $labels],
-            'spec' => [
-                'type' => $options['service_type'] ?? 'ClusterIP',
-                'selector' => $this->selector($name),
-                'ports' => [[
-                    'name' => 'http',
-                    'protocol' => 'TCP',
-                    'port' => 80,
-                    'targetPort' => $port,
-                ]],
-            ],
-        ];
+        return ['apiVersion' => 'v1', 'kind' => 'Service', 'metadata' => ['name' => $name, 'namespace' => $namespace, 'labels' => $labels], 'spec' => ['type' => $options['service_type'] ?? 'ClusterIP', 'selector' => $this->selector($name), 'ports' => [['name' => 'http', 'protocol' => 'TCP', 'port' => 80, 'targetPort' => $port]]]];
     }
 
     private function ingress(Application $application, string $name, string $namespace, array $labels, string $serviceName, array $options): ?array
@@ -172,36 +168,44 @@ class KubernetesComposeManifestGenerator
             $spec['tls'] = [['hosts' => [$host], 'secretName' => $options['ingress_tls_secret']]];
         }
 
+        $metadata = ['name' => $name, 'namespace' => $namespace, 'labels' => $labels];
+        $annotations = $this->data->keyValueMap($options['ingress_annotations'] ?? null);
+        if ($annotations !== []) {
+            $metadata['annotations'] = $annotations;
+        }
+
         return [
             'apiVersion' => 'networking.k8s.io/v1',
             'kind' => 'Ingress',
-            'metadata' => ['name' => $name, 'namespace' => $namespace, 'labels' => $labels],
+            'metadata' => $metadata,
             'spec' => $spec,
         ];
     }
 
     private function horizontalPodAutoscaler(string $name, string $namespace, array $labels, array $options): array
     {
-        return [
-            'apiVersion' => 'autoscaling/v2',
-            'kind' => 'HorizontalPodAutoscaler',
-            'metadata' => ['name' => $name, 'namespace' => $namespace, 'labels' => $labels],
-            'spec' => [
-                'scaleTargetRef' => ['apiVersion' => 'apps/v1', 'kind' => 'Deployment', 'name' => $name],
-                'minReplicas' => (int) ($options['min_replicas'] ?? 1),
-                'maxReplicas' => (int) ($options['max_replicas'] ?? 3),
-                'metrics' => [[
-                    'type' => 'Resource',
-                    'resource' => [
-                        'name' => 'cpu',
-                        'target' => [
-                            'type' => 'Utilization',
-                            'averageUtilization' => (int) ($options['target_cpu_utilization_percentage'] ?? 70),
-                        ],
-                    ],
-                ]],
-            ],
-        ];
+        return ['apiVersion' => 'autoscaling/v2', 'kind' => 'HorizontalPodAutoscaler', 'metadata' => ['name' => $name, 'namespace' => $namespace, 'labels' => $labels], 'spec' => ['scaleTargetRef' => ['apiVersion' => 'apps/v1', 'kind' => 'Deployment', 'name' => $name], 'minReplicas' => (int) ($options['min_replicas'] ?? 1), 'maxReplicas' => (int) ($options['max_replicas'] ?? 3), 'metrics' => [['type' => 'Resource', 'resource' => ['name' => 'cpu', 'target' => ['type' => 'Utilization', 'averageUtilization' => (int) ($options['target_cpu_utilization_percentage'] ?? 70)]]]]]];
+    }
+
+    private function serviceAccount(string $namespace, array $options): ?array
+    {
+        $name = trim((string) ($options['service_account_name'] ?? ''));
+        if ($name === '' || ($options['create_service_account'] ?? false) !== true) {
+            return null;
+        }
+
+        $serviceAccount = ['apiVersion' => 'v1', 'kind' => 'ServiceAccount', 'metadata' => ['name' => $name, 'namespace' => $namespace, 'labels' => ['app.kubernetes.io/managed-by' => 'coolify']]];
+        $imagePullSecrets = $this->data->stringList($options['image_pull_secrets'] ?? null);
+        if ($imagePullSecrets !== []) {
+            $serviceAccount['imagePullSecrets'] = collect($imagePullSecrets)->map(fn (string $secret) => ['name' => $secret])->values()->toArray();
+        }
+
+        return $serviceAccount;
+    }
+
+    private function podDisruptionBudget(string $name, string $namespace, array $labels, array $options): array
+    {
+        return ['apiVersion' => 'policy/v1', 'kind' => 'PodDisruptionBudget', 'metadata' => ['name' => $name, 'namespace' => $namespace, 'labels' => $labels], 'spec' => ['minAvailable' => $this->data->intOrPercent($options['pod_disruption_budget_min_available'] ?? null, 1), 'selector' => ['matchLabels' => $this->selector($name)]]];
     }
 
     private function secret(string $name, string $namespace, array $labels, array $environment): ?array

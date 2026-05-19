@@ -45,36 +45,59 @@ it('generates kubernetes resources for image based compose services', function (
         'autoscaling' => true,
         'min_replicas' => 2,
         'max_replicas' => 4,
+        'service_account_name' => 'coolify-workload',
+        'create_service_account' => true,
+        'image_pull_secrets' => 'regcred',
+        'node_selector' => 'workload=apps',
+        'tolerations' => "- key: dedicated\n  operator: Equal\n  value: apps\n  effect: NoSchedule",
+        'ingress_annotations' => 'traefik.ingress.kubernetes.io/router.entrypoints=websecure',
+        'pod_disruption_budget_enabled' => true,
+        'pod_disruption_budget_min_available' => '50%',
         'environment' => [
             'SHARED' => 'true',
         ],
     ]);
 
     expect(array_column($resources, 'kind'))->toBe([
+        'ServiceAccount',
         'PersistentVolumeClaim',
         'Secret',
         'Deployment',
         'Service',
         'Ingress',
         'HorizontalPodAutoscaler',
+        'PodDisruptionBudget',
         'Secret',
         'Deployment',
         'Service',
         'HorizontalPodAutoscaler',
+        'PodDisruptionBudget',
     ]);
 
-    $apiDeployment = $resources[2];
+    $apiDeployment = collect($resources)->where('kind', 'Deployment')->first();
+    $apiIngress = collect($resources)->firstWhere('kind', 'Ingress');
+    $pdb = collect($resources)->firstWhere('kind', 'PodDisruptionBudget');
+    $serviceAccount = collect($resources)->firstWhere('kind', 'ServiceAccount');
+    $workerDeployment = collect($resources)->where('kind', 'Deployment')->last();
+
     expect($apiDeployment['metadata']['name'])->toBe('customer-stack-api-ckv4a1b2');
     expect($apiDeployment['spec']['template']['spec']['containers'][0]['image'])->toBe('ghcr.io/example/api:1.0.0');
     expect($apiDeployment['spec']['template']['spec']['containers'][0]['ports'][0]['containerPort'])->toBe(3000);
     expect($apiDeployment['spec']['template']['spec']['containers'][0]['volumeMounts'][0]['mountPath'])->toBe('/var/lib/api');
+    expect($apiDeployment['spec']['template']['spec']['serviceAccountName'])->toBe('coolify-workload');
+    expect($apiDeployment['spec']['template']['spec']['imagePullSecrets'][0]['name'])->toBe('regcred');
+    expect($apiDeployment['spec']['template']['spec']['nodeSelector'])->toBe(['workload' => 'apps']);
+    expect($apiDeployment['spec']['template']['spec']['tolerations'][0]['key'])->toBe('dedicated');
 
-    expect($resources[1]['data'])->toMatchArray([
+    expect(collect($resources)->where('kind', 'Secret')->first()['data'])->toMatchArray([
         'APP_ENV' => base64_encode('production'),
         'SHARED' => base64_encode('true'),
     ]);
-    expect($resources[4]['spec']['rules'][0]['host'])->toBe('api.example.com');
-    expect($resources[7]['spec']['template']['spec']['containers'][0]['ports'][0]['containerPort'])->toBe(9000);
+    expect($apiIngress['spec']['rules'][0]['host'])->toBe('api.example.com');
+    expect($apiIngress['metadata']['annotations']['traefik.ingress.kubernetes.io/router.entrypoints'])->toBe('websecure');
+    expect($pdb['spec']['minAvailable'])->toBe('50%');
+    expect($serviceAccount['imagePullSecrets'][0]['name'])->toBe('regcred');
+    expect($workerDeployment['spec']['template']['spec']['containers'][0]['ports'][0]['containerPort'])->toBe(9000);
 });
 
 it('rejects compose services that require local builds', function () {
