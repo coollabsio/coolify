@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\ApplicationsController;
 use App\Http\Controllers\Api\CloudProviderTokensController;
 use App\Http\Controllers\Api\DatabasesController;
 use App\Http\Controllers\Api\DeployController;
+use App\Http\Controllers\Api\DestinationsController;
 use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\HetznerController;
 use App\Http\Controllers\Api\OtherController;
@@ -92,6 +93,12 @@ Route::group([
     Route::post('/servers', [ServersController::class, 'create_server'])->middleware(['api.ability:write']);
     Route::patch('/servers/{uuid}', [ServersController::class, 'update_server'])->middleware(['api.ability:write']);
     Route::delete('/servers/{uuid}', [ServersController::class, 'delete_server'])->middleware(['api.ability:write']);
+
+    Route::get('/destinations', [DestinationsController::class, 'destinations'])->middleware(['api.ability:read']);
+    Route::get('/destinations/{uuid}', [DestinationsController::class, 'destination_by_uuid'])->middleware(['api.ability:read']);
+    Route::post('/destinations/kubernetes', [DestinationsController::class, 'create_kubernetes'])->middleware(['api.ability:write']);
+    Route::patch('/destinations/kubernetes/{uuid}', [DestinationsController::class, 'update_kubernetes'])->middleware(['api.ability:write']);
+    Route::delete('/destinations/kubernetes/{uuid}', [DestinationsController::class, 'delete_kubernetes'])->middleware(['api.ability:write']);
 
     Route::get('/hetzner/locations', [HetznerController::class, 'locations'])->middleware(['api.ability:read']);
     Route::get('/hetzner/server-types', [HetznerController::class, 'serverTypes'])->middleware(['api.ability:read']);
