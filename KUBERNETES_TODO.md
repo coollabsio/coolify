@@ -1,7 +1,7 @@
 # Kubernetes Destination Todo
 
 - [done] Delete application resources from Kubernetes when Coolify deletes an application.
-- [pending] Add Kubernetes resource status/detail coverage beyond Pod list.
+- [done] Add Kubernetes resource status/detail coverage beyond Pod list.
 - [pending] Add service/one-click service Kubernetes rendering and lifecycle.
 - [pending] Add database Kubernetes rendering and lifecycle.
 - [pending] Expand Docker Compose Kubernetes feature mapping.

@@ -5,10 +5,13 @@ namespace App\Livewire\Destination\Concerns;
 use App\Models\KubernetesCluster;
 use App\Services\Kubernetes\KubernetesKubectlCommandBuilder;
 use App\Services\Kubernetes\KubernetesPodStatusParser;
+use App\Services\Kubernetes\KubernetesResourceStatusParser;
 
 trait ManagesKubernetesPods
 {
     public array $kubernetesPods = [];
+
+    public array $kubernetesResources = [];
 
     public string $selectedKubernetesPod = '';
 
@@ -46,6 +49,35 @@ trait ManagesKubernetesPods
 
             $this->updatedSelectedKubernetesPod();
             $this->dispatch('success', 'Kubernetes Pods refreshed.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function refreshKubernetesResources()
+    {
+        try {
+            $this->authorize('view', $this->destination);
+
+            if (! ($this->destination instanceof KubernetesCluster)) {
+                return;
+            }
+
+            $builder = new KubernetesKubectlCommandBuilder;
+            $commandContext = $this->kubernetesCommandContext($builder);
+
+            if ($commandContext === null) {
+                return;
+            }
+
+            [$commands, $kubeconfigPath] = $commandContext;
+            $output = instant_remote_process([
+                ...$commands,
+                $builder->getResources($this->destination, kubeconfigPath: $kubeconfigPath),
+            ], $this->destination->server);
+
+            $this->kubernetesResources = (new KubernetesResourceStatusParser)->parse($output ?: '{"items":[]}');
+            $this->dispatch('success', 'Kubernetes resources refreshed.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

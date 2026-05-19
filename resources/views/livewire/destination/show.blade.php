@@ -98,6 +98,47 @@
             </div>
             <div class="flex flex-col gap-3 pt-8">
                 <div class="flex flex-wrap items-center gap-2">
+                    <h2>Kubernetes Resources</h2>
+                    <x-forms.button canGate="view" :canResource="$destination"
+                        wire:click.prevent='refreshKubernetesResources'>
+                        Refresh Resources
+                    </x-forms.button>
+                </div>
+                <div wire:loading.delay wire:target="refreshKubernetesResources" class="text-sm text-neutral-500">
+                    Loading Kubernetes resources...
+                </div>
+                @if (count($kubernetesResources) > 0)
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-neutral-300 text-left dark:border-coolgray-300">
+                                    <th class="p-2">Kind</th>
+                                    <th class="p-2">Name</th>
+                                    <th class="p-2">Status</th>
+                                    <th class="p-2">Detail</th>
+                                    <th class="p-2">Age</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($kubernetesResources as $resource)
+                                    <tr wire:key="kubernetes-resource-{{ $resource['kind'] }}-{{ $resource['name'] }}"
+                                        class="border-b border-neutral-200 dark:border-coolgray-300">
+                                        <td class="p-2">{{ $resource['kind'] }}</td>
+                                        <td class="p-2 font-mono text-xs">{{ $resource['name'] }}</td>
+                                        <td class="p-2">{{ $resource['status'] }}</td>
+                                        <td class="p-2">{{ $resource['detail'] }}</td>
+                                        <td class="p-2">{{ $resource['age'] }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="text-sm text-neutral-500">No Coolify-managed resources loaded.</div>
+                @endif
+            </div>
+            <div class="flex flex-col gap-3 pt-8">
+                <div class="flex flex-wrap items-center gap-2">
                     <h2>Kubernetes Pods</h2>
                     <x-forms.button canGate="view" :canResource="$destination" wire:click.prevent='refreshKubernetesPods'>
                         Refresh Pods

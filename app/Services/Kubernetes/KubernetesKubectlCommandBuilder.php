@@ -50,6 +50,14 @@ class KubernetesKubectlCommandBuilder
         return $this->base($cluster, $kubeconfigPath).' get pods --selector='.escapeshellarg($selector).' -o json';
     }
 
+    public function getResources(KubernetesCluster $cluster, string $selector = self::COOLIFY_POD_SELECTOR, ?string $kubeconfigPath = null): string
+    {
+        return $this->base($cluster, $kubeconfigPath)
+            .' get deployment,service,ingress,hpa,pdb,pvc,secret,serviceaccount'
+            .' --selector='.escapeshellarg($selector)
+            .' -o json';
+    }
+
     public function getDeployment(KubernetesCluster $cluster, string $deploymentName, ?string $kubeconfigPath = null): string
     {
         return $this->base($cluster, $kubeconfigPath).' get '.escapeshellarg("deployment/{$deploymentName}").' -o json';
