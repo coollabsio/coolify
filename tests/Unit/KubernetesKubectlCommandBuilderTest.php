@@ -42,3 +42,33 @@ it('builds a base64 manifest write command', function () {
     expect($builder->writeKubeconfig('/tmp/kubeconfig', "apiVersion: v1\n"))
         ->toBe("printf %s 'YXBpVmVyc2lvbjogdjEK' | base64 -d > '/tmp/kubeconfig' && chmod 600 '/tmp/kubeconfig'");
 });
+
+it('uses the explicit kubeconfig path for mutable kubernetes commands', function () {
+    $cluster = new KubernetesCluster([
+        'namespace' => 'production',
+        'context' => 'iad-prod',
+        'kubeconfig_path' => '/old/kubeconfig',
+    ]);
+
+    $builder = new KubernetesKubectlCommandBuilder;
+    $kubeconfigPath = '/run/coolify/kubeconfig';
+
+    expect($builder->rolloutRestart($cluster, 'customer-api', $kubeconfigPath))
+        ->toBe("kubectl --kubeconfig='/run/coolify/kubeconfig' --context='iad-prod' --namespace='production' rollout restart 'deployment/customer-api'");
+
+    expect($builder->scaleDeployment($cluster, 'customer-api', 0, $kubeconfigPath))
+        ->toBe("kubectl --kubeconfig='/run/coolify/kubeconfig' --context='iad-prod' --namespace='production' scale 'deployment/customer-api' --replicas=0");
+});
+
+it('escapes shell metacharacters in kubernetes command arguments', function () {
+    $cluster = new KubernetesCluster([
+        'namespace' => 'prod;cat /etc/passwd',
+        'context' => 'ctx`whoami`',
+        'kubeconfig_path' => '/tmp/kubeconfig $(id)',
+    ]);
+
+    $builder = new KubernetesKubectlCommandBuilder;
+
+    expect($builder->deletePod($cluster, 'api;curl attacker'))
+        ->toBe("kubectl --kubeconfig='/tmp/kubeconfig $(id)' --context='ctx`whoami`' --namespace='prod;cat /etc/passwd' delete 'pod/api;curl attacker' --ignore-not-found=true");
+});
