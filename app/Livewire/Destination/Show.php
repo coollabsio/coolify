@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Destination;
 
+use App\Livewire\Destination\Concerns\ManagesKubernetesPods;
 use App\Models\KubernetesCluster;
 use App\Models\StandaloneDocker;
 use App\Services\Kubernetes\KubernetesKubectlCommandBuilder;
@@ -13,6 +14,7 @@ use Livewire\Component;
 class Show extends Component
 {
     use AuthorizesRequests;
+    use ManagesKubernetesPods;
 
     #[Locked]
     public $destination;
@@ -101,6 +103,8 @@ class Show extends Component
                 'tolerations' => ['nullable', 'string', 'max:10000'],
                 'podDisruptionBudgetEnabled' => ['required', 'boolean'],
                 'podDisruptionBudgetMinAvailable' => ['nullable', 'string', 'max:16', 'regex:/^\d+%?$/'],
+                'selectedKubernetesPod' => ['nullable', 'string', 'max:253', 'regex:/^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/'],
+                'selectedKubernetesContainer' => ['nullable', 'string', 'max:253', 'regex:/^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/'],
             ];
         }
 
@@ -224,22 +228,13 @@ class Show extends Component
             $this->destination->refresh();
 
             $builder = new KubernetesKubectlCommandBuilder;
-            $commands = [
-                'mkdir -p '.escapeshellarg($this->destination->configurationDirectory()),
-            ];
-            $kubeconfigPath = $this->destination->effectiveKubeconfigPath();
+            $commandContext = $this->kubernetesCommandContext($builder);
 
-            if (filled($this->destination->kubeconfig)) {
-                $commands[] = $builder->writeKubeconfig($this->destination->storedKubeconfigPath(), $this->destination->kubeconfig);
-                $kubeconfigPath = $this->destination->storedKubeconfigPath();
-            }
-
-            if (blank($kubeconfigPath)) {
-                $this->dispatch('error', 'Kubeconfig is required.');
-
+            if ($commandContext === null) {
                 return;
             }
 
+            [$commands, $kubeconfigPath] = $commandContext;
             $commands[] = $builder->version($this->destination, $kubeconfigPath);
             instant_remote_process($commands, $this->destination->server);
             $this->dispatch('success', 'Kubernetes connection verified.');

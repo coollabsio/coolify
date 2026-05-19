@@ -38,36 +38,36 @@ This foundation targets the deploy-to-Kubernetes path from [coollabsio/coolify#2
 - [Full Kubernetes support with autoscale](https://github.com/coollabsio/coolify/issues/2390) is the canonical feature request. The most concrete community PoC uses a `KubernetesCluster` model, manifest generation, and `kubectl apply`.
 - [Kubernetes Helm Chart for GitOps Deployments](https://github.com/coollabsio/coolify/discussions/2455) asks for Coolify itself to run in Kubernetes. A maintainer/contributor comment notes that Coolify's Docker dependency makes this a different, harder problem.
 - [Coolify v5.x](https://github.com/coollabsio/coolify/issues/5685) frames scaling as core product work, with discussion around simple production scalability.
-- Kubernetes docs used for API targets: [Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/), [Services](https://kubernetes.io/docs/concepts/services-networking/service/), [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/), [Horizontal Pod Autoscaling](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/), [ServiceAccounts](https://kubernetes.io/docs/concepts/security/service-accounts/), [Storage Classes](https://kubernetes.io/docs/concepts/storage/storage-classes/), [Pod Disruption Budgets](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/), and [kubeconfig](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/).
+- Kubernetes docs used for API targets: [Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/), [Pods](https://kubernetes.io/docs/concepts/workloads/pods/), [Services](https://kubernetes.io/docs/concepts/services-networking/service/), [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/), [Horizontal Pod Autoscaling](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/), [ServiceAccounts](https://kubernetes.io/docs/concepts/security/service-accounts/), [Storage Classes](https://kubernetes.io/docs/concepts/storage/storage-classes/), [Pod Disruption Budgets](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/), and [kubeconfig](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/).
 
 ## Data Model
 
 `kubernetes_clusters` stores connection metadata for a Kubernetes destination owned through a Coolify `Server`.
 
-| Field                               | Purpose                                                              |
-| ----------------------------------- | -------------------------------------------------------------------- |
-| `server_id`                         | Keeps current team ownership and SSH execution boundaries.           |
-| `name`                              | Human-readable destination name.                                     |
-| `namespace`                         | Default namespace for generated resources.                           |
-| `create_namespace`                  | Adds a Namespace manifest when the destination owns namespace setup.  |
-| `context`                           | Optional kubeconfig context.                                         |
-| `kubeconfig_path`                   | Optional path on the execution host.                                 |
-| `kubeconfig`                        | Optional encrypted kubeconfig content written to the execution host. |
-| `ingress_class`                     | Default Ingress class, initially `traefik`.                          |
-| `ingress_tls_secret`                | Optional TLS secret reference for generated Ingress resources.        |
-| `ingress_annotations`               | Optional key/value annotations for ingress controllers and certs.     |
-| `service_type`                      | Default Service type, initially `ClusterIP`.                         |
-| `service_account_name`              | Optional ServiceAccount name mounted into application Pods.           |
-| `create_service_account`            | Adds a ServiceAccount manifest when enabled.                          |
-| `image_pull_secrets`                | Newline/comma separated image pull secret references.                 |
-| `storage_class` / `storage_size`    | PVC defaults for Coolify persistent storage mappings.                 |
-| `replicas`                          | Deployment replica count.                                            |
-| `autoscaling_enabled`               | Enables an HPA manifest.                                             |
-| `min_replicas` / `max_replicas`     | HPA scaling bounds.                                                  |
-| `target_cpu_utilization_percentage` | HPA CPU target.                                                      |
-| `node_selector` / `tolerations`     | Optional Pod placement controls.                                     |
-| `pod_disruption_budget_enabled`     | Enables a PDB manifest.                                              |
-| `pod_disruption_budget_min_available` | PDB minimum availability as an integer or percent.                  |
+| Field                                 | Purpose                                                              |
+| ------------------------------------- | -------------------------------------------------------------------- |
+| `server_id`                           | Keeps current team ownership and SSH execution boundaries.           |
+| `name`                                | Human-readable destination name.                                     |
+| `namespace`                           | Default namespace for generated resources.                           |
+| `create_namespace`                    | Adds a Namespace manifest when the destination owns namespace setup. |
+| `context`                             | Optional kubeconfig context.                                         |
+| `kubeconfig_path`                     | Optional path on the execution host.                                 |
+| `kubeconfig`                          | Optional encrypted kubeconfig content written to the execution host. |
+| `ingress_class`                       | Default Ingress class, initially `traefik`.                          |
+| `ingress_tls_secret`                  | Optional TLS secret reference for generated Ingress resources.       |
+| `ingress_annotations`                 | Optional key/value annotations for ingress controllers and certs.    |
+| `service_type`                        | Default Service type, initially `ClusterIP`.                         |
+| `service_account_name`                | Optional ServiceAccount name mounted into application Pods.          |
+| `create_service_account`              | Adds a ServiceAccount manifest when enabled.                         |
+| `image_pull_secrets`                  | Newline/comma separated image pull secret references.                |
+| `storage_class` / `storage_size`      | PVC defaults for Coolify persistent storage mappings.                |
+| `replicas`                            | Deployment replica count.                                            |
+| `autoscaling_enabled`                 | Enables an HPA manifest.                                             |
+| `min_replicas` / `max_replicas`       | HPA scaling bounds.                                                  |
+| `target_cpu_utilization_percentage`   | HPA CPU target.                                                      |
+| `node_selector` / `tolerations`       | Optional Pod placement controls.                                     |
+| `pod_disruption_budget_enabled`       | Enables a PDB manifest.                                              |
+| `pod_disruption_budget_min_available` | PDB minimum availability as an integer or percent.                   |
 
 ```mermaid
 erDiagram
@@ -121,6 +121,7 @@ The first supported workload shape is stateless web application deployment:
 - `PersistentVolumeClaim` uses `v1` and maps Coolify application persistent storage entries to `ReadWriteOnce` claims.
 - `PodDisruptionBudget` uses `policy/v1` and is opt-in through destination UI.
 - Stop scales the Deployment to `0`. Restart runs `kubectl rollout restart` for restart-only deployments.
+- The destination page lists Coolify-managed Pods in the namespace, lets operators select a Pod/container, tails logs, and restarts a selected Pod by deleting it so the owning controller creates a replacement.
 
 ```mermaid
 sequenceDiagram
@@ -141,17 +142,38 @@ sequenceDiagram
 
 The diagram shows the intended execution path. This keeps Coolify's current SSH execution model intact while introducing Kubernetes as the backend API.
 
+## Pod Operations
+
+```mermaid
+sequenceDiagram
+    participant Operator
+    participant Coolify
+    participant Host as SSH Host
+    participant API as Kubernetes API
+    Operator->>Coolify: Refresh Pods
+    Coolify->>Host: kubectl get pods --selector app.kubernetes.io/managed-by=coolify -o json
+    Host->>API: List namespace Pods
+    API-->>Host: Pod JSON
+    Host-->>Coolify: Pod status payload
+    Coolify-->>Operator: Pod table and selector
+    Operator->>Coolify: Show logs or restart selected Pod
+    Coolify->>Host: kubectl logs or kubectl delete pod
+    Host->>API: Read logs or delete Pod
+```
+
+The diagram shows the destination operations loop. Coolify limits the default listing to resources labeled as managed by Coolify, keeps kubeconfig handling on the execution host, and uses Kubernetes controllers for replacement Pods after a restart action.
+
 ## Operational Notes
 
 - Server-side dry-run is the production deployment validation before apply.
-- Status reconciliation must allow Kubernetes eventual consistency. The community PoC reported a false-failure race and solved it with a grace window.
+- Pod listing is an operator inspection path. Broader status reconciliation must still allow Kubernetes eventual consistency. The community PoC reported a false-failure race and solved it with a grace window.
 - Ingress must stay controller-agnostic. `ingress_class` should default to Traefik for Coolify parity but remain configurable.
 - Compose/service/database support should be separate follow-up work. Static Compose conversion alone is not enough for production because volumes, secrets, health checks, lifecycle hooks, and status all need Coolify semantics.
 
 ## Test Plan
 
 - Unit tests assert Namespace, ServiceAccount, Secret, Deployment, Service, Ingress, HPA, PVC, PDB, probes, resources, placement controls, host parsing, image overrides, and image requirements.
-- Unit tests assert escaped `kubectl` command construction, manifest writes, kubeconfig writes, and rollout commands.
+- Unit tests assert escaped `kubectl` command construction, manifest writes, kubeconfig writes, rollout commands, Pod list/log/restart commands, and Pod JSON parsing.
 - Manifest YAML is parsed and checked with `kubectl apply --dry-run=client --validate=false`.
 - Manual cluster validation should use:
 

@@ -96,6 +96,88 @@
                 <x-forms.textarea canGate="update" :canResource="$destination" id="kubeconfig" label="Kubeconfig"
                     rows="12" spellcheck="false" />
             </div>
+            <div class="flex flex-col gap-3 pt-8">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2>Kubernetes Pods</h2>
+                    <x-forms.button canGate="view" :canResource="$destination" wire:click.prevent='refreshKubernetesPods'>
+                        Refresh Pods
+                    </x-forms.button>
+                    @if ($selectedKubernetesPod)
+                        <x-forms.button canGate="view" :canResource="$destination"
+                            wire:click.prevent='loadSelectedKubernetesPodLogs'>
+                            Show Logs
+                        </x-forms.button>
+                        <x-modal-confirmation title="Restart selected Pod?" buttonTitle="Restart Pod" isErrorButton
+                            submitAction="restartSelectedKubernetesPod" :actions="[
+                                'This deletes the selected Pod. Its controller should create a replacement Pod automatically.',
+                            ]" confirmationText="{{ $selectedKubernetesPod }}"
+                            confirmationLabel="Please confirm the Pod name below" shortConfirmationLabel="Pod Name"
+                            :confirmWithPassword="false" step2ButtonText="Restart Pod" canGate="update"
+                            :canResource="$destination" />
+                    @endif
+                </div>
+                <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    <x-forms.select canGate="view" :canResource="$destination" id="selectedKubernetesPod"
+                        label="Selected Pod">
+                        <option value="">Select a Pod</option>
+                        @foreach ($kubernetesPods as $pod)
+                            <option value="{{ $pod['name'] }}">{{ $pod['name'] }}</option>
+                        @endforeach
+                    </x-forms.select>
+                    <x-forms.select canGate="view" :canResource="$destination" id="selectedKubernetesContainer"
+                        label="Container">
+                        <option value="">Default</option>
+                        @foreach ($this->selectedKubernetesPodContainers() as $container)
+                            <option value="{{ $container }}">{{ $container }}</option>
+                        @endforeach
+                    </x-forms.select>
+                </div>
+                <div wire:loading.delay wire:target="refreshKubernetesPods,loadSelectedKubernetesPodLogs,restartSelectedKubernetesPod"
+                    class="text-sm text-neutral-500">
+                    Loading Kubernetes data...
+                </div>
+                @if (count($kubernetesPods) > 0)
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-neutral-300 text-left dark:border-coolgray-300">
+                                    <th class="p-2">Pod</th>
+                                    <th class="p-2">Phase</th>
+                                    <th class="p-2">Ready</th>
+                                    <th class="p-2">Restarts</th>
+                                    <th class="p-2">Node</th>
+                                    <th class="p-2">Age</th>
+                                    <th class="p-2">Containers</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($kubernetesPods as $pod)
+                                    <tr wire:key="kubernetes-pod-{{ $pod['name'] }}"
+                                        wire:click="$set('selectedKubernetesPod', '{{ $pod['name'] }}')"
+                                        @class([
+                                            'cursor-pointer border-b border-neutral-200 dark:border-coolgray-300',
+                                            'bg-coolgray-100' => $selectedKubernetesPod === $pod['name'],
+                                        ])>
+                                        <td class="p-2 font-mono text-xs">{{ $pod['name'] }}</td>
+                                        <td class="p-2">{{ $pod['phase'] }}</td>
+                                        <td class="p-2">{{ $pod['ready'] }}</td>
+                                        <td class="p-2">{{ $pod['restarts'] }}</td>
+                                        <td class="p-2">{{ $pod['node'] }}</td>
+                                        <td class="p-2">{{ $pod['age'] }}</td>
+                                        <td class="p-2">{{ $pod['containers'] }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="text-sm text-neutral-500">No Coolify-managed Pods loaded.</div>
+                @endif
+                @if ($kubernetesPodLogs !== '')
+                    <pre
+                        class="max-h-96 overflow-auto whitespace-pre-wrap rounded bg-coolgray-100 p-3 text-xs dark:text-white">{{ $kubernetesPodLogs }}</pre>
+                @endif
+            </div>
         @endif
     </form>
 </div>

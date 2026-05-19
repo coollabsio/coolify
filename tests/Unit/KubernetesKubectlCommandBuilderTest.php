@@ -20,6 +20,15 @@ it('builds escaped kubectl commands for a cluster destination', function () {
 
     expect($builder->rolloutStatus($cluster, 'customer-api', 120))
         ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' rollout status 'deployment/customer-api' --timeout=120s");
+
+    expect($builder->getPods($cluster))
+        ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' get pods --selector='app.kubernetes.io/managed-by=coolify' -o json");
+
+    expect($builder->podLogs($cluster, 'customer-api-abc123', 'application', 50))
+        ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' logs 'pod/customer-api-abc123' --tail=50 --container='application'");
+
+    expect($builder->deletePod($cluster, 'customer-api-abc123'))
+        ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' delete 'pod/customer-api-abc123' --ignore-not-found=true");
 });
 
 it('builds a base64 manifest write command', function () {

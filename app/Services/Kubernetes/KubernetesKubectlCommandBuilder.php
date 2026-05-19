@@ -6,6 +6,8 @@ use App\Models\KubernetesCluster;
 
 class KubernetesKubectlCommandBuilder
 {
+    public const COOLIFY_POD_SELECTOR = 'app.kubernetes.io/managed-by=coolify';
+
     public function version(KubernetesCluster $cluster, ?string $kubeconfigPath = null): string
     {
         return $this->base($cluster, $kubeconfigPath).' version --output=yaml';
@@ -41,6 +43,27 @@ class KubernetesKubectlCommandBuilder
     public function scaleDeployment(KubernetesCluster $cluster, string $deploymentName, int $replicas, ?string $kubeconfigPath = null): string
     {
         return $this->base($cluster, $kubeconfigPath).' scale '.escapeshellarg("deployment/{$deploymentName}").' --replicas='.((int) $replicas);
+    }
+
+    public function getPods(KubernetesCluster $cluster, string $selector = self::COOLIFY_POD_SELECTOR, ?string $kubeconfigPath = null): string
+    {
+        return $this->base($cluster, $kubeconfigPath).' get pods --selector='.escapeshellarg($selector).' -o json';
+    }
+
+    public function podLogs(KubernetesCluster $cluster, string $podName, ?string $containerName = null, int $tail = 200, ?string $kubeconfigPath = null): string
+    {
+        $command = $this->base($cluster, $kubeconfigPath).' logs '.escapeshellarg("pod/{$podName}").' --tail='.((int) $tail);
+
+        if (filled($containerName)) {
+            $command .= ' --container='.escapeshellarg($containerName);
+        }
+
+        return $command;
+    }
+
+    public function deletePod(KubernetesCluster $cluster, string $podName, ?string $kubeconfigPath = null): string
+    {
+        return $this->base($cluster, $kubeconfigPath).' delete '.escapeshellarg("pod/{$podName}").' --ignore-not-found=true';
     }
 
     public function writeManifest(string $manifestPath, string $manifestYaml): string
