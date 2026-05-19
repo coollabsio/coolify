@@ -3452,6 +3452,27 @@
         "minversion": "0.0.0",
         "port": "8080"
     },
+    "openobserve": {
+        "documentation": "https://openobserve.ai/docs/?utm_source=coolify.io",
+        "slogan": "Cloud-native observability platform for logs, metrics, traces, RUM, errors and session replays \u2014 a 140x cheaper alternative to Elasticsearch, Splunk and Datadog.",
+        "compose": "c2VydmljZXM6CiAgb3Blbm9ic2VydmU6CiAgICBpbWFnZTogJ3B1YmxpYy5lY3IuYXdzL3ppbmNsYWJzL29wZW5vYnNlcnZlOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9PUEVOT0JTRVJWRV81MDgwCiAgICAgIC0gWk9fREFUQV9ESVI9L2RhdGEKICAgICAgLSAnWk9fUk9PVF9VU0VSX0VNQUlMPSR7Wk9fUk9PVF9VU0VSX0VNQUlMOi1yb290QGV4YW1wbGUuY29tfScKICAgICAgLSAnWk9fUk9PVF9VU0VSX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9PUEVOT0JTRVJWRX0nCiAgICAgIC0gJ1pPX1RFTEVNRVRSWT0ke1pPX1RFTEVNRVRSWTotZmFsc2V9JwogICAgdm9sdW1lczoKICAgICAgLSAnb3Blbm9ic2VydmUtZGF0YTovZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSB3Z2V0CiAgICAgICAgLSAnLS1zcGlkZXInCiAgICAgICAgLSAnLXEnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo1MDgwL2hlYWx0aHonCiAgICAgIGludGVydmFsOiAxMHMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogNQogICAgICBzdGFydF9wZXJpb2Q6IDMwcwo=",
+        "tags": [
+            "logs",
+            "metrics",
+            "traces",
+            "observability",
+            "monitoring",
+            "opentelemetry",
+            "otel",
+            "elasticsearch",
+            "splunk",
+            "datadog"
+        ],
+        "category": "monitoring",
+        "logo": "svgs/openobserve.svg",
+        "minversion": "0.0.0",
+        "port": "5080"
+    },
     "openpanel": {
         "documentation": "https://openpanel.dev/docs?utm_source=coolify.io",
         "slogan": "Open source alternative to Mixpanel and Plausible for product analytics",
