@@ -1868,6 +1868,7 @@ class Application extends BaseModel
         }
         $getGitVersion = instant_remote_process(['git --version'], $this->destination->server, false);
         $gitVersion = str($getGitVersion)->explode(' ')->last();
+        $gitOutputLog = "/tmp/{$uuid}/git-output.log";
 
         if (version_compare($gitVersion, '2.35.1', '<')) {
             $fileList = $fileList->map(function ($file) {
@@ -1887,10 +1888,10 @@ class Application extends BaseModel
                 "rm -rf /tmp/{$uuid}",
                 "mkdir -p /tmp/{$uuid}",
                 "cd /tmp/{$uuid}",
-                $cloneCommand,
-                'git sparse-checkout init',
-                "git sparse-checkout set {$fileList->implode(' ')}",
-                'git read-tree -mu HEAD',
+                $this->silenceRemoteCommandOutput($cloneCommand, $gitOutputLog),
+                $this->silenceRemoteCommandOutput('git sparse-checkout init', $gitOutputLog),
+                $this->silenceRemoteCommandOutput("git sparse-checkout set {$fileList->implode(' ')}", $gitOutputLog),
+                $this->silenceRemoteCommandOutput('git read-tree -mu HEAD', $gitOutputLog),
                 "cat .$workdir$composeFile",
             ]);
         } else {
@@ -1898,10 +1899,10 @@ class Application extends BaseModel
                 "rm -rf /tmp/{$uuid}",
                 "mkdir -p /tmp/{$uuid}",
                 "cd /tmp/{$uuid}",
-                $cloneCommand,
-                'git sparse-checkout init --cone',
-                "git sparse-checkout set {$fileList->implode(' ')}",
-                'git read-tree -mu HEAD',
+                $this->silenceRemoteCommandOutput($cloneCommand, $gitOutputLog),
+                $this->silenceRemoteCommandOutput('git sparse-checkout init --cone', $gitOutputLog),
+                $this->silenceRemoteCommandOutput("git sparse-checkout set {$fileList->implode(' ')}", $gitOutputLog),
+                $this->silenceRemoteCommandOutput('git read-tree -mu HEAD', $gitOutputLog),
                 "cat .$workdir$composeFile",
             ]);
         }
@@ -1977,6 +1978,13 @@ class Application extends BaseModel
 
             throw new RuntimeException("Docker Compose file not found at: $workdir$composeFile (branch: {$this->git_branch})<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
         }
+    }
+
+    private function silenceRemoteCommandOutput(string $command, string $logFile): string
+    {
+        $escapedLogFile = escapeshellarg($logFile);
+
+        return "({$command}) >> {$escapedLogFile} 2>&1 || { cat {$escapedLogFile} >&2; exit 1; }";
     }
 
     public function parseContainerLabels(?ApplicationPreview $preview = null)
