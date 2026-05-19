@@ -8,4 +8,4 @@
 - [done] Add preview deployment cleanup parity for Kubernetes.
 - [done] Add runtime scaling controls and HPA status display.
 - [done] Add API support for Kubernetes destinations.
-- [pending] Add broad feature/browser tests for Kubernetes destination flows.
+- [done] Add broad feature/browser tests for Kubernetes destination flows.
