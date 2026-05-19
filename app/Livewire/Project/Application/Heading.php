@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\StopApplication;
 use App\Actions\Docker\GetContainersStatus;
+use App\Actions\Kubernetes\GetKubernetesApplicationStatus;
 use App\Models\Application;
 use App\Models\KubernetesCluster;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -53,7 +54,9 @@ class Heading extends Component
     public function checkStatus()
     {
         if ($this->application->destination instanceof KubernetesCluster) {
-            $this->dispatch('success', 'Kubernetes status is updated during deployments.');
+            GetKubernetesApplicationStatus::run($this->application);
+            $this->application->refresh();
+            $this->dispatch('success', 'Kubernetes status refreshed.');
 
             return;
         }

@@ -122,6 +122,7 @@ The first supported workload shape is stateless web application deployment:
 - `PodDisruptionBudget` uses `policy/v1` and is opt-in through destination UI.
 - Stop scales the Deployment to `0`. Restart runs `kubectl rollout restart` for restart-only deployments.
 - The destination page lists Coolify-managed Pods in the namespace, lets operators select a Pod/container, tails logs, and restarts a selected Pod by deleting it so the owning controller creates a replacement.
+- Manual application status refresh reads the generated Deployment and its Coolify-managed Pods, then maps availability and Pod health back to Coolify statuses such as `running:healthy`, `starting:unhealthy`, `degraded:unhealthy`, or `exited`.
 
 ```mermaid
 sequenceDiagram
@@ -166,14 +167,14 @@ The diagram shows the destination operations loop. Coolify limits the default li
 ## Operational Notes
 
 - Server-side dry-run is the production deployment validation before apply.
-- Pod listing is an operator inspection path. Broader status reconciliation must still allow Kubernetes eventual consistency. The community PoC reported a false-failure race and solved it with a grace window.
+- Pod listing is an operator inspection path. Status refresh still allows Kubernetes eventual consistency by using Deployment availability and Pod states instead of assuming a newly applied resource is immediately healthy.
 - Ingress must stay controller-agnostic. `ingress_class` should default to Traefik for Coolify parity but remain configurable.
 - Compose/service/database support should be separate follow-up work. Static Compose conversion alone is not enough for production because volumes, secrets, health checks, lifecycle hooks, and status all need Coolify semantics.
 
 ## Test Plan
 
 - Unit tests assert Namespace, ServiceAccount, Secret, Deployment, Service, Ingress, HPA, PVC, PDB, probes, resources, placement controls, host parsing, image overrides, and image requirements.
-- Unit tests assert escaped `kubectl` command construction, manifest writes, kubeconfig writes, rollout commands, Pod list/log/restart commands, and Pod JSON parsing.
+- Unit tests assert escaped `kubectl` command construction, manifest writes, kubeconfig writes, rollout commands, Pod list/log/restart commands, Pod JSON parsing, and Kubernetes status mapping.
 - Manifest YAML is parsed and checked with `kubectl apply --dry-run=client --validate=false`.
 - Manual cluster validation should use:
 
@@ -184,7 +185,6 @@ kubectl --kubeconfig <path-to-kubeconfig> apply --dry-run=server -f <manifest>
 
 ## Follow-Up Work
 
-- Add status reconciliation from Deployment, ReplicaSet, Pod, Service, and Ingress state.
-- Add status reconciliation from PVC, HPA, PDB, and ingress address state.
+- Add status reconciliation from Service, Ingress, PVC, HPA, PDB, and ingress address state.
 - Add StatefulSet generation before enabling stateful service/database templates.
 - Decide whether K3s bootstrap belongs in core or as a separate installation action.

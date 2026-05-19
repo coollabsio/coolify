@@ -50,6 +50,11 @@ class KubernetesKubectlCommandBuilder
         return $this->base($cluster, $kubeconfigPath).' get pods --selector='.escapeshellarg($selector).' -o json';
     }
 
+    public function getDeployment(KubernetesCluster $cluster, string $deploymentName, ?string $kubeconfigPath = null): string
+    {
+        return $this->base($cluster, $kubeconfigPath).' get '.escapeshellarg("deployment/{$deploymentName}").' -o json';
+    }
+
     public function podLogs(KubernetesCluster $cluster, string $podName, ?string $containerName = null, int $tail = 200, ?string $kubeconfigPath = null): string
     {
         $command = $this->base($cluster, $kubeconfigPath).' logs '.escapeshellarg("pod/{$podName}").' --tail='.((int) $tail);

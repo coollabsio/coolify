@@ -24,6 +24,9 @@ it('builds escaped kubectl commands for a cluster destination', function () {
     expect($builder->getPods($cluster))
         ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' get pods --selector='app.kubernetes.io/managed-by=coolify' -o json");
 
+    expect($builder->getDeployment($cluster, 'customer-api'))
+        ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' get 'deployment/customer-api' -o json");
+
     expect($builder->podLogs($cluster, 'customer-api-abc123', 'application', 50))
         ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' logs 'pod/customer-api-abc123' --tail=50 --container='application'");
 
