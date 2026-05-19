@@ -10,6 +10,7 @@ use App\Models\Server;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -74,9 +75,20 @@ class Index extends Component
 
     public function projectOptions(): Collection
     {
-        return Project::ownedByCurrentTeam()
-            ->whereHas('applications.deployment_queue')
-            ->get(['id', 'name']);
+        $serverIds = $this->currentTeamServerIds();
+
+        return Project::query()
+            ->select('projects.id', 'projects.name')
+            ->join('environments', 'environments.project_id', '=', 'projects.id')
+            ->join('applications', 'applications.environment_id', '=', 'environments.id')
+            ->join('application_deployment_queues', function ($join) {
+                $join->on(DB::raw($this->castDeploymentApplicationId()), '=', 'applications.id');
+            })
+            ->where('projects.team_id', currentTeam()->id)
+            ->whereIn('application_deployment_queues.server_id', $serverIds)
+            ->distinct()
+            ->orderBy('projects.name')
+            ->get();
     }
 
     public function serverOptions(): Collection
@@ -90,7 +102,12 @@ class Index extends Component
     public function sourceOptions(): Collection
     {
         return Application::ownedByCurrentTeam()
-            ->whereHas('deployment_queue')
+            ->whereExists(function ($query) {
+                $query->selectRaw('1')
+                    ->from('application_deployment_queues')
+                    ->whereRaw($this->deploymentApplicationMatchesApplication())
+                    ->whereIn('application_deployment_queues.server_id', $this->currentTeamServerIds());
+            })
             ->with('source')
             ->get(['id', 'source_id', 'source_type', 'git_repository'])
             ->map(fn (Application $application) => [
@@ -202,14 +219,18 @@ class Index extends Component
 
     private function deploymentQuery(): Builder
     {
-        $serverIds = Server::ownedByCurrentTeam(['id'])->pluck('id');
+        $serverIds = $this->currentTeamServerIds();
 
         return ApplicationDeploymentQueue::query()
             ->with(['application.environment.project', 'application.source'])
             ->whereIn('server_id', $serverIds)
             ->when($this->project !== 'all', function (Builder $query) {
-                $query->whereHas('application.environment.project', function (Builder $query) {
-                    $query->where('id', $this->project);
+                $query->whereExists(function ($query) {
+                    $query->selectRaw('1')
+                        ->from('applications')
+                        ->join('environments', 'environments.id', '=', 'applications.environment_id')
+                        ->whereRaw($this->deploymentApplicationMatchesApplication())
+                        ->where('environments.project_id', $this->project);
                 });
             })
             ->when($this->server !== 'all', function (Builder $query) {
@@ -217,8 +238,12 @@ class Index extends Component
             })
             ->when($this->source !== 'all', function (Builder $query) {
                 if ($this->source === 'public-git') {
-                    $query->whereHas('application', function (Builder $query) {
-                        $query->whereNull('source_type')->whereNull('source_id');
+                    $query->whereExists(function ($query) {
+                        $query->selectRaw('1')
+                            ->from('applications')
+                            ->whereRaw($this->deploymentApplicationMatchesApplication())
+                            ->whereNull('applications.source_type')
+                            ->whereNull('applications.source_id');
                     });
 
                     return;
@@ -234,13 +259,38 @@ class Index extends Component
 
                 [$sourceType, $sourceId] = $sourceParts;
 
-                $query->whereHas('application', function (Builder $query) use ($sourceType, $sourceId) {
-                    $query->where('source_type', $sourceType)->where('source_id', $sourceId);
+                $query->whereExists(function ($query) use ($sourceType, $sourceId) {
+                    $query->selectRaw('1')
+                        ->from('applications')
+                        ->whereRaw($this->deploymentApplicationMatchesApplication())
+                        ->where('applications.source_type', $sourceType)
+                        ->where('applications.source_id', $sourceId);
                 });
             })
             ->when($this->status !== 'all', function (Builder $query) {
                 $query->where('status', $this->status);
             });
+    }
+
+    private function currentTeamServerIds(): Collection
+    {
+        return Server::ownedByCurrentTeam(['id'])->pluck('id');
+    }
+
+    private function deploymentApplicationMatchesApplication(): string
+    {
+        return $this->castDeploymentApplicationId().' = applications.id';
+    }
+
+    private function castDeploymentApplicationId(): string
+    {
+        $column = 'application_deployment_queues.application_id';
+
+        return match (DB::connection()->getDriverName()) {
+            'pgsql' => "CAST({$column} AS BIGINT)",
+            'mysql', 'mariadb' => "CAST({$column} AS UNSIGNED)",
+            default => "CAST({$column} AS INTEGER)",
+        };
     }
 
     private function sourceFilterValue(?string $sourceType, ?int $sourceId): string
