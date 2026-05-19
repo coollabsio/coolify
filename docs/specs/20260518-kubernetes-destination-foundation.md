@@ -22,6 +22,7 @@ This foundation targets the deploy-to-Kubernetes path from [coollabsio/coolify#2
 
 - Add a first-class `KubernetesCluster` destination model.
 - Generate Kubernetes-native manifests from a Coolify application image configuration.
+- Generate Kubernetes-native manifests for image-based Docker Compose applications.
 - Support production SaaS primitives: Namespace, ServiceAccount, Deployment, Service, Ingress, Secret-backed runtime env, PersistentVolumeClaim, PodDisruptionBudget, probes, resource limits, rolling updates, and optional HorizontalPodAutoscaler.
 - Keep deployment execution explicit through generated `kubectl` commands over the existing SSH execution host.
 - Validate generated manifests with unit tests, `kubectl --dry-run=client`, and server-side dry-run in the deployment job.
@@ -29,7 +30,7 @@ This foundation targets the deploy-to-Kubernetes path from [coollabsio/coolify#2
 ## Non-Goals
 
 - No automatic K3s installation flow.
-- No Docker Compose to Kubernetes conversion.
+- No Docker Compose services that require local `build` steps on the destination. Compose services must reference pullable images for Kubernetes destinations.
 - No database or service template translation.
 - No Helm chart for running Coolify itself inside Kubernetes.
 
@@ -108,6 +109,8 @@ flowchart LR
 
 The generator converts a Coolify application into Kubernetes resources. Docker Image applications use the configured image directly. Git, Dockerfile, Nixpacks, Railpack, and static builds must have a registry image name so the built image can be pushed before Kubernetes pulls it.
 
+Image-based Docker Compose applications use `KubernetesComposeManifestGenerator`. Each Compose service becomes a Deployment and Service. Services with configured Compose domains also receive Ingress resources. Named volumes become PVCs. Bind mounts and services with `build` are rejected because they are not portable Kubernetes runtime definitions.
+
 ## Deployment Semantics
 
 The first supported workload shape is stateless web application deployment:
@@ -123,6 +126,7 @@ The first supported workload shape is stateless web application deployment:
 - Stop scales the Deployment to `0`. Restart runs `kubectl rollout restart` for restart-only deployments.
 - The destination page lists Coolify-managed Pods in the namespace, lets operators select a Pod/container, tails logs, and restarts a selected Pod by deleting it so the owning controller creates a replacement.
 - Manual application status refresh reads the generated Deployment and its Coolify-managed Pods, then maps availability and Pod health back to Coolify statuses such as `running:healthy`, `starting:unhealthy`, `degraded:unhealthy`, or `exited`.
+- Docker Compose deployments are supported when every service has a pullable `image`. Coolify rejects Compose services with `build` or bind mounts for Kubernetes destinations instead of applying partial or non-portable resources.
 
 ```mermaid
 sequenceDiagram
@@ -169,11 +173,11 @@ The diagram shows the destination operations loop. Coolify limits the default li
 - Server-side dry-run is the production deployment validation before apply.
 - Pod listing is an operator inspection path. Status refresh still allows Kubernetes eventual consistency by using Deployment availability and Pod states instead of assuming a newly applied resource is immediately healthy.
 - Ingress must stay controller-agnostic. `ingress_class` should default to Traefik for Coolify parity but remain configurable.
-- Compose/service/database support should be separate follow-up work. Static Compose conversion alone is not enough for production because volumes, secrets, health checks, lifecycle hooks, and status all need Coolify semantics.
+- Database and service template support should be separate follow-up work. Static Compose conversion alone is not enough for stateful services because backups, credentials, lifecycle hooks, and status all need Coolify semantics.
 
 ## Test Plan
 
-- Unit tests assert Namespace, ServiceAccount, Secret, Deployment, Service, Ingress, HPA, PVC, PDB, probes, resources, placement controls, host parsing, image overrides, and image requirements.
+- Unit tests assert Namespace, ServiceAccount, Secret, Deployment, Service, Ingress, HPA, PVC, PDB, probes, resources, placement controls, host parsing, image overrides, image requirements, and image-based Compose translation.
 - Unit tests assert escaped `kubectl` command construction, manifest writes, kubeconfig writes, rollout commands, Pod list/log/restart commands, Pod JSON parsing, and Kubernetes status mapping.
 - Manifest YAML is parsed and checked with `kubectl apply --dry-run=client --validate=false`.
 - Manual cluster validation should use:
@@ -187,4 +191,5 @@ kubectl --kubeconfig <path-to-kubeconfig> apply --dry-run=server -f <manifest>
 
 - Add status reconciliation from Service, Ingress, PVC, HPA, PDB, and ingress address state.
 - Add StatefulSet generation before enabling stateful service/database templates.
+- Add Kubernetes build/push support for Compose services that use `build`.
 - Decide whether K3s bootstrap belongs in core or as a separate installation action.

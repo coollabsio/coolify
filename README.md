@@ -14,7 +14,7 @@ Coolify is an open-source & self-hostable alternative to Heroku / Netlify / Verc
 
 It helps you manage your servers, applications, and databases on your own hardware; you only need an SSH connection. You can manage VPS, Bare Metal, Raspberry PIs, and anything else.
 
-Coolify also supports Kubernetes as a destination for application workloads. A Kubernetes destination can deploy generated manifests, use namespace-scoped kubeconfig access, manage scaling and autoscaling settings, and inspect Coolify-managed Pods for status, logs, and restart actions.
+Coolify also supports Kubernetes as a destination for application workloads. A Kubernetes destination can deploy generated manifests for applications and image-based Docker Compose stacks, use namespace-scoped kubeconfig access, manage scaling and autoscaling settings, and inspect Coolify-managed Pods for status, logs, and restart actions.
 
 Imagine having the ease of a cloud but with your own servers. That is **Coolify**.
 

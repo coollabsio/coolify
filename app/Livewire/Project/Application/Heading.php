@@ -94,12 +94,7 @@ class Heading extends Component
 
             return;
         }
-        if ($this->application->destination instanceof KubernetesCluster && $this->application->build_pack === 'dockercompose') {
-            $this->dispatch('error', 'Failed to deploy.', 'Kubernetes destinations do not support Docker Compose applications yet.');
-
-            return;
-        }
-        if ($this->application->destination instanceof KubernetesCluster && $this->application->build_pack !== 'dockerimage' && str($this->application->docker_registry_image_name)->isEmpty()) {
+        if ($this->application->destination instanceof KubernetesCluster && ! in_array($this->application->build_pack, ['dockerimage', 'dockercompose'], true) && str($this->application->docker_registry_image_name)->isEmpty()) {
             $this->dispatch('error', 'Failed to deploy.', 'To deploy built applications to Kubernetes you must set a Docker image name first.');
 
             return;
@@ -157,12 +152,7 @@ class Heading extends Component
     {
         $this->authorize('deploy', $this->application);
 
-        if ($this->application->destination instanceof KubernetesCluster && $this->application->build_pack === 'dockercompose') {
-            $this->dispatch('error', 'Failed to deploy.', 'Kubernetes destinations do not support Docker Compose applications yet.');
-
-            return;
-        }
-        if ($this->application->destination instanceof KubernetesCluster && $this->application->build_pack !== 'dockerimage' && str($this->application->docker_registry_image_name)->isEmpty()) {
+        if ($this->application->destination instanceof KubernetesCluster && ! in_array($this->application->build_pack, ['dockerimage', 'dockercompose'], true) && str($this->application->docker_registry_image_name)->isEmpty()) {
             $this->dispatch('error', 'Failed to deploy.', 'To deploy built applications to Kubernetes you must set a Docker image name first.');
 
             return;

@@ -7,8 +7,10 @@ use App\Events\ServiceStatusChanged;
 use App\Models\Application;
 use App\Models\KubernetesCluster;
 use App\Services\Kubernetes\KubernetesApplicationManifestGenerator;
+use App\Services\Kubernetes\KubernetesComposeManifestGenerator;
 use App\Services\Kubernetes\KubernetesKubectlCommandBuilder;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Symfony\Component\Yaml\Yaml;
 
 class StopApplication
 {
@@ -86,7 +88,9 @@ class StopApplication
 
             $builder = new KubernetesKubectlCommandBuilder;
             $generator = new KubernetesApplicationManifestGenerator;
-            $resourceName = $generator->resourceName($application);
+            $deploymentNames = $application->build_pack === 'dockercompose'
+                ? (new KubernetesComposeManifestGenerator)->resourceNames($application, $this->kubernetesComposeFile($application))
+                : [$generator->resourceName($application)];
             $kubeconfigPath = $cluster->effectiveKubeconfigPath();
             $commands = [
                 'mkdir -p '.escapeshellarg($cluster->configurationDirectory()),
@@ -101,7 +105,9 @@ class StopApplication
                 return 'Kubernetes kubeconfig is not configured';
             }
 
-            $commands[] = $builder->scaleDeployment($cluster, $resourceName, 0, $kubeconfigPath);
+            foreach ($deploymentNames as $deploymentName) {
+                $commands[] = $builder->scaleDeployment($cluster, $deploymentName, 0, $kubeconfigPath);
+            }
             instant_remote_process($commands, $server, throwError: false);
             $application->update([
                 'status' => 'exited',
@@ -115,5 +121,14 @@ class StopApplication
         } catch (\Exception $e) {
             return $e->getMessage();
         }
+    }
+
+    private function kubernetesComposeFile(Application $application): array
+    {
+        $compose = $application->settings->is_raw_compose_deployment_enabled
+            ? $application->docker_compose_raw
+            : ($application->docker_compose ?: $application->docker_compose_raw);
+
+        return Yaml::parse($compose) ?: [];
     }
 }

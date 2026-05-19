@@ -21,6 +21,7 @@ use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
 use App\Services\Kubernetes\KubernetesApplicationManifestGenerator;
+use App\Services\Kubernetes\KubernetesComposeManifestGenerator;
 use App\Services\Kubernetes\KubernetesKubectlCommandBuilder;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
@@ -732,6 +733,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             'hidden' => true,
         ]);
 
+        if ($this->destination instanceof KubernetesCluster) {
+            $this->deploy_to_kubernetes($composeFile);
+
+            return;
+        }
+
         // Modify Dockerfiles for ARGs and build secrets
         $this->modify_dockerfiles_for_compose($composeFile);
         // Build new container to limit downtime.
@@ -1258,7 +1265,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $cluster = $this->destination;
         $builder = new KubernetesKubectlCommandBuilder;
         $generator = new KubernetesApplicationManifestGenerator;
-        $resourceName = $generator->resourceName($this->application);
+        $composeGenerator = new KubernetesComposeManifestGenerator;
+        $deploymentNames = $this->application->build_pack === 'dockercompose'
+            ? $composeGenerator->resourceNames($this->application, $this->kubernetesComposeFile())
+            : [$generator->resourceName($this->application)];
         $kubeconfigPath = $cluster->effectiveKubeconfigPath();
         $commands = [
             ['command' => 'mkdir -p '.escapeshellarg($cluster->configurationDirectory()), 'hidden' => true],
@@ -1274,11 +1284,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $this->server = $this->mainServer;
-        $this->application_deployment_queue->addLogEntry("Restarting Kubernetes deployment {$resourceName}.");
+        $this->application_deployment_queue->addLogEntry('Restarting Kubernetes deployment(s).');
         $this->execute_remote_command(
             ...array_merge($commands, [
-                ['command' => $builder->rolloutRestart($cluster, $resourceName, $kubeconfigPath), 'type' => 'stdout'],
-                ['command' => $builder->rolloutStatus($cluster, $resourceName, $this->timeout, $kubeconfigPath), 'type' => 'stdout'],
+                ...collect($deploymentNames)
+                    ->flatMap(fn (string $deploymentName) => [
+                        ['command' => $builder->rolloutRestart($cluster, $deploymentName, $kubeconfigPath), 'type' => 'stdout'],
+                        ['command' => $builder->rolloutStatus($cluster, $deploymentName, $this->timeout, $kubeconfigPath), 'type' => 'stdout'],
+                    ])
+                    ->toArray(),
             ])
         );
     }
@@ -1998,13 +2012,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function deploy_to_kubernetes(): void
+    private function deploy_to_kubernetes(?array $composeFile = null): void
     {
-        if ($this->application->build_pack === 'dockercompose') {
-            throw new DeploymentException('Kubernetes destinations do not support Docker Compose applications yet.');
-        }
-
-        if ($this->build_pack !== 'dockerimage' && blank($this->application->docker_registry_image_name)) {
+        if (! in_array($this->build_pack, ['dockerimage', 'dockercompose'], true) && blank($this->application->docker_registry_image_name)) {
             throw new DeploymentException('Kubernetes build deployments require a Docker registry image name.');
         }
 
@@ -2016,11 +2026,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $builder = new KubernetesKubectlCommandBuilder;
         $generator = new KubernetesApplicationManifestGenerator;
-        $resourceName = $generator->resourceName($this->application);
+        $composeGenerator = new KubernetesComposeManifestGenerator;
         $manifestDirectory = "{$this->configuration_dir}/kubernetes";
         $manifestPath = "{$manifestDirectory}/manifest-{$this->deployment_uuid}.yaml";
         $kubeconfigPath = $cluster->effectiveKubeconfigPath();
-        $manifestYaml = $generator->toYaml($this->application, [
+        $manifestOptions = [
             'namespace' => $cluster->namespace,
             'create_namespace' => $cluster->create_namespace,
             'ingress_class' => $cluster->ingress_class,
@@ -2044,7 +2054,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             'image' => $this->production_image_name,
             'deployment_uuid' => $this->deployment_uuid,
             'environment' => $this->kubernetesRuntimeEnvironment(),
-        ]);
+        ];
+
+        if ($this->application->build_pack === 'dockercompose') {
+            $composeFile ??= $this->kubernetesComposeFile();
+            $manifestYaml = $composeGenerator->toYaml($this->application, $composeFile, $manifestOptions);
+            $deploymentNames = $composeGenerator->resourceNames($this->application, $composeFile);
+        } else {
+            $manifestYaml = $generator->toYaml($this->application, $manifestOptions);
+            $deploymentNames = [$generator->resourceName($this->application)];
+        }
 
         $commands = [
             ['command' => 'mkdir -p '.escapeshellarg($manifestDirectory), 'hidden' => true],
@@ -2072,7 +2091,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ['command' => $builder->version($cluster, $kubeconfigPath), 'hidden' => true],
                 ['command' => $builder->serverSideDryRun($cluster, $manifestPath, $kubeconfigPath), 'hidden' => true],
                 ['command' => $builder->apply($cluster, $manifestPath, $kubeconfigPath), 'type' => 'stdout'],
-                ['command' => $builder->rolloutStatus($cluster, $resourceName, $this->timeout, $kubeconfigPath), 'type' => 'stdout'],
+                ...collect($deploymentNames)
+                    ->map(fn (string $deploymentName) => ['command' => $builder->rolloutStatus($cluster, $deploymentName, $this->timeout, $kubeconfigPath), 'type' => 'stdout'])
+                    ->toArray(),
             ])
         );
         $this->application->update(['status' => 'running']);
@@ -2088,6 +2109,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return [$key => $value];
             })
             ->toArray();
+    }
+
+    private function kubernetesComposeFile(): array
+    {
+        $compose = $this->application->settings->is_raw_compose_deployment_enabled
+            ? $this->application->docker_compose_raw
+            : ($this->application->docker_compose ?: $this->application->docker_compose_raw);
+
+        return Yaml::parse($compose) ?: [];
     }
 
     private function health_check()
