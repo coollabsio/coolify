@@ -336,6 +336,11 @@ class Server extends BaseModel
         return $this->hasOne(ServerSetting::class);
     }
 
+    public function teamDeployments()
+    {
+        return $this->hasMany(ApplicationDeploymentQueue::class);
+    }
+
     public function dockerCleanupExecutions()
     {
         return $this->hasMany(DockerCleanupExecution::class);

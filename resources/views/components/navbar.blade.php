@@ -158,6 +158,23 @@
                         </a>
                     </li>
                     <li>
+                        <a title="Deployments" {{ wireNavigate() }}
+                            class="{{ request()->is('deployments*') ? 'menu-item menu-item-active' : 'menu-item' }}"
+                            href="{{ route('deployments.index') }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="menu-item-icon" viewBox="0 0 24 24"
+                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M4 5h16" />
+                                <path d="M4 12h16" />
+                                <path d="M4 19h16" />
+                                <path d="M8 5v14" />
+                                <path d="M16 5v14" />
+                            </svg>
+                            <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Deployments</span>
+                        </a>
+                    </li>
+                    <li>
                         <a title="Servers" {{ wireNavigate() }}
                             class="{{ request()->is('server/*') || request()->is('servers') ? 'menu-item menu-item-active' : 'menu-item' }}"
                             href="/servers">
