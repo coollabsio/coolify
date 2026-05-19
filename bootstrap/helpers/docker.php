@@ -149,6 +149,20 @@ function executeInDocker(string $containerId, string $command)
     return "docker exec {$containerId} bash -c '{$escapedCommand}'";
 }
 
+function dockerNetworkCreateCommand(string $network, bool $isSwarm = false, bool $suppressOutput = false): string
+{
+    $safeNetwork = escapeshellarg($network);
+    $options = $isSwarm ? '--driver overlay --attachable' : '--attachable';
+    $stdoutRedirect = $suppressOutput ? ' >/dev/null' : '';
+    $stderrRedirect = $suppressOutput ? ' 2>&1' : '';
+
+    if ($isSwarm) {
+        return "docker network create {$options} {$safeNetwork}{$stdoutRedirect}{$stderrRedirect}";
+    }
+
+    return "(docker network create --ipv6 {$options} {$safeNetwork}{$stdoutRedirect} 2>/dev/null || docker network create {$options} {$safeNetwork}{$stdoutRedirect}{$stderrRedirect})";
+}
+
 function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
 {
     if ($server->isSwarm()) {

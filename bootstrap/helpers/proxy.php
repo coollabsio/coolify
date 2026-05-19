@@ -120,7 +120,7 @@ function connectProxyToNetworks(Server $server)
         $commands = $networks->map(function ($network) {
             $safe = escapeshellarg($network);
             return [
-                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --attachable {$safe} >/dev/null",
+                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || ".dockerNetworkCreateCommand($network, suppressOutput: true),
                 "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
@@ -154,7 +154,7 @@ function ensureProxyNetworksExist(Server $server)
             $safe = escapeshellarg($network);
             return [
                 "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable {$safe}",
+                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || ".dockerNetworkCreateCommand($network),
             ];
         });
     }

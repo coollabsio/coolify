@@ -33,7 +33,7 @@ class StartService
         }
         if ($service->networks()->count() > 0) {
             $commands[] = "echo 'Creating Docker network.'";
-            $commands[] = "docker network inspect $service->uuid >/dev/null 2>&1 || docker network create --attachable $service->uuid";
+            $commands[] = "docker network inspect $service->uuid >/dev/null 2>&1 || ".dockerNetworkCreateCommand($service->uuid);
         }
         $commands[] = 'echo Starting service.';
         $commands[] = "docker compose --project-directory {$workdir} -f {$workdir}/docker-compose.yml --project-name {$service->uuid} up -d --remove-orphans --force-recreate --build";
