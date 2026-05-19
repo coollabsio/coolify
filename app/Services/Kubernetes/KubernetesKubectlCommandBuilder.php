@@ -95,6 +95,22 @@ class KubernetesKubectlCommandBuilder
             .' --ignore-not-found=true';
     }
 
+    public function deleteServiceResources(KubernetesCluster $cluster, string $serviceUuid, ?string $kubeconfigPath = null): string
+    {
+        return $this->base($cluster, $kubeconfigPath)
+            .' delete deployment,service,ingress,hpa,pdb,secret,serviceaccount'
+            .' --selector='.escapeshellarg($this->serviceSelector($serviceUuid))
+            .' --ignore-not-found=true';
+    }
+
+    public function deleteServicePersistentVolumeClaims(KubernetesCluster $cluster, string $serviceUuid, ?string $kubeconfigPath = null): string
+    {
+        return $this->base($cluster, $kubeconfigPath)
+            .' delete pvc'
+            .' --selector='.escapeshellarg($this->serviceSelector($serviceUuid))
+            .' --ignore-not-found=true';
+    }
+
     public function writeManifest(string $manifestPath, string $manifestYaml): string
     {
         return $this->writeFile($manifestPath, $manifestYaml);
@@ -134,5 +150,10 @@ class KubernetesKubectlCommandBuilder
     private function applicationSelector(string $applicationUuid): string
     {
         return 'app.kubernetes.io/managed-by=coolify,coolify.io/application-uuid='.$applicationUuid;
+    }
+
+    private function serviceSelector(string $serviceUuid): string
+    {
+        return 'app.kubernetes.io/managed-by=coolify,coolify.io/service-uuid='.$serviceUuid;
     }
 }

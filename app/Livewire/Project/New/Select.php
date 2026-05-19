@@ -331,7 +331,7 @@ class Select extends Component
         $this->server = $server;
         $this->standaloneDockers = $server->standaloneDockers;
         $this->swarmDockers = $server->swarmDockers;
-        $this->kubernetesClusters = $this->isDatabase ? collect([]) : $server->kubernetesClusters;
+        $this->kubernetesClusters = $this->supportsKubernetesDestination() ? $server->kubernetesClusters : collect([]);
         $count = count($this->standaloneDockers) + count($this->swarmDockers) + count($this->kubernetesClusters);
         if ($count === 1) {
             $destination = $this->standaloneDockers->first() ?? $this->swarmDockers->first() ?? $this->kubernetesClusters->first();
@@ -342,6 +342,15 @@ class Select extends Component
             }
         }
         $this->current_step = 'destinations';
+    }
+
+    private function supportsKubernetesDestination(): bool
+    {
+        if (! $this->isDatabase) {
+            return true;
+        }
+
+        return str($this->type)->startsWith('one-click-service') || str($this->type)->startsWith('docker-compose-empty');
     }
 
     public function setDestination(string $destination_uuid)

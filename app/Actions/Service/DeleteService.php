@@ -3,7 +3,9 @@
 namespace App\Actions\Service;
 
 use App\Actions\Server\CleanupDocker;
+use App\Models\KubernetesCluster;
 use App\Models\Service;
+use App\Services\Kubernetes\KubernetesKubectlCommandBuilder;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -13,8 +15,16 @@ class DeleteService
 
     public function handle(Service $service, bool $deleteVolumes, bool $deleteConnectedNetworks, bool $deleteConfigurations, bool $dockerCleanup)
     {
+        $server = data_get($service, 'server');
+
         try {
-            $server = data_get($service, 'server');
+            if ($service->destination instanceof KubernetesCluster) {
+                $server = $service->destination->server;
+                $this->deleteKubernetesService($service, $deleteVolumes);
+
+                return;
+            }
+
             if ($deleteVolumes && $server->isFunctional()) {
                 $storagesToDelete = collect([]);
 
@@ -70,9 +80,40 @@ class DeleteService
             $service->tags()->detach();
             $service->forceDelete();
 
-            if ($dockerCleanup) {
+            if ($dockerCleanup && ! ($service->destination instanceof KubernetesCluster)) {
                 CleanupDocker::dispatch($server, false, false);
             }
         }
+    }
+
+    private function deleteKubernetesService(Service $service, bool $deleteVolumes): void
+    {
+        $cluster = $service->destination;
+        $server = $cluster->server;
+
+        if (! $server->isFunctional()) {
+            throw new \RuntimeException('Server is not functional');
+        }
+
+        $builder = new KubernetesKubectlCommandBuilder;
+        $kubeconfigPath = $cluster->effectiveKubeconfigPath();
+        $commands = ['mkdir -p '.escapeshellarg($cluster->configurationDirectory())];
+
+        if (filled($cluster->kubeconfig)) {
+            $commands[] = $builder->writeKubeconfig($cluster->storedKubeconfigPath(), $cluster->kubeconfig);
+            $kubeconfigPath = $cluster->storedKubeconfigPath();
+        }
+
+        if (blank($kubeconfigPath)) {
+            throw new \RuntimeException('Kubernetes kubeconfig is not configured');
+        }
+
+        $commands[] = $builder->deleteServiceResources($cluster, (string) $service->uuid, $kubeconfigPath);
+
+        if ($deleteVolumes) {
+            $commands[] = $builder->deleteServicePersistentVolumeClaims($cluster, (string) $service->uuid, $kubeconfigPath);
+        }
+
+        instant_remote_process($commands, $server, throwError: false);
     }
 }

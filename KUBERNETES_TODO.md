@@ -2,7 +2,7 @@
 
 - [done] Delete application resources from Kubernetes when Coolify deletes an application.
 - [done] Add Kubernetes resource status/detail coverage beyond Pod list.
-- [pending] Add service/one-click service Kubernetes rendering and lifecycle.
+- [done] Add service/one-click service Kubernetes rendering and lifecycle.
 - [pending] Add database Kubernetes rendering and lifecycle.
 - [pending] Expand Docker Compose Kubernetes feature mapping.
 - [pending] Add preview deployment cleanup parity for Kubernetes.

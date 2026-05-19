@@ -36,7 +36,7 @@ class Create extends Component
             }
             $services = get_service_templates();
 
-            if ($destination instanceof KubernetesCluster && (in_array($type, DATABASE_TYPES) || $type->startsWith('one-click-service-') || $type->startsWith('docker-compose-empty'))) {
+            if ($destination instanceof KubernetesCluster && in_array($type, DATABASE_TYPES)) {
                 return redirect()->route('project.resource.create', [
                     'project_uuid' => $project->uuid,
                     'environment_uuid' => $environment->uuid,
