@@ -22,7 +22,7 @@ This foundation targets the deploy-to-Kubernetes path from [coollabsio/coolify#2
 
 - Add a first-class `KubernetesCluster` destination model.
 - Generate Kubernetes-native manifests from a Coolify application image configuration.
-- Support production SaaS primitives: Deployment, Service, Ingress, Secret-backed runtime env, probes, resource limits, rolling updates, and optional HorizontalPodAutoscaler.
+- Support production SaaS primitives: Namespace, ServiceAccount, Deployment, Service, Ingress, Secret-backed runtime env, PersistentVolumeClaim, PodDisruptionBudget, probes, resource limits, rolling updates, and optional HorizontalPodAutoscaler.
 - Keep deployment execution explicit through generated `kubectl` commands over the existing SSH execution host.
 - Validate generated manifests with unit tests, `kubectl --dry-run=client`, and server-side dry-run in the deployment job.
 
@@ -30,7 +30,7 @@ This foundation targets the deploy-to-Kubernetes path from [coollabsio/coolify#2
 
 - No automatic K3s installation flow.
 - No Docker Compose to Kubernetes conversion.
-- No database, service template, or persistent volume translation.
+- No database or service template translation.
 - No Helm chart for running Coolify itself inside Kubernetes.
 
 ## Research Inputs
@@ -38,7 +38,7 @@ This foundation targets the deploy-to-Kubernetes path from [coollabsio/coolify#2
 - [Full Kubernetes support with autoscale](https://github.com/coollabsio/coolify/issues/2390) is the canonical feature request. The most concrete community PoC uses a `KubernetesCluster` model, manifest generation, and `kubectl apply`.
 - [Kubernetes Helm Chart for GitOps Deployments](https://github.com/coollabsio/coolify/discussions/2455) asks for Coolify itself to run in Kubernetes. A maintainer/contributor comment notes that Coolify's Docker dependency makes this a different, harder problem.
 - [Coolify v5.x](https://github.com/coollabsio/coolify/issues/5685) frames scaling as core product work, with discussion around simple production scalability.
-- Kubernetes docs used for API targets: [Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/), [Services](https://kubernetes.io/docs/concepts/services-networking/service/), [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/), [Horizontal Pod Autoscaling](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/), and [kubeconfig](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/).
+- Kubernetes docs used for API targets: [Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/), [Services](https://kubernetes.io/docs/concepts/services-networking/service/), [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/), [Horizontal Pod Autoscaling](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/), [ServiceAccounts](https://kubernetes.io/docs/concepts/security/service-accounts/), [Storage Classes](https://kubernetes.io/docs/concepts/storage/storage-classes/), [Pod Disruption Budgets](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/), and [kubeconfig](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/).
 
 ## Data Model
 
@@ -49,15 +49,25 @@ This foundation targets the deploy-to-Kubernetes path from [coollabsio/coolify#2
 | `server_id`                         | Keeps current team ownership and SSH execution boundaries.           |
 | `name`                              | Human-readable destination name.                                     |
 | `namespace`                         | Default namespace for generated resources.                           |
+| `create_namespace`                  | Adds a Namespace manifest when the destination owns namespace setup.  |
 | `context`                           | Optional kubeconfig context.                                         |
 | `kubeconfig_path`                   | Optional path on the execution host.                                 |
 | `kubeconfig`                        | Optional encrypted kubeconfig content written to the execution host. |
 | `ingress_class`                     | Default Ingress class, initially `traefik`.                          |
+| `ingress_tls_secret`                | Optional TLS secret reference for generated Ingress resources.        |
+| `ingress_annotations`               | Optional key/value annotations for ingress controllers and certs.     |
 | `service_type`                      | Default Service type, initially `ClusterIP`.                         |
+| `service_account_name`              | Optional ServiceAccount name mounted into application Pods.           |
+| `create_service_account`            | Adds a ServiceAccount manifest when enabled.                          |
+| `image_pull_secrets`                | Newline/comma separated image pull secret references.                 |
+| `storage_class` / `storage_size`    | PVC defaults for Coolify persistent storage mappings.                 |
 | `replicas`                          | Deployment replica count.                                            |
 | `autoscaling_enabled`               | Enables an HPA manifest.                                             |
 | `min_replicas` / `max_replicas`     | HPA scaling bounds.                                                  |
 | `target_cpu_utilization_percentage` | HPA CPU target.                                                      |
+| `node_selector` / `tolerations`     | Optional Pod placement controls.                                     |
+| `pod_disruption_budget_enabled`     | Enables a PDB manifest.                                              |
+| `pod_disruption_budget_min_available` | PDB minimum availability as an integer or percent.                  |
 
 ```mermaid
 erDiagram
@@ -76,16 +86,24 @@ The diagram shows the destination parity goal: Kubernetes clusters sit beside ex
 ```mermaid
 flowchart LR
     A["Coolify Application"] --> B["KubernetesApplicationManifestGenerator"]
-    B --> C["Secret when runtime env exists"]
-    B --> D["Deployment"]
-    B --> E["Service"]
-    B --> F["Ingress when fqdn exists"]
-    B --> G["HorizontalPodAutoscaler when enabled"]
-    C --> H["kubectl apply"]
-    D --> H
-    E --> H
-    F --> H
-    G --> H
+    B --> C["Namespace when enabled"]
+    B --> D["ServiceAccount when enabled"]
+    B --> E["PersistentVolumeClaim for storages"]
+    B --> F["Secret when runtime env exists"]
+    B --> G["Deployment"]
+    B --> H["Service"]
+    B --> I["Ingress when fqdn exists"]
+    B --> J["HorizontalPodAutoscaler when enabled"]
+    B --> K["PodDisruptionBudget when enabled"]
+    C --> L["kubectl apply"]
+    D --> L
+    E --> L
+    F --> L
+    G --> L
+    H --> L
+    I --> L
+    J --> L
+    K --> L
 ```
 
 The generator converts a Coolify application into Kubernetes resources. Docker Image applications use the configured image directly. Git, Dockerfile, Nixpacks, Railpack, and static builds must have a registry image name so the built image can be pushed before Kubernetes pulls it.
@@ -95,10 +113,13 @@ The generator converts a Coolify application into Kubernetes resources. Docker I
 The first supported workload shape is stateless web application deployment:
 
 - `Secret` uses `v1` and stores runtime environment variables for `envFrom`.
-- `Deployment` uses `apps/v1`, `revisionHistoryLimit: 3`, rolling-update strategy, stable Coolify labels, image name/tag, exposed container port, HTTP probes, and resource settings.
+- `Namespace` and `ServiceAccount` are optional because some production clusters grant namespace-scoped credentials without namespace creation rights.
+- `Deployment` uses `apps/v1`, `revisionHistoryLimit: 3`, rolling-update strategy, stable Coolify labels, image name/tag, exposed container port, HTTP probes, image pull secret refs, node placement, tolerations, PVC mounts, and resource settings.
 - `Service` uses `v1`, defaults to `ClusterIP`, and routes public port `80` to the application container port.
-- `Ingress` uses `networking.k8s.io/v1` and is emitted only when `fqdn` exists.
+- `Ingress` uses `networking.k8s.io/v1` and is emitted only when `fqdn` exists. TLS secret refs and annotations remain destination-configurable.
 - `HorizontalPodAutoscaler` uses `autoscaling/v2` and is opt-in through destination UI.
+- `PersistentVolumeClaim` uses `v1` and maps Coolify application persistent storage entries to `ReadWriteOnce` claims.
+- `PodDisruptionBudget` uses `policy/v1` and is opt-in through destination UI.
 - Stop scales the Deployment to `0`. Restart runs `kubectl rollout restart` for restart-only deployments.
 
 ```mermaid
@@ -129,7 +150,7 @@ The diagram shows the intended execution path. This keeps Coolify's current SSH 
 
 ## Test Plan
 
-- Unit tests assert Secret, Deployment, Service, Ingress, HPA, probes, resources, host parsing, image overrides, and image requirements.
+- Unit tests assert Namespace, ServiceAccount, Secret, Deployment, Service, Ingress, HPA, PVC, PDB, probes, resources, placement controls, host parsing, image overrides, and image requirements.
 - Unit tests assert escaped `kubectl` command construction, manifest writes, kubeconfig writes, and rollout commands.
 - Manifest YAML is parsed and checked with `kubectl apply --dry-run=client --validate=false`.
 - Manual cluster validation should use:
@@ -142,5 +163,6 @@ kubectl --kubeconfig <path-to-kubeconfig> apply --dry-run=server -f <manifest>
 ## Follow-Up Work
 
 - Add status reconciliation from Deployment, ReplicaSet, Pod, Service, and Ingress state.
-- Add persistent volume support before enabling stateful service templates.
+- Add status reconciliation from PVC, HPA, PDB, and ingress address state.
+- Add StatefulSet generation before enabling stateful service/database templates.
 - Decide whether K3s bootstrap belongs in core or as a separate installation action.

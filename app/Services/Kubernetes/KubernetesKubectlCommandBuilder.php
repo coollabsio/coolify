@@ -21,6 +21,13 @@ class KubernetesKubectlCommandBuilder
         return $this->apply($cluster, $manifestPath, $kubeconfigPath).' --dry-run=server';
     }
 
+    public function ensureNamespace(KubernetesCluster $cluster, ?string $kubeconfigPath = null): string
+    {
+        $namespace = escapeshellarg($cluster->namespace);
+
+        return $this->base($cluster, $kubeconfigPath).' create namespace '.$namespace.' --dry-run=client -o yaml | '.$this->base($cluster, $kubeconfigPath).' apply -f -';
+    }
+
     public function rolloutStatus(KubernetesCluster $cluster, string $deploymentName, int $timeoutSeconds = 300, ?string $kubeconfigPath = null): string
     {
         return $this->base($cluster, $kubeconfigPath).' rollout status '.escapeshellarg("deployment/{$deploymentName}").' --timeout='.((int) $timeoutSeconds).'s';

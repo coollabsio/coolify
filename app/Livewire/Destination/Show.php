@@ -25,6 +25,8 @@ class Show extends Component
 
     public string $namespace = 'default';
 
+    public bool $createNamespace = false;
+
     public string $context = '';
 
     public string $kubeconfigPath = '';
@@ -33,7 +35,21 @@ class Show extends Component
 
     public string $ingressClass = 'traefik';
 
+    public string $ingressTlsSecret = '';
+
+    public string $ingressAnnotations = '';
+
     public string $serviceType = 'ClusterIP';
+
+    public string $serviceAccountName = '';
+
+    public bool $createServiceAccount = false;
+
+    public string $imagePullSecrets = '';
+
+    public string $storageClass = '';
+
+    public string $storageSize = '1Gi';
 
     public int $replicas = 1;
 
@@ -45,6 +61,14 @@ class Show extends Component
 
     public int $targetCpuUtilizationPercentage = 70;
 
+    public string $nodeSelector = '';
+
+    public string $tolerations = '';
+
+    public bool $podDisruptionBudgetEnabled = false;
+
+    public string $podDisruptionBudgetMinAvailable = '';
+
     public function rules(): array
     {
         $rules = [
@@ -55,16 +79,28 @@ class Show extends Component
         if ($this->destination instanceof KubernetesCluster) {
             return $rules + [
                 'namespace' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/'],
+                'createNamespace' => ['required', 'boolean'],
                 'context' => ['nullable', 'string', 'max:255'],
                 'kubeconfigPath' => ['nullable', 'string', 'max:1024'],
                 'kubeconfig' => ['nullable', 'string'],
                 'ingressClass' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/'],
+                'ingressTlsSecret' => ['nullable', 'string', 'max:253', 'regex:/^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/'],
+                'ingressAnnotations' => ['nullable', 'string', 'max:10000'],
                 'serviceType' => ['required', 'string', 'in:ClusterIP,NodePort,LoadBalancer'],
+                'serviceAccountName' => ['nullable', 'string', 'max:253', 'regex:/^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/'],
+                'createServiceAccount' => ['required', 'boolean'],
+                'imagePullSecrets' => ['nullable', 'string', 'max:5000'],
+                'storageClass' => ['nullable', 'string', 'max:253'],
+                'storageSize' => ['required', 'string', 'max:32', 'regex:/^[1-9][0-9]*(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$/'],
                 'replicas' => ['required', 'integer', 'min:1', 'max:100'],
                 'autoscalingEnabled' => ['required', 'boolean'],
                 'minReplicas' => ['required', 'integer', 'min:1', 'max:100'],
                 'maxReplicas' => ['required', 'integer', 'min:1', 'max:100'],
                 'targetCpuUtilizationPercentage' => ['required', 'integer', 'min:1', 'max:100'],
+                'nodeSelector' => ['nullable', 'string', 'max:10000'],
+                'tolerations' => ['nullable', 'string', 'max:10000'],
+                'podDisruptionBudgetEnabled' => ['required', 'boolean'],
+                'podDisruptionBudgetMinAvailable' => ['nullable', 'string', 'max:16', 'regex:/^\d+%?$/'],
             ];
         }
 
@@ -101,16 +137,28 @@ class Show extends Component
                 }
 
                 $this->destination->namespace = $this->namespace;
+                $this->destination->create_namespace = $this->createNamespace;
                 $this->destination->context = blank($this->context) ? null : $this->context;
                 $this->destination->kubeconfig_path = blank($this->kubeconfigPath) ? null : $this->kubeconfigPath;
                 $this->destination->kubeconfig = blank($this->kubeconfig) ? null : $this->kubeconfig;
                 $this->destination->ingress_class = $this->ingressClass;
+                $this->destination->ingress_tls_secret = blank($this->ingressTlsSecret) ? null : $this->ingressTlsSecret;
+                $this->destination->ingress_annotations = blank($this->ingressAnnotations) ? null : $this->ingressAnnotations;
                 $this->destination->service_type = $this->serviceType;
+                $this->destination->service_account_name = blank($this->serviceAccountName) ? null : $this->serviceAccountName;
+                $this->destination->create_service_account = $this->createServiceAccount;
+                $this->destination->image_pull_secrets = blank($this->imagePullSecrets) ? null : $this->imagePullSecrets;
+                $this->destination->storage_class = blank($this->storageClass) ? null : $this->storageClass;
+                $this->destination->storage_size = $this->storageSize;
                 $this->destination->replicas = $this->replicas;
                 $this->destination->autoscaling_enabled = $this->autoscalingEnabled;
                 $this->destination->min_replicas = $this->minReplicas;
                 $this->destination->max_replicas = $this->maxReplicas;
                 $this->destination->target_cpu_utilization_percentage = $this->targetCpuUtilizationPercentage;
+                $this->destination->node_selector = blank($this->nodeSelector) ? null : $this->nodeSelector;
+                $this->destination->tolerations = blank($this->tolerations) ? null : $this->tolerations;
+                $this->destination->pod_disruption_budget_enabled = $this->podDisruptionBudgetEnabled;
+                $this->destination->pod_disruption_budget_min_available = blank($this->podDisruptionBudgetMinAvailable) ? null : $this->podDisruptionBudgetMinAvailable;
             } else {
                 $this->destination->network = $this->network;
                 $this->destination->server->ip = $this->serverIp;
@@ -123,16 +171,28 @@ class Show extends Component
 
             if ($this->destination instanceof KubernetesCluster) {
                 $this->namespace = $this->destination->namespace;
+                $this->createNamespace = $this->destination->create_namespace;
                 $this->context = $this->destination->context ?? '';
                 $this->kubeconfigPath = $this->destination->kubeconfig_path ?? '';
                 $this->kubeconfig = $this->destination->kubeconfig ?? '';
                 $this->ingressClass = $this->destination->ingress_class;
+                $this->ingressTlsSecret = $this->destination->ingress_tls_secret ?? '';
+                $this->ingressAnnotations = $this->destination->ingress_annotations ?? '';
                 $this->serviceType = $this->destination->service_type;
+                $this->serviceAccountName = $this->destination->service_account_name ?? '';
+                $this->createServiceAccount = $this->destination->create_service_account;
+                $this->imagePullSecrets = $this->destination->image_pull_secrets ?? '';
+                $this->storageClass = $this->destination->storage_class ?? '';
+                $this->storageSize = $this->destination->storage_size ?? '1Gi';
                 $this->replicas = $this->destination->replicas;
                 $this->autoscalingEnabled = $this->destination->autoscaling_enabled;
                 $this->minReplicas = $this->destination->min_replicas;
                 $this->maxReplicas = $this->destination->max_replicas;
                 $this->targetCpuUtilizationPercentage = $this->destination->target_cpu_utilization_percentage;
+                $this->nodeSelector = $this->destination->node_selector ?? '';
+                $this->tolerations = $this->destination->tolerations ?? '';
+                $this->podDisruptionBudgetEnabled = $this->destination->pod_disruption_budget_enabled;
+                $this->podDisruptionBudgetMinAvailable = $this->destination->pod_disruption_budget_min_available ?? '';
             } else {
                 $this->network = $this->destination->network;
             }

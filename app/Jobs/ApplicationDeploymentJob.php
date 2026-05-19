@@ -2004,10 +2004,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             throw new DeploymentException('Kubernetes destinations do not support Docker Compose applications yet.');
         }
 
-        if ($this->application->persistentStorages()->count() > 0) {
-            throw new DeploymentException('Kubernetes destinations do not support Coolify persistent storage volumes yet.');
-        }
-
         if ($this->build_pack !== 'dockerimage' && blank($this->application->docker_registry_image_name)) {
             throw new DeploymentException('Kubernetes build deployments require a Docker registry image name.');
         }
@@ -2026,13 +2022,25 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $kubeconfigPath = $cluster->effectiveKubeconfigPath();
         $manifestYaml = $generator->toYaml($this->application, [
             'namespace' => $cluster->namespace,
+            'create_namespace' => $cluster->create_namespace,
             'ingress_class' => $cluster->ingress_class,
+            'ingress_tls_secret' => $cluster->ingress_tls_secret,
+            'ingress_annotations' => $cluster->ingress_annotations,
             'service_type' => $cluster->service_type,
+            'service_account_name' => $cluster->service_account_name,
+            'create_service_account' => $cluster->create_service_account,
+            'image_pull_secrets' => $cluster->image_pull_secrets,
+            'storage_class' => $cluster->storage_class,
+            'storage_size' => $cluster->storage_size,
             'replicas' => $cluster->replicas,
             'autoscaling' => $cluster->autoscaling_enabled,
             'min_replicas' => $cluster->min_replicas,
             'max_replicas' => $cluster->max_replicas,
             'target_cpu_utilization_percentage' => $cluster->target_cpu_utilization_percentage,
+            'node_selector' => $cluster->node_selector,
+            'tolerations' => $cluster->tolerations,
+            'pod_disruption_budget_enabled' => $cluster->pod_disruption_budget_enabled,
+            'pod_disruption_budget_min_available' => $cluster->pod_disruption_budget_min_available,
             'image' => $this->production_image_name,
             'deployment_uuid' => $this->deployment_uuid,
             'environment' => $this->kubernetesRuntimeEnvironment(),
@@ -2055,6 +2063,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->application_deployment_queue->addLogEntry('----------------------------------------');
         $this->application_deployment_queue->addLogEntry("Applying Kubernetes manifests to namespace {$cluster->namespace}.");
+        if ($cluster->create_namespace) {
+            $commands[] = ['command' => $builder->ensureNamespace($cluster, $kubeconfigPath), 'hidden' => true];
+        }
+
         $this->execute_remote_command(
             ...array_merge($commands, [
                 ['command' => $builder->version($cluster, $kubeconfigPath), 'hidden' => true],

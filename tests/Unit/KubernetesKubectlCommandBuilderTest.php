@@ -15,6 +15,9 @@ it('builds escaped kubectl commands for a cluster destination', function () {
     expect($builder->serverSideDryRun($cluster, '/data/coolify/app manifests/api.yaml'))
         ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' apply -f '/data/coolify/app manifests/api.yaml' --dry-run=server");
 
+    expect($builder->ensureNamespace($cluster))
+        ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' create namespace 'production' --dry-run=client -o yaml | kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' apply -f -");
+
     expect($builder->rolloutStatus($cluster, 'customer-api', 120))
         ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' rollout status 'deployment/customer-api' --timeout=120s");
 });

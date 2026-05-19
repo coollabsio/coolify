@@ -14,18 +14,19 @@ class KubernetesApplicationManifestGenerator
         $namespace = $this->namespace($options['namespace'] ?? null);
         $port = $this->containerPort($application);
         $labels = $this->labels($application, $name);
+        $extras = new KubernetesApplicationManifestExtras($application, $name, $namespace, $labels, $options);
 
-        $resources = [];
+        $resources = $extras->prefixResources();
         $secret = $this->secret($name, $namespace, $labels, $options);
 
         if ($secret !== null) {
             $resources[] = $secret;
         }
 
-        $resources[] = $this->deployment($application, $name, $namespace, $port, $labels, $options, $secret !== null);
+        $resources[] = $this->deployment($application, $name, $namespace, $port, $labels, $options, $secret !== null, $extras);
         $resources[] = $this->service($name, $namespace, $port, $labels, $options);
 
-        $ingress = $this->ingress($application, $name, $namespace, $labels, $options);
+        $ingress = $this->ingress($application, $name, $namespace, $labels, $options, $extras);
 
         if ($ingress !== null) {
             $resources[] = $ingress;
@@ -33,6 +34,10 @@ class KubernetesApplicationManifestGenerator
 
         if (($options['autoscaling'] ?? false) === true) {
             $resources[] = $this->horizontalPodAutoscaler($name, $namespace, $labels, $options);
+        }
+
+        foreach ($extras->suffixResources() as $resource) {
+            $resources[] = $resource;
         }
 
         return $resources;
@@ -64,7 +69,7 @@ class KubernetesApplicationManifestGenerator
         return trim($name, '-').'-'.$suffix;
     }
 
-    private function deployment(Application $application, string $name, string $namespace, int $port, array $labels, array $options, bool $hasSecret): array
+    private function deployment(Application $application, string $name, string $namespace, int $port, array $labels, array $options, bool $hasSecret, KubernetesApplicationManifestExtras $extras): array
     {
         $container = [
             'name' => 'application',
@@ -100,6 +105,8 @@ class KubernetesApplicationManifestGenerator
         if ($resources !== []) {
             $container['resources'] = $resources;
         }
+
+        $container = $extras->container($container);
 
         $templateMetadata = [
             'labels' => $labels,
@@ -137,9 +144,7 @@ class KubernetesApplicationManifestGenerator
                 ],
                 'template' => [
                     'metadata' => $templateMetadata,
-                    'spec' => [
-                        'containers' => [$container],
-                    ],
+                    'spec' => $extras->podSpec($container),
                 ],
             ],
         ];
@@ -196,7 +201,7 @@ class KubernetesApplicationManifestGenerator
         ];
     }
 
-    private function ingress(Application $application, string $name, string $namespace, array $labels, array $options): ?array
+    private function ingress(Application $application, string $name, string $namespace, array $labels, array $options, KubernetesApplicationManifestExtras $extras): ?array
     {
         $host = $this->host($application);
 
@@ -204,30 +209,26 @@ class KubernetesApplicationManifestGenerator
             return null;
         }
 
-        return [
-            'apiVersion' => 'networking.k8s.io/v1',
-            'kind' => 'Ingress',
-            'metadata' => [
-                'name' => $name,
-                'namespace' => $namespace,
-                'labels' => $labels,
-            ],
-            'spec' => [
-                'ingressClassName' => $options['ingress_class'] ?? 'traefik',
-                'rules' => [
-                    [
-                        'host' => $host,
-                        'http' => [
-                            'paths' => [
-                                [
-                                    'path' => '/',
-                                    'pathType' => 'Prefix',
-                                    'backend' => [
-                                        'service' => [
-                                            'name' => $name,
-                                            'port' => [
-                                                'number' => 80,
-                                            ],
+        $metadata = $extras->ingressMetadata([
+            'name' => $name,
+            'namespace' => $namespace,
+            'labels' => $labels,
+        ]);
+        $spec = $extras->ingressSpec([
+            'ingressClassName' => $options['ingress_class'] ?? 'traefik',
+            'rules' => [
+                [
+                    'host' => $host,
+                    'http' => [
+                        'paths' => [
+                            [
+                                'path' => '/',
+                                'pathType' => 'Prefix',
+                                'backend' => [
+                                    'service' => [
+                                        'name' => $name,
+                                        'port' => [
+                                            'number' => 80,
                                         ],
                                     ],
                                 ],
@@ -236,6 +237,13 @@ class KubernetesApplicationManifestGenerator
                     ],
                 ],
             ],
+        ], $host);
+
+        return [
+            'apiVersion' => 'networking.k8s.io/v1',
+            'kind' => 'Ingress',
+            'metadata' => $metadata,
+            'spec' => $spec,
         ];
     }
 

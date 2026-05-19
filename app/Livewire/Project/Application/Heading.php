@@ -96,11 +96,6 @@ class Heading extends Component
 
             return;
         }
-        if ($this->application->destination instanceof KubernetesCluster && $this->application->persistentStorages()->count() > 0) {
-            $this->dispatch('error', 'Failed to deploy.', 'Kubernetes destinations do not support Coolify persistent storage volumes yet.');
-
-            return;
-        }
         if ($this->application->destination instanceof KubernetesCluster && $this->application->build_pack !== 'dockerimage' && str($this->application->docker_registry_image_name)->isEmpty()) {
             $this->dispatch('error', 'Failed to deploy.', 'To deploy built applications to Kubernetes you must set a Docker image name first.');
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Application;
+use App\Models\LocalPersistentVolume;
 use App\Services\Kubernetes\KubernetesApplicationManifestGenerator;
 use Symfony\Component\Yaml\Yaml;
 
@@ -105,6 +106,85 @@ it('adds runtime environment variables through an opaque secret', function () {
         ->toBe('customer-api-ckv4a1b2-env');
     expect($resources[1]['spec']['template']['metadata']['annotations']['coolify.io/deployment-uuid'])
         ->toBe('deployment-123');
+});
+
+it('generates production resource primitives when configured', function () {
+    $generator = new KubernetesApplicationManifestGenerator;
+
+    $resources = $generator->generate(kubernetesApplication(), [
+        'namespace' => 'coolify-production',
+        'create_namespace' => true,
+        'service_account_name' => 'customer-api',
+        'create_service_account' => true,
+        'image_pull_secrets' => "ghcr-secret\nregistry-secret",
+        'ingress_tls_secret' => 'api-example-tls',
+        'ingress_annotations' => "cert-manager.io/cluster-issuer=letsencrypt\nnginx.ingress.kubernetes.io/proxy-body-size=10m",
+        'node_selector' => 'pool=apps',
+        'tolerations' => "- key: dedicated\n  operator: Equal\n  value: apps\n  effect: NoSchedule",
+        'pod_disruption_budget_enabled' => true,
+        'pod_disruption_budget_min_available' => '50%',
+    ]);
+
+    expect(array_column($resources, 'kind'))->toBe([
+        'Namespace',
+        'ServiceAccount',
+        'Deployment',
+        'Service',
+        'Ingress',
+        'PodDisruptionBudget',
+    ]);
+
+    $serviceAccount = $resources[1];
+    expect($serviceAccount['imagePullSecrets'])->toBe([
+        ['name' => 'ghcr-secret'],
+        ['name' => 'registry-secret'],
+    ]);
+
+    $podSpec = $resources[2]['spec']['template']['spec'];
+    expect($podSpec['serviceAccountName'])->toBe('customer-api');
+    expect($podSpec['imagePullSecrets'])->toBe($serviceAccount['imagePullSecrets']);
+    expect($podSpec['nodeSelector'])->toBe(['pool' => 'apps']);
+    expect($podSpec['tolerations'][0]['key'])->toBe('dedicated');
+
+    $ingress = $resources[4];
+    expect($ingress['metadata']['annotations']['cert-manager.io/cluster-issuer'])->toBe('letsencrypt');
+    expect($ingress['spec']['tls'][0])->toBe([
+        'hosts' => ['api.example.com'],
+        'secretName' => 'api-example-tls',
+    ]);
+
+    expect($resources[5]['spec']['minAvailable'])->toBe('50%');
+});
+
+it('generates persistent volume claims and mounts for application storage', function () {
+    $generator = new KubernetesApplicationManifestGenerator;
+    $application = kubernetesApplication();
+    $application->setRelation('persistentStorages', collect([
+        new LocalPersistentVolume([
+            'name' => 'Cache Data',
+            'mount_path' => '/var/cache/app',
+        ]),
+    ]));
+
+    $resources = $generator->generate($application, [
+        'namespace' => 'coolify-production',
+        'storage_class' => 'fast-ssd',
+        'storage_size' => '5Gi',
+    ]);
+
+    expect(array_column($resources, 'kind'))->toBe(['PersistentVolumeClaim', 'Deployment', 'Service', 'Ingress']);
+
+    $claim = $resources[0];
+    expect($claim['metadata']['name'])->toBe('customer-api-ckv4a1b2-cache-data');
+    expect($claim['spec']['storageClassName'])->toBe('fast-ssd');
+    expect($claim['spec']['resources']['requests']['storage'])->toBe('5Gi');
+
+    $podSpec = $resources[1]['spec']['template']['spec'];
+    expect($podSpec['containers'][0]['volumeMounts'][0])->toBe([
+        'name' => 'cache-data',
+        'mountPath' => '/var/cache/app',
+    ]);
+    expect($podSpec['volumes'][0]['persistentVolumeClaim']['claimName'])->toBe('customer-api-ckv4a1b2-cache-data');
 });
 
 it('throws when no registry image is configured', function () {

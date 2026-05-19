@@ -18,27 +18,42 @@ class KubernetesCluster extends BaseModel
         'server_id',
         'name',
         'namespace',
+        'create_namespace',
         'context',
         'kubeconfig_path',
         'kubeconfig',
         'ingress_class',
+        'ingress_tls_secret',
+        'ingress_annotations',
         'service_type',
+        'service_account_name',
+        'create_service_account',
+        'image_pull_secrets',
+        'storage_class',
+        'storage_size',
         'replicas',
         'autoscaling_enabled',
         'min_replicas',
         'max_replicas',
         'target_cpu_utilization_percentage',
+        'node_selector',
+        'tolerations',
+        'pod_disruption_budget_enabled',
+        'pod_disruption_budget_min_available',
     ];
 
     protected function casts(): array
     {
         return [
             'kubeconfig' => 'encrypted',
+            'create_namespace' => 'boolean',
+            'create_service_account' => 'boolean',
             'replicas' => 'integer',
             'autoscaling_enabled' => 'boolean',
             'min_replicas' => 'integer',
             'max_replicas' => 'integer',
             'target_cpu_utilization_percentage' => 'integer',
+            'pod_disruption_budget_enabled' => 'boolean',
         ];
     }
 
