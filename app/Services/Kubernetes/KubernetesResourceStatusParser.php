@@ -15,7 +15,10 @@ class KubernetesResourceStatusParser
      *     status: string,
      *     detail: string,
      *     age: string,
-     *     application_uuid: ?string
+     *     application_uuid: ?string,
+     *     desired_replicas: ?int,
+     *     ready_replicas: ?int,
+     *     scalable: bool
      * }>
      *
      * @throws JsonException
@@ -45,6 +48,9 @@ class KubernetesResourceStatusParser
             'age' => $this->age(data_get($resource, 'metadata.creationTimestamp')),
             'application_uuid' => data_get($resource, 'metadata.labels.coolify\.io/application-uuid')
                 ?? data_get($resource, 'metadata.labels')['coolify.io/application-uuid'] ?? null,
+            'desired_replicas' => $this->desiredReplicas($kind, $resource),
+            'ready_replicas' => $this->readyReplicas($kind, $resource),
+            'scalable' => in_array($kind, ['Deployment', 'StatefulSet'], true),
         ];
     }
 
@@ -145,6 +151,16 @@ class KubernetesResourceStatusParser
         $class = (string) data_get($resource, 'spec.storageClassName', '');
 
         return trim(implode(' ', array_filter([$capacity, $class])));
+    }
+
+    private function desiredReplicas(string $kind, array $resource): ?int
+    {
+        return in_array($kind, ['Deployment', 'StatefulSet'], true) ? (int) data_get($resource, 'spec.replicas', 0) : null;
+    }
+
+    private function readyReplicas(string $kind, array $resource): ?int
+    {
+        return in_array($kind, ['Deployment', 'StatefulSet'], true) ? (int) data_get($resource, 'status.readyReplicas', 0) : null;
     }
 
     private function age(?string $createdAt): string

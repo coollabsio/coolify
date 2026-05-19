@@ -103,6 +103,8 @@ class Show extends Component
                 'tolerations' => ['nullable', 'string', 'max:10000'],
                 'podDisruptionBudgetEnabled' => ['required', 'boolean'],
                 'podDisruptionBudgetMinAvailable' => ['nullable', 'string', 'max:16', 'regex:/^\d+%?$/'],
+                'selectedKubernetesResource' => ['nullable', 'string', 'max:320', 'regex:/^$|^(Deployment|StatefulSet)\/[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/'],
+                'kubernetesResourceReplicas' => ['required', 'integer', 'min:0', 'max:100'],
                 'selectedKubernetesPod' => ['nullable', 'string', 'max:253', 'regex:/^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/'],
                 'selectedKubernetesContainer' => ['nullable', 'string', 'max:253', 'regex:/^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/'],
             ];

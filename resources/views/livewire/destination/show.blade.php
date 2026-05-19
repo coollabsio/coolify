@@ -107,6 +107,29 @@
                 <div wire:loading.delay wire:target="refreshKubernetesResources" class="text-sm text-neutral-500">
                     Loading Kubernetes resources...
                 </div>
+                <div class="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_140px_auto_auto] md:items-end">
+                    <x-forms.select canGate="view" :canResource="$destination" id="selectedKubernetesResource"
+                        label="Workload">
+                        <option value="">Select a workload</option>
+                        @foreach ($kubernetesResources as $resource)
+                            @if ($resource['scalable'])
+                                <option value="{{ $resource['kind'] }}/{{ $resource['name'] }}">
+                                    {{ $resource['kind'] }}/{{ $resource['name'] }}
+                                </option>
+                            @endif
+                        @endforeach
+                    </x-forms.select>
+                    <x-forms.input canGate="update" :canResource="$destination" id="kubernetesResourceReplicas"
+                        label="Replicas" type="number" min="0" max="100" />
+                    <x-forms.button canGate="update" :canResource="$destination"
+                        wire:click.prevent='scaleSelectedKubernetesResource'>
+                        Scale
+                    </x-forms.button>
+                    <x-forms.button canGate="update" :canResource="$destination"
+                        wire:click.prevent='restartSelectedKubernetesResource'>
+                        Restart
+                    </x-forms.button>
+                </div>
                 @if (count($kubernetesResources) > 0)
                     <div class="overflow-x-auto">
                         <table class="min-w-full text-sm">
@@ -126,7 +149,14 @@
                                         <td class="p-2">{{ $resource['kind'] }}</td>
                                         <td class="p-2 font-mono text-xs">{{ $resource['name'] }}</td>
                                         <td class="p-2">{{ $resource['status'] }}</td>
-                                        <td class="p-2">{{ $resource['detail'] }}</td>
+                                        <td class="p-2">
+                                            {{ $resource['detail'] }}
+                                            @if ($resource['scalable'])
+                                                <span class="text-neutral-500">
+                                                    · replicas {{ $resource['ready_replicas'] }}/{{ $resource['desired_replicas'] }}
+                                                </span>
+                                            @endif
+                                        </td>
                                         <td class="p-2">{{ $resource['age'] }}</td>
                                     </tr>
                                 @endforeach

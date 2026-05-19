@@ -6,6 +6,6 @@
 - [done] Add database Kubernetes rendering and lifecycle.
 - [done] Expand Docker Compose Kubernetes feature mapping.
 - [done] Add preview deployment cleanup parity for Kubernetes.
-- [pending] Add runtime scaling controls and HPA status display.
+- [done] Add runtime scaling controls and HPA status display.
 - [pending] Add API support for Kubernetes destinations.
 - [pending] Add broad feature/browser tests for Kubernetes destination flows.

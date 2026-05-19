@@ -45,6 +45,11 @@ class KubernetesKubectlCommandBuilder
         return $this->base($cluster, $kubeconfigPath).' rollout restart '.escapeshellarg("deployment/{$deploymentName}");
     }
 
+    public function rolloutRestartStatefulSet(KubernetesCluster $cluster, string $statefulSetName, ?string $kubeconfigPath = null): string
+    {
+        return $this->base($cluster, $kubeconfigPath).' rollout restart '.escapeshellarg("statefulset/{$statefulSetName}");
+    }
+
     public function scaleDeployment(KubernetesCluster $cluster, string $deploymentName, int $replicas, ?string $kubeconfigPath = null): string
     {
         return $this->base($cluster, $kubeconfigPath).' scale '.escapeshellarg("deployment/{$deploymentName}").' --replicas='.((int) $replicas);

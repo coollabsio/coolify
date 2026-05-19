@@ -59,6 +59,9 @@ it('parses coolify managed kubernetes resource status summaries', function () {
             'status' => 'Ready',
             'detail' => 'ready 2/2, available 2',
             'application_uuid' => 'app-1',
+            'desired_replicas' => 2,
+            'ready_replicas' => 2,
+            'scalable' => true,
         ])
         ->and($resources[1])->toMatchArray([
             'kind' => 'HorizontalPodAutoscaler',

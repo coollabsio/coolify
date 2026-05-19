@@ -86,6 +86,9 @@ it('uses the explicit kubeconfig path for mutable kubernetes commands', function
     expect($builder->rolloutRestart($cluster, 'customer-api', $kubeconfigPath))
         ->toBe("kubectl --kubeconfig='/run/coolify/kubeconfig' --context='iad-prod' --namespace='production' rollout restart 'deployment/customer-api'");
 
+    expect($builder->rolloutRestartStatefulSet($cluster, 'customer-db', $kubeconfigPath))
+        ->toBe("kubectl --kubeconfig='/run/coolify/kubeconfig' --context='iad-prod' --namespace='production' rollout restart 'statefulset/customer-db'");
+
     expect($builder->scaleDeployment($cluster, 'customer-api', 0, $kubeconfigPath))
         ->toBe("kubectl --kubeconfig='/run/coolify/kubeconfig' --context='iad-prod' --namespace='production' scale 'deployment/customer-api' --replicas=0");
 

@@ -13,6 +13,10 @@ trait ManagesKubernetesPods
 
     public array $kubernetesResources = [];
 
+    public string $selectedKubernetesResource = '';
+
+    public int $kubernetesResourceReplicas = 1;
+
     public string $selectedKubernetesPod = '';
 
     public string $selectedKubernetesContainer = '';
@@ -77,9 +81,94 @@ trait ManagesKubernetesPods
             ], $this->destination->server);
 
             $this->kubernetesResources = (new KubernetesResourceStatusParser)->parse($output ?: '{"items":[]}');
+            $this->syncSelectedKubernetesResource();
             $this->dispatch('success', 'Kubernetes resources refreshed.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    public function updatedSelectedKubernetesResource(): void
+    {
+        $this->syncSelectedKubernetesResource();
+    }
+
+    public function selectedKubernetesResourcePayload(): ?array
+    {
+        if (blank($this->selectedKubernetesResource)) {
+            return null;
+        }
+
+        [$kind, $name] = array_pad(explode('/', $this->selectedKubernetesResource, 2), 2, null);
+
+        return collect($this->kubernetesResources)
+            ->first(fn (array $resource) => $resource['kind'] === $kind && $resource['name'] === $name && $resource['scalable'] === true);
+    }
+
+    public function scaleSelectedKubernetesResource(): void
+    {
+        try {
+            $resource = $this->selectedKubernetesResourcePayload();
+            if (! ($this->destination instanceof KubernetesCluster) || $resource === null) {
+                $this->dispatch('error', 'Select a scalable Kubernetes resource first.');
+
+                return;
+            }
+
+            $this->authorize('update', $this->destination);
+            $this->validateOnly('selectedKubernetesResource');
+            $this->validateOnly('kubernetesResourceReplicas');
+
+            $builder = new KubernetesKubectlCommandBuilder;
+            $commandContext = $this->kubernetesCommandContext($builder);
+
+            if ($commandContext === null) {
+                return;
+            }
+
+            [$commands, $kubeconfigPath] = $commandContext;
+            $commands[] = $resource['kind'] === 'StatefulSet'
+                ? $builder->scaleStatefulSet($this->destination, $resource['name'], $this->kubernetesResourceReplicas, $kubeconfigPath)
+                : $builder->scaleDeployment($this->destination, $resource['name'], $this->kubernetesResourceReplicas, $kubeconfigPath);
+            instant_remote_process($commands, $this->destination->server);
+
+            $this->dispatch('success', 'Kubernetes resource scale requested.');
+            $this->refreshKubernetesResources();
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function restartSelectedKubernetesResource(): void
+    {
+        try {
+            $resource = $this->selectedKubernetesResourcePayload();
+            if (! ($this->destination instanceof KubernetesCluster) || $resource === null) {
+                $this->dispatch('error', 'Select a scalable Kubernetes resource first.');
+
+                return;
+            }
+
+            $this->authorize('update', $this->destination);
+            $this->validateOnly('selectedKubernetesResource');
+
+            $builder = new KubernetesKubectlCommandBuilder;
+            $commandContext = $this->kubernetesCommandContext($builder);
+
+            if ($commandContext === null) {
+                return;
+            }
+
+            [$commands, $kubeconfigPath] = $commandContext;
+            $commands[] = $resource['kind'] === 'StatefulSet'
+                ? $builder->rolloutRestartStatefulSet($this->destination, $resource['name'], $kubeconfigPath)
+                : $builder->rolloutRestart($this->destination, $resource['name'], $kubeconfigPath);
+            instant_remote_process($commands, $this->destination->server);
+
+            $this->dispatch('success', 'Kubernetes resource restart requested.');
+            $this->refreshKubernetesResources();
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 
@@ -90,6 +179,18 @@ trait ManagesKubernetesPods
         if (! in_array($this->selectedKubernetesContainer, $containers, true)) {
             $this->selectedKubernetesContainer = $containers[0] ?? '';
         }
+    }
+
+    private function syncSelectedKubernetesResource(): void
+    {
+        $resource = $this->selectedKubernetesResourcePayload();
+
+        if ($resource === null) {
+            $resource = collect($this->kubernetesResources)->firstWhere('scalable', true);
+            $this->selectedKubernetesResource = $resource ? "{$resource['kind']}/{$resource['name']}" : '';
+        }
+
+        $this->kubernetesResourceReplicas = max(0, (int) ($resource['desired_replicas'] ?? $this->kubernetesResourceReplicas));
     }
 
     public function selectedKubernetesPodContainers(): array
