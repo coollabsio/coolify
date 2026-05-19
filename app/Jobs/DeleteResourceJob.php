@@ -7,7 +7,9 @@ use App\Actions\Database\StopDatabase;
 use App\Actions\Server\CleanupDocker;
 use App\Actions\Service\DeleteService;
 use App\Actions\Service\StopService;
+use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
@@ -52,7 +54,13 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
             switch ($this->resource->type()) {
                 case 'application':
-                    StopApplication::run($this->resource, previewDeployments: true, dockerCleanup: $this->dockerCleanup);
+                    StopApplication::run(
+                        $this->resource,
+                        previewDeployments: true,
+                        dockerCleanup: $this->dockerCleanup,
+                        deleteKubernetesResources: true,
+                        deleteKubernetesVolumes: $this->deleteVolumes,
+                    );
                     break;
                 case 'standalone-postgresql':
                 case 'standalone-redis':
@@ -125,11 +133,11 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         // Cancel any active deployments for this PR (same logic as API cancel_deployment)
-        $activeDeployments = \App\Models\ApplicationDeploymentQueue::where('application_id', $application->id)
+        $activeDeployments = ApplicationDeploymentQueue::where('application_id', $application->id)
             ->where('pull_request_id', $pull_request_id)
             ->whereIn('status', [
-                \App\Enums\ApplicationDeploymentStatus::QUEUED->value,
-                \App\Enums\ApplicationDeploymentStatus::IN_PROGRESS->value,
+                ApplicationDeploymentStatus::QUEUED->value,
+                ApplicationDeploymentStatus::IN_PROGRESS->value,
             ])
             ->get();
 
@@ -137,7 +145,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             try {
                 // Mark deployment as cancelled
                 $activeDeployment->update([
-                    'status' => \App\Enums\ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+                    'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
                 ]);
 
                 // Add cancellation log entry

@@ -18,10 +18,10 @@ class StopApplication
 
     public string $jobQueue = 'high';
 
-    public function handle(Application $application, bool $previewDeployments = false, bool $dockerCleanup = true)
+    public function handle(Application $application, bool $previewDeployments = false, bool $dockerCleanup = true, bool $deleteKubernetesResources = false, bool $deleteKubernetesVolumes = false)
     {
         if ($application->destination instanceof KubernetesCluster) {
-            return $this->stopKubernetesApplication($application);
+            return $this->stopKubernetesApplication($application, $deleteKubernetesResources, $deleteKubernetesVolumes);
         }
 
         $servers = collect([$application->destination->server]);
@@ -76,7 +76,7 @@ class StopApplication
         ServiceStatusChanged::dispatch($application->environment->project->team->id);
     }
 
-    private function stopKubernetesApplication(Application $application): ?string
+    private function stopKubernetesApplication(Application $application, bool $deleteResources = false, bool $deleteVolumes = false): ?string
     {
         try {
             $cluster = $application->destination;
@@ -105,9 +105,18 @@ class StopApplication
                 return 'Kubernetes kubeconfig is not configured';
             }
 
-            foreach ($deploymentNames as $deploymentName) {
-                $commands[] = $builder->scaleDeployment($cluster, $deploymentName, 0, $kubeconfigPath);
+            if ($deleteResources) {
+                $commands[] = $builder->deleteApplicationResources($cluster, (string) $application->uuid, $kubeconfigPath);
+
+                if ($deleteVolumes) {
+                    $commands[] = $builder->deleteApplicationPersistentVolumeClaims($cluster, (string) $application->uuid, $kubeconfigPath);
+                }
+            } else {
+                foreach ($deploymentNames as $deploymentName) {
+                    $commands[] = $builder->scaleDeployment($cluster, $deploymentName, 0, $kubeconfigPath);
+                }
             }
+
             instant_remote_process($commands, $server, throwError: false);
             $application->update([
                 'status' => 'exited',

@@ -71,6 +71,22 @@ class KubernetesKubectlCommandBuilder
         return $this->base($cluster, $kubeconfigPath).' delete '.escapeshellarg("pod/{$podName}").' --ignore-not-found=true';
     }
 
+    public function deleteApplicationResources(KubernetesCluster $cluster, string $applicationUuid, ?string $kubeconfigPath = null): string
+    {
+        return $this->base($cluster, $kubeconfigPath)
+            .' delete deployment,service,ingress,hpa,pdb,secret,serviceaccount'
+            .' --selector='.escapeshellarg($this->applicationSelector($applicationUuid))
+            .' --ignore-not-found=true';
+    }
+
+    public function deleteApplicationPersistentVolumeClaims(KubernetesCluster $cluster, string $applicationUuid, ?string $kubeconfigPath = null): string
+    {
+        return $this->base($cluster, $kubeconfigPath)
+            .' delete pvc'
+            .' --selector='.escapeshellarg($this->applicationSelector($applicationUuid))
+            .' --ignore-not-found=true';
+    }
+
     public function writeManifest(string $manifestPath, string $manifestYaml): string
     {
         return $this->writeFile($manifestPath, $manifestYaml);
@@ -105,5 +121,10 @@ class KubernetesKubectlCommandBuilder
         }
 
         return $command;
+    }
+
+    private function applicationSelector(string $applicationUuid): string
+    {
+        return 'app.kubernetes.io/managed-by=coolify,coolify.io/application-uuid='.$applicationUuid;
     }
 }

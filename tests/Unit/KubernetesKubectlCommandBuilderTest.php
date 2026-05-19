@@ -32,6 +32,12 @@ it('builds escaped kubectl commands for a cluster destination', function () {
 
     expect($builder->deletePod($cluster, 'customer-api-abc123'))
         ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' delete 'pod/customer-api-abc123' --ignore-not-found=true");
+
+    expect($builder->deleteApplicationResources($cluster, 'app-uuid'))
+        ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' delete deployment,service,ingress,hpa,pdb,secret,serviceaccount --selector='app.kubernetes.io/managed-by=coolify,coolify.io/application-uuid=app-uuid' --ignore-not-found=true");
+
+    expect($builder->deleteApplicationPersistentVolumeClaims($cluster, 'app-uuid'))
+        ->toBe("kubectl --kubeconfig='/data/coolify/kubernetes/iad prod.yaml' --context='iad-prod' --namespace='production' delete pvc --selector='app.kubernetes.io/managed-by=coolify,coolify.io/application-uuid=app-uuid' --ignore-not-found=true");
 });
 
 it('builds a base64 manifest write command', function () {
