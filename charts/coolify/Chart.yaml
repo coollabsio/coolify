@@ -1,0 +1,28 @@
+apiVersion: v2
+name: coolify
+description: Official Helm chart for running Coolify on Kubernetes.
+type: application
+version: 0.1.0
+appVersion: "4.1.0"
+kubeVersion: ">=1.24.0-0"
+home: https://coolify.io
+icon: https://raw.githubusercontent.com/coollabsio/coolify/next/public/coolify-logo.svg
+sources:
+  - https://github.com/coollabsio/coolify
+keywords:
+  - coolify
+  - paas
+  - self-hosted
+  - kubernetes
+maintainers:
+  - name: Coolify
+    url: https://coolify.io
+dependencies:
+  - name: postgresql
+    version: 18.6.7
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: 25.5.3
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled

@@ -1,0 +1,44 @@
+{{- if .Values.podDisruptionBudget.web.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "coolify.fullname" . }}-web
+  labels:
+    {{- include "coolify.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.web.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "coolify.componentLabels" (dict "root" . "component" "web") | nindent 6 }}
+{{- end }}
+{{- if and .Values.worker.enabled .Values.podDisruptionBudget.worker.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "coolify.fullname" . }}-worker
+  labels:
+    {{- include "coolify.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.worker.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "coolify.componentLabels" (dict "root" . "component" "worker") | nindent 6 }}
+{{- end }}
+{{- if and .Values.realtime.enabled .Values.podDisruptionBudget.realtime.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "coolify.fullname" . }}-realtime
+  labels:
+    {{- include "coolify.labels" . | nindent 4 }}
+    app.kubernetes.io/component: realtime
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.realtime.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "coolify.componentLabels" (dict "root" . "component" "realtime") | nindent 6 }}
+{{- end }}

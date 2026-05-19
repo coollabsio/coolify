@@ -1,0 +1,26 @@
+{{- if .Values.realtime.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "coolify.fullname" . }}-realtime
+  labels:
+    {{- include "coolify.labels" . | nindent 4 }}
+    app.kubernetes.io/component: realtime
+  {{- with .Values.realtime.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.realtime.service.type }}
+  ports:
+    - name: pusher
+      port: {{ .Values.realtime.service.pusherPort }}
+      targetPort: pusher
+      protocol: TCP
+    - name: metrics
+      port: {{ .Values.realtime.service.metricsPort }}
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    {{- include "coolify.componentLabels" (dict "root" . "component" "realtime") | nindent 4 }}
+{{- end }}

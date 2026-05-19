@@ -1,0 +1,82 @@
+{{- if .Values.scheduler.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "coolify.fullname" . }}-scheduler
+  labels:
+    {{- include "coolify.labels" . | nindent 4 }}
+    app.kubernetes.io/component: scheduler
+  {{- with .Values.scheduler.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  schedule: {{ .Values.scheduler.schedule | quote }}
+  concurrencyPolicy: {{ .Values.scheduler.concurrencyPolicy }}
+  startingDeadlineSeconds: {{ .Values.scheduler.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ .Values.scheduler.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.scheduler.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "coolify.componentLabels" (dict "root" . "component" "scheduler") | nindent 12 }}
+            {{- with .Values.scheduler.podLabels }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.scheduler.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: {{ include "coolify.serviceAccountName" . }}
+          {{- with .Values.global.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.scheduler.priorityClassName }}
+          priorityClassName: {{ . }}
+          {{- end }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          {{- with .Values.scheduler.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.scheduler.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.scheduler.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if and .Values.persistence.enabled .Values.storageInit.enabled }}
+          initContainers:
+            {{- include "coolify.storageInitContainer" . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: scheduler
+              image: {{ include "coolify.image" . | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              workingDir: /var/www/html
+              command:
+                {{- toYaml .Values.scheduler.command | nindent 16 }}
+              args:
+                {{- toYaml .Values.scheduler.args | nindent 16 }}
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              env:
+                {{- include "coolify.commonEnv" . | nindent 16 }}
+                - name: SCHEDULER_ENABLED
+                  value: "true"
+              resources:
+                {{- toYaml .Values.scheduler.resources | nindent 16 }}
+              volumeMounts:
+                {{- include "coolify.volumeMounts" . | nindent 16 }}
+          volumes:
+            {{- include "coolify.envVolume" . | nindent 12 }}
+            {{- include "coolify.dataVolume" . | nindent 12 }}
+{{- end }}

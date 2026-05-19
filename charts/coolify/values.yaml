@@ -1,0 +1,326 @@
+global:
+  imagePullSecrets: []
+  storageClass: ""
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  registry: ghcr.io
+  repository: coollabsio/coolify
+  tag: ""
+  pullPolicy: IfNotPresent
+
+realtimeImage:
+  registry: ghcr.io
+  repository: coollabsio/coolify-realtime
+  tag: "1.0.15"
+  pullPolicy: IfNotPresent
+
+app:
+  name: Coolify
+  env: production
+  url: http://coolify.localhost
+  debug: false
+  key: ""
+  autoUpdate: false
+  baseConfigPath: /data/coolify
+  trustedProxies: "*"
+  cdnUrl: https://cdn.coollabs.io
+
+env:
+  secretName: coolify-env
+  existingSecret: ""
+  extra: {}
+
+database:
+  host: ""
+  port: 5432
+  name: coolify
+  username: coolify
+  password: ""
+  existingSecret:
+    name: ""
+    key: password
+
+redisConnection:
+  host: ""
+  port: 6379
+  password: ""
+  existingSecret:
+    name: ""
+    key: redis-password
+
+pusher:
+  appId: ""
+  appKey: ""
+  appSecret: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+rbac:
+  create: true
+  clusterScoped: false
+  rules:
+    - apiGroups: [""]
+      resources: ["configmaps", "endpoints", "events", "persistentvolumeclaims", "pods", "pods/log", "secrets", "services"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    - apiGroups: ["apps"]
+      resources: ["deployments", "replicasets", "statefulsets"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    - apiGroups: ["batch"]
+      resources: ["cronjobs", "jobs"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    - apiGroups: ["networking.k8s.io"]
+      resources: ["ingresses"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    - apiGroups: ["autoscaling"]
+      resources: ["horizontalpodautoscalers"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    - apiGroups: ["policy"]
+      resources: ["poddisruptionbudgets"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+podSecurityContext:
+  fsGroup: 9999
+  fsGroupChangePolicy: OnRootMismatch
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  runAsGroup: 9999
+  runAsNonRoot: true
+  runAsUser: 9999
+
+storageInit:
+  enabled: true
+  image:
+    registry: docker.io
+    repository: busybox
+    tag: "1.37"
+    pullPolicy: IfNotPresent
+  securityContext:
+    runAsUser: 0
+    runAsGroup: 0
+
+persistence:
+  enabled: true
+  existingClaim: ""
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+  annotations: {}
+
+web:
+  replicaCount: 1
+  annotations: {}
+  podAnnotations: {}
+  podLabels: {}
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  priorityClassName: ""
+  topologySpreadConstraints: []
+  terminationGracePeriodSeconds: 30
+  php:
+    memoryLimit: 256M
+    fpmPmControl: dynamic
+    fpmPmStartServers: "1"
+    fpmPmMinSpareServers: "1"
+    fpmPmMaxSpareServers: "10"
+  probes:
+    readiness:
+      enabled: true
+      initialDelaySeconds: 20
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 6
+    liveness:
+      enabled: true
+      initialDelaySeconds: 60
+      periodSeconds: 20
+      timeoutSeconds: 5
+      failureThreshold: 6
+
+worker:
+  enabled: true
+  replicaCount: 1
+  command:
+    - /bin/sh
+    - -lc
+  args:
+    - php artisan horizon
+  annotations: {}
+  podAnnotations: {}
+  podLabels: {}
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  priorityClassName: ""
+
+scheduler:
+  enabled: true
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  command:
+    - /bin/sh
+    - -lc
+  args:
+    - php artisan schedule:run --no-interaction
+  annotations: {}
+  podAnnotations: {}
+  podLabels: {}
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  priorityClassName: ""
+
+migration:
+  enabled: true
+  hook: true
+  backoffLimit: 6
+  activeDeadlineSeconds: 900
+  command:
+    - /bin/sh
+    - -lc
+  args:
+    - php artisan start:migration && if [ "${SEEDER_ENABLED}" = "true" ]; then php artisan start:seeder; fi
+  annotations: {}
+  podAnnotations: {}
+  podLabels: {}
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  priorityClassName: ""
+
+seeder:
+  enabled: true
+
+realtime:
+  enabled: true
+  replicaCount: 1
+  publicHost: ""
+  publicPort: ""
+  publicScheme: http
+  annotations: {}
+  podAnnotations: {}
+  podLabels: {}
+  securityContext: {}
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  priorityClassName: ""
+  service:
+    type: ClusterIP
+    annotations: {}
+    pusherPort: 6001
+    metricsPort: 6002
+  probes:
+    readiness:
+      enabled: true
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 6
+    liveness:
+      enabled: true
+      initialDelaySeconds: 30
+      periodSeconds: 20
+      timeoutSeconds: 5
+      failureThreshold: 6
+
+service:
+  type: ClusterIP
+  annotations: {}
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: coolify.localhost
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+realtimeIngress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: coolify-realtime.localhost
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+autoscaling:
+  web:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: ""
+  worker:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  web:
+    enabled: false
+    minAvailable: 1
+  worker:
+    enabled: false
+    minAvailable: 1
+  realtime:
+    enabled: false
+    minAvailable: 1
+
+networkPolicy:
+  enabled: false
+  ingressNamespaceLabels: {}
+
+postgresql:
+  enabled: true
+  fullnameOverride: coolify-postgresql
+  auth:
+    username: coolify
+    database: coolify
+    existingSecret: coolify-env
+    secretKeys:
+      adminPasswordKey: DB_PASSWORD
+      userPasswordKey: DB_PASSWORD
+  primary:
+    persistence:
+      size: 10Gi
+
+redis:
+  enabled: true
+  fullnameOverride: coolify-redis
+  architecture: standalone
+  auth:
+    enabled: true
+    existingSecret: coolify-env
+    existingSecretPasswordKey: REDIS_PASSWORD
+  master:
+    persistence:
+      size: 5Gi

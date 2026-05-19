@@ -1,0 +1,9 @@
+Coolify has been installed.
+
+Set app.url and ingress hosts to the public URL before production use.
+
+Health check:
+  kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+
+Run Helm test:
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}

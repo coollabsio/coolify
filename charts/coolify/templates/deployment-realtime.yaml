@@ -1,0 +1,121 @@
+{{- if .Values.realtime.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "coolify.fullname" . }}-realtime
+  labels:
+    {{- include "coolify.labels" . | nindent 4 }}
+    app.kubernetes.io/component: realtime
+  {{- with .Values.realtime.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.realtime.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "coolify.componentLabels" (dict "root" . "component" "realtime") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "coolify.componentLabels" (dict "root" . "component" "realtime") | nindent 8 }}
+        {{- with .Values.realtime.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.realtime.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "coolify.serviceAccountName" . }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.realtime.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.realtime.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.realtime.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.realtime.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if and .Values.persistence.enabled .Values.storageInit.enabled }}
+      initContainers:
+        {{- include "coolify.storageInitContainer" . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: realtime
+          image: {{ include "coolify.realtimeImage" . | quote }}
+          imagePullPolicy: {{ .Values.realtimeImage.pullPolicy }}
+          {{- with .Values.realtime.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            - name: APP_NAME
+              value: {{ .Values.app.name | quote }}
+            - name: SOKETI_DEBUG
+              value: {{ .Values.app.debug | quote }}
+            - name: SOKETI_DEFAULT_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "coolify.envSecretName" . }}
+                  key: PUSHER_APP_ID
+            - name: SOKETI_DEFAULT_APP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "coolify.envSecretName" . }}
+                  key: PUSHER_APP_KEY
+            - name: SOKETI_DEFAULT_APP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "coolify.envSecretName" . }}
+                  key: PUSHER_APP_SECRET
+            - name: SOKETI_HOST
+              value: 0.0.0.0
+          ports:
+            - name: pusher
+              containerPort: 6001
+              protocol: TCP
+            - name: metrics
+              containerPort: 6002
+              protocol: TCP
+          {{- if .Values.realtime.probes.readiness.enabled }}
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: pusher
+            initialDelaySeconds: {{ .Values.realtime.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.realtime.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.realtime.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.realtime.probes.readiness.failureThreshold }}
+          {{- end }}
+          {{- if .Values.realtime.probes.liveness.enabled }}
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: pusher
+            initialDelaySeconds: {{ .Values.realtime.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.realtime.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.realtime.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.realtime.probes.liveness.failureThreshold }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.realtime.resources | nindent 12 }}
+          volumeMounts:
+            - name: coolify-data
+              mountPath: /var/www/html/storage/app/ssh
+              subPath: ssh
+      volumes:
+        {{- include "coolify.dataVolume" . | nindent 8 }}
+{{- end }}
