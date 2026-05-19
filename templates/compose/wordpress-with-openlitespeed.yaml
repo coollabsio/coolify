@@ -1,0 +1,80 @@
+# documentation: https://openlitespeed.org/
+# slogan: WordPress running on OpenLiteSpeed with LSCache support.
+# category: cms
+# tags: cms, blog, content, management, wordpress, openlitespeed, lscache, mariadb
+# logo: svgs/wordpress.svg
+# port: 80
+
+services:
+  wordpress:
+    image: litespeedtech/openlitespeed:latest
+    environment:
+      - SERVICE_URL_WORDPRESS_80
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_NAME=${MARIADB_DATABASE:-wordpress}
+      - WORDPRESS_DB_USER=${SERVICE_USER_WORDPRESS}
+      - WORDPRESS_DB_PASSWORD=${SERVICE_PASSWORD_WORDPRESS}
+      - WORDPRESS_ADMIN_USER=${SERVICE_USER_WORDPRESSADMIN}
+      - WORDPRESS_ADMIN_PASSWORD=${SERVICE_PASSWORD_WORDPRESSADMIN}
+      - WORDPRESS_ADMIN_EMAIL=${WORDPRESS_ADMIN_EMAIL:-admin@example.com}
+      - WORDPRESS_SITE_TITLE=${WORDPRESS_SITE_TITLE:-WordPress on OpenLiteSpeed}
+    entrypoint:
+      - /bin/bash
+      - -lc
+      - |
+        set -e
+        WORDPRESS_PATH=/var/www/vhosts/localhost/html
+        mkdir -p "$$WORDPRESS_PATH"
+        if ! wp core is-installed --path="$$WORDPRESS_PATH" --allow-root >/dev/null 2>&1; then
+          find "$$WORDPRESS_PATH" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          wp core download --path="$$WORDPRESS_PATH" --allow-root
+          wp config create \
+            --path="$$WORDPRESS_PATH" \
+            --dbname="$${WORDPRESS_DB_NAME}" \
+            --dbuser="$${WORDPRESS_DB_USER}" \
+            --dbpass="$${WORDPRESS_DB_PASSWORD}" \
+            --dbhost="$${WORDPRESS_DB_HOST}" \
+            --skip-check \
+            --allow-root
+          wp core install \
+            --path="$$WORDPRESS_PATH" \
+            --url="$${SERVICE_URL_WORDPRESS_80:-http://localhost}" \
+            --title="$${WORDPRESS_SITE_TITLE}" \
+            --admin_user="$${WORDPRESS_ADMIN_USER}" \
+            --admin_password="$${WORDPRESS_ADMIN_PASSWORD}" \
+            --admin_email="$${WORDPRESS_ADMIN_EMAIL}" \
+            --skip-email \
+            --allow-root
+          wp plugin install litespeed-cache --activate --path="$$WORDPRESS_PATH" --allow-root
+        fi
+        chown -R 994:994 "$$WORDPRESS_PATH"
+        exec /entrypoint.sh
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost/html
+      - openlitespeed-conf:/usr/local/lsws/conf
+      - openlitespeed-admin-conf:/usr/local/lsws/admin/conf
+      - openlitespeed-logs:/usr/local/lsws/logs
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+      - MYSQL_DATABASE=${MARIADB_DATABASE:-wordpress}
+      - MYSQL_USER=${SERVICE_USER_WORDPRESS}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_WORDPRESS}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
