@@ -125,6 +125,52 @@ it('filters deployments by project server source and status', function () {
         ->assertDontSee('non-matching-deployment');
 });
 
+it('hides server and source filters until there are multiple options', function () {
+    [$application, $server] = createDeploymentPageApplication($this->team, 'Only Option API');
+
+    ApplicationDeploymentQueue::create([
+        'application_id' => $application->id,
+        'application_name' => $application->name,
+        'server_id' => $server->id,
+        'server_name' => $server->name,
+        'deployment_uuid' => 'only-option-deployment',
+        'status' => ApplicationDeploymentStatus::FINISHED->value,
+    ]);
+
+    Livewire::test(Index::class)
+        ->assertSee('Only Option API')
+        ->assertDontSee('wire:model=server', false)
+        ->assertDontSee('wire:model=source', false);
+
+    $source = GithubApp::query()->create([
+        'uuid' => (string) new Cuid2,
+        'name' => 'Production GitHub',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'team_id' => $this->team->id,
+    ]);
+
+    [$secondApplication, $secondServer] = createDeploymentPageApplication($this->team, 'Second Option API', [
+        'source_id' => $source->id,
+        'source_type' => GithubApp::class,
+    ]);
+
+    ApplicationDeploymentQueue::create([
+        'application_id' => $secondApplication->id,
+        'application_name' => $secondApplication->name,
+        'server_id' => $secondServer->id,
+        'server_name' => $secondServer->name,
+        'deployment_uuid' => 'second-option-deployment',
+        'status' => ApplicationDeploymentStatus::QUEUED->value,
+    ]);
+
+    Livewire::test(Index::class)
+        ->assertSee('Only Option API')
+        ->assertSee('Second Option API')
+        ->assertSee('wire:model=server', false)
+        ->assertSee('wire:model=source', false);
+});
+
 it('adds deployments to the main sidebar navigation', function () {
     $navbar = file_get_contents(resource_path('views/components/navbar.blade.php'));
     $routes = file_get_contents(base_path('routes/web.php'));
