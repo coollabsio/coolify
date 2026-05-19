@@ -105,9 +105,16 @@ it('renders Kubernetes-native Coolify workloads with Helm', function () {
             'podDisruptionBudget.web.enabled=true',
             '--set',
             'networkPolicy.enabled=true',
+            '--set-string',
+            'env.extra.ROOT_USERNAME=Root User',
         ], dirname(__DIR__, 2));
 
         $output = $render->getOutput();
+        $documents = collect(explode("\n---", $output))
+            ->map(fn (string $document) => Yaml::parse($document))
+            ->filter();
+        $realtimeDeployment = $documents->first(fn (?array $document) => data_get($document, 'kind') === 'Deployment'
+            && data_get($document, 'metadata.name') === 'coolify-realtime');
 
         expect($render->isSuccessful())->toBeTrue($render->getErrorOutput())
             ->and($output)->toContain('kind: Deployment')
@@ -121,6 +128,8 @@ it('renders Kubernetes-native Coolify workloads with Helm', function () {
             ->and($output)->toContain('kind: PodDisruptionBudget')
             ->and($output)->toContain('kind: NetworkPolicy')
             ->and($output)->toContain('mountPath: /var/www/html/.env')
+            ->and($output)->toContain('ROOT_USERNAME="Root User"')
+            ->and(data_get($realtimeDeployment, 'spec.template.spec.volumes'))->toBeNull()
             ->and($output)->not->toContain('/var/run/docker.sock');
     } finally {
         coolifyRemoveDirectory($temporaryChart);

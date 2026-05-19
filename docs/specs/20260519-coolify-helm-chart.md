@@ -5,7 +5,7 @@ type: feature
 created_at: 2026-05-19
 updated_at: 2026-05-19
 owners:
-  - coolify
+    - coolify
 ---
 
 # Coolify Helm Chart
@@ -45,8 +45,10 @@ flowchart TD
     Worker --> Data
     Worker --> Redis
     Scheduler["Scheduler CronJob"] --> Env
+    Scheduler --> Data
     Scheduler --> Redis
     Migration["Migration Hook Job"] --> Env
+    Migration --> Data
     Migration --> Postgres
 ```
 
@@ -65,10 +67,10 @@ sequenceDiagram
 
     Helm->>Secret: Create or reuse generated credentials
     Helm->>DB: Install bundled dependencies when enabled
-    Helm->>Job: Run post-install or post-upgrade hook
-    Job->>DB: Run migrations and optional seeder
     Helm->>Web: Roll out HTTP workload
     Helm->>Worker: Roll out Horizon workload
+    Helm->>Job: Run post-install or post-upgrade hook
+    Job->>DB: Wait for sockets, then run migrations and optional seeder
 ```
 
 The sequence keeps schema changes isolated in a Job. Runtime pods set `MIGRATION_ENABLED=false`, `HORIZON_ENABLED=false`, and `SCHEDULER_ENABLED=false` in the mounted `.env` file so the web container does not duplicate worker or scheduler responsibilities.
@@ -76,6 +78,8 @@ The sequence keeps schema changes isolated in a Job. Runtime pods set `MIGRATION
 ## Configuration Model
 
 The chart generates `coolify-env` by default. That Secret contains individual keys for Kubernetes Secret references and a complete `.env` file for the Coolify image. Bundled PostgreSQL and Redis read the same Secret keys, so first install credentials match without manual password coordination.
+
+Generated dotenv values are quoted so root-user bootstrap values and other `env.extra` strings with whitespace remain valid Laravel dotenv input. The production seeder ensures root team `0` exists before inserting system records, and the root-user seeder can attach a root user to that existing team without creating a duplicate team.
 
 External services are configured by disabling dependencies:
 
@@ -91,6 +95,15 @@ External services are configured by disabling dependencies:
 - Enable `podDisruptionBudget` and `autoscaling` only after resource requests are set.
 - Use namespace-scoped RBAC by default. Set `rbac.clusterScoped=true` only for in-cluster management workflows that need cluster-wide access.
 - Set `env.existingSecret` when credentials are owned by an external secret manager.
+- For `ReadWriteOnce` storage on multi-node clusters, use `nodeSelector` or affinity to co-locate web, worker, scheduler, and migration workloads, or use `ReadWriteMany` storage.
+- Realtime does not mount the Coolify data PVC; it only needs Pusher credentials.
+
+## Verification
+
+- `helm lint charts/coolify`
+- `helm template` with `env.extra.ROOT_USERNAME=Root User`
+- `php artisan test --compact tests/Unit/CoolifyHelmChartTest.php tests/Feature/RootTeamSeederTest.php tests/Feature/CaSslCertSeederTest.php`
+- Real Kubernetes smoke: install, migration hook, web/worker/realtime availability, scheduler job, and `helm test` health check passed on 2026-05-19.
 
 ## References
 

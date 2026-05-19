@@ -22,6 +22,21 @@ use Illuminate\Support\Facades\Storage;
 
 class ProductionSeeder extends Seeder
 {
+    public static function ensureRootTeamExists(): Team
+    {
+        $team = Team::find(0) ?? new Team;
+        $team->forceFill([
+            'id' => 0,
+            'name' => 'Root Team',
+            'description' => 'The root team',
+            'personal_team' => true,
+            'show_boarding' => true,
+        ]);
+        $team->save();
+
+        return $team;
+    }
+
     public function run(): void
     {
         $user = 'root';
@@ -49,6 +64,8 @@ class ProductionSeeder extends Seeder
                 'id' => 0,
             ]);
         }
+
+        self::ensureRootTeamExists();
 
         if (GithubApp::find(0) == null) {
             GithubApp::create([

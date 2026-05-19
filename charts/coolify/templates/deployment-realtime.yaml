@@ -49,10 +49,6 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if and .Values.persistence.enabled .Values.storageInit.enabled }}
-      initContainers:
-        {{- include "coolify.storageInitContainer" . | nindent 8 }}
-      {{- end }}
       containers:
         - name: realtime
           image: {{ include "coolify.realtimeImage" . | quote }}
@@ -112,10 +108,4 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.realtime.resources | nindent 12 }}
-          volumeMounts:
-            - name: coolify-data
-              mountPath: /var/www/html/storage/app/ssh
-              subPath: ssh
-      volumes:
-        {{- include "coolify.dataVolume" . | nindent 8 }}
 {{- end }}

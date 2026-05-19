@@ -1,98 +1,111 @@
 {
-  "$schema": "https://json-schema.org/schema#",
-  "type": "object",
-  "properties": {
-    "image": {
-      "type": "object",
-      "properties": {
-        "registry": { "type": "string", "minLength": 1 },
-        "repository": { "type": "string", "minLength": 1 },
-        "tag": { "type": "string" },
-        "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
-      }
-    },
-    "app": {
-      "type": "object",
-      "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "env": { "type": "string", "minLength": 1 },
-        "url": { "type": "string", "minLength": 1 },
-        "debug": { "type": "boolean" },
-        "key": { "type": "string" },
-        "autoUpdate": { "type": "boolean" }
-      }
-    },
-    "database": {
-      "type": "object",
-      "properties": {
-        "host": { "type": "string" },
-        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
-        "name": { "type": "string", "minLength": 1 },
-        "username": { "type": "string", "minLength": 1 },
-        "password": { "type": "string" },
-        "existingSecret": {
-          "type": "object",
-          "properties": {
-            "name": { "type": "string" },
-            "key": { "type": "string", "minLength": 1 }
-          }
+    "$schema": "https://json-schema.org/schema#",
+    "type": "object",
+    "properties": {
+        "image": {
+            "type": "object",
+            "properties": {
+                "registry": { "type": "string", "minLength": 1 },
+                "repository": { "type": "string", "minLength": 1 },
+                "tag": { "type": "string" },
+                "pullPolicy": {
+                    "type": "string",
+                    "enum": ["Always", "IfNotPresent", "Never"]
+                }
+            }
+        },
+        "app": {
+            "type": "object",
+            "properties": {
+                "name": { "type": "string", "minLength": 1 },
+                "env": { "type": "string", "minLength": 1 },
+                "url": { "type": "string", "minLength": 1 },
+                "debug": { "type": "boolean" },
+                "key": { "type": "string" },
+                "autoUpdate": { "type": "boolean" }
+            }
+        },
+        "database": {
+            "type": "object",
+            "properties": {
+                "host": { "type": "string" },
+                "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                "name": { "type": "string", "minLength": 1 },
+                "username": { "type": "string", "minLength": 1 },
+                "password": { "type": "string" },
+                "existingSecret": {
+                    "type": "object",
+                    "properties": {
+                        "name": { "type": "string" },
+                        "key": { "type": "string", "minLength": 1 }
+                    }
+                }
+            }
+        },
+        "redisConnection": {
+            "type": "object",
+            "properties": {
+                "host": { "type": "string" },
+                "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                "password": { "type": "string" },
+                "existingSecret": {
+                    "type": "object",
+                    "properties": {
+                        "name": { "type": "string" },
+                        "key": { "type": "string", "minLength": 1 }
+                    }
+                }
+            }
+        },
+        "service": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": ["ClusterIP", "NodePort", "LoadBalancer"]
+                },
+                "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                "targetPort": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                }
+            }
+        },
+        "ingress": {
+            "type": "object",
+            "properties": {
+                "enabled": { "type": "boolean" },
+                "className": { "type": "string" },
+                "annotations": { "type": "object" },
+                "hosts": { "type": "array" },
+                "tls": { "type": "array" }
+            }
+        },
+        "persistence": {
+            "type": "object",
+            "properties": {
+                "enabled": { "type": "boolean" },
+                "existingClaim": { "type": "string" },
+                "storageClass": { "type": "string" },
+                "accessModes": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                },
+                "size": { "type": "string", "minLength": 1 }
+            }
+        },
+        "postgresql": {
+            "type": "object",
+            "properties": {
+                "enabled": { "type": "boolean" }
+            }
+        },
+        "redis": {
+            "type": "object",
+            "properties": {
+                "enabled": { "type": "boolean" }
+            }
         }
-      }
-    },
-    "redisConnection": {
-      "type": "object",
-      "properties": {
-        "host": { "type": "string" },
-        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
-        "password": { "type": "string" },
-        "existingSecret": {
-          "type": "object",
-          "properties": {
-            "name": { "type": "string" },
-            "key": { "type": "string", "minLength": 1 }
-          }
-        }
-      }
-    },
-    "service": {
-      "type": "object",
-      "properties": {
-        "type": { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
-        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
-        "targetPort": { "type": "integer", "minimum": 1, "maximum": 65535 }
-      }
-    },
-    "ingress": {
-      "type": "object",
-      "properties": {
-        "enabled": { "type": "boolean" },
-        "className": { "type": "string" },
-        "annotations": { "type": "object" },
-        "hosts": { "type": "array" },
-        "tls": { "type": "array" }
-      }
-    },
-    "persistence": {
-      "type": "object",
-      "properties": {
-        "enabled": { "type": "boolean" },
-        "existingClaim": { "type": "string" },
-        "storageClass": { "type": "string" },
-        "accessModes": { "type": "array", "items": { "type": "string" } },
-        "size": { "type": "string", "minLength": 1 }
-      }
-    },
-    "postgresql": {
-      "type": "object",
-      "properties": {
-        "enabled": { "type": "boolean" }
-      }
-    },
-    "redis": {
-      "type": "object",
-      "properties": {
-        "enabled": { "type": "boolean" }
-      }
     }
-  }
 }

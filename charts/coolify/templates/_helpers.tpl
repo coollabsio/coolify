@@ -101,6 +101,14 @@ app.kubernetes.io/component: {{ .component }}
 {{- define "coolify.commonEnv" -}}
 - name: APP_ENV
   value: {{ .Values.app.env | quote }}
+- name: DB_HOST
+  value: {{ include "coolify.databaseHost" . | quote }}
+- name: DB_PORT
+  value: {{ .Values.database.port | quote }}
+- name: REDIS_HOST
+  value: {{ include "coolify.redisHost" . | quote }}
+- name: REDIS_PORT
+  value: {{ .Values.redisConnection.port | quote }}
 - name: PHP_MEMORY_LIMIT
   value: {{ .Values.web.php.memoryLimit | quote }}
 - name: PHP_FPM_PM_CONTROL

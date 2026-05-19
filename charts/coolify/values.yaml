@@ -66,7 +66,17 @@ rbac:
   clusterScoped: false
   rules:
     - apiGroups: [""]
-      resources: ["configmaps", "endpoints", "events", "persistentvolumeclaims", "pods", "pods/log", "secrets", "services"]
+      resources:
+        [
+          "configmaps",
+          "endpoints",
+          "events",
+          "persistentvolumeclaims",
+          "pods",
+          "pods/log",
+          "secrets",
+          "services",
+        ]
       verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
     - apiGroups: ["apps"]
       resources: ["deployments", "replicasets", "statefulsets"]
@@ -156,7 +166,9 @@ worker:
     - /bin/sh
     - -lc
   args:
-    - php artisan horizon
+    - >-
+      php -r '$targets = [["DB_HOST", "DB_PORT"], ["REDIS_HOST", "REDIS_PORT"]]; foreach ($targets as [$hostKey, $portKey]) { $host = getenv($hostKey); $port = (int) getenv($portKey); $deadline = time() + 300; while (! @fsockopen($host, $port, $errorCode, $errorMessage, 2)) { if (time() >= $deadline) { fwrite(STDERR, "$hostKey timeout\n"); exit(1); } sleep(2); } }'
+      && php artisan horizon
   annotations: {}
   podAnnotations: {}
   podLabels: {}
@@ -177,7 +189,9 @@ scheduler:
     - /bin/sh
     - -lc
   args:
-    - php artisan schedule:run --no-interaction
+    - >-
+      php -r '$targets = [["DB_HOST", "DB_PORT"], ["REDIS_HOST", "REDIS_PORT"]]; foreach ($targets as [$hostKey, $portKey]) { $host = getenv($hostKey); $port = (int) getenv($portKey); $deadline = time() + 300; while (! @fsockopen($host, $port, $errorCode, $errorMessage, 2)) { if (time() >= $deadline) { fwrite(STDERR, "$hostKey timeout\n"); exit(1); } sleep(2); } }'
+      && php artisan schedule:run --no-interaction
   annotations: {}
   podAnnotations: {}
   podLabels: {}
@@ -196,7 +210,9 @@ migration:
     - /bin/sh
     - -lc
   args:
-    - php artisan start:migration && if [ "${SEEDER_ENABLED}" = "true" ]; then php artisan start:seeder; fi
+    - >-
+      php -r '$targets = [["DB_HOST", "DB_PORT"], ["REDIS_HOST", "REDIS_PORT"]]; foreach ($targets as [$hostKey, $portKey]) { $host = getenv($hostKey); $port = (int) getenv($portKey); $deadline = time() + 300; while (! @fsockopen($host, $port, $errorCode, $errorMessage, 2)) { if (time() >= $deadline) { fwrite(STDERR, "$hostKey timeout\n"); exit(1); } sleep(2); } }'
+      && php artisan start:migration && if [ "${SEEDER_ENABLED}" = "true" ]; then php artisan start:seeder; fi
   annotations: {}
   podAnnotations: {}
   podLabels: {}

@@ -45,13 +45,21 @@ class RootUserSeeder extends Seeder
             }
 
             try {
-                $user = (new User)->forceFill([
-                    'id' => 0,
-                    'name' => env('ROOT_USERNAME', 'Root User'),
-                    'email' => env('ROOT_USER_EMAIL'),
-                    'password' => Hash::make(env('ROOT_USER_PASSWORD')),
+                $user = User::withoutEvents(function () {
+                    $user = (new User)->forceFill([
+                        'id' => 0,
+                        'name' => env('ROOT_USERNAME', 'Root User'),
+                        'email' => env('ROOT_USER_EMAIL'),
+                        'password' => Hash::make(env('ROOT_USER_PASSWORD')),
+                    ]);
+                    $user->save();
+
+                    return $user;
+                });
+                $rootTeam = ProductionSeeder::ensureRootTeamExists();
+                $user->teams()->syncWithoutDetaching([
+                    $rootTeam->id => ['role' => 'owner'],
                 ]);
-                $user->save();
                 echo "\n  SUCCESS  Root user created successfully.\n\n";
             } catch (\Exception $e) {
                 echo "\n  ERROR  Failed to create root user: {$e->getMessage()}\n\n";

@@ -12,6 +12,10 @@ class CaSslCertSeeder extends Seeder
     {
         Server::chunk(200, function ($servers) {
             foreach ($servers as $server) {
+                if (! $server->privateKey()->exists()) {
+                    continue;
+                }
+
                 $existingCaCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
 
                 if (! $existingCaCert) {
