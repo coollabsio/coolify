@@ -72,7 +72,7 @@ describe('Application Rollback', function () {
 
         // escapeshellarg wraps the value in single quotes, neutralizing metacharacters
         expect($result)
-            ->toContain("checkout 'abc123; rm -rf /'")
+            ->toContain("checkout '\\''abc123; rm -rf /'\\''")
             ->not->toContain('checkout abc123; rm -rf /');
     });
 
@@ -142,5 +142,22 @@ describe('Application Rollback', function () {
         expect($result)
             ->toContain('GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git lfs pull')
             ->not->toContain('-i /root/.ssh/id_rsa');
+    });
+
+    test('setGitImportSettings retries transient git import failures', function () {
+        $result = $this->application->setGitImportSettings(
+            deployment_uuid: 'test-uuid',
+            git_clone_command: 'git clone',
+            public: true,
+        );
+
+        expect($result)
+            ->toContain('bash -lc')
+            ->toContain('max_attempts=3')
+            ->toContain("rm -rf -- '\\''/artifacts/test-uuid'\\''")
+            ->toContain('Retrying Git import after transient network failure')
+            ->toContain('curl 92')
+            ->toContain('early EOF')
+            ->toContain('invalid index-pack output');
     });
 });
