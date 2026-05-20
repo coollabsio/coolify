@@ -1859,6 +1859,7 @@ class Application extends BaseModel
         }
         $uuid = new Cuid2;
         ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
+        $quietCloneCommand = preg_replace('/^git clone\b/', 'git clone --quiet', $cloneCommand) ?? $cloneCommand;
         $workdir = rtrim($this->base_directory, '/');
         $composeFile = $this->docker_compose_location;
         $fileList = collect([".$workdir$composeFile"]);
@@ -1887,7 +1888,7 @@ class Application extends BaseModel
                 "rm -rf /tmp/{$uuid}",
                 "mkdir -p /tmp/{$uuid}",
                 "cd /tmp/{$uuid}",
-                $cloneCommand,
+                $quietCloneCommand,
                 'git sparse-checkout init',
                 "git sparse-checkout set {$fileList->implode(' ')}",
                 'git read-tree -mu HEAD',
@@ -1898,7 +1899,7 @@ class Application extends BaseModel
                 "rm -rf /tmp/{$uuid}",
                 "mkdir -p /tmp/{$uuid}",
                 "cd /tmp/{$uuid}",
-                $cloneCommand,
+                $quietCloneCommand,
                 'git sparse-checkout init --cone',
                 "git sparse-checkout set {$fileList->implode(' ')}",
                 'git read-tree -mu HEAD',
