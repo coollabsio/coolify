@@ -1406,9 +1406,9 @@ $schema://$host {
             return;
         }
         if ($isSwarm) {
-            return instant_remote_process(['docker network create --attachable --driver overlay coolify-overlay >/dev/null 2>&1 || true'], $this, false);
+            return instant_remote_process([dockerNetworkCreateCommand('coolify-overlay', 'overlay', preferIpv6: false).' 2>&1 || true'], $this, false);
         } else {
-            return instant_remote_process(['docker network create coolify --attachable >/dev/null 2>&1 || true'], $this, false);
+            return instant_remote_process([dockerNetworkCreateCommand('coolify').' 2>&1 || true'], $this, false);
         }
     }
 
