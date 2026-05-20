@@ -1849,6 +1849,13 @@ class Application extends BaseModel
         }
     }
 
+    protected function redirectComposeLoaderOutput(string $command, string $outputLog): string
+    {
+        $escapedOutputLog = escapeshellarg($outputLog);
+
+        return "({$command}) >> {$escapedOutputLog} 2>&1 || { cat {$escapedOutputLog} >&2; exit 1; }";
+    }
+
     public function loadComposeFile($isInit = false, ?string $restoreBaseDirectory = null, ?string $restoreDockerComposeLocation = null)
     {
         // Use provided restore values or capture current values as fallback
@@ -1858,10 +1865,11 @@ class Application extends BaseModel
             return;
         }
         $uuid = new Cuid2;
-        ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
+        ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: 'checkout');
         $workdir = rtrim($this->base_directory, '/');
         $composeFile = $this->docker_compose_location;
         $fileList = collect([".$workdir$composeFile"]);
+        $composeLoaderOutputLog = "/tmp/{$uuid}/compose-loader-output.log";
         $gitRemoteStatus = $this->getGitRemoteStatus(deployment_uuid: $uuid);
         if (! $gitRemoteStatus['is_accessible']) {
             throw new RuntimeException('Failed to read Git source. Please verify repository access and try again.');
@@ -1887,10 +1895,11 @@ class Application extends BaseModel
                 "rm -rf /tmp/{$uuid}",
                 "mkdir -p /tmp/{$uuid}",
                 "cd /tmp/{$uuid}",
-                $cloneCommand,
-                'git sparse-checkout init',
-                "git sparse-checkout set {$fileList->implode(' ')}",
-                'git read-tree -mu HEAD',
+                $this->redirectComposeLoaderOutput($cloneCommand, $composeLoaderOutputLog),
+                'cd checkout',
+                $this->redirectComposeLoaderOutput('git sparse-checkout init', $composeLoaderOutputLog),
+                $this->redirectComposeLoaderOutput("git sparse-checkout set {$fileList->implode(' ')}", $composeLoaderOutputLog),
+                $this->redirectComposeLoaderOutput('git read-tree -mu HEAD', $composeLoaderOutputLog),
                 "cat .$workdir$composeFile",
             ]);
         } else {
@@ -1898,10 +1907,11 @@ class Application extends BaseModel
                 "rm -rf /tmp/{$uuid}",
                 "mkdir -p /tmp/{$uuid}",
                 "cd /tmp/{$uuid}",
-                $cloneCommand,
-                'git sparse-checkout init --cone',
-                "git sparse-checkout set {$fileList->implode(' ')}",
-                'git read-tree -mu HEAD',
+                $this->redirectComposeLoaderOutput($cloneCommand, $composeLoaderOutputLog),
+                'cd checkout',
+                $this->redirectComposeLoaderOutput('git sparse-checkout init --cone', $composeLoaderOutputLog),
+                $this->redirectComposeLoaderOutput("git sparse-checkout set {$fileList->implode(' ')}", $composeLoaderOutputLog),
+                $this->redirectComposeLoaderOutput('git read-tree -mu HEAD', $composeLoaderOutputLog),
                 "cat .$workdir$composeFile",
             ]);
         }
