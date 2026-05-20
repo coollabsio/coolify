@@ -240,6 +240,12 @@ class Index extends Component
     public function resetPassword()
     {
         try {
+            if (! auth()->user()->canUsePasswordAuth()) {
+                $this->dispatch('error', 'Password login is disabled for this account. Use your OAuth provider to sign in.');
+
+                return;
+            }
+
             $this->validate([
                 'current_password' => ['required'],
                 'new_password' => ['required', Password::defaults(), 'confirmed'],
