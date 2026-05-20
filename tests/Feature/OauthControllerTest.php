@@ -5,6 +5,7 @@ use App\Models\OauthSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Socialite\Facades\Socialite;
+use SocialiteProviders\Manager\Config;
 
 uses(RefreshDatabase::class);
 
@@ -30,7 +31,7 @@ it('logs in an existing user when the oauth provider returns a mixed-case email'
         'email' => 'username@example.edu',
     ]);
 
-    $provider = \Mockery::mock();
+    $provider = Mockery::mock();
     $provider->shouldReceive('setConfig')->once()->andReturnSelf();
     $provider->shouldReceive('with')->once()->with(['hd' => 'example.com'])->andReturnSelf();
     $provider->shouldReceive('user')->once()->andReturn((object) [
@@ -48,6 +49,51 @@ it('logs in an existing user when the oauth provider returns a mixed-case email'
     expect(User::count())->toBe(1);
 });
 
+it('logs in through a generic oidc provider configured with a base url', function () {
+    config()->set('app.maintenance.driver', 'file');
+
+    $user = User::factory()->create([
+        'email' => 'user@example.com',
+    ]);
+
+    OauthSetting::create([
+        'provider' => 'oidc',
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'redirect_uri' => 'https://coolify.example.com/auth/oidc/callback',
+        'base_url' => 'https://idp.example.com',
+    ]);
+
+    $provider = Mockery::mock();
+    $provider->shouldReceive('setConfig')->once()->with(Mockery::type(Config::class))->andReturnSelf();
+    $provider->shouldReceive('user')->once()->andReturn((object) [
+        'email' => 'user@example.com',
+        'name' => 'Example User',
+        'id' => 'oidc-user-id',
+    ]);
+
+    Socialite::shouldReceive('driver')->once()->with('oidc')->andReturn($provider);
+
+    $response = $this->get(route('auth.callback', 'oidc'));
+
+    $response->assertRedirect('/');
+    $this->assertAuthenticatedAs($user);
+});
+
+it('requires a base url before oidc can be enabled', function () {
+    $setting = new OauthSetting([
+        'provider' => 'oidc',
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+    ]);
+
+    expect($setting->couldBeEnabled())->toBeFalse();
+
+    $setting->base_url = 'https://idp.example.com';
+
+    expect($setting->couldBeEnabled())->toBeTrue();
+});
+
 it('rejects oauth logins when the provider does not return an email address', function (?string $providerEmail) {
     config()->set('app.maintenance.driver', 'file');
     InstanceSettings::firstOrCreate([
@@ -58,7 +104,7 @@ it('rejects oauth logins when the provider does not return an email address', fu
         'is_registration_enabled' => true,
     ]);
 
-    $provider = \Mockery::mock();
+    $provider = Mockery::mock();
     $provider->shouldReceive('setConfig')->once()->andReturnSelf();
     $provider->shouldReceive('with')->once()->with(['hd' => 'example.com'])->andReturnSelf();
     $provider->shouldReceive('user')->once()->andReturn((object) [
