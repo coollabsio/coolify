@@ -1,4 +1,3 @@
-# ignore: true
 # documentation: https://huly.io/
 # category: cms
 # slogan: Open Source All-in-One Project Management Platform
@@ -8,7 +7,6 @@
 services:
   mongodb:
     image: "mongo:7-jammy"
-    container_name: mongodb
     environment:
       - PUID=1000
       - PGID=1000
@@ -121,3 +119,8 @@ services:
       resources:
         limits:
           memory: 500M
+
+volumes:
+  huly-db:
+  huly-files:
+  huly-elastic:
