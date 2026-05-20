@@ -343,8 +343,40 @@
                         <button
                             x-on:click="
                                 $wire.copyLogs().then(logs => {
-                                    navigator.clipboard.writeText(logs);
-                                    Livewire.dispatch('success', ['Logs copied to clipboard.']);
+                                    // Try modern Clipboard API first, fallback to execCommand for mobile
+                                    const copyToClipboard = (text) => {
+                                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                                            return navigator.clipboard.writeText(text);
+                                        }
+                                        // Fallback for mobile browsers that block Clipboard API
+                                        return new Promise((resolve, reject) => {
+                                            const textarea = document.createElement('textarea');
+                                            textarea.value = text;
+                                            textarea.style.position = 'fixed';
+                                            textarea.style.left = '-9999px';
+                                            textarea.style.top = '0';
+                                            document.body.appendChild(textarea);
+                                            textarea.focus();
+                                            textarea.select();
+                                            try {
+                                                const success = document.execCommand('copy');
+                                                document.body.removeChild(textarea);
+                                                if (success) {
+                                                    resolve();
+                                                } else {
+                                                    reject(new Error('execCommand copy failed'));
+                                                }
+                                            } catch (err) {
+                                                document.body.removeChild(textarea);
+                                                reject(err);
+                                            }
+                                        });
+                                    };
+                                    copyToClipboard(logs).then(() => {
+                                        Livewire.dispatch('success', ['Logs copied to clipboard.']);
+                                    }).catch(err => {
+                                        Livewire.dispatch('error', ['Failed to copy logs to clipboard.']);
+                                    });
                                 });
                             "
                             title="Copy Logs"
