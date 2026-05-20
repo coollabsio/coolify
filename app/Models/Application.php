@@ -1868,6 +1868,9 @@ class Application extends BaseModel
         }
         $getGitVersion = instant_remote_process(['git --version'], $this->destination->server, false);
         $gitVersion = str($getGitVersion)->explode(' ')->last();
+        $logFile = escapeshellarg("/tmp/{$uuid}/load-compose-file.log");
+        $quietCloneCommand = $this->muteComposeLoaderCommand($cloneCommand, $logFile);
+        $quietReadTreeCommand = $this->muteComposeLoaderCommand('git read-tree -mu HEAD', $logFile);
 
         if (version_compare($gitVersion, '2.35.1', '<')) {
             $fileList = $fileList->map(function ($file) {
@@ -1883,25 +1886,29 @@ class Application extends BaseModel
 
                 return $paths;
             })->flatten()->unique()->values();
+            $quietSparseCheckoutInitCommand = $this->muteComposeLoaderCommand('git sparse-checkout init', $logFile);
+            $quietSparseCheckoutSetCommand = $this->muteComposeLoaderCommand("git sparse-checkout set {$fileList->implode(' ')}", $logFile);
             $commands = collect([
                 "rm -rf /tmp/{$uuid}",
                 "mkdir -p /tmp/{$uuid}",
                 "cd /tmp/{$uuid}",
-                $cloneCommand,
-                'git sparse-checkout init',
-                "git sparse-checkout set {$fileList->implode(' ')}",
-                'git read-tree -mu HEAD',
+                $quietCloneCommand,
+                $quietSparseCheckoutInitCommand,
+                $quietSparseCheckoutSetCommand,
+                $quietReadTreeCommand,
                 "cat .$workdir$composeFile",
             ]);
         } else {
+            $quietSparseCheckoutInitCommand = $this->muteComposeLoaderCommand('git sparse-checkout init --cone', $logFile);
+            $quietSparseCheckoutSetCommand = $this->muteComposeLoaderCommand("git sparse-checkout set {$fileList->implode(' ')}", $logFile);
             $commands = collect([
                 "rm -rf /tmp/{$uuid}",
                 "mkdir -p /tmp/{$uuid}",
                 "cd /tmp/{$uuid}",
-                $cloneCommand,
-                'git sparse-checkout init --cone',
-                "git sparse-checkout set {$fileList->implode(' ')}",
-                'git read-tree -mu HEAD',
+                $quietCloneCommand,
+                $quietSparseCheckoutInitCommand,
+                $quietSparseCheckoutSetCommand,
+                $quietReadTreeCommand,
                 "cat .$workdir$composeFile",
             ]);
         }
@@ -1977,6 +1984,11 @@ class Application extends BaseModel
 
             throw new RuntimeException("Docker Compose file not found at: $workdir$composeFile (branch: {$this->git_branch})<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
         }
+    }
+
+    protected function muteComposeLoaderCommand(string $command, string $escapedLogFile): string
+    {
+        return "({$command}) > {$escapedLogFile} 2>&1 || { cat {$escapedLogFile} >&2; exit 1; }";
     }
 
     public function parseContainerLabels(?ApplicationPreview $preview = null)
