@@ -1525,7 +1525,7 @@ class Application extends BaseModel
 
         $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} -b {$escapedBranch}";
         if ($only_checkout) {
-            $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} --no-checkout -b {$escapedBranch}";
+            $git_clone_command = "git clone --quiet{$depthFlag}{$submoduleFlags} --no-checkout -b {$escapedBranch}";
         }
         if ($pull_request_id !== 0) {
             $pr_branch_name = "pr-{$pull_request_id}-coolify";
@@ -1858,7 +1858,7 @@ class Application extends BaseModel
             return;
         }
         $uuid = new Cuid2;
-        ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
+        ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: 'checkout');
         $workdir = rtrim($this->base_directory, '/');
         $composeFile = $this->docker_compose_location;
         $fileList = collect([".$workdir$composeFile"]);
@@ -1888,6 +1888,7 @@ class Application extends BaseModel
                 "mkdir -p /tmp/{$uuid}",
                 "cd /tmp/{$uuid}",
                 $cloneCommand,
+                'cd checkout',
                 'git sparse-checkout init',
                 "git sparse-checkout set {$fileList->implode(' ')}",
                 'git read-tree -mu HEAD',
@@ -1899,6 +1900,7 @@ class Application extends BaseModel
                 "mkdir -p /tmp/{$uuid}",
                 "cd /tmp/{$uuid}",
                 $cloneCommand,
+                'cd checkout',
                 'git sparse-checkout init --cone',
                 "git sparse-checkout set {$fileList->implode(' ')}",
                 'git read-tree -mu HEAD',
