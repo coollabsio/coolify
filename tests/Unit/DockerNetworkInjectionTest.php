@@ -46,3 +46,28 @@ it('SwarmDocker accepts valid network names', function (string $network) {
     'with hyphen' => 'my-network',
     'with underscore' => 'my_network',
 ]);
+
+it('creates standalone docker networks with IPv6 preferred and IPv4 fallback', function () {
+    $command = dockerNetworkCreateCommand('coolify');
+
+    expect($command)
+        ->toContain('docker network create --ipv6 --attachable')
+        ->toContain('2>/dev/null || docker network create --attachable')
+        ->toContain("'coolify'");
+});
+
+it('keeps swarm docker network creation IPv4-only', function () {
+    $command = dockerNetworkCreateCommand('coolify-overlay', isSwarm: true);
+
+    expect($command)
+        ->toBe("docker network create --driver overlay --attachable 'coolify-overlay'")
+        ->not->toContain('--ipv6');
+});
+
+it('can suppress docker network creation output', function () {
+    $command = dockerNetworkCreateCommand('coolify', suppressOutput: true);
+
+    expect($command)
+        ->toContain("docker network create --ipv6 --attachable 'coolify' >/dev/null")
+        ->toContain("|| docker network create --attachable 'coolify' >/dev/null");
+});
