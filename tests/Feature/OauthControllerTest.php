@@ -77,3 +77,51 @@ it('rejects oauth logins when the provider does not return an email address', fu
     'null email' => [null],
     'blank email' => ['   '],
 ]);
+
+it('creates a new oauth user when oauth registration is enabled and general registration is disabled', function () {
+    config()->set('app.maintenance.driver', 'file');
+    InstanceSettings::find(0)->update([
+        'is_registration_enabled' => false,
+        'is_oauth_registration_enabled' => true,
+    ]);
+
+    $provider = \Mockery::mock();
+    $provider->shouldReceive('setConfig')->once()->andReturnSelf();
+    $provider->shouldReceive('with')->once()->with(['hd' => 'example.com'])->andReturnSelf();
+    $provider->shouldReceive('user')->once()->andReturn((object) [
+        'email' => 'NewUser@example.edu',
+        'name' => 'New OAuth User',
+        'id' => 'google-user-id',
+    ]);
+
+    Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+    $response = $this->get(route('auth.callback', 'google'));
+
+    $response->assertRedirect('/');
+
+    $user = User::whereEmail('newuser@example.edu')->first();
+    expect($user)->not->toBeNull()
+        ->and($user->password)->toBeNull();
+    $this->assertAuthenticatedAs($user);
+});
+
+it('rejects new oauth users when both registration modes are disabled', function () {
+    config()->set('app.maintenance.driver', 'file');
+
+    $provider = \Mockery::mock();
+    $provider->shouldReceive('setConfig')->once()->andReturnSelf();
+    $provider->shouldReceive('with')->once()->with(['hd' => 'example.com'])->andReturnSelf();
+    $provider->shouldReceive('user')->once()->andReturn((object) [
+        'email' => 'blocked@example.edu',
+        'name' => 'Blocked User',
+        'id' => 'google-user-id',
+    ]);
+
+    Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+    $response = $this->from('/login')->get(route('auth.callback', 'google'));
+
+    $response->assertRedirect('/login');
+    expect(User::whereEmail('blocked@example.edu')->exists())->toBeFalse();
+});
