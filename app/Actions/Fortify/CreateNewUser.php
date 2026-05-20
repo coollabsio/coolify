@@ -22,6 +22,9 @@ class CreateNewUser implements CreatesNewUsers
         if (! $settings->is_registration_enabled) {
             abort(403);
         }
+        if ($settings->is_password_authentication_disabled && User::count() > 0) {
+            abort(403, 'Password authentication is disabled');
+        }
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
             'email' => [

@@ -17,6 +17,10 @@ class UpdateUserPassword implements UpdatesUserPasswords
      */
     public function update(User $user, array $input): void
     {
+        if (instanceSettings()->is_password_authentication_disabled && $user->id !== 0) {
+            abort(403, 'Password authentication is disabled');
+        }
+
         Validator::make($input, [
             'current_password' => ['required', 'string', 'current_password:web'],
             'password' => ['required', Password::defaults(), 'confirmed'],
