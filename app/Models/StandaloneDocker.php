@@ -23,9 +23,8 @@ class StandaloneDocker extends BaseModel
         parent::boot();
         static::created(function ($newStandaloneDocker) {
             $server = $newStandaloneDocker->server;
-            $safeNetwork = escapeshellarg($newStandaloneDocker->network);
             instant_remote_process([
-                "docker network inspect {$safeNetwork} >/dev/null 2>&1 || docker network create --driver overlay --attachable {$safeNetwork} >/dev/null",
+                'docker network inspect '.escapeshellarg($newStandaloneDocker->network).' >/dev/null 2>&1 || '.dockerNetworkCreateCommand($newStandaloneDocker->network, preferIpv6: true, suppressOutput: true),
             ], $server, false);
             ConnectProxyToNetworksJob::dispatchSync($server);
         });
