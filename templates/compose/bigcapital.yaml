@@ -1,0 +1,130 @@
+# documentation: https://docs.bigcapital.app
+# slogan: Open-source accounting and financial management software
+# category: Finance
+# tags: accounting,finance,invoicing,self-hosted
+# logo: svgs/bigcapital.svg
+# port: 80
+
+services:
+  webapp:
+    image: 'bigcapitalhq/webapp:latest'
+    restart: on-failure
+    environment:
+      - SERVICE_FQDN_WEBAPP_80
+    command: "sh -c \"echo 'server {\n  listen 80 default_server;\n  location /api {\n    proxy_pass http://server:3000;\n    proxy_set_header Host $$host;\n    proxy_set_header X-Real-IP $$remote_addr;\n  }\n  location / {\n    root /usr/share/nginx/html;\n    try_files $$uri /index.html;\n  }\n}' > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'\"\n"
+    depends_on:
+      - server
+
+  server:
+    image: 'bigcapitalhq/server:latest'
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: on-failure
+    environment:
+      # Mail settings (required for signup confirmation and notifications)
+      - MAIL_HOST=${MAIL_HOST:-}
+      - MAIL_USERNAME=${MAIL_USERNAME:-}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_SECURE=${MAIL_SECURE:-false}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-Bigcapital}
+      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS:-}
+      # Database
+      - DB_HOST=mysql
+      - DB_USER=${SERVICE_USER_MYSQL}
+      - DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - DB_CHARSET=${DB_CHARSET:-utf8}
+      - SYSTEM_DB_NAME=${SYSTEM_DB_NAME:-bigcapital}
+      # Redis / Queue
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - QUEUE_HOST=redis
+      - QUEUE_PORT=6379
+      # App
+      - TENANT_DB_NAME_PERFIX=bigcapital_tenant_
+      - JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
+      - BASE_URL=${SERVICE_URL_WEBAPP}
+      # Signup controls (all optional)
+      - SIGNUP_DISABLED=${SIGNUP_DISABLED:-false}
+      - SIGNUP_ALLOWED_DOMAINS=${SIGNUP_ALLOWED_DOMAINS:-}
+      - SIGNUP_ALLOWED_EMAILS=${SIGNUP_ALLOWED_EMAILS:-}
+      - SIGNUP_EMAIL_CONFIRMATION=${SIGNUP_EMAIL_CONFIRMATION:-false}
+      # PDF generation via Gotenberg (optional)
+      - GOTENBERG_URL=http://gotenberg:3000
+      - GOTENBERG_DOCS_URL=http://gotenberg:3000
+      # Exchange rates (optional)
+      - EXCHANGE_RATE_SERVICE=${EXCHANGE_RATE_SERVICE:-}
+      - OPEN_EXCHANGE_RATE_APP_ID=${OPEN_EXCHANGE_RATE_APP_ID:-}
+      # Plaid bank feeds (optional)
+      - BANK_FEED_ENABLED=${BANK_FEED_ENABLED:-false}
+      - PLAID_ENV=${PLAID_ENV:-}
+      - PLAID_CLIENT_ID=${PLAID_CLIENT_ID:-}
+      - PLAID_SECRET=${PLAID_SECRET:-}
+      - PLAID_LINK_WEBHOOK=${PLAID_LINK_WEBHOOK:-}
+      # S3 storage (optional)
+      - S3_REGION=${S3_REGION:-}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
+      - S3_ENDPOINT=${S3_ENDPOINT:-}
+      - S3_BUCKET=${S3_BUCKET:-}
+      # Stripe payments (optional)
+      - STRIPE_PAYMENT_SECRET_KEY=${STRIPE_PAYMENT_SECRET_KEY:-}
+      - STRIPE_PAYMENT_PUBLISHABLE_KEY=${STRIPE_PAYMENT_PUBLISHABLE_KEY:-}
+      - STRIPE_PAYMENT_CLIENT_ID=${STRIPE_PAYMENT_CLIENT_ID:-}
+      - STRIPE_PAYMENT_WEBHOOKS_SECRET=${STRIPE_PAYMENT_WEBHOOKS_SECRET:-}
+      - STRIPE_PAYMENT_REDIRECT_URL=${STRIPE_PAYMENT_REDIRECT_URL:-}
+      # Lemon Squeezy (optional)
+      - LEMONSQUEEZY_API_KEY=${LEMONSQUEEZY_API_KEY:-}
+      - LEMONSQUEEZY_STORE_ID=${LEMONSQUEEZY_STORE_ID:-}
+      - LEMONSQUEEZY_WEBHOOK_SECRET=${LEMONSQUEEZY_WEBHOOK_SECRET:-}
+      - HOSTED_ON_BIGCAPITAL_CLOUD=${HOSTED_ON_BIGCAPITAL_CLOUD:-false}
+
+  database_migration:
+    image: 'bigcapitalhq/server:latest'
+    environment:
+      - DB_HOST=mysql
+      - DB_USER=${SERVICE_USER_MYSQL}
+      - DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - DB_CHARSET=${DB_CHARSET:-utf8}
+      - SYSTEM_DB_NAME=${SYSTEM_DB_NAME:-bigcapital}
+      - TENANT_DB_NAME_PERFIX=bigcapital_tenant_
+      - SYSTEM_DB_MIGRATION_DIR=/app/packages/server/dist/database/system/migrations
+      - SYSTEM_DB_SEEDS_DIR=/app/packages/server/dist/database/system/seeds
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: "sh -c \"sleep 15 &&\n     node /app/packages/server/dist/cli.js system:migrate:latest &&\n     node /app/packages/server/dist/cli.js tenants:migrate:latest\"\n"
+
+  mysql:
+    image: 'mariadb:10.2'
+    restart: on-failure
+    environment:
+      - MYSQL_DATABASE=${SYSTEM_DB_NAME:-bigcapital}
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+    volumes:
+      - 'mysql:/var/lib/mysql'
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1']
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    command: "sh -c \"echo \\\"GRANT ALL PRIVILEGES ON *.* TO '$$MYSQL_USER'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;\\\" > /docker-entrypoint-initdb.d/init.sql && docker-entrypoint.sh mysqld\"\n"
+
+  redis:
+    image: 'redis:6.2.21'
+    restart: on-failure
+    volumes:
+      - 'redis:/data'
+
+  gotenberg:
+    image: 'gotenberg/gotenberg:7'
+    restart: on-failure
+
+volumes:
+  mysql:
+  redis:
