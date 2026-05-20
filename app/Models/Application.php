@@ -1314,7 +1314,68 @@ class Application extends BaseModel
             $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} git lfs pull";
         }
 
-        return $git_clone_command;
+        return $this->wrapGitImportCommandWithRetry($git_clone_command, $escapedBaseDir);
+    }
+
+    private function wrapGitImportCommandWithRetry(string $git_import_command, string $escapedBaseDir): string
+    {
+        $transientGitFailurePattern = implode('|', [
+            'curl 92',
+            'HTTP/2 stream',
+            'early EOF',
+            'fetch-pack: unexpected disconnect',
+            'invalid index-pack output',
+            'remote end hung up unexpectedly',
+            'connection reset',
+            'Operation timed out',
+        ]);
+
+        $script = <<<'BASH'
+set -o pipefail
+attempt=1
+max_attempts=3
+while true; do
+    if [ "$attempt" -gt 1 ]; then
+        rm -rf -- __COOLIFY_GIT_IMPORT_BASE_DIR__
+    fi
+
+    output_file="$(mktemp)"
+    if { __COOLIFY_GIT_IMPORT_COMMAND__; } >"$output_file" 2>&1; then
+        cat "$output_file"
+        rm -f "$output_file"
+        exit 0
+    fi
+
+    status="$?"
+    cat "$output_file"
+
+    if [ "$attempt" -ge "$max_attempts" ] || ! grep -Eiq __COOLIFY_GIT_TRANSIENT_PATTERN__ "$output_file"; then
+        rm -f "$output_file"
+        exit "$status"
+    fi
+
+    rm -f "$output_file"
+    attempt=$((attempt + 1))
+    echo "Retrying Git import after transient network failure (attempt $attempt/$max_attempts)..."
+    sleep $((attempt * 2))
+done
+BASH;
+
+        $script = str_replace(
+            [
+                '__COOLIFY_GIT_IMPORT_BASE_DIR__',
+                '__COOLIFY_GIT_IMPORT_COMMAND__',
+                '__COOLIFY_GIT_TRANSIENT_PATTERN__',
+            ],
+            [
+                $escapedBaseDir,
+                $git_import_command,
+                escapeshellarg($transientGitFailurePattern),
+            ],
+            $script
+        );
+
+        return 'bash -lc '.escapeshellarg($script);
     }
 
     public function getGitRemoteStatus(string $deployment_uuid)
