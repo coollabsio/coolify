@@ -1859,6 +1859,7 @@ class Application extends BaseModel
         }
         $uuid = new Cuid2;
         ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
+        $gitOutputLog = "/tmp/{$uuid}/compose-load.log";
         $workdir = rtrim($this->base_directory, '/');
         $composeFile = $this->docker_compose_location;
         $fileList = collect([".$workdir$composeFile"]);
@@ -1886,22 +1887,24 @@ class Application extends BaseModel
             $commands = collect([
                 "rm -rf /tmp/{$uuid}",
                 "mkdir -p /tmp/{$uuid}",
+                ': > '.escapeshellarg($gitOutputLog),
                 "cd /tmp/{$uuid}",
-                $cloneCommand,
-                'git sparse-checkout init',
-                "git sparse-checkout set {$fileList->implode(' ')}",
-                'git read-tree -mu HEAD',
+                $this->composeFileLoadSetupCommand($cloneCommand, $gitOutputLog),
+                $this->composeFileLoadSetupCommand('git sparse-checkout init', $gitOutputLog),
+                $this->composeFileLoadSetupCommand("git sparse-checkout set {$fileList->implode(' ')}", $gitOutputLog),
+                $this->composeFileLoadSetupCommand('git read-tree -mu HEAD', $gitOutputLog),
                 "cat .$workdir$composeFile",
             ]);
         } else {
             $commands = collect([
                 "rm -rf /tmp/{$uuid}",
                 "mkdir -p /tmp/{$uuid}",
+                ': > '.escapeshellarg($gitOutputLog),
                 "cd /tmp/{$uuid}",
-                $cloneCommand,
-                'git sparse-checkout init --cone',
-                "git sparse-checkout set {$fileList->implode(' ')}",
-                'git read-tree -mu HEAD',
+                $this->composeFileLoadSetupCommand($cloneCommand, $gitOutputLog),
+                $this->composeFileLoadSetupCommand('git sparse-checkout init --cone', $gitOutputLog),
+                $this->composeFileLoadSetupCommand("git sparse-checkout set {$fileList->implode(' ')}", $gitOutputLog),
+                $this->composeFileLoadSetupCommand('git read-tree -mu HEAD', $gitOutputLog),
                 "cat .$workdir$composeFile",
             ]);
         }
@@ -1977,6 +1980,13 @@ class Application extends BaseModel
 
             throw new RuntimeException("Docker Compose file not found at: $workdir$composeFile (branch: {$this->git_branch})<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
         }
+    }
+
+    private function composeFileLoadSetupCommand(string $command, string $gitOutputLog): string
+    {
+        $escapedGitOutputLog = escapeshellarg($gitOutputLog);
+
+        return "{$command} >> {$escapedGitOutputLog} 2>&1 || { cat {$escapedGitOutputLog} >&2; exit 1; }";
     }
 
     public function parseContainerLabels(?ApplicationPreview $preview = null)
