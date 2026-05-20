@@ -1702,6 +1702,74 @@
             "time": "2025-03-19T14:43:43+00:00"
         },
         {
+            "name": "kovah/laravel-socialite-oidc",
+            "version": "v0.5.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Kovah/laravel-socialite-oidc.git",
+                "reference": "b3e14d9b797b12ff3c8526ece43020dc8af2ecdf"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Kovah/laravel-socialite-oidc/zipball/b3e14d9b797b12ff3c8526ece43020dc8af2ecdf",
+                "reference": "b3e14d9b797b12ff3c8526ece43020dc8af2ecdf",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "firebase/php-jwt": "^6.11.1",
+                "illuminate/http": "^9.0 | ^10.0 | ^11.0 | ^12.0",
+                "illuminate/support": "^9.0 | ^10.0 | ^11.0 | ^12.0",
+                "php": "^8.1",
+                "socialiteproviders/manager": "^4.0"
+            },
+            "conflict": {
+                "jp-gauthier/socialiteproviders-oidc": "*"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "SocialiteProviders\\OIDC\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "JPG Dev",
+                    "homepage": "https://jpgdev.com"
+                },
+                {
+                    "name": "Kevin Woblick",
+                    "email": "mail@woblick.dev",
+                    "homepage": "https://woblick.dev",
+                    "role": "Developer"
+                }
+            ],
+            "description": "OpenID Connect OAuth2 Provider for Laravel Socialite",
+            "homepage": "https://github.com/kovah/laravel-socialite-oidc",
+            "keywords": [
+                "laravel",
+                "oauth",
+                "oidc",
+                "provider",
+                "socialite"
+            ],
+            "support": {
+                "issues": "https://github.com/Kovah/laravel-socialite-oidc/issues",
+                "source": "https://github.com/Kovah/laravel-socialite-oidc/tree/v0.5.0"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/sponsors/kovah",
+                    "type": "github"
+                }
+            ],
+            "time": "2025-08-31T18:41:24+00:00"
+        },
+        {
             "name": "laravel/fortify",
             "version": "v1.36.2",
             "source": {
