@@ -34,6 +34,7 @@ use OpenApi\Attributes as OA;
         'email_verified_at' => ['type' => 'string', 'description' => 'The date when the user email was verified.'],
         'created_at' => ['type' => 'string', 'description' => 'The date when the user was created.'],
         'updated_at' => ['type' => 'string', 'description' => 'The date when the user was updated.'],
+        'is_oauth_only' => ['type' => 'boolean', 'description' => 'Whether the account is restricted to OAuth sign-in only.'],
         'two_factor_confirmed_at' => ['type' => 'string', 'description' => 'The date when the user two factor was confirmed.'],
         'force_password_reset' => ['type' => 'boolean', 'description' => 'The flag to force the user to reset the password.'],
         'marketing_emails' => ['type' => 'boolean', 'description' => 'The flag to receive marketing emails.'],
@@ -63,6 +64,7 @@ class User extends Authenticatable implements SendsEmail
 
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'is_oauth_only' => 'boolean',
         'force_password_reset' => 'boolean',
         'show_boarding' => 'boolean',
         'email_change_code_expires_at' => 'datetime',
@@ -486,5 +488,10 @@ class User extends Authenticatable implements SendsEmail
     public function hasPassword(): bool
     {
         return ! empty($this->password);
+    }
+
+    public function canUsePasswordAuth(): bool
+    {
+        return $this->hasPassword() && ! $this->is_oauth_only;
     }
 }

@@ -48,6 +48,32 @@ it('logs in an existing user when the oauth provider returns a mixed-case email'
     expect(User::count())->toBe(1);
 });
 
+it('creates oauth-only users even when general registration is disabled', function () {
+    config()->set('app.maintenance.driver', 'file');
+
+    $provider = \Mockery::mock();
+    $provider->shouldReceive('setConfig')->once()->andReturnSelf();
+    $provider->shouldReceive('with')->once()->with(['hd' => 'example.com'])->andReturnSelf();
+    $provider->shouldReceive('user')->once()->andReturn((object) [
+        'email' => 'new-user@example.edu',
+        'name' => 'Example User',
+        'id' => 'google-user-id',
+    ]);
+
+    Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+    $response = $this->get(route('auth.callback', 'google'));
+
+    $response->assertRedirect('/');
+    $user = User::whereEmail('new-user@example.edu')->first();
+
+    expect($user)
+        ->not->toBeNull()
+        ->and($user->is_oauth_only)->toBeTrue()
+        ->and($user->password)->toBeNull();
+    $this->assertAuthenticatedAs($user);
+});
+
 it('rejects oauth logins when the provider does not return an email address', function (?string $providerEmail) {
     config()->set('app.maintenance.driver', 'file');
     InstanceSettings::firstOrCreate([
