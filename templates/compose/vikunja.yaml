@@ -17,7 +17,7 @@ services:
       - VIKUNJA_DATABASE_PATH=/db/vikunja.db
       - VIKUNJA_DATABASE_TYPE=sqlite
     volumes:
-      -   vikunja-data:/app/vikunja/
+      - vikunja-data:/app/vikunja/
       - vikunja-sqlite-data:/db
     depends_on:
       - init
