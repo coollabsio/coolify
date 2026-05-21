@@ -76,8 +76,10 @@ class StartProxy
                 "    echo 'Successfully stopped and removed existing coolify-proxy.'",
                 'fi',
             ]);
-            // Ensure required networks exist BEFORE docker compose up (networks are declared as external)
-            $commands = $commands->merge(ensureProxyNetworksExist($server));
+ // Ensure the coolify network has IPv6 enabled for proper client IP forwarding
+ $commands = $commands->merge(ensureCoolifyNetworkHasIPv6($server));
+ // Ensure required networks exist BEFORE docker compose up (networks are declared as external)
+ $commands = $commands->merge(ensureProxyNetworksExist($server));
             $commands = $commands->merge([
                 "echo 'Starting coolify-proxy.'",
                 'docker compose up -d --wait --remove-orphans',

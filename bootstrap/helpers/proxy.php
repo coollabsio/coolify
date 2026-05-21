@@ -116,18 +116,19 @@ function connectProxyToNetworks(Server $server)
                 "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
         });
-    } else {
-        $commands = $networks->map(function ($network) {
-            $safe = escapeshellarg($network);
-            return [
-                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --attachable {$safe} >/dev/null",
-                "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
-                "echo 'Successfully connected coolify-proxy to {$safe} network.'",
-            ];
-        });
-    }
+ } else {
+ $commands = $networks->map(function ($network) {
+ $safe = escapeshellarg($network);
+ $ipv6Flag = ($network === 'coolify') ? ' --ipv6' : '';
+ return [
+ "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --attachable{$ipv6Flag} {$safe} >/dev/null",
+ "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
+ "echo 'Successfully connected coolify-proxy to {$safe} network.'",
+ ];
+ });
+ }
 
-    return $commands->flatten();
+ return $commands->flatten();
 }
 
 /**
@@ -149,17 +150,78 @@ function ensureProxyNetworksExist(Server $server)
                 "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable {$safe}",
             ];
         });
-    } else {
-        $commands = $networks->map(function ($network) {
-            $safe = escapeshellarg($network);
-            return [
-                "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable {$safe}",
-            ];
-        });
-    }
+ } else {
+ $commands = $networks->map(function ($network) {
+ $safe = escapeshellarg($network);
+ $ipv6Flag = ($network === 'coolify') ? ' --ipv6' : '';
+ return [
+ "echo 'Ensuring network {$safe} exists...'",
+ "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable{$ipv6Flag} {$safe}",
+ ];
+ });
+ }
 
     return $commands->flatten();
+}
+
+/**
+ * Ensure the coolify proxy ingress network has IPv6 enabled.
+ * If the network exists as IPv4-only, recreate it with --ipv6.
+ * This is necessary because Traefik can only forward real IPv6 client IPs
+ * when the ingress network supports IPv6. Without it, IPv6 clients appear
+ * as the Docker gateway IP in X-Forwarded-For headers.
+ *
+ * @param Server $server The server to check/fix the network on
+ * @return array Commands to migrate the network if needed
+ */
+function ensureCoolifyNetworkHasIPv6(Server $server): array
+{
+ if ($server->isSwarm()) {
+ // Swarm overlay networks handle IPv6 differently; skip for now
+ return [];
+ }
+
+ $network = 'coolify';
+
+ // Check if network exists and whether it has IPv6 enabled
+ $checkCommand = "docker network inspect {$network} --format '{{.EnableIPv6}}' 2>/dev/null || echo 'missing'";
+
+ $result = instant_remote_process([$checkCommand], $server, false);
+ $result = trim($result);
+
+ // If network doesn't exist or already has IPv6, nothing to do
+ if ($result === 'missing' || $result === 'true') {
+ return [];
+ }
+
+ // Network exists but is IPv4-only — needs recreation
+ // Only safe to recreate if no containers are attached
+ $hasContainers = instant_remote_process([
+ "docker network inspect {$network} --format '{{len .Containers}}' 2>/dev/null",
+ ], $server, false);
+
+ if (intval(trim($hasContainers)) > 0) {
+ // Containers are attached — log warning, cannot safely recreate
+ Log::warning("Coolify network '{$network}' is IPv4-only but has containers attached. Cannot auto-migrate. Please manually recreate the network with --ipv6 flag.");
+
+ return [
+ "echo '⚠️ The coolify network is IPv4-only but has containers attached.'",
+ "echo '⚠️ To fix IPv6 client IP forwarding, run these steps manually:'",
+ "echo '⚠️   1. Stop all coolify containers: docker stop \\$(docker network inspect coolify -f \"{{range .Containers}}{{.Name}} {{end}}\")'",
+ "echo '⚠️   2. Disconnect containers: docker network disconnect coolify <container>'",
+ "echo '⚠️   3. Remove network: docker network rm coolify'",
+ "echo '⚠️   4. Recreate with IPv6: docker network create --attachable --ipv6 coolify'",
+ "echo '⚠️   5. Restart containers'",
+ ];
+ }
+
+ // No containers attached — safe to recreate
+ return [
+ "echo 'Recreating coolify network with IPv6 support...'",
+ "docker network rm {$network} 2>/dev/null || true",
+ "docker network create --attachable --ipv6 {$network}",
+ "echo '✅ Coolify network recreated with IPv6 support.'",
+ ];
 }
 
 function extractCustomProxyCommands(Server $server, string $existing_config): array
