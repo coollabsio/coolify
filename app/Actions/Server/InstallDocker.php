@@ -98,11 +98,11 @@ class InstallDocker
             ]);
             if ($server->isSwarm()) {
                 $command = $command->merge([
-                    'docker network create --attachable --driver overlay coolify-overlay >/dev/null 2>&1 || true',
+                    dockerNetworkEnsureCommand('coolify-overlay', isSwarm: true, suppressOutput: true).' || true',
                 ]);
             } else {
                 $command = $command->merge([
-                    'docker network create --attachable coolify >/dev/null 2>&1 || true',
+                    dockerNetworkEnsureCommand('coolify', preferIpv6: true, repairEmptyIpv4Only: true, suppressOutput: true).' || true',
                 ]);
                 $command = $command->merge([
                     "echo 'Done!'",
