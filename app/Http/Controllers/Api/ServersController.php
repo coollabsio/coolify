@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\Server\DeleteServer;
+use App\Actions\Server\StartLogDrain;
+use App\Actions\Server\StopLogDrain;
 use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
@@ -649,7 +651,7 @@ class ServersController extends Controller
     )]
     public function update_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'connection_timeout'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'connection_timeout', 'is_logdrain_newrelic_enabled', 'is_logdrain_highlight_enabled', 'is_logdrain_axiom_enabled', 'is_logdrain_custom_enabled', 'logdrain_newrelic_license_key', 'logdrain_newrelic_base_uri', 'logdrain_highlight_project_id', 'logdrain_axiom_api_key', 'logdrain_axiom_dataset_name', 'logdrain_custom_config', 'logdrain_custom_config_parser'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -676,6 +678,17 @@ class ServersController extends Controller
             'server_disk_usage_notification_threshold' => 'integer|min:1|max:100',
             'server_disk_usage_check_frequency' => 'string',
             'connection_timeout' => 'integer|min:1|max:300',
+            'is_logdrain_newrelic_enabled' => 'boolean|nullable',
+            'is_logdrain_highlight_enabled' => 'boolean|nullable',
+            'is_logdrain_axiom_enabled' => 'boolean|nullable',
+            'is_logdrain_custom_enabled' => 'boolean|nullable',
+            'logdrain_newrelic_license_key' => 'string|nullable',
+            'logdrain_newrelic_base_uri' => 'string|nullable',
+            'logdrain_highlight_project_id' => 'string|nullable',
+            'logdrain_axiom_api_key' => 'string|nullable',
+            'logdrain_axiom_dataset_name' => 'string|nullable',
+            'logdrain_custom_config' => 'string|nullable',
+            'logdrain_custom_config_parser' => 'string|nullable',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -723,6 +736,15 @@ class ServersController extends Controller
         $advancedSettings = $request->only(['concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'connection_timeout']);
         if (! empty($advancedSettings)) {
             $server->settings()->update(array_filter($advancedSettings, fn ($value) => ! is_null($value)));
+        }
+
+        $logDrainFields = ['is_logdrain_newrelic_enabled', 'is_logdrain_highlight_enabled', 'is_logdrain_axiom_enabled', 'is_logdrain_custom_enabled', 'logdrain_newrelic_license_key', 'logdrain_newrelic_base_uri', 'logdrain_highlight_project_id', 'logdrain_axiom_api_key', 'logdrain_axiom_dataset_name', 'logdrain_custom_config', 'logdrain_custom_config_parser'];
+        $logDrainPayload = $request->only($logDrainFields);
+        if (! empty($logDrainPayload)) {
+            $server->settings()->update($logDrainPayload);
+            $server->refresh();
+            StopLogDrain::run($server);
+            StartLogDrain::run($server);
         }
 
         if ($request->instant_validate) {
