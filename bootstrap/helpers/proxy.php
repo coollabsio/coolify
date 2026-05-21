@@ -36,6 +36,40 @@ function collectProxyDockerNetworksByServer(Server $server)
         return collect(json_decode($network))->keys();
     })->flatten()->unique();
 }
+
+function collectProxyIngressDockerNetworksByServer(Server $server)
+{
+    if ($server->isSwarm()) {
+        $networks = collect($server->swarmDockers)->map(function ($docker) {
+            return $docker['network'];
+        });
+
+        if ($networks->count() === 0) {
+            $networks = collect(['coolify-overlay']);
+        }
+    } else {
+        $networks = collect($server->standaloneDockers)->map(function ($docker) {
+            return $docker['network'];
+        });
+
+        if ($networks->count() === 0) {
+            $networks = collect(['coolify']);
+        }
+    }
+
+    return $networks->flatten()->unique()->filter(function ($network) {
+        return ! isDockerPredefinedNetwork($network);
+    });
+}
+
+function shouldCreateProxyNetworkWithIpv6(Server $server, string $network): bool
+{
+    if ($server->isSwarm()) {
+        return false;
+    }
+
+    return collectProxyIngressDockerNetworksByServer($server)->contains($network);
+}
 function collectDockerNetworksByServer(Server $server)
 {
     $allNetworks = collect([]);
@@ -110,17 +144,20 @@ function connectProxyToNetworks(Server $server)
     if ($server->isSwarm()) {
         $commands = $networks->map(function ($network) {
             $safe = escapeshellarg($network);
+
             return [
-                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --driver overlay --attachable {$safe} >/dev/null",
+                dockerNetworkEnsureCommand($network, isSwarm: true, suppressOutput: true),
                 "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
         });
     } else {
-        $commands = $networks->map(function ($network) {
+        $commands = $networks->map(function ($network) use ($server) {
             $safe = escapeshellarg($network);
+            $preferIpv6 = shouldCreateProxyNetworkWithIpv6($server, $network);
+
             return [
-                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --attachable {$safe} >/dev/null",
+                dockerNetworkEnsureCommand($network, preferIpv6: $preferIpv6, repairEmptyIpv4Only: $preferIpv6, suppressOutput: true),
                 "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
@@ -144,17 +181,20 @@ function ensureProxyNetworksExist(Server $server)
     if ($server->isSwarm()) {
         $commands = $networks->map(function ($network) {
             $safe = escapeshellarg($network);
+
             return [
                 "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable {$safe}",
+                dockerNetworkEnsureCommand($network, isSwarm: true),
             ];
         });
     } else {
-        $commands = $networks->map(function ($network) {
+        $commands = $networks->map(function ($network) use ($server) {
             $safe = escapeshellarg($network);
+            $preferIpv6 = shouldCreateProxyNetworkWithIpv6($server, $network);
+
             return [
                 "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable {$safe}",
+                dockerNetworkEnsureCommand($network, preferIpv6: $preferIpv6, repairEmptyIpv4Only: $preferIpv6),
             ];
         });
     }
@@ -230,21 +270,7 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
     $proxy_path = $server->proxyPath();
     $proxy_type = $server->proxyType();
 
-    if ($server->isSwarm()) {
-        $networks = collect($server->swarmDockers)->map(function ($docker) {
-            return $docker['network'];
-        })->unique();
-        if ($networks->count() === 0) {
-            $networks = collect(['coolify-overlay']);
-        }
-    } else {
-        $networks = collect($server->standaloneDockers)->map(function ($docker) {
-            return $docker['network'];
-        })->unique();
-        if ($networks->count() === 0) {
-            $networks = collect(['coolify']);
-        }
-    }
+    $networks = collectProxyIngressDockerNetworksByServer($server);
 
     $array_of_networks = collect([]);
     $filtered_networks = collect([]);

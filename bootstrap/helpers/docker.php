@@ -149,6 +149,58 @@ function executeInDocker(string $containerId, string $command)
     return "docker exec {$containerId} bash -c '{$escapedCommand}'";
 }
 
+function dockerNetworkExistsCommand(string $network): string
+{
+    $safeNetwork = escapeshellarg($network);
+
+    return "docker network inspect {$safeNetwork} >/dev/null 2>&1";
+}
+
+function dockerNetworkIpv6EnabledCommand(string $network): string
+{
+    $safeNetwork = escapeshellarg($network);
+
+    return "docker network inspect --format '{{.EnableIPv6}}' {$safeNetwork} 2>/dev/null | grep -Fxq true";
+}
+
+function dockerNetworkCreateCommand(string $network, bool $isSwarm = false, bool $preferIpv6 = false, bool $suppressOutput = false): string
+{
+    $safeNetwork = escapeshellarg($network);
+    $outputRedirect = $suppressOutput ? ' >/dev/null 2>&1' : '';
+
+    if ($isSwarm) {
+        return "docker network create --driver overlay --attachable {$safeNetwork}{$outputRedirect}";
+    }
+
+    $plainCreate = "docker network create --attachable {$safeNetwork}{$outputRedirect}";
+
+    if (! $preferIpv6) {
+        return $plainCreate;
+    }
+
+    $ipv6Redirect = $suppressOutput ? ' >/dev/null 2>&1' : ' 2>/dev/null';
+    $ipv6Create = "docker network create --ipv6 --attachable {$safeNetwork}{$ipv6Redirect}";
+
+    return "({$ipv6Create} || {$plainCreate})";
+}
+
+function dockerNetworkEnsureCommand(string $network, bool $isSwarm = false, bool $preferIpv6 = false, bool $repairEmptyIpv4Only = false, bool $suppressOutput = false): string
+{
+    $safeNetwork = escapeshellarg($network);
+    $inspectCommand = dockerNetworkExistsCommand($network);
+    $createCommand = dockerNetworkCreateCommand($network, $isSwarm, $preferIpv6, $suppressOutput);
+
+    if ($isSwarm || ! $preferIpv6 || ! $repairEmptyIpv4Only) {
+        return "{$inspectCommand} || {$createCommand}";
+    }
+
+    $ipv6CheckCommand = dockerNetworkIpv6EnabledCommand($network);
+    $containerCountCommand = "docker network inspect --format '{{len .Containers}}' {$safeNetwork} 2>/dev/null || echo 1";
+    $warning = escapeshellarg("Coolify proxy network {$network} exists without IPv6. Recreate the network during a maintenance window so IPv6 clients keep their real IP in X-Forwarded-For.");
+
+    return "(if ! {$inspectCommand}; then {$createCommand}; elif {$ipv6CheckCommand}; then true; else container_count=\$({$containerCountCommand}); if [ \"\$container_count\" = \"0\" ]; then docker network rm {$safeNetwork} >/dev/null 2>&1 && {$createCommand}; else echo {$warning}; fi; fi)";
+}
+
 function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
 {
     if ($server->isSwarm()) {
