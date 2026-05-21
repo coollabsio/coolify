@@ -40,13 +40,15 @@ class InstallDocker
             remote_process($commands, $server);
         }
 
-        $config = base64_encode('{
-            "log-driver": "json-file",
-            "log-opts": {
-              "max-size": "10m",
-              "max-file": "3"
-            }
-          }');
+ $config = base64_encode('{
+ "log-driver": "json-file",
+ "log-opts": {
+ "max-size": "10m",
+ "max-file": "3"
+ },
+ "ip6tables": true,
+ "fixed-cidr-v6": "fd00:dead:beef::/48"
+ }');
         $found = StandaloneDocker::where('server_id', $server->id);
         if ($found->count() == 0 && $server->id) {
             StandaloneDocker::create([
@@ -102,7 +104,7 @@ class InstallDocker
                 ]);
             } else {
                 $command = $command->merge([
-                    'docker network create --attachable coolify >/dev/null 2>&1 || true',
+                    'docker network create --attachable --ipv6 coolify >/dev/null 2>&1 || true',
                 ]);
                 $command = $command->merge([
                     "echo 'Done!'",
