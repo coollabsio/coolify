@@ -274,7 +274,11 @@
                     <div>({{ $pull_request }})</div>
                 @endif
                 @if ($streamLogs)
-                    <x-loading wire:poll.2000ms='getLogs(true)' />
+                    @if ($showHealthcheckLogs)
+                        <x-loading wire:poll.5000ms='getHealthcheckLogs' />
+                    @else
+                        <x-loading wire:poll.2000ms='getLogs(true)' />
+                    @endif
                 @endif
             </div>
         @endif
@@ -286,7 +290,7 @@
                 <div
                     class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
                     <div class="flex items-center gap-2">
-                        <form wire:submit="getLogs(true)" class="relative flex items-center">
+                        <form wire:submit="{{ $showHealthcheckLogs ? 'getHealthcheckLogs' : 'getLogs(true)' }}" class="relative flex items-center">
                             <span
                                 class="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">Lines:</span>
                             <input type="number" wire:model="numberOfLines" placeholder="100" min="1" max="50000"
@@ -315,7 +319,7 @@
                             </button>
                         </div>
                         <div class="flex flex-wrap items-center gap-1">
-                            <button wire:click="getLogs(true)" title="Refresh Logs" {{ $streamLogs ? 'disabled' : '' }}
+                            <button wire:click="{{ $showHealthcheckLogs ? 'getHealthcheckLogs' : 'getLogs(true)' }}" title="Refresh Logs" {{ $streamLogs ? 'disabled' : '' }}
                             class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-50">
                             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor">
@@ -418,6 +422,15 @@
                                     d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                             </svg>
                         </button>
+                        <button wire:click="toggleHealthcheckLogs"
+                            title="{{ $showHealthcheckLogs ? 'Show Container Logs' : 'Show Healthcheck Logs' }}"
+                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 {{ $showHealthcheckLogs ? '!text-warning' : '' }}">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+                            </svg>
+                        </button>
                         <button title="Toggle Log Colors" x-on:click="toggleColorLogs"
                             :class="colorLogs ? '!text-warning' : ''"
                             class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
@@ -506,7 +519,57 @@
                     @touchstart="handleTouchStart" @touchmove="handleTouchMove" @keydown="handleKeyScroll" tabindex="0"
                     class="flex overflow-y-auto overflow-x-hidden flex-col px-4 py-2 w-full min-w-0 scrollbar"
                     :class="fullscreen ? 'flex-1' : 'max-h-[40rem]'">
-                    @if ($outputs)
+                    @if ($showHealthcheckLogs)
+                        <div id="logs" class="font-logs max-w-full cursor-default">
+                            <div class="flex items-center gap-2 mb-2 pb-2 border-b dark:border-coolgray-300 border-neutral-200 text-sm text-gray-500 dark:text-gray-400">
+                                <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+                                </svg>
+                                <span>Viewing healthcheck logs only. Click the heart icon in the toolbar to switch back to container logs.</span>
+                            </div>
+                            @if ($healthcheckStatus)
+                                @php
+                                    $badgeClasses = match ($healthcheckStatus) {
+                                        'healthy' => 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+                                        'unhealthy' => 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+                                        default => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+                                    };
+                                @endphp
+                                <div class="flex items-center gap-2 mb-2 pb-2 border-b dark:border-coolgray-300 border-neutral-200">
+                                    <span class="text-sm font-medium dark:text-white">Health Status:</span>
+                                    <span class="px-2 py-0.5 text-xs font-medium rounded {{ $badgeClasses }}">
+                                        {{ ucfirst($healthcheckStatus) }}
+                                    </span>
+                                </div>
+                            @endif
+                            @if ($healthcheckOutputs)
+                                @php
+                                    $headerLines = collect(explode("\n", $healthcheckOutputs))
+                                        ->take(2)
+                                        ->filter(fn($line) => trim($line) !== '');
+                                @endphp
+                                @foreach ($headerLines as $index => $line)
+                                    <div wire:key="hc-header-{{ $index }}" data-log-line data-log-content="{{ $line }}" class="flex gap-2 log-line">
+                                        <span data-line-text="{{ $line }}" class="whitespace-pre-wrap break-all">{{ $line }}</span>
+                                    </div>
+                                @endforeach
+                                @forelse ($healthcheckEntries as $index => $entry)
+                                    <div wire:key="hc-{{ $index }}" data-log-line data-log-content="{{ $entry['text'] }}" class="flex gap-2 log-line">
+                                        <span data-line-text="{{ $entry['text'] }}" class="whitespace-pre-wrap break-all {{ $entry['exitCode'] === 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400' }}">{{ $entry['text'] }}</span>
+                                    </div>
+                                @empty
+                                    <div class="flex gap-2 log-line">
+                                        <span class="whitespace-pre-wrap break-all text-neutral-400">No healthcheck log entries yet.</span>
+                                    </div>
+                                @endforelse
+                                <div class="mt-2 pt-2 border-t dark:border-coolgray-300 border-neutral-200">
+                                    <span class="text-xs text-neutral-400">Docker stores only the last 5 healthcheck results per container.</span>
+                                </div>
+                            @else
+                                <pre class="font-logs whitespace-pre-wrap break-all max-w-full text-neutral-400">No healthcheck data. Click refresh or enable streaming.</pre>
+                            @endif
+                        </div>
+                    @elseif ($outputs)
                         @php
                             $displayLines = collect(explode("\n", $outputs))->filter(fn($line) => trim($line) !== '');
                         @endphp
