@@ -188,6 +188,18 @@
                         </a>
                     </li>
                     <li>
+                        <a title="Deployments" {{ wireNavigate() }}
+                            class="{{ request()->is('deployments') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                            href="{{ route('deployments.index') }}">
+                            <svg class="menu-item-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M12 3l7 4v10l-7 4l-7-4V7l7-4Zm0 0v10m0 0l7-4m-7 4L5 9" />
+                            </svg>
+                            <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Deployments</span>
+                        </a>
+                    </li>
+                    <li>
                         <a title="Destinations" {{ wireNavigate() }}
                             class="{{ request()->is('destination*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('destination.index') }}">
