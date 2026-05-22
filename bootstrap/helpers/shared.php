@@ -1065,6 +1065,11 @@ function queryDatabaseByUuidWithinTeam(string $uuid, string $teamId)
         }
     }
 
+    $serviceDatabase = ServiceDatabase::whereUuid($uuid)->first();
+    if ($serviceDatabase && $serviceDatabase->team()?->id == $teamId) {
+        return $serviceDatabase->unsetRelation('service');
+    }
+
     return null;
 }
 function queryResourcesByUuid(string $uuid)
