@@ -30,6 +30,8 @@ class Heading extends Component
 
     public function mount()
     {
+        $this->authorize('view', $this->service);
+
         if (str($this->service->status)->contains('running') && is_null($this->service->config_hash)) {
             $this->service->isConfigurationChanged(true);
             $this->dispatch('configurationChanged');
@@ -50,6 +52,8 @@ class Heading extends Component
 
     public function checkStatus()
     {
+        $this->authorize('view', $this->service);
+
         if ($this->service->server->isFunctional()) {
             GetContainersStatus::dispatch($this->service->server);
         } else {
@@ -64,6 +68,8 @@ class Heading extends Component
 
     public function serviceChecked()
     {
+        $this->authorize('view', $this->service);
+
         try {
             $this->service->applications->each(function ($application) {
                 $application->refresh();
@@ -85,6 +91,8 @@ class Heading extends Component
 
     public function checkDeployments()
     {
+        $this->authorize('view', $this->service);
+
         try {
             $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
             $status = data_get($activity, 'properties.status');

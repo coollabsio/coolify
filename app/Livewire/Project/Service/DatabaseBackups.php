@@ -28,7 +28,23 @@ class DatabaseBackups extends Component
         try {
             $this->parameters = get_route_parameters();
             $this->query = request()->query();
-            $this->service = Service::whereUuid($this->parameters['service_uuid'])->first();
+            $project = currentTeam()?->projects()
+                ->select('id', 'uuid', 'team_id')
+                ->where('uuid', $this->parameters['project_uuid'])
+                ->first();
+            if (! $project) {
+                return redirect()->route('dashboard');
+            }
+
+            $environment = $project->environments()
+                ->select('id', 'uuid', 'name', 'project_id')
+                ->where('uuid', $this->parameters['environment_uuid'])
+                ->first();
+            if (! $environment) {
+                return redirect()->route('dashboard');
+            }
+
+            $this->service = $environment->services()->whereUuid($this->parameters['service_uuid'])->first();
             if (! $this->service) {
                 return redirect()->route('dashboard');
             }
