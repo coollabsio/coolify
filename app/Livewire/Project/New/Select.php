@@ -162,6 +162,12 @@ class Select extends Component
                 'logo' => asset('svgs/github.svg'),
             ],
             [
+                'id' => 'private-gitlab-app',
+                'name' => 'Private Repository (with GitLab App)',
+                'description' => 'You can deploy public & private repositories through your GitLab Apps.',
+                'logo' => asset('svgs/gitlab.svg'),
+            ],
+            [
                 'id' => 'private-deploy-key',
                 'name' => 'Private Repository (with Deploy Key)',
                 'description' => 'You can deploy private repositories with a deploy key.',

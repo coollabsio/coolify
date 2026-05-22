@@ -1386,6 +1386,29 @@ class Application extends BaseModel
 
             if ($this->source->getMorphClass() === GitlabApp::class) {
                 $gitlabSource = $this->source;
+
+                if ($gitlabSource->isConnected()) {
+                    $token = generateGitlabCloneToken($gitlabSource);
+                    $encodedToken = rawurlencode($token);
+                    $pathPrefix = rtrim($url['path'] ?? '', '/');
+                    $repoUrl = "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/{$customRepository}.git";
+                    $escapedRepoUrl = escapeshellarg($repoUrl);
+                    $fullRepoUrl = $repoUrl;
+                    $base_command = "{$base_command} {$escapedRepoUrl}";
+
+                    if ($exec_in_docker) {
+                        $commands->push(executeInDocker($deployment_uuid, $base_command));
+                    } else {
+                        $commands->push($base_command);
+                    }
+
+                    return [
+                        'commands' => $commands->implode(' && '),
+                        'branch' => $branch,
+                        'fullRepoUrl' => $fullRepoUrl,
+                    ];
+                }
+
                 $private_key = data_get($gitlabSource, 'privateKey.private_key');
 
                 if ($private_key) {
@@ -1422,7 +1445,6 @@ class Application extends BaseModel
                     ];
                 }
 
-                // GitLab source without private key — use URL as-is (supports user-embedded basic auth)
                 $fullRepoUrl = $customRepository;
                 $escapedCustomRepository = escapeshellarg($customRepository);
                 $base_command = "{$base_command} {$escapedCustomRepository}";
@@ -1593,6 +1615,44 @@ class Application extends BaseModel
 
             if ($this->source->getMorphClass() === GitlabApp::class) {
                 $gitlabSource = $this->source;
+
+                if ($gitlabSource->isConnected()) {
+                    $token = generateGitlabCloneToken($gitlabSource);
+                    $encodedToken = rawurlencode($token);
+                    $pathPrefix = rtrim($url['path'] ?? '', '/');
+                    $repoUrl = "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/{$customRepository}.git";
+                    $escapedRepoUrl = escapeshellarg($repoUrl);
+                    $fullRepoUrl = $repoUrl;
+                    $git_clone_command_base = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
+                    if ($only_checkout) {
+                        $git_clone_command = $git_clone_command_base;
+                    } else {
+                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit);
+                    }
+
+                    if ($pull_request_id !== 0) {
+                        $branch = "merge-requests/{$pull_request_id}/head:{$pr_branch_name}";
+                        if ($exec_in_docker) {
+                            $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out {$branch}'"));
+                        } else {
+                            $commands->push("echo 'Checking out {$branch}'");
+                        }
+                        $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && git fetch origin {$branch} && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    }
+
+                    if ($exec_in_docker) {
+                        $commands->push(executeInDocker($deployment_uuid, $git_clone_command));
+                    } else {
+                        $commands->push($git_clone_command);
+                    }
+
+                    return [
+                        'commands' => $commands->implode(' && '),
+                        'branch' => $branch,
+                        'fullRepoUrl' => $fullRepoUrl,
+                    ];
+                }
+
                 $private_key = data_get($gitlabSource, 'privateKey.private_key');
 
                 if ($private_key) {
@@ -1644,7 +1704,6 @@ class Application extends BaseModel
                     ];
                 }
 
-                // GitLab source without private key — use URL as-is (supports user-embedded basic auth)
                 $fullRepoUrl = $customRepository;
                 $escapedCustomRepository = escapeshellarg($customRepository);
                 $git_clone_command = "{$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
