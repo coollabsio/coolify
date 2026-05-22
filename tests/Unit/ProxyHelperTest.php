@@ -166,6 +166,24 @@ it('identifies coolify as not predefined network', function () {
     expect(isDockerPredefinedNetwork('coolify'))->toBeFalse();
 });
 
+it('creates standalone docker networks with ipv6 fallback', function () {
+    expect(dockerNetworkCreateCommand('coolify'))->toBe(
+        "docker network create --attachable --ipv6 'coolify' >/dev/null 2>&1 || docker network create --attachable 'coolify' >/dev/null"
+    );
+});
+
+it('creates swarm docker networks without ipv6 fallback', function () {
+    expect(dockerNetworkCreateCommand('coolify-overlay', true))->toBe(
+        "docker network create --driver overlay --attachable 'coolify-overlay' >/dev/null"
+    );
+});
+
+it('inspects before creating docker networks', function () {
+    expect(dockerNetworkInspectOrCreateCommand('app-network'))->toBe(
+        "docker network inspect 'app-network' >/dev/null 2>&1 || docker network create --attachable --ipv6 'app-network' >/dev/null 2>&1 || docker network create --attachable 'app-network' >/dev/null"
+    );
+});
+
 it('identifies coolify-overlay as not predefined network', function () {
     expect(isDockerPredefinedNetwork('coolify-overlay'))->toBeFalse();
 });
