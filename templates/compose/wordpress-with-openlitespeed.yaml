@@ -48,6 +48,9 @@ services:
       - -c
       - |
         set -e
+        wp() {
+          php -d memory_limit=512M /usr/local/bin/wp "$@"
+        }
         if [ ! -f /var/www/html/wp-config.php ]; then
           wp core download --path=/var/www/html --allow-root --force
           wp config create \
@@ -59,7 +62,6 @@ services:
             --skip-check \
             --allow-root
           wp config shuffle-salts --path=/var/www/html --allow-root
-          wp plugin install litespeed-cache --path=/var/www/html --allow-root
         fi
         chown -R 1000:1000 /var/www/html
 
