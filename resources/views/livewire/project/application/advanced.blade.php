@@ -86,7 +86,21 @@
                     helper="Readonly labels are disabled. You need to set the labels in the labels section." disabled
                     instantSave id="isStripprefixEnabled" label="Strip Prefixes" canGate="update" :canResource="$application" />
             @endif
-
+            <h3 class="pt-4">Operations</h3>
+            <form class="flex items-end gap-2" wire:submit.prevent='saveStopGracePeriod'>
+                <x-forms.input
+                    type="number"
+                    id="stopGracePeriod"
+                    label="Stop Grace Period (seconds)"
+                    placeholder="{{ DEFAULT_STOP_GRACE_PERIOD_SECONDS }}"
+                    helper="How long to wait for graceful shutdown during rolling updates, manual stops, and restarts. Applies to all containers for this application. Default: {{ DEFAULT_STOP_GRACE_PERIOD_SECONDS }} seconds. Range: {{ MIN_STOP_GRACE_PERIOD_SECONDS }}-{{ MAX_STOP_GRACE_PERIOD_SECONDS }} seconds (1 hour)."
+                    min="{{ MIN_STOP_GRACE_PERIOD_SECONDS }}"
+                    max="{{ MAX_STOP_GRACE_PERIOD_SECONDS }}"
+                    canGate="update"
+                    :canResource="$application"
+                />
+                <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
+            </form>
             <h3 class="pt-4">Logs</h3>
             <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
                 instantSave id="isLogDrainEnabled" label="Drain Logs" canGate="update" :canResource="$application" />

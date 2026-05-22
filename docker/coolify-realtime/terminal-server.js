@@ -1,7 +1,6 @@
 import { WebSocketServer } from 'ws';
 import http from 'http';
 import pty from 'node-pty';
-import axios from 'axios';
 import cookie from 'cookie';
 import 'dotenv/config';
 import {
@@ -12,9 +11,60 @@ import {
     isAuthorizedTargetHost,
 } from './terminal-utils.js';
 
+async function postToCoolify(path, headers) {
+    return new Promise((resolve, reject) => {
+        const request = http.request({
+            hostname: 'coolify',
+            port: 8080,
+            path,
+            method: 'POST',
+            headers,
+        }, (response) => {
+            let responseText = '';
+
+            response.setEncoding('utf8');
+            response.on('data', (chunk) => {
+                responseText += chunk;
+            });
+            response.on('end', () => {
+                try {
+                    resolve({
+                        status: response.statusCode ?? 0,
+                        data: parseResponseData(response.headers['content-type'], responseText),
+                    });
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        });
+
+        request.on('error', reject);
+        request.end();
+    });
+}
+
+function parseResponseData(contentType = '', responseText = '') {
+    if (responseText === '') {
+        return null;
+    }
+
+    if (contentType.includes('application/json')) {
+        return JSON.parse(responseText);
+    }
+
+    return responseText;
+}
+
+function createHttpError(response) {
+    const error = new Error(`Request failed with status code ${response.status}`);
+    error.response = response;
+
+    return error;
+}
+
 const userSessions = new Map();
-const terminalDebugEnabled = ['local', 'development'].includes(
-    String(process.env.APP_ENV || process.env.NODE_ENV || '').toLowerCase()
+const terminalDebugEnabled = ['1', 'true', 'yes'].includes(
+    String(process.env.TERMINAL_DEBUG || '').toLowerCase()
 );
 
 function logTerminal(level, message, context = {}) {
@@ -74,11 +124,9 @@ const verifyClient = async (info, callback) => {
 
     try {
         // Authenticate with Laravel backend
-        const response = await axios.post(`http://coolify:8080/terminal/auth`, null, {
-            headers: {
-                'Cookie': `${sessionCookieName}=${laravelSession}`,
-                'X-XSRF-TOKEN': xsrfToken
-            },
+        const response = await postToCoolify('/terminal/auth', {
+            'Cookie': `${sessionCookieName}=${laravelSession}`,
+            'X-XSRF-TOKEN': xsrfToken
         });
 
         if (response.status === 200) {
@@ -161,12 +209,15 @@ wss.on('connection', async (ws, req) => {
     }
 
     try {
-        const response = await axios.post(`http://coolify:8080/terminal/auth/ips`, null, {
-            headers: {
-                'Cookie': `${sessionCookieName}=${laravelSession}`,
-                'X-XSRF-TOKEN': xsrfToken
-            },
+        const response = await postToCoolify('/terminal/auth/ips', {
+            'Cookie': `${sessionCookieName}=${laravelSession}`,
+            'X-XSRF-TOKEN': xsrfToken
         });
+
+        if (response.status !== 200) {
+            throw createHttpError(response);
+        }
+
         userSession.authorizedIPs = response.data.ipAddresses || [];
         logTerminal('log', 'Fetched authorized terminal hosts for websocket session.', {
             ...connectionContext,

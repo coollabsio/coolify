@@ -172,7 +172,8 @@
         }
         @auth
             window.Pusher = Pusher;
-            window.Echo = new Echo({
+            const EchoConstructor = typeof Echo === 'function' ? Echo : Echo.default;
+            window.Echo = new EchoConstructor({
                 broadcaster: 'pusher',
                 cluster: "{{ config('constants.pusher.host') }}" || window.location.hostname,
                 key: "{{ config('constants.pusher.app_key') }}" || 'coolify',

@@ -17,6 +17,9 @@ use OpenApi\Attributes as OA;
         'deployment_uuid' => ['type' => 'string'],
         'pull_request_id' => ['type' => 'integer'],
         'docker_registry_image_tag' => ['type' => 'string', 'nullable' => true],
+        'configuration_hash' => ['type' => 'string', 'nullable' => true],
+        'configuration_snapshot' => ['type' => 'object', 'nullable' => true],
+        'configuration_diff' => ['type' => 'object', 'nullable' => true],
         'force_rebuild' => ['type' => 'boolean'],
         'commit' => ['type' => 'string'],
         'status' => ['type' => 'string'],
@@ -45,6 +48,9 @@ class ApplicationDeploymentQueue extends Model
         'deployment_uuid',
         'pull_request_id',
         'docker_registry_image_tag',
+        'configuration_hash',
+        'configuration_snapshot',
+        'configuration_diff',
         'force_rebuild',
         'commit',
         'status',
@@ -71,6 +77,8 @@ class ApplicationDeploymentQueue extends Model
     protected $casts = [
         'pull_request_id' => 'integer',
         'finished_at' => 'datetime',
+        'configuration_snapshot' => 'array',
+        'configuration_diff' => 'array',
     ];
 
     public function application()

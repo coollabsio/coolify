@@ -3,6 +3,8 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
@@ -21,7 +23,7 @@ class Source extends Component
     #[Validate(['nullable', 'string'])]
     public ?string $privateKeyName = null;
 
-    #[Validate(['nullable', 'integer'])]
+    #[Locked]
     public ?int $privateKeyId = null;
 
     #[Validate(['required', 'string'])]
@@ -103,12 +105,14 @@ class Source extends Component
     {
         try {
             $this->authorize('update', $this->application);
-            $this->privateKeyId = $privateKeyId;
+            $key = PrivateKey::ownedByCurrentTeam()->findOrFail($privateKeyId);
+            $this->privateKeyId = $key->id;
             $this->syncData(true);
             $this->getPrivateKeys();
             $this->application->refresh();
             $this->privateKeyName = $this->application->private_key->name;
             $this->dispatch('success', 'Private key updated!');
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -124,6 +128,7 @@ class Source extends Component
             }
             $this->syncData(true);
             $this->dispatch('success', 'Application source updated!');
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -134,8 +139,11 @@ class Source extends Component
 
         try {
             $this->authorize('update', $this->application);
+            $allowedSourceTypes = [GithubApp::class, GitlabApp::class];
+            abort_unless(in_array($sourceType, $allowedSourceTypes, true), 404);
+            $source = $sourceType::ownedByCurrentTeam()->findOrFail($sourceId);
             $this->application->update([
-                'source_id' => $sourceId,
+                'source_id' => $source->id,
                 'source_type' => $sourceType,
             ]);
 

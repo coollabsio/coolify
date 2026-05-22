@@ -22,5 +22,12 @@ class ApplicationSettingsSeeder extends Seeder
             $gitlabPublic->settings->is_static = true;
             $gitlabPublic->settings->save();
         }
+
+        $railpackStatic = Application::where('uuid', 'railpack-static')->first();
+        if ($railpackStatic) {
+            $railpackStatic->load(['settings']);
+            $railpackStatic->settings->is_static = true;
+            $railpackStatic->settings->save();
+        }
     }
 }

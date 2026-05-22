@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Application\CleanupPreviewDeployment;
 use App\Actions\Application\LoadComposeFile;
 use App\Actions\Application\StopApplication;
-use App\Actions\Service\StartService;
 use App\Enums\BuildPackTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
@@ -18,7 +17,6 @@ use App\Models\LocalPersistentVolume;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
-use App\Models\Service;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Services\DockerImageParser;
@@ -155,7 +153,7 @@ class ApplicationsController extends Controller
                             'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
                             'git_repository' => ['type' => 'string', 'description' => 'The git repository URL.'],
                             'git_branch' => ['type' => 'string', 'description' => 'The git branch.'],
-                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
+                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'railpack', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
                             'ports_exposes' => ['type' => 'string', 'description' => 'The ports to expose.'],
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
@@ -324,7 +322,7 @@ class ApplicationsController extends Controller
                             'git_branch' => ['type' => 'string', 'description' => 'The git branch.'],
                             'ports_exposes' => ['type' => 'string', 'description' => 'The ports to expose.'],
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
-                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
+                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'railpack', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
                             'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
@@ -490,7 +488,7 @@ class ApplicationsController extends Controller
                             'git_branch' => ['type' => 'string', 'description' => 'The git branch.'],
                             'ports_exposes' => ['type' => 'string', 'description' => 'The ports to expose.'],
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
-                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
+                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'railpack', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
                             'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
@@ -652,7 +650,7 @@ class ApplicationsController extends Controller
                             'environment_name' => ['type' => 'string', 'description' => 'The environment name. You need to provide at least one of environment_name or environment_uuid.'],
                             'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
                             'dockerfile' => ['type' => 'string', 'description' => 'The Dockerfile content.'],
-                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
+                            'build_pack' => ['type' => 'string', 'enum' => ['dockerfile'], 'description' => 'The build pack type.'],
                             'ports_exposes' => ['type' => 'string', 'description' => 'The ports to expose.'],
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
@@ -899,105 +897,6 @@ class ApplicationsController extends Controller
         return $this->create_application($request, 'dockerimage');
     }
 
-    /**
-     * @deprecated Use POST /api/v1/services instead. This endpoint creates a Service, not an Application and is an unstable duplicate of POST /api/v1/services.
-     */
-    #[OA\Post(
-        summary: 'Create (Docker Compose)',
-        description: 'Deprecated: Use POST /api/v1/services instead.',
-        path: '/applications/dockercompose',
-        operationId: 'create-dockercompose-application',
-        deprecated: true,
-        security: [
-            ['bearerAuth' => []],
-        ],
-        tags: ['Applications'],
-        requestBody: new OA\RequestBody(
-            description: 'Application object that needs to be created.',
-            required: true,
-            content: [
-                new OA\MediaType(
-                    mediaType: 'application/json',
-                    schema: new OA\Schema(
-                        type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'docker_compose_raw'],
-                        properties: [
-                            'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
-                            'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
-                            'environment_name' => ['type' => 'string', 'description' => 'The environment name. You need to provide at least one of environment_name or environment_uuid.'],
-                            'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
-                            'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
-                            'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID if the server has more than one destinations.'],
-                            'name' => ['type' => 'string', 'description' => 'The application name.'],
-                            'description' => ['type' => 'string', 'description' => 'The application description.'],
-                            'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
-                            'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
-                            'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
-                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
-                            'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
-                        ],
-                    )
-                ),
-            ]
-        ),
-        responses: [
-            new OA\Response(
-                response: 201,
-                description: 'Application created successfully.',
-                content: new OA\MediaType(
-                    mediaType: 'application/json',
-                    schema: new OA\Schema(
-                        type: 'object',
-                        properties: [
-                            'uuid' => ['type' => 'string'],
-                        ]
-                    )
-                )
-            ),
-            new OA\Response(
-                response: 401,
-                ref: '#/components/responses/401',
-            ),
-            new OA\Response(
-                response: 400,
-                ref: '#/components/responses/400',
-            ),
-            new OA\Response(
-                response: 409,
-                description: 'Domain conflicts detected.',
-                content: [
-                    new OA\MediaType(
-                        mediaType: 'application/json',
-                        schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
-                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
-                                'conflicts' => [
-                                    'type' => 'array',
-                                    'items' => new OA\Schema(
-                                        type: 'object',
-                                        properties: [
-                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
-                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
-                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
-                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
-                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
-                                        ]
-                                    ),
-                                ],
-                            ]
-                        )
-                    ),
-                ]
-            ),
-        ]
-    )]
-    public function create_dockercompose_application(Request $request)
-    {
-        return $this->create_application($request, 'dockercompose');
-    }
-
     private function create_application(Request $request, $type)
     {
         $teamId = getTeamIdFromToken();
@@ -1080,6 +979,9 @@ class ApplicationsController extends Controller
                     ],
                 ], 422);
             }
+            $request->merge([
+                'custom_nginx_configuration' => $customNginxConfiguration,
+            ]);
         }
 
         $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
@@ -2005,97 +1907,6 @@ class ApplicationsController extends Controller
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'fqdn'),
             ]))->setStatusCode(201);
-        } elseif ($type === 'dockercompose') {
-            $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'instant_deploy', 'docker_compose_raw', 'force_domain_override', 'is_container_label_escape_enabled'];
-
-            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
-                $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
-                }
-
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ], 422);
-            }
-            if (! $request->has('name')) {
-                $request->offsetSet('name', 'service'.new Cuid2);
-            }
-            $validationRules = [
-                'docker_compose_raw' => 'string|required',
-            ];
-            $validationRules = array_merge(sharedDataApplications(), $validationRules);
-            $validator = customApiValidator($request->all(), $validationRules);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => $validator->errors(),
-                ], 422);
-            }
-            $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof JsonResponse) {
-                return $return;
-            }
-            if (! isBase64Encoded($request->docker_compose_raw)) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $dockerComposeRaw = base64_decode($request->docker_compose_raw);
-            if (mb_detect_encoding($dockerComposeRaw, 'UTF-8', true) === false) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $dockerCompose = base64_decode($request->docker_compose_raw);
-            $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
-
-            $service = new Service;
-            removeUnnecessaryFieldsFromRequest($request);
-            $service->fill($request->only($allowedFields));
-
-            $service->docker_compose_raw = $dockerComposeRaw;
-            $service->environment_id = $environment->id;
-            $service->server_id = $server->id;
-            $service->destination_id = $destination->id;
-            $service->destination_type = $destination->getMorphClass();
-            if (isset($isContainerLabelEscapeEnabled)) {
-                $service->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
-            }
-            $service->save();
-
-            $service->parse(isNew: true);
-
-            // Apply service-specific application prerequisites
-            applyServiceApplicationPrerequisites($service);
-
-            if ($instantDeploy) {
-                StartService::dispatch($service);
-            }
-
-            auditLog('api.application.created', [
-                'team_id' => $teamId,
-                'service_uuid' => data_get($service, 'uuid'),
-                'service_name' => data_get($service, 'name'),
-                'application_type' => $type,
-                'instant_deploy' => (bool) ($instantDeploy ?? false),
-            ]);
-
-            return response()->json(serializeApiResponse([
-                'uuid' => data_get($service, 'uuid'),
-                'domains' => data_get($service, 'domains'),
-            ]))->setStatusCode(201);
         }
 
         return response()->json(['message' => 'Invalid type.'], 400);
@@ -2398,7 +2209,7 @@ class ApplicationsController extends Controller
                             'git_branch' => ['type' => 'string', 'description' => 'The git branch.'],
                             'ports_exposes' => ['type' => 'string', 'description' => 'The ports to expose.'],
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
-                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
+                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'railpack', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
                             'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
@@ -2589,7 +2400,7 @@ class ApplicationsController extends Controller
                 }
             }
         }
-        if ($request->has('custom_nginx_configuration')) {
+        if ($request->has('custom_nginx_configuration') && ! is_null($request->custom_nginx_configuration)) {
             if (! isBase64Encoded($request->custom_nginx_configuration)) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -2607,6 +2418,9 @@ class ApplicationsController extends Controller
                     ],
                 ], 422);
             }
+            $request->merge([
+                'custom_nginx_configuration' => $customNginxConfiguration,
+            ]);
         }
         $return = $this->validateDataApplications($request, $server);
         if ($return instanceof JsonResponse) {

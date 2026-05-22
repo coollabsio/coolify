@@ -1,5 +1,5 @@
 <nav class="flex flex-col flex-1 bg-white border-r dark:border-coolgray-200 border-neutral-300 dark:bg-base"
-    :class="collapsed ? 'lg:px-1 px-2 sidebar-collapsed' : 'px-2'"
+    :class="collapsed ? 'px-2 lg:px-[0.7rem] sidebar-collapsed' : 'px-2 lg:px-[0.7rem]'"
     @mouseover="
         if (!collapsed) return;
         const el = $event.target.closest('.menu-item');
@@ -92,8 +92,8 @@
                 }
             }
     }">
-    <div class="flex pt-4 pb-4 pl-2 items-start gap-2"
-        :class="collapsed ? 'lg:flex-col lg:items-center lg:pl-0 lg:gap-3 lg:pt-8' : 'lg:pt-6'">
+    <div class="flex pt-4 pb-4 pl-2 items-start gap-2 motion-safe:transition-all motion-safe:duration-200 motion-safe:ease-out motion-reduce:transition-none"
+        :class="collapsed ? 'lg:flex-col lg:items-center lg:pl-0 lg:gap-3 lg:pt-7' : 'lg:pt-6'">
         <div class="flex flex-col w-full" :class="collapsed && 'lg:hidden'">
             <a href="/" {{ wireNavigate() }} class="text-2xl font-bold tracking-tight dark:text-white hover:opacity-80 transition-opacity">Coolify</a>
             <x-version />
@@ -124,7 +124,7 @@
             <livewire:settings-dropdown />
         </div>
     </div>
-    <div class="px-2 pt-2 pb-7" :class="collapsed && 'lg:px-0 lg:pt-0 lg:pb-4 lg:flex lg:justify-center'">
+    <div class="px-2 pt-2 pb-7 overflow-hidden motion-safe:transition-all motion-safe:duration-200 motion-safe:ease-out motion-reduce:transition-none" :class="collapsed && 'lg:px-0 lg:pt-0 lg:pb-4 lg:min-h-8 lg:flex lg:justify-center'">
         <livewire:switch-team />
     </div>
     <ul role="list" class="flex flex-col flex-1 gap-y-7">
@@ -425,7 +425,7 @@
                                 <path fill="currentColor"
                                     d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2a9.985 9.985 0 0 1 8 4h-2.71a8 8 0 1 0 .001 12h2.71A9.985 9.985 0 0 1 12 22m7-6v-3h-8v-2h8V8l5 4z" />
                             </svg>
-                            <span :class="collapsed && 'lg:hidden'">Logout</span>
+                            <span class="text-left menu-item-label" :class="collapsed && 'lg:hidden'">Logout</span>
                         </button>
                     </form>
                 </li>

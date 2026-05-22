@@ -7,7 +7,6 @@
     <!-- Global search component - included once to prevent keyboard shortcut duplication -->
     <livewire:global-search />
     @auth
-        <livewire:deployments-indicator />
         <div x-data="{
             open: false,
             collapsed: false,
@@ -26,6 +25,7 @@
             }
         }" x-cloak class="mx-auto dark:text-inherit text-black"
             :class="pageWidth === 'full' ? '' : 'max-w-7xl'">
+            <livewire:deployments-indicator />
             <div class="relative z-50 lg:hidden" :class="open ? 'block' : 'hidden'" role="dialog" aria-modal="true">
                 <div class="fixed inset-0 bg-black/80" x-on:click="open = false"></div>
                 <div class="fixed inset-y-0 right-0 h-full flex">
@@ -79,10 +79,8 @@
                 </button>
             </div>
 
-            <main class="transition-[padding] duration-200" :class="collapsed ? 'lg:pl-16' : 'lg:pl-56'">
-                <div class="p-4 sm:px-6 lg:px-8 lg:py-6">
+            <main class="transition-[padding] duration-200 p-6" :class="collapsed ? 'lg:pl-[6rem]' : 'lg:pl-[16rem]'">
                     {{ $slot }}
-                </div>
             </main>
         </div>
     @endauth

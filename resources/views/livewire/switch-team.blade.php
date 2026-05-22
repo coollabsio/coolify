@@ -26,7 +26,7 @@
         }">
         <button @click="openTeamMenu($event)" type="button"
             title="Team: {{ $currentTeam->name }}"
-            class="flex items-center justify-center w-8 h-8 text-sm font-semibold rounded-md bg-coollabs hover:opacity-80 transition-opacity text-white cursor-pointer">
+            class="flex items-center justify-center w-8 h-8 p-0 text-sm font-semibold text-coollabs dark:text-warning bg-neutral-100 dark:bg-coolgray-200 hover:bg-neutral-200 dark:hover:bg-coolgray-300 rounded-sm cursor-pointer transition-colors">
             {{ $teamInitial }}
         </button>
         <div x-show="teamOpen"
