@@ -61,7 +61,7 @@
             }
         },
         scrollToBottom() {
-            const logsContainer = document.getElementById('logsContainer');
+            const logsContainer = this.$refs.logsContainer;
             if (logsContainer) {
                 this.isScrolling = true;
                 logsContainer.scrollTop = logsContainer.scrollHeight;
@@ -117,7 +117,7 @@
             this.applyColorLogs();
         },
         applyColorLogs() {
-            const logs = document.getElementById('logs');
+            const logs = this.$refs.logs;
             if (!logs) return;
             const lines = logs.querySelectorAll('[data-log-line]');
             lines.forEach(line => {
@@ -134,7 +134,7 @@
             if (!selection || selection.isCollapsed || !selection.toString().trim()) {
                 return false;
             }
-            const logsContainer = document.getElementById('logs');
+            const logsContainer = this.$refs.logs;
             if (!logsContainer) return false;
             const range = selection.getRangeAt(0);
             return logsContainer.contains(range.commonAncestorContainer);
@@ -144,7 +144,7 @@
             return doc.documentElement.textContent;
         },
         applySearch() {
-            const logs = document.getElementById('logs');
+            const logs = this.$refs.logs;
             if (!logs) return;
             const lines = logs.querySelectorAll('[data-log-line]');
             const query = this.searchQuery.trim().toLowerCase();
@@ -200,7 +200,7 @@
             }
         },
         downloadLogs() {
-            const logs = document.getElementById('logs');
+            const logs = this.$refs.logs;
             if (!logs) return;
             const visibleLines = logs.querySelectorAll('[data-log-line]:not(.hidden)');
             let content = '';
@@ -502,7 +502,7 @@
                         </div>
                     </div>
                 </div>
-                <div id="logsContainer" @scroll="handleScroll" @wheel="handleWheel"
+                <div x-ref="logsContainer" @scroll="handleScroll" @wheel="handleWheel"
                     @touchstart="handleTouchStart" @touchmove="handleTouchMove" @keydown="handleKeyScroll" tabindex="0"
                     class="flex overflow-y-auto overflow-x-hidden flex-col px-4 py-2 w-full min-w-0 scrollbar"
                     :class="fullscreen ? 'flex-1' : 'max-h-[40rem]'">
@@ -510,7 +510,7 @@
                         @php
                             $displayLines = collect(explode("\n", $outputs))->filter(fn($line) => trim($line) !== '');
                         @endphp
-                        <div id="logs" class="font-logs max-w-full cursor-default">
+                        <div x-ref="logs" class="font-logs max-w-full cursor-default">
                             <div x-show="searchQuery.trim() && matchCount === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
                                 No matches found.
@@ -547,7 +547,7 @@
                             @endforeach
                         </div>
                     @else
-                        <pre id="logs"
+                        <pre x-ref="logs"
                             class="font-logs whitespace-pre-wrap break-all max-w-full text-neutral-400">No logs yet.</pre>
                     @endif
                 </div>
