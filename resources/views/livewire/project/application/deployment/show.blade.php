@@ -9,8 +9,11 @@
         fullscreen: @entangle('fullscreen'),
         alwaysScroll: {{ $isKeepAliveOn ? 'true' : 'false' }},
         rafId: null,
+        scrollTimeout: null,
         scrollDebounce: null,
         isScrolling: false,
+        destroyed: false,
+        deploymentFinishedCleanup: null,
         lastTouchY: 0,
         showTimestamps: true,
         searchQuery: '',
@@ -20,20 +23,28 @@
             this.fullscreen = !this.fullscreen;
         },
         scrollToBottom() {
-            const logsContainer = document.getElementById('logsContainer');
+            if (this.destroyed) return;
+            const logsContainer = this.$root.querySelector('#logsContainer');
             if (logsContainer) {
                 this.isScrolling = true;
                 logsContainer.scrollTop = logsContainer.scrollHeight;
-                setTimeout(() => { this.isScrolling = false; }, 50);
+                requestAnimationFrame(() => { this.isScrolling = false; });
+            }
+        },
+        cancelScrollLoop() {
+            if (this.rafId) {
+                cancelAnimationFrame(this.rafId);
+                this.rafId = null;
+            }
+            if (this.scrollTimeout) {
+                clearTimeout(this.scrollTimeout);
+                this.scrollTimeout = null;
             }
         },
         disableFollow() {
             if (!this.alwaysScroll) return;
             this.alwaysScroll = false;
-            if (this.rafId) {
-                cancelAnimationFrame(this.rafId);
-                this.rafId = null;
-            }
+            this.cancelScrollLoop();
         },
         handleWheel(event) {
             if (this.alwaysScroll && event.deltaY < 0) {
@@ -59,10 +70,11 @@
             }
         },
         handleScroll(event) {
-            if (this.isScrolling) return;
+            if (this.isScrolling || this.destroyed) return;
+            const el = event.target;
             clearTimeout(this.scrollDebounce);
             this.scrollDebounce = setTimeout(() => {
-                const el = event.target;
+                if (this.destroyed) return;
                 const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
                 if (!this.alwaysScroll && distanceFromBottom <= 10) {
                     this.alwaysScroll = true;
@@ -71,11 +83,12 @@
             }, 150);
         },
         scheduleScroll() {
-            if (!this.alwaysScroll) return;
+            if (!this.alwaysScroll || this.destroyed) return;
             this.rafId = requestAnimationFrame(() => {
+                if (!this.alwaysScroll || this.destroyed) return;
                 this.scrollToBottom();
-                if (this.alwaysScroll) {
-                    setTimeout(() => this.scheduleScroll(), 250);
+                if (this.alwaysScroll && !this.destroyed) {
+                    this.scrollTimeout = setTimeout(() => this.scheduleScroll(), 250);
                 }
             });
         },
@@ -84,10 +97,7 @@
             if (this.alwaysScroll) {
                 this.scheduleScroll();
             } else {
-                if (this.rafId) {
-                    cancelAnimationFrame(this.rafId);
-                    this.rafId = null;
-                }
+                this.cancelScrollLoop();
             }
         },
         hasActiveLogSelection() {
@@ -189,10 +199,7 @@
         stopScroll() {
             this.scrollToBottom();
             this.alwaysScroll = false;
-            if (this.rafId) {
-                cancelAnimationFrame(this.rafId);
-                this.rafId = null;
-            }
+            this.cancelScrollLoop();
         },
         init() {
             // Watch search query changes
@@ -200,21 +207,28 @@
                 this.applySearch();
             });
 
-            // Apply search after Livewire updates
+            // Apply search after Livewire updates.
+            // Livewire.hook() has no deregister API, so this callback survives
+            // wire:navigate. It is made harmless after teardown by the
+            // `destroyed` guard and by only reacting to DOM inside this root.
             Livewire.hook('morph.updated', ({ el }) => {
-                if (el.id === 'logs') {
-                    this.$nextTick(() => {
-                        this.applySearch();
-                        if (this.alwaysScroll) {
-                            this.scrollToBottom();
-                        }
-                    });
-                }
+                if (this.destroyed) return;
+                if (el.id !== 'logs' || !this.$root.contains(el)) return;
+                this.$nextTick(() => {
+                    if (this.destroyed) return;
+                    this.applySearch();
+                    if (this.alwaysScroll) {
+                        this.scrollToBottom();
+                    }
+                });
             });
 
-            // Stop auto-scroll when deployment finishes
-            Livewire.on('deploymentFinished', () => {
+            // Stop auto-scroll when deployment finishes.
+            // Livewire.on() returns an unregister fn; keep it for destroy().
+            this.deploymentFinishedCleanup = Livewire.on('deploymentFinished', () => {
+                if (this.destroyed) return;
                 setTimeout(() => {
+                    if (this.destroyed) return;
                     this.stopScroll();
                 }, 500);
             });
@@ -222,6 +236,20 @@
             // Start auto-scroll if deployment is in progress
             if (this.alwaysScroll) {
                 this.scheduleScroll();
+            }
+        },
+        destroy() {
+            // Runs when Alpine tears the component down (wire:navigate away).
+            this.destroyed = true;
+            this.alwaysScroll = false;
+            this.cancelScrollLoop();
+            if (this.scrollDebounce) {
+                clearTimeout(this.scrollDebounce);
+                this.scrollDebounce = null;
+            }
+            if (typeof this.deploymentFinishedCleanup === 'function') {
+                this.deploymentFinishedCleanup();
+                this.deploymentFinishedCleanup = null;
             }
         }
     }" class="flex flex-1 min-h-0 flex-col overflow-hidden">

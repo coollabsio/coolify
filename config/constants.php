@@ -94,6 +94,21 @@ return [
         'sentry_dsn' => env('SENTRY_DSN'),
     ],
 
+    'sentinel' => [
+        // How often (seconds) PushServerUpdateJob is force-dispatched even when
+        // the container state hash is unchanged. Keeps last_online_at,
+        // exited-detection and storage checks from going stale.
+        'push_force_interval_seconds' => env('SENTINEL_PUSH_FORCE_INTERVAL_SECONDS', 300),
+    ],
+
+    'proxy' => [
+        // How often (seconds) PushServerUpdateJob periodically re-connects the
+        // proxy to Docker networks as a safety net. Real network-layout changes
+        // already connect the proxy on-demand; this only covers gaps (Swarm
+        // networks added via UI, proxy crash recovery).
+        'connect_networks_interval_seconds' => env('PROXY_CONNECT_NETWORKS_INTERVAL_SECONDS', 3600),
+    ],
+
     'webhooks' => [
         'feedback_discord_webhook' => env('FEEDBACK_DISCORD_WEBHOOK'),
         'dev_webhook' => env('SERVEO_URL'),
