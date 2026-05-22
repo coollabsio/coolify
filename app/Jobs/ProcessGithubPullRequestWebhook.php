@@ -39,6 +39,7 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
         public string $commitSha,
         public ?string $authorAssociation,
         public string $fullName,
+        public bool $isForkPullRequest = false,
     ) {
         $this->onQueue('high');
     }
@@ -94,6 +95,9 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
         if (! $application->settings->is_pr_deployments_public_enabled) {
             $trustedAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR', 'CONTRIBUTOR'];
             if (! in_array($this->authorAssociation, $trustedAssociations)) {
+                return;
+            }
+            if ($this->isForkPullRequest) {
                 return;
             }
         }
