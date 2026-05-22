@@ -19,6 +19,9 @@ it('generates ls-remote commands for GitLab source with private key', function (
     $gitlabSource->shouldReceive('getAttribute')->with('privateKey')->andReturn($privateKey);
     $gitlabSource->shouldReceive('getAttribute')->with('private_key_id')->andReturn(1);
     $gitlabSource->shouldReceive('getAttribute')->with('custom_port')->andReturn(22);
+    $gitlabSource->shouldReceive('getAttribute')->with('access_token')->andReturn(null);
+    $gitlabSource->shouldReceive('getAttribute')->with('refresh_token')->andReturn(null);
+    $gitlabSource->shouldReceive('isConnected')->andReturn(false);
 
     $application = Mockery::mock(Application::class)->makePartial();
     $application->git_branch = 'main';
@@ -46,6 +49,9 @@ it('generates ls-remote commands for GitLab source without private key', functio
     $gitlabSource->shouldReceive('getMorphClass')->andReturn(\App\Models\GitlabApp::class);
     $gitlabSource->shouldReceive('getAttribute')->with('privateKey')->andReturn(null);
     $gitlabSource->shouldReceive('getAttribute')->with('private_key_id')->andReturn(null);
+    $gitlabSource->shouldReceive('getAttribute')->with('access_token')->andReturn(null);
+    $gitlabSource->shouldReceive('getAttribute')->with('refresh_token')->andReturn(null);
+    $gitlabSource->shouldReceive('isConnected')->andReturn(false);
 
     $application = Mockery::mock(Application::class)->makePartial();
     $application->git_branch = 'main';
@@ -74,6 +80,9 @@ it('does not return null for GitLab source type', function () {
     $gitlabSource->shouldReceive('getMorphClass')->andReturn(\App\Models\GitlabApp::class);
     $gitlabSource->shouldReceive('getAttribute')->with('privateKey')->andReturn(null);
     $gitlabSource->shouldReceive('getAttribute')->with('private_key_id')->andReturn(null);
+    $gitlabSource->shouldReceive('getAttribute')->with('access_token')->andReturn(null);
+    $gitlabSource->shouldReceive('getAttribute')->with('refresh_token')->andReturn(null);
+    $gitlabSource->shouldReceive('isConnected')->andReturn(false);
 
     $application = Mockery::mock(Application::class)->makePartial();
     $application->git_branch = 'main';

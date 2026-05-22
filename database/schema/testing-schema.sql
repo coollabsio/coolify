@@ -370,6 +370,12 @@ CREATE TABLE IF NOT EXISTS "gitlab_apps" (
     "is_public" INTEGER DEFAULT false NOT NULL,
     "app_id" INTEGER,
     "app_secret" TEXT,
+    "client_id" TEXT,
+    "client_secret" TEXT,
+    "access_token" TEXT,
+    "refresh_token" TEXT,
+    "expires_at" INTEGER,
+    "redirect_uri" TEXT,
     "oauth_id" INTEGER,
     "group_name" TEXT,
     "public_key" TEXT,
@@ -1752,3 +1758,4 @@ INSERT INTO "migrations" ("id", "migration", "batch") VALUES (311, '2025_12_10_1
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (312, '2025_12_15_143052_trim_s3_storage_credentials', 312);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (313, '2025_12_17_000001_add_is_wire_navigate_enabled_to_instance_settings_table', 313);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (314, '2025_12_17_000002_add_restart_tracking_to_standalone_databases', 314);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (315, '2026_05_22_000000_add_oauth_fields_to_gitlab_apps_table', 315);

@@ -15,6 +15,8 @@ Route::middleware(['web', 'auth', 'throttle:30,1'])->group(function () {
 Route::post('/source/github/events', [Github::class, 'normal']);
 Route::post('/source/github/events/manual', [Github::class, 'manual']);
 
+Route::get('/source/gitlab/redirect', [Gitlab::class, 'redirect']);
+Route::post('/source/gitlab/events', [Gitlab::class, 'normal']);
 Route::post('/source/gitlab/events/manual', [Gitlab::class, 'manual']);
 
 Route::post('/source/bitbucket/events/manual', [Bitbucket::class, 'manual']);
