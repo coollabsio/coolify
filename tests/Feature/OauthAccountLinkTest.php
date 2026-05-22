@@ -7,6 +7,7 @@ use App\Models\OauthUserLink;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Socialite\Facades\Socialite;
 use Livewire\Livewire;
 
@@ -174,4 +175,71 @@ it('does not allow a user to disconnect another user oauth link', function () {
         ->call('disconnect', $link->id);
 
     expect(OauthUserLink::find($link->id))->not->toBeNull();
+});
+
+it('blocks disconnect when it is the last sign-in method for a password-less user', function () {
+    $user = makeUserWithoutBoarding(['password' => null]);
+    $this->actingAs($user);
+
+    $link = OauthUserLink::create([
+        'user_id' => $user->id,
+        'provider' => 'google',
+        'provider_user_id' => 'google-uid-only',
+    ]);
+
+    Livewire::test(OauthLinks::class)
+        ->call('disconnect', $link->id)
+        ->assertDispatched('error');
+
+    expect(OauthUserLink::find($link->id))->not->toBeNull();
+});
+
+it('allows disconnect when password-less user has multiple oauth links', function () {
+    $user = makeUserWithoutBoarding(['password' => null]);
+    $this->actingAs($user);
+
+    OauthSetting::create([
+        'provider' => 'github',
+        'enabled' => true,
+        'client_id' => 'gh-client-id',
+        'client_secret' => 'gh-client-secret',
+        'redirect_uri' => 'https://coolify.example.com/auth/github/callback',
+        'tenant' => '',
+    ]);
+
+    $linkA = OauthUserLink::create([
+        'user_id' => $user->id,
+        'provider' => 'google',
+        'provider_user_id' => 'google-uid-multi-a',
+    ]);
+
+    $linkB = OauthUserLink::create([
+        'user_id' => $user->id,
+        'provider' => 'github',
+        'provider_user_id' => 'github-uid-multi-b',
+    ]);
+
+    Livewire::test(OauthLinks::class)
+        ->call('disconnect', $linkA->id)
+        ->assertDispatched('success');
+
+    expect(OauthUserLink::find($linkA->id))->toBeNull();
+    expect(OauthUserLink::find($linkB->id))->not->toBeNull();
+});
+
+it('allows disconnect when user has a password even if it is their last oauth link', function () {
+    $user = makeUserWithoutBoarding(['password' => Hash::make('SecurePass!1')]);
+    $this->actingAs($user);
+
+    $link = OauthUserLink::create([
+        'user_id' => $user->id,
+        'provider' => 'google',
+        'provider_user_id' => 'google-uid-has-pw',
+    ]);
+
+    Livewire::test(OauthLinks::class)
+        ->call('disconnect', $link->id)
+        ->assertDispatched('success');
+
+    expect(OauthUserLink::find($link->id))->toBeNull();
 });

@@ -47,6 +47,19 @@ class OauthLinks extends Component
             return;
         }
 
+        $user = Auth::user();
+        if (! $user->hasPassword()) {
+            $remaining = OauthUserLink::where('user_id', $user->id)
+                ->where('id', '!=', $link->id)
+                ->count();
+
+            if ($remaining === 0) {
+                $this->dispatch('error', 'Cannot disconnect your only sign-in method. Set a password first, or connect another provider.');
+
+                return;
+            }
+        }
+
         $provider = $link->provider;
         $link->delete();
 

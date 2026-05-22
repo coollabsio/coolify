@@ -198,6 +198,25 @@ it('creates a new user and link when registration is enabled', function () {
     $this->assertAuthenticated();
 });
 
+it('rejects oauth login for an invited user with a password and force_password_reset flag', function () {
+    $user = User::factory()->create([
+        'email' => 'invited@example.edu',
+        'password' => Hash::make('TempPass!1'),
+        'force_password_reset' => true,
+    ]);
+
+    mockGoogleProvider([
+        'email' => 'invited@example.edu',
+        'user' => ['email_verified' => true],
+    ]);
+
+    $response = $this->get(route('auth.callback', 'google'));
+
+    $response->assertStatus(403);
+    $this->assertGuest();
+    expect(OauthUserLink::count())->toBe(0);
+});
+
 it('still authenticates linked users that have 2FA enrolled (oauth path bypasses Coolify 2FA by design)', function () {
     $user = User::factory()->create([
         'email' => 'twofa@example.edu',
