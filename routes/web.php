@@ -8,6 +8,7 @@ use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Show as DestinationShow;
+use App\Livewire\Deployments\Index as DeploymentsIndex;
 use App\Livewire\ForcePasswordReset;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
@@ -312,6 +313,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('/deployments', DeploymentsIndex::class)->name('deployments.index');
     Route::get('/sources', function () {
         $sources = currentTeam()->sources();
 
