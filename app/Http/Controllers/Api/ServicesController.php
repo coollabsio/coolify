@@ -486,6 +486,14 @@ class ServicesController extends Controller
                     StartService::dispatch($service);
                 }
 
+                auditLog('api.service.created', [
+                    'team_id' => $teamId,
+                    'service_uuid' => $service->uuid,
+                    'service_name' => $service->name,
+                    'service_type' => $oneClickServiceName ?? null,
+                    'instant_deploy' => (bool) $instantDeploy,
+                ]);
+
                 return response()->json([
                     'uuid' => $service->uuid,
                     'domains' => $service->applications()->pluck('fqdn')->filter()->sort()->values(),
@@ -650,6 +658,14 @@ class ServicesController extends Controller
                 StartService::dispatch($service);
             }
 
+            auditLog('api.service.created', [
+                'team_id' => $teamId,
+                'service_uuid' => $service->uuid,
+                'service_name' => $service->name,
+                'service_type' => 'docker_compose',
+                'instant_deploy' => (bool) $instantDeploy,
+            ]);
+
             return response()->json([
                 'uuid' => $service->uuid,
                 'domains' => $service->applications()->pluck('fqdn')->filter()->sort()->values(),
@@ -791,6 +807,12 @@ class ServicesController extends Controller
             deleteConfigurations: $request->boolean('delete_configurations', true),
             dockerCleanup: $request->boolean('docker_cleanup', true)
         );
+
+        auditLog('api.service.deleted', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'service_name' => $service->name,
+        ]);
 
         return response()->json([
             'message' => 'Service deletion request queued.',
@@ -1046,6 +1068,13 @@ class ServicesController extends Controller
             StartService::dispatch($service);
         }
 
+        auditLog('api.service.updated', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'service_name' => $service->name,
+            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
+        ]);
+
         return response()->json([
             'uuid' => $service->uuid,
             'domains' => $service->applications()->pluck('fqdn')->filter()->sort()->values(),
@@ -1255,6 +1284,13 @@ class ServicesController extends Controller
         }
         $env->save();
 
+        auditLog('api.service.env_updated', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'env_uuid' => $env->uuid,
+            'env_key' => $env->key,
+        ]);
+
         return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
     }
 
@@ -1384,6 +1420,12 @@ class ServicesController extends Controller
             $updatedEnvs->push($this->removeSensitiveData($env));
         }
 
+        auditLog('api.service.env_bulk_upserted', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'env_count' => $updatedEnvs->count(),
+        ]);
+
         return response()->json($updatedEnvs)->setStatusCode(201);
     }
 
@@ -1506,6 +1548,13 @@ class ServicesController extends Controller
             'comment' => $request->comment ?? null,
         ]);
 
+        auditLog('api.service.env_created', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'env_uuid' => $env->uuid,
+            'env_key' => $env->key,
+        ]);
+
         return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
     }
 
@@ -1591,7 +1640,16 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Environment variable not found.'], 404);
         }
 
+        $envKey = $env->key;
+        $envUuid = $env->uuid;
         $env->forceDelete();
+
+        auditLog('api.service.env_deleted', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'env_uuid' => $envUuid,
+            'env_key' => $envKey,
+        ]);
 
         return response()->json(['message' => 'Environment variable deleted.']);
     }
@@ -1667,6 +1725,12 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service is already running.'], 400);
         }
         StartService::dispatch($service);
+
+        auditLog('api.service.deployed', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'service_name' => $service->name,
+        ]);
 
         return response()->json(
             [
@@ -1759,6 +1823,13 @@ class ServicesController extends Controller
         $dockerCleanup = $request->boolean('docker_cleanup', true);
         StopService::dispatch($service, false, $dockerCleanup);
 
+        auditLog('api.service.stopped', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'service_name' => $service->name,
+            'docker_cleanup' => $dockerCleanup,
+        ]);
+
         return response()->json(
             [
                 'message' => 'Service stopping request queued.',
@@ -1845,6 +1916,13 @@ class ServicesController extends Controller
 
         $pullLatest = $request->boolean('latest');
         RestartService::dispatch($service, $pullLatest);
+
+        auditLog('api.service.restarted', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'service_name' => $service->name,
+            'pull_latest' => $pullLatest,
+        ]);
 
         return response()->json(
             [
@@ -2126,6 +2204,15 @@ class ServicesController extends Controller
             ]);
         }
 
+        auditLog('api.service.storage_created', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'storage_uuid' => $storage->uuid ?? null,
+            'storage_id' => $storage->id,
+            'storage_type' => $request->type,
+            'mount_path' => $storage->mount_path,
+        ]);
+
         return response()->json($storage, 201);
     }
 
@@ -2354,6 +2441,15 @@ class ServicesController extends Controller
 
         $storage->save();
 
+        auditLog('api.service.storage_updated', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'storage_uuid' => $storage->uuid ?? null,
+            'storage_id' => $storage->id,
+            'storage_type' => $request->type,
+            'mount_path' => $storage->mount_path ?? null,
+        ]);
+
         return response()->json($storage);
     }
 
@@ -2454,7 +2550,17 @@ class ServicesController extends Controller
             $storage->deleteStorageOnServer();
         }
 
+        $storageType = $storage instanceof LocalFileVolume ? 'file' : 'persistent';
+        $storageMountPath = $storage->mount_path ?? null;
         $storage->delete();
+
+        auditLog('api.service.storage_deleted', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'storage_uuid' => $storageUuid,
+            'storage_type' => $storageType,
+            'mount_path' => $storageMountPath,
+        ]);
 
         return response()->json(['message' => 'Storage deleted.']);
     }

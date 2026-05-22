@@ -58,7 +58,7 @@
                                             <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
                                         @endif
                                     @else
-                                        @if (!$env->is_nixpacks)
+                                        @if (!$env->is_buildpack_control)
                                             <x-forms.checkbox instantSave id="is_buildtime"
                                                 helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
                                                 label="Available at Buildtime" />
@@ -67,7 +67,7 @@
                                             helper="Make this variable available in the running container at runtime."
                                             label="Available at Runtime" />
                                         @if (!$isMagicVariable)
-                                            @if (!$env->is_nixpacks)
+                                            @if (!$env->is_buildpack_control)
                                                 <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
                                                 @if ($is_multiline === false)
                                                     <x-forms.checkbox instantSave id="is_literal"
@@ -236,7 +236,7 @@
                                             <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
                                         @endif
                                     @else
-                                        @if (!$env->is_nixpacks)
+                                        @if (!$env->is_buildpack_control)
                                             <x-forms.checkbox instantSave id="is_buildtime"
                                                 helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
                                                 label="Available at Buildtime" />
@@ -245,7 +245,7 @@
                                             helper="Make this variable available in the running container at runtime."
                                             label="Available at Runtime" />
                                         @if (!$isMagicVariable)
-                                            @if (!$env->is_nixpacks)
+                                            @if (!$env->is_buildpack_control)
                                                 <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
                                                 @if ($is_multiline === false)
                                                     <x-forms.checkbox instantSave id="is_literal"

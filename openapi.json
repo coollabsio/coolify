@@ -111,6 +111,7 @@
                                         "type": "string",
                                         "enum": [
                                             "nixpacks",
+                                            "railpack",
                                             "static",
                                             "dockerfile",
                                             "dockercompose"
@@ -569,6 +570,7 @@
                                         "type": "string",
                                         "enum": [
                                             "nixpacks",
+                                            "railpack",
                                             "static",
                                             "dockerfile",
                                             "dockercompose"
@@ -1019,6 +1021,7 @@
                                         "type": "string",
                                         "enum": [
                                             "nixpacks",
+                                            "railpack",
                                             "static",
                                             "dockerfile",
                                             "dockercompose"
@@ -1448,10 +1451,7 @@
                                     "build_pack": {
                                         "type": "string",
                                         "enum": [
-                                            "nixpacks",
-                                            "static",
-                                            "dockerfile",
-                                            "dockercompose"
+                                            "dockerfile"
                                         ],
                                         "description": "The build pack type."
                                     },
@@ -2092,173 +2092,6 @@
                 ]
             }
         },
-        "\/applications\/dockercompose": {
-            "post": {
-                "tags": [
-                    "Applications"
-                ],
-                "summary": "Create (Docker Compose)",
-                "description": "Deprecated: Use POST \/api\/v1\/services instead.",
-                "operationId": "create-dockercompose-application",
-                "requestBody": {
-                    "description": "Application object that needs to be created.",
-                    "required": true,
-                    "content": {
-                        "application\/json": {
-                            "schema": {
-                                "required": [
-                                    "project_uuid",
-                                    "server_uuid",
-                                    "environment_name",
-                                    "environment_uuid",
-                                    "docker_compose_raw"
-                                ],
-                                "properties": {
-                                    "project_uuid": {
-                                        "type": "string",
-                                        "description": "The project UUID."
-                                    },
-                                    "server_uuid": {
-                                        "type": "string",
-                                        "description": "The server UUID."
-                                    },
-                                    "environment_name": {
-                                        "type": "string",
-                                        "description": "The environment name. You need to provide at least one of environment_name or environment_uuid."
-                                    },
-                                    "environment_uuid": {
-                                        "type": "string",
-                                        "description": "The environment UUID. You need to provide at least one of environment_name or environment_uuid."
-                                    },
-                                    "docker_compose_raw": {
-                                        "type": "string",
-                                        "description": "The Docker Compose raw content."
-                                    },
-                                    "destination_uuid": {
-                                        "type": "string",
-                                        "description": "The destination UUID if the server has more than one destinations."
-                                    },
-                                    "name": {
-                                        "type": "string",
-                                        "description": "The application name."
-                                    },
-                                    "description": {
-                                        "type": "string",
-                                        "description": "The application description."
-                                    },
-                                    "instant_deploy": {
-                                        "type": "boolean",
-                                        "description": "The flag to indicate if the application should be deployed instantly."
-                                    },
-                                    "use_build_server": {
-                                        "type": "boolean",
-                                        "nullable": true,
-                                        "description": "Use build server."
-                                    },
-                                    "connect_to_docker_network": {
-                                        "type": "boolean",
-                                        "description": "The flag to connect the service to the predefined Docker network."
-                                    },
-                                    "force_domain_override": {
-                                        "type": "boolean",
-                                        "description": "Force domain usage even if conflicts are detected. Default is false."
-                                    },
-                                    "is_container_label_escape_enabled": {
-                                        "type": "boolean",
-                                        "default": true,
-                                        "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Application created successfully.",
-                        "content": {
-                            "application\/json": {
-                                "schema": {
-                                    "properties": {
-                                        "uuid": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "$ref": "#\/components\/responses\/401"
-                    },
-                    "400": {
-                        "$ref": "#\/components\/responses\/400"
-                    },
-                    "409": {
-                        "description": "Domain conflicts detected.",
-                        "content": {
-                            "application\/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Domain conflicts detected. Use force_domain_override=true to proceed."
-                                        },
-                                        "warning": {
-                                            "type": "string",
-                                            "example": "Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior."
-                                        },
-                                        "conflicts": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "domain": {
-                                                        "type": "string",
-                                                        "example": "example.com"
-                                                    },
-                                                    "resource_name": {
-                                                        "type": "string",
-                                                        "example": "My Application"
-                                                    },
-                                                    "resource_uuid": {
-                                                        "type": "string",
-                                                        "nullable": true,
-                                                        "example": "abc123-def456"
-                                                    },
-                                                    "resource_type": {
-                                                        "type": "string",
-                                                        "enum": [
-                                                            "application",
-                                                            "service",
-                                                            "instance"
-                                                        ],
-                                                        "example": "application"
-                                                    },
-                                                    "message": {
-                                                        "type": "string",
-                                                        "example": "Domain example.com is already in use by application 'My Application'"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "deprecated": true,
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "\/applications\/{uuid}": {
             "get": {
                 "tags": [
@@ -2457,6 +2290,7 @@
                                         "type": "string",
                                         "enum": [
                                             "nixpacks",
+                                            "railpack",
                                             "static",
                                             "dockerfile",
                                             "dockercompose"
@@ -4381,8 +4215,8 @@
                                         "description": "Number of days to retain backups locally"
                                     },
                                     "database_backup_retention_max_storage_locally": {
-                                        "type": "integer",
-                                        "description": "Max storage (MB) for local backups"
+                                        "type": "number",
+                                        "description": "Max storage (GB) for local backups"
                                     },
                                     "database_backup_retention_amount_s3": {
                                         "type": "integer",
@@ -4393,8 +4227,8 @@
                                         "description": "Number of days to retain backups in S3"
                                     },
                                     "database_backup_retention_max_storage_s3": {
-                                        "type": "integer",
-                                        "description": "Max storage (MB) for S3 backups"
+                                        "type": "number",
+                                        "description": "Max storage (GB) for S3 backups"
                                     },
                                     "timeout": {
                                         "type": "integer",
@@ -4951,7 +4785,7 @@
                                         "description": "Retention days of the backup locally"
                                     },
                                     "database_backup_retention_max_storage_locally": {
-                                        "type": "integer",
+                                        "type": "number",
                                         "description": "Max storage of the backup locally"
                                     },
                                     "database_backup_retention_amount_s3": {
@@ -4963,7 +4797,7 @@
                                         "description": "Retention days of the backup in s3"
                                     },
                                     "database_backup_retention_max_storage_s3": {
-                                        "type": "integer",
+                                        "type": "number",
                                         "description": "Max storage of the backup in S3"
                                     },
                                     "timeout": {
@@ -8650,6 +8484,110 @@
                 ]
             }
         },
+        "\/mcp\/enable": {
+            "post": {
+                "summary": "Enable MCP Server",
+                "description": "Enable the MCP server endpoint at \/mcp (only with root permissions).",
+                "operationId": "enable-mcp",
+                "responses": {
+                    "200": {
+                        "description": "MCP server enabled.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "MCP server enabled."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "You are not allowed to enable the MCP server.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "You are not allowed to enable the MCP server."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/mcp\/disable": {
+            "post": {
+                "summary": "Disable MCP Server",
+                "description": "Disable the MCP server endpoint at \/mcp (only with root permissions).",
+                "operationId": "disable-mcp",
+                "responses": {
+                    "200": {
+                        "description": "MCP server disabled.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "MCP server disabled."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "You are not allowed to disable the MCP server.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "You are not allowed to disable the MCP server."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/health": {
             "get": {
                 "summary": "Healthcheck",
@@ -10545,6 +10483,10 @@
                                     "server_disk_usage_check_frequency": {
                                         "type": "string",
                                         "description": "Cron expression for disk usage check frequency."
+                                    },
+                                    "connection_timeout": {
+                                        "type": "integer",
+                                        "description": "SSH connection timeout in seconds (1-300). Default: 10."
                                     }
                                 },
                                 "type": "object"
@@ -12499,6 +12441,7 @@
                         "description": "Build pack.",
                         "enum": [
                             "nixpacks",
+                            "railpack",
                             "static",
                             "dockerfile",
                             "dockercompose"
@@ -12846,6 +12789,18 @@
                     },
                     "docker_registry_image_tag": {
                         "type": "string",
+                        "nullable": true
+                    },
+                    "configuration_hash": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "configuration_snapshot": {
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "configuration_diff": {
+                        "type": "object",
                         "nullable": true
                     },
                     "force_rebuild": {
@@ -13349,6 +13304,10 @@
                     "delete_unused_networks": {
                         "type": "boolean",
                         "description": "The flag to indicate if the unused networks should be deleted."
+                    },
+                    "connection_timeout": {
+                        "type": "integer",
+                        "description": "SSH connection timeout in seconds."
                     }
                 },
                 "type": "object"

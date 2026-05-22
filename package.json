@@ -9,7 +9,6 @@
     "devDependencies": {
         "@tailwindcss/postcss": "4.1.18",
         "@vitejs/plugin-vue": "6.0.3",
-        "axios": "1.15.0",
         "laravel-echo": "2.2.7",
         "laravel-vite-plugin": "2.0.1",
         "postcss": "8.5.6",

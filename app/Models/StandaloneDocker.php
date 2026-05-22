@@ -134,8 +134,11 @@ class StandaloneDocker extends BaseModel
         $mongodbs = $this->mongodbs;
         $mysqls = $this->mysqls;
         $mariadbs = $this->mariadbs;
+        $keydbs = $this->keydbs;
+        $dragonflies = $this->dragonflies;
+        $clickhouses = $this->clickhouses;
 
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs);
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
     }
 
     public function attachedTo()

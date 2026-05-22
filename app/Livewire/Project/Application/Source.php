@@ -109,6 +109,7 @@ class Source extends Component
             $this->application->refresh();
             $this->privateKeyName = $this->application->private_key->name;
             $this->dispatch('success', 'Private key updated!');
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -124,6 +125,7 @@ class Source extends Component
             }
             $this->syncData(true);
             $this->dispatch('success', 'Application source updated!');
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

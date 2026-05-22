@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Webhook;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Jobs\GithubAppPermissionJob;
 use App\Jobs\ProcessGithubPullRequestWebhook;
 use App\Models\Application;
@@ -16,6 +17,8 @@ use Visus\Cuid2\Cuid2;
 
 class Github extends Controller
 {
+    use DetectsSkipDeployCommits;
+
     public function manual(Request $request)
     {
         try {
@@ -43,12 +46,14 @@ class Github extends Controller
                 $removed_files = data_get($payload, 'commits.*.removed');
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
+                $skip_deploy_commits = self::shouldSkipDeploy(data_get($payload, 'commits.*.message', []));
             }
             if ($x_github_event === 'pull_request') {
                 $action = data_get($payload, 'action');
                 $full_name = data_get($payload, 'repository.full_name');
                 $pull_request_id = data_get($payload, 'number');
                 $pull_request_html_url = data_get($payload, 'pull_request.html_url');
+                $pull_request_title = data_get($payload, 'pull_request.title');
                 $branch = data_get($payload, 'pull_request.head.ref');
                 $base_branch = data_get($payload, 'pull_request.base.ref');
                 $before_sha = data_get($payload, 'before');
@@ -82,6 +87,12 @@ class Github extends Controller
                 foreach ($serverApplications as $application) {
                     $webhook_secret = data_get($application, 'manual_webhook_secret_github');
                     if (empty($webhook_secret)) {
+                        auditLogWebhookFailure('github', 'webhook_secret_missing', [
+                            'application_uuid' => $application->uuid,
+                            'application_name' => $application->name,
+                            'repository' => $full_name ?? null,
+                            'mode' => 'manual',
+                        ]);
                         $return_payloads->push([
                             'application' => $application->name,
                             'status' => 'failed',
@@ -92,6 +103,12 @@ class Github extends Controller
                     }
                     $hmac = hash_hmac('sha256', $request->getContent(), $webhook_secret);
                     if (! hash_equals($x_hub_signature_256, $hmac) && ! isDev()) {
+                        auditLogWebhookFailure('github', 'invalid_signature', [
+                            'application_uuid' => $application->uuid,
+                            'application_name' => $application->name,
+                            'repository' => $full_name ?? null,
+                            'mode' => 'manual',
+                        ]);
                         $return_payloads->push([
                             'application' => $application->name,
                             'status' => 'failed',
@@ -114,6 +131,17 @@ class Github extends Controller
                         if ($application->isDeployable()) {
                             $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
                             if ($is_watch_path_triggered || blank($application->watch_paths)) {
+                                if ($skip_deploy_commits ?? false) {
+                                    $return_payloads->push([
+                                        'application' => $application->name,
+                                        'status' => 'skipped',
+                                        'message' => 'All commits contain [skip cd] or [skip ci]. Skipping deployment.',
+                                        'application_uuid' => $application->uuid,
+                                        'application_name' => $application->name,
+                                    ]);
+
+                                    continue;
+                                }
                                 $deployment_uuid = new Cuid2;
                                 $result = queue_application_deployment(
                                     application: $application,
@@ -131,6 +159,15 @@ class Github extends Controller
                                         'message' => $result['message'],
                                     ]);
                                 } else {
+                                    auditLog('webhook.deployment.queued', [
+                                        'provider' => 'github',
+                                        'mode' => 'manual',
+                                        'application_uuid' => $application->uuid,
+                                        'application_name' => $application->name,
+                                        'deployment_uuid' => $result['deployment_uuid'],
+                                        'commit' => data_get($payload, 'after'),
+                                        'repository' => $full_name ?? null,
+                                    ]);
                                     $return_payloads->push([
                                         'application' => $application->name,
                                         'status' => 'success',
@@ -180,6 +217,7 @@ class Github extends Controller
                             action: $action,
                             pullRequestId: $pull_request_id,
                             pullRequestHtmlUrl: $pull_request_html_url,
+                            pullRequestTitle: $pull_request_title ?? null,
                             beforeSha: $before_sha,
                             afterSha: $after_sha,
                             commitSha: data_get($payload, 'pull_request.head.sha', 'HEAD'),
@@ -224,6 +262,13 @@ class Github extends Controller
             $hmac = hash_hmac('sha256', $request->getContent(), $webhook_secret);
             if (config('app.env') !== 'local') {
                 if (! hash_equals($x_hub_signature_256, $hmac)) {
+                    auditLogWebhookFailure('github', 'invalid_signature', [
+                        'mode' => 'app',
+                        'github_app_id' => $github_app->id,
+                        'github_app_name' => $github_app->name,
+                        'installation_target_id' => $x_github_hook_installation_target_id,
+                    ]);
+
                     return response('Invalid signature.');
                 }
             }
@@ -246,12 +291,14 @@ class Github extends Controller
                 $removed_files = data_get($payload, 'commits.*.removed');
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
+                $skip_deploy_commits = self::shouldSkipDeploy(data_get($payload, 'commits.*.message', []));
             }
             if ($x_github_event === 'pull_request') {
                 $action = data_get($payload, 'action');
                 $id = data_get($payload, 'repository.id');
                 $pull_request_id = data_get($payload, 'number');
                 $pull_request_html_url = data_get($payload, 'pull_request.html_url');
+                $pull_request_title = data_get($payload, 'pull_request.title');
                 $branch = data_get($payload, 'pull_request.head.ref');
                 $base_branch = data_get($payload, 'pull_request.base.ref');
                 $before_sha = data_get($payload, 'before');
@@ -300,6 +347,17 @@ class Github extends Controller
                         if ($application->isDeployable()) {
                             $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
                             if ($is_watch_path_triggered || blank($application->watch_paths)) {
+                                if ($skip_deploy_commits ?? false) {
+                                    $return_payloads->push([
+                                        'application' => $application->name,
+                                        'status' => 'skipped',
+                                        'message' => 'All commits contain [skip cd] or [skip ci]. Skipping deployment.',
+                                        'application_uuid' => $application->uuid,
+                                        'application_name' => $application->name,
+                                    ]);
+
+                                    continue;
+                                }
                                 $deployment_uuid = new Cuid2;
                                 $result = queue_application_deployment(
                                     application: $application,
@@ -310,6 +368,17 @@ class Github extends Controller
                                 );
                                 if ($result['status'] === 'queue_full') {
                                     return response($result['message'], 429)->header('Retry-After', 60);
+                                }
+                                if ($result['status'] !== 'skipped' && ! empty($result['deployment_uuid'])) {
+                                    auditLog('webhook.deployment.queued', [
+                                        'provider' => 'github',
+                                        'mode' => 'app',
+                                        'application_uuid' => $application->uuid,
+                                        'application_name' => $application->name,
+                                        'deployment_uuid' => $result['deployment_uuid'],
+                                        'commit' => data_get($payload, 'after'),
+                                        'github_app_id' => $github_app->id,
+                                    ]);
                                 }
                                 $return_payloads->push([
                                     'status' => $result['status'],
@@ -360,6 +429,7 @@ class Github extends Controller
                             action: $action,
                             pullRequestId: $pull_request_id,
                             pullRequestHtmlUrl: $pull_request_html_url,
+                            pullRequestTitle: $pull_request_title ?? null,
                             beforeSha: $before_sha,
                             afterSha: $after_sha,
                             commitSha: data_get($payload, 'pull_request.head.sha', 'HEAD'),

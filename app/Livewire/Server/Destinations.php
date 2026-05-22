@@ -45,7 +45,7 @@ class Destinations extends Component
             } else {
                 SwarmDocker::create([
                     'name' => $this->server->name.'-'.$name,
-                    'network' => $this->name,
+                    'network' => $name,
                     'server_id' => $this->server->id,
                 ]);
             }

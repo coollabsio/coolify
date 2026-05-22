@@ -36,10 +36,11 @@ class StopApplication
                     : getCurrentApplicationContainerStatus($server, $application->id, 0);
 
                 $containersToStop = $containers->pluck('Names')->toArray();
+                $timeout = $application->settings->stopGracePeriodSeconds();
 
                 foreach ($containersToStop as $containerName) {
                     instant_remote_process(command: [
-                        "docker stop -t 30 $containerName",
+                        "docker stop --time=$timeout $containerName",
                         "docker rm -f $containerName",
                     ], server: $server, throwError: false);
                 }
