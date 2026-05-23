@@ -1016,6 +1016,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--gpus' => 'gpus',
         '--hostname' => 'hostname',
         '--entrypoint' => 'entrypoint',
+        '--network' => 'network_mode',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
