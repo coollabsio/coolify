@@ -40,6 +40,8 @@ use Visus\Cuid2\Cuid2;
         'created_at' => ['type' => 'string', 'description' => 'The date and time when the service was created.'],
         'updated_at' => ['type' => 'string', 'description' => 'The date and time when the service was last updated.'],
         'deleted_at' => ['type' => 'string', 'description' => 'The date and time when the service was deleted.'],
+        'status' => ['type' => 'string', 'description' => 'The aggregate status of the service. Format: "{status}:{health}" (e.g. "running:healthy", "exited:unhealthy"). Computed from all service components.'],
+        'server_status' => ['type' => 'boolean', 'description' => 'Whether the server hosting this service is reachable.'],
     ],
 )]
 class Service extends BaseModel
