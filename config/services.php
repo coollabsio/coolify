@@ -60,6 +60,14 @@ return [
         'tenant' => env('GOOGLE_TENANT'),
     ],
 
+    'oidc' => [
+        'base_url' => env('OIDC_BASE_URL'),
+        'client_id' => env('OIDC_CLIENT_ID'),
+        'client_secret' => env('OIDC_CLIENT_SECRET'),
+        'redirect' => env('OIDC_REDIRECT_URI'),
+        'scopes' => env('OIDC_SCOPES') ? preg_split('/[\s,]+/', env('OIDC_SCOPES'), -1, PREG_SPLIT_NO_EMPTY) : [],
+    ],
+
     'zitadel' => [
         'client_id' => env('ZITADEL_CLIENT_ID'),
         'client_secret' => env('ZITADEL_CLIENT_SECRET'),

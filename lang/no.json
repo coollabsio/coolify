@@ -9,6 +9,7 @@
     "auth.login.gitlab": "Logg inn med Gitlab",
     "auth.login.google": "Logg inn med Google",
     "auth.login.infomaniak": "Logg inn med Infomaniak",
+    "auth.login.oidc": "Logg inn med OIDC",
     "auth.already_registered": "Allerede registrert?",
     "auth.confirm_password": "Bekreft passord",
     "auth.forgot_password_link": "Glemt passord?",

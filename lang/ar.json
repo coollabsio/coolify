@@ -9,6 +9,7 @@
     "auth.login.gitlab": "تسجيل الدخول باستخدام Gitlab",
     "auth.login.google": "تسجيل الدخول باستخدام Google",
     "auth.login.infomaniak": "تسجيل الدخول باستخدام Infomaniak",
+    "auth.login.oidc": "تسجيل الدخول باستخدام OIDC",
     "auth.already_registered": "هل سبق لك التسجيل؟",
     "auth.confirm_password": "تأكيد كلمة المرور",
     "auth.forgot_password_link": "هل نسيت كلمة المرور؟",

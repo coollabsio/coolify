@@ -9,6 +9,7 @@
     "auth.login.gitlab": "Zaloguj się przez Gitlab",
     "auth.login.google": "Zaloguj się przez Google",
     "auth.login.infomaniak": "Zaloguj się przez Infomaniak",
+    "auth.login.oidc": "Zaloguj się przez OIDC",
     "auth.login.zitadel": "Zaloguj się przez Zitadel",
     "auth.already_registered": "Już zarejestrowany?",
     "auth.confirm_password": "Potwierdź hasło",

@@ -8,6 +8,7 @@
     "auth.login.gitlab": "ورود با گیت لب",
     "auth.login.google": "ورود با گوگل",
     "auth.login.infomaniak": "ورود با Infomaniak",
+    "auth.login.oidc": "ورود با OIDC",
     "auth.already_registered": "قبلاً ثبت نام کرده‌اید؟",
     "auth.confirm_password": "تایید رمز عبور",
     "auth.forgot_password_link": "رمز عبور را فراموش کرده‌اید؟",

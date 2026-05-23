@@ -9,6 +9,7 @@
   "auth.login.gitlab": "GitLab ilə daxil ol",
   "auth.login.google": "Google ilə daxil ol",
   "auth.login.infomaniak": "Infomaniak ilə daxil ol",
+  "auth.login.oidc": "OIDC ilə daxil ol",
   "auth.already_registered": "Qeytiyatınız var?",
   "auth.confirm_password": "Şifrəni təsdiqləyin",
   "auth.forgot_password_link": "Şifrəmi unutdum?",

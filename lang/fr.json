@@ -9,6 +9,7 @@
     "auth.login.gitlab": "Connexion avec Gitlab",
     "auth.login.google": "Connexion avec Google",
     "auth.login.infomaniak": "Connexion avec Infomaniak",
+    "auth.login.oidc": "Connexion avec OIDC",
     "auth.already_registered": "Déjà enregistré ?",
     "auth.confirm_password": "Confirmer le mot de passe",
     "auth.forgot_password_link": "Mot de passe oublié ?",

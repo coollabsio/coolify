@@ -9,6 +9,7 @@
     "auth.login.gitlab": "Masuk dengan Gitlab",
     "auth.login.google": "Masuk dengan Google",
     "auth.login.infomaniak": "Masuk dengan Infomaniak",
+    "auth.login.oidc": "Masuk dengan OIDC",
     "auth.already_registered": "Sudah terdaftar?",
     "auth.confirm_password": "Konfirmasi kata sandi",
     "auth.forgot_password_link": "Lupa kata sandi?",
