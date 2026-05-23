@@ -1,0 +1,26 @@
+# documentation: https://stalw.art/docs/install/platform/docker/
+# slogan: Stalwart is an all-in-one mail and collaboration server with WebUI administration, SMTP, IMAP, JMAP, CalDAV, CardDAV, and WebDAV support.
+# category: email
+# tags: email,smtp,imap,jmap,caldav,carddav,webdav,mail-server
+# port: 8080
+
+services:
+  stalwart:
+    image: stalwartlabs/stalwart:v0.16
+    volumes:
+      - stalwart-etc:/etc/stalwart
+      - stalwart-data:/var/lib/stalwart
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "143:143"
+      - "993:993"
+      - "4190:4190"
+      - "110:110"
+      - "995:995"
+    environment:
+      - SERVICE_URL_STALWART_8080
+      - STALWART_PUBLIC_URL=${SERVICE_URL_STALWART}
+      - STALWART_RECOVERY_ADMIN=${STALWART_RECOVERY_ADMIN:-admin:${SERVICE_PASSWORD_ADMIN}}
+      - TZ=${TZ:-UTC}
