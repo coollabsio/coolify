@@ -2,6 +2,11 @@
 
 use App\Models\OauthSetting;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\BitbucketProvider;
+use Laravel\Socialite\Two\GithubProvider;
+use Laravel\Socialite\Two\GitlabProvider;
+use SocialiteProviders\Discord\Provider;
+use SocialiteProviders\Manager\Config;
 
 function get_socialite_provider(string $provider)
 {
@@ -12,47 +17,36 @@ function get_socialite_provider(string $provider)
     }
 
     if ($provider === 'azure') {
-        $azure_config = new \SocialiteProviders\Manager\Config(
+        $azureConfig = new Config(
             $oauth_setting->client_id,
             $oauth_setting->client_secret,
             $oauth_setting->redirect_uri,
             ['tenant' => $oauth_setting->tenant],
         );
 
-        return Socialite::driver('azure')->setConfig($azure_config);
+        return Socialite::driver('azure')->setConfig($azureConfig);
     }
 
-    if ($provider == 'authentik' || $provider == 'clerk') {
-        $authentik_clerk_config = new \SocialiteProviders\Manager\Config(
+    if (in_array($provider, ['authentik', 'clerk', 'oidc', 'zitadel'], true)) {
+        $config = new Config(
             $oauth_setting->client_id,
             $oauth_setting->client_secret,
             $oauth_setting->redirect_uri,
             ['base_url' => $oauth_setting->base_url],
         );
 
-        return Socialite::driver($provider)->setConfig($authentik_clerk_config);
-    }
-
-    if ($provider == 'zitadel') {
-        $zitadel_config = new \SocialiteProviders\Manager\Config(
-            $oauth_setting->client_id,
-            $oauth_setting->client_secret,
-            $oauth_setting->redirect_uri,
-            ['base_url' => $oauth_setting->base_url],
-        );
-
-        return Socialite::driver('zitadel')->setConfig($zitadel_config);
+        return Socialite::driver($provider)->setConfig($config);
     }
 
     if ($provider == 'google') {
-        $google_config = new \SocialiteProviders\Manager\Config(
+        $googleConfig = new Config(
             $oauth_setting->client_id,
             $oauth_setting->client_secret,
             $oauth_setting->redirect_uri
         );
 
         return Socialite::driver('google')
-            ->setConfig($google_config)
+            ->setConfig($googleConfig)
             ->with(['hd' => $oauth_setting->tenant]);
     }
 
@@ -63,11 +57,11 @@ function get_socialite_provider(string $provider)
     ];
 
     $provider_class_map = [
-        'bitbucket' => \Laravel\Socialite\Two\BitbucketProvider::class,
-        'discord' => \SocialiteProviders\Discord\Provider::class,
-        'github' => \Laravel\Socialite\Two\GithubProvider::class,
-        'gitlab' => \Laravel\Socialite\Two\GitlabProvider::class,
-        'infomaniak' => \SocialiteProviders\Infomaniak\Provider::class,
+        'bitbucket' => BitbucketProvider::class,
+        'discord' => Provider::class,
+        'github' => GithubProvider::class,
+        'gitlab' => GitlabProvider::class,
+        'infomaniak' => SocialiteProviders\Infomaniak\Provider::class,
     ];
 
     $socialite = Socialite::buildProvider(

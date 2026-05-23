@@ -9,6 +9,7 @@
     "auth.login.gitlab": "使用 Gitlab 登录",
     "auth.login.google": "使用 Google 登录",
     "auth.login.infomaniak": "使用 Infomaniak 登录",
+    "auth.login.oidc": "使用 SSO 登录",
     "auth.login.zitadel": "使用 Zitadel 登录",
     "auth.already_registered": "已经注册？",
     "auth.confirm_password": "确认密码",

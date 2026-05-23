@@ -5,6 +5,7 @@ use App\Models\OauthSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Socialite\Facades\Socialite;
+use SocialiteProviders\Manager\Config;
 
 uses(RefreshDatabase::class);
 
@@ -30,7 +31,7 @@ it('logs in an existing user when the oauth provider returns a mixed-case email'
         'email' => 'username@example.edu',
     ]);
 
-    $provider = \Mockery::mock();
+    $provider = Mockery::mock();
     $provider->shouldReceive('setConfig')->once()->andReturnSelf();
     $provider->shouldReceive('with')->once()->with(['hd' => 'example.com'])->andReturnSelf();
     $provider->shouldReceive('user')->once()->andReturn((object) [
@@ -58,7 +59,7 @@ it('rejects oauth logins when the provider does not return an email address', fu
         'is_registration_enabled' => true,
     ]);
 
-    $provider = \Mockery::mock();
+    $provider = Mockery::mock();
     $provider->shouldReceive('setConfig')->once()->andReturnSelf();
     $provider->shouldReceive('with')->once()->with(['hd' => 'example.com'])->andReturnSelf();
     $provider->shouldReceive('user')->once()->andReturn((object) [
@@ -77,3 +78,30 @@ it('rejects oauth logins when the provider does not return an email address', fu
     'null email' => [null],
     'blank email' => ['   '],
 ]);
+
+it('configures generic oidc provider with its base url', function () {
+    OauthSetting::create([
+        'provider' => 'oidc',
+        'client_id' => 'oidc-client-id',
+        'client_secret' => 'oidc-client-secret',
+        'redirect_uri' => 'https://coolify.example.com/auth/oidc/callback',
+        'base_url' => 'https://auth.example.com/application/coolify',
+    ]);
+
+    $provider = Mockery::mock();
+    $provider->shouldReceive('setConfig')
+        ->once()
+        ->with(Mockery::on(function (Config $config) {
+            return $config->get() === [
+                'client_id' => 'oidc-client-id',
+                'client_secret' => 'oidc-client-secret',
+                'redirect' => 'https://coolify.example.com/auth/oidc/callback',
+                'base_url' => 'https://auth.example.com/application/coolify',
+            ];
+        }))
+        ->andReturnSelf();
+
+    Socialite::shouldReceive('driver')->once()->with('oidc')->andReturn($provider);
+
+    expect(get_socialite_provider('oidc'))->toBe($provider);
+});
