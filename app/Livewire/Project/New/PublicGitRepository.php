@@ -96,9 +96,11 @@ class PublicGitRepository extends Component
 
     public function updatedBuildPack()
     {
-        if ($this->build_pack === 'nixpacks') {
+        if ($this->build_pack === 'nixpacks' || $this->build_pack === 'railpack') {
             $this->show_is_static = true;
-            $this->port = 3000;
+            if (! $this->isStatic) {
+                $this->port = 3000;
+            }
         } elseif ($this->build_pack === 'static') {
             $this->show_is_static = false;
             $this->isStatic = false;

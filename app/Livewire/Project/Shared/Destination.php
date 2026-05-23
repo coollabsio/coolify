@@ -110,15 +110,23 @@ class Destination extends Component
 
     public function promote(int $network_id, int $server_id)
     {
-        $main_destination = $this->resource->destination;
-        $this->resource->update([
-            'destination_id' => $network_id,
-            'destination_type' => StandaloneDocker::class,
-        ]);
-        $this->resource->additional_networks()->detach($network_id, ['server_id' => $server_id]);
-        $this->resource->additional_networks()->attach($main_destination->id, ['server_id' => $main_destination->server->id]);
-        $this->refreshServers();
-        $this->resource->refresh();
+        try {
+            $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
+            $network = StandaloneDocker::ownedByCurrentTeam()->findOrFail($network_id);
+            $this->authorize('update', $this->resource);
+
+            $main_destination = $this->resource->destination;
+            $this->resource->update([
+                'destination_id' => $network->id,
+                'destination_type' => StandaloneDocker::class,
+            ]);
+            $this->resource->additional_networks()->detach($network->id, ['server_id' => $server->id]);
+            $this->resource->additional_networks()->attach($main_destination->id, ['server_id' => $main_destination->server->id]);
+            $this->refreshServers();
+            $this->resource->refresh();
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function refreshServers()
@@ -130,8 +138,16 @@ class Destination extends Component
 
     public function addServer(int $network_id, int $server_id)
     {
-        $this->resource->additional_networks()->attach($network_id, ['server_id' => $server_id]);
-        $this->dispatch('refresh');
+        try {
+            $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
+            $network = StandaloneDocker::ownedByCurrentTeam()->findOrFail($network_id);
+            $this->authorize('update', $this->resource);
+
+            $this->resource->additional_networks()->attach($network->id, ['server_id' => $server->id]);
+            $this->dispatch('refresh');
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function removeServer(int $network_id, int $server_id, $password, $selectedActions = [])

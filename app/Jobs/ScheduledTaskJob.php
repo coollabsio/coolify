@@ -65,7 +65,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct($task)
     {
-        $this->onQueue('high');
+        $this->onQueue(crons_queue());
 
         $this->task = $task;
         if ($service = $task->service()->first()) {

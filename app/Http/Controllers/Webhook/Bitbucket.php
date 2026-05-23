@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Webhook;
 
 use App\Actions\Application\CleanupPreviewDeployment;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
+use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Exception;
@@ -12,6 +14,9 @@ use Visus\Cuid2\Cuid2;
 
 class Bitbucket extends Controller
 {
+    use DetectsSkipDeployCommits;
+    use MatchesManualWebhookApplications;
+
     public function manual(Request $request)
     {
         try {
@@ -31,6 +36,16 @@ class Bitbucket extends Controller
                 $branch = data_get($payload, 'push.changes.0.new.name');
                 $full_name = data_get($payload, 'repository.full_name');
                 $commit = data_get($payload, 'push.changes.0.new.target.hash');
+                // Bitbucket webhooks ship up to 5 commits per change. Larger pushes
+                // are evaluated only on the visible 5.
+                $skip_deploy_commits = self::shouldSkipDeploy(
+                    collect(data_get($payload, 'push.changes', []))
+                        ->flatMap(fn ($change) => data_get($change, 'commits', []))
+                        ->pluck('message')
+                        ->filter()
+                        ->values()
+                        ->all()
+                );
 
                 if (! $branch) {
                     return response([
@@ -45,10 +60,18 @@ class Bitbucket extends Controller
                 $full_name = data_get($payload, 'repository.full_name');
                 $pull_request_id = data_get($payload, 'pullrequest.id');
                 $pull_request_html_url = data_get($payload, 'pullrequest.links.html.href');
+                $pull_request_title = data_get($payload, 'pullrequest.title');
+                $skip_deploy_pr = self::shouldSkipDeployAny([$pull_request_title]);
                 $commit = data_get($payload, 'pullrequest.source.commit.hash');
             }
-            $applications = Application::where('git_repository', 'like', "%$full_name%");
-            $applications = $applications->where('git_branch', $branch)->get();
+            $full_name = $this->manualWebhookRepositoryFullName($full_name);
+            if ($full_name === null) {
+                return response([
+                    'status' => 'failed',
+                    'message' => 'Nothing to do. Invalid repository.',
+                ]);
+            }
+            $applications = $this->manualWebhookApplications(Application::query()->where('git_branch', $branch), $full_name);
             if ($applications->isEmpty()) {
                 return response([
                     'status' => 'failed',
@@ -58,11 +81,13 @@ class Bitbucket extends Controller
             foreach ($applications as $application) {
                 $webhook_secret = data_get($application, 'manual_webhook_secret_bitbucket');
                 if (empty($webhook_secret)) {
-                    $return_payloads->push([
-                        'application' => $application->name,
-                        'status' => 'failed',
-                        'message' => 'Webhook secret not configured.',
+                    auditLogWebhookFailure('bitbucket', 'webhook_secret_missing', [
+                        'application_uuid' => $application->uuid,
+                        'application_name' => $application->name,
+                        'repository' => $full_name ?? null,
+                        'event' => $x_bitbucket_event,
                     ]);
+                    $return_payloads->push($this->unauthenticatedManualWebhookFailurePayload());
 
                     continue;
                 }
@@ -70,22 +95,26 @@ class Bitbucket extends Controller
 
                 $parts = explode('=', $x_bitbucket_token, 2);
                 if (count($parts) !== 2 || $parts[0] !== 'sha256') {
-                    $return_payloads->push([
-                        'application' => $application->name,
-                        'status' => 'failed',
-                        'message' => 'Invalid signature.',
+                    auditLogWebhookFailure('bitbucket', 'malformed_signature', [
+                        'application_uuid' => $application->uuid,
+                        'application_name' => $application->name,
+                        'repository' => $full_name ?? null,
+                        'event' => $x_bitbucket_event,
                     ]);
+                    $return_payloads->push($this->unauthenticatedManualWebhookFailurePayload());
 
                     continue;
                 }
                 $hash = $parts[1];
                 $payloadHash = hash_hmac('sha256', $payload, $webhook_secret);
                 if (! hash_equals($hash, $payloadHash) && ! isDev()) {
-                    $return_payloads->push([
-                        'application' => $application->name,
-                        'status' => 'failed',
-                        'message' => 'Invalid signature.',
+                    auditLogWebhookFailure('bitbucket', 'invalid_signature', [
+                        'application_uuid' => $application->uuid,
+                        'application_name' => $application->name,
+                        'repository' => $full_name ?? null,
+                        'event' => $x_bitbucket_event,
                     ]);
+                    $return_payloads->push($this->unauthenticatedManualWebhookFailurePayload());
 
                     continue;
                 }
@@ -101,6 +130,17 @@ class Bitbucket extends Controller
                 }
                 if ($x_bitbucket_event === 'repo:push') {
                     if ($application->isDeployable()) {
+                        if ($skip_deploy_commits ?? false) {
+                            $return_payloads->push([
+                                'application' => $application->name,
+                                'status' => 'skipped',
+                                'message' => 'All commits contain [skip cd] or [skip ci]. Skipping deployment.',
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
+                            ]);
+
+                            continue;
+                        }
                         $deployment_uuid = new Cuid2;
                         $result = queue_application_deployment(
                             application: $application,
@@ -118,6 +158,15 @@ class Bitbucket extends Controller
                                 'message' => $result['message'],
                             ]);
                         } else {
+                            auditLog('webhook.deployment.queued', [
+                                'provider' => 'bitbucket',
+                                'mode' => 'manual',
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
+                                'deployment_uuid' => $deployment_uuid->toString(),
+                                'commit' => $commit,
+                                'repository' => $full_name ?? null,
+                            ]);
                             $return_payloads->push([
                                 'application' => $application->name,
                                 'status' => 'success',
@@ -134,6 +183,15 @@ class Bitbucket extends Controller
                 }
                 if ($x_bitbucket_event === 'pullrequest:created' || $x_bitbucket_event === 'pullrequest:updated') {
                     if ($application->isPRDeployable()) {
+                        if ($skip_deploy_pr ?? false) {
+                            $return_payloads->push([
+                                'application' => $application->name,
+                                'status' => 'skipped',
+                                'message' => 'PR title contains [skip cd] or [skip ci]. Skipping preview deployment.',
+                            ]);
+
+                            continue;
+                        }
                         $deployment_uuid = new Cuid2;
                         $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                         if (! $found) {

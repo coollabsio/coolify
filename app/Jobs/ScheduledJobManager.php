@@ -37,17 +37,7 @@ class ScheduledJobManager implements ShouldQueue
      */
     public function __construct()
     {
-        $this->onQueue($this->determineQueue());
-    }
-
-    private function determineQueue(): string
-    {
-        $preferredQueue = 'crons';
-        $fallbackQueue = 'high';
-
-        $configuredQueues = explode(',', env('HORIZON_QUEUES', 'high,default'));
-
-        return in_array($preferredQueue, $configuredQueues) ? $preferredQueue : $fallbackQueue;
+        $this->onQueue(crons_queue());
     }
 
     /**

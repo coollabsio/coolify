@@ -85,10 +85,14 @@ class OtherController extends Controller
             return invalidTokenResponse();
         }
         if ($teamId !== '0') {
+            auditLog('api.instance.enable_denied', ['team_id' => $teamId], 'warning');
+
             return response()->json(['message' => 'You are not allowed to enable the API.'], 403);
         }
         $settings = instanceSettings();
         $settings->update(['is_api_enabled' => true]);
+
+        auditLog('api.instance.enabled', ['team_id' => $teamId]);
 
         return response()->json(['message' => 'API enabled.'], 200);
     }
@@ -137,12 +141,128 @@ class OtherController extends Controller
             return invalidTokenResponse();
         }
         if ($teamId !== '0') {
+            auditLog('api.instance.disable_denied', ['team_id' => $teamId], 'warning');
+
             return response()->json(['message' => 'You are not allowed to disable the API.'], 403);
         }
         $settings = instanceSettings();
         $settings->update(['is_api_enabled' => false]);
 
+        auditLog('api.instance.disabled', ['team_id' => $teamId]);
+
         return response()->json(['message' => 'API disabled.'], 200);
+    }
+
+    #[OA\Post(
+        summary: 'Enable MCP Server',
+        description: 'Enable the MCP server endpoint at /mcp (only with root permissions).',
+        path: '/mcp/enable',
+        operationId: 'enable-mcp',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'MCP server enabled.',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'MCP server enabled.'),
+                    ]
+                )),
+            new OA\Response(
+                response: 403,
+                description: 'You are not allowed to enable the MCP server.',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'You are not allowed to enable the MCP server.'),
+                    ]
+                )),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function enable_mcp(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        if ($teamId !== '0') {
+            auditLog('api.mcp.enable_denied', ['team_id' => $teamId], 'warning');
+
+            return response()->json(['message' => 'You are not allowed to enable the MCP server.'], 403);
+        }
+        $settings = instanceSettings();
+        $settings->update(['is_mcp_server_enabled' => true]);
+
+        auditLog('api.mcp.enabled', ['team_id' => $teamId]);
+
+        return response()->json(['message' => 'MCP server enabled.'], 200);
+    }
+
+    #[OA\Post(
+        summary: 'Disable MCP Server',
+        description: 'Disable the MCP server endpoint at /mcp (only with root permissions).',
+        path: '/mcp/disable',
+        operationId: 'disable-mcp',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'MCP server disabled.',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'MCP server disabled.'),
+                    ]
+                )),
+            new OA\Response(
+                response: 403,
+                description: 'You are not allowed to disable the MCP server.',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'You are not allowed to disable the MCP server.'),
+                    ]
+                )),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function disable_mcp(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        if ($teamId !== '0') {
+            auditLog('api.mcp.disable_denied', ['team_id' => $teamId], 'warning');
+
+            return response()->json(['message' => 'You are not allowed to disable the MCP server.'], 403);
+        }
+        $settings = instanceSettings();
+        $settings->update(['is_mcp_server_enabled' => false]);
+
+        auditLog('api.mcp.disabled', ['team_id' => $teamId]);
+
+        return response()->json(['message' => 'MCP server disabled.'], 200);
     }
 
     public function feedback(Request $request)

@@ -1236,10 +1236,8 @@ $schema://$host {
         $this->refresh();
         $unreachableNotificationSent = (bool) $this->unreachable_notification_sent;
         $isReachable = (bool) $this->settings->is_reachable;
-        if ($isReachable === true) {
-            $this->unreachable_count = 0;
-            $this->save();
 
+        if ($isReachable === true) {
             if ($unreachableNotificationSent === true) {
                 $this->sendReachableNotification();
             }
@@ -1247,28 +1245,8 @@ $schema://$host {
             return;
         }
 
-        $this->increment('unreachable_count');
-
-        if ($this->unreachable_count === 1) {
-            $this->settings->is_reachable = true;
-            $this->settings->save();
-
-            return;
-        }
-
         if ($this->unreachable_count >= 2 && ! $unreachableNotificationSent) {
-            $failedChecks = 0;
-            for ($i = 0; $i < 3; $i++) {
-                $status = $this->serverStatus();
-                sleep(5);
-                if (! $status) {
-                    $failedChecks++;
-                }
-            }
-
-            if ($failedChecks === 3 && ! $unreachableNotificationSent) {
-                $this->sendUnreachableNotification();
-            }
+            $this->sendUnreachableNotification();
         }
     }
 

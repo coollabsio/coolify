@@ -127,15 +127,20 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         }
         $data = collect($this->data);
 
-        $this->server->sentinelHeartbeat();
-
+        // Heartbeat is updated by SentinelController on every push, before dispatch.
         $this->containers = collect(data_get($data, 'containers'));
         $filesystemUsageRoot = data_get($data, 'filesystem_usage_root.used_percentage');
 
-        // Only dispatch storage check when disk percentage actually changes
+        // Only dispatch the storage check when disk usage is at/above the notification
+        // threshold AND the value changed. Below the threshold ServerStorageCheckJob
+        // has nothing to do (it only sends a HighDiskUsage notification), so dispatching
+        // it is wasted work — and most servers sit well below the threshold.
+        $diskThreshold = data_get($this->server, 'settings.server_disk_usage_notification_threshold', 80);
         $storageCacheKey = 'storage-check:'.$this->server->id;
         $lastPercentage = Cache::get($storageCacheKey);
-        if ($lastPercentage === null || (string) $lastPercentage !== (string) $filesystemUsageRoot) {
+        if ($filesystemUsageRoot !== null
+            && $filesystemUsageRoot >= $diskThreshold
+            && (string) $lastPercentage !== (string) $filesystemUsageRoot) {
             Cache::put($storageCacheKey, $filesystemUsageRoot, 600);
             ServerStorageCheckJob::dispatch($this->server, $filesystemUsageRoot);
         }
@@ -500,11 +505,11 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 } catch (\Throwable $e) {
                 }
             } else {
-                // Connect proxy to networks periodically (every 10 min) to avoid excessive job dispatches.
+                // Connect proxy to networks periodically as a safety net to avoid excessive job dispatches.
                 // On-demand triggers (new network, service deploy) use dispatchSync() and bypass this.
                 $proxyCacheKey = 'connect-proxy:'.$this->server->id;
                 if (! Cache::has($proxyCacheKey)) {
-                    Cache::put($proxyCacheKey, true, 600);
+                    Cache::put($proxyCacheKey, true, config('constants.proxy.connect_networks_interval_seconds', 3600));
                     ConnectProxyToNetworksJob::dispatch($this->server);
                 }
             }

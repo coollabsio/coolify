@@ -111,6 +111,29 @@ describe('Buildpack Switching Cleanup', function () {
         expect($application->dockerfile)->toBeNull();
     });
 
+    test('clears dockerfile fields when switching from dockerfile to railpack', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'build_pack' => 'dockerfile',
+            'dockerfile' => 'FROM node:18',
+            'dockerfile_location' => '/Dockerfile',
+            'dockerfile_target_build' => 'production',
+            'custom_healthcheck_found' => true,
+        ]);
+
+        Livewire::test(General::class, ['application' => $application])
+            ->assertSuccessful()
+            ->set('buildPack', 'railpack')
+            ->call('updatedBuildPack');
+
+        $application->refresh();
+        expect($application->build_pack)->toBe('railpack');
+        expect($application->dockerfile)->toBeNull();
+        expect($application->dockerfile_location)->toBeNull();
+        expect($application->dockerfile_target_build)->toBeNull();
+        expect($application->custom_healthcheck_found)->toBeFalse();
+    });
+
     test('clears dockerfile fields when switching from dockerfile to dockercompose', function () {
         $application = Application::factory()->create([
             'environment_id' => $this->environment->id,

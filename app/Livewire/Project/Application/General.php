@@ -606,7 +606,7 @@ class General extends Component
         // Sync property to model before checking/modifying
         $this->syncData(toModel: true);
 
-        if ($this->buildPack !== 'nixpacks') {
+        if ($this->buildPack !== 'nixpacks' && $this->buildPack !== 'railpack') {
             $this->isStatic = false;
             $this->application->settings->is_static = false;
             $this->application->settings->save();

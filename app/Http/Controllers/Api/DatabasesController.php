@@ -596,6 +596,14 @@ class DatabasesController extends Controller
             StopDatabaseProxy::dispatch($database);
         }
 
+        auditLog('api.database.updated', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'database_name' => $database->name,
+            'database_type' => $database->type(),
+            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
+        ]);
+
         return response()->json([
             'message' => 'Database updated.',
         ]);
@@ -639,10 +647,10 @@ class DatabasesController extends Controller
                         'backup_now' => ['type' => 'boolean', 'description' => 'Whether to trigger backup immediately after creation'],
                         'database_backup_retention_amount_locally' => ['type' => 'integer', 'description' => 'Number of backups to retain locally'],
                         'database_backup_retention_days_locally' => ['type' => 'integer', 'description' => 'Number of days to retain backups locally'],
-                        'database_backup_retention_max_storage_locally' => ['type' => 'integer', 'description' => 'Max storage (MB) for local backups'],
+                        'database_backup_retention_max_storage_locally' => ['type' => 'number', 'description' => 'Max storage (GB) for local backups'],
                         'database_backup_retention_amount_s3' => ['type' => 'integer', 'description' => 'Number of backups to retain in S3'],
                         'database_backup_retention_days_s3' => ['type' => 'integer', 'description' => 'Number of days to retain backups in S3'],
-                        'database_backup_retention_max_storage_s3' => ['type' => 'integer', 'description' => 'Max storage (MB) for S3 backups'],
+                        'database_backup_retention_max_storage_s3' => ['type' => 'number', 'description' => 'Max storage (GB) for S3 backups'],
                         'timeout' => ['type' => 'integer', 'description' => 'Backup job timeout in seconds (min: 60, max: 36000)', 'default' => 3600],
                     ],
                 ),
@@ -703,10 +711,10 @@ class DatabasesController extends Controller
             'databases_to_backup' => 'string|nullable',
             'database_backup_retention_amount_locally' => 'integer|min:0',
             'database_backup_retention_days_locally' => 'integer|min:0',
-            'database_backup_retention_max_storage_locally' => 'integer|min:0',
+            'database_backup_retention_max_storage_locally' => 'numeric|min:0',
             'database_backup_retention_amount_s3' => 'integer|min:0',
             'database_backup_retention_days_s3' => 'integer|min:0',
-            'database_backup_retention_max_storage_s3' => 'integer|min:0',
+            'database_backup_retention_max_storage_s3' => 'numeric|min:0',
             'timeout' => 'integer|min:60|max:36000',
         ]);
 
@@ -826,6 +834,15 @@ class DatabasesController extends Controller
             dispatch(new DatabaseBackupJob($backupConfig));
         }
 
+        auditLog('api.database.backup_created', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'backup_uuid' => $backupConfig->uuid,
+            'frequency' => $backupConfig->frequency,
+            'save_s3' => (bool) $backupConfig->save_s3,
+            'backup_now' => (bool) $request->backup_now,
+        ]);
+
         return response()->json([
             'uuid' => $backupConfig->uuid,
             'message' => 'Backup configuration created successfully.',
@@ -878,10 +895,10 @@ class DatabasesController extends Controller
                         'frequency' => ['type' => 'string', 'description' => 'Frequency of the backup'],
                         'database_backup_retention_amount_locally' => ['type' => 'integer', 'description' => 'Retention amount of the backup locally'],
                         'database_backup_retention_days_locally' => ['type' => 'integer', 'description' => 'Retention days of the backup locally'],
-                        'database_backup_retention_max_storage_locally' => ['type' => 'integer', 'description' => 'Max storage of the backup locally'],
+                        'database_backup_retention_max_storage_locally' => ['type' => 'number', 'description' => 'Max storage of the backup locally'],
                         'database_backup_retention_amount_s3' => ['type' => 'integer', 'description' => 'Retention amount of the backup in s3'],
                         'database_backup_retention_days_s3' => ['type' => 'integer', 'description' => 'Retention days of the backup in s3'],
-                        'database_backup_retention_max_storage_s3' => ['type' => 'integer', 'description' => 'Max storage of the backup in S3'],
+                        'database_backup_retention_max_storage_s3' => ['type' => 'number', 'description' => 'Max storage of the backup in S3'],
                         'timeout' => ['type' => 'integer', 'description' => 'Backup job timeout in seconds (min: 60, max: 36000)', 'default' => 3600],
                     ],
                 ),
@@ -933,10 +950,10 @@ class DatabasesController extends Controller
             'frequency' => 'string',
             'database_backup_retention_amount_locally' => 'integer|min:0',
             'database_backup_retention_days_locally' => 'integer|min:0',
-            'database_backup_retention_max_storage_locally' => 'integer|min:0',
+            'database_backup_retention_max_storage_locally' => 'numeric|min:0',
             'database_backup_retention_amount_s3' => 'integer|min:0',
             'database_backup_retention_days_s3' => 'integer|min:0',
-            'database_backup_retention_max_storage_s3' => 'integer|min:0',
+            'database_backup_retention_max_storage_s3' => 'numeric|min:0',
             'timeout' => 'integer|min:60|max:36000',
         ]);
         if ($validator->fails()) {
@@ -1044,6 +1061,14 @@ class DatabasesController extends Controller
         if ($request->backup_now) {
             dispatch(new DatabaseBackupJob($backupConfig));
         }
+
+        auditLog('api.database.backup_updated', [
+            'team_id' => $teamId,
+            'backup_uuid' => $backupConfig->uuid,
+            'database_id' => $backupConfig->database_id,
+            'changed_fields' => array_values(array_intersect($backupConfigFields, array_keys($request->all()))),
+            'backup_now' => (bool) $request->backup_now,
+        ]);
 
         return response()->json([
             'message' => 'Database backup configuration updated',
@@ -1779,6 +1804,16 @@ class DatabasesController extends Controller
                 $payload['external_db_url'] = $database->external_db_url;
             }
 
+            auditLog('api.database.created', [
+                'team_id' => $teamId,
+                'database_uuid' => $database->uuid,
+                'database_name' => $database->name,
+                'database_type' => $type->value,
+                'server_uuid' => $serverUuid,
+                'is_public' => (bool) $database->is_public,
+                'instant_deploy' => (bool) $instantDeploy,
+            ]);
+
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         } elseif ($type === NewDatabaseTypes::MARIADB) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database'];
@@ -1837,6 +1872,16 @@ class DatabasesController extends Controller
             if ($database->is_public && $database->public_port) {
                 $payload['external_db_url'] = $database->external_db_url;
             }
+
+            auditLog('api.database.created', [
+                'team_id' => $teamId,
+                'database_uuid' => $database->uuid,
+                'database_name' => $database->name,
+                'database_type' => $type->value,
+                'server_uuid' => $serverUuid,
+                'is_public' => (bool) $database->is_public,
+                'instant_deploy' => (bool) $instantDeploy,
+            ]);
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         } elseif ($type === NewDatabaseTypes::MYSQL) {
@@ -1897,6 +1942,16 @@ class DatabasesController extends Controller
                 $payload['external_db_url'] = $database->external_db_url;
             }
 
+            auditLog('api.database.created', [
+                'team_id' => $teamId,
+                'database_uuid' => $database->uuid,
+                'database_name' => $database->name,
+                'database_type' => $type->value,
+                'server_uuid' => $serverUuid,
+                'is_public' => (bool) $database->is_public,
+                'instant_deploy' => (bool) $instantDeploy,
+            ]);
+
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         } elseif ($type === NewDatabaseTypes::REDIS) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'redis_password', 'redis_conf'];
@@ -1952,6 +2007,16 @@ class DatabasesController extends Controller
             if ($database->is_public && $database->public_port) {
                 $payload['external_db_url'] = $database->external_db_url;
             }
+
+            auditLog('api.database.created', [
+                'team_id' => $teamId,
+                'database_uuid' => $database->uuid,
+                'database_name' => $database->name,
+                'database_type' => $type->value,
+                'server_uuid' => $serverUuid,
+                'is_public' => (bool) $database->is_public,
+                'instant_deploy' => (bool) $instantDeploy,
+            ]);
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         } elseif ($type === NewDatabaseTypes::DRAGONFLY) {
@@ -2039,6 +2104,16 @@ class DatabasesController extends Controller
                 $payload['external_db_url'] = $database->external_db_url;
             }
 
+            auditLog('api.database.created', [
+                'team_id' => $teamId,
+                'database_uuid' => $database->uuid,
+                'database_name' => $database->name,
+                'database_type' => $type->value,
+                'server_uuid' => $serverUuid,
+                'is_public' => (bool) $database->is_public,
+                'instant_deploy' => (bool) $instantDeploy,
+            ]);
+
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         } elseif ($type === NewDatabaseTypes::CLICKHOUSE) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares',  'clickhouse_admin_user', 'clickhouse_admin_password'];
@@ -2074,6 +2149,16 @@ class DatabasesController extends Controller
             if ($database->is_public && $database->public_port) {
                 $payload['external_db_url'] = $database->external_db_url;
             }
+
+            auditLog('api.database.created', [
+                'team_id' => $teamId,
+                'database_uuid' => $database->uuid,
+                'database_name' => $database->name,
+                'database_type' => $type->value,
+                'server_uuid' => $serverUuid,
+                'is_public' => (bool) $database->is_public,
+                'instant_deploy' => (bool) $instantDeploy,
+            ]);
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         } elseif ($type === NewDatabaseTypes::MONGODB) {
@@ -2132,6 +2217,16 @@ class DatabasesController extends Controller
             if ($database->is_public && $database->public_port) {
                 $payload['external_db_url'] = $database->external_db_url;
             }
+
+            auditLog('api.database.created', [
+                'team_id' => $teamId,
+                'database_uuid' => $database->uuid,
+                'database_name' => $database->name,
+                'database_type' => $type->value,
+                'server_uuid' => $serverUuid,
+                'is_public' => (bool) $database->is_public,
+                'instant_deploy' => (bool) $instantDeploy,
+            ]);
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         }
@@ -2216,6 +2311,13 @@ class DatabasesController extends Controller
             deleteConfigurations: $request->boolean('delete_configurations', true),
             dockerCleanup: $request->boolean('docker_cleanup', true)
         );
+
+        auditLog('api.database.deleted', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'database_name' => $database->name,
+            'database_type' => $database->type(),
+        ]);
 
         return response()->json([
             'message' => 'Database deletion request queued.',
@@ -2328,6 +2430,14 @@ class DatabasesController extends Controller
             // Delete the backup configuration itself
             $backup->delete();
             DB::commit();
+
+            auditLog('api.database.backup_deleted', [
+                'team_id' => $teamId,
+                'database_uuid' => $database->uuid,
+                'backup_uuid' => $request->scheduled_backup_uuid,
+                'delete_s3' => $deleteS3,
+                'executions_deleted' => $executions->count(),
+            ]);
 
             return response()->json([
                 'message' => 'Backup configuration and all executions deleted.',
@@ -2450,6 +2560,14 @@ class DatabasesController extends Controller
             }
 
             $execution->delete();
+
+            auditLog('api.database.backup_execution_deleted', [
+                'team_id' => $teamId,
+                'database_uuid' => $database->uuid,
+                'backup_uuid' => $request->scheduled_backup_uuid,
+                'execution_uuid' => $request->execution_uuid,
+                'delete_s3' => $deleteS3,
+            ]);
 
             return response()->json([
                 'message' => 'Backup execution deleted.',
@@ -2633,6 +2751,13 @@ class DatabasesController extends Controller
         }
         StartDatabase::dispatch($database);
 
+        auditLog('api.database.started', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'database_name' => $database->name,
+            'database_type' => $database->type(),
+        ]);
+
         return response()->json(
             [
                 'message' => 'Database starting request queued.',
@@ -2724,6 +2849,14 @@ class DatabasesController extends Controller
         $dockerCleanup = $request->boolean('docker_cleanup', true);
         StopDatabase::dispatch($database, $dockerCleanup);
 
+        auditLog('api.database.stopped', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'database_name' => $database->name,
+            'database_type' => $database->type(),
+            'docker_cleanup' => $dockerCleanup,
+        ]);
+
         return response()->json(
             [
                 'message' => 'Database stopping request queued.',
@@ -2800,6 +2933,13 @@ class DatabasesController extends Controller
         $this->authorize('manage', $database);
 
         RestartDatabase::dispatch($database);
+
+        auditLog('api.database.restarted', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'database_name' => $database->name,
+            'database_type' => $database->type(),
+        ]);
 
         return response()->json(
             [
@@ -3017,6 +3157,13 @@ class DatabasesController extends Controller
         }
         $env->save();
 
+        auditLog('api.database.env_updated', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'env_uuid' => $env->uuid,
+            'env_key' => $env->key,
+        ]);
+
         return response()->json($this->removeSensitiveEnvData($env))->setStatusCode(201);
     }
 
@@ -3145,6 +3292,12 @@ class DatabasesController extends Controller
             $updatedEnvs->push($this->removeSensitiveEnvData($env));
         }
 
+        auditLog('api.database.env_bulk_upserted', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'env_count' => $updatedEnvs->count(),
+        ]);
+
         return response()->json($updatedEnvs)->setStatusCode(201);
     }
 
@@ -3266,6 +3419,13 @@ class DatabasesController extends Controller
             'comment' => $request->comment ?? null,
         ]);
 
+        auditLog('api.database.env_created', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'env_uuid' => $env->uuid,
+            'env_key' => $env->key,
+        ]);
+
         return response()->json($this->removeSensitiveEnvData($env))->setStatusCode(201);
     }
 
@@ -3351,7 +3511,16 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Environment variable not found.'], 404);
         }
 
+        $envKey = $env->key;
+        $envUuid = $env->uuid;
         $env->forceDelete();
+
+        auditLog('api.database.env_deleted', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'env_uuid' => $envUuid,
+            'env_key' => $envKey,
+        ]);
 
         return response()->json(['message' => 'Environment variable deleted.']);
     }
@@ -3599,6 +3768,15 @@ class DatabasesController extends Controller
             ]);
         }
 
+        auditLog('api.database.storage_created', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'storage_uuid' => $storage->uuid ?? null,
+            'storage_id' => $storage->id,
+            'storage_type' => $request->type,
+            'mount_path' => $storage->mount_path,
+        ]);
+
         return response()->json($storage, 201);
     }
 
@@ -3797,6 +3975,15 @@ class DatabasesController extends Controller
 
         $storage->save();
 
+        auditLog('api.database.storage_updated', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'storage_uuid' => $storage->uuid ?? null,
+            'storage_id' => $storage->id,
+            'storage_type' => $request->type,
+            'mount_path' => $storage->mount_path ?? null,
+        ]);
+
         return response()->json($storage);
     }
 
@@ -3870,7 +4057,17 @@ class DatabasesController extends Controller
             $storage->deleteStorageOnServer();
         }
 
+        $storageType = $storage instanceof LocalFileVolume ? 'file' : 'persistent';
+        $storageMountPath = $storage->mount_path ?? null;
         $storage->delete();
+
+        auditLog('api.database.storage_deleted', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'storage_uuid' => $storageUuid,
+            'storage_type' => $storageType,
+            'mount_path' => $storageMountPath,
+        ]);
 
         return response()->json(['message' => 'Storage deleted.']);
     }

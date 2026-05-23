@@ -45,6 +45,7 @@ class InstanceSettings extends Model
         'is_sponsorship_popup_enabled',
         'dev_helper_version',
         'is_wire_navigate_enabled',
+        'is_mcp_server_enabled',
     ];
 
     protected $casts = [
@@ -67,6 +68,7 @@ class InstanceSettings extends Model
         'update_check_frequency' => 'string',
         'sentinel_token' => 'encrypted',
         'is_wire_navigate_enabled' => 'boolean',
+        'is_mcp_server_enabled' => 'boolean',
     ];
 
     protected static function booted(): void

@@ -27,6 +27,7 @@ class ApplicationSetting extends Model
         'is_git_shallow_clone_enabled' => 'boolean',
         'docker_images_to_keep' => 'integer',
         'max_preview_deployments' => 'integer',
+        'stop_grace_period' => 'integer',
     ];
 
     protected $fillable = [
@@ -66,7 +67,29 @@ class ApplicationSetting extends Model
         'include_source_commit_in_build',
         'docker_images_to_keep',
         'max_preview_deployments',
+        'stop_grace_period',
     ];
+
+    public function stopGracePeriodSeconds(): int
+    {
+        if (
+            $this->stop_grace_period >= MIN_STOP_GRACE_PERIOD_SECONDS &&
+            $this->stop_grace_period <= MAX_STOP_GRACE_PERIOD_SECONDS
+        ) {
+            return $this->stop_grace_period;
+        }
+
+        return DEFAULT_STOP_GRACE_PERIOD_SECONDS;
+    }
+
+    public function deploymentStopGracePeriodSeconds(): int
+    {
+        if (isDev() && $this->stop_grace_period === null) {
+            return MIN_STOP_GRACE_PERIOD_SECONDS;
+        }
+
+        return $this->stopGracePeriodSeconds();
+    }
 
     public function isStatic(): Attribute
     {
