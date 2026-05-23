@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Webhook;
 use App\Actions\Application\CleanupPreviewDeployment;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
+use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Exception;
@@ -15,6 +16,7 @@ use Visus\Cuid2\Cuid2;
 class Gitlab extends Controller
 {
     use DetectsSkipDeployCommits;
+    use MatchesManualWebhookApplications;
 
     public function manual(Request $request)
     {
@@ -85,9 +87,18 @@ class Gitlab extends Controller
                     return response($return_payloads);
                 }
             }
-            $applications = Application::where('git_repository', 'like', "%$full_name%");
+            $full_name = $this->manualWebhookRepositoryFullName($full_name);
+            if ($full_name === null) {
+                $return_payloads->push([
+                    'status' => 'failed',
+                    'message' => 'Nothing to do. Invalid repository.',
+                ]);
+
+                return response($return_payloads);
+            }
+            $applications = Application::query();
             if ($x_gitlab_event === 'push') {
-                $applications = $applications->where('git_branch', $branch)->get();
+                $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
                 if ($applications->isEmpty()) {
                     $return_payloads->push([
                         'status' => 'failed',
@@ -98,7 +109,7 @@ class Gitlab extends Controller
                 }
             }
             if ($x_gitlab_event === 'merge_request') {
-                $applications = $applications->where('git_branch', $base_branch)->get();
+                $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
                 if ($applications->isEmpty()) {
                     $return_payloads->push([
                         'status' => 'failed',
@@ -117,11 +128,7 @@ class Gitlab extends Controller
                         'repository' => $full_name ?? null,
                         'event' => $x_gitlab_event,
                     ]);
-                    $return_payloads->push([
-                        'application' => $application->name,
-                        'status' => 'failed',
-                        'message' => 'Webhook secret not configured.',
-                    ]);
+                    $return_payloads->push($this->unauthenticatedManualWebhookFailurePayload());
 
                     continue;
                 }
@@ -132,11 +139,7 @@ class Gitlab extends Controller
                         'repository' => $full_name ?? null,
                         'event' => $x_gitlab_event,
                     ]);
-                    $return_payloads->push([
-                        'application' => $application->name,
-                        'status' => 'failed',
-                        'message' => 'Invalid signature.',
-                    ]);
+                    $return_payloads->push($this->unauthenticatedManualWebhookFailurePayload());
 
                     continue;
                 }

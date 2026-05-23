@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Webhook;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
+use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Jobs\GithubAppPermissionJob;
 use App\Jobs\ProcessGithubPullRequestWebhook;
 use App\Models\Application;
@@ -11,6 +12,7 @@ use App\Models\GithubApp;
 use App\Models\PrivateKey;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Visus\Cuid2\Cuid2;
@@ -18,6 +20,7 @@ use Visus\Cuid2\Cuid2;
 class Github extends Controller
 {
     use DetectsSkipDeployCommits;
+    use MatchesManualWebhookApplications;
 
     public function manual(Request $request)
     {
@@ -66,15 +69,19 @@ class Github extends Controller
             if (! $branch) {
                 return response('Nothing to do. No branch found in the request.');
             }
-            $applications = Application::where('git_repository', 'like', "%$full_name%");
+            $full_name = $this->manualWebhookRepositoryFullName($full_name);
+            if ($full_name === null) {
+                return response('Nothing to do. Invalid repository.');
+            }
+            $applications = Application::query();
             if ($x_github_event === 'push') {
-                $applications = $applications->where('git_branch', $branch)->get();
+                $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
                 if ($applications->isEmpty()) {
                     return response("Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.");
                 }
             }
             if ($x_github_event === 'pull_request') {
-                $applications = $applications->where('git_branch', $base_branch)->get();
+                $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
                 if ($applications->isEmpty()) {
                     return response("Nothing to do. No applications found for repo $full_name and branch '$base_branch'.");
                 }
@@ -93,11 +100,7 @@ class Github extends Controller
                             'repository' => $full_name ?? null,
                             'mode' => 'manual',
                         ]);
-                        $return_payloads->push([
-                            'application' => $application->name,
-                            'status' => 'failed',
-                            'message' => 'Webhook secret not configured.',
-                        ]);
+                        $return_payloads->push($this->unauthenticatedManualWebhookFailurePayload());
 
                         continue;
                     }
@@ -109,11 +112,7 @@ class Github extends Controller
                             'repository' => $full_name ?? null,
                             'mode' => 'manual',
                         ]);
-                        $return_payloads->push([
-                            'application' => $application->name,
-                            'status' => 'failed',
-                            'message' => 'Invalid signature.',
-                        ]);
+                        $return_payloads->push($this->unauthenticatedManualWebhookFailurePayload());
 
                         continue;
                     }
@@ -454,53 +453,136 @@ class Github extends Controller
 
     public function redirect(Request $request)
     {
-        try {
-            $code = $request->get('code');
-            $state = $request->get('state');
-            $github_app = GithubApp::where('uuid', $state)->firstOrFail();
-            $api_url = data_get($github_app, 'api_url');
-            $data = Http::withBody(null)->accept('application/vnd.github+json')->post("$api_url/app-manifests/$code/conversions")->throw()->json();
-            $id = data_get($data, 'id');
-            $slug = data_get($data, 'slug');
-            $client_id = data_get($data, 'client_id');
-            $client_secret = data_get($data, 'client_secret');
-            $private_key = data_get($data, 'pem');
-            $webhook_secret = data_get($data, 'webhook_secret');
-            $private_key = PrivateKey::create([
-                'name' => "github-app-{$slug}",
-                'private_key' => $private_key,
-                'team_id' => $github_app->team_id,
-                'is_git_related' => true,
-            ]);
-            $github_app->name = $slug;
-            $github_app->app_id = $id;
-            $github_app->client_id = $client_id;
-            $github_app->client_secret = $client_secret;
-            $github_app->webhook_secret = $webhook_secret;
-            $github_app->private_key_id = $private_key->id;
-            $github_app->save();
+        $code = (string) $request->query('code', '');
+        abort_if(blank($code), 422, 'Missing GitHub App manifest code.');
 
-            return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
-        } catch (Exception $e) {
-            return handleError($e);
-        }
+        $github_app = $this->consumeGithubAppSetupState(
+            request: $request,
+            state: (string) $request->query('state', ''),
+            action: 'manifest',
+        );
+
+        abort_if($this->githubAppHasManifestCredentials($github_app), 403, 'GitHub App credentials are already configured.');
+
+        $api_url = data_get($github_app, 'api_url');
+        $data = Http::withBody(null)
+            ->accept('application/vnd.github+json')
+            ->timeout(10)
+            ->connectTimeout(5)
+            ->post("$api_url/app-manifests/$code/conversions")
+            ->throw()
+            ->json();
+
+        $id = data_get($data, 'id');
+        $slug = data_get($data, 'slug');
+        $client_id = data_get($data, 'client_id');
+        $client_secret = data_get($data, 'client_secret');
+        $private_key = data_get($data, 'pem');
+        $webhook_secret = data_get($data, 'webhook_secret');
+
+        abort_if(blank($id) || blank($slug) || blank($client_id) || blank($client_secret) || blank($private_key) || blank($webhook_secret), 422, 'GitHub App manifest conversion response is incomplete.');
+
+        $private_key = PrivateKey::create([
+            'name' => "github-app-{$slug}",
+            'private_key' => $private_key,
+            'team_id' => $github_app->team_id,
+            'is_git_related' => true,
+        ]);
+        $github_app->name = $slug;
+        $github_app->app_id = $id;
+        $github_app->client_id = $client_id;
+        $github_app->client_secret = $client_secret;
+        $github_app->webhook_secret = $webhook_secret;
+        $github_app->private_key_id = $private_key->id;
+        $github_app->save();
+
+        return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
     }
 
     public function install(Request $request)
     {
-        try {
-            $installation_id = $request->get('installation_id');
-            $source = $request->get('source');
-            $setup_action = $request->get('setup_action');
-            $github_app = GithubApp::where('uuid', $source)->firstOrFail();
-            if ($setup_action === 'install') {
-                $github_app->installation_id = $installation_id;
-                $github_app->save();
-            }
+        $source = (string) $request->query('source', '');
+        abort_if(blank($source), 404);
 
+        $github_app = GithubApp::ownedByCurrentTeam()->where('uuid', $source)->firstOrFail();
+
+        $setup_action = (string) $request->query('setup_action', '');
+        if ($setup_action !== 'install') {
             return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
-        } catch (Exception $e) {
-            return handleError($e);
         }
+
+        $installation_id = (string) $request->query('installation_id', '');
+        abort_unless(ctype_digit($installation_id), 422, 'Missing GitHub App installation id.');
+
+        abort_unless(
+            $this->githubInstallationBelongsToApp($github_app, $installation_id),
+            403,
+            'GitHub App installation could not be verified.'
+        );
+
+        $github_app->installation_id = $installation_id;
+        $github_app->save();
+
+        return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
+    }
+
+    /**
+     * Verify that the given installation id actually belongs to this GitHub App.
+     *
+     * The installation id arrives as an untrusted query parameter on an
+     * unauthenticated-reachable GET callback, so it must be confirmed against
+     * the GitHub API using the App's own credentials before it is persisted.
+     */
+    private function githubInstallationBelongsToApp(GithubApp $github_app, string $installation_id): bool
+    {
+        if (blank($github_app->app_id) || blank($github_app->privateKey?->private_key)) {
+            return false;
+        }
+
+        try {
+            $jwt = generateGithubJwt($github_app);
+            $response = Http::withHeaders([
+                'Authorization' => "Bearer $jwt",
+                'Accept' => 'application/vnd.github+json',
+            ])
+                ->timeout(10)
+                ->connectTimeout(5)
+                ->get("{$github_app->api_url}/app/installations/{$installation_id}");
+
+            return $response->successful()
+                && (string) data_get($response->json(), 'app_id') === (string) $github_app->app_id;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private function consumeGithubAppSetupState(Request $request, string $state, string $action): GithubApp
+    {
+        abort_if(blank($state), 404);
+
+        $payload = Cache::pull($this->githubAppSetupStateCacheKey($state));
+        abort_unless(is_array($payload), 404);
+        abort_unless(data_get($payload, 'action') === $action, 404);
+
+        $team_id = $request->user()?->currentTeam()?->id;
+        abort_unless(! is_null($team_id) && (int) data_get($payload, 'team_id') === $team_id, 403);
+
+        return GithubApp::whereKey(data_get($payload, 'github_app_id'))
+            ->where('team_id', data_get($payload, 'team_id'))
+            ->firstOrFail();
+    }
+
+    private function githubAppSetupStateCacheKey(string $state): string
+    {
+        return 'github-app-setup-state:'.hash('sha256', $state);
+    }
+
+    private function githubAppHasManifestCredentials(GithubApp $github_app): bool
+    {
+        return filled($github_app->app_id)
+            || filled($github_app->client_id)
+            || filled($github_app->client_secret)
+            || filled($github_app->webhook_secret)
+            || filled($github_app->private_key_id);
     }
 }

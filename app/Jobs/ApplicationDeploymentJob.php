@@ -197,7 +197,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(public int $application_deployment_queue_id)
     {
-        $this->onQueue('high');
+        $this->onQueue(deployment_queue());
 
         $this->application_deployment_queue = ApplicationDeploymentQueue::find($this->application_deployment_queue_id);
         $this->nixpacks_plan_json = collect([]);

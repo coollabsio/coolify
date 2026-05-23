@@ -59,6 +59,7 @@ Thank you so much!
 
 * [MVPS](https://www.mvps.net?ref=coolify.io) - Cheap VPS servers at the highest possible quality
 * [SerpAPI](https://serpapi.com?ref=coolify.io) - Google Search API — Scrape Google and other search engines from our fast, easy, and complete API
+* [Seibert Group](https://seibert.link/coolifysoftware?ref=coolify.io) - Boost productivity company-wide with AI agents like Claude Code
 * [ScreenshotOne](https://screenshotone.com?ref=coolify.io) - Screenshot API for devs
 * [PrivateAlps](https://privatealps.net?ref=coolify.io) - Cloud Services Provider, VPS, servers infrastructure for people who care about privacy and control
 
@@ -70,7 +71,6 @@ Thank you so much!
 * [BC Direct](https://bc.direct?ref=coolify.io) - Your trusted technology consulting partner
 * [Blacksmith](https://blacksmith.sh?ref=coolify.io) - Infrastructure automation platform
 * [Capture.page](https://capture.page/?ref=coolify.io) - Fast & Reliable Screenshot API for Developers
-* [Context.dev](https://context.dev?ref=coolify.io) - API to personalize your product with logos, colors, and company info from any domain
 * [ByteBase](https://www.bytebase.com?ref=coolify.io) - Database CI/CD and Security at Scale
 * [CodeRabbit](https://coderabbit.ai?ref=coolify.io) - Cut Code Review Time & Bugs in Half
 * [COMIT](https://comit.international?ref=coolify.io) - New York Times award–winning contractor

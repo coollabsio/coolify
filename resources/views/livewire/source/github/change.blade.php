@@ -290,8 +290,8 @@
                 function createGithubApp(webhook_endpoint, preview_deployment_permissions, administration) {
                     const {
                         organization,
-                        uuid,
-                        html_url
+                        html_url,
+                        uuid
                     } = @json($github_app);
                     if (!webhook_endpoint) {
                         alert('Please select a webhook endpoint.');
@@ -299,6 +299,7 @@
                     }
                     let baseUrl = webhook_endpoint;
                     const name = @js($name);
+                    const manifestState = @js($manifestState);
                     const isDev = @js(config('app.env')) ===
                         'local';
                     const devWebhook = @js(config('constants.webhooks.dev_webhook'));
@@ -340,7 +341,7 @@
                     };
                     const form = document.createElement('form');
                     form.setAttribute('method', 'post');
-                    form.setAttribute('action', `${html_url}/${path}?state=${uuid}`);
+                    form.setAttribute('action', `${html_url}/${path}?state=${manifestState}`);
                     const input = document.createElement('input');
                     input.setAttribute('id', 'manifest');
                     input.setAttribute('name', 'manifest');

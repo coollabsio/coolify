@@ -274,9 +274,12 @@
                     <div>({{ $pull_request }})</div>
                 @endif
                 @if ($streamLogs)
-                    <x-loading wire:poll.2000ms='getLogs(true)' />
+                    <x-loading />
                 @endif
             </div>
+        @endif
+        @if ($streamLogs)
+            <div class="sr-only" wire:poll.2000ms="getLogs(true)" aria-hidden="true"></div>
         @endif
         <div x-show="expanded" {{ $collapsible ? 'x-collapse' : '' }}
             :class="fullscreen ? 'fullscreen flex flex-col !overflow-visible' : 'relative w-full {{ $collapsible ? 'py-4' : '' }} mx-auto'"

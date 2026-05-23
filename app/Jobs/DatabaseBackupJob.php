@@ -77,7 +77,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(public ScheduledDatabaseBackup $backup)
     {
-        $this->onQueue('high');
+        $this->onQueue(crons_queue());
         $this->timeout = $backup->timeout ?? 3600;
     }
 
