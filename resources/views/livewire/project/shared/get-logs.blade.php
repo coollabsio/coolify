@@ -538,11 +538,11 @@
                                         $lineKey = "{$timestamp}.{$microseconds}";
                                     }
                                 @endphp
-                                <div wire:key="{{ $lineKey ?? 'line-' . $index }}" data-log-line data-log-content="{{ $line }}" class="flex gap-2 log-line">
+                                <div wire:key="{{ $lineKey ?? 'line-' . $index }}" data-log-line data-log-content="{!! addslashes($line) !!}" class="flex gap-2 log-line">
                                     @if ($timestamp && $showTimeStamps)
                                         <span class="shrink-0 text-gray-500">{{ $timestamp }}</span>
                                     @endif
-                                    <span data-line-text="{{ $logContent }}" class="whitespace-pre-wrap break-all">{{ $logContent }}</span>
+                                    <span data-line-text="{!! addslashes($logContent) !!}" class="whitespace-pre-wrap break-all">{{ $logContent }}</span>
                                 </div>
                             @endforeach
                         </div>
