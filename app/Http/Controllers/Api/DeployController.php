@@ -653,8 +653,19 @@ class DeployController extends Controller
                     new OA\MediaType(
                         mediaType: 'application/json',
                         schema: new OA\Schema(
-                            type: 'array',
-                            items: new OA\Items(ref: '#/components/schemas/Application'),
+                            type: 'object',
+                            properties: [
+                                new OA\Property(
+                                    property: 'count',
+                                    type: 'integer',
+                                    description: 'Total number of deployments for this application.',
+                                ),
+                                new OA\Property(
+                                    property: 'deployments',
+                                    type: 'array',
+                                    items: new OA\Items(ref: '#/components/schemas/ApplicationDeploymentQueue'),
+                                ),
+                            ]
                         )
                     ),
                 ]),
