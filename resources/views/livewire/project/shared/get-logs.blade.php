@@ -61,7 +61,7 @@
             }
         },
         scrollToBottom() {
-            const logsContainer = document.getElementById('logsContainer');
+            const logsContainer = this.$root.querySelector('#logsContainer');
             if (logsContainer) {
                 this.isScrolling = true;
                 logsContainer.scrollTop = logsContainer.scrollHeight;
@@ -117,7 +117,7 @@
             this.applyColorLogs();
         },
         applyColorLogs() {
-            const logs = document.getElementById('logs');
+            const logs = this.$root.querySelector('#logs');
             if (!logs) return;
             const lines = logs.querySelectorAll('[data-log-line]');
             lines.forEach(line => {
@@ -134,7 +134,7 @@
             if (!selection || selection.isCollapsed || !selection.toString().trim()) {
                 return false;
             }
-            const logsContainer = document.getElementById('logs');
+            const logsContainer = this.$root.querySelector('#logs');
             if (!logsContainer) return false;
             const range = selection.getRangeAt(0);
             return logsContainer.contains(range.commonAncestorContainer);
@@ -144,7 +144,7 @@
             return doc.documentElement.textContent;
         },
         applySearch() {
-            const logs = document.getElementById('logs');
+            const logs = this.$root.querySelector('#logs');
             if (!logs) return;
             const lines = logs.querySelectorAll('[data-log-line]');
             const query = this.searchQuery.trim().toLowerCase();
@@ -200,7 +200,7 @@
             }
         },
         downloadLogs() {
-            const logs = document.getElementById('logs');
+            const logs = this.$root.querySelector('#logs');
             if (!logs) return;
             const visibleLines = logs.querySelectorAll('[data-log-line]:not(.hidden)');
             let content = '';
@@ -243,14 +243,14 @@
 
             // Apply colors after Livewire updates (existing content)
             Livewire.hook('morph.updated', ({ el }) => {
-                if (el.id === 'logs') {
+                if (el.id === 'logs' && this.$root.contains(el)) {
                     applyAfterUpdate();
                 }
             });
 
             // Apply colors after Livewire adds new content (initial load)
             Livewire.hook('morph.added', ({ el }) => {
-                if (el.id === 'logs') {
+                if (el.id === 'logs' && this.$root.contains(el)) {
                     applyAfterUpdate();
                 }
             });
