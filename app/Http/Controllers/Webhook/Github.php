@@ -59,6 +59,7 @@ class Github extends Controller
                 $before_sha = data_get($payload, 'before');
                 $after_sha = data_get($payload, 'after', data_get($payload, 'pull_request.head.sha'));
                 $author_association = data_get($payload, 'pull_request.author_association');
+                $is_fork = data_get($payload, 'pull_request.head.repo.fork', false);
             }
             if (! in_array($x_github_event, ['push', 'pull_request'])) {
                 return response("Nothing to do. Event '$x_github_event' is not supported.");
@@ -223,6 +224,7 @@ class Github extends Controller
                             commitSha: data_get($payload, 'pull_request.head.sha', 'HEAD'),
                             authorAssociation: $author_association,
                             fullName: $full_name,
+                            isFork: $is_fork,
                         );
 
                         $return_payloads->push([
@@ -304,6 +306,7 @@ class Github extends Controller
                 $before_sha = data_get($payload, 'before');
                 $after_sha = data_get($payload, 'after', data_get($payload, 'pull_request.head.sha'));
                 $author_association = data_get($payload, 'pull_request.author_association');
+                $is_fork = data_get($payload, 'pull_request.head.repo.fork', false);
             }
             if (! in_array($x_github_event, ['push', 'pull_request'])) {
                 return response("Nothing to do. Event '$x_github_event' is not supported.");
@@ -435,6 +438,7 @@ class Github extends Controller
                             commitSha: data_get($payload, 'pull_request.head.sha', 'HEAD'),
                             authorAssociation: $author_association,
                             fullName: $full_name,
+                            isFork: $is_fork,
                         );
 
                         $return_payloads->push([
