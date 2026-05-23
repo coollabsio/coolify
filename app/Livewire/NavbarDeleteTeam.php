@@ -22,7 +22,13 @@ class NavbarDeleteTeam extends Component
         }
 
         $currentTeam = currentTeam();
-        $currentTeam->delete();
+
+        // Get the user's first remaining team BEFORE deleting (so currentTeam() doesn't return null)
+        $user = Auth::user();
+        $newTeam = $user->teams()->where('teams.id', '!=', $currentTeam->id)->first();
+        if ($newTeam) {
+            $user->forceFill(['currentTeam_id' => $newTeam->id])->save();
+        }
 
         $currentTeam->members->each(function ($user) use ($currentTeam) {
             if ($user->id === Auth::id()) {
@@ -35,7 +41,9 @@ class NavbarDeleteTeam extends Component
             }
         });
 
-        refreshSession();
+        $currentTeam->delete();
+
+        refreshSession($newTeam);
 
         return redirectRoute($this, 'team.index');
     }
