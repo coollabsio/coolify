@@ -189,3 +189,21 @@ it('identifies none as not predefined (per codebase pattern)', function () {
     // only filters 'default' and 'host', so we maintain consistency
     expect(isDockerPredefinedNetwork('none'))->toBeFalse();
 });
+
+it('creates standalone docker networks with ipv6 fallback', function () {
+    $safe = escapeshellarg('coolify');
+    $command = dockerCreateAttachableStandaloneNetworkCommand('coolify');
+    $expected = "docker network create --ipv6 --attachable {$safe} 2>/dev/null"
+        . " || docker network create --attachable {$safe}";
+
+    expect($command)->toBe($expected);
+});
+
+it('can silence standalone docker network creation attempts', function () {
+    $safe = escapeshellarg('coolify');
+    $command = dockerCreateAttachableStandaloneNetworkCommand('coolify', true);
+    $expected = "docker network create --ipv6 --attachable {$safe} >/dev/null 2>&1"
+        . " || docker network create --attachable {$safe} >/dev/null 2>&1";
+
+    expect($command)->toBe($expected);
+});

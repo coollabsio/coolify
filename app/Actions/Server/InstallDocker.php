@@ -102,7 +102,7 @@ class InstallDocker
                 ]);
             } else {
                 $command = $command->merge([
-                    'docker network create --attachable coolify >/dev/null 2>&1 || true',
+                    dockerCreateAttachableStandaloneNetworkCommand('coolify', true) . ' || true',
                 ]);
                 $command = $command->merge([
                     "echo 'Done!'",
