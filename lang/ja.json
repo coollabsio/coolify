@@ -8,6 +8,7 @@
     "auth.login.gitlab": "Gitlabでログイン",
     "auth.login.google": "Googleでログイン",
     "auth.login.infomaniak": "Infomaniakでログイン",
+    "auth.login.oidc": "OIDCでログイン",
     "auth.already_registered": "すでに登録済みですか？",
     "auth.confirm_password": "パスワードを確認",
     "auth.forgot_password_link": "パスワードをお忘れですか？",

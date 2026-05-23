@@ -9,6 +9,7 @@
     "auth.login.gitlab": "Entrar com Gitlab",
     "auth.login.google": "Entrar com Google",
     "auth.login.infomaniak": "Entrar com Infomaniak",
+    "auth.login.oidc": "Entrar com OIDC",
     "auth.login.zitadel": "Entrar com Zitadel",
     "auth.already_registered": "Já tem uma conta?",
     "auth.confirm_password": "Confirmar senha",

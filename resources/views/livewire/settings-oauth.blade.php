@@ -16,7 +16,7 @@
         <div class="flex flex-col gap-2 pt-4">
             @foreach ($oauth_settings_map as $oauth_setting)
                 <div class="p-4 border dark:border-coolgray-300 border-neutral-200">
-                    <h3>{{ ucfirst($oauth_setting['provider']) }}</h3>
+                    <h3>{{ $oauth_setting['provider'] == 'oidc' ? 'Generic OIDC' : ucfirst($oauth_setting['provider']) }}</h3>
                     <div class="w-32">
                         <x-forms.checkbox instantSave="instantSave('{{ $oauth_setting['provider'] }}')"
                             id="oauth_settings_map.{{ $oauth_setting['provider'] }}.enabled" label="Enabled" />
@@ -41,9 +41,16 @@
                             $oauth_setting['provider'] == 'authentik' ||
                                 $oauth_setting['provider'] == 'clerk' ||
                                 $oauth_setting['provider'] == 'zitadel' ||
+                                $oauth_setting['provider'] == 'oidc' ||
                                 $oauth_setting['provider'] == 'gitlab')
                             <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.base_url"
-                                label="Base URL" />
+                                label="{{ $oauth_setting['provider'] == 'oidc' ? 'Issuer / Base URL' : 'Base URL' }}"
+                                helper="{{ $oauth_setting['provider'] == 'oidc' ? 'OIDC issuer URL without the /.well-known/openid-configuration suffix.' : '' }}" />
+                        @endif
+                        @if ($oauth_setting['provider'] == 'oidc')
+                            <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.scopes"
+                                label="Scopes"
+                                helper="Optional additional scopes separated by spaces or commas. Defaults include openid, email, and profile." />
                         @endif
                     </div>
                 </div>
