@@ -1000,6 +1000,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--ulimit',
         '--device',
         '--shm-size',
+        '--volume',
     ]);
     $mapping = collect([
         '--cap-add' => 'cap_add',
@@ -1016,6 +1017,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--gpus' => 'gpus',
         '--hostname' => 'hostname',
         '--entrypoint' => 'entrypoint',
+        '--volume' => 'volumes',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
@@ -1113,6 +1115,10 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 // Docker compose accepts entrypoint as either a string or an array
                 // Keep it as a string for simplicity - docker compose will handle it
                 $compose_options->put($mapping[$option], $value[0]);
+            }
+        } elseif ($option === '--volume') {
+            if (! is_null($value) && is_array($value) && count($value) > 0) {
+                $compose_options->put($mapping[$option], array_values($value));
             }
         } elseif ($option === '--gpus') {
             $payload = [
