@@ -31,6 +31,8 @@ class Change extends Component
 
     public ?bool $preview_deployment_permissions = true;
 
+    public ?bool $deployment_statuses_permissions = true;
+
     public ?bool $administration = false;
 
     public $parameters;
@@ -70,6 +72,8 @@ class Change extends Component
 
     public ?string $pullRequests = null;
 
+    public ?string $deployments = null;
+
     public $applications;
 
     public $privateKeys;
@@ -94,6 +98,7 @@ class Change extends Component
             'contents' => 'nullable|string',
             'metadata' => 'nullable|string',
             'pullRequests' => 'nullable|string',
+            'deployments' => 'nullable|string',
             'privateKeyId' => 'nullable|int',
         ];
     }
@@ -130,6 +135,7 @@ class Change extends Component
             $this->github_app->contents = $this->contents;
             $this->github_app->metadata = $this->metadata;
             $this->github_app->pull_requests = $this->pullRequests;
+            $this->github_app->deployments = $this->deployments;
         } else {
             // Sync FROM model (on load/refresh)
             $this->name = $this->github_app->name;
@@ -148,6 +154,7 @@ class Change extends Component
             $this->contents = $this->github_app->contents;
             $this->metadata = $this->github_app->metadata;
             $this->pullRequests = $this->github_app->pull_requests;
+            $this->deployments = $this->github_app->deployments;
         }
     }
 
@@ -201,6 +208,7 @@ class Change extends Component
 
             GithubAppPermissionJob::dispatchSync($this->github_app);
             $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
+            $this->syncData(false);
             $this->dispatch('success', 'Github App permissions updated.');
         } catch (\Throwable $e) {
             // Provide better error message for unsupported key formats
@@ -266,7 +274,7 @@ class Change extends Component
             if (isCloud() && ! isDev()) {
                 $this->webhook_endpoint = config('app.url');
             } else {
-                $this->webhook_endpoint = $this->fqdn ?? $this->ipv4 ?? '';
+                $this->webhook_endpoint = $this->fqdn ?: $this->ipv4 ?: config('app.url') ?: '';
                 $this->is_system_wide = $this->github_app->is_system_wide;
             }
         } catch (\Throwable $e) {

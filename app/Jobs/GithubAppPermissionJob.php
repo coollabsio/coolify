@@ -44,6 +44,7 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
             $this->github_app->contents = data_get($permissions, 'contents');
             $this->github_app->metadata = data_get($permissions, 'metadata');
             $this->github_app->pull_requests = data_get($permissions, 'pull_requests');
+            $this->github_app->deployments = data_get($permissions, 'deployments');
             $this->github_app->administration = data_get($permissions, 'administration');
 
             $this->github_app->save();

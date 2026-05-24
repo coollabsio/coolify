@@ -189,6 +189,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private Collection|string $build_secrets;
 
+    private ?int $github_deployment_id = null;
+
     public function tags()
     {
         // Do not remove this one, it needs to properly identify which worker is running the job
@@ -293,6 +295,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
             'horizon_job_worker' => gethostname(),
         ]);
+        $this->createSyncedGitHubDeployment();
+        $this->syncGitHubDeploymentStatus('in_progress', 'Deployment started.');
         if ($this->server->isFunctional() === false) {
             $this->application_deployment_queue->addLogEntry('Server is not functional.');
             $this->fail('Server is not functional.');
@@ -4655,6 +4659,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->refresh();
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
             $this->application_deployment_queue->addLogEntry('Deployment cancelled by user, stopping execution.');
+            $this->syncGitHubDeploymentStatus('error', 'Deployment cancelled by user.');
             throw new DeploymentException('Deployment cancelled by user', 69420);
         }
     }
@@ -4692,6 +4697,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
             $this->application_deployment_queue->addLogEntry('Deployment cancelled by user, stopping execution.');
+            $this->syncGitHubDeploymentStatus('error', 'Deployment cancelled by user.');
             throw new DeploymentException('Deployment cancelled by user', 69420);
         }
 
@@ -4747,6 +4753,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         $this->sendDeploymentNotification(DeploymentSuccess::class);
+        $this->syncGitHubDeploymentStatus('success', 'Deployment finished successfully.');
     }
 
     /**
@@ -4755,6 +4762,168 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function handleFailedDeployment(): void
     {
         $this->sendDeploymentNotification(DeploymentFailed::class);
+        $this->syncGitHubDeploymentStatus('failure', 'Deployment failed.');
+    }
+
+    private function createSyncedGitHubDeployment(): void
+    {
+        if (! $this->shouldSyncGitHubDeployment()) {
+            return;
+        }
+
+        try {
+            ['repository' => $repository] = $this->application->customRepository();
+            $this->github_deployment_id = createGitHubDeployment(
+                source: $this->source,
+                repository: $repository,
+                ref: $this->resolveGitHubDeploymentRef(),
+                environment: $this->resolveGitHubDeploymentEnvironment(),
+                description: $this->resolveGitHubDeploymentDescription(),
+                transientEnvironment: $this->pull_request_id !== 0,
+                productionEnvironment: $this->pull_request_id === 0,
+            );
+
+            if ($this->github_deployment_id) {
+                $this->application_deployment_queue->addLogEntry(
+                    "GitHub deployment {$this->github_deployment_id} created.",
+                    hidden: true
+                );
+            }
+        } catch (Throwable $e) {
+            \Log::warning('Failed to create GitHub deployment.', [
+                'application_id' => $this->application->id,
+                'deployment_uuid' => $this->deployment_uuid,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function syncGitHubDeploymentStatus(string $state, string $description): void
+    {
+        if (! $this->shouldSyncGitHubDeployment() || ! $this->github_deployment_id) {
+            return;
+        }
+
+        try {
+            ['repository' => $repository] = $this->application->customRepository();
+
+            updateGitHubDeploymentStatus(
+                source: $this->source,
+                repository: $repository,
+                deploymentId: $this->github_deployment_id,
+                state: $state,
+                description: $description,
+                logUrl: route('project.application.deployment.show', [
+                    'project_uuid' => data_get($this->application, 'environment.project.uuid'),
+                    'application_uuid' => data_get($this->application, 'uuid'),
+                    'deployment_uuid' => $this->deployment_uuid,
+                    'environment_uuid' => data_get($this->application, 'environment.uuid'),
+                ]),
+                environmentUrl: in_array($state, ['in_progress', 'success'], true)
+                    ? $this->resolveGitHubDeploymentEnvironmentUrl()
+                    : null,
+            );
+        } catch (Throwable $e) {
+            \Log::warning('Failed to update GitHub deployment status.', [
+                'application_id' => $this->application->id,
+                'deployment_uuid' => $this->deployment_uuid,
+                'state' => $state,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function shouldSyncGitHubDeployment(): bool
+    {
+        return $this->source instanceof GithubApp
+            && ! $this->is_this_additional_server
+            && hasGitHubDeploymentsPermission($this->source);
+    }
+
+    private function resolveGitHubDeploymentRef(): string
+    {
+        return determineGitHubDeploymentRef(
+            pullRequestId: $this->pull_request_id,
+            branch: $this->application->git_branch,
+            commit: $this->commit ?: $this->application->git_commit_sha,
+            rollback: $this->rollback,
+        );
+    }
+
+    private function resolveGitHubDeploymentEnvironment(): string
+    {
+        if ($this->pull_request_id !== 0) {
+            return "preview/pr-{$this->pull_request_id}";
+        }
+
+        return $this->application->git_branch ?: 'production';
+    }
+
+    private function resolveGitHubDeploymentDescription(): string
+    {
+        if ($this->pull_request_id !== 0) {
+            return Str::limit("Coolify preview deployment for PR #{$this->pull_request_id}", 140, '');
+        }
+
+        return Str::limit("Coolify deployment for branch {$this->application->git_branch}", 140, '');
+    }
+
+    private function resolveGitHubDeploymentEnvironmentUrl(): ?string
+    {
+        if ($this->pull_request_id !== 0) {
+            if ($this->application->build_pack === 'dockercompose') {
+                return $this->resolveDockerComposeDeploymentUrl($this->preview?->docker_compose_domains);
+            }
+
+            return $this->normalizeGitHubDeploymentUrl($this->preview?->fqdn);
+        }
+
+        if ($this->application->build_pack === 'dockercompose') {
+            return $this->resolveDockerComposeDeploymentUrl($this->application->docker_compose_domains);
+        }
+
+        return $this->normalizeGitHubDeploymentUrl($this->application->fqdn);
+    }
+
+    private function resolveDockerComposeDeploymentUrl(?string $domains): ?string
+    {
+        if (blank($domains)) {
+            return null;
+        }
+
+        $dockerComposeDomains = json_decode($domains, true);
+        if (! is_array($dockerComposeDomains)) {
+            return null;
+        }
+
+        foreach ($dockerComposeDomains as $config) {
+            $domain = data_get($config, 'domain');
+            if (blank($domain)) {
+                continue;
+            }
+
+            return $this->normalizeGitHubDeploymentUrl($domain);
+        }
+
+        return null;
+    }
+
+    private function normalizeGitHubDeploymentUrl(?string $url): ?string
+    {
+        if (blank($url)) {
+            return null;
+        }
+
+        $firstUrl = trim(str($url)->explode(',')->first());
+        if ($firstUrl === '') {
+            return null;
+        }
+
+        if (! str($firstUrl)->startsWith('http://') && ! str($firstUrl)->startsWith('https://')) {
+            return "http://{$firstUrl}";
+        }
+
+        return $firstUrl;
     }
 
     /**

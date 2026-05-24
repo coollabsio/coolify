@@ -25,6 +25,7 @@ class GithubApp extends BaseModel
         'contents',
         'metadata',
         'pull_requests',
+        'deployments',
         'administration',
     ];
 

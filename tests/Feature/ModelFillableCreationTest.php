@@ -1053,6 +1053,7 @@ it('creates GithubApp with all fillable attributes', function () {
         'contents' => 'read',
         'metadata' => 'read',
         'pull_requests' => 'write',
+        'deployments' => 'write',
         'administration' => 'read',
     ]);
 
@@ -1064,6 +1065,7 @@ it('creates GithubApp with all fillable attributes', function () {
     expect($githubApp->client_id)->toBe('Iv1.abc123');
     expect($githubApp->team_id)->toBe($this->team->id);
     expect($githubApp->private_key_id)->toBe($this->server->private_key_id);
+    expect($githubApp->deployments)->toBe('write');
 });
 
 it('creates Subscription with all fillable attributes', function () {
