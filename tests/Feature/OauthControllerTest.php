@@ -1,9 +1,11 @@
 <?php
 
+use App\Actions\Fortify\ResetUserPassword;
 use App\Models\InstanceSettings;
 use App\Models\OauthSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Laravel\Socialite\Facades\Socialite;
 
 uses(RefreshDatabase::class);
@@ -47,6 +49,46 @@ it('logs in an existing user when the oauth provider returns a mixed-case email'
     $this->assertAuthenticatedAs($user);
     expect(User::count())->toBe(1);
 });
+
+it('creates and logs in a new oauth user when password registration is disabled', function () {
+    config()->set('app.maintenance.driver', 'file');
+
+    User::factory()->create([
+        'email' => 'admin@example.edu',
+    ]);
+
+    $provider = \Mockery::mock();
+    $provider->shouldReceive('setConfig')->once()->andReturnSelf();
+    $provider->shouldReceive('with')->once()->with(['hd' => 'example.com'])->andReturnSelf();
+    $provider->shouldReceive('user')->once()->andReturn((object) [
+        'email' => 'NewUser@example.edu',
+        'name' => 'New OAuth User',
+        'id' => 'google-user-id',
+    ]);
+
+    Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+    $response = $this->get(route('auth.callback', 'google'));
+
+    $response->assertRedirect('/');
+    $user = User::whereEmail('newuser@example.edu')->first();
+
+    expect($user)->not->toBeNull()
+        ->and($user->password)->toBeNull();
+    $this->assertAuthenticatedAs($user);
+    expect(User::count())->toBe(2);
+});
+
+it('prevents oauth-only users from setting a password through reset', function () {
+    $user = User::factory()->create([
+        'password' => null,
+    ]);
+
+    app(ResetUserPassword::class)->reset($user, [
+        'password' => 'Password1!@',
+        'password_confirmation' => 'Password1!@',
+    ]);
+})->throws(ValidationException::class);
 
 it('rejects oauth logins when the provider does not return an email address', function (?string $providerEmail) {
     config()->set('app.maintenance.driver', 'file');
