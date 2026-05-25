@@ -757,10 +757,22 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             // Use build-time .env file from /artifacts (outside Docker context to prevent it from being in the image)
             $command .= ' --env-file '.self::BUILD_TIME_ENV_PATH;
-            if ($this->force_rebuild) {
-                $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull --no-cache";
+            $composeFlags = " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location}";
+            $buildArgs = $this->force_rebuild ? ' --pull --no-cache' : ' --pull';
+
+            // Detect intra-compose image dependencies: a service may consume an
+            // image produced by another service's `build:` (e.g. Sentry's
+            // sentry-cleanup uses sentry-self-hosted-local:latest, which `web`
+            // builds). `docker compose build --pull` builds services in
+            // parallel and tries to pull every FROM, so the consumer races the
+            // producer and fails to resolve a tag that doesn't exist on any
+            // registry. Build producers first when this pattern is detected.
+            $producerServices = $this->detectIntraComposeProducers();
+            if (! empty($producerServices)) {
+                $producers = implode(' ', $producerServices);
+                $command .= "{$composeFlags} build {$producers} && {$command}{$composeFlags} build{$buildArgs}";
             } else {
-                $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull";
+                $command .= "{$composeFlags} build{$buildArgs}";
             }
 
             if (! $this->application->settings->use_build_secrets && $this->build_args instanceof Collection && $this->build_args->isNotEmpty()) {
@@ -4645,6 +4657,58 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $this->application_deployment_queue->addLogEntry($post_deployment_command_output, 'stderr');
             }
         }
+    }
+
+    /**
+     * Find services that produce an `image:` consumed by a sibling service in
+     * the same compose file. Returns the producer service names so they can
+     * be built before the rest, preventing `docker compose build --pull` from
+     * trying to pull a tag that only exists locally after a sibling builds it.
+     *
+     * @return array<int, string>
+     */
+    private function detectIntraComposeProducers(): array
+    {
+        try {
+            $yaml = $this->application->docker_compose_raw ?? $this->application->docker_compose;
+            if (empty($yaml)) {
+                return [];
+            }
+            $parsed = Yaml::parse($yaml);
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $services = $parsed['services'] ?? [];
+        if (! is_array($services) || empty($services)) {
+            return [];
+        }
+
+        // Build a map of image-tag -> producer service name (services that
+        // have a `build:` block and an `image:` declaring the tag they produce).
+        $producesImage = [];
+        foreach ($services as $name => $svc) {
+            if (! is_array($svc) || empty($svc['build']) || empty($svc['image'])) {
+                continue;
+            }
+            $producesImage[$svc['image']] = $name;
+        }
+        if (empty($producesImage)) {
+            return [];
+        }
+
+        // Find services that consume a produced image without building it
+        // themselves — they need the producer built first.
+        $producers = [];
+        foreach ($services as $name => $svc) {
+            if (! is_array($svc) || ! empty($svc['build']) || empty($svc['image'])) {
+                continue;
+            }
+            if (isset($producesImage[$svc['image']]) && $producesImage[$svc['image']] !== $name) {
+                $producers[$producesImage[$svc['image']]] = true;
+            }
+        }
+
+        return array_keys($producers);
     }
 
     /**
