@@ -21,6 +21,22 @@ function isDockerPredefinedNetwork(string $network): bool
     return in_array($network, ['default', 'host'], true);
 }
 
+function buildDockerNetworkCreateIfMissingCommand(string $network, bool $preferIpv6 = false, bool $overlay = false): string
+{
+    $safe = escapeshellarg($network);
+    $baseCreate = $overlay
+        ? "docker network create --driver overlay --attachable {$safe}"
+        : "docker network create --attachable {$safe}";
+
+    if ($preferIpv6 && ! $overlay) {
+        $baseCreate = "docker network create --attachable --ipv6 {$safe} >/dev/null 2>&1 || docker network create --attachable {$safe} >/dev/null 2>&1";
+    } else {
+        $baseCreate .= " >/dev/null 2>&1";
+    }
+
+    return "docker network inspect {$safe} >/dev/null 2>&1 || ({$baseCreate})";
+}
+
 function collectProxyDockerNetworksByServer(Server $server)
 {
     if (! $server->isFunctional()) {
@@ -113,16 +129,16 @@ function connectProxyToNetworks(Server $server)
             return [
                 "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --driver overlay --attachable {$safe} >/dev/null",
                 "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
-                "echo 'Successfully connected coolify-proxy to {$safe} network.'",
+                "echo 'Successfully connected coolify-proxy to {$network} network.'",
             ];
         });
     } else {
         $commands = $networks->map(function ($network) {
             $safe = escapeshellarg($network);
             return [
-                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --attachable {$safe} >/dev/null",
+                buildDockerNetworkCreateIfMissingCommand($network, preferIpv6: $network === 'coolify'),
                 "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
-                "echo 'Successfully connected coolify-proxy to {$safe} network.'",
+                "echo 'Successfully connected coolify-proxy to {$network} network.'",
             ];
         });
     }
@@ -145,16 +161,15 @@ function ensureProxyNetworksExist(Server $server)
         $commands = $networks->map(function ($network) {
             $safe = escapeshellarg($network);
             return [
-                "echo 'Ensuring network {$safe} exists...'",
+                "echo 'Ensuring network {$network} exists...'",
                 "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable {$safe}",
             ];
         });
     } else {
         $commands = $networks->map(function ($network) {
-            $safe = escapeshellarg($network);
             return [
-                "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable {$safe}",
+                "echo 'Ensuring network {$network} exists...'",
+                buildDockerNetworkCreateIfMissingCommand($network, preferIpv6: $network === 'coolify'),
             ];
         });
     }
