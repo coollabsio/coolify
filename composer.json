@@ -26,6 +26,7 @@
         "laravel/socialite": "^5.24.2",
         "laravel/tinker": "^2.11.0",
         "laravel/ui": "^4.6.1",
+        "kovah/laravel-socialite-oidc": "^0.8.0",
         "lcobucci/jwt": "^5.6.0",
         "league/flysystem-aws-s3-v3": "^3.31.0",
         "league/flysystem-sftp-v3": "^3.31",

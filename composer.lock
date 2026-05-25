@@ -6946,6 +6946,73 @@
             "time": "2024-11-20T05:42:36+00:00"
         },
         {
+            "name": "kovah/laravel-socialite-oidc",
+            "description": "OpenID Connect OAuth2 Provider for Laravel Socialite",
+            "keywords": [
+                "oauth",
+                "provider",
+                "laravel",
+                "oidc",
+                "socialite"
+            ],
+            "homepage": "https://github.com/kovah/laravel-socialite-oidc",
+            "version": "v0.8.0",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "JPG Dev",
+                    "homepage": "https://jpgdev.com"
+                },
+                {
+                    "name": "Kevin Woblick",
+                    "email": "contact@woblick.dev",
+                    "homepage": "https://woblick.dev",
+                    "role": "Developer"
+                }
+            ],
+            "source": {
+                "url": "https://github.com/Kovah/laravel-socialite-oidc.git",
+                "type": "git",
+                "reference": "cfd9c9a658da97b961d936159c45ca4ed082e62a"
+            },
+            "dist": {
+                "url": "https://api.github.com/repos/Kovah/laravel-socialite-oidc/zipball/cfd9c9a658da97b961d936159c45ca4ed082e62a",
+                "type": "zip",
+                "shasum": "",
+                "reference": "cfd9c9a658da97b961d936159c45ca4ed082e62a"
+            },
+            "type": "library",
+            "support": {
+                "issues": "https://github.com/Kovah/laravel-socialite-oidc/issues",
+                "source": "https://github.com/Kovah/laravel-socialite-oidc/tree/v0.8.0"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/sponsors/kovah",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-04-30T09:17:26+00:00",
+            "autoload": {
+                "psr-4": {
+                    "SocialiteProviders\\OIDC\\": "src"
+                }
+            },
+            "require": {
+                "php": "^8.1",
+                "ext-json": "*",
+                "socialiteproviders/manager": "^4.0",
+                "illuminate/http": "^9.0 | ^10.0 | ^11.0 | ^12.0 | ^13.0",
+                "illuminate/support": "^9.0 | ^10.0 | ^11.0 | ^12.0 | ^13.0",
+                "firebase/php-jwt": "^6.4|^7.0"
+            },
+            "conflict": {
+                "jp-gauthier/socialiteproviders-oidc": "*"
+            }
+        },
+        {
             "name": "socialiteproviders/manager",
             "version": "4.9.2",
             "source": {
