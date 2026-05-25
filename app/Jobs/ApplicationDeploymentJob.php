@@ -697,9 +697,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             $yaml = Yaml::dump(convertToArray($composeFile), 10);
         }
-        $this->docker_compose_base64 = base64_encode($yaml);
+        $this->docker_compose_base64 = base64_encode(gzencode($yaml, 9));
         $this->execute_remote_command([
-            executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}{$this->docker_compose_location} > /dev/null"),
+            executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | gunzip | tee {$this->workdir}{$this->docker_compose_location} > /dev/null"),
             'hidden' => true,
         ]);
 
@@ -1060,7 +1060,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     "mkdir -p $mainDir",
                 ],
                 [
-                    "echo '{$this->docker_compose_base64}' | base64 -d | tee $composeFileName > /dev/null",
+                    "echo '{$this->docker_compose_base64}' | base64 -d | gunzip | tee $composeFileName > /dev/null",
                 ],
                 [
                     "echo '{$readme}' > $mainDir/README.md",
@@ -3278,8 +3278,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         $this->docker_compose = Yaml::dump($docker_compose, 10);
-        $this->docker_compose_base64 = base64_encode($this->docker_compose);
-        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}/docker-compose.yaml > /dev/null"), 'hidden' => true]);
+        $this->docker_compose_base64 = base64_encode(gzencode($this->docker_compose, 9));
+        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | gunzip | tee {$this->workdir}/docker-compose.yaml > /dev/null"), 'hidden' => true]);
     }
 
     private function generate_local_persistent_volumes()
