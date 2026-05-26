@@ -1343,6 +1343,7 @@ class Application extends BaseModel
         $branch = $this->git_branch;
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
         $commands = collect([]);
+        $customSshKeyLocation = "/root/.ssh/id_rsa_coolify_{$deployment_uuid}";
         $base_command = 'git ls-remote';
 
         if ($this->deploymentType() === 'source') {
@@ -1396,19 +1397,20 @@ class Application extends BaseModel
                     $private_key = base64_encode($private_key);
                     $gitlabPort = $gitlabSource->custom_port ?? 22;
                     $escapedCustomRepository = str_replace("'", "'\\''", $customRepository);
-                    $base_command = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$gitlabPort} -o Port={$gitlabPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$base_command} '{$escapedCustomRepository}'";
+                    $base_command = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$gitlabPort} -o Port={$gitlabPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$customSshKeyLocation} -o IdentitiesOnly=yes\" {$base_command} '{$escapedCustomRepository}'";
 
                     if ($exec_in_docker) {
                         $commands = collect([
                             executeInDocker($deployment_uuid, 'mkdir -p /root/.ssh'),
-                            executeInDocker($deployment_uuid, "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null"),
-                            executeInDocker($deployment_uuid, 'chmod 600 /root/.ssh/id_rsa'),
+                            executeInDocker($deployment_uuid, "echo '{$private_key}' | base64 -d | tee {$customSshKeyLocation} > /dev/null"),
+                            executeInDocker($deployment_uuid, "chmod 600 {$customSshKeyLocation}"),
                         ]);
                     } else {
                         $commands = collect([
+                            "trap 'rm -f {$customSshKeyLocation}' EXIT",
                             'mkdir -p /root/.ssh',
-                            "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null",
-                            'chmod 600 /root/.ssh/id_rsa',
+                            "echo '{$private_key}' | base64 -d | tee {$customSshKeyLocation} > /dev/null",
+                            "chmod 600 {$customSshKeyLocation}",
                         ]);
                     }
 
@@ -1454,19 +1456,20 @@ class Application extends BaseModel
             // When used with executeInDocker (which uses bash -c '...'), we need to escape for bash context
             // Replace ' with '\'' to safely escape within single-quoted bash strings
             $escapedCustomRepository = str_replace("'", "'\\''", $customRepository);
-            $base_command = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$base_command} '{$escapedCustomRepository}'";
+            $base_command = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$customSshKeyLocation} -o IdentitiesOnly=yes\" {$base_command} '{$escapedCustomRepository}'";
 
             if ($exec_in_docker) {
                 $commands = collect([
                     executeInDocker($deployment_uuid, 'mkdir -p /root/.ssh'),
-                    executeInDocker($deployment_uuid, "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null"),
-                    executeInDocker($deployment_uuid, 'chmod 600 /root/.ssh/id_rsa'),
+                    executeInDocker($deployment_uuid, "echo '{$private_key}' | base64 -d | tee {$customSshKeyLocation} > /dev/null"),
+                    executeInDocker($deployment_uuid, "chmod 600 {$customSshKeyLocation}"),
                 ]);
             } else {
                 $commands = collect([
+                    "trap 'rm -f {$customSshKeyLocation}' EXIT",
                     'mkdir -p /root/.ssh',
-                    "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null",
-                    'chmod 600 /root/.ssh/id_rsa',
+                    "echo '{$private_key}' | base64 -d | tee {$customSshKeyLocation} > /dev/null",
+                    "chmod 600 {$customSshKeyLocation}",
                 ]);
             }
 
@@ -1507,6 +1510,7 @@ class Application extends BaseModel
         $branch = $this->git_branch;
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
         $baseDir = $custom_base_dir ?? $this->generateBaseDir($deployment_uuid);
+        $customSshKeyLocation = "/root/.ssh/id_rsa_coolify_{$deployment_uuid}";
 
         // Escape shell arguments for safety to prevent command injection
         $escapedBranch = escapeshellarg($branch);
@@ -1603,7 +1607,7 @@ class Application extends BaseModel
                     $private_key = base64_encode($private_key);
                     $gitlabPort = $gitlabSource->custom_port ?? 22;
                     $escapedCustomRepository = escapeshellarg($customRepository);
-                    $gitlabSshCommand = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$gitlabPort} -o Port={$gitlabPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\"";
+                    $gitlabSshCommand = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$gitlabPort} -o Port={$gitlabPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$customSshKeyLocation} -o IdentitiesOnly=yes\"";
                     $git_clone_command_base = "{$gitlabSshCommand} {$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
                     if ($only_checkout) {
                         $git_clone_command = $git_clone_command_base;
@@ -1613,14 +1617,15 @@ class Application extends BaseModel
                     if ($exec_in_docker) {
                         $commands = collect([
                             executeInDocker($deployment_uuid, 'mkdir -p /root/.ssh'),
-                            executeInDocker($deployment_uuid, "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null"),
-                            executeInDocker($deployment_uuid, 'chmod 600 /root/.ssh/id_rsa'),
+                            executeInDocker($deployment_uuid, "echo '{$private_key}' | base64 -d | tee {$customSshKeyLocation} > /dev/null"),
+                            executeInDocker($deployment_uuid, "chmod 600 {$customSshKeyLocation}"),
                         ]);
                     } else {
                         $commands = collect([
+                            "trap 'rm -f {$customSshKeyLocation}' EXIT",
                             'mkdir -p /root/.ssh',
-                            "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null",
-                            'chmod 600 /root/.ssh/id_rsa',
+                            "echo '{$private_key}' | base64 -d | tee {$customSshKeyLocation} > /dev/null",
+                            "chmod 600 {$customSshKeyLocation}",
                         ]);
                     }
 
@@ -1631,7 +1636,7 @@ class Application extends BaseModel
                         } else {
                             $commands->push("echo 'Checking out $branch'");
                         }
-                        $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$gitlabPort} -o Port={$gitlabPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                        $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$gitlabPort} -o Port={$gitlabPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$customSshKeyLocation} -o IdentitiesOnly=yes\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
                     }
 
                     if ($exec_in_docker) {
@@ -1674,7 +1679,7 @@ class Application extends BaseModel
             }
             $private_key = base64_encode($private_key);
             $escapedCustomRepository = escapeshellarg($customRepository);
-            $deployKeySshCommand = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\"";
+            $deployKeySshCommand = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$customSshKeyLocation} -o IdentitiesOnly=yes\"";
             $git_clone_command_base = "{$deployKeySshCommand} {$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
             if ($only_checkout) {
                 $git_clone_command = $git_clone_command_base;
@@ -1684,14 +1689,15 @@ class Application extends BaseModel
             if ($exec_in_docker) {
                 $commands = collect([
                     executeInDocker($deployment_uuid, 'mkdir -p /root/.ssh'),
-                    executeInDocker($deployment_uuid, "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null"),
-                    executeInDocker($deployment_uuid, 'chmod 600 /root/.ssh/id_rsa'),
+                    executeInDocker($deployment_uuid, "echo '{$private_key}' | base64 -d | tee {$customSshKeyLocation} > /dev/null"),
+                    executeInDocker($deployment_uuid, "chmod 600 {$customSshKeyLocation}"),
                 ]);
             } else {
                 $commands = collect([
+                    "trap 'rm -f {$customSshKeyLocation}' EXIT",
                     'mkdir -p /root/.ssh',
-                    "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null",
-                    'chmod 600 /root/.ssh/id_rsa',
+                    "echo '{$private_key}' | base64 -d | tee {$customSshKeyLocation} > /dev/null",
+                    "chmod 600 {$customSshKeyLocation}",
                 ]);
             }
             if ($pull_request_id !== 0) {
@@ -1702,7 +1708,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$customSshKeyLocation} -o IdentitiesOnly=yes\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
                 } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -1710,14 +1716,14 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$customSshKeyLocation} -o IdentitiesOnly=yes\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
                 } elseif ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" ".$this->buildGitCheckoutCommand($commit);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$customSshKeyLocation} -o IdentitiesOnly=yes\" ".$this->buildGitCheckoutCommand($commit);
                 }
             }
 
@@ -1747,7 +1753,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$customSshKeyLocation} -o IdentitiesOnly=yes\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
                 } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -1755,14 +1761,14 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$customSshKeyLocation} -o IdentitiesOnly=yes\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
                 } elseif ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" ".$this->buildGitCheckoutCommand($commit);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$customSshKeyLocation} -o IdentitiesOnly=yes\" ".$this->buildGitCheckoutCommand($commit);
                 }
             }
 
