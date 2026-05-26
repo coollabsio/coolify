@@ -25,6 +25,8 @@ class All extends Component
 
     public string $view = 'normal';
 
+    public string $search = '';
+
     public bool $is_env_sorting_enabled = false;
 
     public bool $use_build_secrets = false;
@@ -34,6 +36,14 @@ class All extends Component
         'refreshEnvs',
         'environmentVariableDeleted' => 'refreshEnvs',
     ];
+
+    public function updatedSearch()
+    {
+        unset($this->environmentVariables);
+        unset($this->environmentVariablesPreview);
+        unset($this->hardcodedEnvironmentVariables);
+        unset($this->hardcodedEnvironmentVariablesPreview);
+    }
 
     public function mount()
     {
@@ -68,6 +78,10 @@ class All extends Component
         $query = $this->resource->environment_variables()
             ->orderByRaw("CASE WHEN is_required = true AND (value IS NULL OR value = '') THEN 0 ELSE 1 END");
 
+        if ($this->search !== '') {
+            $query->where('key', 'like', "%{$this->search}%");
+        }
+
         if ($this->is_env_sorting_enabled) {
             $query->orderBy('key');
         } else {
@@ -81,6 +95,10 @@ class All extends Component
     {
         $query = $this->resource->environment_variables_preview()
             ->orderByRaw("CASE WHEN is_required = true AND (value IS NULL OR value = '') THEN 0 ELSE 1 END");
+
+        if ($this->search !== '') {
+            $query->where('key', 'like', "%{$this->search}%");
+        }
 
         if ($this->is_env_sorting_enabled) {
             $query->orderBy('key');
@@ -137,6 +155,12 @@ class All extends Component
         $hardcodedVars = $hardcodedVars->filter(function ($var) use ($managedKeys) {
             return ! in_array($var['key'], $managedKeys);
         });
+
+        if ($this->search !== '') {
+            $hardcodedVars = $hardcodedVars->filter(function ($var) {
+                return str($var['key'])->contains($this->search, true);
+            });
+        }
 
         // Apply sorting based on is_env_sorting_enabled
         if ($this->is_env_sorting_enabled) {
@@ -285,6 +309,8 @@ class All extends Component
         // Clear computed property cache to force refresh
         unset($this->environmentVariables);
         unset($this->environmentVariablesPreview);
+        unset($this->hardcodedEnvironmentVariables);
+        unset($this->hardcodedEnvironmentVariablesPreview);
 
         $this->dispatch('success', 'Environment variable added.');
     }
@@ -416,6 +442,8 @@ class All extends Component
         // Clear computed property cache to force refresh
         unset($this->environmentVariables);
         unset($this->environmentVariablesPreview);
+        unset($this->hardcodedEnvironmentVariables);
+        unset($this->hardcodedEnvironmentVariablesPreview);
         $this->getDevView();
     }
 }
