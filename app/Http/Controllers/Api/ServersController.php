@@ -706,7 +706,15 @@ class ServersController extends Controller
                 return response()->json(['message' => 'Invalid proxy type.'], 422);
             }
         }
-        $server->update($request->only(['name', 'description', 'ip', 'port', 'user']));
+        $updateFields = $request->only(['name', 'description', 'ip', 'port', 'user']);
+        if ($request->filled('private_key_uuid')) {
+            $privateKey = PrivateKey::whereTeamId($teamId)->whereUuid($request->private_key_uuid)->first();
+            if (! $privateKey) {
+                return response()->json(['message' => 'Private key not found.'], 404);
+            }
+            $updateFields['private_key_id'] = $privateKey->id;
+        }
+        $server->update($updateFields);
         if ($request->is_build_server) {
             $server->settings()->update([
                 'is_build_server' => $request->is_build_server,
