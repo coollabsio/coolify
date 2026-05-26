@@ -31,8 +31,8 @@ services:
       - -c
       - |
         validate_registration_env() {
-          if [ "${ENABLE_REGISTRATION}" = "true" ]; then
-            if [ "${ENABLE_REGISTRATION_WITHOUT_VERIFICATION}" != "true" ] && [ "${REGISTRATION_REQUIRES_TOKEN}" != "true" ]; then
+          if [ "$${ENABLE_REGISTRATION}" = "true" ]; then
+            if [ "$${ENABLE_REGISTRATION_WITHOUT_VERIFICATION}" != "true" ] && [ "$${REGISTRATION_REQUIRES_TOKEN}" != "true" ]; then
               echo "ERROR: ENABLE_REGISTRATION=true requires ENABLE_REGISTRATION_WITHOUT_VERIFICATION=true or REGISTRATION_REQUIRES_TOKEN=true." >&2
               echo "See Synapse registration docs: https://element-hq.github.io/synapse/latest/usage/configuration/config_documentation.html#registration" >&2
               exit 1
@@ -49,7 +49,7 @@ services:
           # Set public_baseurl to actual deployment URL (may differ from server_name)
           # This allows hosting at matrix.example.org while server_name is example.org
           if ! grep -q "public_baseurl" /data/homeserver.yaml; then
-            sed -i "/^server_name:/a public_baseurl: ${SERVICE_URL_SYNAPSE}/" /data/homeserver.yaml
+            sed -i "/^server_name:/a public_baseurl: $${SERVICE_URL_SYNAPSE}/" /data/homeserver.yaml
           fi
 
           # Configure listener for reverse proxy
@@ -58,24 +58,24 @@ services:
           sed -i '/type: http/a \    x_forwarded: true' /data/homeserver.yaml
 
           # Enable registration if requested
-          if [ "${ENABLE_REGISTRATION}" = "true" ]; then
+          if [ "$${ENABLE_REGISTRATION}" = "true" ]; then
             cat >> /data/homeserver.yaml <<REGEOF
         enable_registration: true
-        enable_registration_without_verification: ${ENABLE_REGISTRATION_WITHOUT_VERIFICATION}
-        registration_requires_token: ${REGISTRATION_REQUIRES_TOKEN}
+        enable_registration_without_verification: $${ENABLE_REGISTRATION_WITHOUT_VERIFICATION}
+        registration_requires_token: $${REGISTRATION_REQUIRES_TOKEN}
         REGEOF
           fi
         fi
 
         # Register admin user if credentials provided
-        if [ -n "${SERVICE_USER_ADMIN}" ] && [ -n "${SERVICE_PASSWORD_ADMIN}" ]; then
+        if [ -n "$${SERVICE_USER_ADMIN}" ] && [ -n "$${SERVICE_PASSWORD_ADMIN}" ]; then
           (
             while ! curl -sf http://localhost:8008/health > /dev/null 2>&1; do
               sleep 2
             done
             register_new_matrix_user -a \
-              -u "${SERVICE_USER_ADMIN}" \
-              -p "${SERVICE_PASSWORD_ADMIN}" \
+              -u "$${SERVICE_USER_ADMIN}" \
+              -p "$${SERVICE_PASSWORD_ADMIN}" \
               -c /data/homeserver.yaml \
               http://localhost:8008 2>/dev/null || true
           ) &

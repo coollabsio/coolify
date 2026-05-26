@@ -33,8 +33,8 @@ services:
       - -c
       - |
         validate_registration_env() {
-          if [ "${ENABLE_REGISTRATION}" = "true" ]; then
-            if [ "${ENABLE_REGISTRATION_WITHOUT_VERIFICATION}" != "true" ] && [ "${REGISTRATION_REQUIRES_TOKEN}" != "true" ]; then
+          if [ "$${ENABLE_REGISTRATION}" = "true" ]; then
+            if [ "$${ENABLE_REGISTRATION_WITHOUT_VERIFICATION}" != "true" ] && [ "$${REGISTRATION_REQUIRES_TOKEN}" != "true" ]; then
               echo "ERROR: ENABLE_REGISTRATION=true requires ENABLE_REGISTRATION_WITHOUT_VERIFICATION=true or REGISTRATION_REQUIRES_TOKEN=true." >&2
               echo "See Synapse registration docs: https://element-hq.github.io/synapse/latest/usage/configuration/config_documentation.html#registration" >&2
               exit 1
@@ -54,14 +54,6 @@ services:
 
         grep "form_secret" /data/homeserver.yaml \
         | awk '{print $2}' > ./form_secret
-
-        registration_yaml=""
-        if [ "${ENABLE_REGISTRATION}" = "true" ]; then
-          registration_yaml="
-        enable_registration: true
-        enable_registration_without_verification: ${ENABLE_REGISTRATION_WITHOUT_VERIFICATION}
-        registration_requires_token: ${REGISTRATION_REQUIRES_TOKEN}"
-        fi
 
         # Create homeserver.yaml with PostgreSQL
         cat <<EOF > /data/homeserver.yaml
@@ -101,7 +93,14 @@ services:
 
         trusted_key_servers:
           - server_name: "matrix.org"
-        ${registration_yaml}
+        EOF
+
+        [ "$${ENABLE_REGISTRATION}" = "true" ] && ! grep "#registration" /data/homeserver.yaml &>/dev/null \
+        && echo >> /data/homeserver.yaml \
+        && cat <<EOF >> /data/homeserver.yaml
+        enable_registration: true
+        enable_registration_without_verification: $${ENABLE_REGISTRATION_WITHOUT_VERIFICATION}
+        registration_requires_token: $${REGISTRATION_REQUIRES_TOKEN}
         EOF
 
         # Register admin user if provided
@@ -111,12 +110,12 @@ services:
           done
           register_new_matrix_user \
             -a \
-            -u "${SERVICE_USER_ADMIN}" \
-            -p "${SERVICE_PASSWORD_ADMIN}" \
+            -u "$${SERVICE_USER_ADMIN}" \
+            -p "$${SERVICE_PASSWORD_ADMIN}" \
             -c /data/homeserver.yaml \
             http://localhost:8008 &>/dev/null
         }
-        [ -n "${SERVICE_USER_ADMIN}" ] && register_admin &
+        [ -n "$${SERVICE_USER_ADMIN}" ] && register_admin &
 
         /start.py
     healthcheck:
