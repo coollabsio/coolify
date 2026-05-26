@@ -9,6 +9,7 @@
 # - If hosting at matrix.example.org but want user IDs like @user:example.org, set SYNAPSE_SERVER_NAME=example.org
 # - You'll need to set up .well-known delegation at https://example.org/.well-known/matrix/server
 # - See: https://element-hq.github.io/synapse/latest/delegate.html
+# Registration (default false): if ENABLE_REGISTRATION=true, also set ENABLE_REGISTRATION_WITHOUT_VERIFICATION or REGISTRATION_REQUIRES_TOKEN — https://element-hq.github.io/synapse/latest/usage/configuration/config_documentation.html#registration
 
 services:
   synapse:
@@ -18,6 +19,8 @@ services:
       - SYNAPSE_SERVER_NAME=${SYNAPSE_SERVER_NAME:?}
       - SYNAPSE_REPORT_STATS=${SYNAPSE_REPORT_STATS:-no}
       - ENABLE_REGISTRATION=${ENABLE_REGISTRATION:-false}
+      - ENABLE_REGISTRATION_WITHOUT_VERIFICATION=${ENABLE_REGISTRATION_WITHOUT_VERIFICATION:-false}
+      - REGISTRATION_REQUIRES_TOKEN=${REGISTRATION_REQUIRES_TOKEN:-false}
       - SERVICE_USER_ADMIN=${SERVICE_USER_ADMIN}
       - SERVICE_PASSWORD_ADMIN=${SERVICE_PASSWORD_ADMIN}
       - SERVICE_USER_POSTGRESQL=${SERVICE_USER_POSTGRESQL}
@@ -29,6 +32,17 @@ services:
       - /bin/bash
       - -c
       - |
+        validate_registration_env() {
+          if [ "${ENABLE_REGISTRATION}" = "true" ]; then
+            if [ "${ENABLE_REGISTRATION_WITHOUT_VERIFICATION}" != "true" ] && [ "${REGISTRATION_REQUIRES_TOKEN}" != "true" ]; then
+              echo "ERROR: ENABLE_REGISTRATION=true requires ENABLE_REGISTRATION_WITHOUT_VERIFICATION=true or REGISTRATION_REQUIRES_TOKEN=true." >&2
+              echo "See Synapse registration docs: https://element-hq.github.io/synapse/latest/usage/configuration/config_documentation.html#registration" >&2
+              exit 1
+            fi
+          fi
+        }
+        validate_registration_env
+
         ! test -f /data/homeserver.yaml && /start.py generate
 
         # Extract secrets from generated config
@@ -40,6 +54,14 @@ services:
 
         grep "form_secret" /data/homeserver.yaml \
         | awk '{print $2}' > ./form_secret
+
+        registration_yaml=""
+        if [ "${ENABLE_REGISTRATION}" = "true" ]; then
+          registration_yaml="
+        enable_registration: true
+        enable_registration_without_verification: ${ENABLE_REGISTRATION_WITHOUT_VERIFICATION}
+        registration_requires_token: ${REGISTRATION_REQUIRES_TOKEN}"
+        fi
 
         # Create homeserver.yaml with PostgreSQL
         cat <<EOF > /data/homeserver.yaml
@@ -79,12 +101,7 @@ services:
 
         trusted_key_servers:
           - server_name: "matrix.org"
-        EOF
-
-        [ "${ENABLE_REGISTRATION}" = "true" ] && ! grep "#registration" /data/homeserver.yaml &>/dev/null \
-        && echo >> /data/homeserver.yaml \
-        && cat <<EOF >> /data/homeserver.yaml
-        enable_registration: true
+        ${registration_yaml}
         EOF
 
         # Register admin user if provided
@@ -94,8 +111,8 @@ services:
           done
           register_new_matrix_user \
             -a \
-            -u ${SERVICE_USER_ADMIN} \
-            -p ${SERVICE_PASSWORD_ADMIN} \
+            -u "${SERVICE_USER_ADMIN}" \
+            -p "${SERVICE_PASSWORD_ADMIN}" \
             -c /data/homeserver.yaml \
             http://localhost:8008 &>/dev/null
         }

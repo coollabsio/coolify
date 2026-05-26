@@ -9,6 +9,8 @@
 # - If hosting at matrix.example.org but want user IDs like @user:example.org, set SYNAPSE_SERVER_NAME=example.org
 # - You'll need to set up .well-known delegation at https://example.org/.well-known/matrix/server
 # - See: https://element-hq.github.io/synapse/latest/delegate.html
+# Registration (default false): if ENABLE_REGISTRATION=true, also set ENABLE_REGISTRATION_WITHOUT_VERIFICATION or REGISTRATION_REQUIRES_TOKEN — https://element-hq.github.io/synapse/latest/usage/configuration/config_documentation.html#registration
+# SQLite: registration env vars apply only when homeserver.yaml is first created.
 
 services:
   synapse:
@@ -18,6 +20,8 @@ services:
       - SYNAPSE_SERVER_NAME=${SYNAPSE_SERVER_NAME:?}
       - SYNAPSE_REPORT_STATS=${SYNAPSE_REPORT_STATS:-no}
       - ENABLE_REGISTRATION=${ENABLE_REGISTRATION:-false}
+      - ENABLE_REGISTRATION_WITHOUT_VERIFICATION=${ENABLE_REGISTRATION_WITHOUT_VERIFICATION:-false}
+      - REGISTRATION_REQUIRES_TOKEN=${REGISTRATION_REQUIRES_TOKEN:-false}
       - SERVICE_USER_ADMIN=${SERVICE_USER_ADMIN}
       - SERVICE_PASSWORD_ADMIN=${SERVICE_PASSWORD_ADMIN}
     volumes:
@@ -26,6 +30,17 @@ services:
     command:
       - -c
       - |
+        validate_registration_env() {
+          if [ "${ENABLE_REGISTRATION}" = "true" ]; then
+            if [ "${ENABLE_REGISTRATION_WITHOUT_VERIFICATION}" != "true" ] && [ "${REGISTRATION_REQUIRES_TOKEN}" != "true" ]; then
+              echo "ERROR: ENABLE_REGISTRATION=true requires ENABLE_REGISTRATION_WITHOUT_VERIFICATION=true or REGISTRATION_REQUIRES_TOKEN=true." >&2
+              echo "See Synapse registration docs: https://element-hq.github.io/synapse/latest/usage/configuration/config_documentation.html#registration" >&2
+              exit 1
+            fi
+          fi
+        }
+        validate_registration_env
+
         # Generate config on first run
         if [ ! -f /data/homeserver.yaml ]; then
           # Generate default config using SYNAPSE_SERVER_NAME (permanent, used in user IDs)
@@ -43,8 +58,12 @@ services:
           sed -i '/type: http/a \    x_forwarded: true' /data/homeserver.yaml
 
           # Enable registration if requested
-          if [ "${ENABLE_REGISTRATION}" = "true" ] && ! grep -q "enable_registration" /data/homeserver.yaml; then
-            echo "enable_registration: true" >> /data/homeserver.yaml
+          if [ "${ENABLE_REGISTRATION}" = "true" ]; then
+            cat >> /data/homeserver.yaml <<REGEOF
+        enable_registration: true
+        enable_registration_without_verification: ${ENABLE_REGISTRATION_WITHOUT_VERIFICATION}
+        registration_requires_token: ${REGISTRATION_REQUIRES_TOKEN}
+        REGEOF
           fi
         fi
 
