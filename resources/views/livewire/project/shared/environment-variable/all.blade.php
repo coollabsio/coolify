@@ -43,9 +43,22 @@
         @endif
     </div>
     @if ($view === 'normal')
-        <div>
-            <h3>Production Environment Variables</h3>
-            <div>Environment (secrets) variables for Production.</div>
+        <div class="flex flex-col md:flex-row gap-2 justify-between md:items-center">
+            <div>
+                <h3>Production Environment Variables</h3>
+                <div class="subtitle">Environment (secrets) variables for Production.</div>
+            </div>
+            <div class="w-full md:w-96">
+                <div class="relative">
+                    <input type="search" placeholder="Search" wire:model.live.debounce.300ms="search" class="w-full input pl-10" />
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <svg class="w-4 h-4 dark:text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
         </div>
         @forelse ($this->environmentVariables as $env)
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}" :env="$env"
@@ -56,8 +69,7 @@
         @if (($resource->type() === 'service' || $resource?->build_pack === 'dockercompose') && $this->hardcodedEnvironmentVariables->isNotEmpty())
             @foreach ($this->hardcodedEnvironmentVariables as $index => $env)
                 <livewire:project.shared.environment-variable.show-hardcoded
-                    wire:key="hardcoded-prod-{{ $env['key'] }}-{{ $env['service_name'] ?? 'default' }}-{{ $index }}"
-                    :env="$env" />
+                    wire:key="hardcoded-prod-{{ $env['key'] }}-{{ $env['service_name'] ?? 'default' }}-{{ $index }}" :env="$env" />
             @endforeach
         @endif
         @if ($resource->type() === 'application' && $resource->environment_variables_preview->count() > 0 && $showPreview)
@@ -88,8 +100,9 @@
                     label="Production Environment Variables"></x-forms.textarea>
 
                 @if ($showPreview)
-                    <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" label="Preview Deployments Environment Variables"
-                        id="variablesPreview" wire:model="variablesPreview"></x-forms.textarea>
+                    <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans"
+                        label="Preview Deployments Environment Variables" id="variablesPreview"
+                        wire:model="variablesPreview"></x-forms.textarea>
                 @endif
 
                 <x-forms.button type="submit" class="btn btn-primary">Save All Environment Variables</x-forms.button>
@@ -98,8 +111,9 @@
                     label="Production Environment Variables" disabled></x-forms.textarea>
 
                 @if ($showPreview)
-                    <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" label="Preview Deployments Environment Variables"
-                        id="variablesPreview" wire:model="variablesPreview" disabled></x-forms.textarea>
+                    <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans"
+                        label="Preview Deployments Environment Variables" id="variablesPreview" wire:model="variablesPreview"
+                        disabled></x-forms.textarea>
                 @endif
             @endcan
         </form>
