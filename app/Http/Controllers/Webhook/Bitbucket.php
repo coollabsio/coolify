@@ -4,80 +4,65 @@ namespace App\Http\Controllers\Webhook;
 
 use App\Actions\Application\CleanupPreviewDeployment;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
-use App\Http\Controllers\Webhook\Concerns\ParsesBitbucketWebhookEvents;
+use App\Http\Controllers\Webhook\Bitbucket\BitbucketWebhookContext;
+use App\Http\Controllers\Webhook\Bitbucket\BitbucketWebhookVariantRegistry;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Exception;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Visus\Cuid2\Cuid2;
 
 class Bitbucket extends Controller
 {
-    use DetectsSkipDeployCommits;
-    use ParsesBitbucketWebhookEvents;
-
-    public function manual(Request $request)
+    public function manual(Request $request, ?BitbucketWebhookVariantRegistry $registry = null)
     {
         try {
             $return_payloads = collect([]);
-            $payload = $request->collect();
-            $headers = $request->headers->all();
-            $x_bitbucket_token = data_get($headers, 'x-hub-signature.0', '');
-            $raw_bitbucket_event = self::bitbucketEventKey($request);
-            $x_bitbucket_event = self::normalizeBitbucketEventKey($raw_bitbucket_event);
+            $registry ??= new BitbucketWebhookVariantRegistry;
+            $variant = $registry->resolve($request);
+            $raw_bitbucket_event = $variant->eventKey($request);
 
-            if (! in_array($raw_bitbucket_event, self::handledBitbucketWebhookEventKeys(), true)) {
+            if ($raw_bitbucket_event === '' || ! in_array($raw_bitbucket_event, $variant->handledEventKeys(), true)) {
                 return response([
                     'status' => 'failed',
                     'message' => 'Nothing to do. Event not handled.',
                 ]);
             }
 
-            $parsed = self::parseBitbucketWebhookPayload($payload, $raw_bitbucket_event);
+            $context = $variant->parse($request);
 
-            if ($parsed === null) {
-                if ($raw_bitbucket_event === 'repo:refs_changed') {
-                    return response([
-                        'status' => 'failed',
-                        'message' => 'Nothing to do. Ref change is not a branch push update.',
-                    ]);
-                }
-
+            if ($context === null) {
                 return response([
                     'status' => 'failed',
-                    'message' => 'Nothing to do. No branch found in the request.',
+                    'message' => $variant->unhandledBranchMessage($raw_bitbucket_event),
                 ]);
             }
 
-            $branch = $parsed['branch'];
-            $commit = $parsed['commit'];
-            $skip_deploy_commits = $parsed['skip_deploy_commits'];
-            $pull_request_id = $parsed['pull_request_id'];
-            $pull_request_html_url = $parsed['pull_request_html_url'];
-            $skip_deploy_pr = $parsed['skip_deploy_pr'];
-            $repository_identifiers = $parsed['repository_identifiers'];
-
             $applicationsQuery = Application::query();
-            if (empty($repository_identifiers)) {
+            if (empty($context->repositoryIdentifiers)) {
                 $applications = collect();
             } else {
-                $applicationsQuery->where(function ($query) use ($repository_identifiers) {
-                    foreach ($repository_identifiers as $identifier) {
+                $applicationsQuery->where(function ($query) use ($context) {
+                    foreach ($context->repositoryIdentifiers as $identifier) {
                         $query->orWhere('git_repository', 'like', "%{$identifier}%");
                     }
                 });
-                $applications = $applicationsQuery->where('git_branch', $branch)->get();
+                $applications = $applicationsQuery->where('git_branch', $context->branch)->get();
             }
 
-            $repositoryLabel = implode(', ', $repository_identifiers) ?: 'unknown';
+            $repositoryLabel = $context->repositoryLabel();
 
             if ($applications->isEmpty()) {
                 return response([
                     'status' => 'failed',
-                    'message' => "Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $repositoryLabel.",
+                    'message' => "Nothing to do. No applications found with deploy key set, branch is '{$context->branch}' and Git Repository name has {$repositoryLabel}.",
                 ]);
             }
+
+            $headers = $request->headers->all();
+            $x_bitbucket_token = data_get($headers, 'x-hub-signature.0', '');
+
             foreach ($applications as $application) {
                 $webhook_secret = data_get($application, 'manual_webhook_secret_bitbucket');
                 if (empty($webhook_secret)) {
@@ -140,149 +125,193 @@ class Bitbucket extends Controller
 
                     continue;
                 }
-                if ($x_bitbucket_event === 'repo:push') {
-                    if ($application->isDeployable()) {
-                        if ($skip_deploy_commits) {
-                            $return_payloads->push([
-                                'application' => $application->name,
-                                'status' => 'skipped',
-                                'message' => 'All commits contain [skip cd] or [skip ci]. Skipping deployment.',
-                                'application_uuid' => $application->uuid,
-                                'application_name' => $application->name,
-                            ]);
 
-                            continue;
-                        }
-                        $deployment_uuid = new Cuid2;
-                        $result = queue_application_deployment(
-                            application: $application,
-                            deployment_uuid: $deployment_uuid,
-                            commit: $commit,
-                            force_rebuild: false,
-                            is_webhook: true
-                        );
-                        if ($result['status'] === 'queue_full') {
-                            return response($result['message'], 429)->header('Retry-After', 60);
-                        } elseif ($result['status'] === 'skipped') {
-                            $return_payloads->push([
-                                'application' => $application->name,
-                                'status' => 'skipped',
-                                'message' => $result['message'],
-                            ]);
-                        } else {
-                            auditLog('webhook.deployment.queued', [
-                                'provider' => 'bitbucket',
-                                'mode' => 'manual',
-                                'application_uuid' => $application->uuid,
-                                'application_name' => $application->name,
-                                'deployment_uuid' => $deployment_uuid->toString(),
-                                'commit' => $commit,
-                                'repository' => $repositoryLabel,
-                            ]);
-                            $return_payloads->push([
-                                'application' => $application->name,
-                                'status' => 'success',
-                                'message' => 'Deployment queued.',
-                            ]);
-                        }
-                    } else {
-                        $return_payloads->push([
-                            'application' => $application->name,
-                            'status' => 'failed',
-                            'message' => 'Auto deployment disabled.',
-                        ]);
-                    }
-                }
-                if ($x_bitbucket_event === 'pullrequest:created' || $x_bitbucket_event === 'pullrequest:updated') {
-                    if ($application->isPRDeployable()) {
-                        if ($skip_deploy_pr) {
-                            $return_payloads->push([
-                                'application' => $application->name,
-                                'status' => 'skipped',
-                                'message' => 'PR title contains [skip cd] or [skip ci]. Skipping preview deployment.',
-                            ]);
-
-                            continue;
-                        }
-                        $deployment_uuid = new Cuid2;
-                        $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
-                        if (! $found) {
-                            if ($application->build_pack === 'dockercompose') {
-                                $pr_app = ApplicationPreview::create([
-                                    'git_type' => 'bitbucket',
-                                    'application_id' => $application->id,
-                                    'pull_request_id' => $pull_request_id,
-                                    'pull_request_html_url' => $pull_request_html_url,
-                                    'docker_compose_domains' => $application->docker_compose_domains,
-                                ]);
-                                $pr_app->generate_preview_fqdn_compose();
-                            } else {
-                                $pr_app = ApplicationPreview::create([
-                                    'git_type' => 'bitbucket',
-                                    'application_id' => $application->id,
-                                    'pull_request_id' => $pull_request_id,
-                                    'pull_request_html_url' => $pull_request_html_url,
-                                ]);
-                                $pr_app->generate_preview_fqdn();
-                            }
-                        }
-                        $result = queue_application_deployment(
-                            application: $application,
-                            pull_request_id: $pull_request_id,
-                            deployment_uuid: $deployment_uuid,
-                            force_rebuild: false,
-                            commit: $commit,
-                            is_webhook: true,
-                            git_type: 'bitbucket'
-                        );
-                        if ($result['status'] === 'queue_full') {
-                            return response($result['message'], 429)->header('Retry-After', 60);
-                        } elseif ($result['status'] === 'skipped') {
-                            $return_payloads->push([
-                                'application' => $application->name,
-                                'status' => 'skipped',
-                                'message' => $result['message'],
-                            ]);
-                        } else {
-                            $return_payloads->push([
-                                'application' => $application->name,
-                                'status' => 'success',
-                                'message' => 'Preview deployment queued.',
-                            ]);
-                        }
-                    } else {
-                        $return_payloads->push([
-                            'application' => $application->name,
-                            'status' => 'failed',
-                            'message' => 'Preview deployments disabled.',
-                        ]);
-                    }
-                }
-                if ($x_bitbucket_event === 'pullrequest:rejected' || $x_bitbucket_event === 'pullrequest:fulfilled') {
-                    $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
-                    if ($found) {
-                        // Use comprehensive cleanup that cancels active deployments,
-                        // kills helper containers, and removes all PR containers
-                        CleanupPreviewDeployment::run($application, $pull_request_id, $found);
-
-                        $return_payloads->push([
-                            'application' => $application->name,
-                            'status' => 'success',
-                            'message' => 'Preview deployment closed.',
-                        ]);
-                    } else {
-                        $return_payloads->push([
-                            'application' => $application->name,
-                            'status' => 'failed',
-                            'message' => 'No preview deployment found.',
-                        ]);
-                    }
-                }
+                $return_payloads->push($this->dispatchBitbucketWebhookAction($application, $context, $repositoryLabel));
             }
 
             return response($return_payloads);
         } catch (Exception $e) {
             return handleError($e);
         }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function dispatchBitbucketWebhookAction(Application $application, BitbucketWebhookContext $context, string $repositoryLabel): array
+    {
+        return match ($context->action) {
+            'push' => $this->handlePush($application, $context, $repositoryLabel),
+            'preview_deploy' => $this->handlePreviewDeploy($application, $context),
+            'preview_close' => $this->handlePreviewClose($application, $context),
+            default => [
+                'application' => $application->name,
+                'status' => 'failed',
+                'message' => 'Nothing to do. Event not handled.',
+            ],
+        };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function handlePush(Application $application, BitbucketWebhookContext $context, string $repositoryLabel): array
+    {
+        if (! $application->isDeployable()) {
+            return [
+                'application' => $application->name,
+                'status' => 'failed',
+                'message' => 'Auto deployment disabled.',
+            ];
+        }
+
+        if ($context->skipDeployCommits) {
+            return [
+                'application' => $application->name,
+                'status' => 'skipped',
+                'message' => 'All commits contain [skip cd] or [skip ci]. Skipping deployment.',
+                'application_uuid' => $application->uuid,
+                'application_name' => $application->name,
+            ];
+        }
+
+        $deployment_uuid = new Cuid2;
+        $result = queue_application_deployment(
+            application: $application,
+            deployment_uuid: $deployment_uuid,
+            commit: $context->commit,
+            force_rebuild: false,
+            is_webhook: true
+        );
+
+        if ($result['status'] === 'queue_full') {
+            throw new HttpResponseException(response($result['message'], 429)->header('Retry-After', 60));
+        }
+
+        if ($result['status'] === 'skipped') {
+            return [
+                'application' => $application->name,
+                'status' => 'skipped',
+                'message' => $result['message'],
+            ];
+        }
+
+        auditLog('webhook.deployment.queued', [
+            'provider' => 'bitbucket',
+            'mode' => 'manual',
+            'application_uuid' => $application->uuid,
+            'application_name' => $application->name,
+            'deployment_uuid' => $deployment_uuid->toString(),
+            'commit' => $context->commit,
+            'repository' => $repositoryLabel,
+        ]);
+
+        return [
+            'application' => $application->name,
+            'status' => 'success',
+            'message' => 'Deployment queued.',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function handlePreviewDeploy(Application $application, BitbucketWebhookContext $context): array
+    {
+        if (! $application->isPRDeployable()) {
+            return [
+                'application' => $application->name,
+                'status' => 'failed',
+                'message' => 'Preview deployments disabled.',
+            ];
+        }
+
+        if ($context->skipDeployPr) {
+            return [
+                'application' => $application->name,
+                'status' => 'skipped',
+                'message' => 'PR title contains [skip cd] or [skip ci]. Skipping preview deployment.',
+            ];
+        }
+
+        $deployment_uuid = new Cuid2;
+        $found = ApplicationPreview::where('application_id', $application->id)
+            ->where('pull_request_id', $context->pullRequestId)
+            ->first();
+
+        if (! $found) {
+            if ($application->build_pack === 'dockercompose') {
+                $pr_app = ApplicationPreview::create([
+                    'git_type' => 'bitbucket',
+                    'application_id' => $application->id,
+                    'pull_request_id' => $context->pullRequestId,
+                    'pull_request_html_url' => $context->pullRequestHtmlUrl,
+                    'docker_compose_domains' => $application->docker_compose_domains,
+                ]);
+                $pr_app->generate_preview_fqdn_compose();
+            } else {
+                $pr_app = ApplicationPreview::create([
+                    'git_type' => 'bitbucket',
+                    'application_id' => $application->id,
+                    'pull_request_id' => $context->pullRequestId,
+                    'pull_request_html_url' => $context->pullRequestHtmlUrl,
+                ]);
+                $pr_app->generate_preview_fqdn();
+            }
+        }
+
+        $result = queue_application_deployment(
+            application: $application,
+            pull_request_id: $context->pullRequestId,
+            deployment_uuid: $deployment_uuid,
+            force_rebuild: false,
+            commit: $context->commit,
+            is_webhook: true,
+            git_type: 'bitbucket'
+        );
+
+        if ($result['status'] === 'queue_full') {
+            throw new HttpResponseException(response($result['message'], 429)->header('Retry-After', 60));
+        }
+
+        if ($result['status'] === 'skipped') {
+            return [
+                'application' => $application->name,
+                'status' => 'skipped',
+                'message' => $result['message'],
+            ];
+        }
+
+        return [
+            'application' => $application->name,
+            'status' => 'success',
+            'message' => 'Preview deployment queued.',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function handlePreviewClose(Application $application, BitbucketWebhookContext $context): array
+    {
+        $found = ApplicationPreview::where('application_id', $application->id)
+            ->where('pull_request_id', $context->pullRequestId)
+            ->first();
+
+        if (! $found) {
+            return [
+                'application' => $application->name,
+                'status' => 'failed',
+                'message' => 'No preview deployment found.',
+            ];
+        }
+
+        CleanupPreviewDeployment::run($application, $context->pullRequestId, $found);
+
+        return [
+            'application' => $application->name,
+            'status' => 'success',
+            'message' => 'Preview deployment closed.',
+        ];
     }
 }
