@@ -240,6 +240,49 @@ describe('Bitbucket Manual Webhook HMAC', function () {
         expect($content)->not->toContain('Invalid signature');
         expect($content)->not->toContain('Webhook secret not configured');
     });
+
+    test('accepts bitbucket data center repo refs changed with valid sha256 hash', function () {
+        $app = createApplicationWithWebhook(
+            repo: '~harrison/fx-data-agents-benchmark-output',
+            branch: 'master',
+            overrides: [
+                'git_repository' => 'ssh://git@code.fineres.com:7999/~harrison/fx-data-agents-benchmark-output.git',
+            ]
+        );
+        $secret = $app->manual_webhook_secret_bitbucket;
+
+        $payload = json_encode([
+            'eventKey' => 'repo:refs_changed',
+            'repository' => [
+                'slug' => 'fx-data-agents-benchmark-output',
+                'project' => ['key' => '~HARRISON'],
+                'links' => [
+                    'clone' => [
+                        ['href' => 'ssh://git@code.fineres.com:7999/~harrison/fx-data-agents-benchmark-output.git'],
+                    ],
+                ],
+            ],
+            'changes' => [[
+                'ref' => ['displayId' => 'master'],
+                'toHash' => '2502c69be7e8570a0fb7a7e2ef1df150433c9549',
+                'type' => 'UPDATE',
+            ]],
+        ]);
+
+        $hmac = hash_hmac('sha256', $payload, $secret);
+
+        $response = $this->call('POST', '/webhooks/source/bitbucket/events/manual', [], [], [], [
+            'HTTP_X-Event-Key' => 'repo:refs_changed',
+            'HTTP_X-Hub-Signature' => "sha256={$hmac}",
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        $content = $response->getContent();
+        expect($content)->not->toContain('Invalid signature');
+        expect($content)->not->toContain('Event not handled');
+        expect($content)->not->toContain('No applications found');
+    });
 });
 
 describe('Gitea Manual Webhook HMAC', function () {
