@@ -67,4 +67,11 @@ return [
         'base_url' => env('ZITADEL_BASE_URL'),
     ],
 
+    'oidc' => [
+        'client_id' => env('OIDC_CLIENT_ID'),
+        'client_secret' => env('OIDC_CLIENT_SECRET'),
+        'redirect' => env('OIDC_REDIRECT_URI'),
+        'base_url' => env('OIDC_BASE_URL'),
+    ],
+
 ];
