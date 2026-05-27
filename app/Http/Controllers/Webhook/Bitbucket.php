@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Webhook;
 use App\Actions\Application\CleanupPreviewDeployment;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
+use App\Http\Controllers\Webhook\Concerns\ParsesBitbucketWebhookEvents;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Exception;
@@ -14,6 +15,7 @@ use Visus\Cuid2\Cuid2;
 class Bitbucket extends Controller
 {
     use DetectsSkipDeployCommits;
+    use ParsesBitbucketWebhookEvents;
 
     public function manual(Request $request)
     {
@@ -22,52 +24,58 @@ class Bitbucket extends Controller
             $payload = $request->collect();
             $headers = $request->headers->all();
             $x_bitbucket_token = data_get($headers, 'x-hub-signature.0', '');
-            $x_bitbucket_event = data_get($headers, 'x-event-key.0', '');
-            $handled_events = collect(['repo:push', 'pullrequest:updated', 'pullrequest:created', 'pullrequest:rejected', 'pullrequest:fulfilled']);
-            if (! $handled_events->contains($x_bitbucket_event)) {
+            $raw_bitbucket_event = self::bitbucketEventKey($request);
+            $x_bitbucket_event = self::normalizeBitbucketEventKey($raw_bitbucket_event);
+
+            if (! in_array($raw_bitbucket_event, self::handledBitbucketWebhookEventKeys(), true)) {
                 return response([
                     'status' => 'failed',
                     'message' => 'Nothing to do. Event not handled.',
                 ]);
             }
-            if ($x_bitbucket_event === 'repo:push') {
-                $branch = data_get($payload, 'push.changes.0.new.name');
-                $full_name = data_get($payload, 'repository.full_name');
-                $commit = data_get($payload, 'push.changes.0.new.target.hash');
-                // Bitbucket webhooks ship up to 5 commits per change. Larger pushes
-                // are evaluated only on the visible 5.
-                $skip_deploy_commits = self::shouldSkipDeploy(
-                    collect(data_get($payload, 'push.changes', []))
-                        ->flatMap(fn ($change) => data_get($change, 'commits', []))
-                        ->pluck('message')
-                        ->filter()
-                        ->values()
-                        ->all()
-                );
 
-                if (! $branch) {
+            $parsed = self::parseBitbucketWebhookPayload($payload, $raw_bitbucket_event);
+
+            if ($parsed === null) {
+                if ($raw_bitbucket_event === 'repo:refs_changed') {
                     return response([
                         'status' => 'failed',
-                        'message' => 'Nothing to do. No branch found in the request.',
+                        'message' => 'Nothing to do. Ref change is not a branch push update.',
                     ]);
                 }
+
+                return response([
+                    'status' => 'failed',
+                    'message' => 'Nothing to do. No branch found in the request.',
+                ]);
             }
-            if ($x_bitbucket_event === 'pullrequest:updated' || $x_bitbucket_event === 'pullrequest:created' || $x_bitbucket_event === 'pullrequest:rejected' || $x_bitbucket_event === 'pullrequest:fulfilled') {
-                $branch = data_get($payload, 'pullrequest.destination.branch.name');
-                $base_branch = data_get($payload, 'pullrequest.source.branch.name');
-                $full_name = data_get($payload, 'repository.full_name');
-                $pull_request_id = data_get($payload, 'pullrequest.id');
-                $pull_request_html_url = data_get($payload, 'pullrequest.links.html.href');
-                $pull_request_title = data_get($payload, 'pullrequest.title');
-                $skip_deploy_pr = self::shouldSkipDeployAny([$pull_request_title]);
-                $commit = data_get($payload, 'pullrequest.source.commit.hash');
+
+            $branch = $parsed['branch'];
+            $commit = $parsed['commit'];
+            $skip_deploy_commits = $parsed['skip_deploy_commits'];
+            $pull_request_id = $parsed['pull_request_id'];
+            $pull_request_html_url = $parsed['pull_request_html_url'];
+            $skip_deploy_pr = $parsed['skip_deploy_pr'];
+            $repository_identifiers = $parsed['repository_identifiers'];
+
+            $applicationsQuery = Application::query();
+            if (empty($repository_identifiers)) {
+                $applications = collect();
+            } else {
+                $applicationsQuery->where(function ($query) use ($repository_identifiers) {
+                    foreach ($repository_identifiers as $identifier) {
+                        $query->orWhere('git_repository', 'like', "%{$identifier}%");
+                    }
+                });
+                $applications = $applicationsQuery->where('git_branch', $branch)->get();
             }
-            $applications = Application::where('git_repository', 'like', "%$full_name%");
-            $applications = $applications->where('git_branch', $branch)->get();
+
+            $repositoryLabel = implode(', ', $repository_identifiers) ?: 'unknown';
+
             if ($applications->isEmpty()) {
                 return response([
                     'status' => 'failed',
-                    'message' => "Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.",
+                    'message' => "Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $repositoryLabel.",
                 ]);
             }
             foreach ($applications as $application) {
@@ -76,8 +84,8 @@ class Bitbucket extends Controller
                     auditLogWebhookFailure('bitbucket', 'webhook_secret_missing', [
                         'application_uuid' => $application->uuid,
                         'application_name' => $application->name,
-                        'repository' => $full_name ?? null,
-                        'event' => $x_bitbucket_event,
+                        'repository' => $repositoryLabel,
+                        'event' => $raw_bitbucket_event,
                     ]);
                     $return_payloads->push([
                         'application' => $application->name,
@@ -94,8 +102,8 @@ class Bitbucket extends Controller
                     auditLogWebhookFailure('bitbucket', 'malformed_signature', [
                         'application_uuid' => $application->uuid,
                         'application_name' => $application->name,
-                        'repository' => $full_name ?? null,
-                        'event' => $x_bitbucket_event,
+                        'repository' => $repositoryLabel,
+                        'event' => $raw_bitbucket_event,
                     ]);
                     $return_payloads->push([
                         'application' => $application->name,
@@ -111,8 +119,8 @@ class Bitbucket extends Controller
                     auditLogWebhookFailure('bitbucket', 'invalid_signature', [
                         'application_uuid' => $application->uuid,
                         'application_name' => $application->name,
-                        'repository' => $full_name ?? null,
-                        'event' => $x_bitbucket_event,
+                        'repository' => $repositoryLabel,
+                        'event' => $raw_bitbucket_event,
                     ]);
                     $return_payloads->push([
                         'application' => $application->name,
@@ -134,7 +142,7 @@ class Bitbucket extends Controller
                 }
                 if ($x_bitbucket_event === 'repo:push') {
                     if ($application->isDeployable()) {
-                        if ($skip_deploy_commits ?? false) {
+                        if ($skip_deploy_commits) {
                             $return_payloads->push([
                                 'application' => $application->name,
                                 'status' => 'skipped',
@@ -169,7 +177,7 @@ class Bitbucket extends Controller
                                 'application_name' => $application->name,
                                 'deployment_uuid' => $deployment_uuid->toString(),
                                 'commit' => $commit,
-                                'repository' => $full_name ?? null,
+                                'repository' => $repositoryLabel,
                             ]);
                             $return_payloads->push([
                                 'application' => $application->name,
@@ -187,7 +195,7 @@ class Bitbucket extends Controller
                 }
                 if ($x_bitbucket_event === 'pullrequest:created' || $x_bitbucket_event === 'pullrequest:updated') {
                     if ($application->isPRDeployable()) {
-                        if ($skip_deploy_pr ?? false) {
+                        if ($skip_deploy_pr) {
                             $return_payloads->push([
                                 'application' => $application->name,
                                 'status' => 'skipped',
