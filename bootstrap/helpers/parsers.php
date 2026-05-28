@@ -403,6 +403,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     }
 
     $parsedServices = collect([]);
+    $detectedDatabases = collect([]);
 
     $allMagicEnvironments = collect([]);
     foreach ($services as $serviceName => $service) {
@@ -1445,6 +1446,24 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         }
 
         $parsedServices->put($serviceName, $payload);
+        if (isset($isDatabase) && $isDatabase) {
+            $detectedDatabases->put($serviceName, $service);
+        }
+    }
+    if ($isPullRequest) {
+        $resourceToSync = $preview_id ? $resource->previews()->find($preview_id) : $resource->previews()->where('pull_request_id', $pullRequestId)->first();
+        if (! $resourceToSync) {
+            \Illuminate\Support\Facades\Log::warning('Preview not found for application parsing', [
+                'application_id' => $resource->id,
+                'pull_request_id' => $pullRequestId,
+                'preview_id' => $preview_id,
+            ]);
+        }
+    } else {
+        $resourceToSync = $resource;
+    }
+    if ($resourceToSync) {
+        updateResourceDatabases($resourceToSync, $detectedDatabases);
     }
     $topLevel->put('services', $parsedServices);
 

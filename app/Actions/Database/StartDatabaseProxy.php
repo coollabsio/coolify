@@ -36,9 +36,25 @@ class StartDatabaseProxy
 
         if ($database->getMorphClass() === ServiceDatabase::class) {
             $databaseType = $database->databaseType();
-            $network = $database->service->uuid;
-            $server = data_get($database, 'service.destination.server');
-            $containerName = "{$database->name}-{$database->service->uuid}";
+            $containerName = resolveServiceDatabaseContainer($database);
+            if ($database->service_id) {
+                $service = $database->service;
+                $network = $service?->uuid;
+                $server = data_get($service, 'destination.server');
+            } elseif ($database->application_id) {
+                $application = $database->application;
+                $network = data_get($application, 'destination.network');
+                $server = data_get($application, 'destination.server');
+            } elseif ($database->application_preview_id) {
+                $preview = $database->application_preview;
+                $application = $preview?->application;
+                $network = data_get($application, 'destination.network');
+                $server = data_get($application, 'destination.server');
+            }
+
+            if (! $server || ! $network || ! $containerName) {
+                throw new \RuntimeException("Unable to resolve proxy target for database {$database->name}.");
+            }
         }
         $internalPort = match ($databaseType) {
             'standalone-mariadb', 'standalone-mysql' => 3306,

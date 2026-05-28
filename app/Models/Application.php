@@ -345,6 +345,7 @@ class Application extends BaseModel
             }
         });
         static::forceDeleting(function ($application) {
+            $application->databases()->get()->each->delete();
             $application->update(['fqdn' => null]);
             $application->settings()->delete();
             $application->persistentStorages()->delete();
@@ -2348,5 +2349,10 @@ class Application extends BaseModel
         } catch (\Exception $e) {
             throw new \Exception('Failed to update application settings');
         }
+    }
+
+    public function databases(): HasMany
+    {
+        return $this->hasMany(ServiceDatabase::class);
     }
 }

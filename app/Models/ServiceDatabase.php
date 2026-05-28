@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Symfony\Component\Yaml\Yaml;
 
 class ServiceDatabase extends BaseModel
 {
@@ -11,6 +13,8 @@ class ServiceDatabase extends BaseModel
 
     protected $fillable = [
         'service_id',
+        'application_id',
+        'application_preview_id',
         'name',
         'human_name',
         'description',
@@ -44,6 +48,16 @@ class ServiceDatabase extends BaseModel
             $service->scheduledBackups()->delete();
         });
         static::saving(function ($service) {
+            $ownerCount = collect([
+                $service->service_id,
+                $service->application_id,
+                $service->application_preview_id,
+            ])->filter(fn ($id) => filled($id))->count();
+
+            if ($ownerCount !== 1) {
+                throw new \InvalidArgumentException('ServiceDatabase must have exactly one owner.');
+            }
+
             if ($service->isDirty('status')) {
                 $service->last_online_at = now();
             }
@@ -52,21 +66,24 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application_preview.application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
-    /**
-     * Get query builder for service databases owned by current team.
-     * If you need all service databases without further query chaining, use ownedByCurrentTeamCached() instead.
-     */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        $teamId = currentTeam()->id;
+
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application_preview.application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
-    /**
-     * Get all service databases owned by current team (cached for request duration).
-     */
     public static function ownedByCurrentTeamCached()
     {
         return once(function () {
@@ -76,9 +93,31 @@ class ServiceDatabase extends BaseModel
 
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        $container_id = resolveServiceDatabaseContainer($this);
+        $server = $this->server;
+
+        if ($container_id && $server) {
+            remote_process(["docker restart {$container_id}"], $server);
+        }
     }
+
+
+
+    public function getServerAttribute(): ?Server
+    {
+        if ($this->service_id) {
+            return data_get($this, 'service.server');
+        }
+        if ($this->application_id) {
+            return data_get($this, 'application.destination.server');
+        }
+        if ($this->application_preview_id) {
+            return data_get($this, 'application_preview.application.destination.server');
+        }
+
+        return null;
+    }
+
 
     public function isRunning()
     {
@@ -136,30 +175,69 @@ class ServiceDatabase extends BaseModel
         return "standalone-$finalImage";
     }
 
-    public function getServiceDatabaseUrl()
+    public function getServiceDatabaseUrl(): ?string
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = null;
+        if ($this->service_id) {
+            $server = $this->service->server;
+        } elseif ($this->application_id) {
+            $server = $this->application->destination->server;
+        } elseif ($this->application_preview_id) {
+            $server = $this->application_preview->application->destination->server;
+        }
+
+        if (! $server) {
+            return null;
+        }
+
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
         return "{$realIp}:{$port}";
     }
 
-    public function team()
+    public function team(): ?Team
     {
-        return data_get($this, 'service.environment.project.team');
+        if ($this->service_id) {
+            return data_get($this, 'service.environment.project.team');
+        } elseif ($this->application_id) {
+            return data_get($this, 'application.environment.project.team');
+        } elseif ($this->application_preview_id) {
+            return data_get($this, 'application_preview.application.environment.project.team');
+        }
+
+        return null;
     }
 
-    public function workdir()
+    public function workdir(): ?string
     {
-        return service_configuration_dir()."/{$this->service->uuid}";
+        if ($this->service_id) {
+            return service_configuration_dir()."/{$this->service->uuid}";
+        } elseif ($this->application_id) {
+            return application_configuration_dir()."/{$this->application->uuid}";
+        } elseif ($this->application_preview_id) {
+            return application_configuration_dir()."/{$this->application_preview->application->uuid}";
+        }
+
+        return null;
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application(): BelongsTo
+    {
+        return $this->belongsTo(Application::class);
+    }
+
+    public function application_preview(): BelongsTo
+    {
+        return $this->belongsTo(ApplicationPreview::class);
     }
 
     public function persistentStorages()

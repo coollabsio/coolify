@@ -2660,7 +2660,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         $topLevelConfigs = collect(data_get($yaml, 'configs', []));
         $topLevelSecrets = collect(data_get($yaml, 'secrets', []));
         $services = data_get($yaml, 'services');
-
+        $detectedDatabases = collect([]);
         $generatedServiceFQDNS = collect([]);
         if (is_null($resource->destination)) {
             $destination = $server->destinations()->first();
@@ -2673,7 +2673,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
         }
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id, $detectedDatabases) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -2976,6 +2976,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $image = data_get_str($service, 'image');
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
+            if ($isDatabase) {
+                $detectedDatabases->put($serviceName, $service);
+            }
 
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
@@ -3372,6 +3375,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         data_forget($resource, 'environment_variables');
         data_forget($resource, 'environment_variables_preview');
         $resource->save();
+
+        if ($pull_request_id !== 0) {
+            $resourceToSync = ApplicationPreview::where('application_id', $resource->id)
+                ->where('pull_request_id', $pull_request_id)
+                ->first();
+        } else {
+            $resourceToSync = $resource;
+        }
+        if ($resourceToSync) {
+            updateResourceDatabases($resourceToSync, $detectedDatabases);
+        }
 
         return collect($finalServices);
     }
@@ -3981,6 +3995,55 @@ function verifyPasswordConfirmation(mixed $password, ?Component $component = nul
     }
 
     return true;
+}
+
+/**
+ * Convert a path from the SSH target perspective to the Docker host perspective.
+ *
+ * In dev mode, SSH commands run in coolify-testing-host where the volume is mounted
+ * at /data/coolify, but Docker Compose runs on the host where the same volume is at
+ * /var/lib/docker/volumes/coolify_dev_coolify_data/_data.
+ */
+function convertPathToDockerHost(string $path): string
+{
+    if (isDev()) {
+        static $volumePath = null;
+        if ($volumePath === null) {
+            $volumePath = discoverDevCoolifyVolumePath();
+        }
+
+        return str_replace('/data/coolify', $volumePath, $path);
+    }
+
+    return $path;
+}
+
+function discoverDevCoolifyVolumePath(): string
+{
+    $fallback = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data';
+
+    try {
+        $server = \App\Models\Server::find(0);
+        if ($server) {
+            $output = instant_remote_process(
+                ["cat /proc/self/mountinfo | grep '/data/coolify ' | head -1"],
+                $server,
+                false,
+                false,
+                10,
+                disableMultiplexing: true
+            );
+            if (preg_match('#(/var/lib/docker/volumes/[^/]+_dev_coolify_data/_data)\s+/data/coolify#', $output, $matches)) {
+                return $matches[1];
+            }
+            if (preg_match('#/docker/volumes/([^/]+_dev_coolify_data)/_data\s+/data/coolify#', $output, $matches)) {
+                return '/var/lib/docker/volumes/'.$matches[1].'/_data';
+            }
+        }
+    } catch (Throwable $e) {
+    }
+
+    return $fallback;
 }
 
 /**

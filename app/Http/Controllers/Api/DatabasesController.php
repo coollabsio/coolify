@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Database\PgBackrestRestore;
 use App\Actions\Database\RestartDatabase;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StartDatabaseProxy;
@@ -11,12 +12,14 @@ use App\Enums\NewDatabaseTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DeleteResourceJob;
+use App\Models\DatabaseRestore;
 use App\Models\EnvironmentVariable;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Support\ValidationPatterns;
@@ -651,6 +654,12 @@ class DatabasesController extends Controller
                         'database_backup_retention_amount_s3' => ['type' => 'integer', 'description' => 'Number of backups to retain in S3'],
                         'database_backup_retention_days_s3' => ['type' => 'integer', 'description' => 'Number of days to retain backups in S3'],
                         'database_backup_retention_max_storage_s3' => ['type' => 'number', 'description' => 'Max storage (GB) for S3 backups'],
+                        'engine' => ['type' => 'string', 'description' => 'Backup engine: native (pg_dump) or pgbackrest (PostgreSQL only)', 'enum' => ['native', 'pgbackrest'], 'default' => 'native'],
+                        'pgbackrest_backup_type' => ['type' => 'string', 'description' => 'pgBackRest backup type', 'enum' => ['full', 'diff', 'incr']],
+                        'pgbackrest_compress_type' => ['type' => 'string', 'description' => 'pgBackRest compression type', 'enum' => ['lz4', 'gzip', 'zstd', 'none']],
+                        'pgbackrest_compress_level' => ['type' => 'integer', 'description' => 'pgBackRest compression level (0-9)'],
+                        'pgbackrest_log_level' => ['type' => 'string', 'description' => 'pgBackRest log level', 'enum' => ['off', 'error', 'warn', 'info', 'detail', 'debug', 'trace']],
+                        'pgbackrest_archive_mode' => ['type' => 'string', 'description' => 'pgBackRest archive mode for WAL archiving', 'enum' => ['standard', 'reduced', 'minimal']],
                         'timeout' => ['type' => 'integer', 'description' => 'Backup job timeout in seconds (min: 60, max: 36000)', 'default' => 3600],
                     ],
                 ),
@@ -688,7 +697,7 @@ class DatabasesController extends Controller
     )]
     public function create_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout'];
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'engine', 'pgbackrest_backup_type', 'pgbackrest_compress_type', 'pgbackrest_compress_level', 'pgbackrest_log_level', 'pgbackrest_archive_mode', 'timeout'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -715,6 +724,12 @@ class DatabasesController extends Controller
             'database_backup_retention_amount_s3' => 'integer|min:0',
             'database_backup_retention_days_s3' => 'integer|min:0',
             'database_backup_retention_max_storage_s3' => 'numeric|min:0',
+            'engine' => 'string|in:native,pgbackrest|nullable',
+            'pgbackrest_backup_type' => 'string|in:full,diff,incr|nullable',
+            'pgbackrest_compress_type' => 'string|in:lz4,gzip,zstd,none|nullable',
+            'pgbackrest_compress_level' => 'integer|min:0|max:9|nullable',
+            'pgbackrest_log_level' => 'string|in:off,error,warn,info,detail,debug,trace|nullable',
+            'pgbackrest_archive_mode' => 'string|in:standard,reduced,minimal|nullable',
             'timeout' => 'integer|min:60|max:36000',
         ]);
 
@@ -736,6 +751,14 @@ class DatabasesController extends Controller
         }
 
         $this->authorize('manageBackups', $database);
+
+        // Validate pgBackRest can only be used with PostgreSQL
+        if ($request->input('engine') === 'pgbackrest' && $database->type() !== 'standalone-postgresql') {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['engine' => ['pgBackRest engine is only supported for PostgreSQL databases.']],
+            ], 422);
+        }
 
         // Validate frequency is a valid cron expression
         $isValid = validate_cron_expression($request->frequency);
@@ -899,6 +922,12 @@ class DatabasesController extends Controller
                         'database_backup_retention_amount_s3' => ['type' => 'integer', 'description' => 'Retention amount of the backup in s3'],
                         'database_backup_retention_days_s3' => ['type' => 'integer', 'description' => 'Retention days of the backup in s3'],
                         'database_backup_retention_max_storage_s3' => ['type' => 'number', 'description' => 'Max storage of the backup in S3'],
+                        'engine' => ['type' => 'string', 'description' => 'Backup engine: native (pg_dump) or pgbackrest (PostgreSQL only)', 'enum' => ['native', 'pgbackrest']],
+                        'pgbackrest_backup_type' => ['type' => 'string', 'description' => 'pgBackRest backup type', 'enum' => ['full', 'diff', 'incr']],
+                        'pgbackrest_compress_type' => ['type' => 'string', 'description' => 'pgBackRest compression type', 'enum' => ['lz4', 'gzip', 'zstd', 'none']],
+                        'pgbackrest_compress_level' => ['type' => 'integer', 'description' => 'pgBackRest compression level (0-9)'],
+                        'pgbackrest_log_level' => ['type' => 'string', 'description' => 'pgBackRest log level', 'enum' => ['off', 'error', 'warn', 'info', 'detail', 'debug', 'trace']],
+                        'pgbackrest_archive_mode' => ['type' => 'string', 'description' => 'pgBackRest archive mode for WAL archiving', 'enum' => ['standard', 'reduced', 'minimal']],
                         'timeout' => ['type' => 'integer', 'description' => 'Backup job timeout in seconds (min: 60, max: 36000)', 'default' => 3600],
                     ],
                 ),
@@ -929,7 +958,7 @@ class DatabasesController extends Controller
     )]
     public function update_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout'];
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'engine', 'pgbackrest_backup_type', 'pgbackrest_compress_type', 'pgbackrest_compress_level', 'pgbackrest_log_level', 'pgbackrest_archive_mode', 'timeout'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -954,6 +983,12 @@ class DatabasesController extends Controller
             'database_backup_retention_amount_s3' => 'integer|min:0',
             'database_backup_retention_days_s3' => 'integer|min:0',
             'database_backup_retention_max_storage_s3' => 'numeric|min:0',
+            'engine' => 'string|in:native,pgbackrest|nullable',
+            'pgbackrest_backup_type' => 'string|in:full,diff,incr|nullable',
+            'pgbackrest_compress_type' => 'string|in:lz4,gzip,zstd,none|nullable',
+            'pgbackrest_compress_level' => 'integer|min:0|max:9|nullable',
+            'pgbackrest_log_level' => 'string|in:off,error,warn,info,detail,debug,trace|nullable',
+            'pgbackrest_archive_mode' => 'string|in:standard,reduced,minimal|nullable',
             'timeout' => 'integer|min:60|max:36000',
         ]);
         if ($validator->fails()) {
@@ -980,6 +1015,14 @@ class DatabasesController extends Controller
         }
 
         $this->authorize('update', $database);
+
+        // Validate pgBackRest can only be used with PostgreSQL
+        if ($request->input('engine') === 'pgbackrest' && $database->type() !== 'standalone-postgresql') {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['engine' => ['pgBackRest engine is only supported for PostgreSQL databases.']],
+            ], 422);
+        }
 
         // Validate frequency is a valid cron expression
         if ($request->filled('frequency')) {

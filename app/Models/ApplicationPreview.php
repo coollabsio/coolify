@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\ValidationPatterns;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
@@ -32,6 +33,7 @@ class ApplicationPreview extends BaseModel
     protected static function booted()
     {
         static::forceDeleting(function ($preview) {
+            $preview->databases()->get()->each->delete();
             $server = $preview->application->destination->server;
             $application = $preview->application;
 
@@ -201,5 +203,10 @@ class ApplicationPreview extends BaseModel
         $this->fqdn = ! empty($allDomains) ? $allDomains : null;
 
         $this->save();
+    }
+
+    public function databases(): HasMany
+    {
+        return $this->hasMany(ServiceDatabase::class);
     }
 }

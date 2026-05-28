@@ -331,18 +331,22 @@ class ResourceOperations extends Component
                     $newPersistentVolume->save();
 
                     if ($this->cloneVolumeData) {
-                        try {
-                            StopService::dispatch($database->service);
-                            $sourceVolume = $volume->name;
-                            $targetVolume = $newPersistentVolume->name;
-                            $sourceServer = $database->service->destination->server;
-                            $targetServer = $new_resource->destination->server;
+                        if ($database->service_id) {
+                            try {
+                                StopService::dispatch($database->service);
+                                $sourceVolume = $volume->name;
+                                $targetVolume = $newPersistentVolume->name;
+                                $sourceServer = $database->service->destination->server;
+                                $targetServer = $new_resource->destination->server;
 
-                            VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
+                                VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
-                            StartService::dispatch($database->service);
-                        } catch (\Exception $e) {
-                            \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                                StartService::dispatch($database->service);
+                            } catch (\Exception $e) {
+                                \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                            }
+                        } else {
+                            \Log::warning('Volume cloning skipped for application-owned database', ['database' => $database->name]);
                         }
                     }
                 }
