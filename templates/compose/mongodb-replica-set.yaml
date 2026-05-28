@@ -1,0 +1,49 @@
+# documentation: https://www.mongodb.com/docs/manual/replication/
+# slogan: MongoDB deployed as a single-node replica set, unlocking transactions, change streams and the same API as a standalone instance with one-click setup.
+# category: databases
+# tags: mongodb, database, nosql, replica-set, transactions
+# logo: svgs/mongodb.svg
+# port: 27017
+
+services:
+  mongodb:
+    image: mongo:7
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${SERVICE_USER_MONGODB}
+      - MONGO_INITDB_ROOT_PASSWORD=${SERVICE_PASSWORD_MONGODB}
+      - MONGO_REPLICA_SET_NAME=${MONGO_REPLICA_SET_NAME:-rs0}
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-default}
+    volumes:
+      - mongodb-data:/data/db
+      - mongodb-config:/data/configdb
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -e
+        KEYFILE=/data/configdb/keyfile
+        if [ ! -f "$$KEYFILE" ]; then
+          openssl rand -base64 756 > "$$KEYFILE"
+          chmod 400 "$$KEYFILE"
+          chown 999:999 "$$KEYFILE"
+        fi
+        exec docker-entrypoint.sh mongod --replSet "$${MONGO_REPLICA_SET_NAME:-rs0}" --keyFile "$$KEYFILE" --bind_ip_all
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - |
+          mongosh --quiet -u "$${MONGO_INITDB_ROOT_USERNAME}" -p "$${MONGO_INITDB_ROOT_PASSWORD}" --eval '
+            try { if (rs.status().ok === 1) { quit(0) } }
+            catch (e) {
+              rs.initiate({_id: "'"$${MONGO_REPLICA_SET_NAME:-rs0}"'", members: [{_id: 0, host: "localhost:27017"}]});
+            }
+            quit(0)
+          '
+      interval: 10s
+      timeout: 30s
+      retries: 15
+      start_period: 20s
+
+volumes:
+  mongodb-data:
+  mongodb-config:
