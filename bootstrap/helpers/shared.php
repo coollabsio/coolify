@@ -2682,6 +2682,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $serviceLabels = collect(data_get($service, 'labels', []));
             $serviceBuildVariables = collect(data_get($service, 'build.args', []));
             $serviceVariables = $serviceVariables->merge($serviceBuildVariables);
+            $predefinedPort = getServiceProxyTargetPort($service);
             if ($serviceLabels->count() > 0) {
                 $removedLabels = collect([]);
                 $serviceLabels = $serviceLabels->filter(function ($serviceLabel, $serviceLabelName) use ($removedLabels) {
@@ -3269,6 +3270,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                            predefinedPort: $predefinedPort,
                                         )
                                     );
                                     break;
@@ -3283,6 +3285,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                            predefinedPort: $predefinedPort,
                                         )
                                     );
                                     break;
@@ -3298,6 +3301,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                    predefinedPort: $predefinedPort,
                                 )
                             );
                             $serviceLabels = $serviceLabels->merge(
@@ -3310,6 +3314,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                    predefinedPort: $predefinedPort,
                                 )
                             );
                         }
