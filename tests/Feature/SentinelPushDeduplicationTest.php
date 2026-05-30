@@ -138,6 +138,16 @@ it('dispatches the job when container state changes', function () use ($running)
     Queue::assertPushed(PushServerUpdateJob::class, 2);
 });
 
+it('ignores health status changes while container lifecycle state is unchanged', function () {
+    $healthy = [['name' => 'app-1', 'state' => 'running', 'health_status' => 'healthy']];
+    $unhealthy = [['name' => 'app-1', 'state' => 'running', 'health_status' => 'unhealthy']];
+
+    pushSentinel($this->token, sentinelPayload($healthy))->assertOk();
+    pushSentinel($this->token, sentinelPayload($unhealthy))->assertOk();
+
+    Queue::assertPushed(PushServerUpdateJob::class, 1);
+});
+
 it('ignores disk percentage changes (excluded from the hash)', function () use ($running) {
     pushSentinel($this->token, sentinelPayload($running(), diskPercentage: 42.0))->assertOk();
     pushSentinel($this->token, sentinelPayload($running(), diskPercentage: 88.0))->assertOk();

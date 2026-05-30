@@ -41,7 +41,7 @@
                     instantSave id="isPreviewDeploymentsEnabled" label="Preview Deployments" canGate="update"
                     :canResource="$application" />
                 <x-forms.checkbox
-                    helper="When enabled, anyone can trigger PR deployments. When disabled, only repository members, collaborators, and contributors can trigger PR deployments."
+                    helper="When enabled, anyone can trigger PR deployments. When disabled, fork PRs are blocked and only repository owners, members, and collaborators can trigger PR deployments."
                     instantSave id="isPrDeploymentsPublicEnabled" label="Allow Public PR Deployments" canGate="update"
                     :canResource="$application" :disabled="!$isPreviewDeploymentsEnabled" />
 
