@@ -1,0 +1,42 @@
+# documentation: https://github.com/MendyLanda/cut#-coolify
+# slogan: A tiny, self-hosted URL shortener — short links that are entirely yours.
+# category: productivity
+# tags: url-shortener,links,redis,self-hosted
+# logo: svgs/cut.svg
+# port: 3000
+
+services:
+  cut:
+    image: ghcr.io/mendylanda/cut:latest
+    environment:
+      # Coolify generates the public FQDN and routes it to port 3000. Cut reads
+      # the request host at runtime, so no base-URL variable is needed.
+      - SERVICE_FQDN_CUT_3000
+      # Coolify generates a strong admin password; view or change it in the UI.
+      - ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      # Bundled Redis below (private to the stack, never exposed).
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    # appendonly = durable across restarts; noeviction because this is Cut's
+    # primary datastore, not a cache (don't drop links under memory pressure).
+    command: redis-server --appendonly yes --maxmemory-policy noeviction
+    volumes:
+      - cut-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  cut-redis-data:
