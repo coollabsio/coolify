@@ -7,7 +7,7 @@
 
 services:
   hermes-agent:
-    image: nousresearch/hermes-agent:sha-273ff5c4a47af4499bbe5e3b1139efd313995554
+    image: nousresearch/hermes-agent:v2026.5.29.2
     command: gateway run
     environment:
       - HERMES_HOME=/home/hermes/.hermes
