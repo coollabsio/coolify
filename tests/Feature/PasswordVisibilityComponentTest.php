@@ -53,3 +53,31 @@ it('resets password visibility on success event for env-var-input', function () 
         ->toContain("x-on:click=\"type = type === 'password' ? 'text' : 'password'\"")
         ->toContain('x-bind:type="type"');
 });
+
+it('renders password field before toggle button for keyboard navigation', function (string $component, array $fieldsBeforeToggle) {
+    $html = Blade::render($component);
+
+    $togglePosition = strpos($html, 'aria-label="Toggle password visibility"');
+
+    expect($togglePosition)->not->toBeFalse();
+
+    foreach ($fieldsBeforeToggle as $fieldMarker) {
+        $fieldPosition = strpos($html, $fieldMarker);
+
+        expect($fieldPosition)->not->toBeFalse()
+            ->and($fieldPosition)->toBeLessThan($togglePosition);
+    }
+})->with([
+    'forms.input' => [
+        '<x-forms.input type="password" id="secret" />',
+        ['<input'],
+    ],
+    'forms.textarea' => [
+        '<x-forms.textarea type="password" id="secret" />',
+        ['<input', '<textarea'],
+    ],
+    'forms.env-var-input' => [
+        '<x-forms.env-var-input type="password" id="secret" />',
+        ['<input'],
+    ],
+]);
