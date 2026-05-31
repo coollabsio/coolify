@@ -1,0 +1,10 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cut logo">
+  <rect width="64" height="64" rx="16" fill="#059669"/>
+  <g transform="translate(14 14) scale(1.5)" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="6" cy="6" r="3"/>
+    <path d="M8.12 8.12 12 12"/>
+    <path d="M20 4 8.12 15.88"/>
+    <circle cx="6" cy="18" r="3"/>
+    <path d="M14.8 14.8 20 20"/>
+  </g>
+</svg>
