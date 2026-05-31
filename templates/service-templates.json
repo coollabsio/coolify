@@ -3684,6 +3684,23 @@
         "minversion": "0.0.0",
         "port": "80"
     },
+    "payloadcms": {
+        "documentation": "https://payloadcms.com/docs/production/deployment#docker?utm_source=coolify.io",
+        "slogan": "The open-source, Next.js, headless CMS.",
+        "compose": "c2VydmljZXM6CiAgcGF5bG9hZDoKICAgIGltYWdlOiAncGF5bG9hZGNtcy9wYXlsb2FkOmxhdGVzdCcKICAgIHJlc3RhcnQ6IHVubGVzcy1zdG9wcGVkCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fUEFZTE9BRF8zMDAwCiAgICAgIC0gJ1BBWUxPQURfU0VDUkVUPSR7U0VSVklDRV9QQVNTV09SRF82NF9QQVlMT0FEfScKICAgICAgLSAnREFUQUJBU0VfVVJJPXBvc3RncmVzOi8vJHtTRVJWSUNFX1VTRVJfUE9TVEdSRVN9OiR7U0VSVklDRV9QQVNTV09SRF9QT1NUR1JFU31AcG9zdGdyZXM6NTQzMi8ke1BPU1RHUkVTX0RCOi1wYXlsb2FkfScKICAgICAgLSAnUEFZTE9BRF9QVUJMSUNfU0VSVkVSX1VSTD0ke1NFUlZJQ0VfRlFETl9QQVlMT0FEfScKICAgIGRlcGVuZHNfb246CiAgICAgIHBvc3RncmVzOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgcG9zdGdyZXM6CiAgICBpbWFnZTogJ3Bvc3RncmVzOjE2LWFscGluZScKICAgIHJlc3RhcnQ6IHVubGVzcy1zdG9wcGVkCiAgICB2b2x1bWVzOgogICAgICAtICdwYXlsb2FkLXBvc3RncmVzLWRhdGE6L3Zhci9saWIvcG9zdGdyZXNxbC9kYXRhJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ1BPU1RHUkVTX1VTRVI9JHtTRVJWSUNFX1VTRVJfUE9TVEdSRVN9JwogICAgICAtICdQT1NUR1JFU19QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVN9JwogICAgICAtICdQT1NUR1JFU19EQj0ke1BPU1RHUkVTX0RCOi1wYXlsb2FkfScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAncGdfaXNyZWFkeSAtZCAkJHtQT1NUR1JFU19EQn0gLVUgJCR7UE9TVEdSRVNfVVNFUn0nCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
+        "tags": [
+            "cms",
+            "payload",
+            "nextjs",
+            "headless",
+            "api",
+            "payloadcms"
+        ],
+        "category": "cms",
+        "logo": "svgs/payloadcms.svg",
+        "minversion": "0.0.0",
+        "port": "3000"
+    },
     "paymenter": {
         "documentation": "https://paymenter.org/docs/guides/docker?utm_source=coolify.io",
         "slogan": "Open-Source Billing, Built for Hosting",
@@ -4658,6 +4675,25 @@
         "logo": "svgs/sure.png",
         "minversion": "0.0.0",
         "port": "3000"
+    },
+    "surrealdb": {
+        "documentation": "https://surrealdb.com/docs/surrealdb/installation/running/docker?utm_source=coolify.io",
+        "slogan": "A multi-model database for modern applications.",
+        "compose": "c2VydmljZXM6CiAgc3VycmVhbGRiOgogICAgaW1hZ2U6ICdzdXJyZWFsZGIvc3VycmVhbGRiOmxhdGVzdCcKICAgIHJlc3RhcnQ6IHVubGVzcy1zdG9wcGVkCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnU1VSUkVBTF9VU0VSPSR7U1VSUkVBTF9VU0VSOi1yb290fScKICAgICAgLSAnU1VSUkVBTF9QQVNTPSR7U0VSVklDRV9QQVNTV09SRF9TVVJSRUFMREJ9JwogICAgY29tbWFuZDogJ3N0YXJ0IC0tdXNlciAke1NVUlJFQUxfVVNFUjotcm9vdH0gLS1wYXNzICR7U0VSVklDRV9QQVNTV09SRF9TVVJSRUFMREJ9IHJvY2tzZGI6L2RhdGEvZGF0YWJhc2UuZGInCiAgICB2b2x1bWVzOgogICAgICAtICdzdXJyZWFsZGItZGF0YTovZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBzdXJyZWFsCiAgICAgICAgLSBpc3JlYWR5CiAgICAgICAgLSAnLS1lbmRwb2ludCcKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjgwMDAnCiAgICAgIGludGVydmFsOiAxMHMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogNQo=",
+        "tags": [
+            "surrealdb",
+            "surreal",
+            "database",
+            "multi-model",
+            "graph",
+            "realtime",
+            "rocksdb",
+            "tikv"
+        ],
+        "category": "database",
+        "logo": "svgs/surrealdb.svg",
+        "minversion": "0.0.0",
+        "port": "8000"
     },
     "swetrix": {
         "documentation": "https://docs.swetrix.com/selfhosting/how-to?utm_source=coolify.io",
