@@ -47,6 +47,7 @@ class User extends Authenticatable implements SendsEmail
         'name',
         'email',
         'password',
+        'oauth_provider',
         'force_password_reset',
         'marketing_emails',
         'pending_email',
