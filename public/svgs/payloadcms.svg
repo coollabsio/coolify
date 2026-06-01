@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect width="128" height="128" rx="24" fill="#000000"/>
+  <text x="64" y="78" font-family="Arial,sans-serif" font-size="36" font-weight="bold" fill="white" text-anchor="middle">P</text>
+  <text x="64" y="108" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#AAAAAA" text-anchor="middle">CMS</text>
+</svg>
