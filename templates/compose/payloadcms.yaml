@@ -1,0 +1,33 @@
+# documentation: https://payloadcms.com/docs/production/deployment#docker
+# slogan: The open-source, Next.js, headless CMS.
+# category: cms
+# tags: cms,payload,nextjs,headless,api,payloadcms
+# logo: svgs/payloadcms.svg
+# port: 3000
+
+services:
+  payload:
+    image: payloadcms/payload:latest
+    restart: unless-stopped
+    environment:
+      - SERVICE_URL_PAYLOAD_3000
+      - PAYLOAD_SECRET=${SERVICE_PASSWORD_64_PAYLOAD}
+      - DATABASE_URI=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-payload}
+      - PAYLOAD_PUBLIC_SERVER_URL=${SERVICE_URL_PAYLOAD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    volumes:
+      - payload-postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-payload}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
