@@ -69,7 +69,7 @@ class SshMultiplexingHelper
         return $scpCommand.escapeshellarg($source).' '.self::escapedUserAtHost($server).':'.escapeshellarg($dest);
     }
 
-    public static function generateSshCommand(Server $server, string $command, bool $disableMultiplexing = false): string
+    public static function generateSshCommand(Server $server, string $command, bool $disableMultiplexing = false, ?int $commandTimeout = null): string
     {
         if ($server->settings->force_disabled) {
             throw new \RuntimeException('Server is disabled.');
@@ -80,7 +80,8 @@ class SshMultiplexingHelper
 
         self::validateSshKey($server->privateKey);
 
-        $sshCommand = 'timeout '.config('constants.ssh.command_timeout').' ssh ';
+        $commandTimeout = $commandTimeout ?? (int) config('constants.ssh.command_timeout');
+        $sshCommand = $commandTimeout > 0 ? "timeout {$commandTimeout} ssh " : 'ssh ';
 
         if (! $disableMultiplexing && self::isMultiplexingEnabled()) {
             $sshCommand .= self::multiplexingOptions($server);

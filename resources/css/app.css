@@ -53,6 +53,13 @@
   If we ever want to remove these styles, we need to add an explicit border
   color utility to any element that depends on these defaults.
 */
+
+@layer components {
+    .terminal-mobile-key {
+        @apply min-h-10 rounded-md border border-white/10 bg-white/10 px-2 py-2 text-sm font-semibold text-white shadow-inner active:bg-white/25;
+    }
+}
+
 @layer base {
 
     *,

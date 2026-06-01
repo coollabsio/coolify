@@ -35,6 +35,7 @@ return [
         'protocol' => env('TERMINAL_PROTOCOL'),
         'host' => env('TERMINAL_HOST'),
         'port' => env('TERMINAL_PORT'),
+        'command_timeout' => 0,
     ],
 
     'pusher' => [

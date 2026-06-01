@@ -73,6 +73,19 @@ it('adds native openssh multiplexing options to ssh commands', function () {
     Process::assertNothingRan();
 });
 
+it('can generate terminal ssh commands without a hard command timeout', function () {
+    config(['constants.ssh.mux_enabled' => true]);
+    $server = makeMuxServer();
+    Storage::disk('ssh-keys')->put("ssh_key@{$server->privateKey->uuid}", $server->privateKey->private_key);
+
+    $command = SshMultiplexingHelper::generateSshCommand($server, 'echo ok', commandTimeout: 0);
+
+    expect($command)
+        ->toStartWith('ssh ')
+        ->not->toStartWith('timeout ')
+        ->not->toContain('timeout 3600 ssh');
+});
+
 it('omits native multiplexing options when ssh multiplexing is disabled for a command', function () {
     config(['constants.ssh.mux_enabled' => true]);
     $server = makeMuxServer();
