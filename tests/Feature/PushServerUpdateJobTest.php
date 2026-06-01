@@ -4,17 +4,21 @@ use App\Jobs\PushServerUpdateJob;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 test('containers with empty service subId are skipped', function () {
-    $server = Server::factory()->create();
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
     $service = Service::factory()->create([
         'server_id' => $server->id,
     ]);
-    $serviceApp = ServiceApplication::factory()->create([
+    $serviceApp = ServiceApplication::create([
         'service_id' => $service->id,
+        'uuid' => (string) str()->uuid(),
+        'name' => 'app-'.str()->random(8),
     ]);
 
     $data = [
@@ -44,12 +48,15 @@ test('containers with empty service subId are skipped', function () {
 });
 
 test('containers with valid service subId are processed', function () {
-    $server = Server::factory()->create();
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
     $service = Service::factory()->create([
         'server_id' => $server->id,
     ]);
-    $serviceApp = ServiceApplication::factory()->create([
+    $serviceApp = ServiceApplication::create([
         'service_id' => $service->id,
+        'uuid' => (string) str()->uuid(),
+        'name' => 'app-'.str()->random(8),
     ]);
 
     $data = [

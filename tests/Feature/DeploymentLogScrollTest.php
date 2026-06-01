@@ -94,6 +94,11 @@ it('scopes scroll teardown to the component so a stale loop cannot leak across d
         ->not->toContain("document.getElementById('logsContainer')")
         // morph.updated hook only acts on this component's own DOM.
         ->toContain('this.$root.contains(el)')
+        // Global Livewire hook is unregistered when Alpine tears down.
+        ->toContain('morphUpdatedCleanup: null')
+        ->toContain("this.morphUpdatedCleanup = Livewire.hook('morph.updated'")
+        ->toContain("typeof this.morphUpdatedCleanup === 'function'")
+        ->toContain('this.morphUpdatedCleanup()')
         // Continuation timeout is tracked so it can be cancelled.
         ->toContain('scrollTimeout');
 });

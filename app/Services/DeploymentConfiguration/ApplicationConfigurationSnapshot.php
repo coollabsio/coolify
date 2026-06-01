@@ -306,7 +306,7 @@ class ApplicationConfigurationSnapshot
     private function displayValue(mixed $value): string
     {
         if ($value === null) {
-            return 'Not set';
+            return '-';
         }
 
         if (is_bool($value)) {
@@ -323,7 +323,7 @@ class ApplicationConfigurationSnapshot
     private function summarizeText(?string $value): string
     {
         if (blank($value)) {
-            return 'Not set';
+            return '-';
         }
 
         $value = trim((string) $value);

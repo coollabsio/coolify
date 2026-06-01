@@ -4,11 +4,9 @@ namespace App\Livewire\Project\Database\Keydb;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
-use App\Helpers\SslHelper;
 use App\Models\Server;
 use App\Models\StandaloneKeydb;
 use App\Support\ValidationPatterns;
-use Carbon\Carbon;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
@@ -42,25 +40,21 @@ class General extends Component
 
     public ?string $customDockerRunOptions = null;
 
-    public ?string $dbUrl = null;
-
-    public ?string $dbUrlPublic = null;
-
     public bool $isLogDrainEnabled = false;
 
-    public ?Carbon $certificateValidUntil = null;
-
-    public bool $enable_ssl = false;
-
-    public function getListeners()
+    public function getListeners(): array
     {
-        $userId = Auth::id();
-        $teamId = Auth::user()->currentTeam()->id;
+        $user = Auth::user();
+        if (! $user) {
+            return [];
+        }
+        $team = $user->currentTeam();
+        if (! $team) {
+            return [];
+        }
 
         return [
-            "echo-private:team.{$teamId},DatabaseProxyStopped" => 'databaseProxyStopped',
-            "echo-private:user.{$userId},DatabaseStatusChanged" => 'refresh',
-            "echo-private:team.{$teamId},ServiceChecked" => 'refresh',
+            "echo-private:team.{$team->id},DatabaseProxyStopped" => 'databaseProxyStopped',
         ];
     }
 
@@ -75,12 +69,6 @@ class General extends Component
 
                 return;
             }
-
-            $existingCert = $this->database->sslCertificates()->first();
-
-            if ($existingCert) {
-                $this->certificateValidUntil = $existingCert->valid_until;
-            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -88,7 +76,7 @@ class General extends Component
 
     protected function rules(): array
     {
-        $baseRules = [
+        return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
             'keydbConf' => 'nullable|string',
@@ -101,13 +89,8 @@ class General extends Component
             'publicPort' => 'nullable|integer|min:1|max:65535',
             'publicPortTimeout' => 'nullable|integer|min:1',
             'customDockerRunOptions' => 'nullable|string',
-            'dbUrl' => 'nullable|string',
-            'dbUrlPublic' => 'nullable|string',
             'isLogDrainEnabled' => 'nullable|boolean',
-            'enable_ssl' => 'boolean',
         ];
-
-        return $baseRules;
     }
 
     protected function messages(): array
@@ -143,11 +126,7 @@ class General extends Component
             $this->database->public_port_timeout = $this->publicPortTimeout ?: null;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
-            $this->database->enable_ssl = $this->enable_ssl;
             $this->database->save();
-
-            $this->dbUrl = $this->database->internal_db_url;
-            $this->dbUrlPublic = $this->database->external_db_url;
         } else {
             $this->name = $this->database->name;
             $this->description = $this->database->description;
@@ -160,9 +139,6 @@ class General extends Component
             $this->publicPortTimeout = $this->database->public_port_timeout;
             $this->customDockerRunOptions = $this->database->custom_docker_run_options;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
-            $this->enable_ssl = $this->database->enable_ssl;
-            $this->dbUrl = $this->database->internal_db_url;
-            $this->dbUrlPublic = $this->database->external_db_url;
         }
     }
 
@@ -211,6 +187,7 @@ class General extends Component
                 StopDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is no longer publicly accessible.');
             }
+            $this->dispatch('databaseUpdated');
         } catch (\Throwable $e) {
             $this->isPublic = ! $this->isPublic;
             $this->syncData(true);
@@ -219,9 +196,13 @@ class General extends Component
         }
     }
 
-    public function databaseProxyStopped()
+    public function databaseProxyStopped(): void
     {
-        $this->syncData();
+        $this->database->refresh();
+        $this->isPublic = $this->database->is_public;
+        $this->publicPort = $this->database->public_port;
+        $this->publicPortTimeout = $this->database->public_port_timeout;
+        $this->dispatch('databaseUpdated');
     }
 
     public function submit()
@@ -237,6 +218,7 @@ class General extends Component
             }
             $this->syncData(true);
             $this->dispatch('success', 'Database updated.');
+            $this->dispatch('databaseUpdated');
         } catch (Exception $e) {
             return handleError($e, $this);
         } finally {
@@ -245,65 +227,6 @@ class General extends Component
             } else {
                 $this->dispatch('configurationChanged');
             }
-        }
-    }
-
-    public function instantSaveSSL()
-    {
-        try {
-            $this->authorize('update', $this->database);
-
-            $this->syncData(true);
-            $this->dispatch('success', 'SSL configuration updated.');
-        } catch (Exception $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function regenerateSslCertificate()
-    {
-        try {
-            $this->authorize('update', $this->database);
-
-            $existingCert = $this->database->sslCertificates()->first();
-
-            if (! $existingCert) {
-                $this->dispatch('error', 'No existing SSL certificate found for this database.');
-
-                return;
-            }
-
-            $caCert = $this->server->sslCertificates()
-                ->where('is_ca_certificate', true)
-                ->first();
-
-            if (! $caCert) {
-                $this->server->generateCaCertificate();
-                $caCert = $this->server->sslCertificates()->where('is_ca_certificate', true)->first();
-            }
-
-            if (! $caCert) {
-                $this->dispatch('error', 'No CA certificate found for this database. Please generate a CA certificate for this server in the server/advanced page.');
-
-                return;
-            }
-
-            SslHelper::generateSslCertificate(
-                commonName: $existingCert->common_name,
-                subjectAlternativeNames: $existingCert->subject_alternative_names ?? [],
-                resourceType: $existingCert->resource_type,
-                resourceId: $existingCert->resource_id,
-                serverId: $existingCert->server_id,
-                caCert: $caCert->ssl_certificate,
-                caKey: $caCert->ssl_private_key,
-                configurationDir: $existingCert->configuration_dir,
-                mountPath: $existingCert->mount_path,
-                isPemKeyFileRequired: true,
-            );
-
-            $this->dispatch('success', 'SSL certificates regenerated. Restart database to apply changes.');
-        } catch (Exception $e) {
-            handleError($e, $this);
         }
     }
 

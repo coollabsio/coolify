@@ -93,8 +93,8 @@ it('detects environment variable value changes without exposing secret values', 
 
     expect($change)->not->toBeNull()
         ->and($change['display_summary'])->toBe('Changed')
-        ->and($change['old_display_value'])->toBe('Set')
-        ->and($change['new_display_value'])->toBe('Set')
+        ->and($change['old_display_value'])->toBe('••••••••')
+        ->and($change['new_display_value'])->toBe('••••••••')
         ->and(json_encode($diff->toArray()))->not->toContain('old-secret')->not->toContain('new-secret');
 });
 
@@ -117,7 +117,7 @@ it('describes added environment variables as set without exposing secret values'
 
     expect($change)->not->toBeNull()
         ->and($change['display_summary'])->toBeNull()
-        ->and($change['old_display_value'])->toBe('Not set')
-        ->and($change['new_display_value'])->toBe('Set')
+        ->and($change['old_display_value'])->toBe('-')
+        ->and($change['new_display_value'])->toBe('••••••••')
         ->and(json_encode($diff->toArray()))->not->toContain('new-secret');
 });

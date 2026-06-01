@@ -80,11 +80,11 @@ it('checks legacy preview deployment configuration hash using preview environmen
 
     $diff = $application->pendingDeploymentConfigurationDiff();
 
-    expect($diff->isLegacyFallback())->toBeTrue()
-        ->and($diff->isChanged())->toBeTrue();
+    expect($diff->isChanged())->toBeTrue()
+        ->and($diff->count())->toBeGreaterThan(0);
 });
 
-it('falls back to legacy configuration hash when no deployment snapshot exists', function () {
+it('falls back to real diff against empty snapshot when no deployment snapshot exists', function () {
     $application = configurationChangedTestApplication();
     $application->isConfigurationChanged(save: true);
 
@@ -92,6 +92,10 @@ it('falls back to legacy configuration hash when no deployment snapshot exists',
 
     $application->update(['build_command' => 'pnpm build']);
 
-    expect($application->refresh()->pendingDeploymentConfigurationDiff()->isLegacyFallback())->toBeTrue()
-        ->and($application->pendingDeploymentConfigurationDiff()->isChanged())->toBeTrue();
+    $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
+
+    expect($diff->isChanged())->toBeTrue()
+        ->and($diff->isLegacyFallback())->toBeFalse()
+        ->and($diff->count())->toBeGreaterThan(0)
+        ->and(collect($diff->changes())->pluck('label')->toArray())->toContain('Build command');
 });

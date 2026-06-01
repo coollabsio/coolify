@@ -13,6 +13,7 @@
         scrollDebounce: null,
         isScrolling: false,
         destroyed: false,
+        morphUpdatedCleanup: null,
         deploymentFinishedCleanup: null,
         lastTouchY: 0,
         showTimestamps: true,
@@ -39,6 +40,10 @@
             if (this.scrollTimeout) {
                 clearTimeout(this.scrollTimeout);
                 this.scrollTimeout = null;
+            }
+            if (this.scrollDebounce) {
+                clearTimeout(this.scrollDebounce);
+                this.scrollDebounce = null;
             }
         },
         disableFollow() {
@@ -208,10 +213,8 @@
             });
 
             // Apply search after Livewire updates.
-            // Livewire.hook() has no deregister API, so this callback survives
-            // wire:navigate. It is made harmless after teardown by the
-            // `destroyed` guard and by only reacting to DOM inside this root.
-            Livewire.hook('morph.updated', ({ el }) => {
+            // Livewire.hook() returns an unregister fn; keep it for destroy().
+            this.morphUpdatedCleanup = Livewire.hook('morph.updated', ({ el }) => {
                 if (this.destroyed) return;
                 if (el.id !== 'logs' || !this.$root.contains(el)) return;
                 this.$nextTick(() => {
@@ -246,6 +249,10 @@
             if (this.scrollDebounce) {
                 clearTimeout(this.scrollDebounce);
                 this.scrollDebounce = null;
+            }
+            if (typeof this.morphUpdatedCleanup === 'function') {
+                this.morphUpdatedCleanup();
+                this.morphUpdatedCleanup = null;
             }
             if (typeof this.deploymentFinishedCleanup === 'function') {
                 this.deploymentFinishedCleanup();

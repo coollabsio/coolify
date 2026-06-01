@@ -126,8 +126,7 @@ it('does not render environment variable secret values', function () {
 
     Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
         ->assertSee('API_TOKEN')
-        ->assertSee('changed')
-        ->assertSee('Set')
+        ->assertSee('••••••••')
         ->assertDontSee('Hidden')
         ->assertDontSee('old-secret')
         ->assertDontSee('new-secret');
@@ -150,9 +149,9 @@ it('renders added environment variables as set without exposing secret values', 
     Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
         ->assertSee('API_TOKEN')
         ->assertSee('From')
-        ->assertSee('Not set')
+        ->assertSee('-')
         ->assertSee('To')
-        ->assertSee('Set')
+        ->assertSee('••••••••')
         ->assertDontSee('Hidden')
         ->assertDontSee('new-secret');
 });

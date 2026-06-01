@@ -3,6 +3,24 @@
 use Illuminate\Support\Str;
 use Pdo\Pgsql;
 
+$parseDatabaseHosts = function (mixed $hosts, mixed $fallback = 'coolify-db'): array {
+    $parsedHosts = array_values(array_filter(
+        array_map('trim', explode(',', (string) $hosts)),
+        'strlen',
+    ));
+
+    if ($parsedHosts !== []) {
+        return $parsedHosts;
+    }
+
+    $fallbackHosts = array_values(array_filter(
+        array_map('trim', explode(',', (string) $fallback)),
+        'strlen',
+    ));
+
+    return $fallbackHosts === [] ? ['coolify-db'] : $fallbackHosts;
+};
+
 $pgsql = [
     'driver' => 'pgsql',
     'url' => env('DATABASE_URL'),
@@ -28,13 +46,13 @@ $pgsql = [
  */
 if (env('DB_READ_HOST')) {
     $pgsql['read'] = [
-        'host' => array_map('trim', explode(',', (string) env('DB_READ_HOST'))),
+        'host' => $parseDatabaseHosts(env('DB_READ_HOST'), env('DB_HOST', 'coolify-db')),
         'port' => env('DB_READ_PORT', env('DB_PORT', '5432')),
         'username' => env('DB_READ_USERNAME', env('DB_USERNAME', 'coolify')),
         'password' => env('DB_READ_PASSWORD', env('DB_PASSWORD', '')),
     ];
     $pgsql['write'] = [
-        'host' => array_map('trim', explode(',', (string) env('DB_WRITE_HOST', env('DB_HOST', 'coolify-db')))),
+        'host' => $parseDatabaseHosts(env('DB_WRITE_HOST'), env('DB_HOST', 'coolify-db')),
         'port' => env('DB_WRITE_PORT', env('DB_PORT', '5432')),
         'username' => env('DB_WRITE_USERNAME', env('DB_USERNAME', 'coolify')),
         'password' => env('DB_WRITE_PASSWORD', env('DB_PASSWORD', '')),

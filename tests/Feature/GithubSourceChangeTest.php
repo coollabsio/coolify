@@ -2,6 +2,7 @@
 
 use App\Livewire\Source\Github\Change;
 use App\Models\GithubApp;
+use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
@@ -19,9 +20,45 @@ beforeEach(function () {
     // Set current team
     $this->actingAs($this->user);
     session(['currentTeam' => $this->team]);
+
+    InstanceSettings::forceCreate([
+        'id' => 0,
+        'fqdn' => null,
+        'public_ipv4' => null,
+        'public_ipv6' => null,
+    ]);
 });
 
+function validPrivateKey(): string
+{
+    $key = openssl_pkey_new([
+        'private_key_bits' => 2048,
+        'private_key_type' => OPENSSL_KEYTYPE_RSA,
+    ]);
+
+    openssl_pkey_export($key, $privateKey);
+
+    return $privateKey;
+}
+
 describe('GitHub Source Change Component', function () {
+    test('all github app form controls declare explicit authorization', function () {
+        $view = file_get_contents(resource_path('views/livewire/source/github/change.blade.php'));
+
+        preg_match_all(
+            '/<x-forms\.(button|input|select|checkbox)\b(?![^>]*\bcanGate=)[^>]*>/s',
+            $view,
+            $matches,
+            PREG_OFFSET_CAPTURE
+        );
+
+        $missingAuthorization = collect($matches[0])
+            ->map(fn (array $match): string => 'Line '.(substr_count(substr($view, 0, $match[1]), PHP_EOL) + 1).': '.trim(preg_replace('/\s+/', ' ', $match[0])))
+            ->all();
+
+        expect($missingAuthorization)->toBeEmpty();
+    });
+
     test('can mount with newly created github app with null app_id', function () {
         // Create a GitHub app without app_id (simulating a newly created source)
         $githubApp = GithubApp::create([
@@ -47,10 +84,69 @@ describe('GitHub Source Change Component', function () {
             ->assertSet('privateKeyId', null);
     });
 
+    test('defaults webhook endpoint to app url when it is the first available endpoint', function () {
+        config(['app.url' => 'http://localhost:8000']);
+
+        InstanceSettings::findOrFail(0)->update([
+            'fqdn' => null,
+            'public_ipv4' => null,
+            'public_ipv6' => null,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSuccessful()
+            ->assertSet('webhook_endpoint', 'http://localhost:8000');
+    });
+
+    test('custom webhook endpoint is selected explicitly with a checkbox', function () {
+        config(['app.url' => 'http://localhost:8000']);
+
+        InstanceSettings::findOrFail(0)->update([
+            'fqdn' => 'http://staging.example.com',
+            'public_ipv4' => '84.1.202.183',
+            'public_ipv6' => null,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSuccessful()
+            ->assertSet('use_custom_webhook_endpoint', false)
+            ->set('custom_webhook_endpoint', 'https://staging.example.com')
+            ->set('use_custom_webhook_endpoint', true)
+            ->assertSet('webhook_endpoint', 'http://staging.example.com')
+            ->assertSet('custom_webhook_endpoint', 'https://staging.example.com')
+            ->assertSet('use_custom_webhook_endpoint', true)
+            ->assertSee('Use custom webhook endpoint')
+            ->assertSee('Selected endpoint')
+            ->assertSee('Custom endpoint')
+            ->assertSee('createGithubApp(webhookEndpoint, useCustomWebhookEndpoint, customWebhookEndpoint');
+    });
+
     test('can mount with fully configured github app', function () {
         $privateKey = PrivateKey::create([
             'name' => 'Test Key',
-            'private_key' => 'test-private-key-content',
+            'private_key' => validPrivateKey(),
             'team_id' => $this->team->id,
         ]);
 
@@ -84,7 +180,7 @@ describe('GitHub Source Change Component', function () {
     test('can update github app from null to valid values', function () {
         $privateKey = PrivateKey::create([
             'name' => 'Test Key',
-            'private_key' => 'test-private-key-content',
+            'private_key' => validPrivateKey(),
             'team_id' => $this->team->id,
         ]);
 
@@ -157,8 +253,8 @@ describe('GitHub Source Change Component', function () {
 
         // Verify the database was updated
         $githubApp->refresh();
-        expect($githubApp->app_id)->toBe('1234567890');
-        expect($githubApp->installation_id)->toBe('1234567890');
+        expect($githubApp->app_id)->toBe(1234567890);
+        expect($githubApp->installation_id)->toBe(1234567890);
     });
 
     test('checkPermissions validates required fields', function () {
@@ -179,6 +275,8 @@ describe('GitHub Source Change Component', function () {
             ->assertSuccessful()
             ->call('checkPermissions')
             ->assertDispatched('error', function ($event, $message) {
+                $message = is_array($message) ? implode(' ', $message) : $message;
+
                 return str_contains($message, 'App ID') && str_contains($message, 'Private Key');
             });
     });
@@ -202,6 +300,8 @@ describe('GitHub Source Change Component', function () {
             ->assertSuccessful()
             ->call('checkPermissions')
             ->assertDispatched('error', function ($event, $message) {
+                $message = is_array($message) ? implode(' ', $message) : $message;
+
                 return str_contains($message, 'Private Key not found');
             });
     });

@@ -32,7 +32,7 @@
                             {{ $destination->name }}
                             <x-deprecated-badge />
                         </div>
-                        <div class="box-description">server: {{ $destination->server->name }}</div>
+                        <div class="box-description">Server: {{ $destination->server->name }}</div>
                     </div>
                 </a>
             @endif

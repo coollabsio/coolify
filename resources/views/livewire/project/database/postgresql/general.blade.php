@@ -68,114 +68,38 @@
                     helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433"
                     canGate="update" :canResource="$database" />
             </div>
-
-            <x-forms.input label="Postgres URL (internal)"
-                helper="If you change the user/password/port, this could be different. This is with the default values."
-                type="password" readonly wire:model="db_url" />
-            @if ($db_url_public)
-                <x-forms.input label="Postgres URL (public)"
-                    helper="If you change the user/password/port, this could be different. This is with the default values."
-                    type="password" readonly wire:model="db_url_public" />
-            @endif
         </div>
+        <livewire:project.database.postgresql.status-info :database="$database" />
         <div class="flex flex-col gap-2">
             <div class="flex items-center gap-2 py-2">
-                <h3>SSL Configuration</h3>
-                @if ($enableSsl && $certificateValidUntil)
-                    <x-modal-confirmation title="Regenerate SSL Certificates" buttonTitle="Regenerate SSL Certificates"
-                        :actions="[
-                            'The SSL certificate of this database will be regenerated.',
-                            'You must restart the database after regenerating the certificate to start using the new certificate.',
-                        ]" submitAction="regenerateSslCertificate" :confirmWithText="false"
-                        :confirmWithPassword="false" />
+                <h3>Proxy</h3>
+                <x-loading wire:loading wire:target="instantSave" />
+                @if (data_get($database, 'is_public'))
+                    <x-slide-over fullScreen>
+                        <x-slot:title>Proxy Logs</x-slot:title>
+                        <x-slot:content>
+                            <livewire:project.shared.get-logs :server="$server" :resource="$database"
+                                container="{{ data_get($database, 'uuid') }}-proxy" :collapsible="false" lazy />
+                        </x-slot:content>
+                        <x-forms.button disabled="{{ !data_get($database, 'is_public') }}"
+                            @click="slideOverOpen=true">Logs</x-forms.button>
+                    </x-slide-over>
                 @endif
             </div>
-            @if ($enableSsl && $certificateValidUntil)
-                <span class="text-sm">Valid until:
-                    @if (now()->gt($certificateValidUntil))
-                        <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} - Expired</span>
-                    @elseif(now()->addDays(30)->gt($certificateValidUntil))
-                        <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} - Expiring
-                            soon</span>
-                    @else
-                        <span>{{ $certificateValidUntil->format('d.m.Y H:i:s') }}</span>
-                    @endif
-                </span>
-            @endif
+            <div class="flex flex-col gap-2 w-64">
+                <x-forms.checkbox instantSave id="isPublic" label="Make it publicly available"
+                    canGate="update" :canResource="$database" />
+            </div>
+            <div class="flex flex-col gap-2">
+                <x-forms.input type="number" placeholder="5432" disabled="{{ $isPublic }}" id="publicPort"
+                    label="Public Port" canGate="update" :canResource="$database" />
+                <x-forms.input type="number" placeholder="3600" disabled="{{ $isPublic }}" id="publicPortTimeout"
+                    label="Proxy Timeout (seconds)" helper="Timeout for the public TCP proxy connection in seconds. Default: 3600 (1 hour)." canGate="update" :canResource="$database" />
+            </div>
         </div>
         <div class="flex flex-col gap-2">
-            <div class="flex flex-col gap-2">
-                <div class="w-64" wire:key='enable_ssl'>
-                    @if ($database->isExited())
-                        <x-forms.checkbox id="enableSsl" label="Enable SSL" wire:model.live="enableSsl"
-                            instantSave="instantSaveSSL" canGate="update" :canResource="$database" />
-                    @else
-                        <x-forms.checkbox id="enableSsl" label="Enable SSL" wire:model.live="enableSsl"
-                            instantSave="instantSaveSSL" disabled
-                            helper="Database should be stopped to change this settings." />
-                    @endif
-                </div>
-                @if ($enableSsl)
-                    <div class="mx-2">
-                        @if ($database->isExited())
-                            <x-forms.select id="sslMode" label="SSL Mode" wire:model.live="sslMode"
-                                instantSave="instantSaveSSL"
-                                helper="Choose the SSL verification mode for PostgreSQL connections" canGate="update"
-                                :canResource="$database">
-                                <option value="allow" title="Allow insecure connections">allow (insecure)</option>
-                                <option value="prefer" title="Prefer secure connections">prefer (secure)</option>
-                                <option value="require" title="Require secure connections">require (secure)</option>
-                                <option value="verify-ca" title="Verify CA certificate">verify-ca (secure)</option>
-                                <option value="verify-full" title="Verify full certificate">verify-full (secure)
-                                </option>
-                            </x-forms.select>
-                        @else
-                            <x-forms.select id="sslMode" label="SSL Mode" instantSave="instantSaveSSL" disabled
-                                helper="Database should be stopped to change this settings.">
-                                <option value="allow" title="Allow insecure connections">allow (insecure)</option>
-                                <option value="prefer" title="Prefer secure connections">prefer (secure)</option>
-                                <option value="require" title="Require secure connections">require (secure)</option>
-                                <option value="verify-ca" title="Verify CA certificate">verify-ca (secure)</option>
-                                <option value="verify-full" title="Verify full certificate">verify-full (secure)
-                                </option>
-                            </x-forms.select>
-                        @endif
-                    </div>
-                @endif
-
-                <div class="flex flex-col gap-2">
-                    <div class="flex items-center gap-2 py-2">
-                        <h3>Proxy</h3>
-                        <x-loading wire:loading wire:target="instantSave" />
-                        @if (data_get($database, 'is_public'))
-                            <x-slide-over fullScreen>
-                                <x-slot:title>Proxy Logs</x-slot:title>
-                                <x-slot:content>
-                                    <livewire:project.shared.get-logs :server="$server" :resource="$database"
-                                        container="{{ data_get($database, 'uuid') }}-proxy" :collapsible="false" lazy />
-                                </x-slot:content>
-                                <x-forms.button disabled="{{ !data_get($database, 'is_public') }}"
-                                    @click="slideOverOpen=true">Logs</x-forms.button>
-                            </x-slide-over>
-                        @endif
-                    </div>
-                    <div class="flex flex-col gap-2 w-64">
-                        <x-forms.checkbox instantSave id="isPublic" label="Make it publicly available"
-                            canGate="update" :canResource="$database" />
-                    </div>
-                    <div class="flex flex-col gap-2">
-                        <x-forms.input type="number" placeholder="5432" disabled="{{ $isPublic }}" id="publicPort"
-                            label="Public Port" canGate="update" :canResource="$database" />
-                        <x-forms.input type="number" placeholder="3600" disabled="{{ $isPublic }}" id="publicPortTimeout"
-                            label="Proxy Timeout (seconds)" helper="Timeout for the public TCP proxy connection in seconds. Default: 3600 (1 hour)." canGate="update" :canResource="$database" />
-                    </div>
-                </div>
-
-                <div class="flex flex-col gap-2">
-                    <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10" id="postgresConf"
-                        canGate="update" :canResource="$database" />
-                </div>
-            </div>
+            <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10" id="postgresConf"
+                canGate="update" :canResource="$database" />
         </div>
     </form>
 

@@ -50,6 +50,39 @@ it('does not dispatch storage check when disk usage is below threshold', functio
     Queue::assertNotPushed(ServerStorageCheckJob::class);
 });
 
+it('clears stale storage cache when disk usage drops below threshold', function () {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $storageCacheKey = 'storage-check:'.$server->id;
+
+    Cache::put($storageCacheKey, 85, 600);
+
+    $belowThresholdData = [
+        'containers' => [],
+        'filesystem_usage_root' => ['used_percentage' => 45],
+    ];
+
+    $job = new PushServerUpdateJob($server, $belowThresholdData);
+    $job->handle();
+
+    Queue::assertNotPushed(ServerStorageCheckJob::class);
+    expect(Cache::missing($storageCacheKey))->toBeTrue();
+
+    Queue::fake();
+
+    $aboveThresholdData = [
+        'containers' => [],
+        'filesystem_usage_root' => ['used_percentage' => 85],
+    ];
+
+    $job = new PushServerUpdateJob($server, $aboveThresholdData);
+    $job->handle();
+
+    Queue::assertPushed(ServerStorageCheckJob::class, function ($job) use ($server) {
+        return $job->server->id === $server->id && $job->percentage === 85;
+    });
+});
+
 it('does not dispatch storage check when disk percentage is unchanged', function () {
     $team = Team::factory()->create();
     $server = Server::factory()->create(['team_id' => $team->id]);

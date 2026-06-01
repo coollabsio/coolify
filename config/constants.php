@@ -2,9 +2,9 @@
 
 return [
     'coolify' => [
-        'version' => '4.1.1',
+        'version' => '4.1.2',
         'helper_version' => '1.0.14',
-        'realtime_version' => '1.0.15',
+        'realtime_version' => '1.0.16',
         'railpack_version' => '0.23.0',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
@@ -67,13 +67,6 @@ return [
     'ssh' => [
         'mux_enabled' => env('MUX_ENABLED', env('SSH_MUX_ENABLED', true)),
         'mux_persist_time' => env('SSH_MUX_PERSIST_TIME', 3600),
-        'mux_health_check_enabled' => env('SSH_MUX_HEALTH_CHECK_ENABLED', true),
-        'mux_health_check_timeout' => env('SSH_MUX_HEALTH_CHECK_TIMEOUT', 5),
-        'mux_max_age' => env('SSH_MUX_MAX_AGE', 1800), // 30 minutes
-        'mux_lock_ttl' => env('SSH_MUX_LOCK_TTL', 30), // lock auto-release, seconds
-        'mux_lock_timeout' => env('SSH_MUX_LOCK_TIMEOUT', 10), // max wait for lock, seconds
-        'mux_orphan_min_age' => env('SSH_MUX_ORPHAN_MIN_AGE', 600), // min process age before reaping orphans, seconds
-        'mux_orphan_reap_enabled' => env('SSH_MUX_ORPHAN_REAP_ENABLED', false), // false = dry-run, only log orphans
         'connection_timeout' => 10,
         'server_interval' => 20,
         'command_timeout' => 3600,
@@ -100,9 +93,11 @@ return [
 
     'sentinel' => [
         // How often (seconds) PushServerUpdateJob is force-dispatched even when
-        // the container state hash is unchanged. Keeps last_online_at,
-        // exited-detection and storage checks from going stale.
+        // the container state hash is unchanged. Keeps exited-detection and
+        // storage checks from going stale without writing every resource row on
+        // every push.
         'push_force_interval_seconds' => env('SENTINEL_PUSH_FORCE_INTERVAL_SECONDS', 300),
+
     ],
 
     'proxy' => [

@@ -62,6 +62,7 @@ class Github extends Controller
                 $before_sha = data_get($payload, 'before');
                 $after_sha = data_get($payload, 'after', data_get($payload, 'pull_request.head.sha'));
                 $author_association = data_get($payload, 'pull_request.author_association');
+                $is_fork_pull_request = $this->isForkPullRequest($payload);
             }
             if (! in_array($x_github_event, ['push', 'pull_request'])) {
                 return response("Nothing to do. Event '$x_github_event' is not supported.");
@@ -222,6 +223,7 @@ class Github extends Controller
                             commitSha: data_get($payload, 'pull_request.head.sha', 'HEAD'),
                             authorAssociation: $author_association,
                             fullName: $full_name,
+                            isForkPullRequest: $is_fork_pull_request ?? false,
                         );
 
                         $return_payloads->push([
@@ -303,6 +305,7 @@ class Github extends Controller
                 $before_sha = data_get($payload, 'before');
                 $after_sha = data_get($payload, 'after', data_get($payload, 'pull_request.head.sha'));
                 $author_association = data_get($payload, 'pull_request.author_association');
+                $is_fork_pull_request = $this->isForkPullRequest($payload);
             }
             if (! in_array($x_github_event, ['push', 'pull_request'])) {
                 return response("Nothing to do. Event '$x_github_event' is not supported.");
@@ -434,6 +437,7 @@ class Github extends Controller
                             commitSha: data_get($payload, 'pull_request.head.sha', 'HEAD'),
                             authorAssociation: $author_association,
                             fullName: $full_name,
+                            isForkPullRequest: $is_fork_pull_request ?? false,
                         );
 
                         $return_payloads->push([
@@ -449,6 +453,40 @@ class Github extends Controller
         } catch (Exception $e) {
             return handleError($e);
         }
+    }
+
+    /**
+     * Determine whether a pull_request webhook payload originates from a fork.
+     *
+     * GitHub's `author_association` is not a reliable trust signal (it grants
+     * CONTRIBUTOR to anyone who has merely opened an issue/PR before), so fork
+     * detection is gated on whether the PR crosses repository boundaries.
+     *
+     * The repository id comparison is the canonical signal; the `head.repo.fork`
+     * flag and a case-insensitive full_name comparison are fallbacks for payloads
+     * where the ids are unavailable (e.g. a deleted head repository).
+     */
+    private function isForkPullRequest(mixed $payload): bool
+    {
+        $headRepoId = data_get($payload, 'pull_request.head.repo.id');
+        $baseRepoId = data_get($payload, 'pull_request.base.repo.id');
+
+        if ($headRepoId !== null && $baseRepoId !== null) {
+            return (string) $headRepoId !== (string) $baseRepoId;
+        }
+
+        if (data_get($payload, 'pull_request.head.repo.fork') === true) {
+            return true;
+        }
+
+        $headRepoFullName = data_get($payload, 'pull_request.head.repo.full_name');
+        $baseRepoFullName = data_get($payload, 'pull_request.base.repo.full_name');
+
+        if (is_string($headRepoFullName) && is_string($baseRepoFullName)) {
+            return Str::lower($headRepoFullName) !== Str::lower($baseRepoFullName);
+        }
+
+        return false;
     }
 
     public function redirect(Request $request)

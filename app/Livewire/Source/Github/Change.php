@@ -21,6 +21,10 @@ class Change extends Component
 
     public string $webhook_endpoint = '';
 
+    public string $custom_webhook_endpoint = '';
+
+    public bool $use_custom_webhook_endpoint = false;
+
     public ?string $ipv4 = null;
 
     public ?string $ipv6 = null;
@@ -76,6 +80,8 @@ class Change extends Component
 
     public string $manifestState = '';
 
+    public string $activeTab = 'general';
+
     protected function rules(): array
     {
         return [
@@ -95,6 +101,9 @@ class Change extends Component
             'metadata' => 'nullable|string',
             'pullRequests' => 'nullable|string',
             'privateKeyId' => 'nullable|int',
+            'webhook_endpoint' => ['required', 'string', 'url'],
+            'custom_webhook_endpoint' => ['nullable', 'string', 'url'],
+            'use_custom_webhook_endpoint' => ['required', 'bool'],
         ];
     }
 
@@ -263,10 +272,18 @@ class Change extends Component
                 }
             }
             $this->parameters = get_route_parameters();
+            $routeName = request()->route()?->getName();
+            if ($routeName === 'source.github.permissions') {
+                $this->activeTab = 'permissions';
+            } elseif ($routeName === 'source.github.resources') {
+                $this->activeTab = 'resources';
+            } else {
+                $this->activeTab = 'general';
+            }
             if (isCloud() && ! isDev()) {
                 $this->webhook_endpoint = config('app.url');
             } else {
-                $this->webhook_endpoint = $this->fqdn ?? $this->ipv4 ?? '';
+                $this->webhook_endpoint = $this->fqdn ?? $this->ipv4 ?? $this->ipv6 ?? config('app.url') ?? '';
                 $this->is_system_wide = $this->github_app->is_system_wide;
             }
         } catch (\Throwable $e) {

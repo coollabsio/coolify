@@ -127,7 +127,7 @@ describe('GitHub Private Repository Component', function () {
         Http::assertNothingSent();
     });
 
-    test('loadRepositories does not mint tokens for another teams system wide github app', function () {
+    test('mount lists another teams system wide github app', function () {
         $victimTeam = Team::factory()->create();
         $victimPrivateKey = githubPrivateRepositoryTestPrivateKeyForTeam($victimTeam);
         $systemWideGithubApp = GithubApp::create([
@@ -147,13 +147,43 @@ describe('GitHub Private Repository Component', function () {
             'is_system_wide' => true,
         ]);
 
-        Http::fake();
+        $component = Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app']);
 
-        expect(fn () => Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app'])
+        expect($component->get('github_apps')->pluck('id')->all())
+            ->toContain($this->githubApp->id)
+            ->toContain($systemWideGithubApp->id);
+    });
+
+    test('loadRepositories can use another teams system wide github app', function () {
+        $victimTeam = Team::factory()->create();
+        $victimPrivateKey = githubPrivateRepositoryTestPrivateKeyForTeam($victimTeam);
+        $systemWideGithubApp = GithubApp::create([
+            'name' => 'System Wide GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 54321,
+            'installation_id' => 67890,
+            'client_id' => 'system-client-id',
+            'client_secret' => 'system-client-secret',
+            'webhook_secret' => 'system-webhook-secret',
+            'private_key_id' => $victimPrivateKey->id,
+            'team_id' => $victimTeam->id,
+            'is_public' => false,
+            'is_system_wide' => true,
+        ]);
+        $repos = [
+            ['id' => 1, 'name' => 'system-repo', 'owner' => ['login' => 'testuser']],
+        ];
+
+        fakeGithubHttp($repos);
+
+        Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app'])
             ->call('loadRepositories', $systemWideGithubApp->id)
-        )->toThrow(ModelNotFoundException::class);
-
-        Http::assertNothingSent();
+            ->assertSet('current_step', 'repository')
+            ->assertSet('total_repositories_count', 1)
+            ->assertSet('selected_repository_id', 1);
     });
 
     test('github installation token is not stored as public component state', function () {

@@ -1187,17 +1187,20 @@ class Application extends BaseModel
         $currentSnapshot = $this->deploymentConfigurationSnapshot();
         $lastDeployment = $this->get_last_successful_deployment();
 
-        if ($lastDeployment?->configuration_snapshot) {
-            return app(ConfigurationDiffer::class)->diff($lastDeployment->configuration_snapshot, $currentSnapshot);
+        $previousSnapshot = $lastDeployment?->configuration_snapshot;
+
+        if (! $previousSnapshot) {
+            $oldConfigHash = data_get($this, 'config_hash');
+            $hasLegacyChange = $oldConfigHash === null || $oldConfigHash !== $this->legacyConfigurationHash();
+
+            if (! $hasLegacyChange) {
+                return ConfigurationDiff::unchanged();
+            }
+
+            $previousSnapshot = [];
         }
 
-        $oldConfigHash = data_get($this, 'config_hash');
-
-        if ($oldConfigHash === null) {
-            return ConfigurationDiff::legacy(true);
-        }
-
-        return ConfigurationDiff::legacy($oldConfigHash !== $this->legacyConfigurationHash());
+        return app(ConfigurationDiffer::class)->diff($previousSnapshot, $currentSnapshot);
     }
 
     public function hasPendingDeploymentConfigurationChanges(): bool

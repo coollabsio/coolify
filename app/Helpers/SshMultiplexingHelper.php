@@ -63,10 +63,10 @@ class SshMultiplexingHelper
         $scpCommand .= self::getCommonSshOptions($server, $sshKeyLocation, self::getConnectionTimeout($server), config('constants.ssh.server_interval'), isScp: true);
 
         if ($server->isIpv6()) {
-            return $scpCommand."{$source} ".escapeshellarg($server->user).'@['.escapeshellarg($server->ip)."]:{$dest}";
+            return $scpCommand.escapeshellarg($source).' '.escapeshellarg($server->user).'@['.escapeshellarg($server->ip).']:'.escapeshellarg($dest);
         }
 
-        return $scpCommand."{$source} ".self::escapedUserAtHost($server).":{$dest}";
+        return $scpCommand.escapeshellarg($source).' '.self::escapedUserAtHost($server).':'.escapeshellarg($dest);
     }
 
     public static function generateSshCommand(Server $server, string $command, bool $disableMultiplexing = false): string

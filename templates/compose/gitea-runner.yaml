@@ -6,7 +6,7 @@
 
 services:
   runner:
-    image: 'docker.io/gitea/runner:1.0.0'
+    image: 'docker.io/gitea/runner:1.0.6'
     environment:
       - 'GITEA_INSTANCE_URL=${GITEA_INSTANCE_URL}'
       - 'GITEA_RUNNER_REGISTRATION_TOKEN=${GITEA_RUNNER_REGISTRATION_TOKEN}'

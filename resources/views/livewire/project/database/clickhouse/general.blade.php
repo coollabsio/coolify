@@ -41,19 +41,8 @@
                     helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433"
                     canGate="update" :canResource="$database" />
             </div>
-            <x-forms.input label="Clickhouse URL (internal)"
-                helper="If you change the user/password/port, this could be different. This is with the default values."
-                type="password" readonly wire:model="dbUrl" canGate="update" :canResource="$database" />
-            @if ($dbUrlPublic)
-                <x-forms.input label="Clickhouse URL (public)"
-                    helper="If you change the user/password/port, this could be different. This is with the default values."
-                    type="password" readonly wire:model="dbUrlPublic" canGate="update" :canResource="$database" />
-            @else
-                <x-forms.input label="Clickhouse URL (public)"
-                    helper="If you change the user/password/port, this could be different. This is with the default values."
-                    readonly value="Starting the database will generate this." canGate="update" :canResource="$database" />
-            @endif
         </div>
+        <livewire:project.database.clickhouse.status-info :database="$database" />
             <div class="flex flex-col py-2 w-64">
                 <div class="flex items-center gap-2 pb-2">
                     <div class="flex items-center">

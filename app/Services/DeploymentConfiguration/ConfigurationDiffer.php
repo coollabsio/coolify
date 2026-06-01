@@ -37,8 +37,8 @@ class ConfigurationDiffer
                 'impact' => data_get($item, 'impact', 'redeploy'),
                 'sensitive' => $sensitive,
                 'display_summary' => $displaySummary,
-                'old_display_value' => $sensitive ? ($previous === null ? 'Not set' : 'Set') : data_get($previous, 'display_value', 'Not set'),
-                'new_display_value' => $sensitive ? ($current === null ? 'Removed' : 'Set') : data_get($current, 'display_value', 'Not set'),
+                'old_display_value' => $sensitive ? ($previous === null ? '-' : '••••••••') : data_get($previous, 'display_value', '-'),
+                'new_display_value' => $sensitive ? ($current === null ? '-' : '••••••••') : data_get($current, 'display_value', '-'),
             ];
         }
 

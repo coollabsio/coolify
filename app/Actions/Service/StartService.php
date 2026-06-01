@@ -19,7 +19,7 @@ class StartService
     public function handle(Service $service, bool $pullLatestImages = false, bool $stopBeforeStart = false)
     {
         $service->parse();
-        if ($stopBeforeStart) {
+        if ($this->shouldStopBeforeStarting($pullLatestImages, $stopBeforeStart)) {
             StopService::run(service: $service, dockerCleanup: false);
         }
         $service->saveComposeConfigs();
@@ -52,5 +52,10 @@ class StartService
         }
 
         return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
+    }
+
+    private function shouldStopBeforeStarting(bool $pullLatestImages, bool $stopBeforeStart): bool
+    {
+        return $stopBeforeStart && ! $pullLatestImages;
     }
 }

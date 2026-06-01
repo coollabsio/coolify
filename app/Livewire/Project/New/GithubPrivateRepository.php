@@ -73,7 +73,7 @@ class GithubPrivateRepository extends Component
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
         $this->repositories = $this->branches = collect();
-        $this->github_apps = GithubApp::where('team_id', currentTeam()->id)
+        $this->github_apps = GithubApp::ownedByCurrentTeam()
             ->where('is_public', false)
             ->whereNotNull('app_id')
             ->get();
@@ -108,7 +108,7 @@ class GithubPrivateRepository extends Component
         $this->total_branches_count = 0;
         $this->page = 1;
         $this->selected_github_app_id = $github_app_id;
-        $this->github_app = GithubApp::where('team_id', currentTeam()->id)
+        $this->github_app = GithubApp::ownedByCurrentTeam()
             ->where('is_public', false)
             ->whereNotNull('app_id')
             ->findOrFail($github_app_id);
