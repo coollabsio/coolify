@@ -17,17 +17,10 @@ class Configuration extends Component
 
     public $servers;
 
-    public function getListeners()
-    {
-        $teamId = auth()->user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
-            "echo-private:team.{$teamId},ServiceStatusChanged" => '$refresh',
-            'buildPackUpdated' => '$refresh',
-            'refresh' => '$refresh',
-        ];
-    }
+    protected $listeners = [
+        'buildPackUpdated' => '$refresh',
+        'refresh' => '$refresh',
+    ];
 
     public function mount()
     {

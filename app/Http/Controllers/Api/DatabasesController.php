@@ -299,6 +299,11 @@ class DatabasesController extends Controller
                         'mysql_user' => ['type' => 'string', 'description' => 'MySQL user'],
                         'mysql_database' => ['type' => 'string', 'description' => 'MySQL database'],
                         'mysql_conf' => ['type' => 'string', 'description' => 'MySQL conf'],
+                        'health_check_enabled' => ['type' => 'boolean', 'description' => 'Enable the database healthcheck probe.', 'default' => true],
+                        'health_check_interval' => ['type' => 'integer', 'description' => 'Healthcheck interval in seconds.', 'minimum' => 1, 'default' => 15],
+                        'health_check_timeout' => ['type' => 'integer', 'description' => 'Healthcheck timeout in seconds.', 'minimum' => 1, 'default' => 5],
+                        'health_check_retries' => ['type' => 'integer', 'description' => 'Healthcheck retries count.', 'minimum' => 1, 'default' => 5],
+                        'health_check_start_period' => ['type' => 'integer', 'description' => 'Healthcheck start period in seconds.', 'minimum' => 0, 'default' => 5],
                     ],
                 ),
             )
@@ -565,9 +570,17 @@ class DatabasesController extends Controller
                 }
                 break;
         }
+        $allowedFields = array_merge($allowedFields, ['health_check_enabled', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period']);
+        $healthCheckValidator = customApiValidator($request->all(), [
+            'health_check_enabled' => 'boolean',
+            'health_check_interval' => 'integer|min:1',
+            'health_check_timeout' => 'integer|min:1',
+            'health_check_retries' => 'integer|min:1',
+            'health_check_start_period' => 'integer|min:0',
+        ]);
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
-            $errors = $validator->errors();
+        if ($validator->fails() || $healthCheckValidator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors()->merge($healthCheckValidator->errors());
             if (! empty($extraFields)) {
                 foreach ($extraFields as $field) {
                     $errors->add($field, 'This field is not allowed.');

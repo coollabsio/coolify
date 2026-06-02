@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\User\RevokeUserTeamTokens;
 use App\Events\ServerReachabilityChanged;
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
@@ -72,6 +73,8 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         });
 
         static::deleting(function (Team $team) {
+            RevokeUserTeamTokens::forTeam($team->id);
+
             foreach ($team->privateKeys as $key) {
                 $key->delete();
             }

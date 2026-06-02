@@ -85,8 +85,7 @@ describe('PATCH /api/v1/applications/{uuid} build_pack=railpack', function () {
         $app->refresh();
         expect($app->build_pack)->toBe('railpack');
         expect($app->dockerfile)->toBeNull();
-        // NOTE: dockerfile_location is normalized to '/Dockerfile' by the model
-        // mutator when set to null, so we cannot assert it becomes null here.
+        expect($app->dockerfile_location)->toBeNull();
         expect($app->dockerfile_target_build)->toBeNull();
         expect((bool) $app->custom_healthcheck_found)->toBeFalse();
     });

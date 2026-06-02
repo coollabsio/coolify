@@ -1,5 +1,5 @@
 <nav class="flex flex-col flex-1 bg-white border-r dark:border-coolgray-200 border-neutral-300 dark:bg-base"
-    :class="collapsed ? 'lg:px-1 px-2 sidebar-collapsed' : 'px-2'"
+    :class="collapsed ? 'px-2 lg:px-[0.7rem] sidebar-collapsed' : 'px-2 lg:px-[0.7rem]'"
     @mouseover="
         if (!collapsed) return;
         const el = $event.target.closest('.menu-item');
@@ -49,23 +49,32 @@
                 localStorage.setItem('theme', type);
                 this.queryTheme();
             },
+            cycleTheme() {
+                const themes = ['light', 'system', 'dark'];
+                const currentIndex = themes.indexOf(this.theme || localStorage.getItem('theme') || 'dark');
+                this.setTheme(themes[(currentIndex + 1) % themes.length]);
+            },
             queryTheme() {
                 const darkModePreference = window.matchMedia('(prefers-color-scheme: dark)').matches;
                 const userSettings = localStorage.getItem('theme') || 'dark';
                 localStorage.setItem('theme', userSettings);
+                let isDark = false;
                 if (userSettings === 'dark') {
                     document.documentElement.classList.add('dark');
                     this.theme = 'dark';
+                    isDark = true;
                 } else if (userSettings === 'light') {
                     document.documentElement.classList.remove('dark');
                     this.theme = 'light';
                 } else if (darkModePreference) {
                     this.theme = 'system';
                     document.documentElement.classList.add('dark');
+                    isDark = true;
                 } else if (!darkModePreference) {
                     this.theme = 'system';
                     document.documentElement.classList.remove('dark');
                 }
+                document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
             },
             checkZoom() {
                 if (this.zoom === null) {
@@ -92,9 +101,9 @@
                 }
             }
     }">
-    <div class="flex pt-4 pb-4 pl-2 items-start gap-2 motion-safe:transition-all motion-safe:duration-200 motion-safe:ease-out motion-reduce:transition-none"
-        :class="collapsed ? 'lg:flex-col lg:items-center lg:pl-0 lg:gap-3 lg:pt-8' : 'lg:pt-6'">
-        <div class="flex flex-col w-full" :class="collapsed && 'lg:hidden'">
+    <div class="flex pt-4 pb-4 pl-2 pr-3 items-start gap-3"
+        :class="collapsed ? 'lg:flex-col lg:items-center lg:pl-0 lg:pr-0 lg:gap-3 lg:pt-7' : 'lg:pt-6'">
+        <div class="flex min-w-0 flex-1 flex-col" :class="collapsed && 'lg:hidden'">
             <a href="/" {{ wireNavigate() }} class="text-2xl font-bold tracking-tight dark:text-white hover:opacity-80 transition-opacity">Coolify</a>
             <x-version />
         </div>
@@ -107,10 +116,10 @@
             </a>
             <x-version class="text-[10px]" />
         </div>
-        <div :class="collapsed && 'lg:hidden'">
+        <div class="min-w-0 flex-1" :class="collapsed && 'lg:hidden'">
             <!-- Search button that triggers global search modal -->
             <button @click="$dispatch('open-global-search')" type="button" title="Search (Press / or ⌘K)"
-                class="flex items-center gap-1.5 px-2.5 py-1.5 bg-neutral-100 dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-200 rounded-md hover:bg-neutral-200 dark:hover:bg-coolgray-200 transition-colors">
+                class="flex h-8 w-full items-center justify-between gap-1.5 px-2.5 py-1.5 bg-neutral-100 dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-200 rounded-md hover:bg-neutral-200 dark:hover:bg-coolgray-200 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-neutral-500 dark:text-neutral-400"
                     fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -120,11 +129,8 @@
                     class="px-1 py-0.5 text-xs font-semibold text-neutral-500 dark:text-neutral-400 bg-neutral-200 dark:bg-coolgray-200 rounded">/</kbd>
             </button>
         </div>
-        <div :class="collapsed && 'lg:hidden'">
-            <livewire:settings-dropdown />
-        </div>
     </div>
-    <div class="px-2 pt-2 pb-7 overflow-hidden motion-safe:transition-all motion-safe:duration-200 motion-safe:ease-out motion-reduce:transition-none" :class="collapsed && 'lg:px-0 lg:pt-0 lg:pb-0 lg:min-h-[4.5rem] lg:flex lg:justify-center'">
+    <div class="px-2 pt-2 pb-7 overflow-hidden" :class="collapsed && 'lg:px-0 lg:pt-0 lg:pb-4 lg:min-h-8 lg:flex lg:justify-center'">
         <livewire:switch-team />
     </div>
     <ul role="list" class="flex flex-col flex-1 gap-y-7">
@@ -366,9 +372,73 @@
                         @endif
                     @endif
                     <div class="flex-1"></div>
+                    <li>
+                        <livewire:settings-dropdown trigger="changelog-sidebar" />
+                    </li>
+                    <li>
+                        <div class="menu-item" title="Theme" aria-label="Theme switcher" :class="collapsed && 'lg:hidden'">
+                            <svg x-show="theme === 'dark'" class="menu-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                            </svg>
+                            <svg x-show="theme === 'light'" class="menu-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                            </svg>
+                            <svg x-show="theme === 'system'" class="menu-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            <span class="menu-item-label">Theme</span>
+                            <div class="ml-auto flex items-center gap-0.5 rounded-sm bg-neutral-100 p-0.5 dark:bg-coolgray-200">
+                                <button type="button" @click.stop="setTheme('light')" title="Light" aria-label="Use light theme"
+                                    class="grid size-6 place-items-center rounded-sm text-xs hover:bg-white hover:text-coollabs dark:hover:bg-base dark:hover:text-warning"
+                                    :class="theme === 'light' && 'bg-white text-coollabs shadow-sm dark:bg-base dark:text-warning'">
+                                    <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                                    </svg>
+                                </button>
+                                <button type="button" @click.stop="setTheme('system')" title="System default" aria-label="Use system theme"
+                                    class="grid size-6 place-items-center rounded-sm text-xs hover:bg-white hover:text-coollabs dark:hover:bg-base dark:hover:text-warning"
+                                    :class="theme === 'system' && 'bg-white text-coollabs shadow-sm dark:bg-base dark:text-warning'">
+                                    <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                    </svg>
+                                </button>
+                                <button type="button" @click.stop="setTheme('dark')" title="Dark" aria-label="Use dark theme"
+                                    class="grid size-6 place-items-center rounded-sm text-xs hover:bg-white hover:text-coollabs dark:hover:bg-base dark:hover:text-warning"
+                                    :class="theme === 'dark' && 'bg-white text-coollabs shadow-sm dark:bg-base dark:text-warning'">
+                                    <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="button" @click.stop="cycleTheme()"
+                            :title="`Theme: ${theme === 'system' ? 'System default' : theme}. Click to change.`"
+                            :aria-label="`Theme: ${theme === 'system' ? 'System default' : theme}. Click to change theme.`"
+                            class="menu-item hidden"
+                            :class="collapsed && 'lg:flex'">
+                            <svg x-show="theme === 'dark'" class="menu-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                            </svg>
+                            <svg x-show="theme === 'light'" class="menu-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                            </svg>
+                            <svg x-show="theme === 'system'" class="menu-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                        </button>
+                    </li>
                     @if (isInstanceAdmin() && !isCloud())
                         @persist('upgrade')
-                            <li :class="collapsed && 'lg:hidden'">
+                            <li>
                                 <livewire:upgrade />
                             </li>
                         @endpersist
@@ -420,12 +490,12 @@
                 <li>
                     <form action="/logout" method="POST">
                         @csrf
-                        <button title="Logout" type="submit" class="gap-2 mb-6 menu-item">
+                        <button title="Logout" type="submit" class="mb-6 menu-item">
                             <svg class="menu-item-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path fill="currentColor"
                                     d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2a9.985 9.985 0 0 1 8 4h-2.71a8 8 0 1 0 .001 12h2.71A9.985 9.985 0 0 1 12 22m7-6v-3h-8v-2h8V8l5 4z" />
                             </svg>
-                            <span :class="collapsed && 'lg:hidden'">Logout</span>
+                            <span class="text-left menu-item-label" :class="collapsed && 'lg:hidden'">Logout</span>
                         </button>
                     </form>
                 </li>

@@ -93,7 +93,9 @@ class Sentinel extends Component
     {
         if ($event['serverUuid'] === $this->server->uuid) {
             $this->server->refresh();
-            $this->syncData();
+            // Only refresh display-only state; never re-sync text-input properties
+            // (would clobber any unsaved typing — see coolify#6062 / #6354 / #9695).
+            $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
             $this->dispatch('success', 'Sentinel has been restarted successfully.');
         }
     }

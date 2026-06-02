@@ -67,7 +67,7 @@ test('existing application buildpack selector lists nixpacks before railpack', f
         ], false);
 });
 
-test('existing application shows railpack beta badge in build helper copy', function () {
+test('existing application shows railpack beta label in build pack selector', function () {
     $application = Application::factory()->create([
         'environment_id' => $this->environment->id,
         'destination_id' => $this->destination->id,
@@ -81,6 +81,5 @@ test('existing application shows railpack beta badge in build helper copy', func
 
     Livewire::test(General::class, ['application' => $application])
         ->assertSuccessful()
-        ->assertSee('Railpack')
-        ->assertSee('Beta');
+        ->assertSee('Railpack (Beta)');
 });

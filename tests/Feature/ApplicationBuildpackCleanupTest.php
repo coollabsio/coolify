@@ -240,6 +240,27 @@ describe('Application Model Buildpack Cleanup', function () {
         expect($application->dockerfile)->toBeNull();
     });
 
+    test('dockerfile location defaults only for dockerfile buildpack', function () {
+        $team = Team::factory()->create();
+        $project = Project::factory()->create(['team_id' => $team->id]);
+        $environment = Environment::factory()->create(['project_id' => $project->id]);
+
+        $nixpacksApplication = Application::factory()->create([
+            'environment_id' => $environment->id,
+            'build_pack' => 'nixpacks',
+            'dockerfile_location' => null,
+        ]);
+
+        $dockerfileApplication = Application::factory()->create([
+            'environment_id' => $environment->id,
+            'build_pack' => 'dockerfile',
+            'dockerfile_location' => null,
+        ]);
+
+        expect($nixpacksApplication->refresh()->dockerfile_location)->toBeNull();
+        expect($dockerfileApplication->refresh()->dockerfile_location)->toBe('/Dockerfile');
+    });
+
     test('model does not trigger cleanup when build_pack is not changed', function () {
         $team = Team::factory()->create();
         $project = Project::factory()->create(['team_id' => $team->id]);

@@ -51,7 +51,7 @@ describe('GitHub Manual Webhook HMAC', function () {
         ], $payload);
 
         $response->assertOk();
-        expect($response->getContent())->toContain('Webhook secret not configured');
+        expect($response->getContent())->toContain('Invalid signature');
     });
 
     test('rejects push with forged hash', function () {
@@ -118,7 +118,7 @@ describe('GitLab Manual Webhook HMAC', function () {
         ]);
 
         $response->assertOk();
-        expect($response->getContent())->toContain('Webhook secret not configured');
+        expect($response->getContent())->toContain('Invalid signature');
     });
 
     test('rejects push with wrong token', function () {
@@ -178,7 +178,7 @@ describe('Bitbucket Manual Webhook HMAC', function () {
         ], $payload);
 
         $response->assertOk();
-        expect($response->getContent())->toContain('Webhook secret not configured');
+        expect($response->getContent())->toContain('Invalid signature');
     });
 
     test('rejects push with non-sha256 algorithm', function () {
@@ -263,7 +263,7 @@ describe('Gitea Manual Webhook HMAC', function () {
         ], $payload);
 
         $response->assertOk();
-        expect($response->getContent())->toContain('Webhook secret not configured');
+        expect($response->getContent())->toContain('Invalid signature');
     });
 
     test('rejects push with forged hash', function () {
@@ -309,6 +309,269 @@ describe('Gitea Manual Webhook HMAC', function () {
         $content = $response->getContent();
         expect($content)->not->toContain('Invalid signature');
         expect($content)->not->toContain('Webhook secret not configured');
+    });
+});
+
+describe('Manual Webhook Repository Matching', function () {
+    test('github rejects empty repository without leaking applications', function () {
+        $app = createApplicationWithWebhook(overrides: ['name' => 'secret-github-app']);
+
+        $payload = json_encode([
+            'ref' => 'refs/heads/main',
+            'repository' => ['full_name' => ''],
+            'after' => 'abc123',
+            'commits' => [],
+        ]);
+
+        $response = $this->call('POST', '/webhooks/source/github/events/manual', [], [], [], [
+            'HTTP_X-GitHub-Event' => 'push',
+            'HTTP_X-Hub-Signature-256' => 'sha256=forgedhashvalue',
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        $content = $response->getContent();
+        expect($content)->toContain('Invalid repository')
+            ->not->toContain('secret-github-app')
+            ->not->toContain($app->uuid);
+    });
+
+    test('github does not match repository substrings', function () {
+        $app = createApplicationWithWebhook(overrides: ['name' => 'secret-github-app']);
+
+        $payload = json_encode([
+            'ref' => 'refs/heads/main',
+            'repository' => ['full_name' => 'test-org/test'],
+            'after' => 'abc123',
+            'commits' => [],
+        ]);
+
+        $response = $this->call('POST', '/webhooks/source/github/events/manual', [], [], [], [
+            'HTTP_X-GitHub-Event' => 'push',
+            'HTTP_X-Hub-Signature-256' => 'sha256=forgedhashvalue',
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        $content = $response->getContent();
+        expect($content)->toContain('No applications found')
+            ->not->toContain('secret-github-app')
+            ->not->toContain($app->uuid);
+    });
+
+    test('github invalid signature does not leak matched application identifiers', function () {
+        $app = createApplicationWithWebhook(overrides: ['name' => 'secret-github-app']);
+
+        $payload = json_encode([
+            'ref' => 'refs/heads/main',
+            'repository' => ['full_name' => 'test-org/test-repo'],
+            'after' => 'abc123',
+            'commits' => [],
+        ]);
+
+        $response = $this->call('POST', '/webhooks/source/github/events/manual', [], [], [], [
+            'HTTP_X-GitHub-Event' => 'push',
+            'HTTP_X-Hub-Signature-256' => 'sha256=forgedhashvalue',
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        $content = $response->getContent();
+        expect($content)->toContain('Invalid signature')
+            ->not->toContain('secret-github-app')
+            ->not->toContain($app->uuid)
+            ->not->toContain('application_uuid')
+            ->not->toContain('application_name');
+    });
+
+    test('manual webhooks reject empty repositories for every provider without leaking applications', function (string $provider, string $uri, array $payload, array $headers) {
+        $app = createApplicationWithWebhook(overrides: ['name' => "secret-{$provider}-app"]);
+        $body = json_encode($payload);
+
+        $server = ['CONTENT_TYPE' => 'application/json'];
+        foreach ($headers as $name => $value) {
+            $server[$name] = $value;
+        }
+
+        $response = $this->call('POST', $uri, [], [], [], $server, $body);
+
+        $response->assertOk();
+        $content = $response->getContent();
+        expect($content)->toContain('Invalid repository')
+            ->not->toContain("secret-{$provider}-app")
+            ->not->toContain($app->uuid);
+    })->with([
+        'gitlab' => [
+            'gitlab',
+            '/webhooks/source/gitlab/events/manual',
+            [
+                'object_kind' => 'push',
+                'ref' => 'refs/heads/main',
+                'project' => ['path_with_namespace' => ''],
+                'after' => 'abc123',
+                'commits' => [],
+            ],
+            ['HTTP_X-Gitlab-Token' => 'wrong-token'],
+        ],
+        'bitbucket' => [
+            'bitbucket',
+            '/webhooks/source/bitbucket/events/manual',
+            [
+                'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc123']]]]],
+                'repository' => ['full_name' => ''],
+            ],
+            ['HTTP_X-Event-Key' => 'repo:push', 'HTTP_X-Hub-Signature' => 'sha256=forgedhashvalue'],
+        ],
+        'gitea' => [
+            'gitea',
+            '/webhooks/source/gitea/events/manual',
+            [
+                'ref' => 'refs/heads/main',
+                'repository' => ['full_name' => ''],
+                'after' => 'abc123',
+                'commits' => [],
+            ],
+            ['HTTP_X-Gitea-Event' => 'push', 'HTTP_X-Hub-Signature-256' => 'sha256=forgedhashvalue'],
+        ],
+    ]);
+
+    test('manual webhooks do not match repository substrings for every provider', function (string $provider, string $uri, array $payload, array $headers) {
+        $app = createApplicationWithWebhook(overrides: ['name' => "secret-{$provider}-app"]);
+        $body = json_encode($payload);
+
+        $server = ['CONTENT_TYPE' => 'application/json'];
+        foreach ($headers as $name => $value) {
+            $server[$name] = $value;
+        }
+
+        $response = $this->call('POST', $uri, [], [], [], $server, $body);
+
+        $response->assertOk();
+        $content = $response->getContent();
+        expect($content)->toContain('No applications found')
+            ->not->toContain("secret-{$provider}-app")
+            ->not->toContain($app->uuid);
+    })->with([
+        'gitlab' => [
+            'gitlab',
+            '/webhooks/source/gitlab/events/manual',
+            [
+                'object_kind' => 'push',
+                'ref' => 'refs/heads/main',
+                'project' => ['path_with_namespace' => 'test-org/test'],
+                'after' => 'abc123',
+                'commits' => [],
+            ],
+            ['HTTP_X-Gitlab-Token' => 'wrong-token'],
+        ],
+        'bitbucket' => [
+            'bitbucket',
+            '/webhooks/source/bitbucket/events/manual',
+            [
+                'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc123']]]]],
+                'repository' => ['full_name' => 'test-org/test'],
+            ],
+            ['HTTP_X-Event-Key' => 'repo:push', 'HTTP_X-Hub-Signature' => 'sha256=forgedhashvalue'],
+        ],
+        'gitea' => [
+            'gitea',
+            '/webhooks/source/gitea/events/manual',
+            [
+                'ref' => 'refs/heads/main',
+                'repository' => ['full_name' => 'test-org/test'],
+                'after' => 'abc123',
+                'commits' => [],
+            ],
+            ['HTTP_X-Gitea-Event' => 'push', 'HTTP_X-Hub-Signature-256' => 'sha256=forgedhashvalue'],
+        ],
+    ]);
+
+    test('github matches ssh git repository URL exactly', function () {
+        $app = createApplicationWithWebhook(overrides: [
+            'git_repository' => 'git@github.com:test-org/test-repo.git',
+        ]);
+        $secret = $app->manual_webhook_secret_github;
+
+        $payload = json_encode([
+            'ref' => 'refs/heads/main',
+            'repository' => ['full_name' => 'test-org/test-repo'],
+            'after' => 'abc123',
+            'commits' => [],
+        ]);
+
+        $response = $this->call('POST', '/webhooks/source/github/events/manual', [], [], [], [
+            'HTTP_X-GitHub-Event' => 'push',
+            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, $secret),
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        expect($response->getContent())->not->toContain('No applications found');
+    });
+
+    test('gitlab matches scp-style ssh repository URL with custom port', function () {
+        $app = createApplicationWithWebhook(overrides: [
+            'git_repository' => 'git@gitlab.example.com:2222/services/xyz.git',
+            'git_branch' => 'master',
+        ]);
+        $secret = $app->manual_webhook_secret_gitlab;
+
+        $response = $this->postJson('/webhooks/source/gitlab/events/manual', [
+            'object_kind' => 'push',
+            'ref' => 'refs/heads/master',
+            'project' => ['path_with_namespace' => 'services/xyz'],
+            'after' => 'abc123',
+            'commits' => [],
+        ], [
+            'X-Gitlab-Token' => $secret,
+        ]);
+
+        $response->assertOk();
+        expect($response->getContent())->not->toContain('No applications found');
+    });
+
+    test('gitlab matches scp-style ssh repository URL without port', function () {
+        $app = createApplicationWithWebhook(overrides: [
+            'git_repository' => 'git@gitlab.example.com:services/xyz.git',
+            'git_branch' => 'master',
+        ]);
+        $secret = $app->manual_webhook_secret_gitlab;
+
+        $response = $this->postJson('/webhooks/source/gitlab/events/manual', [
+            'object_kind' => 'push',
+            'ref' => 'refs/heads/master',
+            'project' => ['path_with_namespace' => 'services/xyz'],
+            'after' => 'abc123',
+            'commits' => [],
+        ], [
+            'X-Gitlab-Token' => $secret,
+        ]);
+
+        $response->assertOk();
+        expect($response->getContent())->not->toContain('No applications found');
+    });
+
+    test('github matches repository case-insensitively', function () {
+        $app = createApplicationWithWebhook(overrides: [
+            'git_repository' => 'https://github.com/Test-Org/Test-Repo.git',
+        ]);
+        $secret = $app->manual_webhook_secret_github;
+
+        $payload = json_encode([
+            'ref' => 'refs/heads/main',
+            'repository' => ['full_name' => 'test-org/test-repo'],
+            'after' => 'abc123',
+            'commits' => [],
+        ]);
+
+        $response = $this->call('POST', '/webhooks/source/github/events/manual', [], [], [], [
+            'HTTP_X-GitHub-Event' => 'push',
+            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, $secret),
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        expect($response->getContent())->not->toContain('No applications found');
     });
 });
 

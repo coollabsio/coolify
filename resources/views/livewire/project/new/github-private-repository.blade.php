@@ -93,14 +93,6 @@
                                             helper="If there is a build process involved (like Svelte, React, Next, etc..), please specify the output directory for the build assets." />
                                     @endif
                                 </div>
-                                @if ($build_pack === 'railpack')
-                                    <div>
-                                        <span
-                                            class="px-2 py-1 text-xs font-bold uppercase tracking-wide bg-coollabs/10 dark:bg-warning/20 text-coollabs dark:text-warning rounded">
-                                            Beta
-                                        </span>
-                                    </div>
-                                @endif
                                 @if ($build_pack === 'dockercompose')
                                     <div x-data="{
                                         baseDir: '{{ $base_directory }}',

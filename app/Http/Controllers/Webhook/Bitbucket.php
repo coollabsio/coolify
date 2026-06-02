@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Webhook;
 use App\Actions\Application\CleanupPreviewDeployment;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
+use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Exception;
@@ -14,6 +15,7 @@ use Visus\Cuid2\Cuid2;
 class Bitbucket extends Controller
 {
     use DetectsSkipDeployCommits;
+    use MatchesManualWebhookApplications;
 
     public function manual(Request $request)
     {
@@ -62,8 +64,14 @@ class Bitbucket extends Controller
                 $skip_deploy_pr = self::shouldSkipDeployAny([$pull_request_title]);
                 $commit = data_get($payload, 'pullrequest.source.commit.hash');
             }
-            $applications = Application::where('git_repository', 'like', "%$full_name%");
-            $applications = $applications->where('git_branch', $branch)->get();
+            $full_name = $this->manualWebhookRepositoryFullName($full_name);
+            if ($full_name === null) {
+                return response([
+                    'status' => 'failed',
+                    'message' => 'Nothing to do. Invalid repository.',
+                ]);
+            }
+            $applications = $this->manualWebhookApplications(Application::query()->where('git_branch', $branch), $full_name);
             if ($applications->isEmpty()) {
                 return response([
                     'status' => 'failed',
@@ -79,11 +87,7 @@ class Bitbucket extends Controller
                         'repository' => $full_name ?? null,
                         'event' => $x_bitbucket_event,
                     ]);
-                    $return_payloads->push([
-                        'application' => $application->name,
-                        'status' => 'failed',
-                        'message' => 'Webhook secret not configured.',
-                    ]);
+                    $return_payloads->push($this->unauthenticatedManualWebhookFailurePayload());
 
                     continue;
                 }
@@ -97,11 +101,7 @@ class Bitbucket extends Controller
                         'repository' => $full_name ?? null,
                         'event' => $x_bitbucket_event,
                     ]);
-                    $return_payloads->push([
-                        'application' => $application->name,
-                        'status' => 'failed',
-                        'message' => 'Invalid signature.',
-                    ]);
+                    $return_payloads->push($this->unauthenticatedManualWebhookFailurePayload());
 
                     continue;
                 }
@@ -114,11 +114,7 @@ class Bitbucket extends Controller
                         'repository' => $full_name ?? null,
                         'event' => $x_bitbucket_event,
                     ]);
-                    $return_payloads->push([
-                        'application' => $application->name,
-                        'status' => 'failed',
-                        'message' => 'Invalid signature.',
-                    ]);
+                    $return_payloads->push($this->unauthenticatedManualWebhookFailurePayload());
 
                     continue;
                 }

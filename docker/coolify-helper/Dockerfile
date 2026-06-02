@@ -12,9 +12,9 @@ ARG PACK_VERSION=0.38.2
 # https://github.com/railwayapp/nixpacks/releases
 ARG NIXPACKS_VERSION=1.41.0
 # https://github.com/railwayapp/railpack/releases
-ARG RAILPACK_VERSION=0.22.0
+ARG RAILPACK_VERSION=0.23.0
 # https://github.com/jdx/mise/releases — must match railpack's pinned version (https://raw.githubusercontent.com/railwayapp/railpack/refs/heads/main/core/mise/version.txt)
-ARG MISE_VERSION=2026.3.12
+ARG MISE_VERSION=2026.3.17
 # https://github.com/minio/mc/releases
 ARG MINIO_VERSION=RELEASE.2025-08-13T08-35-41Z
 

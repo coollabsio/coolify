@@ -4605,6 +4605,35 @@
                                     "mysql_conf": {
                                         "type": "string",
                                         "description": "MySQL conf"
+                                    },
+                                    "health_check_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable the database healthcheck probe.",
+                                        "default": true
+                                    },
+                                    "health_check_interval": {
+                                        "type": "integer",
+                                        "description": "Healthcheck interval in seconds.",
+                                        "minimum": 1,
+                                        "default": 15
+                                    },
+                                    "health_check_timeout": {
+                                        "type": "integer",
+                                        "description": "Healthcheck timeout in seconds.",
+                                        "minimum": 1,
+                                        "default": 5
+                                    },
+                                    "health_check_retries": {
+                                        "type": "integer",
+                                        "description": "Healthcheck retries count.",
+                                        "minimum": 1,
+                                        "default": 5
+                                    },
+                                    "health_check_start_period": {
+                                        "type": "integer",
+                                        "description": "Healthcheck start period in seconds.",
+                                        "minimum": 0,
+                                        "default": 5
                                     }
                                 },
                                 "type": "object"
@@ -12789,6 +12818,18 @@
                     },
                     "docker_registry_image_tag": {
                         "type": "string",
+                        "nullable": true
+                    },
+                    "configuration_hash": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "configuration_snapshot": {
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "configuration_diff": {
+                        "type": "object",
                         "nullable": true
                     },
                     "force_rebuild": {

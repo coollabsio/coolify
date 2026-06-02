@@ -40,18 +40,21 @@ class General extends Component
 
     public ?string $customDockerRunOptions = null;
 
-    public ?string $dbUrl = null;
-
-    public ?string $dbUrlPublic = null;
-
     public bool $isLogDrainEnabled = false;
 
-    public function getListeners()
+    public function getListeners(): array
     {
-        $teamId = Auth::user()->currentTeam()->id;
+        $user = Auth::user();
+        if (! $user) {
+            return [];
+        }
+        $team = $user->currentTeam();
+        if (! $team) {
+            return [];
+        }
 
         return [
-            "echo-private:team.{$teamId},DatabaseProxyStopped" => 'databaseProxyStopped',
+            "echo-private:team.{$team->id},DatabaseProxyStopped" => 'databaseProxyStopped',
         ];
     }
 
@@ -88,8 +91,6 @@ class General extends Component
             'publicPort' => 'nullable|integer|min:1|max:65535',
             'publicPortTimeout' => 'nullable|integer|min:1',
             'customDockerRunOptions' => 'nullable|string',
-            'dbUrl' => 'nullable|string',
-            'dbUrlPublic' => 'nullable|string',
             'isLogDrainEnabled' => 'nullable|boolean',
         ];
     }
@@ -129,9 +130,6 @@ class General extends Component
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->save();
-
-            $this->dbUrl = $this->database->internal_db_url;
-            $this->dbUrlPublic = $this->database->external_db_url;
         } else {
             $this->name = $this->database->name;
             $this->description = $this->database->description;
@@ -144,8 +142,6 @@ class General extends Component
             $this->publicPortTimeout = $this->database->public_port_timeout;
             $this->customDockerRunOptions = $this->database->custom_docker_run_options;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
-            $this->dbUrl = $this->database->internal_db_url;
-            $this->dbUrlPublic = $this->database->external_db_url;
         }
     }
 
@@ -194,6 +190,7 @@ class General extends Component
                 StopDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is no longer publicly accessible.');
             }
+            $this->dispatch('databaseUpdated');
         } catch (\Throwable $e) {
             $this->isPublic = ! $this->isPublic;
             $this->syncData(true);
@@ -202,9 +199,13 @@ class General extends Component
         }
     }
 
-    public function databaseProxyStopped()
+    public function databaseProxyStopped(): void
     {
-        $this->syncData();
+        $this->database->refresh();
+        $this->isPublic = $this->database->is_public;
+        $this->publicPort = $this->database->public_port;
+        $this->publicPortTimeout = $this->database->public_port_timeout;
+        $this->dispatch('databaseUpdated');
     }
 
     public function submit()
@@ -220,6 +221,7 @@ class General extends Component
             }
             $this->syncData(true);
             $this->dispatch('success', 'Database updated.');
+            $this->dispatch('databaseUpdated');
         } catch (Exception $e) {
             return handleError($e, $this);
         } finally {

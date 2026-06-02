@@ -353,14 +353,30 @@ function showBoarding(): bool
 function refreshSession(?Team $team = null): void
 {
     if (! $team) {
-        if (Auth::user()->currentTeam()) {
-            $team = Team::find(Auth::user()->currentTeam()->id);
-        } else {
-            $team = User::find(Auth::id())->teams->first();
+        $currentTeam = Auth::user()->currentTeam();
+        if ($currentTeam) {
+            // currentTeam() can resolve a stale (just-deleted) team from the
+            // session/cache, so Team::find() may still return null here.
+            $team = Team::find($currentTeam->id);
+        }
+        if (! $team) {
+            // Fall back to any team the user still belongs to.
+            $team = User::query()->find(Auth::id())?->teams()->first();
         }
     }
+
     // Clear old cache key format for backwards compatibility
     Cache::forget('team:'.Auth::id());
+
+    if (! $team) {
+        // The user has no team left (e.g. just deleted their current team and
+        // belongs to no other): clear the stale session reference instead of
+        // dereferencing null.
+        session()->forget('currentTeam');
+
+        return;
+    }
+
     // Use new cache key format that includes team ID
     Cache::forget('user:'.Auth::id().':team:'.$team->id);
     Cache::remember('user:'.Auth::id().':team:'.$team->id, 3600, function () use ($team) {
@@ -590,6 +606,39 @@ function isDev(): bool
 function isCloud(): bool
 {
     return ! config('constants.coolify.self_hosted');
+}
+
+/**
+ * Resolve the queue used for application deployments, database starts and service starts.
+ *
+ * On cloud these jobs run on a dedicated `deployments` queue so they can be drained by an
+ * isolated Horizon worker pool; self-hosted keeps them on the shared `high` queue. Routing
+ * is decided by `isCloud()` (config-based) rather than `HORIZON_QUEUES`, so the dispatching
+ * process needs no special env — only the worker must be configured to drain `deployments`.
+ *
+ * IMPORTANT: on cloud a worker MUST include `deployments` in its `HORIZON_QUEUES`, otherwise
+ * these jobs are never processed.
+ */
+function deployment_queue(): string
+{
+    return isCloud() ? 'deployments' : 'high';
+}
+
+/**
+ * Resolve the queue used for scheduled jobs — the scheduler dispatcher, scheduled tasks and
+ * scheduled database backups, whether triggered automatically or manually.
+ *
+ * On cloud these jobs run on a dedicated `crons` queue so they can be drained by an isolated
+ * Horizon worker pool; self-hosted keeps them on the shared `high` queue. Routing is decided
+ * by `isCloud()` (config-based), so the dispatching process needs no special env — only the
+ * worker must be configured to drain `crons`.
+ *
+ * IMPORTANT: on cloud a worker MUST include `crons` in its `HORIZON_QUEUES`, otherwise these
+ * jobs are never processed.
+ */
+function crons_queue(): string
+{
+    return isCloud() ? 'crons' : 'high';
 }
 
 function translate_cron_expression($expression_to_validate): string

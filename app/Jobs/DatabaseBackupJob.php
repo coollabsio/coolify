@@ -77,7 +77,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(public ScheduledDatabaseBackup $backup)
     {
-        $this->onQueue('high');
+        $this->onQueue(crons_queue());
         $this->timeout = $backup->timeout ?? 3600;
     }
 
@@ -668,12 +668,14 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function upload_to_s3(): void
     {
         if (is_null($this->s3)) {
+            $previousS3StorageId = $this->backup->s3_storage_id;
+
             $this->backup->update([
                 'save_s3' => false,
                 's3_storage_id' => null,
             ]);
 
-            throw new \Exception('S3 storage configuration is missing or has been deleted (S3 storage ID: '.($this->backup->s3_storage_id ?? 'null').'). S3 backup has been disabled for this schedule.');
+            throw new \Exception('S3 storage configuration is missing or has been deleted (S3 storage ID: '.($previousS3StorageId ?? 'null').'). S3 backup has been disabled for this schedule.');
         }
 
         try {

@@ -39,6 +39,7 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
         public string $commitSha,
         public ?string $authorAssociation,
         public string $fullName,
+        public bool $isForkPullRequest = false,
     ) {
         $this->onQueue('high');
     }
@@ -92,7 +93,17 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
 
         // Check if PR deployments from public contributors are restricted
         if (! $application->settings->is_pr_deployments_public_enabled) {
-            $trustedAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR', 'CONTRIBUTOR'];
+            // Fork PRs carry untrusted code from a repository outside our control.
+            // GitHub's author_association cannot be trusted to gate these (it grants
+            // CONTRIBUTOR to anyone who has merely opened an issue/PR before), so fork
+            // PRs are never deployed automatically when public previews are off.
+            if ($this->isForkPullRequest) {
+                return;
+            }
+
+            // Same-repo (non-fork) branch PRs require push access to the base repo,
+            // so only trusted associations are allowed to trigger a deployment.
+            $trustedAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR'];
             if (! in_array($this->authorAssociation, $trustedAssociations)) {
                 return;
             }

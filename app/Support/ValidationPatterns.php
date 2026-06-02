@@ -103,6 +103,23 @@ class ValidationPatterns
     public const DB_PASSWORD_PATTERN = '/^[A-Za-z0-9!@#%^*()_+\-=\[\]{}:,.?\/~]+$/';
 
     /**
+     * Pattern for Docker image repository names without a tag.
+     *
+     * Allows an optional registry host/port followed by lowercase repository
+     * path components. A trailing @sha256 marker is accepted for existing
+     * digest-based dockerimage records that store the digest hash separately.
+     */
+    public const DOCKER_IMAGE_NAME_PATTERN = '/\A(?=.{1,255}\z)(?:(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]+)?\/)?[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:\/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*)(?:@sha256)?\z/';
+
+    /**
+     * Pattern for Docker image tags.
+     *
+     * Docker tags may contain letters, digits, underscores, dots, and hyphens,
+     * must start with an alphanumeric/underscore, and are limited to 128 chars.
+     */
+    public const DOCKER_IMAGE_TAG_PATTERN = '/\A[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\z/';
+
+    /**
      * Normalize environment variable keys before validation and storage.
      */
     public static function normalizeEnvironmentVariableKey(string $value): string
@@ -161,6 +178,81 @@ class ValidationPatterns
         }
 
         return $key;
+    }
+
+    /**
+     * Get validation rules for Docker image repository names without tags.
+     */
+    public static function dockerImageNameRules(bool $required = false, int $maxLength = 255): array
+    {
+        $rules = [];
+
+        if ($required) {
+            $rules[] = 'required';
+        } else {
+            $rules[] = 'nullable';
+        }
+
+        $rules[] = 'string';
+        $rules[] = "max:$maxLength";
+        $rules[] = 'regex:'.self::DOCKER_IMAGE_NAME_PATTERN;
+
+        return $rules;
+    }
+
+    /**
+     * Get validation rules for Docker image tags.
+     */
+    public static function dockerImageTagRules(bool $required = false, int $maxLength = 128): array
+    {
+        $rules = [];
+
+        if ($required) {
+            $rules[] = 'required';
+        } else {
+            $rules[] = 'nullable';
+        }
+
+        $rules[] = 'string';
+        $rules[] = "max:$maxLength";
+        $rules[] = 'regex:'.self::DOCKER_IMAGE_TAG_PATTERN;
+
+        return $rules;
+    }
+
+    /**
+     * Get validation messages for Docker image fields.
+     */
+    public static function dockerImageMessages(string $nameField = 'docker_registry_image_name', string $tagField = 'docker_registry_image_tag'): array
+    {
+        return [
+            "{$nameField}.regex" => 'The Docker registry image name must be a valid image repository without a tag and may not contain shell metacharacters.',
+            "{$tagField}.regex" => 'The Docker registry image tag must be a valid Docker tag and may not contain shell metacharacters.',
+        ];
+    }
+
+    /**
+     * Check if a string is a valid Docker image repository name without a tag.
+     */
+    public static function isValidDockerImageName(?string $value): bool
+    {
+        if (blank($value)) {
+            return true;
+        }
+
+        return preg_match(self::DOCKER_IMAGE_NAME_PATTERN, $value) === 1;
+    }
+
+    /**
+     * Check if a string is a valid Docker image tag.
+     */
+    public static function isValidDockerImageTag(?string $value): bool
+    {
+        if (blank($value)) {
+            return true;
+        }
+
+        return preg_match(self::DOCKER_IMAGE_TAG_PATTERN, $value) === 1;
     }
 
     /**

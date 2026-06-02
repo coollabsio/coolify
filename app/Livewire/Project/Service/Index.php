@@ -108,10 +108,16 @@ class Index extends Component
             $this->parameters = get_route_parameters();
             $this->query = request()->query();
             $this->currentRoute = request()->route()->getName();
-            $this->service = Service::whereUuid($this->parameters['service_uuid'])->first();
-            if (! $this->service) {
-                return redirect()->route('dashboard');
-            }
+            $project = currentTeam()
+                ->projects()
+                ->select('id', 'uuid', 'team_id')
+                ->where('uuid', $this->parameters['project_uuid'])
+                ->firstOrFail();
+            $environment = $project->environments()
+                ->select('id', 'uuid', 'name', 'project_id')
+                ->where('uuid', $this->parameters['environment_uuid'])
+                ->firstOrFail();
+            $this->service = $environment->services()->whereUuid($this->parameters['service_uuid'])->firstOrFail();
             $this->authorize('view', $this->service);
             $service = $this->service->applications()->whereUuid($this->parameters['stack_service_uuid'])->first();
             if ($service) {
