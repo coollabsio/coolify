@@ -156,7 +156,7 @@ Thank you so much!
 <a href="https://github.com/mindedtech?utm_source=coolify.io"><img width="60px" alt="MindedTech" src="https://github.com/mindedtech.png"/></a>
 <a href="https://netrouting.com/?utm_source=coolify.io"><img width="60px" alt="NetRouting" src="https://github.com/netroutingcom.png"/></a>
 <a href="https://github.com/parsecph?utm_source=coolify.io"><img width="60px" alt="ParsecPH" src="https://github.com/parsecph.png"/></a>
-
+<a href="https://www.launchfa.st?utm_source=coolify.io"><img width="60px" alt="LaunchFast" src="https://github.com/LaunchFast-Boilerplates.png"/></a>
 
 ...and many more at [GitHub Sponsors](https://github.com/sponsors/coollabsio)
 
