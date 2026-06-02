@@ -35,7 +35,8 @@ services:
   authentik-worker:
     image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2025.10.3}
     restart: unless-stopped
-    command: worker
+    entrypoint: ["/bin/bash", "-c"]
+    command: ["chown -R 1000:1000 /media /certs /templates && exec dumb-init -- ak worker"]
     environment:
       - AUTHENTIK_POSTGRESQL__HOST=${POSTGRES_HOST:-postgresql}
       - AUTHENTIK_POSTGRESQL__USER=${SERVICE_USER_POSTGRESQL}
