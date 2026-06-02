@@ -215,3 +215,44 @@ test('ConvertIpAndIp6Together', function () {
         'ip6' => ['2001:db8::1'],
     ]);
 });
+
+test('ConvertSecurityOptWithHyphenatedValue', function () {
+    $input = '--security-opt no-new-privileges:true';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'security_opt' => ['no-new-privileges:true'],
+    ]);
+});
+
+test('ConvertSecurityOptWithEquals', function () {
+    $input = '--security-opt=no-new-privileges:true';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'security_opt' => ['no-new-privileges:true'],
+    ]);
+});
+
+test('ConvertSecurityOptApparmor', function () {
+    $input = '--security-opt apparmor:unconfined';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'security_opt' => ['apparmor:unconfined'],
+    ]);
+});
+
+test('ConvertCapDropWithSecurityOpt', function () {
+    $input = '--cap-drop ALL --security-opt no-new-privileges:true';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'cap_drop' => ['ALL'],
+        'security_opt' => ['no-new-privileges:true'],
+    ]);
+});
+
+test('ConvertSysctlWithHyphenatedValue', function () {
+    $input = '--sysctl net.ipv4.ip-forward=1';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'sysctls' => ['net.ipv4.ip-forward=1'],
+    ]);
+});
