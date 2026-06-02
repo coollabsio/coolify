@@ -705,7 +705,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $endpoint = $this->s3->endpoint;
             $this->s3->testConnection(shouldSave: true);
             if (data_get($this->backup, 'database_type') === ServiceDatabase::class) {
-                $network = $this->database->service->destination->network;
+                if ($this->database->application_id) {
+                    $network = $this->database->application->destination->network;
+                } else {
+                    $network = $this->database->service->destination->network;
+                }
             } else {
                 $network = $this->database->destination->network;
             }

@@ -1073,9 +1073,13 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
         return null;
     }
 
-    // ServiceDatabase has a different relationship path: service->environment->project->team_id
+    // ServiceDatabase has a different relationship path via service or application
     if ($resource instanceof ServiceDatabase) {
-        if ($resource->service?->environment?->project?->team_id === $teamId) {
+        if ($resource->application_id) {
+            if ($resource->application?->environment?->project?->team_id === $teamId) {
+                return $resource;
+            }
+        } elseif ($resource->service?->environment?->project?->team_id === $teamId) {
             return $resource;
         }
 

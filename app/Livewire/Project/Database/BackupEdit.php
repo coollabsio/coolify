@@ -145,7 +145,11 @@ class BackupEdit extends Component
         try {
             $server = null;
             if ($this->backup->database instanceof \App\Models\ServiceDatabase) {
-                $server = $this->backup->database->service->destination->server;
+                if ($this->backup->database->application_id) {
+                    $server = $this->backup->database->application->destination->server;
+                } else {
+                    $server = $this->backup->database->service->destination->server;
+                }
             } elseif ($this->backup->database->destination && $this->backup->database->destination->server) {
                 $server = $this->backup->database->destination->server;
             }
@@ -172,6 +176,14 @@ class BackupEdit extends Component
 
             if ($this->backup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $serviceDatabase = $this->backup->database;
+                if ($serviceDatabase->application_id) {
+                    return redirect()->route('project.application.database.backups', [
+                        'project_uuid' => $this->parameters['project_uuid'],
+                        'environment_uuid' => $this->parameters['environment_uuid'],
+                        'application_uuid' => $serviceDatabase->application->uuid,
+                        'stack_service_uuid' => $serviceDatabase->uuid,
+                    ]);
+                }
 
                 return redirect()->route('project.service.database.backups', [
                     'project_uuid' => $this->parameters['project_uuid'],
