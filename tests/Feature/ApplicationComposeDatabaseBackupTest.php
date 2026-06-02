@@ -6,35 +6,22 @@ use App\Models\Project;
 use App\Models\ServiceDatabase;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
 it('creates ServiceDatabase records for detected databases in Application compose path', function () {
     $team = Team::factory()->create();
 
-    $project = Project::create([
-        'uuid' => (string) Str::uuid(),
-        'name' => 'Test Project',
-        'team_id' => $team->id,
-    ]);
+    $project = Project::factory()->create(['team_id' => $team->id]);
 
-    $environment = Environment::create([
-        'name' => 'test-env-'.Str::random(8),
-        'project_id' => $project->id,
-    ]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
 
-    $application = Application::create([
-        'uuid' => (string) Str::uuid(),
-        'name' => 'test-app',
+    $application = Application::factory()->create([
         'build_pack' => 'dockercompose',
         'environment_id' => $environment->id,
-        'destination_id' => 1,
-        'destination_type' => 'App\Models\StandaloneDocker',
     ]);
 
     ServiceDatabase::create([
-        'uuid' => (string) Str::uuid(),
         'name' => 'postgres',
         'image' => 'postgres:16',
         'application_id' => $application->id,
@@ -51,28 +38,16 @@ it('creates ServiceDatabase records for detected databases in Application compos
 it('returns the correct team for ServiceDatabase through the application relationship chain', function () {
     $team = Team::factory()->create();
 
-    $project = Project::create([
-        'uuid' => (string) Str::uuid(),
-        'name' => 'Test Project',
-        'team_id' => $team->id,
-    ]);
+    $project = Project::factory()->create(['team_id' => $team->id]);
 
-    $environment = Environment::create([
-        'name' => 'test-env-'.Str::random(8),
-        'project_id' => $project->id,
-    ]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
 
-    $application = Application::create([
-        'uuid' => (string) Str::uuid(),
-        'name' => 'test-app',
+    $application = Application::factory()->create([
         'build_pack' => 'dockercompose',
         'environment_id' => $environment->id,
-        'destination_id' => 1,
-        'destination_type' => 'App\Models\StandaloneDocker',
     ]);
 
     $serviceDatabase = ServiceDatabase::create([
-        'uuid' => (string) Str::uuid(),
         'name' => 'postgres',
         'image' => 'postgres:16',
         'application_id' => $application->id,
