@@ -101,7 +101,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (data_get($this->backup, 'database_type') === ServiceDatabase::class) {
                 $this->database = data_get($this->backup, 'database');
-                $this->server = $this->database->service->server;
+                if ($this->database->application_id) {
+                    $this->server = $this->database->application->destination->server;
+                } else {
+                    $this->server = $this->database->service->server;
+                }
                 $this->s3 = $this->backup->s3;
             } else {
                 $this->database = data_get($this->backup, 'database');
@@ -130,9 +134,26 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
             if (data_get($this->backup, 'database_type') === ServiceDatabase::class) {
+                // Check for overlapping deployment when database belongs to an Application
+                if ($this->database->application_id) {
+                    $inProgressDeployment = \App\Models\ApplicationDeploymentQueue::where('application_id', $this->database->application_id)
+                        ->where('status', \App\Enums\ApplicationDeploymentStatus::IN_PROGRESS->value)
+                        ->exists();
+                    if ($inProgressDeployment) {
+                        $this->release(60);
+
+                        return;
+                    }
+                }
+
                 $databaseType = $this->database->databaseType();
-                $serviceUuid = $this->database->service->uuid;
-                $serviceName = str($this->database->service->name)->slug();
+                if ($this->database->application_id) {
+                    $serviceUuid = $this->database->application->uuid;
+                    $serviceName = str($this->database->application->name)->slug();
+                } else {
+                    $serviceUuid = $this->database->service->uuid;
+                    $serviceName = str($this->database->service->name)->slug();
+                }
                 if (str($databaseType)->contains('postgres')) {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName.'-'.$this->container_name;

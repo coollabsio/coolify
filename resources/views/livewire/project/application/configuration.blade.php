@@ -55,6 +55,10 @@
                 <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                     href="{{ route('project.application.healthcheck', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Healthcheck</span></a>
             @endif
+            @if ($application->build_pack === 'dockercompose' && $application->serviceDatabase()->exists())
+                <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
+                    href="{{ route('project.application.databases', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Databases</span></a>
+            @endif
             <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.application.rollback', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Rollback</span></a>
             <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
@@ -105,6 +109,8 @@
                 <livewire:project.shared.tags :resource="$application" />
             @elseif ($currentRoute === 'project.application.danger')
                 <livewire:project.shared.danger :resource="$application" />
+            @elseif ($currentRoute === 'project.application.databases' && $application->build_pack === 'dockercompose')
+                <livewire:project.application.databases :application="$application" />
             @endif
         </div>
     </div>

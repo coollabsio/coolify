@@ -2977,6 +2977,24 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
 
+            // Create or update ServiceDatabase record for detected databases
+            if ($isDatabase && $pull_request_id === 0) {
+                $savedServiceDb = ServiceDatabase::where([
+                    'name' => $serviceName,
+                    'application_id' => $resource->id,
+                ])->first();
+                if (is_null($savedServiceDb)) {
+                    ServiceDatabase::create([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'application_id' => $resource->id,
+                    ]);
+                } elseif ($savedServiceDb->image !== $image) {
+                    $savedServiceDb->image = $image;
+                    $savedServiceDb->save();
+                }
+            }
+
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
@@ -3360,6 +3378,18 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 data_forget($services, $serviceName);
             });
         }
+
+        // Remove ServiceDatabase records for services that are no longer in the compose file
+        if ($pull_request_id === 0) {
+            $currentServiceNames = $services->keys()->toArray();
+            ServiceDatabase::where('application_id', $resource->id)
+                ->whereNotIn('name', $currentServiceNames)
+                ->each(function ($serviceDatabase) {
+                    $serviceDatabase->scheduledBackups()->delete();
+                    $serviceDatabase->delete();
+                });
+        }
+
         $finalServices = [
             'services' => $services->toArray(),
             'volumes' => $topLevelVolumes->toArray(),

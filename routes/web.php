@@ -16,6 +16,7 @@ use App\Livewire\Notifications\Slack as NotificationSlack;
 use App\Livewire\Notifications\Telegram as NotificationTelegram;
 use App\Livewire\Notifications\Webhook as NotificationWebhook;
 use App\Livewire\Profile\Index as ProfileIndex;
+use App\Livewire\Project\Application\Backups as ApplicationBackups;
 use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
 use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
 use App\Livewire\Project\Application\Deployment\Show as DeploymentShow;
@@ -234,6 +235,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/logs', Logs::class)->name('project.application.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.application.command')->middleware('can.access.terminal');
         Route::get('/tasks/{task_uuid}', ApplicationConfiguration::class)->name('project.application.scheduled-tasks');
+        Route::get('/databases', ApplicationConfiguration::class)->name('project.application.databases');
+        Route::get('/databases/{stack_service_uuid}/backups', ApplicationBackups::class)->name('project.application.database.backups');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}')->group(function () {
         Route::get('/', DatabaseConfiguration::class)->name('project.database.configuration');
