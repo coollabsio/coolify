@@ -22,13 +22,26 @@
         </div>
         <div class="w-48">
             <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSaveDiscordEnabled" id="discordEnabled" label="Enabled" />
-            <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSaveDiscordPingEnabled" id="discordPingEnabled"
-                helper="If enabled, a ping (@here) will be sent to the notification when a critical event happens."
-                label="Ping Enabled" />
         </div>
         <x-forms.input canGate="update" :canResource="$settings" type="password"
             helper="Create a Discord Server and generate a Webhook URL. <br><a class='inline-block underline dark:text-white' href='https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks' target='_blank'>Webhook Documentation</a>"
-            required id="discordWebhookUrl" label="Webhook" />
+            required id="discordWebhookUrl" label="Webhook URL" />
+        <div class="flex items-end gap-2 {{ $discordPingType !== 'custom' ? 'w-48' : '' }}">
+            <x-forms.select canGate="update" :canResource="$settings" wire:model.live="discordPingType" id="discordPingType"
+                label="Ping on Critical Events"
+                helper="Choose who gets pinged when a critical event triggers a notification.">
+                <option value="none">None</option>
+                <option value="here">@here</option>
+                <option value="everyone">@everyone</option>
+                <option value="custom">Custom</option>
+            </x-forms.select>
+            @if ($discordPingType === 'custom')
+                <x-forms.input canGate="update" :canResource="$settings" id="discordCustomPingText"
+                    label="Custom Ping Text"
+                    placeholder="Hey <@&123456789> notification from Coolify!"
+                    helper="This text is sent alongside the notification embed. You can combine text with mentions.<br><br><span class='text-helper'>Example</span><ul class='list-disc pl-4'><li>Hey &lt;@123456789&gt; a notification from Coolify!</li><li>&lt;@&amp;987654321&gt; deployment failed!</li></ul><br><span class='text-helper'>Syntax</span><ul class='list-disc pl-4'><li>&lt;@USER_ID&gt; — ping a user</li><li>&lt;@&amp;ROLE_ID&gt; — ping a role</li><li>@here — pings only online or idle members who can see the channel</li><li>@everyone — pings all members who can see the channel, regardless of status</li></ul>" />
+            @endif
+        </div>
     </form>
     <h2 class="mt-4">Notification Settings</h2>
     <p class="mb-4">

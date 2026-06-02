@@ -66,8 +66,11 @@ class Discord extends Component
     #[Validate(['boolean'])]
     public bool $traefikOutdatedDiscordNotifications = true;
 
-    #[Validate(['boolean'])]
-    public bool $discordPingEnabled = true;
+    #[Validate(['required', 'in:none,here,everyone,custom'])]
+    public string $discordPingType = 'here';
+
+    #[Validate(['nullable', 'string', 'max:200'])]
+    public ?string $discordCustomPingText = null;
 
     public function mount()
     {
@@ -104,7 +107,8 @@ class Discord extends Component
             $this->settings->server_patch_discord_notifications = $this->serverPatchDiscordNotifications;
             $this->settings->traefik_outdated_discord_notifications = $this->traefikOutdatedDiscordNotifications;
 
-            $this->settings->discord_ping_enabled = $this->discordPingEnabled;
+            $this->settings->discord_ping_type = $this->discordPingType;
+            $this->settings->discord_custom_ping_text = $this->discordCustomPingText;
 
             $this->settings->save();
             refreshSession();
@@ -127,21 +131,22 @@ class Discord extends Component
             $this->serverPatchDiscordNotifications = $this->settings->server_patch_discord_notifications;
             $this->traefikOutdatedDiscordNotifications = $this->settings->traefik_outdated_discord_notifications;
 
-            $this->discordPingEnabled = $this->settings->discord_ping_enabled;
+            $this->discordPingType = $this->settings->discord_ping_type ?? 'here';
+            $this->discordCustomPingText = $this->settings->discord_custom_ping_text;
         }
     }
 
-    public function instantSaveDiscordPingEnabled()
+    public function updatedDiscordPingType()
     {
         try {
-            $original = $this->discordPingEnabled;
             $this->validate([
-                'discordPingEnabled' => 'required',
+                'discordPingType' => 'required|in:none,here,everyone,custom',
             ]);
+            if ($this->discordPingType !== 'custom') {
+                $this->discordCustomPingText = null;
+            }
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->discordPingEnabled = $original;
-
             return handleError($e, $this);
         }
     }

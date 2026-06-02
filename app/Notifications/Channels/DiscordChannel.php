@@ -20,8 +20,8 @@ class DiscordChannel
             return;
         }
 
-        if (! $discordSettings->discord_ping_enabled) {
-            $message->isCritical = false;
+        if ($message->isCritical) {
+            $message->pingText = $discordSettings->getPingText();
         }
 
         SendMessageToDiscordJob::dispatch($message, $discordSettings->discord_webhook_url);

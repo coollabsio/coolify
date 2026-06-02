@@ -31,7 +31,8 @@ class DiscordNotificationSettings extends Model
         'server_unreachable_discord_notifications',
         'server_patch_discord_notifications',
         'traefik_outdated_discord_notifications',
-        'discord_ping_enabled',
+        'discord_ping_type',
+        'discord_custom_ping_text',
     ];
 
     protected $casts = [
@@ -51,7 +52,6 @@ class DiscordNotificationSettings extends Model
         'server_unreachable_discord_notifications' => 'boolean',
         'server_patch_discord_notifications' => 'boolean',
         'traefik_outdated_discord_notifications' => 'boolean',
-        'discord_ping_enabled' => 'boolean',
     ];
 
     public function team()
@@ -64,8 +64,13 @@ class DiscordNotificationSettings extends Model
         return $this->discord_enabled;
     }
 
-    public function isPingEnabled()
+    public function getPingText(): ?string
     {
-        return $this->discord_ping_enabled;
+        return match ($this->discord_ping_type) {
+            'here' => '@here',
+            'everyone' => '@everyone',
+            'custom' => $this->discord_custom_ping_text,
+            default => null,
+        };
     }
 }
