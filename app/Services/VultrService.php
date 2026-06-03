@@ -31,7 +31,7 @@ class VultrService
             throw new \Exception('Vultr API error: '.$response->json('error', 'Unknown error'), $response->status());
         }
 
-        return $response->json();
+        return $response->json() ?? [];
     }
 
     private function requestPaginated(string $endpoint, string $resourceKey, array $data = []): array

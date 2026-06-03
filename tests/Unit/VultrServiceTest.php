@@ -136,3 +136,17 @@ it('finds an instance by IPv4 or IPv6', function () {
         ->and($service->findInstanceByIp('2001:db8::1')['id'])->toBe('instance-1')
         ->and($service->findInstanceByIp('1.2.3.4'))->toBeNull();
 });
+
+it('handles empty successful responses from Vultr API', function () {
+    Http::fake([
+        'https://api.vultr.com/v2/instances/instance-1/start' => Http::response(null, 204),
+        'https://api.vultr.com/v2/instances/instance-1' => Http::response(null, 204),
+    ]);
+
+    $service = new VultrService('fake-token');
+
+    expect($service->startInstance('instance-1'))->toBe([]);
+    $service->deleteInstance('instance-1');
+
+    Http::assertSentCount(2);
+});

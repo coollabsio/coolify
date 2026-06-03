@@ -236,6 +236,23 @@ it('blocks action validation when Vultr instance is stopped', function () {
     ]);
 });
 
+it('shows Vultr power on button when stopped even if server was previously functional', function () {
+    $this->server->update([
+        'ip' => '1.2.3.5',
+        'vultr_instance_status' => 'stopped',
+    ]);
+    $this->server->settings->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+        'force_disabled' => false,
+    ]);
+
+    expect($this->server->fresh()->isFunctional())->toBeTrue();
+
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->assertSee('Power On');
+});
+
 it('starts a Vultr instance', function () {
     Http::fake([
         'https://api.vultr.com/v2/instances/instance-1/start' => Http::response([], 204),

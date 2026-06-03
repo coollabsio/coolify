@@ -140,7 +140,7 @@
                                 </svg>
                             </button>
                         </div>
-                        @if ($server->cloudProviderToken && !$server->isFunctional() && $vultrInstanceStatus === 'stopped')
+                        @if ($server->cloudProviderToken && $vultrInstanceStatus === 'stopped')
                             <x-forms.button wire:click.prevent='startVultrInstance' isHighlighted canGate="update"
                                 :canResource="$server">
                                 Power On
