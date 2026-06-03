@@ -1886,7 +1886,7 @@ class Application extends BaseModel
 
                 return $paths;
             })->flatten()->unique()->values();
-            $commands = collect([
+            $setupCommands = collect([
                 "rm -rf /tmp/{$uuid}",
                 "mkdir -p /tmp/{$uuid}",
                 "cd /tmp/{$uuid}",
@@ -1894,10 +1894,14 @@ class Application extends BaseModel
                 'git sparse-checkout init',
                 "git sparse-checkout set {$fileList->implode(' ')}",
                 'git read-tree -mu HEAD',
+            ]);
+            $commands = collect([
+                "({$setupCommands->implode(' && ')}) > /dev/null",
+                "cd /tmp/{$uuid}",
                 "cat .$workdir$composeFile",
             ]);
         } else {
-            $commands = collect([
+            $setupCommands = collect([
                 "rm -rf /tmp/{$uuid}",
                 "mkdir -p /tmp/{$uuid}",
                 "cd /tmp/{$uuid}",
@@ -1905,6 +1909,10 @@ class Application extends BaseModel
                 'git sparse-checkout init --cone',
                 "git sparse-checkout set {$fileList->implode(' ')}",
                 'git read-tree -mu HEAD',
+            ]);
+            $commands = collect([
+                "({$setupCommands->implode(' && ')}) > /dev/null",
+                "cd /tmp/{$uuid}",
                 "cat .$workdir$composeFile",
             ]);
         }
