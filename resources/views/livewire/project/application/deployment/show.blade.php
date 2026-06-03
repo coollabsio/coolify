@@ -1,4 +1,4 @@
-<div>
+<div class="flex h-[calc(100vh-10rem)] min-h-[50rem] flex-col overflow-hidden">
     <x-slot:title>
         {{ data_get_str($application, 'name')->limit(10) }} > Deployment | Coolify
         </x-slot>
@@ -9,6 +9,13 @@
         fullscreen: @entangle('fullscreen'),
         alwaysScroll: {{ $isKeepAliveOn ? 'true' : 'false' }},
         rafId: null,
+        scrollTimeout: null,
+        scrollDebounce: null,
+        isScrolling: false,
+        destroyed: false,
+        morphUpdatedCleanup: null,
+        deploymentFinishedCleanup: null,
+        lastTouchY: 0,
         showTimestamps: true,
         searchQuery: '',
         matchCount: 0,
@@ -17,17 +24,76 @@
             this.fullscreen = !this.fullscreen;
         },
         scrollToBottom() {
-            const logsContainer = document.getElementById('logsContainer');
+            if (this.destroyed) return;
+            const logsContainer = this.$root.querySelector('#logsContainer');
             if (logsContainer) {
+                this.isScrolling = true;
                 logsContainer.scrollTop = logsContainer.scrollHeight;
+                requestAnimationFrame(() => { this.isScrolling = false; });
             }
         },
-        scheduleScroll() {
+        cancelScrollLoop() {
+            if (this.rafId) {
+                cancelAnimationFrame(this.rafId);
+                this.rafId = null;
+            }
+            if (this.scrollTimeout) {
+                clearTimeout(this.scrollTimeout);
+                this.scrollTimeout = null;
+            }
+            if (this.scrollDebounce) {
+                clearTimeout(this.scrollDebounce);
+                this.scrollDebounce = null;
+            }
+        },
+        disableFollow() {
             if (!this.alwaysScroll) return;
+            this.alwaysScroll = false;
+            this.cancelScrollLoop();
+        },
+        handleWheel(event) {
+            if (this.alwaysScroll && event.deltaY < 0) {
+                this.disableFollow();
+            }
+        },
+        handleTouchStart(event) {
+            this.lastTouchY = event.touches[0].clientY;
+        },
+        handleTouchMove(event) {
+            if (!this.alwaysScroll) return;
+            const currentY = event.touches[0].clientY;
+            if (currentY > this.lastTouchY) {
+                this.disableFollow();
+            }
+            this.lastTouchY = currentY;
+        },
+        handleKeyScroll(event) {
+            if (!this.alwaysScroll) return;
+            const upKeys = ['ArrowUp', 'PageUp', 'Home'];
+            if (upKeys.includes(event.key)) {
+                this.disableFollow();
+            }
+        },
+        handleScroll(event) {
+            if (this.isScrolling || this.destroyed) return;
+            const el = event.target;
+            clearTimeout(this.scrollDebounce);
+            this.scrollDebounce = setTimeout(() => {
+                if (this.destroyed) return;
+                const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+                if (!this.alwaysScroll && distanceFromBottom <= 10) {
+                    this.alwaysScroll = true;
+                    this.scheduleScroll();
+                }
+            }, 150);
+        },
+        scheduleScroll() {
+            if (!this.alwaysScroll || this.destroyed) return;
             this.rafId = requestAnimationFrame(() => {
+                if (!this.alwaysScroll || this.destroyed) return;
                 this.scrollToBottom();
-                if (this.alwaysScroll) {
-                    setTimeout(() => this.scheduleScroll(), 250);
+                if (this.alwaysScroll && !this.destroyed) {
+                    this.scrollTimeout = setTimeout(() => this.scheduleScroll(), 250);
                 }
             });
         },
@@ -36,10 +102,7 @@
             if (this.alwaysScroll) {
                 this.scheduleScroll();
             } else {
-                if (this.rafId) {
-                    cancelAnimationFrame(this.rafId);
-                    this.rafId = null;
-                }
+                this.cancelScrollLoop();
             }
         },
         hasActiveLogSelection() {
@@ -107,9 +170,9 @@
 
             this.matchCount = query ? count : 0;
         },
-        downloadLogs() {
+        collectVisibleLogs() {
             const logs = document.getElementById('logs');
-            if (!logs) return;
+            if (!logs) return '';
             const visibleLines = logs.querySelectorAll('[data-log-line]:not(.hidden)');
             let content = '';
             visibleLines.forEach(line => {
@@ -118,6 +181,17 @@
                     content += text + String.fromCharCode(10);
                 }
             });
+            return content;
+        },
+        copyLogs() {
+            const content = this.collectVisibleLogs();
+            if (!content) return;
+            navigator.clipboard.writeText(content);
+            Livewire.dispatch('success', ['Logs copied to clipboard.']);
+        },
+        downloadLogs() {
+            const content = this.collectVisibleLogs();
+            if (!content) return;
             const blob = new Blob([content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -130,10 +204,7 @@
         stopScroll() {
             this.scrollToBottom();
             this.alwaysScroll = false;
-            if (this.rafId) {
-                cancelAnimationFrame(this.rafId);
-                this.rafId = null;
-            }
+            this.cancelScrollLoop();
         },
         init() {
             // Watch search query changes
@@ -141,21 +212,26 @@
                 this.applySearch();
             });
 
-            // Apply search after Livewire updates
-            Livewire.hook('morph.updated', ({ el }) => {
-                if (el.id === 'logs') {
-                    this.$nextTick(() => {
-                        this.applySearch();
-                        if (this.alwaysScroll) {
-                            this.scrollToBottom();
-                        }
-                    });
-                }
+            // Apply search after Livewire updates.
+            // Livewire.hook() returns an unregister fn; keep it for destroy().
+            this.morphUpdatedCleanup = Livewire.hook('morph.updated', ({ el }) => {
+                if (this.destroyed) return;
+                if (el.id !== 'logs' || !this.$root.contains(el)) return;
+                this.$nextTick(() => {
+                    if (this.destroyed) return;
+                    this.applySearch();
+                    if (this.alwaysScroll) {
+                        this.scrollToBottom();
+                    }
+                });
             });
 
-            // Stop auto-scroll when deployment finishes
-            Livewire.on('deploymentFinished', () => {
+            // Stop auto-scroll when deployment finishes.
+            // Livewire.on() returns an unregister fn; keep it for destroy().
+            this.deploymentFinishedCleanup = Livewire.on('deploymentFinished', () => {
+                if (this.destroyed) return;
                 setTimeout(() => {
+                    if (this.destroyed) return;
                     this.stopScroll();
                 }, 500);
             });
@@ -164,14 +240,32 @@
             if (this.alwaysScroll) {
                 this.scheduleScroll();
             }
+        },
+        destroy() {
+            // Runs when Alpine tears the component down (wire:navigate away).
+            this.destroyed = true;
+            this.alwaysScroll = false;
+            this.cancelScrollLoop();
+            if (this.scrollDebounce) {
+                clearTimeout(this.scrollDebounce);
+                this.scrollDebounce = null;
+            }
+            if (typeof this.morphUpdatedCleanup === 'function') {
+                this.morphUpdatedCleanup();
+                this.morphUpdatedCleanup = null;
+            }
+            if (typeof this.deploymentFinishedCleanup === 'function') {
+                this.deploymentFinishedCleanup();
+                this.deploymentFinishedCleanup = null;
+            }
         }
-    }">
+    }" class="flex flex-1 min-h-0 flex-col overflow-hidden">
             <livewire:project.application.deployment-navbar
                 :application_deployment_queue="$application_deployment_queue" />
-            <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-4 relative'">
+            <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-4 flex flex-1 min-h-0 flex-col overflow-hidden'">
                 <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
-                    class="flex flex-col w-full bg-white dark:text-white dark:bg-coolgray-100 dark:border-coolgray-300"
-                    :class="fullscreen ? 'h-full' : 'border border-dotted rounded-sm'">
+                    class="flex min-h-0 flex-col w-full overflow-hidden bg-white dark:text-white dark:bg-coolgray-100 dark:border-coolgray-300"
+                    :class="fullscreen ? 'h-full' : 'flex-1 border border-dotted rounded-sm'">
                     <div
                         class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
                         <div class="flex items-center gap-3">
@@ -210,12 +304,7 @@
                             </div>
                             <div class="flex flex-wrap items-center gap-1">
                                 <button
-                                    x-on:click="
-                                    $wire.copyLogs().then(logs => {
-                                        navigator.clipboard.writeText(logs);
-                                        Livewire.dispatch('success', ['Logs copied to clipboard.']);
-                                    });
-                                "
+                                    x-on:click="copyLogs()"
                                 title="Copy Logs"
                                 class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                                 <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -327,10 +416,10 @@
                             </div>
                         </div>
                     </div>
-                    <div id="logsContainer"
-                        class="flex flex-col overflow-y-auto p-2 px-4 min-h-4 scrollbar"
-                        :class="fullscreen ? 'flex-1' : 'max-h-[30rem]'">
-                        <div id="logs" class="flex flex-col font-mono">
+                    <div id="logsContainer" @scroll="handleScroll" @wheel="handleWheel"
+                        @touchstart="handleTouchStart" @touchmove="handleTouchMove" @keydown="handleKeyScroll" tabindex="0"
+                        class="flex min-h-40 flex-1 flex-col overflow-y-auto p-2 px-4 scrollbar">
+                        <div id="logs" class="flex flex-col font-logs">
                             <div x-show="searchQuery.trim() && matchCount === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
                                 No matches found.
@@ -356,7 +445,7 @@
                                         ])>{{ $lineContent }}</span>
                                 </div>
                             @empty
-                                <span class="font-mono text-neutral-400 mb-2">No logs yet.</span>
+                                <span class="font-logs text-neutral-400 mb-2">No logs yet.</span>
                             @endforelse
                         </div>
                     </div>

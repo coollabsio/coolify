@@ -6,7 +6,27 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class GithubApp extends BaseModel
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'team_id',
+        'private_key_id',
+        'name',
+        'organization',
+        'api_url',
+        'html_url',
+        'custom_user',
+        'custom_port',
+        'app_id',
+        'installation_id',
+        'client_id',
+        'client_secret',
+        'webhook_secret',
+        'is_system_wide',
+        'is_public',
+        'contents',
+        'metadata',
+        'pull_requests',
+        'administration',
+    ];
 
     protected $appends = ['type'];
 
@@ -53,26 +73,6 @@ class GithubApp extends BaseModel
         });
     }
 
-    public static function public()
-    {
-        return GithubApp::where(function ($query) {
-            $query->where(function ($q) {
-                $q->where('team_id', currentTeam()->id)
-                    ->orWhere('is_system_wide', true);
-            })->where('is_public', true);
-        })->whereNotNull('app_id')->get();
-    }
-
-    public static function private()
-    {
-        return GithubApp::where(function ($query) {
-            $query->where(function ($q) {
-                $q->where('team_id', currentTeam()->id)
-                    ->orWhere('is_system_wide', true);
-            })->where('is_public', false);
-        })->whereNotNull('app_id')->get();
-    }
-
     public function team()
     {
         return $this->belongsTo(Team::class);
@@ -92,7 +92,7 @@ class GithubApp extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                if ($this->getMorphClass() === \App\Models\GithubApp::class) {
+                if ($this->getMorphClass() === GithubApp::class) {
                     return 'github';
                 }
             },

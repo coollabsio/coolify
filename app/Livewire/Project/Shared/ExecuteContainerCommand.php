@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Shared;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
+use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -38,7 +39,7 @@ class ExecuteContainerCommand extends Component
         $this->servers = collect();
         if (data_get($this->parameters, 'application_uuid')) {
             $this->type = 'application';
-            $this->resource = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail();
+            $this->resource = Application::ownedByCurrentTeam()->where('uuid', $this->parameters['application_uuid'])->firstOrFail();
             if ($this->resource->destination->server->isFunctional()) {
                 $this->servers = $this->servers->push($this->resource->destination->server);
             }
@@ -61,14 +62,14 @@ class ExecuteContainerCommand extends Component
             $this->loadContainers();
         } elseif (data_get($this->parameters, 'service_uuid')) {
             $this->type = 'service';
-            $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
+            $this->resource = Service::ownedByCurrentTeam()->where('uuid', $this->parameters['service_uuid'])->firstOrFail();
             if ($this->resource->server->isFunctional()) {
                 $this->servers = $this->servers->push($this->resource->server);
             }
             $this->loadContainers();
         } elseif (data_get($this->parameters, 'server_uuid')) {
             $this->type = 'server';
-            $this->resource = Server::where('uuid', $this->parameters['server_uuid'])->firstOrFail();
+            $this->resource = Server::ownedByCurrentTeam()->where('uuid', $this->parameters['server_uuid'])->firstOrFail();
             $this->servers = $this->servers->push($this->resource);
         }
         $this->servers = $this->servers->sortByDesc(fn ($server) => $server->isTerminalEnabled());
@@ -181,7 +182,7 @@ class ExecuteContainerCommand extends Component
         }
         try {
             // Validate container name format
-            if (! preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/', $this->selected_container)) {
+            if (! ValidationPatterns::isValidContainerName($this->selected_container)) {
                 throw new \InvalidArgumentException('Invalid container name format');
             }
 

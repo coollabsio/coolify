@@ -2,7 +2,7 @@
     <x-slot:title>
         Projects | Coolify
     </x-slot>
-    <div class="flex gap-2">
+    <div class="flex gap-2 items-center">
         <h1>Projects</h1>
         @can('createAnyResource')
             <x-modal-input buttonTitle="+ Add" title="New Project">

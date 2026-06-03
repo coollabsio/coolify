@@ -33,6 +33,7 @@ class Index extends Component
                 'value' => $data['value'],
                 'is_multiline' => $data['is_multiline'],
                 'is_literal' => $data['is_literal'],
+                'comment' => $data['comment'] ?? null,
                 'type' => 'team',
                 'team_id' => currentTeam()->id,
             ]);
@@ -128,7 +129,9 @@ class Index extends Component
     private function updateOrCreateVariables($variables)
     {
         $count = 0;
-        foreach ($variables as $key => $value) {
+        foreach ($variables as $key => $data) {
+            $value = is_array($data) ? ($data['value'] ?? '') : $data;
+
             $found = $this->team->environment_variables()->where('key', $key)->first();
 
             if ($found) {

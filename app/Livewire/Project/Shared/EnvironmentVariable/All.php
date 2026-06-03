@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
+use App\Models\Application;
 use App\Models\EnvironmentVariable;
+use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -38,7 +40,7 @@ class All extends Component
         $this->is_env_sorting_enabled = data_get($this->resource, 'settings.is_env_sorting_enabled', false);
         $this->use_build_secrets = data_get($this->resource, 'settings.use_build_secrets', false);
         $this->resourceClass = get_class($this->resource);
-        $resourceWithPreviews = [\App\Models\Application::class];
+        $resourceWithPreviews = [Application::class];
         $simpleDockerfile = filled(data_get($this->resource, 'dockerfile'));
         if (str($this->resourceClass)->contains($resourceWithPreviews) && ! $simpleDockerfile) {
             $this->showPreview = true;
@@ -87,6 +89,62 @@ class All extends Component
         }
 
         return $query->get();
+    }
+
+    public function getHardcodedEnvironmentVariablesProperty()
+    {
+        return $this->getHardcodedVariables(false);
+    }
+
+    public function getHardcodedEnvironmentVariablesPreviewProperty()
+    {
+        return $this->getHardcodedVariables(true);
+    }
+
+    protected function getHardcodedVariables(bool $isPreview)
+    {
+        // Only for services and docker-compose applications
+        if ($this->resource->type() !== 'service' &&
+            ($this->resourceClass !== 'App\Models\Application' ||
+             ($this->resourceClass === 'App\Models\Application' && $this->resource->build_pack !== 'dockercompose'))) {
+            return collect([]);
+        }
+
+        $dockerComposeRaw = $this->resource->docker_compose_raw ?? $this->resource->docker_compose;
+
+        if (blank($dockerComposeRaw)) {
+            return collect([]);
+        }
+
+        // Extract all hard-coded variables
+        $hardcodedVars = extractHardcodedEnvironmentVariables($dockerComposeRaw);
+
+        // Filter out magic variables (SERVICE_FQDN_*, SERVICE_URL_*, SERVICE_NAME_*)
+        $hardcodedVars = $hardcodedVars->filter(function ($var) {
+            $key = $var['key'];
+
+            return ! str($key)->startsWith(['SERVICE_FQDN_', 'SERVICE_URL_', 'SERVICE_NAME_']);
+        });
+
+        // Filter out variables that exist in database (user has overridden/managed them)
+        // For preview, check against preview variables; for production, check against production variables
+        if ($isPreview) {
+            $managedKeys = $this->resource->environment_variables_preview()->pluck('key')->toArray();
+        } else {
+            $managedKeys = $this->resource->environment_variables()->where('is_preview', false)->pluck('key')->toArray();
+        }
+
+        $hardcodedVars = $hardcodedVars->filter(function ($var) use ($managedKeys) {
+            return ! in_array($var['key'], $managedKeys);
+        });
+
+        // Apply sorting based on is_env_sorting_enabled
+        if ($this->is_env_sorting_enabled) {
+            $hardcodedVars = $hardcodedVars->sortBy('key')->values();
+        }
+        // Otherwise keep order from docker-compose file
+
+        return $hardcodedVars;
     }
 
     public function getDevView()
@@ -138,7 +196,7 @@ class All extends Component
 
     private function updateOrder()
     {
-        $variables = parseEnvFormatToArray($this->variables);
+        $variables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables));
         $order = 1;
         foreach ($variables as $key => $value) {
             $env = $this->resource->environment_variables()->where('key', $key)->first();
@@ -150,7 +208,7 @@ class All extends Component
         }
 
         if ($this->showPreview) {
-            $previewVariables = parseEnvFormatToArray($this->variablesPreview);
+            $previewVariables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variablesPreview));
             $order = 1;
             foreach ($previewVariables as $key => $value) {
                 $env = $this->resource->environment_variables_preview()->where('key', $key)->first();
@@ -165,7 +223,7 @@ class All extends Component
 
     private function handleBulkSubmit()
     {
-        $variables = parseEnvFormatToArray($this->variables);
+        $variables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables));
         $changesMade = false;
         $errorOccurred = false;
 
@@ -185,7 +243,7 @@ class All extends Component
         }
 
         if ($this->showPreview) {
-            $previewVariables = parseEnvFormatToArray($this->variablesPreview);
+            $previewVariables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variablesPreview));
 
             // Try to delete removed preview variables
             $deletedPreviewCount = $this->deleteRemovedVariables(true, $previewVariables);
@@ -211,6 +269,7 @@ class All extends Component
 
     private function handleSingleSubmit($data)
     {
+        $data['key'] = ValidationPatterns::validatedEnvironmentVariableKey($data['key']);
         $found = $this->resource->environment_variables()->where('key', $data['key'])->first();
         if ($found) {
             $this->dispatch('error', 'Environment variable already exists.');
@@ -240,6 +299,7 @@ class All extends Component
         $environment->is_runtime = $data['is_runtime'] ?? true;
         $environment->is_buildtime = $data['is_buildtime'] ?? true;
         $environment->is_preview = $data['is_preview'] ?? false;
+        $environment->comment = $data['comment'] ?? null;
         $environment->resourceable_id = $this->resource->id;
         $environment->resourceable_type = $this->resource->getMorphClass();
 
@@ -277,21 +337,57 @@ class All extends Component
         return $variablesToDelete->count();
     }
 
+    private function normalizeEnvironmentVariables(array $variables): array
+    {
+        $normalizedVariables = [];
+
+        foreach ($variables as $key => $data) {
+            $normalizedKey = ValidationPatterns::validatedEnvironmentVariableKey((string) $key);
+
+            if (array_key_exists($normalizedKey, $normalizedVariables)) {
+                throw new \InvalidArgumentException("Duplicate environment variable key after normalization: {$normalizedKey}.");
+            }
+
+            $normalizedVariables[$normalizedKey] = $data;
+        }
+
+        return $normalizedVariables;
+    }
+
     private function updateOrCreateVariables($isPreview, $variables)
     {
         $count = 0;
-        foreach ($variables as $key => $value) {
+        foreach ($variables as $key => $data) {
             if (str($key)->startsWith('SERVICE_FQDN') || str($key)->startsWith('SERVICE_URL') || str($key)->startsWith('SERVICE_NAME')) {
                 continue;
             }
+
+            // Extract value and comment from parsed data
+            // Handle both array format ['value' => ..., 'comment' => ...] and plain string values
+            $value = is_array($data) ? ($data['value'] ?? '') : $data;
+            $comment = is_array($data) ? ($data['comment'] ?? null) : null;
+
             $method = $isPreview ? 'environment_variables_preview' : 'environment_variables';
             $found = $this->resource->$method()->where('key', $key)->first();
 
             if ($found) {
                 if (! $found->is_shown_once && ! $found->is_multiline) {
-                    // Only count as a change if the value actually changed
+                    $changed = false;
+
+                    // Update value if it changed
                     if ($found->value !== $value) {
                         $found->value = $value;
+                        $changed = true;
+                    }
+
+                    // Only update comment from inline comment if one is provided (overwrites existing)
+                    // If $comment is null, don't touch existing comment field to preserve it
+                    if ($comment !== null && $found->comment !== $comment) {
+                        $found->comment = $comment;
+                        $changed = true;
+                    }
+
+                    if ($changed) {
                         $found->save();
                         $count++;
                     }
@@ -300,6 +396,7 @@ class All extends Component
                 $environment = new EnvironmentVariable;
                 $environment->key = $key;
                 $environment->value = $value;
+                $environment->comment = $comment; // Set comment from inline comment
                 $environment->is_multiline = false;
                 $environment->is_preview = $isPreview;
                 $environment->resourceable_id = $this->resource->id;

@@ -99,8 +99,14 @@
             {{-- Unified Input Container with Tags Inside --}}
             <div @click="$refs.searchInput.focus()" x-data="{ focused: false }" @focusin="focused = true" @focusout="focused = false"
                 class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto scrollbar py-1.5  px-2 w-full text-sm rounded-sm border-0 bg-white dark:bg-coolgray-100 cursor-text px-1 text-black dark:text-white"
-                :style="focused ? 'box-shadow: inset 4px 0 0 #6b16ed, inset 0 0 0 2px #e5e5e5;' : 'box-shadow: inset 4px 0 0 transparent, inset 0 0 0 2px #e5e5e5;'"
-                x-init="$watch('focused', () => { if ($root.classList.contains('dark') || document.documentElement.classList.contains('dark')) { $el.style.boxShadow = focused ? 'inset 4px 0 0 #fcd452, inset 0 0 0 2px #242424' : 'inset 4px 0 0 transparent, inset 0 0 0 2px #242424'; } })"
+                :style="(() => {
+                    const isDark = document.documentElement.classList.contains('dark');
+                    const accent = isDark ? '#fcd452' : '#6b16ed';
+                    const border = isDark ? '#242424' : '#e5e5e5';
+                    return focused
+                        ? 'box-shadow: inset 4px 0 0 ' + accent + ', inset 0 0 0 2px ' + border + ';'
+                        : 'box-shadow: inset 4px 0 0 transparent, inset 0 0 0 2px ' + border + ';';
+                })()"
                 :class="{
                         'opacity-50': {{ $disabled ? 'true' : 'false' }}
                     }" wire:loading.class="opacity-50"
@@ -225,8 +231,14 @@
                 {{-- Input Container --}}
                 <div @click="openDropdown()" x-data="{ focused: false }" @focusin="focused = true" @focusout="focused = false"
                     class="flex items-center gap-2 py-1.5 w-full text-sm rounded-sm border-0 bg-white dark:bg-coolgray-100 cursor-text text-black dark:text-white"
-                    :style="focused ? 'box-shadow: inset 4px 0 0 #6b16ed, inset 0 0 0 2px #e5e5e5;' : 'box-shadow: inset 4px 0 0 transparent, inset 0 0 0 2px #e5e5e5;'"
-                    x-init="$watch('focused', () => { if ($root.classList.contains('dark') || document.documentElement.classList.contains('dark')) { $el.style.boxShadow = focused ? 'inset 4px 0 0 #fcd452, inset 0 0 0 2px #242424' : 'inset 4px 0 0 transparent, inset 0 0 0 2px #242424'; } })"
+                    :style="(() => {
+                        const isDark = document.documentElement.classList.contains('dark');
+                        const accent = isDark ? '#fcd452' : '#6b16ed';
+                        const border = isDark ? '#242424' : '#e5e5e5';
+                        return focused
+                            ? 'box-shadow: inset 4px 0 0 ' + accent + ', inset 0 0 0 2px ' + border + ';'
+                            : 'box-shadow: inset 4px 0 0 transparent, inset 0 0 0 2px ' + border + ';';
+                    })()"
                     :class="{
                     'opacity-50': {{ $disabled ? 'true' : 'false' }}
                 }" wire:loading.class="opacity-50" wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]">

@@ -34,7 +34,11 @@ class EmailNotificationSettings extends Model
         'backup_failure_email_notifications',
         'scheduled_task_success_email_notifications',
         'scheduled_task_failure_email_notifications',
+        'docker_cleanup_success_email_notifications',
+        'docker_cleanup_failure_email_notifications',
         'server_disk_usage_email_notifications',
+        'server_reachable_email_notifications',
+        'server_unreachable_email_notifications',
         'server_patch_email_notifications',
         'traefik_outdated_email_notifications',
     ];
