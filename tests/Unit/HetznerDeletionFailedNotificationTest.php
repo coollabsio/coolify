@@ -1,7 +1,6 @@
 <?php
 
 use App\Notifications\Server\HetznerDeletionFailed;
-use Mockery;
 
 afterEach(function () {
     Mockery::close();

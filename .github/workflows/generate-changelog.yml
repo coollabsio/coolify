@@ -3,6 +3,12 @@ name: Generate Changelog
 on:
   push:
     branches: [ v4.x ]
+    paths-ignore:
+      - .github/workflows/coolify-helper.yml
+      - .github/workflows/coolify-helper-next.yml
+      - .github/workflows/coolify-realtime.yml
+      - .github/workflows/coolify-realtime-next.yml
+      - .github/workflows/pr-quality.yaml
   workflow_dispatch:
 
 permissions:

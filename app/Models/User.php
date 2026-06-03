@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use App\Actions\User\RevokeUserTeamTokens;
 use App\Jobs\UpdateStripeCustomerEmailJob;
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\TransactionalEmails\EmailChangeVerification;
 use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
+use App\Services\ChangelogService;
 use App\Traits\DeletesUserSessions;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -41,7 +44,16 @@ class User extends Authenticatable implements SendsEmail
 {
     use DeletesUserSessions, HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+        'force_password_reset',
+        'marketing_emails',
+        'pending_email',
+        'email_change_code',
+        'email_change_code_expires_at',
+    ];
 
     protected $hidden = [
         'password',
@@ -87,12 +99,31 @@ class User extends Authenticatable implements SendsEmail
                 $team['id'] = 0;
                 $team['name'] = 'Root Team';
             }
-            $new_team = Team::create($team);
+            $new_team = $user->id === 0 ? Team::find(0) : null;
+
+            if ($new_team !== null) {
+                $new_team->forceFill($team);
+                $new_team->save();
+
+                if (! $user->teams()->whereKey($new_team->id)->exists()) {
+                    $user->teams()->attach($new_team, ['role' => 'owner']);
+                } else {
+                    $user->teams()->updateExistingPivot($new_team->id, ['role' => 'owner']);
+                }
+
+                return;
+            }
+
+            $new_team = (new Team)->forceFill($team);
+            $new_team->save();
+
             $user->teams()->attach($new_team, ['role' => 'owner']);
         });
 
         static::deleting(function (User $user) {
             \DB::transaction(function () use ($user) {
+                RevokeUserTeamTokens::forUser($user);
+
                 $teams = $user->teams;
                 foreach ($teams as $team) {
                     $user_alone_in_team = $team->members->count() === 1;
@@ -130,6 +161,7 @@ class User extends Authenticatable implements SendsEmail
                             if ($found_other_member_who_is_not_owner) {
                                 $found_other_member_who_is_not_owner->pivot->role = 'owner';
                                 $found_other_member_who_is_not_owner->pivot->save();
+                                RevokeUserTeamTokens::forUserTeam($found_other_member_who_is_not_owner, $team->id);
                                 $team->members()->detach($user->id);
                             } else {
                                 static::finalizeTeamDeletion($user, $team);
@@ -190,7 +222,8 @@ class User extends Authenticatable implements SendsEmail
             $team['id'] = 0;
             $team['name'] = 'Root Team';
         }
-        $new_team = Team::create($team);
+        $new_team = (new Team)->forceFill($team);
+        $new_team->save();
         $this->teams()->attach($new_team, ['role' => 'owner']);
 
         return $new_team;
@@ -228,7 +261,7 @@ class User extends Authenticatable implements SendsEmail
 
     public function getUnreadChangelogCount(): int
     {
-        return app(\App\Services\ChangelogService::class)->getUnreadCountForUser($this);
+        return app(ChangelogService::class)->getUnreadCountForUser($this);
     }
 
     public function getRecipients(): array
@@ -239,12 +272,12 @@ class User extends Authenticatable implements SendsEmail
     public function sendVerificationEmail()
     {
         $mail = new MailMessage;
-        $url = Url::temporarySignedRoute(
+        $url = URL::temporarySignedRoute(
             'verify.verify',
             Carbon::now()->addMinutes(Config::get('auth.verification.expire', 60)),
             [
                 'id' => $this->getKey(),
-                'hash' => sha1($this->getEmailForVerification()),
+                'hash' => hash('sha256', $this->getEmailForVerification()),
             ]
         );
         $mail->view('emails.email-verification', [
@@ -395,20 +428,20 @@ class User extends Authenticatable implements SendsEmail
     public function requestEmailChange(string $newEmail): void
     {
         // Generate 6-digit code
-        $code = sprintf('%06d', mt_rand(0, 999999));
+        $code = sprintf('%06d', random_int(0, 999999));
 
         // Set expiration using config value
         $expiryMinutes = config('constants.email_change.verification_code_expiry_minutes', 10);
         $expiresAt = Carbon::now()->addMinutes($expiryMinutes);
 
-        $this->update([
+        $this->fill([
             'pending_email' => $newEmail,
             'email_change_code' => $code,
             'email_change_code_expires_at' => $expiresAt,
-        ]);
+        ])->save();
 
         // Send verification email to new address
-        $this->notify(new \App\Notifications\TransactionalEmails\EmailChangeVerification($this, $code, $newEmail, $expiresAt));
+        $this->notify(new EmailChangeVerification($this, $code, $newEmail, $expiresAt));
     }
 
     public function isEmailChangeCodeValid(string $code): bool

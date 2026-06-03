@@ -11,7 +11,6 @@
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use Illuminate\Support\Collection;
-use Mockery;
 
 beforeEach(function () {
     // Clean up Mockery after each test

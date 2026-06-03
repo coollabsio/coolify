@@ -46,6 +46,24 @@ test('ConvertIp', function () {
     ]);
 });
 
+test('ConvertDns', function () {
+    $input = '--dns 10.0.0.10 --dns=1.1.1.1';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'dns' => ['10.0.0.10', '1.1.1.1'],
+    ]);
+});
+
+test('ConvertDnsWithOtherOptions', function () {
+    $input = '--cap-add=NET_ADMIN --dns 10.0.0.10 --init';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'cap_add' => ['NET_ADMIN'],
+        'dns' => ['10.0.0.10'],
+        'init' => true,
+    ]);
+});
+
 test('ConvertPrivilegedAndInit', function () {
     $input = '---privileged --init';
     $output = convertDockerRunToCompose($input);
@@ -196,5 +214,22 @@ test('ConvertEntrypointSingleQuotedWithDoubleQuotesInside', function () {
     $output = convertDockerRunToCompose($input);
     expect($output)->toBe([
         'entrypoint' => 'python -c "print(\"hi\")"',
+    ]);
+});
+
+test('ConvertIp6', function () {
+    $input = '--ip6 2001:db8::1';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'ip6' => ['2001:db8::1'],
+    ]);
+});
+
+test('ConvertIpAndIp6Together', function () {
+    $input = '--ip 172.20.0.5 --ip6 2001:db8::1';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'ip' => ['172.20.0.5'],
+        'ip6' => ['2001:db8::1'],
     ]);
 });

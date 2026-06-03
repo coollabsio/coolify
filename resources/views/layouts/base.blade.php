@@ -172,7 +172,8 @@
         }
         @auth
             window.Pusher = Pusher;
-            window.Echo = new Echo({
+            const EchoConstructor = typeof Echo === 'function' ? Echo : Echo.default;
+            window.Echo = new EchoConstructor({
                 broadcaster: 'pusher',
                 cluster: "{{ config('constants.pusher.host') }}" || window.location.hostname,
                 key: "{{ config('constants.pusher.app_key') }}" || 'coolify',
@@ -202,30 +203,6 @@
         @endauth
         let checkHealthInterval = null;
         let checkIfIamDeadInterval = null;
-
-        function changePasswordFieldType(event) {
-            let element = event.target
-            for (let i = 0; i < 10; i++) {
-                if (element.className === "relative") {
-                    break;
-                }
-                element = element.parentElement;
-            }
-            element = element.children[1];
-            if (element.nodeName === 'INPUT' || element.nodeName === 'TEXTAREA') {
-                if (element.type === 'password') {
-                    element.type = 'text';
-                    if (element.disabled) return;
-                    element.classList.add('truncate');
-                    this.type = 'text';
-                } else {
-                    element.type = 'password';
-                    if (element.disabled) return;
-                    element.classList.remove('truncate');
-                    this.type = 'password';
-                }
-            }
-        }
 
         function copyToClipboard(text) {
             navigator?.clipboard?.writeText(text) && window.Livewire.dispatch('success', 'Copied to clipboard.');

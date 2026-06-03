@@ -16,7 +16,9 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Support\ValidationPatterns;
 use Illuminate\Support\Facades\Process;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class GetLogs extends Component
@@ -29,12 +31,16 @@ class GetLogs extends Component
 
     public string $errors = '';
 
+    #[Locked]
     public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|null $resource = null;
 
+    #[Locked]
     public ServiceApplication|ServiceDatabase|null $servicesubtype = null;
 
+    #[Locked]
     public Server $server;
 
+    #[Locked]
     public ?string $container = null;
 
     public ?string $displayName = null;
@@ -54,7 +60,7 @@ class GetLogs extends Component
     public function mount()
     {
         if (! is_null($this->resource)) {
-            if ($this->resource->getMorphClass() === \App\Models\Application::class) {
+            if ($this->resource->getMorphClass() === Application::class) {
                 $this->showTimeStamps = $this->resource->settings->is_include_timestamps;
             } else {
                 if ($this->servicesubtype) {
@@ -63,7 +69,7 @@ class GetLogs extends Component
                     $this->showTimeStamps = $this->resource->is_include_timestamps;
                 }
             }
-            if ($this->resource?->getMorphClass() === \App\Models\Application::class) {
+            if ($this->resource?->getMorphClass() === Application::class) {
                 if (str($this->container)->contains('-pr-')) {
                     $this->pull_request = 'Pull Request: '.str($this->container)->afterLast('-pr-')->beforeLast('_')->value();
                 }
@@ -74,11 +80,11 @@ class GetLogs extends Component
     public function instantSave()
     {
         if (! is_null($this->resource)) {
-            if ($this->resource->getMorphClass() === \App\Models\Application::class) {
+            if ($this->resource->getMorphClass() === Application::class) {
                 $this->resource->settings->is_include_timestamps = $this->showTimeStamps;
                 $this->resource->settings->save();
             }
-            if ($this->resource->getMorphClass() === \App\Models\Service::class) {
+            if ($this->resource->getMorphClass() === Service::class) {
                 $serviceName = str($this->container)->beforeLast('-')->value();
                 $subType = $this->resource->applications()->where('name', $serviceName)->first();
                 if ($subType) {
@@ -118,10 +124,20 @@ class GetLogs extends Component
 
     public function getLogs($refresh = false)
     {
+        if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists()) {
+            $this->outputs = 'Unauthorized.';
+
+            return;
+        }
         if (! $this->server->isFunctional()) {
             return;
         }
-        if (! $refresh && ! $this->expandByDefault && ($this->resource?->getMorphClass() === \App\Models\Service::class || str($this->container)->contains('-pr-'))) {
+        if ($this->container && ! ValidationPatterns::isValidContainerName($this->container)) {
+            $this->outputs = 'Invalid container name.';
+
+            return;
+        }
+        if (! $refresh && ! $this->expandByDefault && ($this->resource?->getMorphClass() === Service::class || str($this->container)->contains('-pr-'))) {
             return;
         }
         if ($this->numberOfLines <= 0 || is_null($this->numberOfLines)) {
@@ -194,7 +210,13 @@ class GetLogs extends Component
 
     public function downloadAllLogs(): string
     {
+        if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists()) {
+            return '';
+        }
         if (! $this->server->isFunctional() || ! $this->container) {
+            return '';
+        }
+        if (! ValidationPatterns::isValidContainerName($this->container)) {
             return '';
         }
 

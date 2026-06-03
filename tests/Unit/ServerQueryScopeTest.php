@@ -3,7 +3,6 @@
 use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Illuminate\Database\Eloquent\Builder;
-use Mockery;
 
 it('filters servers by proxy type using whereProxyType scope', function () {
     // Mock the Builder

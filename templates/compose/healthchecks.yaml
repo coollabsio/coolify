@@ -1,0 +1,30 @@
+# documentation: https://healthchecks.io/docs
+# slogan: Healthchecks is a cron job monitoring service. It listens for HTTP requests and email messages from your cron jobs and scheduled tasks.
+# category: monitoring
+# tags: monitoring, status, performance, web, services, applications, real-time
+# logo: svgs/healthchecks.webp
+# port: 80000
+
+services:
+  healthchecks:
+    image: "healthchecks/healthchecks:v4.2"
+    container_name: healthchecks
+    environment:
+      - SERVICE_URL_HEALTHCHECKS_8000
+      - DB=sqlite
+      - DB_NAME=/data/hc.sqlite
+      - "ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}"
+      - "REGISTRATION_OPEN=${REGISTRATION_OPEN:-True}"
+      - "DEBUG=${DEBUG:-False}"
+      - "SECRET_KEY=${SECRET_KEY:?${SERVICE_PASSWORD_64_HEALTHCHECKS}}"
+      - "SITE_ROOT=${SERVICE_URL_HEALTHCHECKS}"
+      - "DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-fixme-email-address-here}"
+      - "EMAIL_HOST=${EMAIL_HOST:-my-smtp-server-here.com}"
+      - "EMAIL_PORT=${EMAIL_PORT:-465}"
+      - "EMAIL_HOST_USER=${EMAIL_HOST_USER:-my_username}"
+      - "EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-mypassword}"
+      - "EMAIL_USE_SSL=${EMAIL_USE_SSL:-True}"
+      - "EMAIL_USE_TLS=${EMAIL_USE_TLS:-False}"
+    volumes:
+      - "healthchecks-data:/data"
+

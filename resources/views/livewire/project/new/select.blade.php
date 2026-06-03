@@ -173,6 +173,34 @@
                                         </template>
                                     </x-slot:logo>
                                 </x-resource-view>
+                                <template x-if="service.amd_only">
+                                    <div class="absolute top-2 right-10 group">
+                                        <span
+                                            class="px-2 py-0.5 text-xs rounded bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 cursor-pointer">
+                                            AMD only
+                                        </span>
+                                        <div class="info-helper-popup right-0 w-sm">
+                                            <div class="p-4">
+                                                This service only supports AMD64/x86_64 architecture. It will not work
+                                                on ARM-based servers (e.g., Apple Silicon, Raspberry Pi, AWS Graviton).
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                                <template x-if="service.arm_only">
+                                    <div class="absolute top-2 right-10 group">
+                                        <span
+                                            class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 cursor-pointer">
+                                            ARM only
+                                        </span>
+                                        <div class="info-helper-popup right-0 w-sm">
+                                            <div class="p-4">
+                                                This service only supports ARM64/aarch64 architecture. It will not work
+                                                on AMD64/x86_64-based servers.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
                                 <template x-if="shouldShowDocIcon(service)">
                                     <a :href="getDocLink(service) || coolifyDocsUrl(service.name)" target="_blank"
                                         @click.stop @mouseenter="resolveDocLink(service)"
@@ -424,6 +452,7 @@
                         <div class="flex flex-col mx-6">
                             <div class="font-bold dark:group-hover:text-white">
                                 Swarm Docker <span class="text-xs">({{ $swarmDocker->name }})</span>
+                                <x-deprecated-badge />
                             </div>
                         </div>
                     </div>
@@ -448,14 +477,56 @@
             <h2>Select a Postgresql type</h2>
             <div>If you need extra extensions, you can select Supabase PostgreSQL (or others), otherwise select
                 PostgreSQL
-                17 (default).</div>
-            <div class="flex flex-col gap-6 pt-8">
+                18 (default).</div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-8">
+                <div class="gap-2 coolbox group flex relative"
+                    :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
+                    x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('postgres:18-alpine'))"
+                    :disabled="selecting">
+                    <div class="flex flex-col">
+                        <div class="box-title">PostgreSQL 18 (default)</div>
+                        <div class="box-description">
+                            PostgreSQL is a powerful, open-source object-relational database system (no extensions).
+                        </div>
+                    </div>
+                    <a href="https://hub.docker.com/_/postgres/" target="_blank"
+                        @click.stop
+                        class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
+                        title="View documentation">
+                        <svg class="w-4 h-4 text-neutral-600 dark:text-neutral-400" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </a>
+                </div>
                 <div class="gap-2 coolbox group flex relative"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('postgres:17-alpine'))"
                     :disabled="selecting">
                     <div class="flex flex-col">
-                        <div class="box-title">PostgreSQL 17 (default)</div>
+                        <div class="box-title">PostgreSQL 17</div>
+                        <div class="box-description">
+                            PostgreSQL is a powerful, open-source object-relational database system (no extensions).
+                        </div>
+                    </div>
+                    <a href="https://hub.docker.com/_/postgres/" target="_blank"
+                        @click.stop
+                        class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
+                        title="View documentation">
+                        <svg class="w-4 h-4 text-neutral-600 dark:text-neutral-400" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </a>
+                </div>
+                <div class="gap-2 coolbox group flex relative"
+                    :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
+                    x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('postgres:16-alpine'))"
+                    :disabled="selecting">
+                    <div class="flex flex-col">
+                        <div class="box-title">PostgreSQL 16</div>
                         <div class="box-description">
                             PostgreSQL is a powerful, open-source object-relational database system (no extensions).
                         </div>
@@ -503,6 +574,27 @@
                         </div>
                     </div>
                     <a href="https://github.com/postgis/docker-postgis" target="_blank"
+                        @click.stop
+                        class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
+                        title="View documentation">
+                        <svg class="w-4 h-4 text-neutral-600 dark:text-neutral-400" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </a>
+                </div>
+                <div class="gap-2 coolbox group flex relative"
+                    :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
+                    x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('pgvector/pgvector:pg18'))"
+                    :disabled="selecting">
+                    <div class="flex flex-col">
+                        <div class="box-title">PGVector (18)</div>
+                        <div class="box-description">
+                            PGVector is a PostgreSQL extension for vector data types.
+                        </div>
+                    </div>
+                    <a href="https://github.com/pgvector/pgvector" target="_blank"
                         @click.stop
                         class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
                         title="View documentation">

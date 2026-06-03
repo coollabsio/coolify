@@ -13,7 +13,7 @@ services:
       - 'NB_ENABLE_ROSENPASS=${NB_ENABLE_ROSENPASS:-false}'
       - 'NB_ENABLE_EXPERIMENTAL_LAZY_CONN=${NB_ENABLE_EXPERIMENTAL_LAZY_CONN:-false}'
     volumes:
-      - 'netbird-client:/etc/netbird'
+      - 'netbird-client:/var/lib/netbird'
     cap_add:
       - NET_ADMIN
       - SYS_ADMIN

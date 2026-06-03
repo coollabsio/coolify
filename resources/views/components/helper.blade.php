@@ -1,4 +1,5 @@
-<div {{ $attributes->merge(['class' => 'group']) }}>
+<div x-data="{ open: false }" @click.stop="open = !open" @click.outside="open = false"
+    {{ $attributes->merge(['class' => 'group']) }}>
     <div class="info-helper">
         @isset($icon)
             {{ $icon }}
@@ -10,7 +11,7 @@
         @endisset
 
     </div>
-    <div class="info-helper-popup">
+    <div class="info-helper-popup" :class="{ 'block': open }">
         <div class="p-4">
             {!! $helper !!}
         </div>

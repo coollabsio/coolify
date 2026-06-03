@@ -7,6 +7,7 @@ use App\Actions\Server\StopSentinel;
 use App\Events\ServerReachabilityChanged;
 use App\Models\CloudProviderToken;
 use App\Models\Server;
+use App\Rules\ValidServerIp;
 use App\Services\HetznerService;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -30,6 +31,8 @@ class Show extends Component
     public string $user;
 
     public string $port;
+
+    public int $connectionTimeout;
 
     public ?string $validationLogs = null;
 
@@ -106,9 +109,10 @@ class Show extends Component
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'ip' => 'required',
-            'user' => 'required',
-            'port' => 'required',
+            'ip' => ['required', new ValidServerIp],
+            'user' => ValidationPatterns::serverUsernameRules(),
+            'port' => 'required|integer|between:1,65535',
+            'connectionTimeout' => 'required|integer|min:1|max:300',
             'validationLogs' => 'nullable',
             'wildcardDomain' => 'nullable|url',
             'isReachable' => 'required',
@@ -136,7 +140,12 @@ class Show extends Component
             [
                 'ip.required' => 'The IP Address field is required.',
                 'user.required' => 'The User field is required.',
+                ...ValidationPatterns::serverUsernameMessages(),
                 'port.required' => 'The Port field is required.',
+                'connectionTimeout.required' => 'The SSH Connection Timeout field is required.',
+                'connectionTimeout.integer' => 'The SSH Connection Timeout must be an integer.',
+                'connectionTimeout.min' => 'The SSH Connection Timeout must be at least 1 second.',
+                'connectionTimeout.max' => 'The SSH Connection Timeout must not exceed 300 seconds.',
                 'wildcardDomain.url' => 'The Wildcard Domain must be a valid URL.',
                 'sentinelToken.required' => 'The Sentinel Token field is required.',
                 'sentinelMetricsRefreshRateSeconds.required' => 'The Metrics Refresh Rate field is required.',
@@ -189,12 +198,16 @@ class Show extends Component
             $this->validate();
 
             $this->authorize('update', $this->server);
-            if (Server::where('team_id', currentTeam()->id)
-                ->where('ip', $this->ip)
+            $foundServer = Server::where('ip', $this->ip)
                 ->where('id', '!=', $this->server->id)
-                ->exists()) {
+                ->first();
+            if ($foundServer) {
                 $this->ip = $this->server->ip;
-                throw new \Exception('This IP/Domain is already in use by another server in your team.');
+                if ($foundServer->team_id === currentTeam()->id) {
+                    throw new \Exception('A server with this IP/Domain already exists in your team.');
+                }
+
+                throw new \Exception('A server with this IP/Domain is already in use by another team.');
             }
 
             $this->server->name = $this->name;
@@ -205,6 +218,7 @@ class Show extends Component
             $this->server->validation_logs = $this->validationLogs;
             $this->server->save();
 
+            $this->server->settings->connection_timeout = $this->connectionTimeout;
             $this->server->settings->is_swarm_manager = $this->isSwarmManager;
             $this->server->settings->wildcard_domain = $this->wildcardDomain;
             $this->server->settings->is_swarm_worker = $this->isSwarmWorker;
@@ -232,6 +246,7 @@ class Show extends Component
             $this->ip = $this->server->ip;
             $this->user = $this->server->user;
             $this->port = $this->server->port;
+            $this->connectionTimeout = $this->server->settings->connection_timeout;
 
             $this->wildcardDomain = $this->server->settings->wildcard_domain;
             $this->isReachable = $this->server->settings->is_reachable;
@@ -263,7 +278,9 @@ class Show extends Component
         // Only refresh if the event is for this server
         if (isset($event['serverUuid']) && $event['serverUuid'] === $this->server->uuid) {
             $this->server->refresh();
-            $this->syncData();
+            // Only refresh display-only state; never re-sync text-input properties
+            // (would clobber any unsaved typing — see coolify#6062 / #6354 / #9695).
+            $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
             $this->dispatch('success', 'Sentinel has been restarted successfully.');
         }
     }
@@ -402,7 +419,7 @@ class Show extends Component
                 return;
             }
 
-            $hetznerService = new \App\Services\HetznerService($this->server->cloudProviderToken->token);
+            $hetznerService = new HetznerService($this->server->cloudProviderToken->token);
             $serverData = $hetznerService->getServer($this->server->hetzner_server_id);
 
             $this->hetznerServerStatus = $serverData['status'] ?? null;
@@ -443,12 +460,15 @@ class Show extends Component
             return;
         }
 
-        // Refresh server data
+        // Refresh server data and only the display-only state that validation produces.
+        // Never re-sync text-input properties via syncData() — would clobber any
+        // unsaved typing (see coolify#6062 / #6354 / #9695).
         $this->server->refresh();
-        $this->syncData();
-
-        // Update validation state
+        $this->server->settings->refresh();
         $this->isValidating = $this->server->is_validating ?? false;
+        $this->validationLogs = $this->server->validation_logs;
+        $this->isReachable = $this->server->settings->is_reachable;
+        $this->isUsable = $this->server->settings->is_usable;
 
         // Reload Hetzner tokens in case the linking section should now be shown
         $this->loadHetznerTokens();
@@ -466,7 +486,7 @@ class Show extends Component
                 return;
             }
 
-            $hetznerService = new \App\Services\HetznerService($this->server->cloudProviderToken->token);
+            $hetznerService = new HetznerService($this->server->cloudProviderToken->token);
             $hetznerService->powerOnServer($this->server->hetzner_server_id);
 
             $this->hetznerServerStatus = 'starting';
@@ -475,6 +495,22 @@ class Show extends Component
             $this->dispatch('success', 'Hetzner server is starting...');
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    public function refreshServerMetadata(): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $result = $this->server->gatherServerMetadata();
+            if ($result) {
+                $this->server->refresh();
+                $this->dispatch('success', 'Server details refreshed.');
+            } else {
+                $this->dispatch('error', 'Could not fetch server details. Is the server reachable?');
+            }
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 

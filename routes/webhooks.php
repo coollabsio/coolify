@@ -7,8 +7,11 @@ use App\Http\Controllers\Webhook\Gitlab;
 use App\Http\Controllers\Webhook\Stripe;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/source/github/redirect', [Github::class, 'redirect']);
-Route::get('/source/github/install', [Github::class, 'install']);
+Route::middleware(['web', 'auth', 'throttle:30,1'])->group(function () {
+    Route::get('/source/github/redirect', [Github::class, 'redirect']);
+    Route::get('/source/github/install', [Github::class, 'install']);
+});
+
 Route::post('/source/github/events', [Github::class, 'normal']);
 Route::post('/source/github/events/manual', [Github::class, 'manual']);
 

@@ -5,8 +5,11 @@ namespace App\Livewire\Source\Github;
 use App\Jobs\GithubAppPermissionJob;
 use App\Models\GithubApp;
 use App\Models\PrivateKey;
+use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Lcobucci\JWT\Configuration;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Rsa\Sha256;
@@ -17,6 +20,10 @@ class Change extends Component
     use AuthorizesRequests;
 
     public string $webhook_endpoint = '';
+
+    public string $custom_webhook_endpoint = '';
+
+    public bool $use_custom_webhook_endpoint = false;
 
     public ?string $ipv4 = null;
 
@@ -71,24 +78,34 @@ class Change extends Component
 
     public $privateKeys;
 
-    protected $rules = [
-        'name' => 'required|string',
-        'organization' => 'nullable|string',
-        'apiUrl' => 'required|string',
-        'htmlUrl' => 'required|string',
-        'customUser' => 'required|string',
-        'customPort' => 'required|int',
-        'appId' => 'nullable|int',
-        'installationId' => 'nullable|int',
-        'clientId' => 'nullable|string',
-        'clientSecret' => 'nullable|string',
-        'webhookSecret' => 'nullable|string',
-        'isSystemWide' => 'required|bool',
-        'contents' => 'nullable|string',
-        'metadata' => 'nullable|string',
-        'pullRequests' => 'nullable|string',
-        'privateKeyId' => 'nullable|int',
-    ];
+    public string $manifestState = '';
+
+    public string $activeTab = 'general';
+
+    protected function rules(): array
+    {
+        return [
+            'name' => 'required|string',
+            'organization' => 'nullable|string',
+            'apiUrl' => ['required', 'string', 'url', new SafeExternalUrl],
+            'htmlUrl' => ['required', 'string', 'url', new SafeExternalUrl],
+            'customUser' => 'required|string',
+            'customPort' => 'required|int',
+            'appId' => 'nullable|int',
+            'installationId' => 'nullable|int',
+            'clientId' => 'nullable|string',
+            'clientSecret' => 'nullable|string',
+            'webhookSecret' => 'nullable|string',
+            'isSystemWide' => 'required|bool',
+            'contents' => 'nullable|string',
+            'metadata' => 'nullable|string',
+            'pullRequests' => 'nullable|string',
+            'privateKeyId' => 'nullable|int',
+            'webhook_endpoint' => ['required', 'string', 'url'],
+            'custom_webhook_endpoint' => ['nullable', 'string', 'url'],
+            'use_custom_webhook_endpoint' => ['required', 'bool'],
+        ];
+    }
 
     public function boot()
     {
@@ -143,6 +160,24 @@ class Change extends Component
         }
     }
 
+    private function githubAppSetupStateCacheKey(string $state): string
+    {
+        return 'github-app-setup-state:'.hash('sha256', $state);
+    }
+
+    private function createGithubAppSetupState(string $action): string
+    {
+        $state = Str::random(64);
+
+        Cache::put($this->githubAppSetupStateCacheKey($state), [
+            'action' => $action,
+            'github_app_id' => $this->github_app->id,
+            'team_id' => $this->github_app->team_id,
+        ], now()->addMinutes(60));
+
+        return $state;
+    }
+
     public function checkPermissions()
     {
         try {
@@ -175,6 +210,9 @@ class Change extends Component
 
             GithubAppPermissionJob::dispatchSync($this->github_app);
             $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
+            $this->syncData(false);
+            $this->name = str($this->github_app->name)->kebab();
+
             $this->dispatch('success', 'Github App permissions updated.');
         } catch (\Throwable $e) {
             // Provide better error message for unsupported key formats
@@ -207,6 +245,7 @@ class Change extends Component
             // Override name with kebab case for display
             $this->name = str($this->github_app->name)->kebab();
             $this->fqdn = $settings->fqdn;
+            $this->manifestState = $this->createGithubAppSetupState('manifest');
 
             if ($settings->public_ipv4) {
                 $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
@@ -236,10 +275,18 @@ class Change extends Component
                 }
             }
             $this->parameters = get_route_parameters();
+            $routeName = request()->route()?->getName();
+            if ($routeName === 'source.github.permissions') {
+                $this->activeTab = 'permissions';
+            } elseif ($routeName === 'source.github.resources') {
+                $this->activeTab = 'resources';
+            } else {
+                $this->activeTab = 'general';
+            }
             if (isCloud() && ! isDev()) {
                 $this->webhook_endpoint = config('app.url');
             } else {
-                $this->webhook_endpoint = $this->ipv4 ?? '';
+                $this->webhook_endpoint = $this->fqdn ?? $this->ipv4 ?? $this->ipv6 ?? config('app.url') ?? '';
                 $this->is_system_wide = $this->github_app->is_system_wide;
             }
         } catch (\Throwable $e) {
