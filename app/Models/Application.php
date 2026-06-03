@@ -1884,10 +1884,16 @@ class Application extends BaseModel
             return;
         }
         $uuid = new Cuid2;
+        $checkoutDirectory = "/tmp/{$uuid}";
+        $setupLogFile = "/tmp/{$uuid}.git-setup.log";
+        $escapedCheckoutDirectory = escapeshellarg($checkoutDirectory);
+        $escapedSetupLogFile = escapeshellarg($setupLogFile);
         ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
         $workdir = rtrim($this->base_directory, '/');
         $composeFile = $this->docker_compose_location;
-        $fileList = collect([".$workdir$composeFile"]);
+        $composeFilePath = ".$workdir$composeFile";
+        $escapedComposeFilePath = escapeshellarg($composeFilePath);
+        $fileList = collect([$composeFilePath]);
         $gitRemoteStatus = $this->getGitRemoteStatus(deployment_uuid: $uuid);
         if (! $gitRemoteStatus['is_accessible']) {
             throw new RuntimeException('Failed to read Git source. Please verify repository access and try again.');
@@ -1909,34 +1915,38 @@ class Application extends BaseModel
 
                 return $paths;
             })->flatten()->unique()->values();
+            $escapedFileList = $fileList->map(fn (string $file) => escapeshellarg($file));
             $setupCommands = collect([
-                "rm -rf /tmp/{$uuid}",
-                "mkdir -p /tmp/{$uuid}",
-                "cd /tmp/{$uuid}",
+                "rm -rf {$escapedCheckoutDirectory}",
+                "mkdir -p {$escapedCheckoutDirectory}",
+                "cd {$escapedCheckoutDirectory}",
                 $cloneCommand,
                 'git sparse-checkout init',
-                "git sparse-checkout set {$fileList->implode(' ')}",
+                "git sparse-checkout set {$escapedFileList->implode(' ')}",
                 'git read-tree -mu HEAD',
             ]);
+            $setupCommand = "({$setupCommands->implode(' && ')}) > {$escapedSetupLogFile} 2>&1 || { cat {$escapedSetupLogFile} >&2; exit 1; }";
             $commands = collect([
-                "({$setupCommands->implode(' && ')}) > /dev/null",
-                "cd /tmp/{$uuid}",
-                "cat .$workdir$composeFile",
+                $setupCommand,
+                "cd {$escapedCheckoutDirectory}",
+                "cat {$escapedComposeFilePath}",
             ]);
         } else {
+            $escapedFileList = $fileList->map(fn (string $file) => escapeshellarg($file));
             $setupCommands = collect([
-                "rm -rf /tmp/{$uuid}",
-                "mkdir -p /tmp/{$uuid}",
-                "cd /tmp/{$uuid}",
+                "rm -rf {$escapedCheckoutDirectory}",
+                "mkdir -p {$escapedCheckoutDirectory}",
+                "cd {$escapedCheckoutDirectory}",
                 $cloneCommand,
                 'git sparse-checkout init --cone',
-                "git sparse-checkout set {$fileList->implode(' ')}",
+                "git sparse-checkout set {$escapedFileList->implode(' ')}",
                 'git read-tree -mu HEAD',
             ]);
+            $setupCommand = "({$setupCommands->implode(' && ')}) > {$escapedSetupLogFile} 2>&1 || { cat {$escapedSetupLogFile} >&2; exit 1; }";
             $commands = collect([
-                "({$setupCommands->implode(' && ')}) > /dev/null",
-                "cd /tmp/{$uuid}",
-                "cat .$workdir$composeFile",
+                $setupCommand,
+                "cd {$escapedCheckoutDirectory}",
+                "cat {$escapedComposeFilePath}",
             ]);
         }
         try {
@@ -1960,7 +1970,7 @@ class Application extends BaseModel
         } finally {
             // Cleanup only - restoration happens in catch block
             $commands = collect([
-                "rm -rf /tmp/{$uuid}",
+                "rm -rf {$escapedCheckoutDirectory} {$escapedSetupLogFile}",
             ]);
             instant_remote_process($commands, $this->destination->server, false);
         }
