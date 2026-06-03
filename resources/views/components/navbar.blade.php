@@ -101,7 +101,7 @@
                 }
             }
     }">
-    <div class="flex pt-4 pb-4 pl-2 pr-3 items-start gap-3 motion-safe:transition-all motion-safe:duration-200 motion-safe:ease-out motion-reduce:transition-none"
+    <div class="flex pt-4 pb-4 pl-2 pr-3 items-start gap-3"
         :class="collapsed ? 'lg:flex-col lg:items-center lg:pl-0 lg:pr-0 lg:gap-3 lg:pt-7' : 'lg:pt-6'">
         <div class="flex min-w-0 flex-1 flex-col" :class="collapsed && 'lg:hidden'">
             <a href="/" {{ wireNavigate() }} class="text-2xl font-bold tracking-tight dark:text-white hover:opacity-80 transition-opacity">Coolify</a>
@@ -130,7 +130,7 @@
             </button>
         </div>
     </div>
-    <div class="px-2 pt-2 pb-7 overflow-hidden motion-safe:transition-all motion-safe:duration-200 motion-safe:ease-out motion-reduce:transition-none" :class="collapsed && 'lg:px-0 lg:pt-0 lg:pb-4 lg:min-h-8 lg:flex lg:justify-center'">
+    <div class="px-2 pt-2 pb-7 overflow-hidden" :class="collapsed && 'lg:px-0 lg:pt-0 lg:pb-4 lg:min-h-8 lg:flex lg:justify-center'">
         <livewire:switch-team />
     </div>
     <ul role="list" class="flex flex-col flex-1 gap-y-7">

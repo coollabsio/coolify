@@ -5,6 +5,7 @@ namespace App\Livewire\Project\New;
 use App\Models\Application;
 use App\Models\Project;
 use App\Services\DockerImageParser;
+use App\Support\ValidationPatterns;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -81,8 +82,8 @@ class DockerImage extends Component
     public function submit()
     {
         $this->validate([
-            'imageName' => ['required', 'string'],
-            'imageTag' => ['nullable', 'string', 'regex:/^[a-z0-9][a-z0-9._-]*$/i'],
+            'imageName' => ValidationPatterns::dockerImageNameRules(required: true),
+            'imageTag' => ValidationPatterns::dockerImageTagRules(),
             'imageSha256' => ['nullable', 'string', 'regex:/^[a-f0-9]{64}$/i'],
         ]);
 

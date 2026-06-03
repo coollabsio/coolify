@@ -101,6 +101,18 @@
                 />
                 <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
             </form>
+            <form class="flex items-end gap-2" wire:submit.prevent='saveMaxRestartCount'>
+                <x-forms.input
+                    type="number"
+                    min="0"
+                    helper="Maximum number of crash restarts before Coolify automatically stops the application and sends a notification. Set to 0 to disable the limit."
+                    id="maxRestartCount"
+                    label="Max Restart Count"
+                    canGate="update"
+                    :canResource="$application"
+                />
+                <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
+            </form>
             <h3 class="pt-4">Logs</h3>
             <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
                 instantSave id="isLogDrainEnabled" label="Drain Logs" canGate="update" :canResource="$application" />

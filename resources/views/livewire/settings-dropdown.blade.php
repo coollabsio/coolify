@@ -198,7 +198,7 @@
 
     <!-- What's New Modal -->
     @if ($showWhatsNewModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center py-6 px-4"
+        <div class="fixed inset-0 z-[60] flex items-center justify-center py-6 px-4"
             @keydown.escape.window="$wire.closeWhatsNewModal()">
             <!-- Background overlay -->
             <div class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs" wire:click="closeWhatsNewModal">

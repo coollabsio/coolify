@@ -3,6 +3,7 @@
 use App\Models\GithubApp;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
@@ -19,7 +20,7 @@ function generateGithubToken(GithubApp $source, string $type)
     $timeDiff = abs($serverTime->diffInSeconds($githubTime));
 
     if ($timeDiff > 50) {
-        throw new \Exception(
+        throw new Exception(
             'System time is out of sync with GitHub API time:<br>'.
             '- System time: '.$serverTime->format('Y-m-d H:i:s').' UTC<br>'.
             '- GitHub time: '.$githubTime->format('Y-m-d H:i:s').' UTC<br>'.
@@ -59,7 +60,7 @@ function generateGithubToken(GithubApp $source, string $type)
 
             return $response->json()['token'];
         })(),
-        default => throw new \InvalidArgumentException("Unsupported token type: {$type}")
+        default => throw new InvalidArgumentException("Unsupported token type: {$type}")
     };
 }
 
@@ -76,11 +77,11 @@ function generateGithubJwt(GithubApp $source)
 function githubApi(GithubApp|null $source, string $endpoint, string $method = 'get', ?array $data = null, bool $throwError = true)
 {
     if (is_null($source)) {
-        throw new \Exception('Source is required for API calls');
+        throw new Exception('Source is required for API calls');
     }
 
     if ($source->getMorphClass() !== GithubApp::class) {
-        throw new \InvalidArgumentException("Unsupported source type: {$source->getMorphClass()}");
+        throw new InvalidArgumentException("Unsupported source type: {$source->getMorphClass()}");
     }
 
     if ($source->is_public) {
@@ -99,7 +100,7 @@ function githubApi(GithubApp|null $source, string $endpoint, string $method = 'g
         $errorMessage = data_get($response->json(), 'message', 'no error message found');
         $remainingCalls = $response->header('X-RateLimit-Remaining', '0');
 
-        throw new \Exception(
+        throw new Exception(
             'GitHub API call failed:<br>'.
             "Error: {$errorMessage}<br>".
             'Rate Limit Status:<br>'.
@@ -115,13 +116,19 @@ function githubApi(GithubApp|null $source, string $endpoint, string $method = 'g
     ];
 }
 
-function getInstallationPath(GithubApp $source)
+function getInstallationPath(GithubApp $source): string
 {
-    $github = GithubApp::where('uuid', $source->uuid)->first();
-    $name = str(Str::kebab($github->name));
-    $installation_path = $github->html_url === 'https://github.com' ? 'apps' : 'github-apps';
+    $name = str(Str::kebab($source->name));
+    $installation_path = $source->html_url === 'https://github.com' ? 'apps' : 'github-apps';
+    $state = Str::random(64);
 
-    return "$github->html_url/$installation_path/$name/installations/new";
+    Cache::put('github-app-setup-state:'.hash('sha256', $state), [
+        'action' => 'install',
+        'github_app_id' => $source->id,
+        'team_id' => $source->team_id,
+    ], now()->addMinutes(60));
+
+    return "$source->html_url/$installation_path/$name/installations/new?".http_build_query(['state' => $state]);
 }
 
 function getPermissionsPath(GithubApp $source)

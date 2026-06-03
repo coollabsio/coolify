@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\User\RevokeUserTeamTokens;
 use App\Jobs\UpdateStripeCustomerEmailJob;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\TransactionalEmails\EmailChangeVerification;
@@ -121,6 +122,8 @@ class User extends Authenticatable implements SendsEmail
 
         static::deleting(function (User $user) {
             \DB::transaction(function () use ($user) {
+                RevokeUserTeamTokens::forUser($user);
+
                 $teams = $user->teams;
                 foreach ($teams as $team) {
                     $user_alone_in_team = $team->members->count() === 1;
@@ -158,6 +161,7 @@ class User extends Authenticatable implements SendsEmail
                             if ($found_other_member_who_is_not_owner) {
                                 $found_other_member_who_is_not_owner->pivot->role = 'owner';
                                 $found_other_member_who_is_not_owner->pivot->save();
+                                RevokeUserTeamTokens::forUserTeam($found_other_member_who_is_not_owner, $team->id);
                                 $team->members()->detach($user->id);
                             } else {
                                 static::finalizeTeamDeletion($user, $team);

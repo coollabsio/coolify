@@ -15,8 +15,6 @@ class Sentinel extends Component
 
     public Server $server;
 
-    public array $parameters = [];
-
     public bool $isMetricsEnabled;
 
     #[Validate(['required', 'string', 'max:500', 'regex:/\A[a-zA-Z0-9._\-+=\/]+\z/'])]
@@ -51,15 +49,9 @@ class Sentinel extends Component
         ];
     }
 
-    public function mount(string $server_uuid)
+    public function mount()
     {
-        try {
-            $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
-            $this->parameters = get_route_parameters();
-            $this->syncData();
-        } catch (\Throwable) {
-            return redirect()->route('server.index');
-        }
+        $this->syncData();
     }
 
     public function syncData(bool $toModel = false)
@@ -112,27 +104,29 @@ class Sentinel extends Component
         }
     }
 
-    public function updatedIsSentinelEnabled($value)
+    public function toggleSentinel(): void
     {
         try {
             $this->authorize('manageSentinel', $this->server);
-            if ($value === true) {
+            if (! $this->isSentinelEnabled) {
                 if ($this->server->isBuildServer()) {
-                    $this->isSentinelEnabled = false;
                     $this->dispatch('error', 'Sentinel cannot be enabled on build servers.');
 
                     return;
                 }
+                $this->isSentinelEnabled = true;
                 $customImage = isDev() ? $this->sentinelCustomDockerImage : null;
                 StartSentinel::run($this->server, true, null, $customImage);
             } else {
+                $this->isSentinelEnabled = false;
                 $this->isMetricsEnabled = false;
                 $this->isSentinelDebugEnabled = false;
                 StopSentinel::dispatch($this->server);
             }
             $this->submit();
+            $this->dispatch('refreshServerShow');
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            handleError($e, $this);
         }
     }
 

@@ -28,8 +28,14 @@ trait ResolvesTeam
 
     protected function resolveTeamId(Request $request): ?int
     {
-        $token = $request->user()?->currentAccessToken();
+        $user = $request->user();
+        $token = $user?->currentAccessToken();
+        $teamId = $token?->team_id;
 
-        return $token?->team_id;
+        if (! $user || is_null($teamId) || ! $user->teams()->where('teams.id', $teamId)->exists()) {
+            return null;
+        }
+
+        return (int) $teamId;
     }
 }

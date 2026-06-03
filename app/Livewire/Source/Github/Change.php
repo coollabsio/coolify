@@ -210,6 +210,9 @@ class Change extends Component
 
             GithubAppPermissionJob::dispatchSync($this->github_app);
             $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
+            $this->syncData(false);
+            $this->name = str($this->github_app->name)->kebab();
+
             $this->dispatch('success', 'Github App permissions updated.');
         } catch (\Throwable $e) {
             // Provide better error message for unsupported key formats

@@ -11,6 +11,8 @@ use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\PrivateKey;
 use Exception;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -539,18 +541,21 @@ class Github extends Controller
 
     public function install(Request $request)
     {
-        $source = (string) $request->query('source', '');
-        abort_if(blank($source), 404);
-
-        $github_app = GithubApp::ownedByCurrentTeam()->where('uuid', $source)->firstOrFail();
-
         $setup_action = (string) $request->query('setup_action', '');
-        if ($setup_action !== 'install') {
-            return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
-        }
+        abort_unless(in_array($setup_action, ['install', 'update'], true), 422, 'Invalid GitHub App setup action.');
 
         $installation_id = (string) $request->query('installation_id', '');
         abort_unless(ctype_digit($installation_id), 422, 'Missing GitHub App installation id.');
+
+        if ($setup_action === 'update') {
+            return $this->redirectAfterGithubAppInstallationUpdate($installation_id);
+        }
+
+        $github_app = $this->consumeGithubAppSetupState(
+            request: $request,
+            state: (string) $request->query('state', ''),
+            action: 'install',
+        );
 
         abort_unless(
             $this->githubInstallationBelongsToApp($github_app, $installation_id),
@@ -562,6 +567,19 @@ class Github extends Controller
         $github_app->save();
 
         return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
+    }
+
+    private function redirectAfterGithubAppInstallationUpdate(string $installation_id): RedirectResponse
+    {
+        $github_app = GithubApp::ownedByCurrentTeam()
+            ->where('installation_id', $installation_id)
+            ->first();
+
+        if ($github_app) {
+            return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
+        }
+
+        return redirect()->route('source.all');
     }
 
     /**
@@ -596,11 +614,14 @@ class Github extends Controller
 
     private function consumeGithubAppSetupState(Request $request, string $state, string $action): GithubApp
     {
-        abort_if(blank($state), 404);
+        if (blank($state)) {
+            $this->rejectInvalidGithubAppSetupState($request);
+        }
 
         $payload = Cache::pull($this->githubAppSetupStateCacheKey($state));
-        abort_unless(is_array($payload), 404);
-        abort_unless(data_get($payload, 'action') === $action, 404);
+        if (! is_array($payload) || data_get($payload, 'action') !== $action) {
+            $this->rejectInvalidGithubAppSetupState($request);
+        }
 
         $team_id = $request->user()?->currentTeam()?->id;
         abort_unless(! is_null($team_id) && (int) data_get($payload, 'team_id') === $team_id, 403);
@@ -608,6 +629,18 @@ class Github extends Controller
         return GithubApp::whereKey(data_get($payload, 'github_app_id'))
             ->where('team_id', data_get($payload, 'team_id'))
             ->firstOrFail();
+    }
+
+    private function rejectInvalidGithubAppSetupState(Request $request): never
+    {
+        if ($request->expectsJson()) {
+            abort(404);
+        }
+
+        throw new HttpResponseException(
+            redirect()
+                ->route('source.all')
+        );
     }
 
     private function githubAppSetupStateCacheKey(string $state): string

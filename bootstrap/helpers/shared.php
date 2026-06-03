@@ -1865,15 +1865,15 @@ function isBase64Encoded($strValue)
 {
     return base64_encode(base64_decode($strValue, true)) === $strValue;
 }
-function customApiValidator(Collection|array $item, array $rules)
+function customApiValidator(Collection|array $item, array $rules, array $messages = [])
 {
     if (is_array($item)) {
         $item = collect($item);
     }
 
-    return Validator::make($item->toArray(), $rules, [
+    return Validator::make($item->toArray(), $rules, array_merge([
         'required' => 'This field is required.',
-    ]);
+    ], $messages));
 }
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, ?int $preview_id = null)
 {

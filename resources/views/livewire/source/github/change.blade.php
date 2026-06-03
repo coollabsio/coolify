@@ -351,9 +351,8 @@
                 function createGithubApp(webhook_endpoint, use_custom_webhook_endpoint, custom_webhook_endpoint, preview_deployment_permissions, administration) {
                     const {
                         organization,
-                        html_url,
-                        uuid
-                    } = @js($github_app->only(['organization', 'html_url', 'uuid']));
+                        html_url
+                    } = @js($github_app->only(['organization', 'html_url']));
                     const selectedEndpoint = webhook_endpoint ? webhook_endpoint.trim() : '';
                     const customEndpoint = custom_webhook_endpoint ? custom_webhook_endpoint.trim() : '';
                     if (use_custom_webhook_endpoint && !customEndpoint) {
@@ -401,7 +400,7 @@
                         callback_urls: [`${baseUrl}/login/github/app`],
                         public: false,
                         request_oauth_on_install: false,
-                        setup_url: `${webhookBaseUrl}/source/github/install?source=${uuid}`,
+                        setup_url: `${webhookBaseUrl}/source/github/install`,
                         setup_on_update: true,
                         default_permissions,
                         default_events

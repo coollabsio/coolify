@@ -44,6 +44,7 @@ class SyncBunny extends Command
         $compose_file_prod = 'docker-compose.prod.yml';
         $install_script = 'install.sh';
         $upgrade_script = 'upgrade.sh';
+        $upgrade_postgres_script = 'upgrade-postgres.sh';
         $production_env = '.env.production';
         $service_template = config('constants.services.file_name');
         $versions = 'versions.json';
@@ -52,6 +53,7 @@ class SyncBunny extends Command
         $compose_file_prod_location = "$parent_dir/$compose_file_prod";
         $install_script_location = "$parent_dir/scripts/install.sh";
         $upgrade_script_location = "$parent_dir/scripts/upgrade.sh";
+        $upgrade_postgres_script_location = "$parent_dir/scripts/upgrade-postgres.sh";
         $production_env_location = "$parent_dir/.env.production";
         $versions_location = "$parent_dir/$versions";
 
@@ -87,6 +89,7 @@ class SyncBunny extends Command
                 $compose_file_prod_location = "$parent_dir/other/nightly/$compose_file_prod";
                 $production_env_location = "$parent_dir/other/nightly/$production_env";
                 $upgrade_script_location = "$parent_dir/other/nightly/$upgrade_script";
+                $upgrade_postgres_script_location = "$parent_dir/other/nightly/$upgrade_postgres_script";
                 $install_script_location = "$parent_dir/other/nightly/$install_script";
                 $versions_location = "$parent_dir/other/nightly/$versions";
             }
@@ -101,6 +104,7 @@ class SyncBunny extends Command
                     $compose_file_prod_location => "$bunny_cdn/$bunny_cdn_path/$compose_file_prod",
                     $production_env_location => "$bunny_cdn/$bunny_cdn_path/$production_env",
                     $upgrade_script_location => "$bunny_cdn/$bunny_cdn_path/$upgrade_script",
+                    $upgrade_postgres_script_location => "$bunny_cdn/$bunny_cdn_path/$upgrade_postgres_script",
                     $install_script_location => "$bunny_cdn/$bunny_cdn_path/$install_script",
                 ];
 
@@ -215,6 +219,7 @@ class SyncBunny extends Command
                 $pool->storage(fileName: "$compose_file_prod_location")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file_prod"),
                 $pool->storage(fileName: "$production_env_location")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$production_env"),
                 $pool->storage(fileName: "$upgrade_script_location")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$upgrade_script"),
+                $pool->storage(fileName: "$upgrade_postgres_script_location")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$upgrade_postgres_script"),
                 $pool->storage(fileName: "$install_script_location")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$install_script"),
             ]);
             Http::pool(fn (Pool $pool) => [
@@ -222,6 +227,7 @@ class SyncBunny extends Command
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$compose_file_prod"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$production_env"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$upgrade_script"),
+                $pool->purge("$bunny_cdn/$bunny_cdn_path/$upgrade_postgres_script"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$install_script"),
             ]);
             $this->info('All files uploaded & purged to BunnyCDN.');

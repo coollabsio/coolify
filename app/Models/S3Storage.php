@@ -19,6 +19,7 @@ class S3Storage extends BaseModel
     private const REQUEST_TIMEOUT_SECONDS = 15;
 
     protected $fillable = [
+        'team_id',
         'name',
         'description',
         'region',

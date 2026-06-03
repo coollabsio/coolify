@@ -1,6 +1,6 @@
 <div>
     @if ($isConfigurationChanged && !is_null($resource->config_hash) && !$resource->isExited())
-        <div x-data="{ configurationDiffModalOpen: false }">
+        <div x-data="{ configurationDiffModalOpen: false, expandedRows: {} }">
             <x-popup-small>
                 <x-slot:title>
                     The latest configuration has not been applied

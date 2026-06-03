@@ -7,6 +7,8 @@ use App\Models\EnvironmentVariable;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 class All extends Component
@@ -25,6 +27,8 @@ class All extends Component
 
     public string $view = 'normal';
 
+    public string $search = '';
+
     public bool $is_env_sorting_enabled = false;
 
     public bool $use_build_secrets = false;
@@ -34,6 +38,20 @@ class All extends Component
         'refreshEnvs',
         'environmentVariableDeleted' => 'refreshEnvs',
     ];
+
+    public function updatedSearch(): void
+    {
+        $this->clearEnvironmentVariableCaches();
+    }
+
+    private function clearEnvironmentVariableCaches(): void
+    {
+        unset($this->environmentVariables);
+        unset($this->environmentVariablesPreview);
+        unset($this->hardcodedEnvironmentVariables);
+        unset($this->hardcodedEnvironmentVariablesPreview);
+        unset($this->hasEnvironmentVariables);
+    }
 
     public function mount()
     {
@@ -65,8 +83,27 @@ class All extends Component
 
     public function getEnvironmentVariablesProperty()
     {
-        $query = $this->resource->environment_variables()
-            ->orderByRaw("CASE WHEN is_required = true AND (value IS NULL OR value = '') THEN 0 ELSE 1 END");
+        return $this->getEnvironmentVariables(false);
+    }
+
+    public function getEnvironmentVariablesPreviewProperty()
+    {
+        return $this->getEnvironmentVariables(true);
+    }
+
+    private function getEnvironmentVariables(bool $isPreview, bool $withSearch = true): Collection
+    {
+        $query = $isPreview
+            ? $this->resource->environment_variables_preview()
+            : $this->resource->environment_variables();
+
+        $query->orderByRaw("CASE WHEN is_required = true AND (value IS NULL OR value = '') THEN 0 ELSE 1 END");
+
+        if ($withSearch && $this->searchTerm() !== '') {
+            $escapedSearch = addcslashes(Str::lower($this->searchTerm()), '%_\\');
+
+            $query->whereRaw("LOWER(key) LIKE ? ESCAPE '\\'", ['%'.$escapedSearch.'%']);
+        }
 
         if ($this->is_env_sorting_enabled) {
             $query->orderBy('key');
@@ -77,18 +114,22 @@ class All extends Component
         return $query->get();
     }
 
-    public function getEnvironmentVariablesPreviewProperty()
+    private function searchTerm(): string
     {
-        $query = $this->resource->environment_variables_preview()
-            ->orderByRaw("CASE WHEN is_required = true AND (value IS NULL OR value = '') THEN 0 ELSE 1 END");
+        return trim($this->search);
+    }
 
-        if ($this->is_env_sorting_enabled) {
-            $query->orderBy('key');
-        } else {
-            $query->orderBy('order');
-        }
+    public function getHasEnvironmentVariablesProperty(): bool
+    {
+        return $this->environmentVariables->isNotEmpty() ||
+            $this->environmentVariablesPreview->isNotEmpty() ||
+            $this->hardcodedEnvironmentVariables->isNotEmpty() ||
+            $this->hardcodedEnvironmentVariablesPreview->isNotEmpty();
+    }
 
-        return $query->get();
+    public function getIsSearchActiveProperty(): bool
+    {
+        return $this->searchTerm() !== '';
     }
 
     public function getHardcodedEnvironmentVariablesProperty()
@@ -138,6 +179,12 @@ class All extends Component
             return ! in_array($var['key'], $managedKeys);
         });
 
+        if ($this->searchTerm() !== '') {
+            $hardcodedVars = $hardcodedVars->filter(function ($var) {
+                return str($var['key'])->contains($this->searchTerm(), true);
+            });
+        }
+
         // Apply sorting based on is_env_sorting_enabled
         if ($this->is_env_sorting_enabled) {
             $hardcodedVars = $hardcodedVars->sortBy('key')->values();
@@ -149,9 +196,9 @@ class All extends Component
 
     public function getDevView()
     {
-        $this->variables = $this->formatEnvironmentVariables($this->environmentVariables);
+        $this->variables = $this->formatEnvironmentVariables($this->getEnvironmentVariables(false, false));
         if ($this->showPreview) {
-            $this->variablesPreview = $this->formatEnvironmentVariables($this->environmentVariablesPreview);
+            $this->variablesPreview = $this->formatEnvironmentVariables($this->getEnvironmentVariables(true, false));
         }
     }
 
@@ -282,9 +329,7 @@ class All extends Component
         $environment->order = $maxOrder + 1;
         $environment->save();
 
-        // Clear computed property cache to force refresh
-        unset($this->environmentVariables);
-        unset($this->environmentVariablesPreview);
+        $this->clearEnvironmentVariableCaches();
 
         $this->dispatch('success', 'Environment variable added.');
     }
@@ -413,9 +458,7 @@ class All extends Component
     public function refreshEnvs()
     {
         $this->resource->refresh();
-        // Clear computed property cache to force refresh
-        unset($this->environmentVariables);
-        unset($this->environmentVariablesPreview);
+        $this->clearEnvironmentVariableCaches();
         $this->getDevView();
     }
 }

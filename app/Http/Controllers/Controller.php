@@ -7,6 +7,7 @@ use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Auth\Events\Verified;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Http\Request;
@@ -98,23 +99,50 @@ class Controller extends BaseController
     {
         $token = request()->get('token');
         if ($token) {
-            $decrypted = Crypt::decryptString($token);
-            $email = str($decrypted)->before('@@@');
-            $password = str($decrypted)->after('@@@');
+            try {
+                $decrypted = Crypt::decryptString($token);
+            } catch (DecryptException) {
+                return redirect()->route('login')->with('error', 'Invalid credentials.');
+            }
+
+            if (! str_contains($decrypted, '@@@')) {
+                return redirect()->route('login')->with('error', 'Invalid credentials.');
+            }
+
+            $payload = explode('@@@', $decrypted, 3);
+            if (count($payload) === 3) {
+                [$email, $invitationUuid, $password] = $payload;
+            } else {
+                [$email, $password] = $payload;
+                $invitationUuid = null;
+            }
+
+            $email = Str::lower($email);
             $user = User::whereEmail($email)->first();
             if (! $user) {
                 return redirect()->route('login');
             }
+
+            $invitation = TeamInvitation::query()
+                ->where('email', $email)
+                ->when($invitationUuid, fn ($query) => $query->where('uuid', $invitationUuid))
+                ->where('link', request()->fullUrl())
+                ->first();
+            if (! $invitation || ! $invitation->isValid()) {
+                return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
+            }
+
             if (Hash::check($password, $user->password)) {
-                $invitation = TeamInvitation::whereEmail($email);
-                if ($invitation->exists()) {
-                    $team = $invitation->first()->team;
-                    $user->teams()->attach($team->id, ['role' => $invitation->first()->role]);
-                    $invitation->delete();
-                } else {
-                    $team = $user->teams()->first();
+                $team = $invitation->team;
+                if (! $user->teams()->where('team_id', $team->id)->exists()) {
+                    $user->teams()->attach($team->id, ['role' => $invitation->role]);
                 }
+                $invitation->delete();
+
                 Auth::login($user);
+                $user->forceFill([
+                    'password' => Hash::make(Str::random(64)),
+                ])->save();
                 session(['currentTeam' => $team]);
 
                 return redirect()->route('dashboard');

@@ -30,7 +30,7 @@ it('logs in an existing user when the oauth provider returns a mixed-case email'
         'email' => 'username@example.edu',
     ]);
 
-    $provider = \Mockery::mock();
+    $provider = Mockery::mock();
     $provider->shouldReceive('setConfig')->once()->andReturnSelf();
     $provider->shouldReceive('with')->once()->with(['hd' => 'example.com'])->andReturnSelf();
     $provider->shouldReceive('user')->once()->andReturn((object) [
@@ -58,7 +58,7 @@ it('rejects oauth logins when the provider does not return an email address', fu
         'is_registration_enabled' => true,
     ]);
 
-    $provider = \Mockery::mock();
+    $provider = Mockery::mock();
     $provider->shouldReceive('setConfig')->once()->andReturnSelf();
     $provider->shouldReceive('with')->once()->with(['hd' => 'example.com'])->andReturnSelf();
     $provider->shouldReceive('user')->once()->andReturn((object) [

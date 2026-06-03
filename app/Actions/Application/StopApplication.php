@@ -13,7 +13,7 @@ class StopApplication
 
     public string $jobQueue = 'high';
 
-    public function handle(Application $application, bool $previewDeployments = false, bool $dockerCleanup = true)
+    public function handle(Application $application, bool $previewDeployments = false, bool $dockerCleanup = true, bool $resetRestartCount = true)
     {
         $servers = collect([$application->destination->server]);
         if ($application?->additional_servers?->count() > 0) {
@@ -57,12 +57,17 @@ class StopApplication
             }
         }
 
-        // Reset restart tracking when application is manually stopped
-        $application->update([
-            'restart_count' => 0,
-            'last_restart_at' => null,
-            'last_restart_type' => null,
-        ]);
+        if ($resetRestartCount) {
+            $application->update([
+                'restart_count' => 0,
+                'last_restart_at' => null,
+                'last_restart_type' => null,
+            ]);
+        } else {
+            $application->update([
+                'status' => 'exited',
+            ]);
+        }
 
         ServiceStatusChanged::dispatch($application->environment->project->team->id);
     }

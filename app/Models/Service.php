@@ -778,7 +778,8 @@ class Service extends BaseModel
                     }
                     $rpc_secret = $this->environment_variables()->where('key', 'GARAGE_RPC_SECRET')->first();
                     if (is_null($rpc_secret)) {
-                        $rpc_secret = $this->environment_variables()->where('key', 'SERVICE_HEX_32_RPCSECRET')->first();
+                        $rpc_secret = $this->environment_variables()->where('key', 'SERVICE_HEX_64_RPCSECRET')->first()
+                            ?? $this->environment_variables()->where('key', 'SERVICE_HEX_32_RPCSECRET')->first();
                     }
                     $metrics_token = $this->environment_variables()->where('key', 'GARAGE_METRICS_TOKEN')->first();
                     if (is_null($metrics_token)) {

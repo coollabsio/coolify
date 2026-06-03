@@ -28,7 +28,7 @@ class Configuration extends Component
 
         $project = currentTeam()
             ->projects()
-            ->select('id', 'uuid', 'team_id')
+            ->select('id', 'uuid', 'name', 'team_id')
             ->where('uuid', request()->route('project_uuid'))
             ->firstOrFail();
         $environment = $project->environments()

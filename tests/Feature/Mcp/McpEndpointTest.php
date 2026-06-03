@@ -192,3 +192,14 @@ test('tool calls fail when the token lacks the read ability', function () {
     expect($response->json('result.isError'))->toBeTrue();
     expect($response->json('result.content.0.text'))->toContain('Missing required permissions');
 });
+
+test('MCP rejects token when user no longer belongs to token team', function () {
+    Project::create(['name' => 'Hidden', 'team_id' => $this->team->id]);
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    $this->team->members()->detach($this->user->id);
+
+    $response = mcpCallTool($token, 'list_projects');
+
+    $response->assertUnauthorized();
+});
