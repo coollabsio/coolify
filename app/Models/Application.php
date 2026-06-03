@@ -1678,14 +1678,22 @@ class Application extends BaseModel
                     $encodedToken = rawurlencode($token);
                     $pathPrefix = rtrim($url['path'] ?? '', '/');
                     $source_html_url_host = $this->urlHostWithPort($url ?: []);
+
+                    // Rewrite same-host HTTPS URLs so submodules authenticate with the
+                    // OAuth token too, without persisting credentials (mirrors the GitHub
+                    // OAuth path). Without this, the top-level repo clones but private
+                    // same-host GitLab submodules fail.
+                    $gitConfigOption = '-c '.escapeshellarg("url.{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/.insteadOf={$source_html_url_scheme}://{$source_html_url_host}{$pathPrefix}/");
+                    $gitConfigOptions = $this->withGitHttpTransportConfig($gitConfigOption);
+
                     $repoUrl = "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/{$customRepository}.git";
                     $escapedRepoUrl = escapeshellarg($repoUrl);
                     $fullRepoUrl = $repoUrl;
-                    $git_clone_command_base = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
+                    $git_clone_command_base = $this->applyGitConfigOptionsToCloneCommand("{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}", $gitConfigOptions);
                     if ($only_checkout) {
                         $git_clone_command = $git_clone_command_base;
                     } else {
-                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit);
+                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitConfigOptions: $gitConfigOptions);
                     }
 
                     if ($pull_request_id !== 0) {

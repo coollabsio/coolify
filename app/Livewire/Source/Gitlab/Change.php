@@ -106,7 +106,7 @@ class Change extends Component
             if (isCloud() && ! isDev()) {
                 $this->webhook_endpoint = config('app.url');
             } else {
-                $this->webhook_endpoint = $this->fqdn ?? $this->ipv4 ?? '';
+                $this->webhook_endpoint = $this->fqdn ?? $this->ipv4 ?? $this->ipv6 ?? config('app.url') ?? '';
             }
 
             $this->redirectUri = $this->webhook_endpoint.'/webhooks/source/gitlab/redirect';

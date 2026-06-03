@@ -60,7 +60,10 @@ class GitlabApp extends BaseModel
 
     public static function ownedByCurrentTeam()
     {
-        return GitlabApp::whereTeamId(currentTeam()->id);
+        return GitlabApp::where(function ($query) {
+            $query->where('team_id', currentTeam()->id)
+                ->orWhere('is_system_wide', true);
+        });
     }
 
     public static function public()
