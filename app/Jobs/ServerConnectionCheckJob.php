@@ -67,6 +67,10 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 $this->checkHetznerStatus();
             }
 
+            if ($this->server->vultr_instance_id && $this->server->cloudProviderToken) {
+                $this->checkVultrStatus();
+            }
+
             // Temporarily disable mux if requested
             if ($this->disableMux) {
                 $this->disableSshMux();
@@ -184,6 +188,21 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
+    }
+
+    private function checkVultrStatus(): void
+    {
+        try {
+            $status = $this->server->refreshVultrState();
+        } catch (\Throwable) {
+            // Silently ignore transient Vultr API errors.
+
+            return;
+        }
+
+        if (in_array($status, ['stopped', 'suspended', 'deleted'], true)) {
+            throw new \Exception('Vultr instance is not running');
+        }
     }
 
     private function checkConnection(): bool

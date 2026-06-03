@@ -14,10 +14,10 @@
     <a class="sub-menu-item {{ $activeMenu === 'private-key' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
         href="{{ route('server.private-key', ['server_uuid' => $server->uuid]) }}"><span class="menu-item-label">Private Key</span>
     </a>
-    @if ($server->hetzner_server_id)
+    @if ($server->hetzner_server_id || $server->vultr_instance_id)
         <a class="sub-menu-item {{ $activeMenu === 'cloud-provider-token' ? 'menu-item-active' : '' }}"
             {{ wireNavigate() }}
-            href="{{ route('server.cloud-provider-token', ['server_uuid' => $server->uuid]) }}"><span class="menu-item-label">Hetzner Token</span>
+            href="{{ route('server.cloud-provider-token', ['server_uuid' => $server->uuid]) }}"><span class="menu-item-label">Cloud Token</span>
         </a>
     @endif
     <a class="sub-menu-item {{ $activeMenu === 'ca-certificate' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}

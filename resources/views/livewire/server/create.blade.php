@@ -23,6 +23,29 @@
                 </x-modal-input>
             </div>
 
+            <div>
+                <x-modal-input title="Connect a Vultr Server">
+                    <x-slot:content>
+                        <div class="relative gap-2 cursor-pointer coolbox group">
+                            <div class="flex items-center gap-4 mx-6">
+                                <svg class="w-10 h-10 flex-shrink-0" viewBox="0 0 200 200"
+                                    xmlns="http://www.w3.org/2000/svg">
+                                    <rect width="200" height="200" fill="#007BFC" rx="8" />
+                                    <path d="M42 46 H73 L100 127 L127 46 H158 L114 154 H86 Z" fill="white" />
+                                </svg>
+                                <div class="flex flex-col justify-center flex-1">
+                                    <div class="box-title">Connect a Vultr Server</div>
+                                    <div class="box-description">
+                                        Deploy servers directly from your Vultr account
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </x-slot:content>
+                    <livewire:server.new.by-vultr :private_keys="$private_keys" :limit_reached="$limit_reached" />
+                </x-modal-input>
+            </div>
+
             <div class="border-t dark:border-coolgray-300 my-4"></div>
         @endcan
 

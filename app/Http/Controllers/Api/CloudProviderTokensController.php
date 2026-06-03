@@ -37,6 +37,9 @@ class CloudProviderTokensController extends Controller
                 'digitalocean' => Http::withHeaders([
                     'Authorization' => 'Bearer '.$token,
                 ])->timeout(10)->get('https://api.digitalocean.com/v2/account'),
+                'vultr' => Http::withHeaders([
+                    'Authorization' => 'Bearer '.$token,
+                ])->timeout(10)->get('https://api.vultr.com/v2/account'),
                 default => null,
             };
 
@@ -82,7 +85,7 @@ class CloudProviderTokensController extends Controller
                                 properties: [
                                     'uuid' => ['type' => 'string'],
                                     'name' => ['type' => 'string'],
-                                    'provider' => ['type' => 'string', 'enum' => ['hetzner', 'digitalocean']],
+                                    'provider' => ['type' => 'string', 'enum' => ['hetzner', 'digitalocean', 'vultr']],
                                     'team_id' => ['type' => 'integer'],
                                     'servers_count' => ['type' => 'integer'],
                                     'created_at' => ['type' => 'string'],
@@ -199,7 +202,7 @@ class CloudProviderTokensController extends Controller
                     type: 'object',
                     required: ['provider', 'token', 'name'],
                     properties: [
-                        'provider' => ['type' => 'string', 'enum' => ['hetzner', 'digitalocean'], 'example' => 'hetzner', 'description' => 'The cloud provider.'],
+                        'provider' => ['type' => 'string', 'enum' => ['hetzner', 'digitalocean', 'vultr'], 'example' => 'hetzner', 'description' => 'The cloud provider.'],
                         'token' => ['type' => 'string', 'example' => 'your-api-token-here', 'description' => 'The API token for the cloud provider.'],
                         'name' => ['type' => 'string', 'example' => 'My Hetzner Token', 'description' => 'A friendly name for the token.'],
                     ],
@@ -253,7 +256,7 @@ class CloudProviderTokensController extends Controller
         $body = $request->json()->all();
 
         $validator = customApiValidator($body, [
-            'provider' => 'required|string|in:hetzner,digitalocean',
+            'provider' => 'required|string|in:hetzner,digitalocean,vultr',
             'token' => 'required|string',
             'name' => 'required|string|max:255',
         ]);

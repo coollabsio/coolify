@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\SentinelController;
 use App\Http\Controllers\Api\ServersController;
 use App\Http\Controllers\Api\ServicesController;
 use App\Http\Controllers\Api\TeamController;
+use App\Http\Controllers\Api\VultrController;
 use App\Http\Middleware\ApiAllowed;
 use Illuminate\Support\Facades\Route;
 
@@ -97,6 +98,12 @@ Route::group([
     Route::get('/hetzner/images', [HetznerController::class, 'images'])->middleware(['api.ability:read']);
     Route::get('/hetzner/ssh-keys', [HetznerController::class, 'sshKeys'])->middleware(['api.ability:read']);
     Route::post('/servers/hetzner', [HetznerController::class, 'createServer'])->middleware(['api.ability:write']);
+
+    Route::get('/vultr/regions', [VultrController::class, 'regions'])->middleware(['api.ability:read']);
+    Route::get('/vultr/plans', [VultrController::class, 'plans'])->middleware(['api.ability:read']);
+    Route::get('/vultr/os', [VultrController::class, 'operatingSystems'])->middleware(['api.ability:read']);
+    Route::get('/vultr/ssh-keys', [VultrController::class, 'sshKeys'])->middleware(['api.ability:read']);
+    Route::post('/servers/vultr', [VultrController::class, 'createServer'])->middleware(['api.ability:write']);
 
     Route::get('/resources', [ResourcesController::class, 'resources'])->middleware(['api.ability:read']);
 

@@ -834,7 +834,9 @@ class ServersController extends Controller
             false, // Don't delete from Hetzner via API
             $server->hetzner_server_id,
             $server->cloud_provider_token_id,
-            $server->team_id
+            $server->team_id,
+            false, // Don't delete from Vultr via API
+            $server->vultr_instance_id
         );
 
         auditLog('api.server.deleted', [

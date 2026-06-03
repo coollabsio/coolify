@@ -7,13 +7,14 @@ use App\Models\Server;
 use App\Models\Team;
 use App\Notifications\Server\HetznerDeletionFailed;
 use App\Services\HetznerService;
+use App\Services\VultrService;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class DeleteServer
 {
     use AsAction;
 
-    public function handle(int $serverId, bool $deleteFromHetzner = false, ?int $hetznerServerId = null, ?int $cloudProviderTokenId = null, ?int $teamId = null)
+    public function handle(int $serverId, bool $deleteFromHetzner = false, ?int $hetznerServerId = null, ?int $cloudProviderTokenId = null, ?int $teamId = null, bool $deleteFromVultr = false, ?string $vultrInstanceId = null)
     {
         $server = Server::withTrashed()->find($serverId);
 
@@ -21,6 +22,14 @@ class DeleteServer
         if ($deleteFromHetzner && ($hetznerServerId || ($server && $server->hetzner_server_id))) {
             $this->deleteFromHetznerById(
                 $hetznerServerId ?? $server->hetzner_server_id,
+                $cloudProviderTokenId ?? $server->cloud_provider_token_id,
+                $teamId ?? $server->team_id
+            );
+        }
+
+        if ($deleteFromVultr && ($vultrInstanceId || ($server && $server->vultr_instance_id))) {
+            $this->deleteFromVultrById(
+                $vultrInstanceId ?? $server->vultr_instance_id,
                 $cloudProviderTokenId ?? $server->cloud_provider_token_id,
                 $teamId ?? $server->team_id
             );
@@ -98,6 +107,52 @@ class DeleteServer
             // Notify the team about the failure
             $team = Team::find($teamId);
             $team?->notify(new HetznerDeletionFailed($hetznerServerId, $teamId, $e->getMessage()));
+        }
+    }
+
+    private function deleteFromVultrById(string $vultrInstanceId, ?int $cloudProviderTokenId, int $teamId): void
+    {
+        try {
+            $token = null;
+
+            if ($cloudProviderTokenId) {
+                $token = CloudProviderToken::find($cloudProviderTokenId);
+            }
+
+            if (! $token) {
+                $token = CloudProviderToken::where('team_id', $teamId)
+                    ->where('provider', 'vultr')
+                    ->first();
+            }
+
+            if (! $token) {
+                ray('No Vultr token found for team, skipping Vultr deletion', [
+                    'team_id' => $teamId,
+                    'vultr_instance_id' => $vultrInstanceId,
+                ]);
+
+                return;
+            }
+
+            $vultrService = new VultrService($token->token);
+            $vultrService->deleteInstance($vultrInstanceId);
+
+            ray('Deleted server from Vultr', [
+                'vultr_instance_id' => $vultrInstanceId,
+                'team_id' => $teamId,
+            ]);
+        } catch (\Throwable $e) {
+            ray('Failed to delete server from Vultr', [
+                'error' => $e->getMessage(),
+                'vultr_instance_id' => $vultrInstanceId,
+                'team_id' => $teamId,
+            ]);
+
+            logger()->error('Failed to delete server from Vultr', [
+                'error' => $e->getMessage(),
+                'vultr_instance_id' => $vultrInstanceId,
+                'team_id' => $teamId,
+            ]);
         }
     }
 }

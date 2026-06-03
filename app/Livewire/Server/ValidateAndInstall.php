@@ -87,6 +87,22 @@ class ValidateAndInstall extends Component
     public function validateConnection()
     {
         $this->authorize('update', $this->server);
+        if ($this->server->vultr_instance_id) {
+            $status = $this->server->refreshVultrState();
+            $this->server->refresh();
+
+            if (in_array($status, ['stopped', 'suspended', 'deleted'], true)) {
+                $this->error = $status === 'deleted'
+                    ? 'Vultr instance is deleted or no longer accessible. Relink this server before validating.'
+                    : 'Vultr instance is '.($status ?? 'not running').'. Power it on before validating.';
+                $this->server->update([
+                    'validation_logs' => $this->error,
+                ]);
+
+                return;
+            }
+        }
+
         ['uptime' => $this->uptime, 'error' => $error] = $this->server->validateConnection();
         if (! $this->uptime) {
             $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');

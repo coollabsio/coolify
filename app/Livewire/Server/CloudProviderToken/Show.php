@@ -5,6 +5,7 @@ namespace App\Livewire\Server\CloudProviderToken;
 use App\Models\CloudProviderToken;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class Show extends Component
@@ -16,6 +17,10 @@ class Show extends Component
     public $cloudProviderTokens = [];
 
     public $parameters = [];
+
+    public string $provider = 'hetzner';
+
+    public string $providerName = 'Hetzner';
 
     public function mount(string $server_uuid)
     {
@@ -36,8 +41,11 @@ class Show extends Component
 
     public function loadTokens()
     {
+        $this->provider = $this->server->vultr_instance_id ? 'vultr' : 'hetzner';
+        $this->providerName = $this->provider === 'vultr' ? 'Vultr' : 'Hetzner';
+
         $this->cloudProviderTokens = CloudProviderToken::ownedByCurrentTeam()
-            ->where('provider', 'hetzner')
+            ->where('provider', $this->provider)
             ->get();
     }
 
@@ -67,7 +75,7 @@ class Show extends Component
 
             $this->server->cloudProviderToken()->associate($ownedToken);
             $this->server->save();
-            $this->dispatch('success', 'Hetzner token updated successfully.');
+            $this->dispatch('success', "{$this->providerName} token updated successfully.");
             $this->dispatch('refreshServerShow');
         } catch (\Exception $e) {
             $this->server->refresh();
@@ -78,10 +86,13 @@ class Show extends Component
     private function validateTokenForServer(CloudProviderToken $token): array
     {
         try {
-            // First, validate the token itself
-            $response = \Illuminate\Support\Facades\Http::withHeaders([
+            $endpoint = $token->provider === 'vultr'
+                ? 'https://api.vultr.com/v2/account'
+                : 'https://api.hetzner.cloud/v1/servers';
+
+            $response = Http::withHeaders([
                 'Authorization' => 'Bearer '.$token->token,
-            ])->timeout(10)->get('https://api.hetzner.cloud/v1/servers');
+            ])->timeout(10)->get($endpoint);
 
             if (! $response->successful()) {
                 return [
@@ -90,9 +101,8 @@ class Show extends Component
                 ];
             }
 
-            // Check if this token can access the specific Hetzner server
             if ($this->server->hetzner_server_id) {
-                $serverResponse = \Illuminate\Support\Facades\Http::withHeaders([
+                $serverResponse = Http::withHeaders([
                     'Authorization' => 'Bearer '.$token->token,
                 ])->timeout(10)->get("https://api.hetzner.cloud/v1/servers/{$this->server->hetzner_server_id}");
 
@@ -100,6 +110,19 @@ class Show extends Component
                     return [
                         'valid' => false,
                         'error' => 'This token cannot access this server. It may belong to a different Hetzner project.',
+                    ];
+                }
+            }
+
+            if ($this->server->vultr_instance_id) {
+                $serverResponse = Http::withHeaders([
+                    'Authorization' => 'Bearer '.$token->token,
+                ])->timeout(10)->get("https://api.vultr.com/v2/instances/{$this->server->vultr_instance_id}");
+
+                if (! $serverResponse->successful()) {
+                    return [
+                        'valid' => false,
+                        'error' => 'This token cannot access this instance. It may belong to a different Vultr account.',
                     ];
                 }
             }
@@ -118,19 +141,23 @@ class Show extends Component
         try {
             $token = $this->server->cloudProviderToken;
             if (! $token) {
-                $this->dispatch('error', 'No Hetzner token is associated with this server.');
+                $this->dispatch('error', "No {$this->providerName} token is associated with this server.");
 
                 return;
             }
 
-            $response = \Illuminate\Support\Facades\Http::withHeaders([
+            $endpoint = $token->provider === 'vultr'
+                ? 'https://api.vultr.com/v2/account'
+                : 'https://api.hetzner.cloud/v1/servers';
+
+            $response = Http::withHeaders([
                 'Authorization' => 'Bearer '.$token->token,
-            ])->timeout(10)->get('https://api.hetzner.cloud/v1/servers');
+            ])->timeout(10)->get($endpoint);
 
             if ($response->successful()) {
-                $this->dispatch('success', 'Hetzner token is valid and working.');
+                $this->dispatch('success', "{$this->providerName} token is valid and working.");
             } else {
-                $this->dispatch('error', 'Hetzner token is invalid or has insufficient permissions.');
+                $this->dispatch('error', "{$this->providerName} token is invalid or has insufficient permissions.");
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);

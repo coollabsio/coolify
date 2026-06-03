@@ -9,6 +9,7 @@ use App\Models\CloudProviderToken;
 use App\Models\Server;
 use App\Rules\ValidServerIp;
 use App\Services\HetznerService;
+use App\Services\VultrService;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -75,7 +76,11 @@ class Show extends Component
 
     public ?string $hetznerServerStatus = null;
 
+    public ?string $vultrInstanceStatus = null;
+
     public bool $hetznerServerManuallyStarted = false;
+
+    public bool $vultrInstanceManuallyStarted = false;
 
     public bool $isValidating = false;
 
@@ -91,6 +96,18 @@ class Show extends Component
     public ?string $hetznerSearchError = null;
 
     public bool $hetznerNoMatchFound = false;
+
+    public Collection $availableVultrTokens;
+
+    public ?int $selectedVultrTokenId = null;
+
+    public ?string $manualVultrInstanceId = null;
+
+    public ?array $matchedVultrInstance = null;
+
+    public ?string $vultrSearchError = null;
+
+    public bool $vultrNoMatchFound = false;
 
     public function getListeners()
     {
@@ -172,10 +189,12 @@ class Show extends Component
             }
             // Load saved Hetzner status and validation state
             $this->hetznerServerStatus = $this->server->hetzner_server_status;
+            $this->vultrInstanceStatus = $this->server->vultr_instance_status;
             $this->isValidating = $this->server->is_validating ?? false;
 
-            // Load Hetzner tokens for linking
+            // Load cloud provider tokens for linking
             $this->loadHetznerTokens();
+            $this->loadVultrTokens();
 
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -286,6 +305,22 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            if ($this->server->vultr_instance_id) {
+                $status = $this->server->refreshVultrState();
+                $this->server->refresh();
+                $this->vultrInstanceStatus = $this->server->vultr_instance_status;
+                $this->ip = $this->server->ip;
+
+                if (in_array($status, ['stopped', 'suspended', 'deleted'], true)) {
+                    $message = $status === 'deleted'
+                        ? 'Vultr instance is deleted or no longer accessible. Relink this server before validating.'
+                        : 'Vultr instance is '.($status ?? 'not running').'. Power it on before validating.';
+                    $this->dispatch('error', $message);
+
+                    return;
+                }
+            }
+
             $this->validationLogs = $this->server->validation_logs = null;
             $this->server->save();
             $this->dispatch('init', $install);
@@ -450,6 +485,27 @@ class Show extends Component
         }
     }
 
+    public function checkVultrInstanceStatus(bool $manual = false)
+    {
+        try {
+            if (! $this->server->vultr_instance_id || ! $this->server->cloudProviderToken) {
+                $this->dispatch('error', 'This server is not associated with a Vultr instance or token.');
+
+                return;
+            }
+
+            $this->vultrInstanceStatus = $this->server->refreshVultrState();
+            $this->server->refresh();
+            $this->ip = $this->server->ip;
+
+            if ($manual) {
+                $this->dispatch('success', 'Instance status refreshed: '.ucfirst($this->vultrInstanceStatus ?? 'unknown'));
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function handleServerValidated($event = null)
     {
         // Check if event is for this server
@@ -466,6 +522,7 @@ class Show extends Component
 
         // Reload Hetzner tokens in case the linking section should now be shown
         $this->loadHetznerTokens();
+        $this->loadVultrTokens();
 
         $this->dispatch('refreshServerShow');
         $this->dispatch('refreshServer');
@@ -487,6 +544,27 @@ class Show extends Component
             $this->server->update(['hetzner_server_status' => 'starting']);
             $this->hetznerServerManuallyStarted = true; // Set flag to trigger auto-validation when running
             $this->dispatch('success', 'Hetzner server is starting...');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function startVultrInstance()
+    {
+        try {
+            if (! $this->server->vultr_instance_id || ! $this->server->cloudProviderToken) {
+                $this->dispatch('error', 'This server is not associated with a Vultr instance or token.');
+
+                return;
+            }
+
+            $vultrService = new VultrService($this->server->cloudProviderToken->token);
+            $vultrService->startInstance($this->server->vultr_instance_id);
+
+            $this->vultrInstanceStatus = 'starting';
+            $this->server->update(['vultr_instance_status' => 'starting']);
+            $this->vultrInstanceManuallyStarted = true;
+            $this->dispatch('success', 'Vultr instance is starting...');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -522,6 +600,13 @@ class Show extends Component
     {
         $this->availableHetznerTokens = CloudProviderToken::ownedByCurrentTeam()
             ->where('provider', 'hetzner')
+            ->get();
+    }
+
+    public function loadVultrTokens(): void
+    {
+        $this->availableVultrTokens = CloudProviderToken::ownedByCurrentTeam()
+            ->where('provider', 'vultr')
             ->get();
     }
 
@@ -646,6 +731,130 @@ class Show extends Component
             $this->hetznerSearchError = null;
 
             $this->dispatch('success', 'Server successfully linked to Hetzner Cloud!');
+            $this->dispatch('refreshServerShow');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function searchVultrInstance(): void
+    {
+        $this->vultrSearchError = null;
+        $this->vultrNoMatchFound = false;
+        $this->matchedVultrInstance = null;
+
+        if (! $this->selectedVultrTokenId) {
+            $this->vultrSearchError = 'Please select a Vultr token.';
+
+            return;
+        }
+
+        try {
+            $this->authorize('update', $this->server);
+
+            $token = $this->availableVultrTokens->firstWhere('id', $this->selectedVultrTokenId);
+            if (! $token) {
+                $this->vultrSearchError = 'Invalid token selected.';
+
+                return;
+            }
+
+            $vultrService = new VultrService($token->token);
+            $matched = $vultrService->findInstanceByIp($this->server->ip);
+
+            if ($matched) {
+                $this->matchedVultrInstance = $matched;
+            } else {
+                $this->vultrNoMatchFound = true;
+            }
+        } catch (\Throwable $e) {
+            $this->vultrSearchError = 'Failed to search Vultr instances: '.$e->getMessage();
+        }
+    }
+
+    public function searchVultrInstanceById(): void
+    {
+        $this->vultrSearchError = null;
+        $this->vultrNoMatchFound = false;
+        $this->matchedVultrInstance = null;
+
+        if (! $this->selectedVultrTokenId) {
+            $this->vultrSearchError = 'Please select a Vultr token first.';
+
+            return;
+        }
+
+        if (! $this->manualVultrInstanceId) {
+            $this->vultrSearchError = 'Please enter a Vultr Instance ID.';
+
+            return;
+        }
+
+        try {
+            $this->authorize('update', $this->server);
+
+            $token = $this->availableVultrTokens->firstWhere('id', $this->selectedVultrTokenId);
+            if (! $token) {
+                $this->vultrSearchError = 'Invalid token selected.';
+
+                return;
+            }
+
+            $vultrService = new VultrService($token->token);
+            $instanceData = $vultrService->getInstance($this->manualVultrInstanceId);
+
+            if (! empty($instanceData)) {
+                $this->matchedVultrInstance = $instanceData;
+            } else {
+                $this->vultrNoMatchFound = true;
+            }
+        } catch (\Throwable $e) {
+            $this->vultrSearchError = 'Failed to fetch Vultr instance: '.$e->getMessage();
+        }
+    }
+
+    public function linkToVultr()
+    {
+        if (! $this->matchedVultrInstance) {
+            $this->dispatch('error', 'No Vultr instance selected.');
+
+            return;
+        }
+
+        try {
+            $this->authorize('update', $this->server);
+
+            $token = $this->availableVultrTokens->firstWhere('id', $this->selectedVultrTokenId);
+            if (! $token) {
+                $this->dispatch('error', 'Invalid token selected.');
+
+                return;
+            }
+
+            $vultrService = new VultrService($token->token);
+            $instanceData = $vultrService->getInstance($this->matchedVultrInstance['id']);
+
+            if (empty($instanceData)) {
+                $this->dispatch('error', 'Could not find Vultr instance with ID: '.$this->matchedVultrInstance['id']);
+
+                return;
+            }
+
+            $this->server->update([
+                'cloud_provider_token_id' => $this->selectedVultrTokenId,
+                'vultr_instance_id' => $this->matchedVultrInstance['id'],
+                'vultr_instance_status' => $instanceData['status'] ?? null,
+            ]);
+
+            $this->vultrInstanceStatus = $instanceData['status'] ?? null;
+
+            $this->matchedVultrInstance = null;
+            $this->selectedVultrTokenId = null;
+            $this->manualVultrInstanceId = null;
+            $this->vultrNoMatchFound = false;
+            $this->vultrSearchError = null;
+
+            $this->dispatch('success', 'Server successfully linked to Vultr!');
             $this->dispatch('refreshServerShow');
         } catch (\Throwable $e) {
             return handleError($e, $this);

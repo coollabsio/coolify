@@ -27,7 +27,7 @@ class CloudProviderTokenForm extends Component
     protected function rules(): array
     {
         return [
-            'provider' => 'required|string|in:hetzner,digitalocean',
+            'provider' => 'required|string|in:hetzner,digitalocean,vultr',
             'token' => 'required|string',
             'name' => 'required|string|max:255',
         ];
@@ -50,13 +50,25 @@ class CloudProviderTokenForm extends Component
                 $response = Http::withHeaders([
                     'Authorization' => 'Bearer '.$token,
                 ])->timeout(10)->get('https://api.hetzner.cloud/v1/servers');
-                ray($response);
 
                 return $response->successful();
             }
 
-            // Add other providers here in the future
-            // if ($provider === 'digitalocean') { ... }
+            if ($provider === 'digitalocean') {
+                $response = Http::withHeaders([
+                    'Authorization' => 'Bearer '.$token,
+                ])->timeout(10)->get('https://api.digitalocean.com/v2/account');
+
+                return $response->successful();
+            }
+
+            if ($provider === 'vultr') {
+                $response = Http::withHeaders([
+                    'Authorization' => 'Bearer '.$token,
+                ])->timeout(10)->get('https://api.vultr.com/v2/account');
+
+                return $response->successful();
+            }
 
             return false;
         } catch (\Throwable $e) {

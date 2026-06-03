@@ -6,6 +6,7 @@
                 <x-forms.select required id="provider" label="Provider">
                     <option value="hetzner">Hetzner</option>
                     <option value="digitalocean">DigitalOcean</option>
+                    <option value="vultr">Vultr</option>
                 </x-forms.select>
             @else
                 <input type="hidden" wire:model="provider" />
@@ -20,7 +21,7 @@
             @if (auth()->user()->currentTeam()->cloudProviderTokens->where('provider', $provider)->isEmpty())
                 <div class="text-sm text-neutral-500 dark:text-neutral-400">
                     Create an API token in the <a
-                        href='{{ $provider === 'hetzner' ? 'https://console.hetzner.com/projects' : '#' }}'
+                        href='{{ $provider === 'hetzner' ? 'https://console.hetzner.com/projects' : ($provider === 'vultr' ? 'https://my.vultr.com/settings/#settingsapi' : '#') }}'
                         target='_blank' class='underline dark:text-white'>{{ ucfirst($provider) }} Console</a> → choose
                     Project → Security → API Tokens.
                     @if ($provider === 'hetzner')
@@ -42,6 +43,7 @@
                     <x-forms.select required id="provider" label="Provider" disabled>
                         <option value="hetzner" selected>Hetzner</option>
                         <option value="digitalocean">DigitalOcean</option>
+                        <option value="vultr">Vultr</option>
                     </x-forms.select>
                 </div>
                 <div class="flex-1 min-w-64">

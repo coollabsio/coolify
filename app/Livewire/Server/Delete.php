@@ -16,6 +16,8 @@ class Delete extends Component
 
     public bool $delete_from_hetzner = false;
 
+    public bool $delete_from_vultr = false;
+
     public bool $force_delete_resources = false;
 
     public function mount(string $server_uuid)
@@ -35,6 +37,7 @@ class Delete extends Component
 
         if (! empty($selectedActions)) {
             $this->delete_from_hetzner = in_array('delete_from_hetzner', $selectedActions);
+            $this->delete_from_vultr = in_array('delete_from_vultr', $selectedActions);
             $this->force_delete_resources = in_array('force_delete_resources', $selectedActions);
         }
         try {
@@ -57,7 +60,9 @@ class Delete extends Component
                 $this->delete_from_hetzner,
                 $this->server->hetzner_server_id,
                 $this->server->cloud_provider_token_id,
-                $this->server->team_id
+                $this->server->team_id,
+                $this->delete_from_vultr,
+                $this->server->vultr_instance_id
             );
 
             return redirectRoute($this, 'server.index');
@@ -84,6 +89,14 @@ class Delete extends Component
                 'id' => 'delete_from_hetzner',
                 'label' => 'Also delete server from Hetzner Cloud',
                 'default_warning' => 'The actual server on Hetzner Cloud will NOT be deleted.',
+            ];
+        }
+
+        if ($this->server->vultr_instance_id) {
+            $checkboxes[] = [
+                'id' => 'delete_from_vultr',
+                'label' => 'Also delete server from Vultr',
+                'default_warning' => 'The actual server on Vultr will NOT be deleted.',
             ];
         }
 

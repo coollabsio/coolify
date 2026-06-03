@@ -28,6 +28,19 @@ class ValidateServer
         $server->update([
             'validation_logs' => null,
         ]);
+        if ($server->vultr_instance_id) {
+            $status = $server->refreshVultrState();
+            if (in_array($status, ['stopped', 'suspended', 'deleted'], true)) {
+                $this->error = $status === 'deleted'
+                    ? 'Vultr instance is deleted or no longer accessible. Relink this server before validating.'
+                    : 'Vultr instance is '.($status ?? 'not running').'. Power it on before validating.';
+                $server->update([
+                    'validation_logs' => $this->error,
+                ]);
+                throw new \Exception($this->error);
+            }
+        }
+
         ['uptime' => $this->uptime, 'error' => $error] = $server->validateConnection();
         if (! $this->uptime) {
             $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');
