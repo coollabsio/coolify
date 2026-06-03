@@ -40,6 +40,7 @@ trait SshRetryable
             'Remote host closed connection',
             'Authentication failed',
             'Too many authentication failures',
+            'SSH command failed with exit code: 255',
         ];
 
         $lowerErrorOutput = strtolower($errorOutput);

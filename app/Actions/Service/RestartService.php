@@ -13,8 +13,10 @@ class RestartService
 
     public function handle(Service $service, bool $pullLatestImages)
     {
-        StopService::run($service);
-
-        return StartService::run($service, $pullLatestImages);
+        return StartService::run(
+            service: $service,
+            pullLatestImages: $pullLatestImages,
+            stopBeforeStart: true,
+        );
     }
 }

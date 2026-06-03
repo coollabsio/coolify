@@ -1,6 +1,6 @@
 <form wire:submit='submit' class="flex flex-col">
     <div class="flex items-center gap-2">
-        <h2>Healthchecks</h2>
+        <h2>Healthcheck</h2>
         <x-forms.button canGate="update" :canResource="$resource" type="submit">Save</x-forms.button>
         @if (!$healthCheckEnabled)
             <x-modal-confirmation title="Confirm Healthcheck Enable?" buttonTitle="Enable Healthcheck"

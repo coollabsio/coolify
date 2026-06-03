@@ -143,11 +143,13 @@ class SentinelController extends Controller
     /**
      * Build a stable hash of container state.
      *
-     * Covers [name, state, health_status] only — metrics and
-     * filesystem_usage_root are excluded on purpose (disk % churns constantly
-     * and would defeat the hash; the storage check is separately cache-gated
-     * inside PushServerUpdateJob). Sorted by name so container ordering from
-     * Sentinel does not affect the hash.
+     * Covers [name, state] only — metrics, filesystem_usage_root, and
+     * health_status are excluded on purpose. Disk % churns constantly, and
+     * health checks can flap between starting/healthy/unhealthy while the
+     * container lifecycle state remains unchanged. Both would otherwise defeat
+     * the hash and dispatch DB-heavy PushServerUpdateJob instances too often.
+     * The force window still refreshes full state periodically. Sorted by name
+     * so container ordering from Sentinel does not affect the hash.
      */
     private function containerStateHash(array $data): string
     {
@@ -155,7 +157,6 @@ class SentinelController extends Controller
             ->map(fn ($c) => [
                 'name' => data_get($c, 'name'),
                 'state' => data_get($c, 'state'),
-                'health_status' => data_get($c, 'health_status'),
             ])
             ->sortBy('name')
             ->values()

@@ -9,15 +9,19 @@
     @auth
         <div x-data="{
             open: false,
-            collapsed: false,
-            pageWidth: 'full',
+            collapsed: localStorage.getItem('sidebarCollapsed') === 'true',
+            pageWidth: localStorage.getItem('pageWidth') || 'full',
+            sidebarReady: false,
             init() {
-                this.pageWidth = localStorage.getItem('pageWidth');
-                if (!this.pageWidth) {
-                    this.pageWidth = 'full';
-                    localStorage.setItem('pageWidth', 'full');
+                if (!localStorage.getItem('pageWidth')) {
+                    localStorage.setItem('pageWidth', this.pageWidth);
                 }
-                this.collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+
+                this.$nextTick(() => {
+                    requestAnimationFrame(() => {
+                        this.sidebarReady = true;
+                    });
+                });
             },
             toggleSidebar() {
                 this.collapsed = !this.collapsed;
@@ -47,8 +51,8 @@
                 </div>
             </div>
 
-            <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:flex-col min-w-0 transition-[width] duration-200"
-                :class="collapsed ? 'lg:w-16' : 'lg:w-56'">
+            <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:flex-col min-w-0"
+                :class="[collapsed ? 'lg:w-16' : 'lg:w-56', sidebarReady ? 'transition-[width] duration-200' : '']">
                 <div class="flex flex-col overflow-y-auto grow gap-y-5 scrollbar min-w-0">
                     <x-navbar />
                 </div>
@@ -79,7 +83,7 @@
                 </button>
             </div>
 
-            <main class="transition-[padding] duration-200 p-6" :class="collapsed ? 'lg:pl-[6rem]' : 'lg:pl-[16rem]'">
+            <main class="p-6" :class="[collapsed ? 'lg:pl-[6rem]' : 'lg:pl-[16rem]', sidebarReady ? 'transition-[padding] duration-200' : '']">
                     {{ $slot }}
             </main>
         </div>

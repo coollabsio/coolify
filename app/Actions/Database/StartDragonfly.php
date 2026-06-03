@@ -106,13 +106,9 @@ class StartDragonfly
                         $this->database->destination->network,
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
-                    'healthcheck' => [
-                        'test' => ['CMD', 'redis-cli', '-a', (string) $this->database->dragonfly_password, 'ping'],
-                        'interval' => '5s',
-                        'timeout' => '5s',
-                        'retries' => 10,
-                        'start_period' => '5s',
-                    ],
+                    'healthcheck' => $this->database->healthCheckConfiguration([
+                        'CMD', 'redis-cli', '-a', (string) $this->database->dragonfly_password, 'ping',
+                    ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
                     'mem_swappiness' => $this->database->limits_memory_swappiness,
@@ -182,6 +178,9 @@ class StartDragonfly
         $docker_run_options = convertDockerRunToCompose($this->database->custom_docker_run_options);
         $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
 
+        if (! $this->database->isHealthcheckEnabled()) {
+            unset($docker_compose['services'][$container_name]['healthcheck']);
+        }
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";

@@ -2,8 +2,6 @@
 
 namespace App\Services\DeploymentConfiguration;
 
-use Illuminate\Support\Collection;
-
 class ConfigurationDiff
 {
     /**
@@ -79,20 +77,6 @@ class ConfigurationDiff
     public function changes(): array
     {
         return $this->changes;
-    }
-
-    /**
-     * @return array<string, array{label: string, changes: array<int, array<string, mixed>>}>
-     */
-    public function groupedChanges(): array
-    {
-        return collect($this->changes)
-            ->groupBy('section')
-            ->map(fn (Collection $changes): array => [
-                'label' => (string) data_get($changes->first(), 'section_label', str((string) $changes->keys()->first())->headline()),
-                'changes' => $changes->values()->all(),
-            ])
-            ->all();
     }
 
     /**

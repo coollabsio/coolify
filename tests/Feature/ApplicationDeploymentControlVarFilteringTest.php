@@ -205,6 +205,127 @@ it('filters buildpack control vars from preview build-time env files', function 
     expect($buildtimeEnvs->contains(fn (string $env) => str($env)->startsWith('RAILPACK_NODE_VERSION=')))->toBeFalse();
 });
 
+it('does not let preview docker compose service names override generated build-time service names', function () {
+    $compose = <<<'YAML'
+services:
+  app:
+    image: nginx
+  postgresapp:
+    image: postgres:16-alpine
+YAML;
+
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $compose,
+        'docker_compose' => $compose,
+        'docker_compose_domains' => '[]',
+    ]);
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'SERVICE_NAME_POSTGRESAPP',
+        'value' => '',
+        'is_preview' => true,
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'SERVICE_URL_APP',
+        'value' => '',
+        'is_preview' => true,
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'pull_request_id' => 241,
+    ]);
+
+    /** @var Collection $buildtimeEnvs */
+    $buildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+    $envString = $buildtimeEnvs->implode("\n");
+
+    expect($envString)->toContain("SERVICE_NAME_POSTGRESAPP='postgresapp-pr-241'");
+    expect($envString)->not->toContain('SERVICE_NAME_POSTGRESAPP=""');
+    expect($envString)->not->toContain('SERVICE_URL_APP=');
+});
+
+it('does not let production docker compose service names override generated build-time service names', function () {
+    $compose = <<<'YAML'
+services:
+  app:
+    image: nginx
+  postgresapp:
+    image: postgres:16-alpine
+YAML;
+
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $compose,
+        'docker_compose' => $compose,
+        'docker_compose_domains' => '[]',
+    ]);
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'SERVICE_NAME_POSTGRESAPP',
+        'value' => 'stale-postgresapp',
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+
+    /** @var Collection $buildtimeEnvs */
+    $buildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+    $envString = $buildtimeEnvs->implode("\n");
+
+    expect($envString)->toContain("SERVICE_NAME_POSTGRESAPP='postgresapp'");
+    expect($envString)->not->toContain('stale-postgresapp');
+});
+
+it('filters docker compose generated service variables from build args', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+    ]);
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'APP_ENV',
+        'value' => 'production',
+        'is_preview' => true,
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'SERVICE_NAME_POSTGRESAPP',
+        'value' => '',
+        'is_preview' => true,
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'SERVICE_URL_APP',
+        'value' => 'https://preview.example.com',
+        'is_preview' => true,
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'pull_request_id' => 241,
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'generate_env_variables');
+
+    /** @var Collection $envArgs */
+    $envArgs = readDeploymentJobProperty($job, $reflection, 'env_args');
+
+    expect($envArgs->get('APP_ENV'))->toBe('production');
+    expect($envArgs->has('SERVICE_NAME_POSTGRESAPP'))->toBeFalse();
+    expect($envArgs->has('SERVICE_URL_APP'))->toBeFalse();
+});
+
 it('filters buildpack control vars from preview runtime env fallback', function () {
     [$application, $server] = makeDeploymentControlVarFixture();
 

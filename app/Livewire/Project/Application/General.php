@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Application\GenerateConfig;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
+use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -144,7 +145,7 @@ class General extends Component
             'description' => ValidationPatterns::descriptionRules(),
             'fqdn' => 'nullable',
             'gitRepository' => 'required',
-            'gitBranch' => 'required',
+            'gitBranch' => ['required', 'string', new ValidGitBranch],
             'gitCommitSha' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
             'installCommand' => ValidationPatterns::shellSafeCommandRules(),
             'buildCommand' => ValidationPatterns::shellSafeCommandRules(),
@@ -153,12 +154,12 @@ class General extends Component
             'staticImage' => 'required',
             'baseDirectory' => array_merge(['required'], array_slice(ValidationPatterns::directoryPathRules(), 1)),
             'publishDirectory' => ValidationPatterns::directoryPathRules(),
-            'portsExposes' => ['required', 'string', 'regex:/^(\d+)(,\d+)*$/'],
+            'portsExposes' => ['nullable', 'string', 'regex:/^(\d+)(,\d+)*$/'],
             'portsMappings' => ValidationPatterns::portMappingRules(),
             'customNetworkAliases' => 'nullable',
             'dockerfile' => 'nullable',
-            'dockerRegistryImageName' => 'nullable',
-            'dockerRegistryImageTag' => 'nullable',
+            'dockerRegistryImageName' => ValidationPatterns::dockerImageNameRules(),
+            'dockerRegistryImageTag' => ValidationPatterns::dockerImageTagRules(),
             'dockerfileLocation' => ValidationPatterns::filePathRules(),
             'dockerComposeLocation' => ValidationPatterns::filePathRules(),
             'dockerCompose' => 'nullable',
@@ -211,7 +212,6 @@ class General extends Component
                 'buildPack.required' => 'The Build Pack field is required.',
                 'staticImage.required' => 'The Static Image field is required.',
                 'baseDirectory.required' => 'The Base Directory field is required.',
-                'portsExposes.required' => 'The Exposed Ports field is required.',
                 'portsExposes.regex' => 'Ports exposes must be a comma-separated list of port numbers (e.g. 3000,3001).',
                 ...ValidationPatterns::portMappingMessages(),
                 'isStatic.required' => 'The Static setting is required.',
@@ -759,7 +759,7 @@ class General extends Component
 
             $this->resetErrorBag();
 
-            $this->portsExposes = str($this->portsExposes)->replace(' ', '')->trim()->toString();
+            $this->portsExposes = str($this->portsExposes)->replace(' ', '')->trim()->toString() ?: null;
             if ($this->portsMappings) {
                 $this->portsMappings = str($this->portsMappings)->replace(' ', '')->trim()->toString();
             }
@@ -848,7 +848,7 @@ class General extends Component
             }
             if ($this->buildPack === 'dockerimage') {
                 $this->validate([
-                    'dockerRegistryImageName' => 'required',
+                    'dockerRegistryImageName' => ValidationPatterns::dockerImageNameRules(required: true),
                 ]);
             }
 

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\EncryptedArrayCast;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -74,11 +75,24 @@ class ApplicationDeploymentQueue extends Model
         'finished_at',
     ];
 
+    /**
+     * The configuration snapshot/diff hold full (decrypted on read) configuration,
+     * including unlocked environment variable values. They are only meant for the
+     * in-app diff modal (which redacts per role) and must never be serialized by the
+     * API, so hide them globally as defense in depth.
+     *
+     * @var array<int, string>
+     */
+    protected $hidden = [
+        'configuration_snapshot',
+        'configuration_diff',
+    ];
+
     protected $casts = [
         'pull_request_id' => 'integer',
         'finished_at' => 'datetime',
-        'configuration_snapshot' => 'array',
-        'configuration_diff' => 'array',
+        'configuration_snapshot' => EncryptedArrayCast::class,
+        'configuration_diff' => EncryptedArrayCast::class,
     ];
 
     public function application()

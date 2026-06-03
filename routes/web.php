@@ -7,6 +7,7 @@ use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Destination\Index as DestinationIndex;
+use App\Livewire\Destination\Resources as DestinationResources;
 use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\ForcePasswordReset;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
@@ -15,6 +16,7 @@ use App\Livewire\Notifications\Pushover as NotificationPushover;
 use App\Livewire\Notifications\Slack as NotificationSlack;
 use App\Livewire\Notifications\Telegram as NotificationTelegram;
 use App\Livewire\Notifications\Webhook as NotificationWebhook;
+use App\Livewire\Profile\Appearance as ProfileAppearance;
 use App\Livewire\Profile\Index as ProfileIndex;
 use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
 use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
@@ -56,7 +58,8 @@ use App\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Livewire\Server\Resources as ResourcesShow;
 use App\Livewire\Server\Security\Patches;
 use App\Livewire\Server\Security\TerminalAccess;
-use App\Livewire\Server\Sentinel as ServerSentinel;
+use App\Livewire\Server\Sentinel\Logs as SentinelLogs;
+use App\Livewire\Server\Sentinel\Show as SentinelShow;
 use App\Livewire\Server\Show as ServerShow;
 use App\Livewire\Server\Swarm as ServerSwarm;
 use App\Livewire\Settings\Advanced as SettingsAdvanced;
@@ -124,6 +127,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/scheduled-jobs', SettingsScheduledJobs::class)->name('settings.scheduled-jobs');
 
     Route::get('/profile', ProfileIndex::class)->name('profile');
+    Route::get('/profile/appearance', ProfileAppearance::class)->name('profile.appearance');
 
     Route::prefix('tags')->group(function () {
         Route::get('/{tagName?}', TagsShow::class)->name('tags.show');
@@ -241,6 +245,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/servers', DatabaseConfiguration::class)->name('project.database.servers');
         Route::get('/import-backup', DatabaseConfiguration::class)->name('project.database.import-backup')->middleware('can.update.resource');
         Route::get('/persistent-storage', DatabaseConfiguration::class)->name('project.database.persistent-storage');
+        Route::get('/healthcheck', DatabaseConfiguration::class)->name('project.database.healthcheck');
         Route::get('/webhooks', DatabaseConfiguration::class)->name('project.database.webhooks');
         Route::get('/resource-limits', DatabaseConfiguration::class)->name('project.database.resource-limits');
         Route::get('/resource-operations', DatabaseConfiguration::class)->name('project.database.resource-operations');
@@ -278,7 +283,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
         Route::get('/advanced', ServerAdvanced::class)->name('server.advanced');
         Route::get('/swarm', ServerSwarm::class)->name('server.swarm');
-        Route::get('/sentinel', ServerSentinel::class)->name('server.sentinel');
+        Route::get('/sentinel', SentinelShow::class)->name('server.sentinel');
+        Route::get('/sentinel/logs', SentinelLogs::class)->name('server.sentinel.logs');
         Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
         Route::get('/cloud-provider-token', CloudProviderTokenShow::class)->name('server.cloud-provider-token');
         Route::get('/ca-certificate', CaCertificateShow::class)->name('server.ca-certificate');
@@ -286,7 +292,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/cloudflare-tunnel', CloudflareTunnel::class)->name('server.cloudflare-tunnel');
         Route::get('/destinations', ServerDestinations::class)->name('server.destinations');
         Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
-        Route::get('/metrics', ServerCharts::class)->name('server.charts');
+        Route::get('/metrics', ServerCharts::class)->name('server.metrics');
         Route::get('/danger', DeleteServer::class)->name('server.delete');
         Route::get('/proxy', ProxyShow::class)->name('server.proxy');
         Route::get('/proxy/dynamic', ProxyDynamicConfigurations::class)->name('server.proxy.dynamic-confs');
@@ -299,6 +305,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::get('/destinations', DestinationIndex::class)->name('destination.index');
     Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');
+    Route::get('/destination/{destination_uuid}/resources', DestinationResources::class)->name('destination.resources');
 
     // Route::get('/security', fn () => view('security.index'))->name('security.index');
     Route::get('/security/private-key', SecurityPrivateKeyIndex::class)->name('security.private-key.index');

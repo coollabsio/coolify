@@ -346,8 +346,17 @@
                         <button
                             x-on:click="
                                 $wire.copyLogs().then(logs => {
-                                    navigator.clipboard.writeText(logs);
-                                    Livewire.dispatch('success', ['Logs copied to clipboard.']);
+                                    if (!navigator.clipboard?.writeText) {
+                                        Livewire.dispatch('error', ['Clipboard is not available. Please use HTTPS or localhost.']);
+                                        return;
+                                    }
+                                    navigator.clipboard.writeText(logs).then(() => {
+                                        Livewire.dispatch('success', ['Logs copied to clipboard.']);
+                                    }).catch(() => {
+                                        Livewire.dispatch('error', ['Failed to copy logs to clipboard.']);
+                                    });
+                                }).catch(() => {
+                                    Livewire.dispatch('error', ['Failed to prepare logs for clipboard.']);
                                 });
                             "
                             title="Copy Logs"
@@ -523,20 +532,19 @@
                                     // Parse timestamp from log line (ISO 8601 format: 2025-12-04T11:48:39.136764033Z)
                                     $timestamp = '';
                                     $logContent = $line;
-                                    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z?\s(.*)$/', $line, $matches)) {
-                                        $year = $matches[1];
-                                        $month = $matches[2];
-                                        $day = $matches[3];
-                                        $time = $matches[4];
-                                        $microseconds = isset($matches[5]) ? substr($matches[5], 0, 6) : '000000';
-                                        $logContent = $matches[6];
+                                    if (preg_match('/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z?\s(.*)$/', $line, $matches)) {
+                                        $microseconds = isset($matches[2]) ? substr($matches[2], 0, 6) : '000000';
+                                        $logContent = $matches[3];
 
-                                        // Convert month number to abbreviated name
-                                        $monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                                        $monthName = $monthNames[(int)$month - 1] ?? $month;
-
-                                        // Format for display: 2025-Dec-04 09:44:58
-                                        $timestamp = "{$year}-{$monthName}-{$day} {$time}";
+                                        // Convert UTC Docker timestamp to server timezone for display
+                                        $carbonTs = \Carbon\Carbon::parse($matches[1], 'UTC');
+                                        $serverTz = getServerTimezone($server);
+                                        try {
+                                            $carbonTs->setTimezone($serverTz);
+                                        } catch (\Exception) {
+                                            // keep UTC
+                                        }
+                                        $timestamp = $carbonTs->format('Y-M-d H:i:s');
                                         // Include microseconds in key for uniqueness
                                         $lineKey = "{$timestamp}.{$microseconds}";
                                     }

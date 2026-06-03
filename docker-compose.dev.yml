@@ -129,7 +129,7 @@ services:
     networks:
       - coolify
   minio:
-    image: ghcr.io/coollabsio/maxio:latest
+    image: coollabsio/maxio:latest
     pull_policy: always
     container_name: coolify-minio
     ports:

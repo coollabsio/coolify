@@ -12,6 +12,8 @@ class Terminal extends Component
 {
     public bool $hasShell = true;
 
+    public bool $isTerminalConnected = false;
+
     private function checkShellAvailability(Server $server, string $container): bool
     {
         $escapedContainer = escapeshellarg($container);
@@ -65,12 +67,20 @@ class Terminal extends Component
                 $dockerCommand = "sudo {$dockerCommand}";
             }
 
-            $command = SshMultiplexingHelper::generateSshCommand($server, $dockerCommand);
+            $command = SshMultiplexingHelper::generateSshCommand(
+                $server,
+                $dockerCommand,
+                commandTimeout: (int) config('constants.terminal.command_timeout')
+            );
         } else {
             $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
                             'if [ -f ~/.profile ]; then . ~/.profile; fi && '.
                             'if [ -n "$SHELL" ] && [ -x "$SHELL" ]; then exec $SHELL; else sh; fi';
-            $command = SshMultiplexingHelper::generateSshCommand($server, $shellCommand);
+            $command = SshMultiplexingHelper::generateSshCommand(
+                $server,
+                $shellCommand,
+                commandTimeout: (int) config('constants.terminal.command_timeout')
+            );
         }
         // ssh command is sent back to frontend then to websocket
         // this is done because the websocket connection is not available here
@@ -82,6 +92,23 @@ class Terminal extends Component
         //     - https://github.com/coollabsio/coolify/issues/2298
         //     - https://github.com/coollabsio/coolify/discussions/3362
         $this->dispatch('send-back-command', $command);
+    }
+
+    #[On('terminalConnected')]
+    public function markTerminalConnected(): void
+    {
+        $this->isTerminalConnected = true;
+    }
+
+    #[On('terminalDisconnected')]
+    public function markTerminalDisconnected(): void
+    {
+        $this->isTerminalConnected = false;
+    }
+
+    public function keepTerminalPageAlive(): void
+    {
+        $this->isTerminalConnected = true;
     }
 
     public function render()

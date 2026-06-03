@@ -186,8 +186,15 @@
         copyLogs() {
             const content = this.collectVisibleLogs();
             if (!content) return;
-            navigator.clipboard.writeText(content);
-            Livewire.dispatch('success', ['Logs copied to clipboard.']);
+            if (!navigator.clipboard?.writeText) {
+                Livewire.dispatch('error', ['Clipboard is not available. Please use HTTPS or localhost.']);
+                return;
+            }
+            navigator.clipboard?.writeText(content).then(() => {
+                Livewire.dispatch('success', ['Logs copied to clipboard.']);
+            }).catch(() => {
+                Livewire.dispatch('error', ['Failed to copy logs to clipboard.']);
+            });
         },
         downloadLogs() {
             const content = this.collectVisibleLogs();

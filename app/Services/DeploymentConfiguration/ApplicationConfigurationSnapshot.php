@@ -4,10 +4,13 @@ namespace App\Services\DeploymentConfiguration;
 
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
+use App\Services\DeploymentConfiguration\Concerns\SummarizesDiffText;
 use Illuminate\Support\Arr;
 
 class ApplicationConfigurationSnapshot
 {
+    use SummarizesDiffText;
+
     public const SCHEMA_VERSION = 1;
 
     public function __construct(protected Application $application) {}
@@ -115,12 +118,14 @@ class ApplicationConfigurationSnapshot
             $this->item('publish_directory', 'Publish directory', $this->application->publish_directory, 'build'),
             $this->item('install_command', 'Install command', $this->application->install_command, 'build'),
             $this->item('build_command', 'Build command', $this->application->build_command, 'build'),
-            $this->item('dockerfile', 'Dockerfile', $this->application->dockerfile, 'build', displayValue: $this->summarizeText($this->application->dockerfile)),
+            $this->item('dockerfile', 'Dockerfile', $this->application->dockerfile, 'build', displayValue: $this->summarizeText($this->application->dockerfile), displayFull: $this->application->dockerfile),
             $this->item('dockerfile_location', 'Dockerfile location', $this->application->dockerfile_location, 'build'),
             $this->item('dockerfile_target_build', 'Dockerfile target', $this->application->dockerfile_target_build, 'build'),
             $this->item('docker_compose_location', 'Docker Compose location', $this->application->docker_compose_location, 'build'),
-            $this->item('docker_compose', 'Docker Compose', $this->application->docker_compose, 'build', displayValue: $this->summarizeText($this->application->docker_compose)),
-            $this->item('docker_compose_raw', 'Raw Docker Compose', $this->application->docker_compose_raw, 'build', displayValue: $this->summarizeText($this->application->docker_compose_raw)),
+            // The generated docker_compose is intentionally excluded: it is re-rendered
+            // from git on every parse (resolved env, generated labels, deployment context),
+            // so comparing it would flag a permanent change for git-based compose apps.
+            $this->item('docker_compose_raw', 'Docker Compose', $this->application->docker_compose_raw, 'build', displayValue: $this->summarizeText($this->application->docker_compose_raw), displayFull: $this->application->docker_compose_raw, diffMode: 'lines'),
             $this->item('docker_compose_custom_build_command', 'Docker Compose custom build command', $this->application->docker_compose_custom_build_command, 'build'),
             $this->item('custom_docker_run_options', 'Custom Docker run options', $this->application->custom_docker_run_options, 'build'),
             $this->item('use_build_secrets', 'Use build secrets', data_get($this->application, 'settings.use_build_secrets'), 'build'),
@@ -162,9 +167,10 @@ class ApplicationConfigurationSnapshot
     {
         return [
             $this->item('fqdn', 'Domains', $this->application->fqdn, 'redeploy'),
+            $this->item('docker_compose_domains', 'Service domains', $this->decodedComposeDomains(), 'redeploy', displayValue: $this->summarizeText($this->composeDomainsText()), displayFull: $this->composeDomainsText(), diffMode: 'lines'),
             $this->item('redirect', 'Redirect', $this->application->redirect, 'redeploy'),
-            $this->item('custom_labels', 'Container labels', $this->application->custom_labels, 'redeploy', displayValue: $this->summarizeText($this->application->custom_labels)),
-            $this->item('custom_nginx_configuration', 'Custom Nginx configuration', $this->application->custom_nginx_configuration, 'redeploy', displayValue: $this->summarizeText($this->application->custom_nginx_configuration)),
+            $this->item('custom_labels', 'Container labels', $this->application->custom_labels, 'redeploy', displayValue: $this->summarizeText($this->decodeCustomLabels($this->application->custom_labels)), displayFull: $this->decodeCustomLabels($this->application->custom_labels), diffMode: 'lines'),
+            $this->item('custom_nginx_configuration', 'Custom Nginx configuration', $this->application->custom_nginx_configuration, 'redeploy', displayValue: $this->summarizeText($this->application->custom_nginx_configuration), displayFull: $this->application->custom_nginx_configuration),
             $this->item('is_force_https_enabled', 'Force HTTPS', data_get($this->application, 'settings.is_force_https_enabled'), 'redeploy'),
             $this->item('is_gzip_enabled', 'Gzip', data_get($this->application, 'settings.is_gzip_enabled'), 'redeploy'),
             $this->item('is_stripprefix_enabled', 'Strip prefix', data_get($this->application, 'settings.is_stripprefix_enabled'), 'redeploy'),
@@ -234,6 +240,7 @@ class ApplicationConfigurationSnapshot
     private function environmentItem(EnvironmentVariable $environmentVariable): array
     {
         $impact = $environmentVariable->is_buildtime ? 'build' : 'redeploy';
+        $locked = (bool) $environmentVariable->is_shown_once;
         $compareValue = [
             'value_hash' => $this->sensitiveHash($environmentVariable->value),
             'is_multiline' => $environmentVariable->is_multiline,
@@ -242,20 +249,62 @@ class ApplicationConfigurationSnapshot
             'is_runtime' => $environmentVariable->is_runtime,
         ];
 
+        // Locked (is_shown_once) variables are always redacted and never store a value.
+        if ($locked) {
+            return $this->item(
+                key: (string) $environmentVariable->key,
+                label: (string) $environmentVariable->key,
+                value: $compareValue,
+                impact: $impact,
+                sensitive: true,
+                displayValue: $this->environmentDisplayValue($environmentVariable),
+            );
+        }
+
+        // Unlocked variables expose their value so owners/admins can see the change.
+        // The compare value is pre-hashed (identical formula to the locked branch) so
+        // change detection stays stable and never carries the raw value; members are
+        // redacted at render time in ConfigurationChecker; the column is encrypted at rest.
+        // The value and each scope flag are rendered as their own line and diffed by line,
+        // so a change to one or more attributes shows exactly what changed (one line each).
+        $value = (string) $environmentVariable->value;
+
         return $this->item(
             key: (string) $environmentVariable->key,
             label: (string) $environmentVariable->key,
-            value: $compareValue,
+            value: $this->sensitiveHash($this->normalizeValue($compareValue)),
             impact: $impact,
-            sensitive: true,
-            displayValue: $this->environmentDisplayValue($environmentVariable),
+            sensitive: false,
+            displayValue: $this->summarizeText($value),
+            displayFull: $this->environmentLines($environmentVariable),
+            diffMode: 'lines',
         );
+    }
+
+    /**
+     * One line per attribute so the line diff surfaces exactly which value/flags changed.
+     */
+    private function environmentLines(EnvironmentVariable $environmentVariable): string
+    {
+        $lines = collect();
+
+        $value = (string) $environmentVariable->value;
+        if (filled($value)) {
+            $lines->push($value);
+        }
+
+        $lines->push('Available at build: '.($environmentVariable->is_buildtime ? 'enabled' : 'disabled'));
+        $lines->push('Available at runtime: '.($environmentVariable->is_runtime ? 'enabled' : 'disabled'));
+        $lines->push('Multiline: '.($environmentVariable->is_multiline ? 'enabled' : 'disabled'));
+        $lines->push('Literal: '.($environmentVariable->is_literal ? 'enabled' : 'disabled'));
+
+        return $lines->implode("\n");
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function item(string $key, string $label, mixed $value, string $impact, bool $sensitive = false, mixed $displayValue = null): array
+    private function item(string $key, string $label, mixed $value, string $impact, bool $sensitive = false, mixed $displayValue = null, ?string $displayFull = null, string $diffMode = 'default'): array
     {
         $normalizedValue = $this->normalizeValue($value);
 
@@ -264,21 +313,28 @@ class ApplicationConfigurationSnapshot
             'label' => $label,
             'impact' => $impact,
             'sensitive' => $sensitive,
+            'diff_mode' => $diffMode,
             'compare_value' => $sensitive ? $this->sensitiveHash($normalizedValue) : $normalizedValue,
             'display_value' => $displayValue ?? $this->displayValue($normalizedValue),
+            'display_full' => $sensitive ? null : $this->expandableText($displayFull ?? $this->stringifyValue($normalizedValue)),
         ];
     }
 
     private function environmentDisplayValue(EnvironmentVariable $environmentVariable): string
     {
-        $flags = collect([
+        $flags = $this->environmentFlags($environmentVariable);
+
+        return $flags ? "Hidden ({$flags})" : 'Hidden';
+    }
+
+    private function environmentFlags(EnvironmentVariable $environmentVariable): string
+    {
+        return collect([
             $environmentVariable->is_buildtime ? 'build-time' : null,
             $environmentVariable->is_runtime ? 'runtime' : null,
             $environmentVariable->is_multiline ? 'multiline' : null,
             $environmentVariable->is_literal ? 'literal' : null,
         ])->filter()->implode(', ');
-
-        return $flags ? "Hidden ({$flags})" : 'Hidden';
     }
 
     private function sensitiveHash(mixed $value): string
@@ -320,6 +376,58 @@ class ApplicationConfigurationSnapshot
         return $this->summarizeText((string) $value);
     }
 
+    private function stringifyValue(mixed $value): ?string
+    {
+        if ($value === null || is_bool($value)) {
+            return null;
+        }
+
+        if (is_array($value)) {
+            return json_encode($value, JSON_THROW_ON_ERROR);
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function decodedComposeDomains(): ?array
+    {
+        if (blank($this->application->docker_compose_domains)) {
+            return null;
+        }
+
+        $decoded = json_decode((string) $this->application->docker_compose_domains, true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    private function composeDomainsText(): ?string
+    {
+        $decoded = $this->decodedComposeDomains();
+
+        if (blank($decoded)) {
+            return null;
+        }
+
+        return collect($decoded)
+            ->map(fn ($value, $service): string => $service.': '.(filled(data_get($value, 'domain')) ? data_get($value, 'domain') : '-'))
+            ->sort()
+            ->implode("\n");
+    }
+
+    private function decodeCustomLabels(?string $value): ?string
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        $decoded = base64_decode($value, true);
+
+        return $decoded === false ? $value : $decoded;
+    }
+
     private function summarizeText(?string $value): string
     {
         if (blank($value)) {
@@ -333,6 +441,6 @@ class ApplicationConfigurationSnapshot
             return str($value)->limit(80)." ({$lines} lines)";
         }
 
-        return str($value)->limit(120)->value();
+        return str($value)->limit(self::SINGLE_LINE_LIMIT)->value();
     }
 }

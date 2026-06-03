@@ -17,17 +17,10 @@ class Configuration extends Component
 
     public $servers;
 
-    public function getListeners()
-    {
-        $teamId = auth()->user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
-            "echo-private:team.{$teamId},ServiceStatusChanged" => '$refresh',
-            'buildPackUpdated' => '$refresh',
-            'refresh' => '$refresh',
-        ];
-    }
+    protected $listeners = [
+        'buildPackUpdated' => '$refresh',
+        'refresh' => '$refresh',
+    ];
 
     public function mount()
     {
@@ -35,7 +28,7 @@ class Configuration extends Component
 
         $project = currentTeam()
             ->projects()
-            ->select('id', 'uuid', 'team_id')
+            ->select('id', 'uuid', 'name', 'team_id')
             ->where('uuid', request()->route('project_uuid'))
             ->firstOrFail();
         $environment = $project->environments()
@@ -50,8 +43,6 @@ class Configuration extends Component
         $this->project = $project;
         $this->environment = $environment;
         $this->application = $application;
-
-
 
         if ($this->application->build_pack === 'dockercompose' && $this->currentRoute === 'project.application.healthcheck') {
             return redirect()->route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]);

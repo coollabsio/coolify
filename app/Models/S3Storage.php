@@ -14,7 +14,12 @@ class S3Storage extends BaseModel
 {
     use HasFactory, HasSafeStringAttribute;
 
+    private const CONNECTION_TIMEOUT_SECONDS = 15;
+
+    private const REQUEST_TIMEOUT_SECONDS = 15;
+
     protected $fillable = [
+        'team_id',
         'name',
         'description',
         'region',
@@ -157,6 +162,10 @@ class S3Storage extends BaseModel
                 'bucket' => $this['bucket'],
                 'endpoint' => $this['endpoint'],
                 'use_path_style_endpoint' => true,
+                'http' => [
+                    'connect_timeout' => self::CONNECTION_TIMEOUT_SECONDS,
+                    'timeout' => self::REQUEST_TIMEOUT_SECONDS,
+                ],
             ]);
             // Test the connection by listing files with ListObjectsV2 (S3)
             $disk->files();
@@ -164,11 +173,12 @@ class S3Storage extends BaseModel
             $this->unusable_email_sent = false;
             $this->is_usable = true;
         } catch (\Throwable $e) {
+            $exception = $this->toUserFriendlyConnectionException($e);
             $this->is_usable = false;
             if ($this->unusable_email_sent === false && is_transactional_emails_enabled()) {
                 $mail = new MailMessage;
                 $mail->subject('Coolify: S3 Storage Connection Error');
-                $mail->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $e->getMessage(), 'url' => route('storage.show', ['storage_uuid' => $this->uuid])]);
+                $mail->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $exception->getMessage(), 'url' => route('storage.show', ['storage_uuid' => $this->uuid])]);
 
                 // Load the team with its members and their roles explicitly
                 $team = $this->team()->with(['members' => function ($query) {
@@ -183,11 +193,25 @@ class S3Storage extends BaseModel
                 $this->unusable_email_sent = true;
             }
 
-            throw $e;
+            throw $exception;
         } finally {
             if ($shouldSave) {
                 $this->save();
             }
         }
+    }
+
+    private function toUserFriendlyConnectionException(\Throwable $exception): \Throwable
+    {
+        $message = str($exception->getMessage())->lower();
+
+        if ($message->contains(['timed out', 'timeout', 'connection refused', 'could not resolve', 'curl error 28'])) {
+            return new \RuntimeException(
+                'Could not connect to the S3 endpoint within 15 seconds. Please verify the endpoint, bucket, credentials, region, and network/firewall settings.',
+                previous: $exception,
+            );
+        }
+
+        return $exception;
     }
 }

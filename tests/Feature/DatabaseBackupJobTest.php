@@ -66,6 +66,48 @@ test('upload_to_s3 throws exception and disables s3 when storage is null', funct
     expect($backup->s3_storage_id)->toBeNull();
 });
 
+test('upload_to_s3 exception message reports the previous s3 storage id', function () {
+    $backup = ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
+        'save_s3' => true,
+        's3_storage_id' => 12345,
+        'database_type' => 'App\Models\StandalonePostgresql',
+        'database_id' => 1,
+        'team_id' => Team::factory()->create()->id,
+    ]);
+
+    $job = new DatabaseBackupJob($backup);
+
+    $reflection = new ReflectionClass($job);
+    $reflection->getProperty('s3')->setValue($job, null);
+
+    expect(fn () => $reflection->getMethod('upload_to_s3')->invoke($job))
+        ->toThrow(Exception::class, 'S3 storage ID: 12345');
+
+    $backup->refresh();
+    expect($backup->save_s3)->toBeFalsy();
+    expect($backup->s3_storage_id)->toBeNull();
+});
+
+test('upload_to_s3 exception message reports null when no previous s3 storage id exists', function () {
+    $backup = ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
+        'save_s3' => true,
+        's3_storage_id' => null,
+        'database_type' => 'App\Models\StandalonePostgresql',
+        'database_id' => 1,
+        'team_id' => Team::factory()->create()->id,
+    ]);
+
+    $job = new DatabaseBackupJob($backup);
+
+    $reflection = new ReflectionClass($job);
+    $reflection->getProperty('s3')->setValue($job, null);
+
+    expect(fn () => $reflection->getMethod('upload_to_s3')->invoke($job))
+        ->toThrow(Exception::class, 'S3 storage ID: null');
+});
+
 test('deleting s3 storage disables s3 on linked backups', function () {
     $team = Team::factory()->create();
 

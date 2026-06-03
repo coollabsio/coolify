@@ -41,7 +41,7 @@
                     instantSave id="isPreviewDeploymentsEnabled" label="Preview Deployments" canGate="update"
                     :canResource="$application" />
                 <x-forms.checkbox
-                    helper="When enabled, anyone can trigger PR deployments. When disabled, only repository members, collaborators, and contributors can trigger PR deployments."
+                    helper="When enabled, anyone can trigger PR deployments. When disabled, fork PRs are blocked and only repository owners, members, and collaborators can trigger PR deployments."
                     instantSave id="isPrDeploymentsPublicEnabled" label="Allow Public PR Deployments" canGate="update"
                     :canResource="$application" :disabled="!$isPreviewDeploymentsEnabled" />
 
@@ -96,6 +96,18 @@
                     helper="How long to wait for graceful shutdown during rolling updates, manual stops, and restarts. Applies to all containers for this application. Default: {{ DEFAULT_STOP_GRACE_PERIOD_SECONDS }} seconds. Range: {{ MIN_STOP_GRACE_PERIOD_SECONDS }}-{{ MAX_STOP_GRACE_PERIOD_SECONDS }} seconds (1 hour)."
                     min="{{ MIN_STOP_GRACE_PERIOD_SECONDS }}"
                     max="{{ MAX_STOP_GRACE_PERIOD_SECONDS }}"
+                    canGate="update"
+                    :canResource="$application"
+                />
+                <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
+            </form>
+            <form class="flex items-end gap-2" wire:submit.prevent='saveMaxRestartCount'>
+                <x-forms.input
+                    type="number"
+                    min="0"
+                    helper="Maximum number of crash restarts before Coolify automatically stops the application and sends a notification. Set to 0 to disable the limit."
+                    id="maxRestartCount"
+                    label="Max Restart Count"
                     canGate="update"
                     :canResource="$application"
                 />

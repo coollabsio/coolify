@@ -8,6 +8,7 @@ use App\Jobs\CheckHelperImageJob;
 use App\Jobs\CheckTraefikVersionJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
+use App\Jobs\CleanupStaleMultiplexedConnections;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\RegenerateSslCertJob;
@@ -40,6 +41,10 @@ class Kernel extends ConsoleKernel
             $this->instanceTimezone = config('app.timezone');
         }
 
+        $this->scheduleInstance->call(fn () => app(CleanupStaleMultiplexedConnections::class)->handle())
+            ->name('cleanup:ssh-mux')
+            ->hourly()
+            ->when(fn () => config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop'));
         $this->scheduleInstance->command('cleanup:redis --clear-locks')->daily();
         $this->scheduleInstance->command('sanctum:prune-expired --hours=1')->hourly()->onOneServer();
         $this->scheduleInstance->job(new ApiTokenExpirationWarningJob)->hourly()->onOneServer();

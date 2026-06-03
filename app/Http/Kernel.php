@@ -12,6 +12,7 @@ use App\Http\Middleware\CheckForcePasswordReset;
 use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\EnsureMcpEnabled;
+use App\Http\Middleware\EnsureTokenBelongsToCurrentTeamMember;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\TrimStrings;
@@ -104,6 +105,7 @@ class Kernel extends HttpKernel
         'ability' => CheckForAnyAbility::class,
         'api.ability' => ApiAbility::class,
         'api.sensitive' => ApiSensitiveData::class,
+        'api.token.team' => EnsureTokenBelongsToCurrentTeamMember::class,
         'can.create.resources' => CanCreateResources::class,
         'can.update.resource' => CanUpdateResource::class,
         'can.access.terminal' => CanAccessTerminal::class,

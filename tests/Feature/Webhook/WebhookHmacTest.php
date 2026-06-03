@@ -509,6 +509,48 @@ describe('Manual Webhook Repository Matching', function () {
         expect($response->getContent())->not->toContain('No applications found');
     });
 
+    test('gitlab matches scp-style ssh repository URL with custom port', function () {
+        $app = createApplicationWithWebhook(overrides: [
+            'git_repository' => 'git@gitlab.example.com:2222/services/xyz.git',
+            'git_branch' => 'master',
+        ]);
+        $secret = $app->manual_webhook_secret_gitlab;
+
+        $response = $this->postJson('/webhooks/source/gitlab/events/manual', [
+            'object_kind' => 'push',
+            'ref' => 'refs/heads/master',
+            'project' => ['path_with_namespace' => 'services/xyz'],
+            'after' => 'abc123',
+            'commits' => [],
+        ], [
+            'X-Gitlab-Token' => $secret,
+        ]);
+
+        $response->assertOk();
+        expect($response->getContent())->not->toContain('No applications found');
+    });
+
+    test('gitlab matches scp-style ssh repository URL without port', function () {
+        $app = createApplicationWithWebhook(overrides: [
+            'git_repository' => 'git@gitlab.example.com:services/xyz.git',
+            'git_branch' => 'master',
+        ]);
+        $secret = $app->manual_webhook_secret_gitlab;
+
+        $response = $this->postJson('/webhooks/source/gitlab/events/manual', [
+            'object_kind' => 'push',
+            'ref' => 'refs/heads/master',
+            'project' => ['path_with_namespace' => 'services/xyz'],
+            'after' => 'abc123',
+            'commits' => [],
+        ], [
+            'X-Gitlab-Token' => $secret,
+        ]);
+
+        $response->assertOk();
+        expect($response->getContent())->not->toContain('No applications found');
+    });
+
     test('github matches repository case-insensitively', function () {
         $app = createApplicationWithWebhook(overrides: [
             'git_repository' => 'https://github.com/Test-Org/Test-Repo.git',

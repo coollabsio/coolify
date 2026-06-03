@@ -13,6 +13,7 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
 use App\Rules\ValidServerIp;
+use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
@@ -487,10 +488,12 @@ class ServersController extends Controller
             'ip' => ['string', 'required', new ValidServerIp],
             'port' => 'integer|nullable|between:1,65535',
             'private_key_uuid' => 'string|required',
-            'user' => ['string', 'nullable', 'regex:/^[a-zA-Z0-9_-]+$/'],
+            'user' => ValidationPatterns::serverUsernameRules(required: false),
             'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
             'proxy_type' => 'string|nullable',
+        ], [
+            ...ValidationPatterns::serverUsernameMessages(),
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -666,7 +669,7 @@ class ServersController extends Controller
             'ip' => ['string', 'nullable', new ValidServerIp],
             'port' => 'integer|nullable|between:1,65535',
             'private_key_uuid' => 'string|nullable',
-            'user' => ['string', 'nullable', 'regex:/^[a-zA-Z0-9_-]+$/'],
+            'user' => ValidationPatterns::serverUsernameRules(required: false),
             'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
             'proxy_type' => 'string|nullable',
@@ -676,6 +679,8 @@ class ServersController extends Controller
             'server_disk_usage_notification_threshold' => 'integer|min:1|max:100',
             'server_disk_usage_check_frequency' => 'string',
             'connection_timeout' => 'integer|min:1|max:300',
+        ], [
+            ...ValidationPatterns::serverUsernameMessages(),
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
