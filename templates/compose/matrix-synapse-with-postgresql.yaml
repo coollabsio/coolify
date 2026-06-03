@@ -6,20 +6,61 @@
 # port: 8008
 
 # IMPORTANT: SYNAPSE_SERVER_NAME is permanent and cannot be changed after first deployment!
+# - It becomes part of every user ID (@user:SERVER_NAME) and room alias.
 # - If hosting at matrix.example.org but want user IDs like @user:example.org, set SYNAPSE_SERVER_NAME=example.org
-# - You'll need to set up .well-known delegation at https://example.org/.well-known/matrix/server
+#   and set up .well-known delegation on https://example.org (see the Matrix service docs).
 # - See: https://element-hq.github.io/synapse/latest/delegate.html
+#
+# MIGRATING AN EXISTING SERVER? READ THIS FIRST!
+# - All your data (rooms, messages, users) lives in the PostgreSQL database/volume, NOT in homeserver.yaml.
+# - Keep POSTGRES_DB and the volume names IDENTICAL to your previous deployment, otherwise Synapse will
+#   connect to a fresh, empty database and your server will look wiped (the old data volume is kept, just detached).
+# - Enabling OIDC does NOT automatically log existing users into their accounts. Without
+#   OIDC_ALLOW_EXISTING_USERS=true a first SSO login creates a brand-new account. See the OIDC notes below.
+#
+# Optional features below are activated simply by filling in their variables.
+# Leave a variable empty to keep that feature disabled.
 
 services:
   synapse:
     image: matrixdotorg/synapse:latest
     environment:
       - SERVICE_URL_SYNAPSE_8008
+      # Core
       - SYNAPSE_SERVER_NAME=${SYNAPSE_SERVER_NAME:?}
       - SYNAPSE_REPORT_STATS=${SYNAPSE_REPORT_STATS:-no}
-      - ENABLE_REGISTRATION=${ENABLE_REGISTRATION:-false}
+      - MAX_UPLOAD_SIZE=${MAX_UPLOAD_SIZE:-50M}
+      # Admin user (auto-created on first start)
       - SERVICE_USER_ADMIN=${SERVICE_USER_ADMIN}
       - SERVICE_PASSWORD_ADMIN=${SERVICE_PASSWORD_ADMIN}
+      # Registration & access
+      - ENABLE_REGISTRATION=${ENABLE_REGISTRATION:-false}
+      - ENABLE_GUESTS=${ENABLE_GUESTS:-false}
+      - ALLOW_PUBLIC_ROOMS_OVER_FEDERATION=${ALLOW_PUBLIC_ROOMS_OVER_FEDERATION:-false}
+      # Anti-spam (Google reCAPTCHA) - fill both to enable
+      - RECAPTCHA_PUBLIC_KEY=${RECAPTCHA_PUBLIC_KEY:-}
+      - RECAPTCHA_PRIVATE_KEY=${RECAPTCHA_PRIVATE_KEY:-}
+      # Email / SMTP (for verification, password resets, notifications) - fill SMTP_HOST to enable
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM=${SMTP_FROM:-Matrix <noreply@${SYNAPSE_SERVER_NAME}>}
+      # Single sign-on (OIDC: Authentik, Keycloak, Pocket ID, ...) - fill OIDC_ISSUER to enable.
+      # OIDC_ALLOW_EXISTING_USERS=true links an SSO login to an existing local account whose
+      # username matches the mapped localpart (prevents duplicate accounts when adding SSO to an
+      # existing server). Only enable if your IdP usernames are unique & never reused (see docs).
+      - OIDC_NAME=${OIDC_NAME:-SSO}
+      - OIDC_ISSUER=${OIDC_ISSUER:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - OIDC_ALLOW_EXISTING_USERS=${OIDC_ALLOW_EXISTING_USERS:-false}
+      # Voice/Video calls (TURN server) - fill TURN_URI to enable
+      - TURN_URI=${TURN_URI:-}
+      - TURN_SHARED_SECRET=${TURN_SHARED_SECRET:-}
+      # Advanced: raw YAML appended verbatim to homeserver.yaml
+      - SYNAPSE_CONFIG_APPEND=${SYNAPSE_CONFIG_APPEND:-}
+      # PostgreSQL
       - SERVICE_USER_POSTGRESQL=${SERVICE_USER_POSTGRESQL}
       - SERVICE_PASSWORD_POSTGRESQL=${SERVICE_PASSWORD_POSTGRESQL}
       - POSTGRES_DB=${POSTGRES_DB:-synapse-db}
@@ -29,23 +70,21 @@ services:
       - /bin/bash
       - -c
       - |
+        # Generate the initial config once to obtain the signing key and base secrets.
         ! test -f /data/homeserver.yaml && /start.py generate
 
-        # Extract secrets from generated config
-        grep "registration_shared_secret" /data/homeserver.yaml \
-        | awk '{print $2}' > ./registration_shared_secret
+        # Extract secrets so they stay stable across restarts.
+        grep "registration_shared_secret" /data/homeserver.yaml | awk '{print $2}' > ./registration_shared_secret
+        grep "macaroon_secret_key" /data/homeserver.yaml | awk '{print $2}' > ./macaroon_secret_key
+        grep "form_secret" /data/homeserver.yaml | awk '{print $2}' > ./form_secret
 
-        grep "macaroon_secret_key" /data/homeserver.yaml \
-        | awk '{print $2}' > ./macaroon_secret_key
-
-        grep "form_secret" /data/homeserver.yaml \
-        | awk '{print $2}' > ./form_secret
-
-        # Create homeserver.yaml with PostgreSQL
+        # homeserver.yaml is fully managed from the environment variables above and
+        # rewritten on every start, so changing a variable + redeploy always applies.
         cat <<EOF > /data/homeserver.yaml
         server_name: "${SYNAPSE_SERVER_NAME}"
         pid_file: /data/homeserver.pid
         public_baseurl: "${SERVICE_URL_SYNAPSE}/"
+        serve_server_wellknown: true
 
         listeners:
           - port: 8008
@@ -70,6 +109,7 @@ services:
 
         log_config: "/data/${SYNAPSE_SERVER_NAME}.log.config"
         media_store_path: /data/media_store
+        max_upload_size: ${MAX_UPLOAD_SIZE}
         report_stats: ${SYNAPSE_REPORT_STATS}
 
         registration_shared_secret: $(<./registration_shared_secret)
@@ -77,17 +117,79 @@ services:
         form_secret: $(<./form_secret)
         signing_key_path: "/data/${SYNAPSE_SERVER_NAME}.signing.key"
 
+        enable_registration: ${ENABLE_REGISTRATION}
+        allow_guest_access: ${ENABLE_GUESTS}
+        allow_public_rooms_over_federation: ${ALLOW_PUBLIC_ROOMS_OVER_FEDERATION}
+
         trusted_key_servers:
           - server_name: "matrix.org"
         EOF
 
-        [ "${ENABLE_REGISTRATION}" = "true" ] && ! grep "#registration" /data/homeserver.yaml &>/dev/null \
-        && echo >> /data/homeserver.yaml \
-        && cat <<EOF >> /data/homeserver.yaml
-        enable_registration: true
-        EOF
+        # reCAPTCHA (only when both keys are provided)
+        if [ -n "${RECAPTCHA_PUBLIC_KEY}" ] && [ -n "${RECAPTCHA_PRIVATE_KEY}" ]; then
+        cat <<EOF >> /data/homeserver.yaml
 
-        # Register admin user if provided
+        enable_registration_captcha: true
+        recaptcha_public_key: "${RECAPTCHA_PUBLIC_KEY}"
+        recaptcha_private_key: "${RECAPTCHA_PRIVATE_KEY}"
+        recaptcha_siteverify_api: "https://www.google.com/recaptcha/api/siteverify"
+        EOF
+        fi
+
+        # Email / SMTP (only when SMTP_HOST is provided)
+        if [ -n "${SMTP_HOST}" ]; then
+        cat <<EOF >> /data/homeserver.yaml
+
+        email:
+          smtp_host: "${SMTP_HOST}"
+          smtp_port: ${SMTP_PORT}
+          smtp_user: "${SMTP_USER}"
+          smtp_pass: "${SMTP_PASSWORD}"
+          notif_from: "${SMTP_FROM}"
+          enable_notifs: true
+        EOF
+        fi
+
+        # Single sign-on via OIDC (only when OIDC_ISSUER is provided)
+        if [ -n "${OIDC_ISSUER}" ]; then
+        cat <<EOF >> /data/homeserver.yaml
+
+        oidc_providers:
+          - idp_id: sso
+            idp_name: "${OIDC_NAME}"
+            discover: true
+            issuer: "${OIDC_ISSUER}"
+            client_id: "${OIDC_CLIENT_ID}"
+            client_secret: "${OIDC_CLIENT_SECRET}"
+            allow_existing_users: ${OIDC_ALLOW_EXISTING_USERS}
+            scopes: ["openid", "profile", "email"]
+            user_mapping_provider:
+              config:
+                localpart_template: "{{ user.preferred_username }}"
+                display_name_template: "{{ user.name }}"
+                email_template: "{{ user.email }}"
+        EOF
+        fi
+
+        # Voice/Video calls via TURN (only when TURN_URI is provided)
+        if [ -n "${TURN_URI}" ]; then
+        cat <<EOF >> /data/homeserver.yaml
+
+        turn_uris:
+          - "${TURN_URI}"
+        turn_shared_secret: "${TURN_SHARED_SECRET}"
+        turn_user_lifetime: 1h
+        turn_allow_guests: true
+        EOF
+        fi
+
+        # Advanced raw config (app services, custom blocks, ...)
+        if [ -n "${SYNAPSE_CONFIG_APPEND}" ]; then
+          echo >> /data/homeserver.yaml
+          printf '%s\n' "${SYNAPSE_CONFIG_APPEND}" >> /data/homeserver.yaml
+        fi
+
+        # Auto-create the admin user once Synapse is up (only when credentials are set).
         register_admin(){
           while ! curl -sf http://localhost:8008/health > /dev/null; do
             sleep 2
@@ -99,7 +201,7 @@ services:
             -c /data/homeserver.yaml \
             http://localhost:8008 &>/dev/null
         }
-        [ -n "${SERVICE_USER_ADMIN}" ] && register_admin &
+        [ -n "${SERVICE_USER_ADMIN}" ] && [ -n "${SERVICE_PASSWORD_ADMIN}" ] && register_admin &
 
         /start.py
     healthcheck:
@@ -126,3 +228,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+volumes:
+  synapse-data:
+  postgres-data:
