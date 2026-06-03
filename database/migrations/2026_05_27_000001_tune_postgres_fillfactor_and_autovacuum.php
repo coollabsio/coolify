@@ -7,6 +7,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
+
         // Fillfactor < 100 leaves free space per page so Postgres can do HOT
         // (Heap-Only Tuple) in-place updates instead of allocating a new tuple
         // elsewhere. Coolify's hot-update tables churn rows on every Sentinel
@@ -40,6 +44,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement('ALTER TABLE applications RESET (fillfactor, autovacuum_vacuum_scale_factor)');
         DB::statement('ALTER TABLE servers RESET (fillfactor, autovacuum_vacuum_scale_factor)');
         DB::statement('ALTER TABLE services RESET (fillfactor)');

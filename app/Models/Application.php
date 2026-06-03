@@ -1347,11 +1347,11 @@ class Application extends BaseModel
 
         if ($this->deploymentType() === 'source') {
             $source_html_url = data_get($this, 'source.html_url');
-            $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL));
-            $source_html_url_host = $url['host'];
-            $source_html_url_scheme = $url['scheme'];
 
             if ($this->source->getMorphClass() == 'App\Models\GithubApp') {
+                $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL)) ?: [];
+                $source_html_url_host = $url['host'] ?? '';
+                $source_html_url_scheme = $url['scheme'] ?? '';
                 $escapedCustomRepository = escapeshellarg($customRepository);
                 if ($this->source->is_public) {
                     $escapedRepoUrl = escapeshellarg("{$this->source->html_url}/{$customRepository}");
@@ -1391,6 +1391,9 @@ class Application extends BaseModel
                 $gitlabSource = $this->source;
 
                 if ($gitlabSource->isConnected()) {
+                    $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL)) ?: [];
+                    $source_html_url_host = $this->urlHostWithPort($url);
+                    $source_html_url_scheme = $url['scheme'] ?? '';
                     $token = generateGitlabCloneToken($gitlabSource);
                     $encodedToken = rawurlencode($token);
                     $pathPrefix = rtrim($url['path'] ?? '', '/');
@@ -1623,6 +1626,7 @@ class Application extends BaseModel
                     $token = generateGitlabCloneToken($gitlabSource);
                     $encodedToken = rawurlencode($token);
                     $pathPrefix = rtrim($url['path'] ?? '', '/');
+                    $source_html_url_host = $this->urlHostWithPort($url ?: []);
                     $repoUrl = "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/{$customRepository}.git";
                     $escapedRepoUrl = escapeshellarg($repoUrl);
                     $fullRepoUrl = $repoUrl;
@@ -2364,6 +2368,14 @@ class Application extends BaseModel
             'limits_cpuset' => $this->limits_cpuset,
             'limits_cpu_shares' => $this->limits_cpu_shares,
         ];
+    }
+
+    private function urlHostWithPort(array $url): string
+    {
+        $host = $url['host'] ?? '';
+        $port = isset($url['port']) ? ":{$url['port']}" : '';
+
+        return "{$host}{$port}";
     }
 
     public function generateConfig($is_json = false)

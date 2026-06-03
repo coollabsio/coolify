@@ -1,6 +1,16 @@
 <?php
 
 use App\Models\GitlabApp;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Encryption\Encrypter;
+
+beforeEach(function () {
+    Model::encryptUsing(new Encrypter(str_repeat('a', 32), 'AES-256-CBC'));
+});
+
+afterEach(function () {
+    Model::encryptUsing(null);
+});
 
 it('returns api base url with /api/v4 appended when missing', function () {
     $app = new GitlabApp(['api_url' => 'https://gitlab.example.com']);
