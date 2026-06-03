@@ -6,11 +6,13 @@ use App\Actions\Application\CleanupPreviewDeployment;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
+use App\Livewire\Source\Gitlab\Change as GitlabSource;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GitlabApp;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Visus\Cuid2\Cuid2;
@@ -30,7 +32,18 @@ class Gitlab extends Controller
                 return redirect()->route('source.all')->with('error', 'Invalid GitLab OAuth callback. Missing code or state.');
             }
 
-            $gitlabApp = GitlabApp::whereUuid($state)->firstOrFail();
+            // Validate the one-time, server-issued state instead of trusting a
+            // user-supplied source UUID. This prevents an attacker who knows a
+            // source UUID + client id from driving this callback to overwrite
+            // that source's stored tokens. The route runs under web+auth, so we
+            // can also bind the state to the acting team.
+            $payload = Cache::pull(GitlabSource::oauthStateCacheKey($state));
+            $team_id = $request->user()?->currentTeam()?->id;
+            if (! is_array($payload) || is_null($team_id) || (int) data_get($payload, 'team_id') !== (int) $team_id) {
+                return redirect()->route('source.all')->with('error', 'Invalid or expired GitLab OAuth state. Please start the authorization again.');
+            }
+
+            $gitlabApp = GitlabApp::whereKey(data_get($payload, 'gitlab_app_id'))->firstOrFail();
 
             $baseUrl = rtrim($gitlabApp->html_url, '/');
 

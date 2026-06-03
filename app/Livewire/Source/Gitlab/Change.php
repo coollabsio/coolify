@@ -6,7 +6,9 @@ use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 class Change extends Component
@@ -54,6 +56,8 @@ class Change extends Component
     public bool $isConnected = false;
 
     public ?string $redirectUri = null;
+
+    public ?string $oauthState = null;
 
     protected function rules(): array
     {
@@ -106,9 +110,28 @@ class Change extends Component
             }
 
             $this->redirectUri = $this->webhook_endpoint.'/webhooks/source/gitlab/redirect';
+
+            $this->oauthState = $this->createOAuthState();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    public static function oauthStateCacheKey(string $state): string
+    {
+        return 'gitlab-app-oauth-state:'.hash('sha256', $state);
+    }
+
+    private function createOAuthState(): string
+    {
+        $state = Str::random(64);
+
+        Cache::put(self::oauthStateCacheKey($state), [
+            'gitlab_app_id' => $this->gitlab_app->id,
+            'team_id' => currentTeam()->id,
+        ], now()->addMinutes(60));
+
+        return $state;
     }
 
     private function syncData(bool $toModel = false): void
@@ -247,7 +270,7 @@ class Change extends Component
             'redirect_uri' => $this->redirectUri,
             'response_type' => 'code',
             'scope' => 'api read_user read_repository',
-            'state' => $this->gitlab_app->uuid,
+            'state' => $this->oauthState ??= $this->createOAuthState(),
         ]);
 
         return "{$baseUrl}/oauth/authorize?{$query}";

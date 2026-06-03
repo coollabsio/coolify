@@ -100,10 +100,10 @@ class Source extends Component
             if ($source->id === $this->application->source_id) {
                 return false;
             }
-            if ($source instanceof \App\Models\GithubApp) {
+            if ($source instanceof GithubApp) {
                 return ! is_null($source->app_id);
             }
-            if ($source instanceof \App\Models\GitlabApp) {
+            if ($source instanceof GitlabApp) {
                 return $source->isConnected();
             }
 
@@ -160,10 +160,9 @@ class Source extends Component
             $repository_project_id = null;
 
             if ($sourceType === GithubApp::class) {
-                $repository = githubApi($this->application->source, "repos/{$customRepository}");
+                $repository = githubApi($source, "repos/{$customRepository}");
                 $repository_project_id = data_get($repository, 'data.id');
             } elseif ($sourceType === GitlabApp::class) {
-                $source = $this->application->source;
                 if ($source->isConnected()) {
                     $encoded = urlencode($customRepository);
                     $project = gitlabApi($source, "/projects/{$encoded}");

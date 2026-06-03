@@ -11,7 +11,7 @@
                     Open Repository
                     <x-external-link />
                 </a>
-                @if (data_get($application, 'source.is_public') === false)
+                @if (data_get($application, 'source.is_public') === false && $application->source instanceof \App\Models\GithubApp)
                     <a target="_blank" class="hover:no-underline flex items-center gap-1"
                         href="{{ getInstallationPath($application->source) }}">
                         Open Git App

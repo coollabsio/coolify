@@ -11,12 +11,23 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // SQLite (used for the in-memory test schema) is dynamically typed and
+        // already stores these columns as text, so the Postgres-only TYPE change
+        // is unnecessary there and the raw SQL would be a syntax error.
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement('ALTER TABLE application_deployment_queues ALTER COLUMN configuration_snapshot TYPE text USING configuration_snapshot::text');
         DB::statement('ALTER TABLE application_deployment_queues ALTER COLUMN configuration_diff TYPE text USING configuration_diff::text');
     }
 
     public function down(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement('ALTER TABLE application_deployment_queues ALTER COLUMN configuration_snapshot TYPE json USING configuration_snapshot::json');
         DB::statement('ALTER TABLE application_deployment_queues ALTER COLUMN configuration_diff TYPE json USING configuration_diff::json');
     }
