@@ -583,6 +583,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue->addLogEntry("Starting deployment of {$displayName} to {$this->server->name}.");
         $this->generate_image_names();
         $this->prepare_builder_image();
+        $this->detect_image_healthcheck();
         $this->generate_compose_file();
 
         // Save runtime environment variables (including empty .env file if no variables defined)
@@ -1306,6 +1307,43 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    private function detect_image_healthcheck()
+    {
+        $this->execute_remote_command(
+            [
+                "docker pull {$this->production_image_name} 2>/dev/null",
+                'hidden' => true,
+                'ignore_errors' => true,
+            ],
+            [
+                "docker inspect --format='{{json .Config.Healthcheck}}' {$this->production_image_name} 2>/dev/null",
+                'hidden' => true,
+                'save' => 'image_healthcheck',
+                'ignore_errors' => true,
+            ],
+        );
+
+        $output = trim($this->saved_outputs->get('image_healthcheck') ?? '');
+        $has_healthcheck = false;
+
+        if (! empty($output) && $output !== 'null' && $output !== '<no value>') {
+            $healthcheck = json_decode($output, true);
+            if (is_array($healthcheck) && isset($healthcheck['Test'])) {
+                $test = $healthcheck['Test'];
+                // HEALTHCHECK NONE → {"Test":["NONE"]}
+                $has_healthcheck = ! (is_array($test) && count($test) === 1 && strtoupper($test[0]) === 'NONE');
+            }
+        }
+
+        if ($has_healthcheck !== $this->application->custom_healthcheck_found) {
+            $this->application->custom_healthcheck_found = $has_healthcheck;
+            $this->application->save();
+            if ($has_healthcheck) {
+                $this->application_deployment_queue->addLogEntry('Custom healthcheck detected in Docker image.');
+            }
+        }
+    }
+
     private function generate_runtime_environment_variables()
     {
         $envs = collect([]);
@@ -1958,13 +1996,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->server->isSwarm()) {
                 // Implement healthcheck for swarm
             } else {
-                if ($this->application->isHealthcheckDisabled() && $this->application->custom_healthcheck_found === false) {
+                if ($this->application->isHealthcheckDisabled()) {
                     $this->newVersionIsHealthy = true;
 
                     return;
                 }
                 if ($this->application->custom_healthcheck_found) {
-                    $this->application_deployment_queue->addLogEntry('Custom healthcheck found in Dockerfile.');
+                    $this->application_deployment_queue->addLogEntry('Using custom healthcheck from image.');
                 }
                 if ($this->container_name) {
                     $counter = 1;
@@ -3166,9 +3204,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         // Always use .env file
         $docker_compose['services'][$this->container_name]['env_file'] = ['.env'];
 
-        // Only add Coolify healthcheck if no custom HEALTHCHECK found in Dockerfile
-        // If custom_healthcheck_found is true, the Dockerfile's HEALTHCHECK will be used
-        // If healthcheck is disabled, no healthcheck will be added
+        // Healthcheck logic:
+        // - HC enabled + no image HC → inject Coolify's curl/wget check
+        // - HC enabled + image has HC → let Docker use image's own HEALTHCHECK
+        // - HC disabled + image has HC → explicitly disable it in compose
+        // - HC disabled + no image HC → no healthcheck at all
         if (! $this->application->custom_healthcheck_found && ! $this->application->isHealthcheckDisabled()) {
             $docker_compose['services'][$this->container_name]['healthcheck'] = [
                 'test' => [
@@ -3179,6 +3219,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 'timeout' => $this->application->health_check_timeout.'s',
                 'retries' => $this->application->health_check_retries,
                 'start_period' => $this->application->health_check_start_period.'s',
+            ];
+        } elseif ($this->application->isHealthcheckDisabled() && $this->application->custom_healthcheck_found) {
+            $docker_compose['services'][$this->container_name]['healthcheck'] = [
+                'disable' => true,
             ];
         }
 
@@ -3869,7 +3913,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     });
                 }
             } else {
-                if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile' || $this->application->build_pack === 'dockerimage') {
+                if (($this->application->dockerfile || $this->application->build_pack === 'dockerfile' || $this->application->build_pack === 'dockerimage') && ! $this->application->custom_healthcheck_found) {
                     $this->application_deployment_queue->addLogEntry('----------------------------------------');
                     $this->application_deployment_queue->addLogEntry("WARNING: Dockerfile or Docker Image based deployment detected. The healthcheck needs a curl or wget command to check the health of the application. Please make sure that it is available in the image or turn off healthcheck on Coolify's UI.");
                     $this->application_deployment_queue->addLogEntry('----------------------------------------');
