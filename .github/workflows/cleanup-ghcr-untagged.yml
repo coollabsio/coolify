@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        package: ['coolify', 'coolify-helper', 'coolify-realtime', 'coolify-testing-host']
+        package: ['coolify', 'coolify-helper', 'coolify-testing-host']
     steps:
       - name: Delete untagged ${{ matrix.package }} images
         uses: actions/delete-package-versions@v5

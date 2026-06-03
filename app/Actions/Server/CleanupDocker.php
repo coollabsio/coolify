@@ -13,12 +13,6 @@ class CleanupDocker
 
     public function handle(Server $server, bool $deleteUnusedVolumes = false, bool $deleteUnusedNetworks = false)
     {
-        $realtimeImage = config('constants.coolify.realtime_image');
-        $realtimeImageVersion = config('constants.coolify.realtime_version');
-        $realtimeImageWithVersion = "$realtimeImage:$realtimeImageVersion";
-        $realtimeImageWithoutPrefix = 'coollabsio/coolify-realtime';
-        $realtimeImageWithoutPrefixVersion = "coollabsio/coolify-realtime:$realtimeImageVersion";
-
         $helperImageVersion = getHelperVersion();
         $helperImage = config('constants.coolify.helper_image');
         $helperImageWithVersion = "$helperImage:$helperImageVersion";
@@ -38,13 +32,12 @@ class CleanupDocker
         $cleanupLog = array_merge($cleanupLog, $applicationCleanupLog);
 
         // Build image prune command that excludes application images and current Coolify infrastructure images
-        // This ensures we clean up non-Coolify images while preserving rollback images and current helper/realtime images
+        // This ensures we clean up non-Coolify images while preserving rollback images and current helper image
         // Note: Only the current version is protected; old versions will be cleaned up by explicit commands below
         // We pass the version strings so all registry variants are protected (ghcr.io, docker.io, no prefix)
         $imagePruneCmd = $this->buildImagePruneCommand(
             $applicationImageRepos,
-            $helperImageVersion,
-            $realtimeImageVersion
+            $helperImageVersion
         );
 
         $commands = [
@@ -53,9 +46,7 @@ class CleanupDocker
             'docker builder prune -af',
             "docker run --rm -v \$HOME/.docker/buildx:/root/.docker/buildx -v /var/run/docker.sock:/var/run/docker.sock {$helperImageWithVersion} docker buildx prune --builder coolify-railpack -af 2>/dev/null || true",
             "docker images --filter before=$helperImageWithVersion --filter reference=$helperImage | grep $helperImage | awk '{print $3}' | xargs -r docker rmi -f",
-            "docker images --filter before=$realtimeImageWithVersion --filter reference=$realtimeImage | grep $realtimeImage | awk '{print $3}' | xargs -r docker rmi -f",
             "docker images --filter before=$helperImageWithoutPrefixVersion --filter reference=$helperImageWithoutPrefix | grep $helperImageWithoutPrefix | awk '{print $3}' | xargs -r docker rmi -f",
-            "docker images --filter before=$realtimeImageWithoutPrefixVersion --filter reference=$realtimeImageWithoutPrefix | grep $realtimeImageWithoutPrefix | awk '{print $3}' | xargs -r docker rmi -f",
         ];
 
         if ($deleteUnusedVolumes) {
@@ -87,8 +78,7 @@ class CleanupDocker
      */
     private function buildImagePruneCommand(
         $applicationImageRepos,
-        string $helperImageVersion,
-        string $realtimeImageVersion
+        string $helperImageVersion
     ): string {
         // Step 1: Always prune dangling images (untagged)
         $commands = ['docker image prune -f'];
@@ -105,14 +95,13 @@ class CleanupDocker
         // - ghcr.io/coollabsio/coolify-helper:1.0.12
         // - docker.io/coollabsio/coolify-helper:1.0.12
         // - coollabsio/coolify-helper:1.0.12
-        // Pattern: (^|/)coollabsio/coolify-(helper|realtime):VERSION$
+        // Pattern: (^|/)coollabsio/coolify-helper:VERSION$
         $escapedHelperVersion = preg_replace('/([.\\\\+*?\[\]^$(){}|])/', '\\\\$1', $helperImageVersion);
-        $escapedRealtimeVersion = preg_replace('/([.\\\\+*?\[\]^$(){}|])/', '\\\\$1', $realtimeImageVersion);
-        $infraExcludePattern = "(^|/)coollabsio/coolify-helper:{$escapedHelperVersion}$|(^|/)coollabsio/coolify-realtime:{$escapedRealtimeVersion}$";
+        $infraExcludePattern = "(^|/)coollabsio/coolify-helper:{$escapedHelperVersion}$";
 
         // Delete unused images that:
         // - Are not application images (don't match app repos)
-        // - Are not current Coolify infrastructure images (any registry)
+        // - Are not current Coolify helper image (any registry)
         // - Don't have coolify.managed=true label
         // Images in use by containers will fail silently with docker rmi
         // Pattern matches both uuid:tag and uuid_servicename:tag (Docker Compose with build)

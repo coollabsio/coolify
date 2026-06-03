@@ -23,7 +23,7 @@ yarn-error.log
 /.ssh
 .ignition.json
 .env.dusk.local
-docker/coolify-realtime/node_modules
+docker/coolify-terminal/node_modules
 
 /storage/*.key
 /storage/app/backups

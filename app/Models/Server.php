@@ -481,12 +481,19 @@ class Server extends BaseModel
                                 'service' => 'coolify',
                                 'rule' => "Host(`{$host}`)",
                             ],
-                            'coolify-realtime-ws' => [
+                            'coolify-reverb-ws' => [
                                 'entryPoints' => [
                                     0 => 'http',
                                 ],
-                                'service' => 'coolify-realtime',
+                                'service' => 'coolify-reverb',
                                 'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
+                            ],
+                            'coolify-reverb-api' => [
+                                'entryPoints' => [
+                                    0 => 'http',
+                                ],
+                                'service' => 'coolify-reverb',
+                                'rule' => "Host(`{$host}`) && PathPrefix(`/apps`)",
                             ],
                             'coolify-terminal-ws' => [
                                 'entryPoints' => [
@@ -506,11 +513,11 @@ class Server extends BaseModel
                                     ],
                                 ],
                             ],
-                            'coolify-realtime' => [
+                            'coolify-reverb' => [
                                 'loadBalancer' => [
                                     'servers' => [
                                         0 => [
-                                            'url' => 'http://coolify-realtime:6001',
+                                            'url' => 'http://coolify:6001',
                                         ],
                                     ],
                                 ],
@@ -519,7 +526,7 @@ class Server extends BaseModel
                                 'loadBalancer' => [
                                     'servers' => [
                                         0 => [
-                                            'url' => 'http://coolify-realtime:6002',
+                                            'url' => 'http://coolify:6002',
                                         ],
                                     ],
                                 ],
@@ -543,12 +550,22 @@ class Server extends BaseModel
                             'certresolver' => 'letsencrypt',
                         ],
                     ];
-                    $traefik_dynamic_conf['http']['routers']['coolify-realtime-wss'] = [
+                    $traefik_dynamic_conf['http']['routers']['coolify-reverb-wss'] = [
                         'entryPoints' => [
                             0 => 'https',
                         ],
-                        'service' => 'coolify-realtime',
+                        'service' => 'coolify-reverb',
                         'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
+                        'tls' => [
+                            'certresolver' => 'letsencrypt',
+                        ],
+                    ];
+                    $traefik_dynamic_conf['http']['routers']['coolify-reverb-api-https'] = [
+                        'entryPoints' => [
+                            0 => 'https',
+                        ],
+                        'service' => 'coolify-reverb',
+                        'rule' => "Host(`{$host}`) && PathPrefix(`/apps`)",
                         'tls' => [
                             'certresolver' => 'letsencrypt',
                         ],
@@ -590,10 +607,13 @@ class Server extends BaseModel
                 $caddy_file = "
 $schema://$host {
     handle /app/* {
-        reverse_proxy coolify-realtime:6001
+        reverse_proxy coolify:6001
+    }
+    handle /apps* {
+        reverse_proxy coolify:6001
     }
     handle /terminal/ws {
-        reverse_proxy coolify-realtime:6002
+        reverse_proxy coolify:6002
     }
     reverse_proxy coolify:8080
 }";
