@@ -1,0 +1,47 @@
+# documentation: https://www.keila.io/docs/installation/
+# slogan: Open source newsletter and email campaign tool.
+# category: email
+# tags: newsletter,email,campaigns,marketing,self-hosted,open-source
+# port: 4000
+
+services:
+  keila:
+    image: pentacent/keila:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_KEILA_4000
+      - DB_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-keila}
+      - SECRET_KEY_BASE=${SERVICE_BASE64_64_SECRETKEYBASE}
+      - HASHID_SALT=${SERVICE_PASSWORD_64_HASHIDSALT}
+      - URL_HOST=${SERVICE_FQDN_KEILA}
+      - URL_SCHEMA=${URL_SCHEMA:-https}
+      - URL_PORT=${URL_PORT:-443}
+      - KEILA_USER=${SERVICE_USER_ADMIN}
+      - KEILA_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - DISABLE_REGISTRATION=${DISABLE_REGISTRATION:-true}
+      - USER_CONTENT_DIR=/app/uploads
+      - MAILER_SMTP_HOST=${MAILER_SMTP_HOST:?}
+      - MAILER_SMTP_PORT=${MAILER_SMTP_PORT:-587}
+      - MAILER_SMTP_FROM_EMAIL=${MAILER_SMTP_FROM_EMAIL:?}
+      - MAILER_SMTP_USER=${MAILER_SMTP_USER}
+      - MAILER_SMTP_PASSWORD=${MAILER_SMTP_PASSWORD:?}
+      - MAILER_ENABLE_STARTTLS=${MAILER_ENABLE_STARTTLS:-true}
+      - MAILER_ENABLE_SSL=${MAILER_ENABLE_SSL:-false}
+    volumes:
+      - keila-uploads:/app/uploads
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-keila}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
