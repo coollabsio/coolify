@@ -2,6 +2,7 @@
 # slogan: Open source newsletter and email campaign tool.
 # category: email
 # tags: newsletter,email,campaigns,marketing,self-hosted,open-source
+# logo: svgs/keila.svg
 # port: 4000
 
 services:
