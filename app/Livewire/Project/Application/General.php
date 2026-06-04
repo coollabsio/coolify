@@ -154,7 +154,7 @@ class General extends Component
             'staticImage' => 'required',
             'baseDirectory' => array_merge(['required'], array_slice(ValidationPatterns::directoryPathRules(), 1)),
             'publishDirectory' => ValidationPatterns::directoryPathRules(),
-            'portsExposes' => ['required', 'string', 'regex:/^(\d+)(,\d+)*$/'],
+            'portsExposes' => ['nullable', 'string', 'regex:/^(\d+)(,\d+)*$/'],
             'portsMappings' => ValidationPatterns::portMappingRules(),
             'customNetworkAliases' => 'nullable',
             'dockerfile' => 'nullable',
@@ -212,7 +212,6 @@ class General extends Component
                 'buildPack.required' => 'The Build Pack field is required.',
                 'staticImage.required' => 'The Static Image field is required.',
                 'baseDirectory.required' => 'The Base Directory field is required.',
-                'portsExposes.required' => 'The Exposed Ports field is required.',
                 'portsExposes.regex' => 'Ports exposes must be a comma-separated list of port numbers (e.g. 3000,3001).',
                 ...ValidationPatterns::portMappingMessages(),
                 'isStatic.required' => 'The Static setting is required.',
@@ -760,7 +759,7 @@ class General extends Component
 
             $this->resetErrorBag();
 
-            $this->portsExposes = str($this->portsExposes)->replace(' ', '')->trim()->toString();
+            $this->portsExposes = str($this->portsExposes)->replace(' ', '')->trim()->toString() ?: null;
             if ($this->portsMappings) {
                 $this->portsMappings = str($this->portsMappings)->replace(' ', '')->trim()->toString();
             }

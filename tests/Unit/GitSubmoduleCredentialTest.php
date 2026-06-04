@@ -156,7 +156,7 @@ describe('Git submodule credential propagation', function () {
             exec_in_docker: false,
         );
 
-        $sshCommand = 'ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa';
+        $sshCommand = 'ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa_coolify_test-uuid -o IdentitiesOnly=yes';
 
         expect($result['commands'])
             ->toContain('GIT_SSH_COMMAND="'.$sshCommand.'" git fetch origin merge-requests/123/head:pr-123-coolify')

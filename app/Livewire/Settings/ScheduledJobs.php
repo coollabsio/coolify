@@ -8,6 +8,15 @@ use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledTaskExecution;
 use App\Models\Server;
+use App\Models\ServiceDatabase;
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use App\Services\SchedulerLogParser;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -125,7 +134,21 @@ class ScheduledJobs extends Component
             : collect();
 
         $backups = $backupIds->isNotEmpty()
-            ? ScheduledDatabaseBackup::with(['database.environment.project'])->whereIn('id', $backupIds)->get()->keyBy('id')
+            ? ScheduledDatabaseBackup::with('database')
+                ->whereIn('id', $backupIds)
+                ->get()
+                ->loadMorph('database', [
+                    ServiceDatabase::class => ['service.environment.project'],
+                    StandaloneClickhouse::class => ['environment.project'],
+                    StandaloneDragonfly::class => ['environment.project'],
+                    StandaloneKeydb::class => ['environment.project'],
+                    StandaloneMariadb::class => ['environment.project'],
+                    StandaloneMongodb::class => ['environment.project'],
+                    StandaloneMysql::class => ['environment.project'],
+                    StandalonePostgresql::class => ['environment.project'],
+                    StandaloneRedis::class => ['environment.project'],
+                ])
+                ->keyBy('id')
             : collect();
 
         $servers = $serverIds->isNotEmpty()
@@ -161,14 +184,29 @@ class ScheduledJobs extends Component
                 if ($backup) {
                     $database = $backup->database;
                     $skip['resource_name'] = $database?->name ?? 'Database backup';
-                    $environment = $database?->environment;
-                    $project = $environment?->project;
-                    if ($project && $environment && $database) {
-                        $skip['link'] = route('project.database.backup.index', [
-                            'project_uuid' => $project->uuid,
-                            'environment_uuid' => $environment->uuid,
-                            'database_uuid' => $database->uuid,
-                        ]);
+
+                    if ($database instanceof ServiceDatabase) {
+                        $service = $database->service;
+                        $environment = $service?->environment;
+                        $project = $environment?->project;
+                        if ($project && $environment && $service) {
+                            $skip['link'] = route('project.service.database.backups', [
+                                'project_uuid' => $project->uuid,
+                                'environment_uuid' => $environment->uuid,
+                                'service_uuid' => $service->uuid,
+                                'stack_service_uuid' => $database->uuid,
+                            ]);
+                        }
+                    } else {
+                        $environment = $database?->environment;
+                        $project = $environment?->project;
+                        if ($project && $environment && $database) {
+                            $skip['link'] = route('project.database.backup.index', [
+                                'project_uuid' => $project->uuid,
+                                'environment_uuid' => $environment->uuid,
+                                'database_uuid' => $database->uuid,
+                            ]);
+                        }
                     }
                 }
             } elseif ($skip['type'] === 'docker_cleanup') {

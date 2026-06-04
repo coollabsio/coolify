@@ -5,6 +5,9 @@
             <x-forms.button type="submit" canGate="update" :canResource="$database">
                 Save
             </x-forms.button>
+            <x-modal-input title="Resource Details" buttonTitle="Details">
+                <livewire:project.shared.resource-details :resource="$database" />
+            </x-modal-input>
         </div>
         <div class="flex gap-2">
             <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />

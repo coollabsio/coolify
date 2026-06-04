@@ -222,6 +222,8 @@ class Change extends Component
             $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
             $this->syncData(false);
 
+            $this->name = str($this->github_app->name)->kebab();
+
             $addedEvents = array_diff($this->github_app->webhook_events ?? [], $previousEvents);
             if (! empty($addedEvents)) {
                 $this->dispatch('success', 'Permissions updated. Auto-enabled missing events: '.implode(', ', $addedEvents));

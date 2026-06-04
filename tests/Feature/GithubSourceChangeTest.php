@@ -7,6 +7,8 @@ use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -82,6 +84,67 @@ describe('GitHub Source Change Component', function () {
             ->assertSet('clientSecret', null)
             ->assertSet('webhookSecret', null)
             ->assertSet('privateKeyId', null);
+    });
+
+    test('creates one-time states for manifest conversion and installation callbacks', function () {
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        $component = Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSuccessful();
+
+        $manifestState = $component->get('manifestState');
+        $installationUrl = getInstallationPath($githubApp);
+        parse_str(parse_url($installationUrl, PHP_URL_QUERY), $query);
+        $installState = $query['state'] ?? null;
+
+        expect($manifestState)->not->toBeEmpty()
+            ->and($installState)->not->toBeEmpty()
+            ->and($installState)->not->toBe($manifestState)
+            ->and($installationUrl)->not->toContain($githubApp->uuid)
+            ->and(Cache::get('github-app-setup-state:'.hash('sha256', $manifestState)))
+            ->toMatchArray([
+                'action' => 'manifest',
+                'github_app_id' => $githubApp->id,
+                'team_id' => $githubApp->team_id,
+            ])
+            ->and(Cache::get('github-app-setup-state:'.hash('sha256', $installState)))
+            ->toMatchArray([
+                'action' => 'install',
+                'github_app_id' => $githubApp->id,
+                'team_id' => $githubApp->team_id,
+            ]);
+    });
+
+    test('installation path is generated from the provided github app instance', function () {
+        $githubApp = new GithubApp;
+        $githubApp->forceFill([
+            'id' => 123,
+            'name' => 'Provided GitHub App',
+            'html_url' => 'https://github.example.com',
+            'team_id' => 456,
+        ]);
+
+        $installationUrl = getInstallationPath($githubApp);
+        parse_str(parse_url($installationUrl, PHP_URL_QUERY), $query);
+        $installState = $query['state'] ?? null;
+
+        expect($installationUrl)->toStartWith('https://github.example.com/github-apps/provided-git-hub-app/installations/new?')
+            ->and($installState)->not->toBeEmpty()
+            ->and(Cache::get('github-app-setup-state:'.hash('sha256', $installState)))
+            ->toMatchArray([
+                'action' => 'install',
+                'github_app_id' => 123,
+                'team_id' => 456,
+            ]);
     });
 
     test('defaults webhook endpoint to app url when it is the first available endpoint', function () {
@@ -304,5 +367,66 @@ describe('GitHub Source Change Component', function () {
 
                 return str_contains($message, 'Private Key not found');
             });
+    });
+
+    test('checkPermissions syncs refetched permissions into input fields', function () {
+        $privateKey = PrivateKey::create([
+            'name' => 'Test Key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'client_id' => 'test-client-id',
+            'client_secret' => 'test-client-secret',
+            'webhook_secret' => 'test-webhook-secret',
+            'private_key_id' => $privateKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+            'contents' => null,
+            'metadata' => null,
+            'pull_requests' => null,
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
+                'date' => now()->toRfc7231String(),
+            ]),
+            'https://api.github.com/app' => Http::response([
+                'permissions' => [
+                    'contents' => 'read',
+                    'metadata' => 'read',
+                    'pull_requests' => 'write',
+                ],
+            ]),
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSuccessful()
+            ->assertSet('name', 'test-git-hub-app')
+            ->assertSet('contents', null)
+            ->assertSet('metadata', null)
+            ->assertSet('pullRequests', null)
+            ->call('checkPermissions')
+            ->assertDispatched('success')
+            ->assertSet('name', 'test-git-hub-app')
+            ->assertSet('contents', 'read')
+            ->assertSet('metadata', 'read')
+            ->assertSet('pullRequests', 'write');
+
+        $githubApp->refresh();
+
+        expect($githubApp->contents)->toBe('read')
+            ->and($githubApp->metadata)->toBe('read')
+            ->and($githubApp->pull_requests)->toBe('write');
     });
 });

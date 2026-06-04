@@ -733,6 +733,7 @@ describe('custom_docker_run_options validation', function () {
         '--entrypoint "sh -c \'npm start\'"',
         '--entrypoint "sh -c \'php artisan schedule:work\'"',
         '--hostname "my-host"',
+        '--dns 10.0.0.10 --dns=1.1.1.1',
     ]);
 });
 

@@ -110,7 +110,7 @@ class Show extends Component
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
             'ip' => ['required', new ValidServerIp],
-            'user' => ['required', 'regex:/^[a-zA-Z0-9_-]+$/'],
+            'user' => ValidationPatterns::serverUsernameRules(),
             'port' => 'required|integer|between:1,65535',
             'connectionTimeout' => 'required|integer|min:1|max:300',
             'validationLogs' => 'nullable',
@@ -140,6 +140,7 @@ class Show extends Component
             [
                 'ip.required' => 'The IP Address field is required.',
                 'user.required' => 'The User field is required.',
+                ...ValidationPatterns::serverUsernameMessages(),
                 'port.required' => 'The Port field is required.',
                 'connectionTimeout.required' => 'The SSH Connection Timeout field is required.',
                 'connectionTimeout.integer' => 'The SSH Connection Timeout must be an integer.',

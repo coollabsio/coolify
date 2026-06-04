@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Destination\Resources as DestinationResources;
 use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Project\New\DockerCompose;
 use App\Livewire\Project\New\DockerImage;
@@ -293,5 +294,81 @@ describe('Destination/Show team scope', function () {
 
         expect($component->get('destination'))->toBeNull();
         $component->assertRedirect(route('destination.index'));
+    });
+
+    test('general page links to separate resources page without rendering the resources table', function () {
+        Livewire::test(DestinationShow::class, ['destination_uuid' => $this->destinationA->uuid])
+            ->assertSee('General')
+            ->assertSee('Resources')
+            ->assertDontSee('Search resources...')
+            ->assertDontSee('No resources are using this destination.');
+    });
+
+    test('mount with own standalone destination lists deployed resources', function () {
+        Application::factory()->create([
+            'name' => 'application-on-destination',
+            'environment_id' => $this->environmentA->id,
+            'destination_id' => $this->destinationA->id,
+            'destination_type' => StandaloneDocker::class,
+        ]);
+        Service::factory()->create([
+            'name' => 'service-on-destination',
+            'environment_id' => $this->environmentA->id,
+            'destination_id' => $this->destinationA->id,
+            'destination_type' => StandaloneDocker::class,
+        ]);
+        StandalonePostgresql::withoutEvents(fn () => StandalonePostgresql::create([
+            'uuid' => fake()->uuid(),
+            'name' => 'database-on-destination',
+            'postgres_password' => 'password',
+            'environment_id' => $this->environmentA->id,
+            'destination_id' => $this->destinationA->id,
+            'destination_type' => StandaloneDocker::class,
+        ]));
+
+        Livewire::test(DestinationResources::class, ['destination_uuid' => $this->destinationA->uuid])
+            ->assertSee('Search resources...')
+            ->assertSee('Project')
+            ->assertSee('Environment')
+            ->assertSee('Name')
+            ->assertSee('Type')
+            ->assertSee('application-on-destination')
+            ->assertSee('service-on-destination')
+            ->assertSee('database-on-destination')
+            ->assertSee($this->projectA->name)
+            ->assertSee($this->environmentA->name);
+    });
+
+    test('mount with own standalone destination shows empty state without resources', function () {
+        Livewire::test(DestinationResources::class, ['destination_uuid' => $this->destinationA->uuid])
+            ->assertSee('No resources are using this destination.');
+    });
+
+    test('mount with own standalone destination does not list another team resources', function () {
+        Application::factory()->create([
+            'name' => 'other-team-application',
+            'environment_id' => $this->environmentB->id,
+            'destination_id' => $this->destinationB->id,
+            'destination_type' => StandaloneDocker::class,
+        ]);
+
+        Livewire::test(DestinationResources::class, ['destination_uuid' => $this->destinationA->uuid])
+            ->assertDontSee('other-team-application');
+    });
+
+    test('resource without project renders as non-clickable row', function () {
+        StandalonePostgresql::withoutEvents(fn () => StandalonePostgresql::create([
+            'uuid' => fake()->uuid(),
+            'name' => 'database-without-project',
+            'postgres_password' => 'password',
+            'environment_id' => null,
+            'destination_id' => $this->destinationA->id,
+            'destination_type' => StandaloneDocker::class,
+        ]));
+
+        $component = Livewire::test(DestinationResources::class, ['destination_uuid' => $this->destinationA->uuid])
+            ->assertSee('database-without-project');
+
+        expect($component->html())->not->toContain('href=""');
     });
 });

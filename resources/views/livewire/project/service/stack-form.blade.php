@@ -12,6 +12,9 @@
                     <livewire:project.service.edit-compose serviceId="{{ $service->id }}" />
                 </x-modal-input>
             @endcan
+            <x-modal-input title="Resource Details" buttonTitle="Details">
+                <livewire:project.shared.resource-details :resource="$service" />
+            </x-modal-input>
         </div>
         <div>Configuration</div>
     </div>

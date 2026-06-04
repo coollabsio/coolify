@@ -1388,7 +1388,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             // Add PORT if not exists, use the first port as default
             if ($this->build_pack !== 'dockercompose') {
-                if ($this->application->environment_variables->where('key', 'PORT')->isEmpty()) {
+                if ($this->application->environment_variables->where('key', 'PORT')->isEmpty() && ! empty($ports)) {
                     $envs->push("PORT={$ports[0]}");
                 }
             }
@@ -2129,21 +2129,23 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $helperImage = "{$helperImage}:".getHelperVersion();
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(['echo $HOME'], $this->server);
+        instant_remote_process(["mkdir -p {$this->serverUserHomeDir}/.docker/buildx"], $this->server);
         $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);
 
         $env_flags = $this->generate_docker_env_flags_for_secrets();
+        $buildxMetadataVolume = "-v {$this->serverUserHomeDir}/.docker/buildx:/root/.docker/buildx";
         if ($this->use_build_server) {
             if ($this->dockerConfigFileExists === 'NOK') {
                 throw new DeploymentException('Docker config file (~/.docker/config.json) not found on the build server. Please run "docker login" to login to the docker registry on the server.');
             }
-            $runCommand = "docker run -d --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+            $runCommand = "docker run -d --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
         } else {
             if ($this->dockerConfigFileExists === 'OK') {
                 $safeNetwork = escapeshellarg($this->destination->network);
-                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
             } else {
                 $safeNetwork = escapeshellarg($this->destination->network);
-                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
             }
         }
         if ($firstTry) {
@@ -2258,7 +2260,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $sshCommand = "ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
 
         if ($identityFile !== null) {
-            $sshCommand .= " -i {$identityFile}";
+            $sshCommand .= " -i {$identityFile} -o IdentitiesOnly=yes";
         }
 
         return 'GIT_SSH_COMMAND="'.$sshCommand.'" git ls-remote '.escapeshellarg($this->fullRepoUrl).' '.escapeshellarg($lsRemoteRef);
@@ -2298,18 +2300,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $private_key = data_get($this->application, 'private_key.private_key');
         if ($private_key) {
             $private_key = base64_encode($private_key);
+            $customSshKeyLocation = "/root/.ssh/id_rsa_coolify_{$this->deployment_uuid}";
             $this->execute_remote_command(
                 [
                     executeInDocker($this->deployment_uuid, 'mkdir -p /root/.ssh'),
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null"),
+                    executeInDocker($this->deployment_uuid, "echo '{$private_key}' | base64 -d | tee {$customSshKeyLocation} > /dev/null"),
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, 'chmod 600 /root/.ssh/id_rsa'),
+                    executeInDocker($this->deployment_uuid, "chmod 600 {$customSshKeyLocation}"),
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, $this->gitLsRemoteCommand($lsRemoteRef, '/root/.ssh/id_rsa')),
+                    executeInDocker($this->deployment_uuid, $this->gitLsRemoteCommand($lsRemoteRef, $customSshKeyLocation)),
                     'hidden' => true,
                     'save' => 'git_commit_sha',
                 ]
@@ -3136,7 +3139,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     'image' => $this->production_image_name,
                     'container_name' => $this->container_name,
                     'restart' => RESTART_MODE,
-                    'expose' => $ports,
+                    ...(! empty($ports) ? ['expose' => $ports] : []),
                     'networks' => [
                         $this->destination->network => [
                             'aliases' => array_merge(
@@ -3168,16 +3171,19 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         // If custom_healthcheck_found is true, the Dockerfile's HEALTHCHECK will be used
         // If healthcheck is disabled, no healthcheck will be added
         if (! $this->application->custom_healthcheck_found && ! $this->application->isHealthcheckDisabled()) {
-            $docker_compose['services'][$this->container_name]['healthcheck'] = [
-                'test' => [
-                    'CMD-SHELL',
-                    $this->generate_healthcheck_commands(),
-                ],
-                'interval' => $this->application->health_check_interval.'s',
-                'timeout' => $this->application->health_check_timeout.'s',
-                'retries' => $this->application->health_check_retries,
-                'start_period' => $this->application->health_check_start_period.'s',
-            ];
+            $healthcheck_command = $this->generate_healthcheck_commands();
+            if ($healthcheck_command !== null) {
+                $docker_compose['services'][$this->container_name]['healthcheck'] = [
+                    'test' => [
+                        'CMD-SHELL',
+                        $healthcheck_command,
+                    ],
+                    'interval' => $this->application->health_check_interval.'s',
+                    'timeout' => $this->application->health_check_timeout.'s',
+                    'retries' => $this->application->health_check_retries,
+                    'start_period' => $this->application->health_check_start_period.'s',
+                ];
+            }
         }
 
         if (! is_null($this->application->limits_cpuset)) {
@@ -3387,7 +3393,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         // HTTP type healthcheck (default)
         if (! $this->application->health_check_port) {
-            $health_check_port = (int) $this->application->ports_exposes_array[0];
+            if (! empty($this->application->ports_exposes_array)) {
+                $health_check_port = (int) $this->application->ports_exposes_array[0];
+            } else {
+                return null;
+            }
         } else {
             $health_check_port = (int) $this->application->health_check_port;
         }

@@ -36,6 +36,17 @@ class ValidationPatterns
     public const DOCKER_TARGET_PATTERN = '/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/';
 
     /**
+     * Pattern for SSH usernames.
+     * Allows alphanumeric characters, dots, hyphens, and underscores.
+     */
+    public const SERVER_USERNAME_PATTERN = '/^[a-zA-Z0-9._-]+$/';
+
+    /**
+     * Pattern for removing characters not allowed in SSH usernames.
+     */
+    public const INVALID_SERVER_USERNAME_CHARACTERS_PATTERN = '/[^A-Za-z0-9.\-_]/';
+
+    /**
      * Token-aware pattern for shell-safe command strings (docker compose commands, docker run options).
      *
      * Accepts a sequence of the following tokens only:
@@ -281,6 +292,28 @@ class ValidationPatterns
         }
 
         return $rules;
+    }
+
+    /**
+     * Get validation rules for SSH username fields.
+     */
+    public static function serverUsernameRules(bool $required = true): array
+    {
+        return [
+            $required ? 'required' : 'nullable',
+            'string',
+            'regex:'.self::SERVER_USERNAME_PATTERN,
+        ];
+    }
+
+    /**
+     * Get validation messages for SSH username fields.
+     */
+    public static function serverUsernameMessages(string $field = 'user', string $label = 'User'): array
+    {
+        return [
+            "{$field}.regex" => "The {$label} may only contain letters, numbers, dots, hyphens, and underscores.",
+        ];
     }
 
     /**

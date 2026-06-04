@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Proxy\GetProxyConfiguration;
+use Illuminate\Log\LogManager;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Spatie\SchemalessAttributes\SchemalessAttributes;
@@ -83,7 +84,7 @@ YAML;
 });
 
 it('logs warning when regenerating defaults', function () {
-    Log::swap(new \Illuminate\Log\LogManager(app()));
+    Log::swap(new LogManager(app()));
     Log::spy();
 
     // No DB config, no disk config — will try to regenerate
@@ -94,7 +95,7 @@ it('logs warning when regenerating defaults', function () {
     // the force regenerate path instead
     try {
         GetProxyConfiguration::run($server, forceRegenerate: true);
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         // generateDefaultProxyConfiguration may fail without full server setup
     }
 
@@ -115,7 +116,7 @@ it('does not read from disk when DB config exists', function () {
 });
 
 it('rejects stored Traefik config when proxy type is CADDY', function () {
-    Log::swap(new \Illuminate\Log\LogManager(app()));
+    Log::swap(new LogManager(app()));
     Log::spy();
 
     $traefikConfig = "services:\n  traefik:\n    image: traefik:v3.6\n";
@@ -126,7 +127,7 @@ it('rejects stored Traefik config when proxy type is CADDY', function () {
     // Both will fail in test env, but the warning log proves mismatch was detected.
     try {
         GetProxyConfiguration::run($server);
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         // Expected — regeneration requires SSH/full server setup
     }
 
@@ -136,7 +137,7 @@ it('rejects stored Traefik config when proxy type is CADDY', function () {
 });
 
 it('rejects stored Caddy config when proxy type is TRAEFIK', function () {
-    Log::swap(new \Illuminate\Log\LogManager(app()));
+    Log::swap(new LogManager(app()));
     Log::spy();
 
     $caddyConfig = "services:\n  caddy:\n    image: lucaslorentz/caddy-docker-proxy:2.8-alpine\n";
@@ -144,7 +145,7 @@ it('rejects stored Caddy config when proxy type is TRAEFIK', function () {
 
     try {
         GetProxyConfiguration::run($server);
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         // Expected — regeneration requires SSH/full server setup
     }
 

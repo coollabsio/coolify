@@ -79,8 +79,7 @@
                                     "environment_uuid",
                                     "git_repository",
                                     "git_branch",
-                                    "build_pack",
-                                    "ports_exposes"
+                                    "build_pack"
                                 ],
                                 "properties": {
                                     "project_uuid": {
@@ -526,8 +525,7 @@
                                     "github_app_uuid",
                                     "git_repository",
                                     "git_branch",
-                                    "build_pack",
-                                    "ports_exposes"
+                                    "build_pack"
                                 ],
                                 "properties": {
                                     "project_uuid": {
@@ -977,8 +975,7 @@
                                     "private_key_uuid",
                                     "git_repository",
                                     "git_branch",
-                                    "build_pack",
-                                    "ports_exposes"
+                                    "build_pack"
                                 ],
                                 "properties": {
                                     "project_uuid": {
@@ -1775,8 +1772,7 @@
                                     "server_uuid",
                                     "environment_name",
                                     "environment_uuid",
-                                    "docker_registry_image_name",
-                                    "ports_exposes"
+                                    "docker_registry_image_name"
                                 ],
                                 "properties": {
                                     "project_uuid": {

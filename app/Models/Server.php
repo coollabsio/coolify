@@ -17,6 +17,7 @@ use App\Livewire\Server\Proxy;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use App\Services\ConfigurationRepository;
+use App\Support\ValidationPatterns;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
@@ -945,10 +946,10 @@ $schema://$host {
     {
         return Attribute::make(
             get: function ($value) {
-                return preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
+                return preg_replace(ValidationPatterns::INVALID_SERVER_USERNAME_CHARACTERS_PATTERN, '', $value);
             },
             set: function ($value) {
-                return preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
+                return preg_replace(ValidationPatterns::INVALID_SERVER_USERNAME_CHARACTERS_PATTERN, '', $value);
             }
         );
     }

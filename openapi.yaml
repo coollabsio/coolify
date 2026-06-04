@@ -59,7 +59,6 @@ paths:
                 - git_repository
                 - git_branch
                 - build_pack
-                - ports_exposes
               properties:
                 project_uuid:
                   type: string
@@ -344,7 +343,6 @@ paths:
                 - git_repository
                 - git_branch
                 - build_pack
-                - ports_exposes
               properties:
                 project_uuid:
                   type: string
@@ -632,7 +630,6 @@ paths:
                 - git_repository
                 - git_branch
                 - build_pack
-                - ports_exposes
               properties:
                 project_uuid:
                   type: string
@@ -1141,7 +1138,6 @@ paths:
                 - environment_name
                 - environment_uuid
                 - docker_registry_image_name
-                - ports_exposes
               properties:
                 project_uuid:
                   type: string

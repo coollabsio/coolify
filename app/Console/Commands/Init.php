@@ -253,7 +253,7 @@ class Init extends Command
                             'save_s3' => false,
                             'frequency' => '0 0 * * *',
                             'database_id' => $database->id,
-                            'database_type' => \App\Models\StandalonePostgresql::class,
+                            'database_type' => StandalonePostgresql::class,
                             'team_id' => 0,
                         ]);
                     }

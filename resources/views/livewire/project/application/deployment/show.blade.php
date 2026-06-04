@@ -115,10 +115,6 @@
             const range = selection.getRangeAt(0);
             return logsContainer.contains(range.commonAncestorContainer);
         },
-        decodeHtml(text) {
-            const doc = new DOMParser().parseFromString(text, 'text/html');
-            return doc.documentElement.textContent;
-        },
         highlightText(el, text, query) {
             if (this.hasActiveLogSelection()) return;
 
@@ -159,7 +155,7 @@
                 if (matches && query) count++;
 
                 if (textSpan) {
-                    const originalText = this.decodeHtml(textSpan.dataset.lineText || '');
+                    const originalText = textSpan.dataset.lineText || '';
                     if (!query) {
                         textSpan.textContent = originalText;
                     } else if (matches) {
@@ -186,8 +182,15 @@
         copyLogs() {
             const content = this.collectVisibleLogs();
             if (!content) return;
-            navigator.clipboard.writeText(content);
-            Livewire.dispatch('success', ['Logs copied to clipboard.']);
+            if (!navigator.clipboard?.writeText) {
+                Livewire.dispatch('error', ['Clipboard is not available. Please use HTTPS or localhost.']);
+                return;
+            }
+            navigator.clipboard?.writeText(content).then(() => {
+                Livewire.dispatch('success', ['Logs copied to clipboard.']);
+            }).catch(() => {
+                Livewire.dispatch('error', ['Failed to copy logs to clipboard.']);
+            });
         },
         downloadLogs() {
             const content = this.collectVisibleLogs();
@@ -429,14 +432,14 @@
                                     $lineContent = (isset($line['command']) && $line['command'] ? '[CMD]: ' : '') . trim($line['line']);
                                     $searchableContent = $line['timestamp'] . ' ' . $lineContent;
                                 @endphp
-                                <div data-log-line data-log-content="{{ htmlspecialchars($searchableContent) }}"
+                                <div data-log-line data-log-content="{{ $searchableContent }}"
                                     @class([
                                         'mt-2' => isset($line['command']) && $line['command'],
                                         'flex gap-2 log-line',
                                     ])>
                                     <span x-show="showTimestamps"
                                         class="shrink-0 text-gray-500">{{ $line['timestamp'] }}</span>
-                                    <span data-line-text="{{ htmlspecialchars($lineContent) }}"
+                                    <span data-line-text="{{ $lineContent }}"
                                         @class([
                                             'text-success dark:text-warning' => $line['hidden'],
                                             'text-red-500' => $line['stderr'],

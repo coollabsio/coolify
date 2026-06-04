@@ -199,8 +199,9 @@ it('rejects replayed github app manifest states', function () {
 
 it('requires authentication before processing github app install callbacks', function () {
     Http::preventStrayRequests();
+    cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
 
-    $this->get('/webhooks/source/github/install?source='.$this->githubApp->uuid.'&setup_action=install&installation_id=123456')
+    $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=123456')
         ->assertRedirect();
 
     Http::assertNothingSent();
@@ -209,12 +210,99 @@ it('requires authentication before processing github app install callbacks', fun
     expect($this->githubApp->installation_id)->toBeNull();
 });
 
-it('rejects github app install callbacks for an unknown github app', function () {
+it('rejects github app install callbacks with an app uuid as state', function () {
     authenticateGithubSetupCallbackTest($this);
     Http::preventStrayRequests();
 
-    $this->withHeader('Accept', 'application/json')->get('/webhooks/source/github/install?source=does-not-exist&setup_action=install&installation_id=123456')
+    $this->withHeader('Accept', 'application/json')->get('/webhooks/source/github/install?state='.$this->githubApp->uuid.'&setup_action=install&installation_id=123456')
         ->assertNotFound();
+
+    Http::assertNothingSent();
+});
+
+it('redirects browser github app install callbacks with missing or expired state to sources', function () {
+    authenticateGithubSetupCallbackTest($this);
+    Http::preventStrayRequests();
+
+    $this->get('/webhooks/source/github/install?setup_action=install&installation_id=123456')
+        ->assertRedirect(route('source.all'));
+
+    $this->get('/webhooks/source/github/install?state=expired-state&setup_action=install&installation_id=123456')
+        ->assertRedirect(route('source.all'));
+
+    Http::assertNothingSent();
+});
+
+it('rejects github app setup states for the wrong callback action', function () {
+    authenticateGithubSetupCallbackTest($this);
+    Http::preventStrayRequests();
+    cacheGithubAppSetupState('manifest-state', 'manifest', $this->githubApp);
+    cacheGithubAppSetupState('install-state', 'install', $this->githubApp);
+
+    $this->withHeader('Accept', 'application/json')->get('/webhooks/source/github/install?state=manifest-state&setup_action=install&installation_id=123456')
+        ->assertNotFound();
+
+    $this->withHeader('Accept', 'application/json')->get('/webhooks/source/github/redirect?state=install-state&code=real-code')
+        ->assertNotFound();
+
+    Http::assertNothingSent();
+});
+
+it('allows github app install callbacks for repository update setup actions', function () {
+    authenticateGithubSetupCallbackTest($this);
+    configureGithubAppCredentials($this->githubApp);
+    $this->githubApp->forceFill(['installation_id' => 111111])->save();
+    Http::preventStrayRequests();
+
+    $this->get('/webhooks/source/github/install?setup_action=update&installation_id=111111')
+        ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]));
+
+    Http::assertNothingSent();
+
+    $this->githubApp->refresh();
+    expect($this->githubApp->installation_id)->toBe(111111);
+});
+
+it('redirects github app repository update callbacks without a matching source to the sources page', function () {
+    authenticateGithubSetupCallbackTest($this);
+    Http::preventStrayRequests();
+
+    $this->get('/webhooks/source/github/install?setup_action=update&installation_id=123456')
+        ->assertRedirect(route('source.all'));
+
+    Http::assertNothingSent();
+});
+
+it('rejects github app install callbacks for unknown setup actions', function () {
+    authenticateGithubSetupCallbackTest($this);
+    Http::preventStrayRequests();
+    cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
+
+    $this->withHeader('Accept', 'application/json')->get('/webhooks/source/github/install?state=valid-install-state&setup_action=remove&installation_id=123456')
+        ->assertUnprocessable();
+
+    Http::assertNothingSent();
+});
+
+it('rejects github app setup states from another team', function () {
+    authenticateGithubSetupCallbackTest($this);
+    Http::preventStrayRequests();
+
+    $otherTeam = Team::factory()->create();
+    $otherGithubApp = GithubApp::create([
+        'name' => 'Other GitHub App',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'custom_user' => 'git',
+        'custom_port' => 22,
+        'team_id' => $otherTeam->id,
+        'is_system_wide' => false,
+    ]);
+
+    cacheGithubAppSetupState('other-team-state', 'manifest', $otherGithubApp);
+
+    $this->withHeader('Accept', 'application/json')->get('/webhooks/source/github/redirect?state=other-team-state&code=real-code')
+        ->assertForbidden();
 
     Http::assertNothingSent();
 });
@@ -223,8 +311,9 @@ it('rejects an installation id that github does not confirm belongs to the app',
     authenticateGithubSetupCallbackTest($this);
     configureGithubAppCredentials($this->githubApp);
     fakeGithubInstallationVerificationFailure();
+    cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
 
-    $this->withHeader('Accept', 'application/json')->get('/webhooks/source/github/install?source='.$this->githubApp->uuid.'&setup_action=install&installation_id=999999')
+    $this->withHeader('Accept', 'application/json')->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=999999')
         ->assertForbidden();
 
     $this->githubApp->refresh();
@@ -235,9 +324,26 @@ it('sets installation id when github confirms it belongs to the app', function (
     authenticateGithubSetupCallbackTest($this);
     configureGithubAppCredentials($this->githubApp);
     fakeGithubInstallationVerification($this->githubApp->app_id);
+    cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
 
-    $this->get('/webhooks/source/github/install?source='.$this->githubApp->uuid.'&setup_action=install&installation_id=123456')
+    $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=123456')
         ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]));
+
+    $this->githubApp->refresh();
+    expect($this->githubApp->installation_id)->toBe(123456);
+});
+
+it('rejects replayed github app install states', function () {
+    authenticateGithubSetupCallbackTest($this);
+    configureGithubAppCredentials($this->githubApp);
+    fakeGithubInstallationVerification($this->githubApp->app_id);
+    cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
+
+    $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=123456')
+        ->assertRedirect();
+
+    $this->withHeader('Accept', 'application/json')->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=123456')
+        ->assertNotFound();
 
     $this->githubApp->refresh();
     expect($this->githubApp->installation_id)->toBe(123456);
@@ -248,8 +354,9 @@ it('allows reinstalling an already configured github app installation id', funct
     configureGithubAppCredentials($this->githubApp);
     $this->githubApp->forceFill(['installation_id' => 111111])->save();
     fakeGithubInstallationVerification($this->githubApp->app_id);
+    cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
 
-    $this->get('/webhooks/source/github/install?source='.$this->githubApp->uuid.'&setup_action=install&installation_id=222222')
+    $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=222222')
         ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]));
 
     $this->githubApp->refresh();

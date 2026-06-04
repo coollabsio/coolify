@@ -13,6 +13,7 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
 use App\Rules\ValidServerIp;
+use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
@@ -487,10 +488,12 @@ class ServersController extends Controller
             'ip' => ['string', 'required', new ValidServerIp],
             'port' => 'integer|nullable|between:1,65535',
             'private_key_uuid' => 'string|required',
-            'user' => ['string', 'nullable', 'regex:/^[a-zA-Z0-9_-]+$/'],
+            'user' => ValidationPatterns::serverUsernameRules(required: false),
             'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
             'proxy_type' => 'string|nullable',
+        ], [
+            ...ValidationPatterns::serverUsernameMessages(),
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -666,7 +669,7 @@ class ServersController extends Controller
             'ip' => ['string', 'nullable', new ValidServerIp],
             'port' => 'integer|nullable|between:1,65535',
             'private_key_uuid' => 'string|nullable',
-            'user' => ['string', 'nullable', 'regex:/^[a-zA-Z0-9_-]+$/'],
+            'user' => ValidationPatterns::serverUsernameRules(required: false),
             'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
             'proxy_type' => 'string|nullable',
@@ -676,6 +679,8 @@ class ServersController extends Controller
             'server_disk_usage_notification_threshold' => 'integer|min:1|max:100',
             'server_disk_usage_check_frequency' => 'string',
             'connection_timeout' => 'integer|min:1|max:300',
+        ], [
+            ...ValidationPatterns::serverUsernameMessages(),
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -700,17 +705,17 @@ class ServersController extends Controller
             $validProxyTypes = collect(ProxyTypes::cases())->map(function ($proxyType) {
                 return str($proxyType->value)->lower();
             });
-            if ($validProxyTypes->contains(str($request->proxy_type)->lower())) {
-                $server->changeProxy($request->proxy_type, async: true);
-            } else {
+            if (! $validProxyTypes->contains(str($request->proxy_type)->lower())) {
                 return response()->json(['message' => 'Invalid proxy type.'], 422);
             }
         }
-        $server->update($request->only(['name', 'description', 'ip', 'port', 'user']));
-        if ($request->is_build_server) {
-            $server->settings()->update([
-                'is_build_server' => $request->is_build_server,
-            ]);
+        $updateFields = $request->only(['name', 'description', 'ip', 'port', 'user']);
+        if ($request->filled('private_key_uuid')) {
+            $privateKey = PrivateKey::whereTeamId($teamId)->whereUuid($request->private_key_uuid)->first();
+            if (! $privateKey) {
+                return response()->json(['message' => 'Private key not found.'], 404);
+            }
+            $updateFields['private_key_id'] = $privateKey->id;
         }
 
         if ($request->has('server_disk_usage_check_frequency') && ! validate_cron_expression($request->server_disk_usage_check_frequency)) {
@@ -720,9 +725,20 @@ class ServersController extends Controller
             ], 422);
         }
 
+        $server->update($updateFields);
+        if ($request->has('is_build_server')) {
+            $server->settings()->update([
+                'is_build_server' => $request->boolean('is_build_server'),
+            ]);
+        }
+
         $advancedSettings = $request->only(['concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'connection_timeout']);
         if (! empty($advancedSettings)) {
             $server->settings()->update(array_filter($advancedSettings, fn ($value) => ! is_null($value)));
+        }
+
+        if ($request->proxy_type) {
+            $server->changeProxy($request->proxy_type, async: true);
         }
 
         if ($request->instant_validate) {

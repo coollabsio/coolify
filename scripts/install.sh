@@ -781,10 +781,12 @@ curl -fsSL -L $CDN/.env.production -o /data/coolify/source/.env.production &
 PID3=$!
 curl -fsSL -L $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh &
 PID4=$!
+curl -fsSL -L $CDN/upgrade-postgres.sh -o /data/coolify/source/upgrade-postgres.sh &
+PID5=$!
 
 # Wait for all downloads to complete and check for errors
 DOWNLOAD_FAILED=false
-for PID in $PID1 $PID2 $PID3 $PID4; do
+for PID in $PID1 $PID2 $PID3 $PID4 $PID5; do
     if ! wait $PID; then
         DOWNLOAD_FAILED=true
     fi
@@ -795,6 +797,7 @@ if [ "$DOWNLOAD_FAILED" = true ]; then
     exit 1
 fi
 
+chmod +x /data/coolify/source/upgrade.sh /data/coolify/source/upgrade-postgres.sh
 log "All configuration files downloaded successfully"
 echo "     Done."
 
