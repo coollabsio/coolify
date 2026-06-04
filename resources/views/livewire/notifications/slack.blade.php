@@ -10,18 +10,18 @@
                 Save
             </x-forms.button>
             @if ($slackEnabled)
+                <x-forms.button canGate="update" :canResource="$settings" wire:click="toggleSlackEnabled">
+                    Disable Slack
+                </x-forms.button>
                 <x-forms.button canGate="sendTest" :canResource="$settings" class="normal-case dark:text-white btn btn-xs no-animation btn-primary"
                     wire:click="sendTestNotification">
                     Send Test Notification
                 </x-forms.button>
             @else
-                <x-forms.button canGate="sendTest" :canResource="$settings" disabled class="normal-case dark:text-white btn btn-xs no-animation btn-primary">
-                    Send Test Notification
+                <x-forms.button canGate="update" :canResource="$settings" isHighlighted wire:click="toggleSlackEnabled">
+                    Enable Slack
                 </x-forms.button>
             @endif
-        </div>
-        <div class="w-32">
-            <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSaveSlackEnabled" id="slackEnabled" label="Enabled" />
         </div>
         <x-forms.input canGate="update" :canResource="$settings" type="password"
             helper="Create a Slack APP and generate a Incoming Webhook URL. <br><a class='inline-block underline dark:text-white' href='https://api.slack.com/apps' target='_blank'>Create Slack APP</a>"

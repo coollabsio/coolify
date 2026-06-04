@@ -3,16 +3,19 @@
         Settings | Coolify
     </x-slot>
     <x-settings.navbar />
-    <div class="flex flex-col">
-        <div class="flex items-center gap-2 pb-2">
-            <h2>Backup</h2>
+    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }"
+        class="flex flex-col h-full gap-8 sm:flex-row">
+        <x-settings.sidebar activeMenu="backup" />
+        <div class="flex flex-col w-full">
+        <div class="flex items-center gap-2">
+            <h2>Instance Backup</h2>
             @if (isset($database) && $server->isFunctional())
                 <x-forms.button type="submit" wire:click="submit">
                     Save
                 </x-forms.button>
             @endif
         </div>
-        <div class="pb-4">Backup configuration for Coolify instance.</div>
+        <div class="pb-4">Instance backup configuration for Coolify instance.</div>
         <div>
             @if ($server->isFunctional())
                 @if (isset($database) && isset($backup))

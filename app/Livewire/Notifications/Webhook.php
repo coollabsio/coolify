@@ -141,6 +141,30 @@ class Webhook extends Component
         }
     }
 
+    public function toggleWebhookEnabled()
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->webhookEnabled) {
+                $this->webhookEnabled = false;
+            } else {
+                $this->validate([
+                    'webhookUrl' => 'required',
+                ], [
+                    'webhookUrl.required' => 'Webhook URL is required.',
+                ]);
+                $this->webhookEnabled = true;
+            }
+
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->syncData();
+
+            return handleError($e, $this);
+        }
+    }
+
     public function instantSave()
     {
         try {

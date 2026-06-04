@@ -153,6 +153,34 @@ class Pushover extends Component
         }
     }
 
+    public function togglePushoverEnabled()
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->pushoverEnabled) {
+                $this->pushoverEnabled = false;
+            } else {
+                $this->validate([
+                    'pushoverUserKey' => 'required',
+                    'pushoverApiToken' => 'required',
+                ], [
+                    'pushoverUserKey.required' => 'Pushover User Key is required.',
+                    'pushoverApiToken.required' => 'Pushover API Token is required.',
+                ]);
+                $this->pushoverEnabled = true;
+            }
+
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->syncData();
+
+            return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
+        }
+    }
+
     public function instantSave()
     {
         try {

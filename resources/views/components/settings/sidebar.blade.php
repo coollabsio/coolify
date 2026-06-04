@@ -3,6 +3,10 @@
         href="{{ route('settings.index') }}"><span class="menu-item-label">General</span></a>
     <a class="sub-menu-item {{ $activeMenu === 'advanced' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
         href="{{ route('settings.advanced') }}"><span class="menu-item-label">Advanced</span></a>
+    <a class="sub-menu-item {{ $activeMenu === 'backup' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
+        href="{{ route('settings.backup') }}"><span class="menu-item-label">Instance Backup</span></a>
+    <a class="sub-menu-item {{ $activeMenu === 'email' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
+        href="{{ route('settings.email') }}"><span class="menu-item-label">Transactional Email</span></a>
     <a class="sub-menu-item {{ $activeMenu === 'updates' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
         href="{{ route('settings.updates') }}"><span class="menu-item-label">Updates</span></a>
 </div>

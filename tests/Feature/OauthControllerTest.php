@@ -4,15 +4,18 @@ use App\Models\InstanceSettings;
 use App\Models\OauthSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Once;
 use Laravel\Socialite\Facades\Socialite;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::create([
+    InstanceSettings::forceCreate([
         'id' => 0,
         'is_registration_enabled' => false,
     ]);
+
+    Once::flush();
 
     OauthSetting::create([
         'provider' => 'google',
@@ -20,6 +23,7 @@ beforeEach(function () {
         'client_secret' => 'client-secret',
         'redirect_uri' => 'https://coolify.example.com/auth/google/callback',
         'tenant' => 'example.com',
+        'enabled' => true,
     ]);
 });
 

@@ -42,6 +42,11 @@
                         </div>
                     @endif
                     <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="disable_registration_when_oauth_enabled"
+                            helper="When enabled, the normal registration page is hidden if at least one OAuth provider is enabled. OAuth providers can still create users if their provider-specific registration option allows it."
+                            label="Disable Registration When OAuth Is Enabled" />
+                    </div>
+                    <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."
                             label="Do Not Track" />

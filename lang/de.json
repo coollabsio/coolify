@@ -7,6 +7,7 @@
     "auth.login.github": "Mit GitHub anmelden",
     "auth.login.gitlab": "Mit GitLab anmelden",
     "auth.login.google": "Mit Google anmelden",
+    "auth.login.oidc": "Mit SSO anmelden",
     "auth.login.infomaniak": "Mit Infomaniak anmelden",
     "auth.login.zitadel": "Mit Zitadel anmelden",
     "auth.already_registered": "Bereits registriert?",

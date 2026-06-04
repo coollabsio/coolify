@@ -10,18 +10,20 @@
                 Save
             </x-forms.button>
             @if ($discordEnabled)
+                <x-forms.button canGate="update" :canResource="$settings" wire:click="toggleDiscordEnabled">
+                    Disable Discord
+                </x-forms.button>
                 <x-forms.button canGate="sendTest" :canResource="$settings" class="normal-case dark:text-white btn btn-xs no-animation btn-primary"
                     wire:click="sendTestNotification">
                     Send Test Notification
                 </x-forms.button>
             @else
-                <x-forms.button canGate="sendTest" :canResource="$settings" disabled class="normal-case dark:text-white btn btn-xs no-animation btn-primary">
-                    Send Test Notification
+                <x-forms.button canGate="update" :canResource="$settings" isHighlighted wire:click="toggleDiscordEnabled">
+                    Enable Discord
                 </x-forms.button>
             @endif
         </div>
         <div class="w-48">
-            <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSaveDiscordEnabled" id="discordEnabled" label="Enabled" />
             <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSaveDiscordPingEnabled" id="discordPingEnabled"
                 helper="If enabled, a ping (@here) will be sent to the notification when a critical event happens."
                 label="Ping Enabled" />

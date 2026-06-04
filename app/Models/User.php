@@ -11,6 +11,7 @@ use App\Services\ChangelogService;
 use App\Traits\DeletesUserSessions;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notifiable;
@@ -497,6 +498,16 @@ class User extends Authenticatable implements SendsEmail
             && ! is_null($this->email_change_code)
             && $this->email_change_code_expires_at
             && Carbon::now()->lessThan($this->email_change_code_expires_at);
+    }
+
+    public function oauthIdentities(): HasMany
+    {
+        return $this->hasMany(OauthIdentity::class);
+    }
+
+    public function hasSsoIdentity(): bool
+    {
+        return $this->oauthIdentities()->exists();
     }
 
     /**

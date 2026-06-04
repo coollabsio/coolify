@@ -147,6 +147,32 @@ class Slack extends Component
         }
     }
 
+    public function toggleSlackEnabled()
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->slackEnabled) {
+                $this->slackEnabled = false;
+            } else {
+                $this->validate([
+                    'slackWebhookUrl' => 'required',
+                ], [
+                    'slackWebhookUrl.required' => 'Slack Webhook URL is required.',
+                ]);
+                $this->slackEnabled = true;
+            }
+
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->syncData();
+
+            return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
+        }
+    }
+
     public function instantSave()
     {
         try {

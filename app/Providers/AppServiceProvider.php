@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Auth\Oidc\OidcDiscoveryService;
+use App\Auth\Oidc\OidcTokenValidator;
+use App\Auth\Oidc\Socialite\OidcProvider;
 use App\Models\PersonalAccessToken;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
@@ -10,6 +13,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\Sanctum;
+use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
 use Laravel\Telescope\TelescopeServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -28,7 +32,7 @@ class AppServiceProvider extends ServiceProvider
         $this->configurePasswords();
         $this->configureSanctumModel();
         $this->configureGitHubHttp();
-
+        $this->configureOidcSocialite();
     }
 
     private function configureCommands(): void
@@ -61,6 +65,24 @@ class AppServiceProvider extends ServiceProvider
     private function configureSanctumModel(): void
     {
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+    }
+
+    private function configureOidcSocialite(): void
+    {
+        if (! $this->app->bound(SocialiteFactory::class)) {
+            return;
+        }
+
+        $this->app->make(SocialiteFactory::class)->extend('oidc', function ($app) {
+            return new OidcProvider(
+                $app['request'],
+                $app->make(OidcDiscoveryService::class),
+                $app->make(OidcTokenValidator::class),
+                '',
+                '',
+                '',
+            );
+        });
     }
 
     private function configureGitHubHttp(): void

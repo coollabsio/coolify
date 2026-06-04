@@ -10,18 +10,18 @@
                 Save
             </x-forms.button>
             @if ($telegramEnabled)
+                <x-forms.button canGate="update" :canResource="$settings" wire:click="toggleTelegramEnabled">
+                    Disable Telegram
+                </x-forms.button>
                 <x-forms.button canGate="sendTest" :canResource="$settings" class="normal-case dark:text-white btn btn-xs no-animation btn-primary"
                     wire:click="sendTestNotification">
                     Send Test Notification
                 </x-forms.button>
             @else
-                <x-forms.button canGate="sendTest" :canResource="$settings" disabled class="normal-case dark:text-white btn btn-xs no-animation btn-primary">
-                    Send Test Notification
+                <x-forms.button canGate="update" :canResource="$settings" isHighlighted wire:click="toggleTelegramEnabled">
+                    Enable Telegram
                 </x-forms.button>
             @endif
-        </div>
-        <div class="w-32">
-            <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSaveTelegramEnabled" id="telegramEnabled" label="Enabled" />
         </div>
         <div class="flex gap-2">
             <x-forms.input canGate="update" :canResource="$settings" type="password" autocomplete="new-password"

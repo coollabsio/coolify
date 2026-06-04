@@ -7,14 +7,6 @@
                 href="{{ route('settings.index') }}">
                 Configuration
             </a>
-            <a class="{{ request()->routeIs('settings.backup') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                href="{{ route('settings.backup') }}">
-                Backup
-            </a>
-            <a class="{{ request()->routeIs('settings.email') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                href="{{ route('settings.email') }}">
-                Transactional Email
-            </a>
             <a class="{{ request()->routeIs('settings.oauth') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
                 href="{{ route('settings.oauth') }}">
                 OAuth

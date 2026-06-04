@@ -2,47 +2,60 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
-use Illuminate\Support\Facades\Auth;
+use App\Models\OauthSetting;
+use App\Services\Auth\OauthLoginService;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class OauthController extends Controller
 {
     public function redirect(string $provider)
     {
-        $socialite_provider = get_socialite_provider($provider);
+        $oauthSetting = $this->enabledProvider($provider);
+        $socialiteProvider = get_socialite_provider($oauthSetting->provider);
 
-        return $socialite_provider->redirect();
+        return $socialiteProvider->redirect();
     }
 
-    public function callback(string $provider)
+    public function callback(string $provider, OauthLoginService $oauthLoginService)
     {
         try {
-            $oauthUser = get_socialite_provider($provider)->user();
-            $email = trim((string) $oauthUser->email);
-            if ($email === '') {
-                abort(403, 'OAuth provider did not return an email address');
-            }
-            $email = strtolower($email);
-            $user = User::whereEmail($email)->first();
-            if (! $user) {
-                $settings = instanceSettings();
-                if (! $settings->is_registration_enabled) {
-                    abort(403, 'Registration is disabled');
-                }
-
-                $user = User::create([
-                    'name' => $oauthUser->name,
-                    'email' => $email,
-                ]);
-            }
-            Auth::login($user);
+            $oauthSetting = $this->enabledProvider($provider);
+            $oauthUser = get_socialite_provider($oauthSetting->provider)->user();
+            $oauthLoginService->login($oauthSetting->provider, $oauthUser, $oauthSetting);
 
             return redirect('/');
         } catch (\Exception $e) {
+            $this->logCallbackFailure($provider, $e);
+
             $errorCode = $e instanceof HttpException ? 'auth.failed' : 'auth.failed.callback';
 
             return redirect()->route('login')->withErrors([__($errorCode)]);
         }
+    }
+
+    private function logCallbackFailure(string $provider, \Throwable $exception): void
+    {
+        Log::error('OAuth callback failed.', [
+            'provider' => $provider,
+            'exception_class' => $exception::class,
+            'exception_message' => $exception->getMessage(),
+            'request_error' => request()->query('error'),
+            'request_error_description' => request()->query('error_description'),
+            'has_code' => request()->query->has('code'),
+            'has_state' => request()->query->has('state'),
+            'ip' => request()->ip(),
+            'exception' => $exception,
+        ]);
+    }
+
+    private function enabledProvider(string $provider): OauthSetting
+    {
+        $oauthSetting = OauthSetting::where('provider', $provider)->first();
+        if (! $oauthSetting || ! $oauthSetting->enabled || ! $oauthSetting->couldBeEnabled()) {
+            throw new HttpException(403, 'OAuth provider is not enabled');
+        }
+
+        return $oauthSetting;
     }
 }

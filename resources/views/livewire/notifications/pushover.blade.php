@@ -10,18 +10,18 @@
                 Save
             </x-forms.button>
             @if ($pushoverEnabled)
+                <x-forms.button canGate="update" :canResource="$settings" wire:click="togglePushoverEnabled">
+                    Disable Pushover
+                </x-forms.button>
                 <x-forms.button canGate="sendTest" :canResource="$settings" class="normal-case dark:text-white btn btn-xs no-animation btn-primary"
                     wire:click="sendTestNotification">
                     Send Test Notification
                 </x-forms.button>
             @else
-                <x-forms.button canGate="sendTest" :canResource="$settings" disabled class="normal-case dark:text-white btn btn-xs no-animation btn-primary">
-                    Send Test Notification
+                <x-forms.button canGate="update" :canResource="$settings" isHighlighted wire:click="togglePushoverEnabled">
+                    Enable Pushover
                 </x-forms.button>
             @endif
-        </div>
-        <div class="w-32">
-            <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSavePushoverEnabled" id="pushoverEnabled" label="Enabled" />
         </div>
         <div class="flex  gap-2">
             <x-forms.input canGate="update" :canResource="$settings" type="password"

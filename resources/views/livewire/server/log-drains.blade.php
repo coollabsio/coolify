@@ -9,19 +9,29 @@
             @if ($server->isFunctional())
                 <div class="flex gap-2 items-center">
                     <h2>Log Drains</h2>
-                    <x-loading wire:target="instantSave" wire:loading.delay />
+                    <x-loading wire:target="toggleLogDrain" wire:loading.delay />
                 </div>
                 <div>Sends service logs to 3rd party tools.</div>
                 <div class="flex flex-col gap-4 pt-4">
                     <div class="p-4 border dark:border-coolgray-300 border-neutral-200">
                         <form wire:submit='submit("newrelic")' class="flex flex-col">
-                            <h3>New Relic</h3>
-                            <div class="w-32">
-                                @if ($isLogDrainAxiomEnabled || $isLogDrainCustomEnabled)
-                                    <x-forms.checkbox disabled id="isLogDrainNewRelicEnabled" label="Enabled" />
+                            <div class="flex items-center gap-2">
+                                <h3>New Relic</h3>
+                                @if ($isLogDrainNewRelicEnabled)
+                                    <x-forms.button canGate="update" :canResource="$server" type="submit">
+                                        Save
+                                    </x-forms.button>
+                                    <x-forms.button canGate="update" :canResource="$server" wire:click="toggleLogDrain('newrelic')">
+                                        Disable New Relic
+                                    </x-forms.button>
+                                @elseif ($isLogDrainAxiomEnabled || $isLogDrainCustomEnabled)
+                                    <x-forms.button disabled>
+                                        Enable New Relic
+                                    </x-forms.button>
                                 @else
-                                    <x-forms.checkbox instantSave canGate="update" :canResource="$server"
-                                        id="isLogDrainNewRelicEnabled" label="Enabled" />
+                                    <x-forms.button canGate="update" :canResource="$server" isHighlighted wire:click="toggleLogDrain('newrelic')">
+                                        Enable New Relic
+                                    </x-forms.button>
                                 @endif
                             </div>
                             <div class="flex flex-col gap-4">
@@ -51,16 +61,26 @@
                             </div>
                         </form>
 
-                        <h3>Axiom</h3>
-                        <div class="w-32">
-                            @if ($isLogDrainNewRelicEnabled || $isLogDrainCustomEnabled)
-                                <x-forms.checkbox disabled id="isLogDrainAxiomEnabled" label="Enabled" />
-                            @else
-                                <x-forms.checkbox instantSave canGate="update" :canResource="$server"
-                                    id="isLogDrainAxiomEnabled" label="Enabled" />
-                            @endif
-                        </div>
                         <form wire:submit='submit("axiom")' class="flex flex-col">
+                            <div class="flex items-center gap-2">
+                                <h3>Axiom</h3>
+                                @if ($isLogDrainAxiomEnabled)
+                                    <x-forms.button canGate="update" :canResource="$server" type="submit">
+                                        Save
+                                    </x-forms.button>
+                                    <x-forms.button canGate="update" :canResource="$server" wire:click="toggleLogDrain('axiom')">
+                                        Disable Axiom
+                                    </x-forms.button>
+                                @elseif ($isLogDrainNewRelicEnabled || $isLogDrainCustomEnabled)
+                                    <x-forms.button disabled>
+                                        Enable Axiom
+                                    </x-forms.button>
+                                @else
+                                    <x-forms.button canGate="update" :canResource="$server" isHighlighted wire:click="toggleLogDrain('axiom')">
+                                        Enable Axiom
+                                    </x-forms.button>
+                                @endif
+                            </div>
                             <div class="flex flex-col gap-4">
                                 <div class="flex flex-col w-full gap-2 xl:flex-row">
                                     @if ($server->isLogDrainEnabled())
@@ -82,16 +102,26 @@
                                 </x-forms.button>
                             </div>
                         </form>
-                        <h3>Custom FluentBit</h3>
-                        <div class="w-32">
-                            @if ($isLogDrainNewRelicEnabled || $isLogDrainAxiomEnabled)
-                                <x-forms.checkbox disabled id="isLogDrainCustomEnabled" label="Enabled" />
-                            @else
-                                <x-forms.checkbox instantSave canGate="update" :canResource="$server"
-                                    id="isLogDrainCustomEnabled" label="Enabled" />
-                            @endif
-                        </div>
                         <form wire:submit='submit("custom")' class="flex flex-col">
+                            <div class="flex items-center gap-2">
+                                <h3>Custom FluentBit</h3>
+                                @if ($isLogDrainCustomEnabled)
+                                    <x-forms.button canGate="update" :canResource="$server" type="submit">
+                                        Save
+                                    </x-forms.button>
+                                    <x-forms.button canGate="update" :canResource="$server" wire:click="toggleLogDrain('custom')">
+                                        Disable Custom FluentBit
+                                    </x-forms.button>
+                                @elseif ($isLogDrainNewRelicEnabled || $isLogDrainAxiomEnabled)
+                                    <x-forms.button disabled>
+                                        Enable Custom FluentBit
+                                    </x-forms.button>
+                                @else
+                                    <x-forms.button canGate="update" :canResource="$server" isHighlighted wire:click="toggleLogDrain('custom')">
+                                        Enable Custom FluentBit
+                                    </x-forms.button>
+                                @endif
+                            </div>
                             <div class="flex flex-col gap-4">
                                 @if ($server->isLogDrainEnabled())
                                     <x-forms.textarea disabled rows="6" required id="logDrainCustomConfig"

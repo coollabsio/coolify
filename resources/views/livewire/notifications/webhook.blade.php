@@ -10,21 +10,19 @@
                 Save
             </x-forms.button>
             @if ($webhookEnabled)
+                <x-forms.button canGate="update" :canResource="$settings" wire:click="toggleWebhookEnabled">
+                    Disable Webhook
+                </x-forms.button>
                 <x-forms.button canGate="sendTest" :canResource="$settings"
                     class="normal-case dark:text-white btn btn-xs no-animation btn-primary"
                     wire:click="sendTestNotification">
                     Send Test Notification
                 </x-forms.button>
             @else
-                <x-forms.button canGate="sendTest" :canResource="$settings" disabled
-                    class="normal-case dark:text-white btn btn-xs no-animation btn-primary">
-                    Send Test Notification
+                <x-forms.button canGate="update" :canResource="$settings" isHighlighted wire:click="toggleWebhookEnabled">
+                    Enable Webhook
                 </x-forms.button>
             @endif
-        </div>
-        <div class="w-48">
-            <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSaveWebhookEnabled"
-                id="webhookEnabled" label="Enabled" />
         </div>
         <div class="flex items-end gap-2">
 

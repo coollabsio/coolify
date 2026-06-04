@@ -163,6 +163,30 @@ class Discord extends Component
         }
     }
 
+    public function toggleDiscordEnabled()
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->discordEnabled) {
+                $this->discordEnabled = false;
+            } else {
+                $this->validate([
+                    'discordWebhookUrl' => 'required',
+                ], [
+                    'discordWebhookUrl.required' => 'Discord Webhook URL is required.',
+                ]);
+                $this->discordEnabled = true;
+            }
+
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->syncData();
+
+            return handleError($e, $this);
+        }
+    }
+
     public function instantSave()
     {
         try {

@@ -246,6 +246,34 @@ class Telegram extends Component
         }
     }
 
+    public function toggleTelegramEnabled()
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->telegramEnabled) {
+                $this->telegramEnabled = false;
+            } else {
+                $this->validate([
+                    'telegramToken' => 'required',
+                    'telegramChatId' => 'required',
+                ], [
+                    'telegramToken.required' => 'Telegram Token is required.',
+                    'telegramChatId.required' => 'Telegram Chat ID is required.',
+                ]);
+                $this->telegramEnabled = true;
+            }
+
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->syncData();
+
+            return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
+        }
+    }
+
     public function saveModel()
     {
         $this->syncData(true);

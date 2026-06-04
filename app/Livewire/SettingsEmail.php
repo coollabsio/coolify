@@ -138,28 +138,54 @@ class SettingsEmail extends Component
         }
     }
 
+    public function toggleSmtp()
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->smtpEnabled) {
+                $this->smtpEnabled = false;
+                $this->syncData(true);
+                $this->dispatch('success', 'SMTP settings updated.');
+            } else {
+                $this->validateSmtpSettings();
+                $this->smtpEnabled = true;
+                $this->resendEnabled = false;
+                $this->submitSmtp();
+            }
+        } catch (\Throwable $e) {
+            $this->syncData();
+
+            return handleError($e, $this);
+        }
+    }
+
+    public function toggleResend()
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->resendEnabled) {
+                $this->resendEnabled = false;
+                $this->syncData(true);
+                $this->dispatch('success', 'Resend settings updated.');
+            } else {
+                $this->validateResendSettings();
+                $this->resendEnabled = true;
+                $this->smtpEnabled = false;
+                $this->submitResend();
+            }
+        } catch (\Throwable $e) {
+            $this->syncData();
+
+            return handleError($e, $this);
+        }
+    }
+
     public function submitSmtp()
     {
         try {
-            $this->validate([
-                'smtpEnabled' => 'boolean',
-                'smtpFromAddress' => 'required|email',
-                'smtpFromName' => 'required|string',
-                'smtpHost' => 'required|string',
-                'smtpPort' => 'required|numeric',
-                'smtpEncryption' => 'required|string|in:starttls,tls,none',
-                'smtpUsername' => 'nullable|string',
-                'smtpPassword' => 'nullable|string',
-                'smtpTimeout' => 'nullable|numeric',
-            ], [
-                'smtpFromAddress.required' => 'From Address is required.',
-                'smtpFromAddress.email' => 'Please enter a valid email address.',
-                'smtpFromName.required' => 'From Name is required.',
-                'smtpHost.required' => 'SMTP Host is required.',
-                'smtpPort.required' => 'SMTP Port is required.',
-                'smtpPort.numeric' => 'SMTP Port must be a number.',
-                'smtpEncryption.required' => 'Encryption type is required.',
-            ]);
+            $this->validateSmtpSettings();
 
             $this->settings->smtp_enabled = $this->smtpEnabled;
             $this->settings->smtp_host = $this->smtpHost;
@@ -184,17 +210,7 @@ class SettingsEmail extends Component
     public function submitResend()
     {
         try {
-            $this->validate([
-                'resendEnabled' => 'boolean',
-                'resendApiKey' => 'required|string',
-                'smtpFromAddress' => 'required|email',
-                'smtpFromName' => 'required|string',
-            ], [
-                'resendApiKey.required' => 'Resend API Key is required.',
-                'smtpFromAddress.required' => 'From Address is required.',
-                'smtpFromAddress.email' => 'Please enter a valid email address.',
-                'smtpFromName.required' => 'From Name is required.',
-            ]);
+            $this->validateResendSettings();
 
             $this->settings->resend_enabled = $this->resendEnabled;
             $this->settings->resend_api_key = $this->resendApiKey;
@@ -209,6 +225,44 @@ class SettingsEmail extends Component
 
             return handleError($e, $this);
         }
+    }
+
+    private function validateSmtpSettings(): void
+    {
+        $this->validate([
+            'smtpEnabled' => 'boolean',
+            'smtpFromAddress' => 'required|email',
+            'smtpFromName' => 'required|string',
+            'smtpHost' => 'required|string',
+            'smtpPort' => 'required|numeric',
+            'smtpEncryption' => 'required|string|in:starttls,tls,none',
+            'smtpUsername' => 'nullable|string',
+            'smtpPassword' => 'nullable|string',
+            'smtpTimeout' => 'nullable|numeric',
+        ], [
+            'smtpFromAddress.required' => 'From Address is required.',
+            'smtpFromAddress.email' => 'Please enter a valid email address.',
+            'smtpFromName.required' => 'From Name is required.',
+            'smtpHost.required' => 'SMTP Host is required.',
+            'smtpPort.required' => 'SMTP Port is required.',
+            'smtpPort.numeric' => 'SMTP Port must be a number.',
+            'smtpEncryption.required' => 'Encryption type is required.',
+        ]);
+    }
+
+    private function validateResendSettings(): void
+    {
+        $this->validate([
+            'resendEnabled' => 'boolean',
+            'resendApiKey' => 'required|string',
+            'smtpFromAddress' => 'required|email',
+            'smtpFromName' => 'required|string',
+        ], [
+            'resendApiKey.required' => 'Resend API Key is required.',
+            'smtpFromAddress.required' => 'From Address is required.',
+            'smtpFromAddress.email' => 'Please enter a valid email address.',
+            'smtpFromName.required' => 'From Name is required.',
+        ]);
     }
 
     public function sendTestEmail()

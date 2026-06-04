@@ -21,10 +21,6 @@
                                 </x-forms.button>
                             </form>
                         </x-modal-input>
-                    @else
-                        <x-forms.button disabled class="normal-case dark:text-white btn btn-xs no-animation btn-primary">
-                            Send Test Email
-                        </x-forms.button>
                     @endif
                 @endcan
             @endif
@@ -63,10 +59,15 @@
                     <x-forms.button canGate="update" :canResource="$settings" type="submit">
                         Save
                     </x-forms.button>
-                </div>
-                <div class="w-32">
-                    <x-forms.checkbox canGate="update" :canResource="$settings" wire:model="smtpEnabled" instantSave="instantSave('SMTP')" id="smtpEnabled"
-                        label="Enabled" />
+                    @if ($smtpEnabled)
+                        <x-forms.button canGate="update" :canResource="$settings" wire:click="toggleSmtp">
+                            Disable SMTP Server
+                        </x-forms.button>
+                    @else
+                        <x-forms.button canGate="update" :canResource="$settings" isHighlighted wire:click="toggleSmtp">
+                            Enable SMTP Server
+                        </x-forms.button>
+                    @endif
                 </div>
                 <div class="flex flex-col">
                     <div class="flex flex-col gap-4">
@@ -95,10 +96,15 @@
                     <x-forms.button canGate="update" :canResource="$settings" type="submit">
                         Save
                     </x-forms.button>
-                </div>
-                <div class="w-32">
-                    <x-forms.checkbox canGate="update" :canResource="$settings" wire:model="resendEnabled" instantSave="instantSave('Resend')" id="resendEnabled"
-                        label="Enabled" />
+                    @if ($resendEnabled)
+                        <x-forms.button canGate="update" :canResource="$settings" wire:click="toggleResend">
+                            Disable Resend
+                        </x-forms.button>
+                    @else
+                        <x-forms.button canGate="update" :canResource="$settings" isHighlighted wire:click="toggleResend">
+                            Enable Resend
+                        </x-forms.button>
+                    @endif
                 </div>
                 <div class="flex flex-col">
                     <div class="flex flex-col gap-4">

@@ -7,6 +7,7 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\OauthSetting;
+use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -47,7 +48,7 @@ class FortifyServiceProvider extends ServiceProvider
             $isFirstUser = User::count() === 0;
 
             $settings = instanceSettings();
-            if (! $settings->is_registration_enabled) {
+            if (! $settings->isPasswordRegistrationAllowed()) {
                 return redirect()->route('login');
             }
 
@@ -60,13 +61,13 @@ class FortifyServiceProvider extends ServiceProvider
             $settings = instanceSettings();
             $enabled_oauth_providers = OauthSetting::where('enabled', true)->get();
             $users = User::count();
-            if ($users == 0) {
-                // If there are no users, redirect to registration
+            if ($users == 0 && $settings->isPasswordRegistrationAllowed()) {
+                // If there are no users and password registration is allowed, redirect to registration.
                 return redirect()->route('register');
             }
 
             return view('auth.login', [
-                'is_registration_enabled' => $settings->is_registration_enabled,
+                'is_registration_enabled' => $settings->isPasswordRegistrationAllowed(),
                 'enabled_oauth_providers' => $enabled_oauth_providers,
             ]);
         });
@@ -82,7 +83,7 @@ class FortifyServiceProvider extends ServiceProvider
                 $user->save();
 
                 // Check if user has a pending invitation they haven't accepted yet
-                $invitation = \App\Models\TeamInvitation::whereEmail($email)->first();
+                $invitation = TeamInvitation::whereEmail($email)->first();
                 if ($invitation && $invitation->isValid()) {
                     // User is logging in for the first time after being invited
                     // Attach them to the invited team if not already attached

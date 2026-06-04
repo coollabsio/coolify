@@ -124,6 +124,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
     Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
     Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
+    Route::get('/settings/oauth/{provider}', SettingsOauth::class)
+        ->where('provider', '[A-Za-z0-9_-]+')
+        ->name('settings.oauth.provider');
     Route::get('/settings/scheduled-jobs', SettingsScheduledJobs::class)->name('settings.scheduled-jobs');
 
     Route::get('/profile', ProfileIndex::class)->name('profile');

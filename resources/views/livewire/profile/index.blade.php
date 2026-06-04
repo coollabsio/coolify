@@ -11,16 +11,27 @@
         <div class="flex flex-col gap-2 lg:flex-row items-end">
             <x-forms.input id="name" label="Name" required />
             <x-forms.input id="email" label="Email" readonly />
-            @if (!$show_email_change && !$show_verification)
+            @if ($uses_sso)
+                <x-forms.button type="button" disabled>Change Email</x-forms.button>
+            @elseif (!$show_email_change && !$show_verification)
                 <x-forms.button wire:click="showEmailChangeForm" type="button">Change Email</x-forms.button>
             @else
                 <x-forms.button wire:click="showEmailChangeForm" type="button" disabled>Change Email</x-forms.button>
             @endif
         </div>
+        @if ($uses_sso)
+            <div class="pt-2 text-sm dark:text-white">
+                Signed in with SSO
+                @if ($sso_provider_label)
+                    <span class="text-helper">({{ $sso_provider_label }})</span>
+                @endif
+                <span class="text-helper">Email is managed by your SSO provider.</span>
+            </div>
+        @endif
     </form>
 
     <div class="flex flex-col pt-4">
-        @if ($show_email_change)
+        @if (! $uses_sso && $show_email_change)
             <form wire:submit='requestEmailChange'>
                 <div class="flex gap-2 items-end">
                     <x-forms.input id="new_email" label="New Email Address" required type="email" />
@@ -34,7 +45,7 @@
             </form>
         @endif
 
-        @if ($show_verification)
+        @if (! $uses_sso && $show_verification)
             <form wire:submit='verifyEmailChange'>
                 <div class="flex gap-2 items-end">
                     <x-forms.input id="email_verification_code" label="Verification Code (6 digits)" required
