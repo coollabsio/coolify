@@ -1,3 +1,10 @@
+# documentation: https://snipe-it.readme.io/docs/introduction
+# slogan: Snipe-IT is an open-source asset management platform built for IT departments.
+# category: productivity
+# tags: inventory, open-source
+# logo: svgs/snipe-it.webp
+# port: 80
+
 services:
   app:
     image: "snipe/snipe-it:v8.5.0"
