@@ -73,6 +73,8 @@ class InstallDocker
 
             if ($supported_os_type->contains('debian')) {
                 $command = $command->merge([$this->getDebianDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('alpine')) {
+                $command = $command->merge([$this->getAlpineDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('rhel')) {
                 $command = $command->merge([$this->getRhelDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('sles')) {
@@ -120,7 +122,8 @@ class InstallDocker
             'install -m 0755 -d /etc/apt/keyrings && '.
             'curl -fsSL https://download.docker.com/linux/${ID}/gpg -o /etc/apt/keyrings/docker.asc && '.
             'chmod a+r /etc/apt/keyrings/docker.asc && '.
-            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
+            'CODENAME="${VERSION_CODENAME:-bookworm}" && if [ "$CODENAME" = "trixie" ] || [ -z "$CODENAME" ]; then CODENAME="bookworm"; fi && '.
+            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
             'apt-get update && '.
             'apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin'.
             ')';
@@ -157,5 +160,12 @@ class InstallDocker
     private function getGenericDockerInstallCommand(): string
     {
         return 'curl -fsSL https://get.docker.com | sh';
+    }
+
+    private function getAlpineDockerInstallCommand(): string
+    {
+        return 'apk add --update docker docker-cli-compose && '.
+            'rc-update add docker default && '.
+            'service docker start';
     }
 }
