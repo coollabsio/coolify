@@ -1,0 +1,75 @@
+services:
+  app:
+    image: "snipe/snipe-it:v8.5.0"
+    volumes:
+      - "storage:/var/lib/snipeit"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - SERVICE_URL_SNIPEIT_80
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - "APP_KEY=${APP_KEY:?}"
+      - "APP_URL=${SERVICE_URL_SNIPEIT}"
+      - "APP_TIMEZONE=${APP_TIMEZONE:?UTC}"
+      - "APP_LOCALE=${APP_LOCALE:?en-US}"
+      - "MAX_RESULTS=${MAX_RESULTS:?500}"
+      - PRIVATE_FILESYSTEM_DISK=local
+      - PUBLIC_FILESYSTEM_DISK=local_public
+      - DB_CONNECTION=mysql
+      - DB_HOST=db
+      - DB_SOCKET=null
+      - 'DB_PORT="3306"'
+      - DB_DATABASE=snipeit
+      - "DB_USERNAME=${DB_USERNAME:?${SERVICE_USER_MARIADB}}"
+      - "DB_PASSWORD=${DB_PASSWORD:?${SERVICE_PASSWORD_64_MARIADB}}"
+      - "MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:?${SERVICE_PASSWORD_64_ROOT}}"
+      - DB_PREFIX=null
+      - 'DB_DUMP_PATH="/usr/bin"'
+      - DB_DUMP_SKIP_SSL=true
+      - DB_CHARSET=utf8mb4
+      - DB_COLLATION=utf8mb4_unicode_ci
+      - DB_SSL=false
+      - DB_SSL_IS_PAAS=false
+      - DB_SSL_KEY_PATH=null
+      - DB_SSL_CERT_PATH=null
+      - DB_SSL_CA_PATH=null
+      - DB_SSL_CIPHER=null
+      - DB_SSL_VERIFY_SERVER=null
+      - "MAIL_MAILER=${MAIL_MAILER:?smtp}"
+      - "MAIL_HOST=${MAIL_HOST:?null}"
+      - "MAIL_PORT=${MAIL_PORT:?1025}"
+      - "MAIL_USERNAME=${MAIL_USERNAME:?null}"
+      - "MAIL_PASSWORD=${MAIL_PASSWORD:?null}"
+      - "MAIL_TLS_VERIFY_PEER=${MAIL_TLS_VERIFY_PEER:?true}"
+      - "MAIL_FROM_ADDR=${MAIL_FROM_ADDR:?you@example.com}"
+      - "MAIL_FROM_NAME=${MAIL_FROM_NAME:?Snipe-IT}"
+      - "MAIL_REPLYTO_ADDR=${MAIL_REPLYTO_ADDR:?you@example.com}"
+      - "MAIL_REPLYTO_NAME=${MAIL_REPLYTO_NAME:?Snipe-IT}"
+      - "MAIL_AUTO_EMBED_METHOD=${MAIL_AUTO_EMBED_METHOD:?attachment}"
+      - "ALLOW_BACKUP_DELETE=${ALLOW_BACKUP_DELETE:-false}"
+      - "ALLOW_DATA_PURGE=${ALLOW_DATA_PURGE:-false}"
+      - "IMAGE_LIB=${IMAGE_LIB:?gd}"
+      - MAIL_BACKUP_NOTIFICATION_DRIVER=null
+      - MAIL_BACKUP_NOTIFICATION_ADDRESS=null
+      - BACKUP_ENV=true
+
+  db:
+    image: "mariadb:11.4.7"
+    volumes:
+      - "db_data:/var/lib/mysql"
+    environment:
+      - MYSQL_DATABASE=snipeit
+      - "MYSQL_USER=${MYSQL_USER:?${SERVICE_USER_MARIADB}}"
+      - "MYSQL_PASSWORD=${MYSQL_PASSWORD:?${SERVICE_PASSWORD_64_MARIADB}}"
+      - "MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:?${SERVICE_PASSWORD_64_ROOT}}"
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - "--connect"
+        - "--innodb_initialized"
+      interval: 5s
+      timeout: 1s
+      retries: 5
