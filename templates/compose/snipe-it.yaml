@@ -108,6 +108,15 @@ services:
       - "GOOGLE_MAPS_API=${GOOGLE_MAPS_API:-}"
       - "LDAP_MEM_LIM=${LDAP_MEM_LIM:-500M}"
       - "LDAP_TIME_LIM=${LDAP_TIME_LIM:-600}"
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - "-f"
+        - "http://localhost/health"
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   db:
     image: "mariadb:11.4.7"
