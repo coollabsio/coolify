@@ -18,12 +18,14 @@ class Subscription extends Model
         'stripe_trial_already_ended',
         'stripe_past_due',
         'stripe_refunded_at',
+        'ended_at',
     ];
 
     protected function casts(): array
     {
         return [
             'stripe_refunded_at' => 'datetime',
+            'ended_at' => 'datetime',
         ];
     }
 

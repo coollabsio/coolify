@@ -51,6 +51,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                         $stripe->subscriptions->cancel($subscriptionId, []);
                         $subscription->update([
                             'stripe_invoice_paid' => false,
+                            'ended_at' => now(),
                         ]);
                         send_internal_notification("Early fraud warning created Refunded, subscription canceled. Charge: {$charge}, id: {$id}, pi: {$pi}");
                     } else {
@@ -81,8 +82,10 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                             'stripe_customer_id' => $customerId,
                             'stripe_invoice_paid' => true,
                             'stripe_past_due' => false,
+                            'ended_at' => null,
                         ]
                     );
+                    $team->subscriptionActivated();
                     break;
                 case 'invoice.paid':
                     $customerId = data_get($data, 'customer');
@@ -110,7 +113,9 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                                     $subscription->update([
                                         'stripe_invoice_paid' => true,
                                         'stripe_past_due' => false,
+                                        'ended_at' => null,
                                     ]);
+                                    $subscription->team?->subscriptionActivated();
                                     break;
 
                                 case 'past_due':
@@ -279,6 +284,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                         if ($subscription->stripe_subscription_id === $subscriptionId) {
                             $subscription->update([
                                 'stripe_invoice_paid' => false,
+                                'ended_at' => $subscription->ended_at ?? now(),
                             ]);
                         }
                     }
@@ -310,7 +316,9 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                             $subscription->update([
                                 'stripe_past_due' => false,
                                 'stripe_invoice_paid' => true,
+                                'ended_at' => null,
                             ]);
+                            $subscription->team?->subscriptionActivated();
                         }
                     }
                     if ($feedback) {

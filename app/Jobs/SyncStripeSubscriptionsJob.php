@@ -9,6 +9,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Stripe\StripeClient;
 
 class SyncStripeSubscriptionsJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -33,7 +34,7 @@ class SyncStripeSubscriptionsJob implements ShouldBeEncrypted, ShouldQueue
             ->where('stripe_invoice_paid', true)
             ->get();
 
-        $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
+        $stripe = new StripeClient(config('subscription.stripe_api_key'));
 
         // Bulk fetch all valid subscription IDs from Stripe (active + past_due)
         $validStripeIds = $this->fetchValidStripeSubscriptionIds($stripe, $onProgress);
@@ -93,6 +94,7 @@ class SyncStripeSubscriptionsJob implements ShouldBeEncrypted, ShouldQueue
                 $subscription->update([
                     'stripe_invoice_paid' => false,
                     'stripe_past_due' => false,
+                    'ended_at' => $subscription->ended_at ?? now(),
                 ]);
 
                 if ($stripeStatus === 'canceled') {
@@ -123,7 +125,7 @@ class SyncStripeSubscriptionsJob implements ShouldBeEncrypted, ShouldQueue
      *
      * @return array{email: string, customer_id: string, subscription_id: string, status: string}|null
      */
-    private function findActiveSubscriptionByEmail(\Stripe\StripeClient $stripe, string $customerId): ?array
+    private function findActiveSubscriptionByEmail(StripeClient $stripe, string $customerId): ?array
     {
         try {
             $customer = $stripe->customers->retrieve($customerId);
@@ -177,7 +179,7 @@ class SyncStripeSubscriptionsJob implements ShouldBeEncrypted, ShouldQueue
      *
      * @return array<string>
      */
-    private function fetchValidStripeSubscriptionIds(\Stripe\StripeClient $stripe, ?\Closure $onProgress = null): array
+    private function fetchValidStripeSubscriptionIds(StripeClient $stripe, ?\Closure $onProgress = null): array
     {
         $validIds = [];
         $fetched = 0;

@@ -47,10 +47,12 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'personal_team',
         'show_boarding',
         'custom_server_limit',
+        'is_inactive',
     ];
 
     protected $casts = [
         'personal_team' => 'boolean',
+        'is_inactive' => 'boolean',
     ];
 
     protected static function booted()
@@ -229,6 +231,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             'stripe_invoice_paid' => false,
             'stripe_trial_already_ended' => false,
             'stripe_past_due' => false,
+            'ended_at' => $this->subscription->ended_at ?? now(),
         ]);
         foreach ($this->servers as $server) {
             $server->settings()->update([
@@ -240,6 +243,17 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $server->unreachable_notification_sent = true;
             $server->save();
         }
+    }
+
+    public function subscriptionActivated(): void
+    {
+        if ($this->is_inactive) {
+            $this->update(['is_inactive' => false]);
+        }
+
+        User::whereIn('id', $this->members()->select('users.id'))
+            ->where('is_inactive', true)
+            ->update(['is_inactive' => false]);
     }
 
     public function environment_variables()
