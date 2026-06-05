@@ -195,6 +195,8 @@ function extractCustomProxyCommands(Server $server, string $existing_config): ar
             '--entrypoints.https.http.encodequerysemicolons=',
             '--entryPoints.https.http2.maxConcurrentStreams=',
             '--entrypoints.https.http3',
+            '--entrypoints.http-dest',
+            '--entrypoints.https-dest',
             '--providers.file.',
             '--certificatesresolvers.',
             '--providers.docker',
@@ -251,6 +253,31 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
         }
     }
 
+    // Destinations with a custom bind_ip get their own Traefik entrypoint
+    // bound to that host IP. Swarm uses routing mesh and is not supported here.
+    $boundDestinations = $server->isSwarm()
+        ? collect()
+        : $server->standaloneDockers()->whereNotNull('bind_ip')->get();
+
+    $extraEntrypointCommands = [];
+    $extraPortMappings = [];
+    foreach ($boundDestinations as $boundDestination) {
+        $suffix = $boundDestination->traefikEntrypointSuffix();
+        if (! $suffix) {
+            continue;
+        }
+        $httpPort = $boundDestination->traefikInternalHttpPort();
+        $httpsPort = $boundDestination->traefikInternalHttpsPort();
+
+        $extraEntrypointCommands[] = "--entrypoints.http-{$suffix}.address=:{$httpPort}";
+        $extraEntrypointCommands[] = "--entrypoints.https-{$suffix}.address=:{$httpsPort}";
+        $extraEntrypointCommands[] = "--entrypoints.http-{$suffix}.http.encodequerysemicolons=true";
+        $extraEntrypointCommands[] = "--entrypoints.https-{$suffix}.http.encodequerysemicolons=true";
+
+        $extraPortMappings[] = "{$boundDestination->bind_ip}:80:{$httpPort}";
+        $extraPortMappings[] = "{$boundDestination->bind_ip}:443:{$httpsPort}";
+    }
+
     $array_of_networks = collect([]);
     $filtered_networks = collect([]);
     $networks->map(function ($network) use ($array_of_networks, $filtered_networks) {
@@ -272,6 +299,18 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
             'coolify.managed=true',
             'coolify.proxy=true',
         ];
+
+        // When any destination claims a specific host IP, Docker's userland proxy
+        // refuses to also bind 0.0.0.0:80/443, so the default 80/443 mappings
+        // must be pinned to the server's primary IP to coexist with them.
+        $defaultPortPrefix = (! empty($extraPortMappings) && filled($server->ip)) ? "{$server->ip}:" : '';
+        $defaultPorts = [
+            "{$defaultPortPrefix}80:80",
+            "{$defaultPortPrefix}443:443",
+            "{$defaultPortPrefix}443:443/udp",
+            '8080:8080',
+        ];
+
         $config = [
             'name' => 'coolify-proxy',
             'networks' => $array_of_networks->toArray(),
@@ -284,12 +323,7 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
                         'host.docker.internal:host-gateway',
                     ],
                     'networks' => $filtered_networks->toArray(),
-                    'ports' => [
-                        '80:80',
-                        '443:443',
-                        '443:443/udp',
-                        '8080:8080',
-                    ],
+                    'ports' => $defaultPorts,
                     'healthcheck' => [
                         'test' => 'wget -qO- http://localhost:80/ping || exit 1',
                         'interval' => '4s',
@@ -321,6 +355,18 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
                 ],
             ],
         ];
+        if (! empty($extraPortMappings)) {
+            $config['services']['traefik']['ports'] = array_merge(
+                $config['services']['traefik']['ports'],
+                $extraPortMappings,
+            );
+        }
+        if (! empty($extraEntrypointCommands)) {
+            $config['services']['traefik']['command'] = array_merge(
+                $config['services']['traefik']['command'],
+                $extraEntrypointCommands,
+            );
+        }
         if (isDev()) {
             $config['services']['traefik']['command'][] = '--api.insecure=true';
             $config['services']['traefik']['command'][] = '--log.level=debug';
