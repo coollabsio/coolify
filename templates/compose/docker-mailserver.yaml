@@ -1,0 +1,38 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Production-ready fullstack mail server (SMTP, IMAP, LDAP, Antispam, Antivirus) using Docker Mailserver.
+# category: email
+# tags: mail, email, smtp, imap, postfix, dovecot, rspamd, clamav
+# logo: svgs/docker-mailserver.svg
+
+services:
+  mailserver:
+    image: mailserver/docker-mailserver:latest
+    hostname: ${SERVICE_FQDN_MAILSERVER}
+    environment:
+      - OVERRIDE_HOSTNAME=${SERVICE_FQDN_MAILSERVER}
+      - ENABLE_RSPAMD=1
+      - ENABLE_CLAMAV=1
+      - ENABLE_FAIL2BAN=1
+      - SPOOF_PROTECTION=1
+      - POSTMASTER_ADDRESS=postmaster@${SERVICE_FQDN_MAILSERVER}
+      - TZ=${TZ:-UTC}
+    ports:
+      - "25:25"
+      - "143:143"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    volumes:
+      - mail-data:/var/mail
+      - mail-state:/var/mail-state
+      - mail-logs:/var/log/mail
+      - mail-config:/tmp/docker-mailserver
+      - /etc/localtime:/etc/localtime:ro
+    cap_add:
+      - NET_ADMIN
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "ss --listening --tcp | grep -P 'LISTEN.+:smtp' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
