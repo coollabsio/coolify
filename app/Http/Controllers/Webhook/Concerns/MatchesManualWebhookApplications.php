@@ -79,7 +79,7 @@ trait MatchesManualWebhookApplications
 
         if (is_array($parts) && isset($parts['scheme'])) {
             $path = data_get($parts, 'path');
-        } elseif (Str::startsWith($gitRepository, 'git@') && str_contains($gitRepository, ':')) {
+        } elseif (preg_match('/\A[A-Za-z0-9_.-]+@[^:\s]+:.+\z/', $gitRepository)) {
             $path = Str::after($gitRepository, ':');
             // scp-style SSH URLs embed a custom port as "git@host:2222/owner/repo".
             // Strip the leading numeric port segment so the path matches the webhook
