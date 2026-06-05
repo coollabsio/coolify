@@ -2498,6 +2498,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 if (! $isDatabase && $fqdns->count() > 0) {
                     if ($fqdns) {
                         $shouldGenerateLabelsExactly = $resource->server->settings->generate_exact_labels;
+                        $entrypointSuffix = getTraefikEntrypointSuffixForDestination($resource->destination);
                         if ($shouldGenerateLabelsExactly) {
                             switch ($resource->server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:
@@ -2509,7 +2510,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         is_gzip_enabled: $savedService->isGzipEnabled(),
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                         service_name: $serviceName,
-                                        image: data_get($service, 'image')
+                                        image: data_get($service, 'image'),
+                                        entrypoint_suffix: $entrypointSuffix,
                                     ));
                                     break;
                                 case ProxyTypes::CADDY->value:
@@ -2535,7 +2537,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 is_gzip_enabled: $savedService->isGzipEnabled(),
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                 service_name: $serviceName,
-                                image: data_get($service, 'image')
+                                image: data_get($service, 'image'),
+                                entrypoint_suffix: $entrypointSuffix,
                             ));
                             $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                                 network: $resource->destination->network,
@@ -3272,6 +3275,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             }
                         }
                         $shouldGenerateLabelsExactly = $server->settings->generate_exact_labels;
+                        $entrypointSuffix = getTraefikEntrypointSuffixForDestination($resource->destination);
                         if ($shouldGenerateLabelsExactly) {
                             switch ($server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:
@@ -3285,6 +3289,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                            entrypoint_suffix: $entrypointSuffix,
                                         )
                                     );
                                     break;
@@ -3314,6 +3319,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                    entrypoint_suffix: $entrypointSuffix,
                                 )
                             );
                             $serviceLabels = $serviceLabels->merge(
