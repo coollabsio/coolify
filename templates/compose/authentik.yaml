@@ -30,6 +30,8 @@ services:
       - ./media:/media
       - ./custom-templates:/templates
     depends_on:
+      authentik-permissions:
+        condition: service_completed_successfully
       postgresql:
         condition: service_healthy
   authentik-worker:
@@ -64,8 +66,24 @@ services:
       - ./certs:/certs
       - ./custom-templates:/templates
     depends_on:
+      authentik-permissions:
+        condition: service_completed_successfully
       postgresql:
         condition: service_healthy
+  authentik-permissions:
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2025.10.3}
+    restart: no
+    exclude_from_hc: true
+    user: root
+    entrypoint:
+      - /usr/bin/env
+      - bash
+      - -ec
+    command: |
+      chown -R authentik:authentik /templates
+      chmod -R u+rwX,g+rwX /templates
+    volumes:
+      - ./custom-templates:/templates
   postgresql:
     image: postgres:16-alpine
     restart: unless-stopped
