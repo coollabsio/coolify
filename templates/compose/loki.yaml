@@ -1,0 +1,71 @@
+# documentation: https://grafana.com/docs/loki/latest/
+# slogan: Horizontally scalable log aggregation system from Grafana Labs.
+# category: monitoring
+# tags: loki,logs,logging,grafana,observability,monitoring
+# logo: svgs/loki.svg
+# port: 3100
+
+services:
+  loki:
+    image: grafana/loki:latest
+    command:
+      - -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - loki-data:/loki
+      - type: bind
+        source: ./loki-config.yaml
+        target: /etc/loki/loki-config.yaml
+        read_only: true
+        content: |
+          auth_enabled: false
+
+          server:
+            http_listen_port: 3100
+            grpc_listen_port: 9096
+
+          common:
+            path_prefix: /loki
+            replication_factor: 1
+            ring:
+              kvstore:
+                store: inmemory
+            storage:
+              filesystem:
+                chunks_directory: /loki/chunks
+                rules_directory: /loki/rules
+
+          schema_config:
+            configs:
+              - from: 2024-01-01
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: index_
+                  period: 24h
+
+          storage_config:
+            tsdb_shipper:
+              active_index_directory: /loki/tsdb-index
+              cache_location: /loki/tsdb-cache
+
+          query_range:
+            results_cache:
+              cache:
+                embedded_cache:
+                  enabled: true
+                  max_size_mb: 100
+
+          ruler:
+            storage:
+              type: local
+              local:
+                directory: /loki/rules
+
+          analytics:
+            reporting_enabled: false
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3100/ready || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

@@ -2700,6 +2700,23 @@
         "logo": "svgs/logto_dark.svg",
         "minversion": "0.0.0"
     },
+    "loki": {
+        "documentation": "https://grafana.com/docs/loki/latest/?utm_source=coolify.io",
+        "slogan": "Horizontally scalable log aggregation system from Grafana Labs.",
+        "compose": "c2VydmljZXM6CiAgbG9raToKICAgIGltYWdlOiAnZ3JhZmFuYS9sb2tpOmxhdGVzdCcKICAgIGNvbW1hbmQ6CiAgICAgIC0gJy1jb25maWcuZmlsZT0vZXRjL2xva2kvbG9raS1jb25maWcueWFtbCcKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2xva2ktZGF0YTovbG9raScKICAgICAgLQogICAgICAgIHR5cGU6IGJpbmQKICAgICAgICBzb3VyY2U6IC4vbG9raS1jb25maWcueWFtbAogICAgICAgIHRhcmdldDogL2V0Yy9sb2tpL2xva2ktY29uZmlnLnlhbWwKICAgICAgICByZWFkX29ubHk6IHRydWUKICAgICAgICBjb250ZW50OiAiYXV0aF9lbmFibGVkOiBmYWxzZVxuXG5zZXJ2ZXI6XG4gIGh0dHBfbGlzdGVuX3BvcnQ6IDMxMDBcbiAgZ3JwY19saXN0ZW5fcG9ydDogOTA5NlxuXG5jb21tb246XG4gIHBhdGhfcHJlZml4OiAvbG9raVxuICByZXBsaWNhdGlvbl9mYWN0b3I6IDFcbiAgcmluZzpcbiAgICBrdnN0b3JlOlxuICAgICAgc3RvcmU6IGlubWVtb3J5XG4gIHN0b3JhZ2U6XG4gICAgZmlsZXN5c3RlbTpcbiAgICAgIGNodW5rc19kaXJlY3Rvcnk6IC9sb2tpL2NodW5rc1xuICAgICAgcnVsZXNfZGlyZWN0b3J5OiAvbG9raS9ydWxlc1xuXG5zY2hlbWFfY29uZmlnOlxuICBjb25maWdzOlxuICAgIC0gZnJvbTogMjAyNC0wMS0wMVxuICAgICAgc3RvcmU6IHRzZGJcbiAgICAgIG9iamVjdF9zdG9yZTogZmlsZXN5c3RlbVxuICAgICAgc2NoZW1hOiB2MTNcbiAgICAgIGluZGV4OlxuICAgICAgICBwcmVmaXg6IGluZGV4X1xuICAgICAgICBwZXJpb2Q6IDI0aFxuXG5zdG9yYWdlX2NvbmZpZzpcbiAgdHNkYl9zaGlwcGVyOlxuICAgIGFjdGl2ZV9pbmRleF9kaXJlY3Rvcnk6IC9sb2tpL3RzZGItaW5kZXhcbiAgICBjYWNoZV9sb2NhdGlvbjogL2xva2kvdHNkYi1jYWNoZVxuXG5xdWVyeV9yYW5nZTpcbiAgcmVzdWx0c19jYWNoZTpcbiAgICBjYWNoZTpcbiAgICAgIGVtYmVkZGVkX2NhY2hlOlxuICAgICAgICBlbmFibGVkOiB0cnVlXG4gICAgICAgIG1heF9zaXplX21iOiAxMDBcblxucnVsZXI6XG4gIHN0b3JhZ2U6XG4gICAgdHlwZTogbG9jYWxcbiAgICBsb2NhbDpcbiAgICAgIGRpcmVjdG9yeTogL2xva2kvcnVsZXNcblxuYW5hbHl0aWNzOlxuICByZXBvcnRpbmdfZW5hYmxlZDogZmFsc2UiCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ3dnZXQgLXEgLS1zcGlkZXIgaHR0cDovLzEyNy4wLjAuMTozMTAwL3JlYWR5IHx8IGV4aXQgMScKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "tags": [
+            "loki",
+            "logs",
+            "logging",
+            "grafana",
+            "observability",
+            "monitoring"
+        ],
+        "category": "monitoring",
+        "logo": "svgs/loki.svg",
+        "minversion": "0.0.0",
+        "port": "3100"
+    },
     "lowcoder": {
         "documentation": "https://docs.lowcoder.cloud/?utm_source=coolify.io",
         "slogan": "Lowcoder (forked from OpenBlocks) is a self-hosted, open-source, low-code platform for building internal tools.",
