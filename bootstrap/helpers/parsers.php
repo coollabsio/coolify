@@ -1321,6 +1321,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $shouldGenerateLabelsExactly = $resource->destination->server->settings->generate_exact_labels;
             $labelUuid = $resource->uuid;
             $labelNetwork = data_get($resource, 'destination.network');
+            $entrypointSuffix = getTraefikEntrypointSuffixForDestination($resource->destination);
             if ($isPullRequest) {
                 $labelUuid = "{$resource->uuid}-{$pullRequestId}";
             }
@@ -1338,7 +1339,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
-                            image: $image
+                            image: $image,
+                            entrypoint_suffix: $entrypointSuffix,
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -1365,7 +1367,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
-                    image: $image
+                    image: $image,
+                    entrypoint_suffix: $entrypointSuffix,
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $labelNetwork,
@@ -2598,6 +2601,7 @@ function serviceParser(Service $resource): Collection
             $shouldGenerateLabelsExactly = $resource->server->settings->generate_exact_labels;
             $uuid = $resource->uuid;
             $network = data_get($resource, 'destination.network');
+            $entrypointSuffix = getTraefikEntrypointSuffixForDestination($resource->destination);
             if ($shouldGenerateLabelsExactly) {
                 switch ($server->proxyType()) {
                     case ProxyTypes::TRAEFIK->value:
@@ -2609,7 +2613,8 @@ function serviceParser(Service $resource): Collection
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
-                            image: $image
+                            image: $image,
+                            entrypoint_suffix: $entrypointSuffix,
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -2636,7 +2641,8 @@ function serviceParser(Service $resource): Collection
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
-                    image: $image
+                    image: $image,
+                    entrypoint_suffix: $entrypointSuffix,
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $network,

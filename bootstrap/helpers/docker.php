@@ -5,6 +5,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceApplication;
+use App\Models\StandaloneDocker;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
@@ -411,8 +412,11 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     return $labels->sort();
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?string $entrypoint_suffix = null)
 {
+    $http_entrypoint = filled($entrypoint_suffix) ? "http-{$entrypoint_suffix}" : 'http';
+    $https_entrypoint = filled($entrypoint_suffix) ? "https-{$entrypoint_suffix}" : 'https';
+
     $labels = collect([]);
     $labels->push('traefik.enable=true');
     if ($is_gzip_enabled) {
@@ -499,7 +503,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             if ($schema === 'https') {
                 // Set labels for https
                 $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
-                $labels->push("traefik.http.routers.{$https_label}.entryPoints=https");
+                $labels->push("traefik.http.routers.{$https_label}.entryPoints={$https_entrypoint}");
                 if ($port) {
                     $labels->push("traefik.http.routers.{$https_label}.service={$https_label}");
                     $labels->push("traefik.http.services.{$https_label}.loadbalancer.server.port=$port");
@@ -567,7 +571,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
 
                 // Set labels for http (redirect to https)
                 $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
-                $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
+                $labels->push("traefik.http.routers.{$http_label}.entryPoints={$http_entrypoint}");
                 if ($port) {
                     $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
                     $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
@@ -578,7 +582,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             } else {
                 // Set labels for http
                 $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
-                $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
+                $labels->push("traefik.http.routers.{$http_label}.entryPoints={$http_entrypoint}");
                 if ($port) {
                     $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
                     $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
@@ -648,6 +652,15 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
 
     return $labels->sort();
 }
+function getTraefikEntrypointSuffixForDestination($destination): ?string
+{
+    if ($destination instanceof StandaloneDocker) {
+        return $destination->traefikEntrypointSuffix();
+    }
+
+    return null;
+}
+
 function generateLabelsApplication(Application $application, ?ApplicationPreview $preview = null): array
 {
     $ports = $application->settings->is_static ? [80] : $application->ports_exposes_array;
@@ -660,6 +673,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     if ($pull_request_id !== 0) {
         $appUuid = $appUuid.'-pr-'.$pull_request_id;
     }
+    $entrypoint_suffix = getTraefikEntrypointSuffixForDestination($application->destination);
     $labels = collect([]);
     if ($pull_request_id === 0) {
         if ($application->fqdn) {
@@ -679,6 +693,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
+                            entrypoint_suffix: $entrypoint_suffix,
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -709,6 +724,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
+                    entrypoint_suffix: $entrypoint_suffix,
                 ));
                 $labels = $labels->merge(fqdnLabelsForCaddy(
                     network: $application->destination->network,
@@ -745,6 +761,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
+                        entrypoint_suffix: $entrypoint_suffix,
                     ));
                     break;
                 case ProxyTypes::CADDY->value:
@@ -773,6 +790,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
+                entrypoint_suffix: $entrypoint_suffix,
             ));
             $labels = $labels->merge(fqdnLabelsForCaddy(
                 network: $application->destination->network,
