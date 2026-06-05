@@ -189,3 +189,40 @@ it('identifies none as not predefined (per codebase pattern)', function () {
     // only filters 'default' and 'host', so we maintain consistency
     expect(isDockerPredefinedNetwork('none'))->toBeFalse();
 });
+
+it('creates standalone proxy networks with ipv6 first and ipv4 fallback', function () {
+    $command = createStandaloneProxyNetworkCommand('coolify');
+
+    expect($command)
+        ->toContain("docker network create --ipv6 --attachable 'coolify'")
+        ->toContain("|| docker network create --attachable 'coolify'")
+        ->toContain('2>/dev/null');
+});
+
+it('keeps standalone proxy network creation quiet when requested', function () {
+    $command = createStandaloneProxyNetworkCommand('coolify', quiet: true);
+
+    expect($command)
+        ->toContain("docker network create --ipv6 --attachable 'coolify' >/dev/null 2>&1")
+        ->toContain("|| docker network create --attachable 'coolify' >/dev/null");
+});
+
+it('warns when an existing standalone proxy network is ipv4 only', function () {
+    $command = warnIfStandaloneProxyNetworkIsIpv4OnlyCommand('coolify');
+
+    expect($command)
+        ->toContain("docker network inspect -f '{{.EnableIPv6}}' 'coolify'")
+        ->toContain("= 'false'")
+        ->toContain('IPv4-only')
+        ->toContain('X-Forwarded-For');
+});
+
+it('ensures standalone proxy networks without failing hosts that do not support ipv6', function () {
+    $command = ensureStandaloneProxyNetworkCommand('coolify');
+
+    expect($command)
+        ->toStartWith("if docker network ls --format '{{.Name}}' | grep -qxF -- 'coolify'; then")
+        ->toContain("docker network create --ipv6 --attachable 'coolify'")
+        ->toContain("|| docker network create --attachable 'coolify'")
+        ->toEndWith('fi');
+});

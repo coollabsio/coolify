@@ -105,6 +105,31 @@ function collectDockerNetworksByServer(Server $server)
         'allNetworks' => $allNetworks,
     ];
 }
+
+function createStandaloneProxyNetworkCommand(string $network, bool $quiet = false): string
+{
+    $safe = escapeshellarg($network);
+    $firstRedirect = $quiet ? ' >/dev/null 2>&1' : ' 2>/dev/null';
+    $fallbackRedirect = $quiet ? ' >/dev/null' : '';
+
+    return "docker network create --ipv6 --attachable {$safe}{$firstRedirect} || docker network create --attachable {$safe}{$fallbackRedirect}";
+}
+
+function warnIfStandaloneProxyNetworkIsIpv4OnlyCommand(string $network): string
+{
+    $safe = escapeshellarg($network);
+    $message = escapeshellarg("Warning: Docker network {$network} is IPv4-only. Recreate it with IPv6 enabled to preserve real IPv6 client IPs in X-Forwarded-For.");
+
+    return "if [ \"$(docker network inspect -f '{{.EnableIPv6}}' {$safe} 2>/dev/null)\" = 'false' ]; then echo {$message}; fi";
+}
+
+function ensureStandaloneProxyNetworkCommand(string $network, bool $quiet = false): string
+{
+    $safe = escapeshellarg($network);
+
+    return "if docker network ls --format '{{.Name}}' | grep -qxF -- {$safe}; then ".warnIfStandaloneProxyNetworkIsIpv4OnlyCommand($network).'; else '.createStandaloneProxyNetworkCommand($network, $quiet).'; fi';
+}
+
 function connectProxyToNetworks(Server $server)
 {
     ['networks' => $networks] = collectDockerNetworksByServer($server);
@@ -123,7 +148,7 @@ function connectProxyToNetworks(Server $server)
             $safe = escapeshellarg($network);
 
             return [
-                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --attachable {$safe} >/dev/null",
+                ensureStandaloneProxyNetworkCommand($network, true),
                 "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
@@ -159,7 +184,7 @@ function ensureProxyNetworksExist(Server $server)
 
             return [
                 "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable {$safe}",
+                ensureStandaloneProxyNetworkCommand($network),
             ];
         });
     }
