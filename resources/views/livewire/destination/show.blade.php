@@ -29,5 +29,12 @@
                 <x-forms.input id="network" label="Docker Network" readonly />
             @endif
         </div>
+        @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker' && ! $destination->server->isSwarm())
+            <div class="flex gap-2 pt-2">
+                <x-forms.input canGate="update" :canResource="$destination" id="bindIp" label="Bind IP (optional)"
+                    placeholder="e.g. 192.168.1.10"
+                    helper="Bind deployments on this destination to a specific host IP via a dedicated Traefik entrypoint. Use for LAN-only or multi-homed setups. Leave empty to use the server's primary IP. Changing this restarts the proxy. LAN IPs cannot use Let's Encrypt — provide your own certificate via dynamic configuration. Note: macOS Docker hosts (Docker Desktop, OrbStack) cannot enforce per-IP port bindings; this feature only isolates traffic correctly on Linux." />
+            </div>
+        @endif
     </form>
 </div>

@@ -12,6 +12,8 @@
                     <option value="{{ $server->id }}">{{ $server->name }}</option>
                 @endforeach
             </x-forms.select>
+            <x-forms.input id="bindIp" label="Bind IP (optional)" placeholder="e.g. 192.168.1.10"
+                helper="Bind deployments on this destination to a specific host IP via a dedicated Traefik entrypoint. Use for LAN-only or multi-homed setups. Leave empty to use the server's primary IP. LAN IPs cannot use Let's Encrypt — provide your own certificate via dynamic configuration. Note: macOS Docker hosts (Docker Desktop, OrbStack) cannot enforce per-IP port bindings; this feature only isolates traffic correctly on Linux." />
             <x-forms.button type="submit">
                 Continue
             </x-forms.button>
