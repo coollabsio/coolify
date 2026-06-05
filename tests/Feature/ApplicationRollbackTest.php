@@ -86,6 +86,35 @@ describe('Application Rollback', function () {
         expect($result)->not->toContain('advice.detachedHead=false checkout');
     });
 
+    test('setGitImportSettings skips git lfs smudge when git lfs is disabled', function () {
+        $this->application->git_commit_sha = 'abc123def456abc123def456abc123def456abc1';
+
+        $result = $this->application->setGitImportSettings(
+            deployment_uuid: 'test-uuid',
+            git_clone_command: 'git clone',
+            public: true,
+        );
+
+        expect($result)
+            ->toStartWith('export GIT_LFS_SKIP_SMUDGE=1 && git clone')
+            ->toContain("checkout 'abc123def456abc123def456abc123def456abc1'")
+            ->not->toContain('git lfs pull');
+    });
+
+    test('setGitImportSettings keeps git lfs smudge enabled when git lfs is enabled', function () {
+        $this->application->settings->is_git_lfs_enabled = true;
+
+        $result = $this->application->setGitImportSettings(
+            deployment_uuid: 'test-uuid',
+            git_clone_command: 'git clone',
+            public: true,
+        );
+
+        expect($result)
+            ->not->toContain('GIT_LFS_SKIP_SMUDGE')
+            ->toContain('git lfs pull');
+    });
+
     test('setGitImportSettings uses provided git_ssh_command for fetch', function () {
         $this->application->settings->is_git_shallow_clone_enabled = true;
         $rollbackCommit = 'abc123def456abc123def456abc123def456abc1';

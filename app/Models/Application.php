@@ -1295,6 +1295,7 @@ class Application extends BaseModel
         $baseDir = $this->generateBaseDir($deployment_uuid);
         $escapedBaseDir = escapeshellarg($baseDir);
         $isShallowCloneEnabled = $this->settings?->is_git_shallow_clone_enabled ?? false;
+        $isGitLfsEnabled = $this->settings?->is_git_lfs_enabled ?? false;
         $gitCommand = $gitConfigOptions ? "git {$gitConfigOptions}" : 'git';
 
         $resolvedGitSshCommand = $git_ssh_command ?? $gitSshCommand;
@@ -1303,6 +1304,10 @@ class Application extends BaseModel
                 ? $resolvedGitSshCommand
                 : 'GIT_SSH_COMMAND="'.$resolvedGitSshCommand.'"')
             : 'GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"';
+
+        if (! $isGitLfsEnabled) {
+            $git_clone_command = "export GIT_LFS_SKIP_SMUDGE=1 && {$git_clone_command}";
+        }
 
         // Use the explicitly passed commit (e.g. from rollback), falling back to the application's git_commit_sha.
         // Invalid refs will cause the git checkout/fetch command to fail on the remote server.
@@ -1328,7 +1333,7 @@ class Application extends BaseModel
             $submoduleFlags = $isShallowCloneEnabled ? '--depth=1' : '';
             $git_clone_command = "{$git_clone_command} {$gitCommand} submodule sync && {$sshCommand} {$gitCommand} submodule update --init --recursive {$submoduleFlags}; fi";
         }
-        if ($this->settings->is_git_lfs_enabled) {
+        if ($isGitLfsEnabled) {
             $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} {$gitCommand} lfs pull";
         }
 
