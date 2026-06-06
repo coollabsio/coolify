@@ -1,6 +1,9 @@
 <div>
     <div class="flex items-center gap-2">
         <h1>Destination</h1>
+        <a {{ wireNavigate() }} href="{{ route('destination.index', ['server' => $destination->server->uuid]) }}">
+            <x-forms.button>Back</x-forms.button>
+        </a>
     </div>
     <div class="subtitle">Resources deployed to this Docker network.</div>
 

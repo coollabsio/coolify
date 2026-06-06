@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Destination;
 
+use App\Models\DockerNetwork;
 use App\Models\StandaloneDocker;
+use App\Services\Docker\DockerNetworkManager;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -65,19 +67,33 @@ class Show extends Component
         }
     }
 
-    public function delete()
+    public function delete(?string $password = null, array $selectedActions = [])
     {
         try {
             $this->authorize('delete', $this->destination);
+            $network = null;
 
             if ($this->destination->getMorphClass() === StandaloneDocker::class) {
-                if ($this->destination->attachedTo()) {
-                    return $this->dispatch('error', 'You must delete all resources before deleting this destination.');
+                $deleteNetwork = in_array('deleteNetwork', $selectedActions, true);
+
+                if (! $deleteNetwork && $this->destination->attachedTo()) {
+                    return $this->dispatch('error', 'You must delete all resources before removing this destination.');
                 }
-                $safeNetwork = escapeshellarg($this->destination->network);
-                instant_remote_process(["docker network disconnect {$safeNetwork} coolify-proxy"], $this->destination->server, throwError: false);
-                instant_remote_process(["docker network rm -f {$safeNetwork}"], $this->destination->server);
+
+                $network = DockerNetwork::query()
+                    ->byServer($this->destination->server)
+                    ->byName($this->destination->network)
+                    ->first();
+
+                if (! $deleteNetwork) {
+                    $network?->update(['available_during_creation' => false]);
+                }
             }
+
+            if ($network && ($deleteNetwork ?? false)) {
+                app(DockerNetworkManager::class)->deleteWithDestination($network);
+            }
+
             $this->destination->delete();
 
             return redirect()->route('destination.index');

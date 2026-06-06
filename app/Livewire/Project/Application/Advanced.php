@@ -3,7 +3,9 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
+use App\Models\DockerNetwork;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Validate;
@@ -87,6 +89,8 @@ class Advanced extends Component
     #[Validate(['boolean'])]
     public bool $isConnectToDockerNetworkEnabled = false;
 
+    public ?string $predefinedNetwork = null;
+
     #[Validate(['integer', 'min:0'])]
     public int $maxRestartCount = 10;
 
@@ -103,6 +107,7 @@ class Advanced extends Component
     {
         if ($toModel) {
             $this->validate();
+            $this->validatePredefinedNetwork();
             $this->application->settings->is_force_https_enabled = $this->isForceHttpsEnabled;
             $this->application->settings->is_git_submodules_enabled = $this->isGitSubmodulesEnabled;
             $this->application->settings->is_git_lfs_enabled = $this->isGitLfsEnabled;
@@ -123,6 +128,7 @@ class Advanced extends Component
             $this->application->settings->is_stripprefix_enabled = $this->isStripprefixEnabled;
             $this->application->settings->is_raw_compose_deployment_enabled = $this->isRawComposeDeploymentEnabled;
             $this->application->settings->connect_to_docker_network = $this->isConnectToDockerNetworkEnabled;
+            $this->application->settings->predefined_network = $this->isConnectToDockerNetworkEnabled ? $this->predefinedNetwork : null;
             $this->application->settings->disable_build_cache = $this->disableBuildCache;
             $this->application->settings->inject_build_args_to_dockerfile = $this->injectBuildArgsToDockerfile;
             $this->application->settings->include_source_commit_in_build = $this->includeSourceCommitInBuild;
@@ -149,6 +155,7 @@ class Advanced extends Component
             $this->customInternalName = $this->application->settings->custom_internal_name;
             $this->isRawComposeDeploymentEnabled = $this->application->settings->is_raw_compose_deployment_enabled;
             $this->isConnectToDockerNetworkEnabled = $this->application->settings->connect_to_docker_network;
+            $this->predefinedNetwork = $this->application->settings->predefined_network;
             $this->disableBuildCache = $this->application->settings->disable_build_cache;
             $this->injectBuildArgsToDockerfile = $this->application->settings->inject_build_args_to_dockerfile ?? true;
             $this->includeSourceCommitInBuild = $this->application->settings->include_source_commit_in_build ?? false;
@@ -158,6 +165,37 @@ class Advanced extends Component
         // Load stop_grace_period separately since it has its own save handler
         // Convert null to empty string to prevent dirty detection issues
         $this->stopGracePeriod = $this->application->settings->stop_grace_period ?? '';
+    }
+
+    public function eligiblePredefinedNetworks(): Collection
+    {
+        return DockerNetwork::query()
+            ->byServer($this->application->destination->server_id)
+            ->where('is_active', true)
+            ->where('is_system', false)
+            ->orderBy('display_name')
+            ->get();
+    }
+
+    public function destinationNetworkLabel(): string
+    {
+        return DockerNetwork::query()
+            ->byServer($this->application->destination->server_id)
+            ->byName($this->application->destination->network)
+            ->value('display_name') ?? $this->application->destination->network;
+    }
+
+    private function validatePredefinedNetwork(): void
+    {
+        if (! $this->isConnectToDockerNetworkEnabled || blank($this->predefinedNetwork)) {
+            return;
+        }
+
+        if (! $this->eligiblePredefinedNetworks()->contains('docker_network_name', $this->predefinedNetwork)) {
+            throw ValidationException::withMessages([
+                'predefinedNetwork' => 'Selected predefined network does not exist on this resource server.',
+            ]);
+        }
     }
 
     private function resetDefaultLabels()

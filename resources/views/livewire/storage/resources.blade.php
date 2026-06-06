@@ -90,7 +90,13 @@
                                                     @endforeach
                                                 </select>
                                                 <x-forms.button wire:click="moveBackup({{ $backup->id }})">Save</x-forms.button>
-                                                <x-forms.button isError wire:click="disableS3({{ $backup->id }})" wire:confirm="Are you sure you want to disable S3 for this backup schedule?">Disable S3</x-forms.button>
+                                                <x-modal-confirmation title="Disable S3 for Backup Schedule?"
+                                                    buttonTitle="Disable S3" isErrorButton
+                                                    submitAction="disableS3({{ $backup->id }})"
+                                                    :actions="['Disable S3 for this backup schedule.']"
+                                                    :confirmWithText="false"
+                                                    :confirmWithPassword="false"
+                                                    step2ButtonText="Disable" />
                                             </div>
                                         </td>
                                     </tr>

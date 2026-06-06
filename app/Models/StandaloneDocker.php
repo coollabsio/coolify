@@ -142,8 +142,10 @@ class StandaloneDocker extends BaseModel
         return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
     }
 
-    public function attachedTo()
+    public function attachedTo(): bool
     {
-        return $this->applications?->count() > 0 || $this->databases()->count() > 0;
+        return $this->applications()->exists()
+            || $this->services()->exists()
+            || $this->databases()->isNotEmpty();
     }
 }

@@ -2,7 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Exceptions\ProxyNetworkReconciliationException;
+use App\Models\DockerNetwork;
 use App\Models\Server;
+use App\Services\Docker\ProxyNetworkReconciler;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -38,11 +41,25 @@ class ConnectProxyToNetworksJob implements ShouldBeEncrypted, ShouldQueue, Silen
 
     public function __construct(public Server $server) {}
 
-    public function handle()
+    public function handle(ProxyNetworkReconciler $reconciler): void
     {
         if (! $this->server->isFunctional()) {
             return;
         }
+
+        DockerNetwork::query()
+            ->byServer($this->server)
+            ->where('is_active', true)
+            ->each(function (DockerNetwork $network) use ($reconciler) {
+                try {
+                    $reconciler->detectDrift($network);
+                } catch (ProxyNetworkReconciliationException) {
+                    $inspectData = $network->last_inspect_data ?: [];
+                    $inspectData['proxy_access_reconciled'] = false;
+                    $inspectData['proxy_access_checked_at'] = now()->toISOString();
+                    $network->update(['last_inspect_data' => $inspectData]);
+                }
+            });
 
         $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
 

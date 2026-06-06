@@ -9,6 +9,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Services\Docker\PredefinedNetworkResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -955,7 +956,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             }
 
             if (data_get($resource, 'settings.connect_to_docker_network')) {
-                $network = $resource->destination->network;
+                $network = app(PredefinedNetworkResolver::class)->resolve($resource);
                 $networks_temp->put($network, null);
                 $topLevel->get('networks')->put($network, [
                     'name' => $network,

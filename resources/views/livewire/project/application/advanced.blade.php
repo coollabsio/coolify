@@ -63,6 +63,14 @@
                 <x-forms.checkbox instantSave id="isConnectToDockerNetworkEnabled" label="Connect To Predefined Network"
                     helper="By default, you do not reach the Coolify defined networks.<br>Starting a docker compose based resource will have an internal network. <br>If you connect to a Coolify defined network, you maybe need to use different internal DNS names to connect to a resource.<br><br>For more information, check <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/knowledge-base/docker/compose#connect-to-predefined-networks'>this</a>."
                     canGate="update" :canResource="$application" />
+                @if ($isConnectToDockerNetworkEnabled)
+                    <x-forms.select id="predefinedNetwork" label="Predefined network (optional)" wire:change="instantSave">
+                        <option value="">Destination network — {{ $this->destinationNetworkLabel() }}</option>
+                        @foreach ($this->eligiblePredefinedNetworks() as $network)
+                            <option value="{{ $network->docker_network_name }}">{{ $network->display_name ?: $network->docker_network_name }}</option>
+                        @endforeach
+                    </x-forms.select>
+                @endif
             @endif
 
             <h3 class="pt-4">Proxy</h3>

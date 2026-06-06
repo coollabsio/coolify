@@ -2,10 +2,12 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Models\DockerNetwork;
 use App\Models\Service;
 use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class StackForm extends Component
@@ -27,6 +29,8 @@ class StackForm extends Component
 
     public ?bool $connectToDockerNetwork = null;
 
+    public ?string $predefinedNetwork = null;
+
     protected function rules(): array
     {
         $baseRules = [
@@ -35,6 +39,7 @@ class StackForm extends Component
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
             'connectToDockerNetwork' => 'nullable',
+            'predefinedNetwork' => 'nullable|string|max:255',
         ];
 
         // Add dynamic field rules
@@ -68,12 +73,14 @@ class StackForm extends Component
     private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
+            $this->validatePredefinedNetwork();
             // Sync TO model (before save)
             $this->service->name = $this->name;
             $this->service->description = $this->description;
             $this->service->docker_compose_raw = $this->dockerComposeRaw;
             $this->service->docker_compose = $this->dockerCompose;
             $this->service->connect_to_docker_network = $this->connectToDockerNetwork;
+            $this->service->predefined_network = $this->connectToDockerNetwork ? $this->predefinedNetwork : null;
         } else {
             // Sync FROM model (on load/refresh)
             $this->name = $this->service->name;
@@ -81,6 +88,38 @@ class StackForm extends Component
             $this->dockerComposeRaw = $this->service->docker_compose_raw;
             $this->dockerCompose = $this->service->docker_compose;
             $this->connectToDockerNetwork = $this->service->connect_to_docker_network;
+            $this->predefinedNetwork = $this->service->predefined_network;
+        }
+    }
+
+    public function eligiblePredefinedNetworks(): Collection
+    {
+        return DockerNetwork::query()
+            ->byServer($this->service->destination->server_id)
+            ->where('is_active', true)
+            ->where('is_system', false)
+            ->orderBy('display_name')
+            ->get();
+    }
+
+    public function destinationNetworkLabel(): string
+    {
+        return DockerNetwork::query()
+            ->byServer($this->service->destination->server_id)
+            ->byName($this->service->destination->network)
+            ->value('display_name') ?? $this->service->destination->network;
+    }
+
+    private function validatePredefinedNetwork(): void
+    {
+        if (! $this->connectToDockerNetwork || blank($this->predefinedNetwork)) {
+            return;
+        }
+
+        if (! $this->eligiblePredefinedNetworks()->contains('docker_network_name', $this->predefinedNetwork)) {
+            throw ValidationException::withMessages([
+                'predefinedNetwork' => 'Selected predefined network does not exist on this resource server.',
+            ]);
         }
     }
 

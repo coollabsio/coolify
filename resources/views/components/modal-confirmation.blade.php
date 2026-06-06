@@ -12,7 +12,16 @@
     'checkboxes' => [],
     'actions' => [],
     'warningMessage' => null,
+    'safeMessage' => null,
+    'safeTitle' => 'Information',
+    'safeButtonTitle' => null,
+    'safeActions' => [],
+    'permanentActions' => [],
     'confirmWithText' => true,
+    'confirmWithTextAction' => null,
+    'initialActions' => [],
+    'lockedActions' => [],
+    'inlineActionSelection' => false,
     'confirmationText' => 'Confirm Deletion',
     'confirmationLabel' => 'Please confirm the execution of the actions by entering the Name below',
     'shortConfirmationLabel' => 'Name',
@@ -39,12 +48,14 @@
     }
     // When password step is skipped, Step 2 becomes final - change button text from "Continue" to "Confirm"
     $effectiveStep2ButtonText = ($skipPasswordConfirmation && $step2ButtonText === 'Continue') ? 'Confirm' : $step2ButtonText;
+    $startsInConfirmation = $inlineActionSelection || (! empty($checkboxes)
+        && collect($checkboxes)->pluck('id')->diff($lockedActions)->isEmpty());
 @endphp
 
 <div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
     modalOpen: false,
-    step: {{ empty($checkboxes) ? 2 : 1 }},
-    initialStep: {{ empty($checkboxes) ? 2 : 1 }},
+    step: {{ empty($checkboxes) || $startsInConfirmation ? 2 : 1 }},
+    initialStep: {{ empty($checkboxes) || $startsInConfirmation ? 2 : 1 }},
     finalStep: {{ $confirmWithPassword && !$skipPasswordConfirmation ? 3 : 2 }},
     deleteText: '',
     password: '',
@@ -56,12 +67,15 @@
     })(),
     userConfirmationText: '',
     confirmWithText: @js($confirmWithText && !$disableTwoStepConfirmation),
+    confirmWithTextAction: @js($confirmWithTextAction),
     confirmWithPassword: @js($confirmWithPassword && !$skipPasswordConfirmation),
     submitAction: @js($submitAction),
     dispatchAction: @js($dispatchAction),
     submitting: false,
     passwordError: '',
-    selectedActions: @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all()),
+    selectedActions: @js($initialActions),
+    initialActions: @js($initialActions),
+    lockedActions: @js($lockedActions),
     dispatchEvent: @js($dispatchEvent),
     dispatchEventType: @js($dispatchEventType),
     dispatchEventMessage: @js($dispatchEventMessage),
@@ -73,8 +87,11 @@
         this.password = '';
         this.submitting = false;
         this.userConfirmationText = '';
-        this.selectedActions = @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all());
+        this.selectedActions = [...this.initialActions];
         $wire.$refresh();
+    },
+    requiresTextConfirmation() {
+        return this.confirmWithText && (!this.confirmWithTextAction || this.selectedActions.includes(this.confirmWithTextAction));
     },
     step1ButtonText: @js($step1ButtonText),
     step2ButtonText: @js($effectiveStep2ButtonText),
@@ -119,9 +136,13 @@
             });
     },
     toggleAction(id) {
+        if (this.lockedActions.includes(id)) {
+            return;
+        }
         const index = this.selectedActions.indexOf(id);
         if (index > -1) {
             this.selectedActions.splice(index, 1);
+            this.userConfirmationText = '';
         } else {
             this.selectedActions.push(id);
         }
@@ -215,15 +236,15 @@
                     </button>
                 </div>
                 <div class="relative w-auto overflow-y-auto px-7 pb-6" style="-webkit-overflow-scrolling: touch;">
-                    @if (!empty($checkboxes))
+                    @if (!empty($checkboxes) && !$inlineActionSelection)
                         <!-- Step 1: Select actions -->
                         <div x-show="step === 1">
                             @foreach ($checkboxes as $index => $checkbox)
                                 <div class="flex justify-between items-center mb-2">
                                     <x-forms.checkbox fullWidth :label="$checkbox['label']" :id="$checkbox['id']"
-                                        :wire:model="$checkbox['id']"
-                                        x-on:change="toggleAction('{{ $checkbox['id'] }}')" :checked="$this->{$checkbox['id']}"
-                                        x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')" />
+                                        x-on:change="toggleAction('{{ $checkbox['id'] }}')"
+                                        x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')"
+                                        x-bind:disabled="lockedActions.includes('{{ $checkbox['id'] }}')" />
                                 </div>
                             @endforeach
 
@@ -241,49 +262,80 @@
 
                     <!-- Step 2: Confirm deletion -->
                     <div x-show="step === 2">
-                        <x-callout type="danger" title="Warning" class="mb-4">
-                            {!! $warningMessage ?: 'This operation is permanent and cannot be undone. Please think again before proceeding!' !!}
-                        </x-callout>
-                        <div class="mb-4">The following actions will be performed:</div>
+                        @if ($safeMessage)
+                            <x-callout type="info" :title="$safeTitle" class="mb-4"
+                                x-show="!requiresTextConfirmation()">
+                                {{ $safeMessage }}
+                            </x-callout>
+                        @endif
+                        <div x-show="requiresTextConfirmation()">
+                            <x-callout type="danger" title="Warning" class="mb-4">
+                                {!! $warningMessage ?: 'This operation is permanent and cannot be undone. Please think again before proceeding!' !!}
+                            </x-callout>
+                        </div>
+                        <div class="mb-4 font-medium">The following actions will be performed:</div>
                         <ul class="mb-4 space-y-2">
-                            @foreach ($actions as $action)
-                                <li class="flex items-center text-red-500">
-                                    <svg class="shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
-                                        viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            @foreach ($safeActions as $action)
+                                <li x-show="!requiresTextConfirmation()"
+                                    class="flex items-center text-neutral-600 dark:text-neutral-300">
+                                    <svg class="mr-2 h-5 w-5 shrink-0 text-green-500" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M6 18L18 6M6 6l12 12"></path>
+                                            d="M5 13l4 4L19 7" />
                                     </svg>
                                     <span>{{ $action }}</span>
                                 </li>
                             @endforeach
-                            @foreach ($checkboxes as $checkbox)
-                                <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
+                            @foreach ($permanentActions as $action)
+                                <li x-show="requiresTextConfirmation()" class="flex items-center text-red-500">
+                                    <svg class="mr-2 h-5 w-5 shrink-0" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                    <span>{{ $action }}</span>
+                                </li>
+                            @endforeach
+                            @if (empty($safeActions) && empty($permanentActions))
+                                @foreach ($actions as $action)
                                     <li class="flex items-center text-red-500">
                                         <svg class="shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M6 18L18 6M6 6l12 12"></path>
                                         </svg>
-                                        <span>{{ $checkbox['label'] }}</span>
+                                        <span>{{ $action }}</span>
                                     </li>
-                                </template>
-                                @if (isset($checkbox['default_warning']))
-                                    <template x-if="!selectedActions.includes('{{ $checkbox['id'] }}')">
+                                @endforeach
+                                @foreach ($checkboxes as $checkbox)
+                                    <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
                                         <li class="flex items-center text-red-500">
                                             <svg class="shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
                                                 viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                     d="M6 18L18 6M6 6l12 12"></path>
                                             </svg>
-                                            <span>{{ $checkbox['default_warning'] }}</span>
+                                            <span>{{ $checkbox['label'] }}</span>
                                         </li>
                                     </template>
-                                @endif
-                            @endforeach
+                                    @if (isset($checkbox['default_warning']))
+                                        <template x-if="!selectedActions.includes('{{ $checkbox['id'] }}')">
+                                            <li class="flex items-center text-red-500">
+                                                <svg class="shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                </svg>
+                                                <span>{{ $checkbox['default_warning'] }}</span>
+                                            </li>
+                                        </template>
+                                    @endif
+                                @endforeach
+                            @endif
                         </ul>
                         @if (!$disableTwoStepConfirmation)
                             @if ($confirmWithText)
-                                <div class="mb-4">
+                                <div class="mb-4" x-show="requiresTextConfirmation()">
                                     <h4 class="mb-2 text-lg font-semibold">Confirm Actions</h4>
                                     <p class="mb-2 text-sm">{{ $confirmationLabel }}</p>
                                     <div class="relative mb-2" x-data="{ decodedText: confirmationText }">
@@ -313,8 +365,19 @@
                             @endif
                         @endif
 
+                        @if (!empty($checkboxes) && $inlineActionSelection)
+                            <div class="mb-4">
+                                @foreach ($checkboxes as $checkbox)
+                                    <x-forms.checkbox fullWidth :label="$checkbox['label']" :id="$checkbox['id']"
+                                        x-on:change="toggleAction('{{ $checkbox['id'] }}')"
+                                        x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')"
+                                        x-bind:disabled="lockedActions.includes('{{ $checkbox['id'] }}')" />
+                                @endforeach
+                            </div>
+                        @endif
+
                         <div class="flex flex-wrap gap-2 justify-between mt-4">
-                            @if (!empty($checkboxes))
+                            @if (!empty($checkboxes) && !$inlineActionSelection)
                                 <x-forms.button @click="step--"
                                     class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
                                     Back
@@ -326,7 +389,7 @@
                                 </x-forms.button>
                             @endif
                             <x-forms.button
-                                x-bind:disabled="submitting || (!disableTwoStepConfirmation && confirmWithText && userConfirmationText !==
+                                x-bind:disabled="submitting || (!disableTwoStepConfirmation && requiresTextConfirmation() && userConfirmationText !==
                                     confirmationText)"
                                 class="w-auto" isError
                                 @click="
@@ -346,7 +409,8 @@
                                         });
                                     }
                                 ">
-                                <span x-show="!submitting" x-text="step2ButtonText"></span>
+                                <span x-show="!submitting && !requiresTextConfirmation()">{{ $safeButtonTitle ?? $effectiveStep2ButtonText }}</span>
+                                <span x-show="!submitting && requiresTextConfirmation()" x-text="step2ButtonText"></span>
                                 <x-loading x-show="submitting" text="Processing..." />
                             </x-forms.button>
                         </div>

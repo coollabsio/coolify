@@ -3,6 +3,7 @@
 use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Application;
+use App\Models\DockerNetwork;
 use App\Models\Server;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -108,6 +109,14 @@ function collectDockerNetworksByServer(Server $server)
 function connectProxyToNetworks(Server $server)
 {
     ['networks' => $networks] = collectDockerNetworksByServer($server);
+    $catalogPolicies = DockerNetwork::query()
+        ->byServer($server)
+        ->whereIn('docker_network_name', $networks)
+        ->pluck('proxy_access', 'docker_network_name');
+    $networks = $networks->filter(
+        fn (string $network) => $catalogPolicies->get($network) !== false
+            && $catalogPolicies->get($network) !== 0
+    );
     if ($server->isSwarm()) {
         $commands = $networks->map(function ($network) {
             $safe = escapeshellarg($network);

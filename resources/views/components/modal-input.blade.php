@@ -8,6 +8,7 @@
     'content' => null,
     'closeOutside' => true,
     'isFullWidth' => false,
+    'closeEvent' => null,
 ])
 
 @php
@@ -16,6 +17,7 @@
 
 <div x-data="{ modalOpen: false }"
     x-init="$watch('modalOpen', value => { if (!value) { $wire.dispatch('modalClosed') } })"
+    @if ($closeEvent) x-on:{{ $closeEvent }}.window="modalOpen=false" @endif
     :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
     class="relative w-auto h-auto" wire:ignore>
     @if ($content)

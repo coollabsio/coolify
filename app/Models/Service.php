@@ -55,6 +55,8 @@ class Service extends BaseModel
         'docker_compose_raw',
         'docker_compose',
         'connect_to_docker_network',
+        'predefined_network',
+        'managed_network_mode',
         'service_type',
         'config_hash',
         'compose_parsing_version',
@@ -66,6 +68,11 @@ class Service extends BaseModel
     ];
 
     protected $appends = ['server_status', 'status'];
+
+    protected $casts = [
+        'connect_to_docker_network' => 'boolean',
+        'managed_network_mode' => 'boolean',
+    ];
 
     protected static function booted()
     {

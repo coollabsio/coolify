@@ -29,6 +29,7 @@ use App\Models\StandaloneRedis;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Docker\PredefinedNetworkResolver;
 use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -3064,7 +3065,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $networks->put($network, null);
             }
             if (data_get($resource, 'settings.connect_to_docker_network')) {
-                $network = $resource->destination->network;
+                $network = app(PredefinedNetworkResolver::class)->resolve($resource);
                 $networks->put($network, null);
                 $topLevelNetworks->put($network, [
                     'name' => $network,

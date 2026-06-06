@@ -391,6 +391,8 @@ class Select extends Component
 
     public function setServer(Server $server)
     {
+        abort_unless($this->servers->contains('id', $server->id), 404);
+
         $this->server_id = $server->id;
         $this->server = $server;
         $this->standaloneDockers = $server->standaloneDockers;
@@ -409,6 +411,9 @@ class Select extends Component
 
     public function setDestination(string $destination_uuid)
     {
+        $destinations = ($this->standaloneDockers ?? collect())->merge($this->swarmDockers ?? collect());
+        abort_unless($destinations->contains('uuid', $destination_uuid), 404);
+
         $this->destination_uuid = $destination_uuid;
 
         return $this->whatToDoNext();

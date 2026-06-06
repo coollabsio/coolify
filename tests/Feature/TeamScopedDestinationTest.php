@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\DockerNetworkDeletionException;
 use App\Livewire\Destination\Resources as DestinationResources;
 use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Project\New\DockerCompose;
@@ -9,6 +10,7 @@ use App\Livewire\Project\New\GithubPrivateRepositoryDeployKey;
 use App\Livewire\Project\New\PublicGitRepository;
 use App\Livewire\Project\New\SimpleDockerfile;
 use App\Models\Application;
+use App\Models\DockerNetwork;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -19,6 +21,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Docker\DockerNetworkManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
@@ -298,10 +301,79 @@ describe('Destination/Show team scope', function () {
 
     test('general page links to separate resources page without rendering the resources table', function () {
         Livewire::test(DestinationShow::class, ['destination_uuid' => $this->destinationA->uuid])
+            ->assertSee('Back')
+            ->assertSee(route('destination.index', ['server' => $this->serverA->uuid]), false)
             ->assertSee('General')
             ->assertSee('Resources')
             ->assertDontSee('Search resources...')
             ->assertDontSee('No resources are using this destination.');
+    });
+
+    test('delete removes standalone destination association without deleting docker network inventory', function () {
+        $network = DockerNetwork::query()->create([
+            'server_id' => $this->serverA->id,
+            'display_name' => 'Destination Network',
+            'docker_network_name' => $this->destinationA->network,
+            'driver' => 'bridge',
+            'scope' => 'local',
+            'managed_by_coolify' => true,
+            'external' => false,
+            'is_system' => false,
+            'is_active' => true,
+            'available_during_creation' => true,
+            'source_type' => 'standalone_docker_destination',
+            'network_role' => 'default_destination',
+        ]);
+
+        Livewire::test(DestinationShow::class, ['destination_uuid' => $this->destinationA->uuid])
+            ->call('delete')
+            ->assertRedirect(route('destination.index'));
+
+        expect(StandaloneDocker::query()->whereKey($this->destinationA->id)->exists())->toBeFalse()
+            ->and($network->refresh()->available_during_creation)->toBeFalse()
+            ->and(DockerNetwork::query()->whereKey($network->id)->exists())->toBeTrue();
+    });
+
+    test('delete keeps destination when a service is attached', function () {
+        Service::factory()->create([
+            'environment_id' => $this->environmentA->id,
+            'destination_id' => $this->destinationA->id,
+            'destination_type' => StandaloneDocker::class,
+        ]);
+
+        Livewire::test(DestinationShow::class, ['destination_uuid' => $this->destinationA->uuid])
+            ->call('delete')
+            ->assertDispatched('error');
+
+        expect(StandaloneDocker::query()->whereKey($this->destinationA->id)->exists())->toBeTrue();
+    });
+
+    test('failed permanent deletion keeps destination and network inventory unchanged', function () {
+        $network = DockerNetwork::query()->create([
+            'server_id' => $this->serverA->id,
+            'display_name' => 'Destination Network',
+            'docker_network_name' => $this->destinationA->network,
+            'is_active' => true,
+            'available_during_creation' => true,
+        ]);
+
+        app()->instance(DockerNetworkManager::class, new class extends DockerNetworkManager
+        {
+            public function __construct() {}
+
+            public function deleteWithDestination(DockerNetwork $network): void
+            {
+                throw new DockerNetworkDeletionException('Failed to remove Docker network.');
+            }
+        });
+
+        Livewire::test(DestinationShow::class, ['destination_uuid' => $this->destinationA->uuid])
+            ->call('delete', null, ['deleteNetwork'])
+            ->assertDispatched('error');
+
+        expect(StandaloneDocker::query()->whereKey($this->destinationA->id)->exists())->toBeTrue()
+            ->and($network->refresh()->available_during_creation)->toBeTrue()
+            ->and(DockerNetwork::query()->whereKey($network->id)->exists())->toBeTrue();
     });
 
     test('mount with own standalone destination lists deployed resources', function () {
