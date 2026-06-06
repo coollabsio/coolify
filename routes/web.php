@@ -49,6 +49,7 @@ use App\Livewire\Server\CloudProviderToken\Show as CloudProviderTokenShow;
 use App\Livewire\Server\Delete as DeleteServer;
 use App\Livewire\Server\Destinations as ServerDestinations;
 use App\Livewire\Server\DockerCleanup;
+use App\Livewire\Server\DockerNetworks\Index as DockerNetworksIndex;
 use App\Livewire\Server\Index as ServerIndex;
 use App\Livewire\Server\LogDrains;
 use App\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
@@ -222,6 +223,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/persistent-storage', ApplicationConfiguration::class)->name('project.application.persistent-storage');
         Route::get('/source', ApplicationConfiguration::class)->name('project.application.source');
         Route::get('/servers', ApplicationConfiguration::class)->name('project.application.servers');
+        Route::get('/networking', ApplicationConfiguration::class)->name('project.application.networking');
         Route::get('/scheduled-tasks', ApplicationConfiguration::class)->name('project.application.scheduled-tasks.show');
         Route::get('/webhooks', ApplicationConfiguration::class)->name('project.application.webhooks');
         Route::get('/preview-deployments', ApplicationConfiguration::class)->name('project.application.preview-deployments');
@@ -265,6 +267,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/storages', ServiceConfiguration::class)->name('project.service.storages');
         Route::get('/scheduled-tasks', ServiceConfiguration::class)->name('project.service.scheduled-tasks.show');
         Route::get('/webhooks', ServiceConfiguration::class)->name('project.service.webhooks');
+        Route::get('/networking', ServiceConfiguration::class)->name('project.service.networking');
         Route::get('/resource-operations', ServiceConfiguration::class)->name('project.service.resource-operations');
         Route::get('/tags', ServiceConfiguration::class)->name('project.service.tags');
         Route::get('/danger', ServiceConfiguration::class)->name('project.service.danger');
@@ -291,6 +294,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resources', ResourcesShow::class)->name('server.resources');
         Route::get('/cloudflare-tunnel', CloudflareTunnel::class)->name('server.cloudflare-tunnel');
         Route::get('/destinations', ServerDestinations::class)->name('server.destinations');
+        Route::get('/docker-networks', DockerNetworksIndex::class)->name('server.docker-networks');
         Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
         Route::get('/metrics', ServerCharts::class)->name('server.metrics');
         Route::get('/danger', DeleteServer::class)->name('server.delete');

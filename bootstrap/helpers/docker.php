@@ -5,6 +5,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceApplication;
+use App\Support\DockerNetworkNameGenerator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
@@ -105,12 +106,13 @@ function format_docker_labels_to_json(string|array $rawOutput): Collection
 
             return collect($outputArray)
                 ->map(function ($outputLine) {
-                    return explode('=', $outputLine);
+                    $parts = explode('=', $outputLine, 2);
+
+                    return [$parts[0], $parts[1] ?? ''];
                 })
-                ->mapWithKeys(function ($outputLine) {
-                    return [$outputLine[0] => $outputLine[1]];
-                });
-        })[0];
+                ->mapWithKeys(fn ($outputLine) => [$outputLine[0] => $outputLine[1]]);
+        })
+        ->first() ?? collect([]);
 }
 
 function format_docker_envs_to_json($rawOutput)
@@ -119,14 +121,20 @@ function format_docker_envs_to_json($rawOutput)
         $outputLines = json_decode($rawOutput, true, flags: JSON_THROW_ON_ERROR);
 
         return collect(data_get($outputLines[0], 'Config.Env', []))->mapWithKeys(function ($env) {
-            $env = explode('=', $env, 2);
+            $parts = explode('=', $env, 2);
 
-            return [$env[0] => $env[1]];
+            return [$parts[0] => $parts[1] ?? ''];
         });
     } catch (Throwable) {
         return collect([]);
     }
 }
+
+function generateUniqueDockerNetworkName(Server $server): string
+{
+    return DockerNetworkNameGenerator::generate($server);
+}
+
 function checkMinimumDockerEngineVersion($dockerVersion)
 {
     $majorDockerVersion = (int) str($dockerVersion)->before('.')->value();
@@ -137,6 +145,12 @@ function checkMinimumDockerEngineVersion($dockerVersion)
 
     return $dockerVersion;
 }
+/**
+ * @deprecated Prefer PHP built-in escapeshellarg() for new shell arguments.
+ *             escapeshellarg() handles OS-specific edge cases and is used
+ *             by all new networking features. This function remains for
+ *             backward compatibility with existing code.
+ */
 function escapeShellValue(string $value): string
 {
     return "'".str_replace("'", "'\\''", $value)."'";

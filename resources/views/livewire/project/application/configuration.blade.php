@@ -53,6 +53,11 @@
                 'badge' => true,
             ],
             [
+                'label' => 'Networking',
+                'route' => 'project.application.networking',
+                'active' => $currentRoute === 'project.application.networking',
+            ],
+            [
                 'label' => 'Scheduled Tasks',
                 'route' => 'project.application.scheduled-tasks.show',
                 'active' => str($currentRoute)->startsWith('project.application.scheduled-tasks'),
@@ -142,6 +147,8 @@
                 <livewire:project.application.source :application="$application" />
             @elseif ($currentRoute === 'project.application.servers')
                 <livewire:project.shared.destination :resource="$application" />
+            @elseif ($currentRoute === 'project.application.networking')
+                <livewire:project.shared.networking :resource="$application" />
             @elseif ($currentRoute === 'project.application.scheduled-tasks.show')
                 <livewire:project.shared.scheduled-task.all :resource="$application" />
             @elseif ($currentRoute === 'project.application.scheduled-tasks')
