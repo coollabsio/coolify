@@ -1,0 +1,850 @@
+# documentation: https://docs.openreplay.com/en/deployment/deploy-docker/
+# slogan: Open-source session replay tool that shows you exactly what users did on your app.
+# category: monitoring
+# tags: session replay, analytics, monitoring, observability, debugging
+# logo: svgs/openreplay.svg
+# port: 80
+# amd_only: true
+
+services:
+
+  nginx:
+    image: nginx:1-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - api
+      - http
+      - chalice
+      - assist
+      - integrations
+      - spot
+    networks:
+      - openreplay-net
+    environment:
+      - SERVICE_URL_NGINX
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        cat > /etc/nginx/conf.d/default.conf << 'NGINXEOF'
+        map $arg_peerId $sessionid {
+          default "";
+          "~.*-(\d+)(?:-.*|$)" $1;
+        }
+        map $http_x_forwarded_for $real_ip {
+            ~^(\d+\.\d+\.\d+\.\d+) $1;
+            default $remote_addr;
+        }
+        map $http_upgrade $connection_upgrade {
+          default upgrade;
+          '' close;
+        }
+        map $http_x_forwarded_proto $origin_proto {
+          default $http_x_forwarded_proto;
+          '' $scheme;
+        }
+        server {
+            listen 80;
+            client_body_buffer_size 512k;
+            client_max_body_size 10m;
+            proxy_buffer_size 64k;
+            proxy_buffers 32 64k;
+            proxy_busy_buffers_size 128k;
+            proxy_max_temp_file_size 2048m;
+            proxy_buffering on;
+            proxy_connect_timeout 120s;
+            proxy_read_timeout 300s;
+            proxy_send_timeout 300s;
+            real_ip_header X-Forwarded-For;
+            set_real_ip_from 0.0.0.0/0;
+            real_ip_recursive on;
+            add_header X-XSS-Protection "1; mode=block" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header Referrer-Policy "same-origin" always;
+            server_tokens off;
+            location ~ ^/(mobs|sessions-assets|frontend|static|sourcemaps|ios-images|uxtesting-records|records|spots)/ {
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_set_header Host $http_host;
+              proxy_connect_timeout 300;
+              proxy_http_version 1.1;
+              proxy_set_header Connection "";
+              chunked_transfer_encoding off;
+              proxy_pass http://minio:9000;
+            }
+            location /minio/ {
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "Upgrade";
+              proxy_set_header Host $host;
+              proxy_pass http://minio:9000;
+            }
+            location /ingest/ {
+              rewrite ^/ingest/(.*) /$1 break;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "Upgrade";
+              proxy_set_header X-Forwarded-For $real_ip;
+              proxy_set_header X-Forwarded-Host $host;
+              proxy_set_header X-Real-IP $real_ip;
+              proxy_set_header Host $host;
+              proxy_pass http://http-openreplay:8080;
+              proxy_read_timeout 300s;
+              proxy_connect_timeout 120s;
+              proxy_send_timeout 300s;
+              add_header 'Access-Control-Allow-Origin' '*' always;
+              add_header 'Access-Control-Allow-Methods' 'POST' always;
+              add_header 'Access-Control-Allow-Headers' 'Content-Type,Authorization,Content-Encoding' always;
+              add_header 'Access-Control-Expose-Headers' 'Content-Length' always;
+            }
+            location /integrations/ {
+              rewrite ^/integrations/(.*) /$1 break;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "Upgrade";
+              proxy_set_header X-Forwarded-For $real_ip;
+              proxy_set_header X-Forwarded-Host $host;
+              proxy_set_header X-Real-IP $real_ip;
+              proxy_set_header Host $host;
+              proxy_pass http://integrations-openreplay:8080;
+              proxy_read_timeout 300s;
+              proxy_connect_timeout 120s;
+              proxy_send_timeout 300s;
+              add_header 'Access-Control-Allow-Origin' '*' always;
+              add_header 'Access-Control-Allow-Methods' 'POST,PATCH,OPTIONS,DELETE' always;
+              add_header 'Access-Control-Allow-Headers' 'Content-Type,Authorization,Content-Encoding,X-Openreplay-Batch' always;
+              add_header 'Access-Control-Expose-Headers' 'Content-Length' always;
+            }
+            location /v2/api/ {
+              rewrite ^/v2/api/(.*) /$1 break;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "Upgrade";
+              proxy_set_header Host $host;
+              proxy_set_header X-Forwarded-Proto $origin_proto;
+              proxy_set_header X-Forwarded-For $real_ip;
+              proxy_set_header X-Real-IP $real_ip;
+              proxy_pass http://api-openreplay:8080;
+              proxy_read_timeout 300s;
+              proxy_connect_timeout 120s;
+              proxy_send_timeout 300s;
+              add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+              add_header 'Access-Control-Allow-Methods' 'POST, GET, PATCH, DELETE, OPTIONS, PUT' always;
+              add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch' always;
+              add_header 'Access-Control-Expose-Headers' 'Content-Length' always;
+              add_header 'Access-Control-Max-Age' '3600' always;
+              add_header 'Access-Control-Allow-Credentials' 'true' always;
+              if ($request_method = 'OPTIONS') {
+                add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+                add_header 'Access-Control-Allow-Methods' 'POST, GET, PATCH, DELETE, OPTIONS, PUT' always;
+                add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch' always;
+                add_header 'Access-Control-Max-Age' '3600' always;
+                add_header 'Content-Length' '0';
+                add_header 'Content-Type' 'text/plain';
+                return 204;
+              }
+            }
+            location /api/ {
+              rewrite ^/api/(.*) /$1 break;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "Upgrade";
+              proxy_set_header Host $host;
+              proxy_set_header X-Forwarded-Proto $origin_proto;
+              proxy_set_header X-Forwarded-For $real_ip;
+              proxy_pass http://chalice-openreplay:8000;
+              add_header Cache-Control "no-store,no-cache" always;
+              add_header Pragma "no-cache" always;
+            }
+            location /spot/ {
+              rewrite ^/spot/(.*) /$1 break;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "Upgrade";
+              proxy_set_header Host $host;
+              proxy_set_header X-Forwarded-Proto $origin_proto;
+              proxy_set_header X-Forwarded-For $real_ip;
+              proxy_set_header X-Real-IP $real_ip;
+              proxy_pass http://spot-openreplay:8080;
+              proxy_read_timeout 300s;
+              proxy_connect_timeout 120s;
+              proxy_send_timeout 300s;
+              add_header 'Access-Control-Allow-Origin' '*' always;
+              add_header 'Access-Control-Allow-Methods' 'POST, PATCH, DELETE, OPTIONS' always;
+              add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch' always;
+              add_header 'Access-Control-Expose-Headers' 'Content-Length' always;
+              if ($request_method = 'OPTIONS') {
+                add_header 'Access-Control-Allow-Origin' '*' always;
+                add_header 'Access-Control-Allow-Methods' 'POST, PATCH, DELETE, OPTIONS' always;
+                add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch' always;
+                add_header 'Access-Control-Max-Age' '3600';
+                add_header 'Content-Type' 'text/plain charset=UTF-8';
+                add_header 'Content-Length' 0;
+                return 204;
+              }
+            }
+            location /assist/ {
+              rewrite ^/assist/(.*) /$1 break;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection $connection_upgrade;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $real_ip;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $origin_proto;
+              proxy_read_timeout 3600s;
+              proxy_send_timeout 3600s;
+              proxy_connect_timeout 75s;
+              proxy_buffering off;
+              proxy_pass http://assist-openreplay:9001;
+            }
+            location /ws-assist/ {
+              rewrite ^/ws-assist/(.*) /$1 break;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection $connection_upgrade;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $real_ip;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $origin_proto;
+              proxy_read_timeout 3600s;
+              proxy_send_timeout 3600s;
+              proxy_connect_timeout 120s;
+              proxy_buffering off;
+              add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+              add_header 'Access-Control-Allow-Methods' 'GET, OPTIONS' always;
+              add_header 'Access-Control-Allow-Headers' 'sessionid, Content-Type, Authorization' always;
+              add_header 'Access-Control-Max-Age' '1728000' always;
+              add_header 'X-Debug-Session-ID' $sessionid always;
+              proxy_pass http://assist-openreplay:9001;
+            }
+            location /script/ {
+              rewrite ^/script/(.*)/openreplay(.*).js$ /$1/openreplay$2.js break;
+              proxy_http_version 1.1;
+              proxy_ssl_protocols TLSv1.2 TLSv1.3;
+              proxy_ssl_server_name on;
+              proxy_set_header Host static.openreplay.com;
+              proxy_pass https://static.openreplay.com;
+              proxy_read_timeout 300s;
+              proxy_connect_timeout 120s;
+              proxy_send_timeout 300s;
+              proxy_buffering on;
+              client_max_body_size 8m;
+            }
+            location / {
+              index /index.html;
+              rewrite ^((?!.(js|css|png|svg|jpg|woff|woff2)).)*$ /index.html break;
+              proxy_set_header Host $http_host;
+              proxy_set_header X-Forwarded-For $real_ip;
+              proxy_set_header X-Forwarded-Proto $origin_proto;
+              proxy_pass http://frontend-openreplay:8080;
+              proxy_intercept_errors on;
+              error_page 404 =200 /index.html;
+            }
+        }
+        NGINXEOF
+        exec nginx -g 'daemon off;'
+
+  postgresql:
+    image: ghcr.io/openreplay/postgres:17
+    restart: unless-stopped
+    volumes:
+      - pgdata:/bitnami/postgresql
+    networks:
+      openreplay-net:
+        aliases:
+          - postgresql.db.svc.cluster.local
+    environment:
+      - POSTGRESQL_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.11-alpine
+    restart: unless-stopped
+    volumes:
+      - clickhousedata:/var/lib/clickhouse
+    networks:
+      openreplay-net:
+        aliases:
+          - clickhouse-openreplay-clickhouse.db.svc.cluster.local
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1'"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  redis:
+    image: ghcr.io/openreplay/valkey:8
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    networks:
+      openreplay-net:
+        aliases:
+          - redis-master.db.svc.cluster.local
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    image: rustfs/rustfs:1.0.0-beta.1
+    restart: unless-stopped
+    volumes:
+      - miniodata:/data
+    networks:
+      openreplay-net:
+        aliases:
+          - minio.db.svc.cluster.local
+    environment:
+      - RUSTFS_ACCESS_KEY=$SERVICE_PASSWORD_64_S3KEY
+      - RUSTFS_SECRET_KEY=$SERVICE_PASSWORD_64_S3SECRET
+      - RUSTFS_ADDRESS=0.0.0.0:9000
+      - RUSTFS_CONSOLE_ENABLE=true
+      - RUSTFS_CONSOLE_ADDRESS=0.0.0.0:9001
+      - RUSTFS_VOLUMES=/data
+
+  minio-setup:
+    image: minio/mc:latest
+    restart: on-failure
+    depends_on:
+      - minio
+    networks:
+      - openreplay-net
+    environment:
+      - MINIO_ACCESS_KEY=$SERVICE_PASSWORD_64_S3KEY
+      - MINIO_SECRET_KEY=$SERVICE_PASSWORD_64_S3SECRET
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set minio http://minio:9000 "$${MINIO_ACCESS_KEY}" "$${MINIO_SECRET_KEY}" 2>/dev/null; do
+          echo "Waiting for minio..."
+          sleep 3
+        done
+        for bucket in mobs sessions-assets sourcemaps ios-images spots records frontend uxtesting-records; do
+          mc mb --ignore-existing "minio/$$bucket" || true
+        done
+
+  db-migrate:
+    image: postgres:17-alpine
+    restart: on-failure
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    networks:
+      - openreplay-net
+    environment:
+      - PGHOST=postgresql.db.svc.cluster.local
+      - PGPORT=5432
+      - PGDATABASE=postgres
+      - PGUSER=postgres
+      - PGPASSWORD=$SERVICE_PASSWORD_POSTGRES
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        apk add --no-cache wget
+        wget -q -O /tmp/pg_schema.sql \
+          https://raw.githubusercontent.com/openreplay/openreplay/v1.23.0/scripts/schema/db/init_dbs/postgresql/init_schema.sql
+        psql -f /tmp/pg_schema.sql 2>&1 || echo "Migration may have partially applied (safe to ignore on re-deploy)"
+
+  clickhouse-migrate:
+    image: clickhouse/clickhouse-server:25.11-alpine
+    restart: on-failure
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - openreplay-net
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        wget -q -O /tmp/ch_schema.sql \
+          https://raw.githubusercontent.com/openreplay/openreplay/v1.23.0/scripts/schema/db/init_dbs/clickhouse/create/init_schema.sql
+        clickhouse-client -h clickhouse-openreplay-clickhouse.db.svc.cluster.local --port 9000 \
+          --multiquery < /tmp/ch_schema.sql 2>&1 || echo "Migration may have partially applied (safe to ignore on re-deploy)"
+
+  alerts:
+    image: public.ecr.aws/p1t3u8a3/alerts:v1.23.0
+    restart: unless-stopped
+    depends_on:
+      - postgresql
+      - redis
+      - clickhouse
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - alerts-openreplay
+          - alerts-openreplay.app.svc.cluster.local
+    environment:
+      - pg_host=postgresql.db.svc.cluster.local
+      - pg_port=5432
+      - pg_dbname=postgres
+      - pg_user=postgres
+      - pg_password=$SERVICE_PASSWORD_POSTGRES
+      - ch_host=clickhouse-openreplay-clickhouse.db.svc.cluster.local
+      - ch_port=9000
+      - ch_port_http=8123
+      - ch_username=default
+      - ch_password=
+      - SITE_URL=${SERVICE_URL_NGINX}
+      - S3_HOST=${SERVICE_URL_NGINX}
+      - S3_KEY=$SERVICE_PASSWORD_64_S3KEY
+      - S3_SECRET=$SERVICE_PASSWORD_64_S3SECRET
+      - AWS_DEFAULT_REGION=us-east-1
+      - EMAIL_HOST=${EMAIL_HOST:-}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_USER=${EMAIL_USER:-}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD:-}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-true}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL:-false}
+      - EMAIL_FROM=${EMAIL_FROM:-OpenReplay<do-not-reply@openreplay.com>}
+      - LOGLEVEL=INFO
+      - PYTHONUNBUFFERED=0
+
+  api:
+    image: public.ecr.aws/p1t3u8a3/api:v1.23.0
+    restart: unless-stopped
+    depends_on:
+      - postgresql
+      - redis
+      - clickhouse
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - api-openreplay
+          - api-openreplay.app.svc.cluster.local
+    environment:
+      - JWT_SECRET=$SERVICE_PASSWORD_64_JWT
+      - ASSIST_JWT_SECRET=$SERVICE_PASSWORD_64_ASSISTJWT
+      - AWS_ACCESS_KEY_ID=$SERVICE_PASSWORD_64_S3KEY
+      - AWS_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_64_S3SECRET
+      - AWS_ENDPOINT=${SERVICE_URL_NGINX}
+      - AWS_REGION=us-east-1
+      - BUCKET_NAME=mobs
+      - CH_USERNAME=default
+      - CH_PASSWORD=
+      - CLICKHOUSE_STRING=clickhouse-openreplay-clickhouse.db.svc.cluster.local:9000/default
+      - CLICKHOUSE_HTTP_STRING=clickhouse-openreplay-clickhouse.db.svc.cluster.local:8123/default
+      - pg_password=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_STRING=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@postgresql.db.svc.cluster.local:5432/postgres?sslmode=disable
+      - ASSIST_URL=http://assist-openreplay.app.svc.cluster.local:9001/assist/%s
+      - ASSIST_KEY=$SERVICE_PASSWORD_64_ASSISTKEY
+      - REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379
+      - KAFKA_SERVERS=kafka.db.svc.cluster.local:9092
+      - KAFKA_USE_SSL=false
+
+  http:
+    image: public.ecr.aws/p1t3u8a3/http:v1.23.0
+    restart: unless-stopped
+    depends_on:
+      - postgresql
+      - redis
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - http-openreplay
+          - http-openreplay.app.svc.cluster.local
+    environment:
+      - BUCKET_NAME=uxtesting-records
+      - CACHE_ASSETS=true
+      - AWS_ACCESS_KEY_ID=$SERVICE_PASSWORD_64_S3KEY
+      - AWS_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_64_S3SECRET
+      - AWS_REGION=us-east-1
+      - AWS_ENDPOINT=${SERVICE_URL_NGINX}
+      - LICENSE_KEY=
+      - KAFKA_SERVERS=kafka.db.svc.cluster.local:9092
+      - KAFKA_USE_SSL=false
+      - pg_password=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_STRING=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@postgresql.db.svc.cluster.local:5432/postgres?sslmode=disable
+      - REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379
+      - JWT_SECRET=$SERVICE_PASSWORD_64_JWT
+      - JWT_SPOT_SECRET=$SERVICE_PASSWORD_64_JWTSPOT
+
+  images:
+    image: public.ecr.aws/p1t3u8a3/images:v1.23.0
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - minio
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - images-openreplay
+          - images-openreplay.app.svc.cluster.local
+    environment:
+      - AWS_ACCESS_KEY_ID=$SERVICE_PASSWORD_64_S3KEY
+      - AWS_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_64_S3SECRET
+      - AWS_ENDPOINT=${SERVICE_URL_NGINX}
+      - AWS_REGION=us-east-1
+      - BUCKET_NAME=mobs
+      - LICENSE_KEY=
+      - KAFKA_SERVERS=kafka.db.svc.cluster.local:9092
+      - KAFKA_USE_SSL=false
+      - REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379
+      - FS_CLEAN_HRS=24
+
+  integrations:
+    image: public.ecr.aws/p1t3u8a3/integrations:v1.23.0
+    restart: unless-stopped
+    depends_on:
+      - postgresql
+      - redis
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - integrations-openreplay
+          - integrations-openreplay.app.svc.cluster.local
+    environment:
+      - AWS_ACCESS_KEY_ID=$SERVICE_PASSWORD_64_S3KEY
+      - AWS_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_64_S3SECRET
+      - AWS_ENDPOINT=${SERVICE_URL_NGINX}
+      - AWS_REGION=us-east-1
+      - BUCKET_NAME=mobs
+      - JWT_SECRET=$SERVICE_PASSWORD_64_JWT
+      - LICENSE_KEY=
+      - KAFKA_SERVERS=kafka.db.svc.cluster.local:9092
+      - KAFKA_USE_SSL=false
+      - pg_password=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_STRING=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@postgresql.db.svc.cluster.local:5432/postgres?sslmode=disable
+      - REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379
+
+  sink:
+    image: public.ecr.aws/p1t3u8a3/sink:v1.23.0
+    restart: unless-stopped
+    depends_on:
+      - redis
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - sink-openreplay
+          - sink-openreplay.app.svc.cluster.local
+    environment:
+      - LICENSE_KEY=
+      - KAFKA_SERVERS=kafka.db.svc.cluster.local:9092
+      - KAFKA_USE_SSL=false
+      - ASSETS_ORIGIN=${SERVICE_URL_NGINX}/sessions-assets
+      - REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379
+
+  sourcemapreader:
+    image: public.ecr.aws/p1t3u8a3/sourcemapreader:v1.23.0
+    restart: unless-stopped
+    depends_on:
+      - minio
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - sourcemapreader-openreplay
+          - sourcemapreader-openreplay.app.svc.cluster.local
+    environment:
+      - SMR_HOST=0.0.0.0
+      - S3_HOST=http://minio.db.svc.cluster.local:9000
+      - S3_KEY=$SERVICE_PASSWORD_64_S3KEY
+      - S3_SECRET=$SERVICE_PASSWORD_64_S3SECRET
+      - AWS_REGION=us-east-1
+      - LICENSE_KEY=
+      - ASSETS_ORIGIN=${SERVICE_URL_NGINX}/sessions-assets
+
+  spot:
+    image: public.ecr.aws/p1t3u8a3/spot:v1.23.0
+    restart: unless-stopped
+    depends_on:
+      - postgresql
+      - redis
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - spot-openreplay
+          - spot-openreplay.app.svc.cluster.local
+    environment:
+      - CACHE_ASSETS=true
+      - FS_CLEAN_HRS=24
+      - AWS_ACCESS_KEY_ID=$SERVICE_PASSWORD_64_S3KEY
+      - AWS_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_64_S3SECRET
+      - BUCKET_NAME=spots
+      - AWS_REGION=us-east-1
+      - AWS_ENDPOINT=${SERVICE_URL_NGINX}
+      - LICENSE_KEY=
+      - KAFKA_SERVERS=kafka.db.svc.cluster.local:9092
+      - KAFKA_USE_SSL=false
+      - JWT_SECRET=$SERVICE_PASSWORD_64_JWT
+      - JWT_SPOT_SECRET=$SERVICE_PASSWORD_64_JWTSPOT
+      - pg_password=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_STRING=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@postgresql.db.svc.cluster.local:5432/postgres?sslmode=disable
+      - REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379
+
+  storage:
+    image: public.ecr.aws/p1t3u8a3/storage:v1.23.0
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - minio
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - storage-openreplay
+          - storage-openreplay.app.svc.cluster.local
+    environment:
+      - AWS_ACCESS_KEY_ID=$SERVICE_PASSWORD_64_S3KEY
+      - AWS_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_64_S3SECRET
+      - AWS_ENDPOINT=${SERVICE_URL_NGINX}
+      - AWS_REGION=us-east-1
+      - BUCKET_NAME=mobs
+      - LICENSE_KEY=
+      - KAFKA_SERVERS=kafka.db.svc.cluster.local:9092
+      - KAFKA_USE_SSL=false
+      - REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379
+      - FS_CLEAN_HRS=24
+
+  assets:
+    image: public.ecr.aws/p1t3u8a3/assets:v1.23.0
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - minio
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - assets-openreplay
+          - assets-openreplay.app.svc.cluster.local
+    environment:
+      - AWS_ACCESS_KEY_ID=$SERVICE_PASSWORD_64_S3KEY
+      - AWS_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_64_S3SECRET
+      - BUCKET_NAME=sessions-assets
+      - LICENSE_KEY=
+      - AWS_ENDPOINT=${SERVICE_URL_NGINX}
+      - AWS_REGION=us-east-1
+      - KAFKA_SERVERS=kafka.db.svc.cluster.local:9092
+      - KAFKA_USE_SSL=false
+      - ASSETS_ORIGIN=${SERVICE_URL_NGINX}/sessions-assets
+      - REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379
+
+  assist:
+    image: public.ecr.aws/p1t3u8a3/assist:v1.23.0
+    restart: unless-stopped
+    depends_on:
+      - redis
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - assist-openreplay
+          - assist-openreplay.app.svc.cluster.local
+    environment:
+      - ASSIST_JWT_SECRET=$SERVICE_PASSWORD_64_ASSISTJWT
+      - ASSIST_KEY=$SERVICE_PASSWORD_64_ASSISTKEY
+      - AWS_DEFAULT_REGION=us-east-1
+      - REDIS_URL=redis-master.db.svc.cluster.local
+      - CLEAR_SOCKET_TIME=720
+      - debug=0
+      - redis=false
+
+  canvases:
+    image: public.ecr.aws/p1t3u8a3/canvases:v1.23.0
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - minio
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - canvases-openreplay
+          - canvases-openreplay.app.svc.cluster.local
+    environment:
+      - AWS_ACCESS_KEY_ID=$SERVICE_PASSWORD_64_S3KEY
+      - AWS_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_64_S3SECRET
+      - AWS_ENDPOINT=${SERVICE_URL_NGINX}
+      - AWS_REGION=us-east-1
+      - BUCKET_NAME=mobs
+      - LICENSE_KEY=
+      - KAFKA_SERVERS=kafka.db.svc.cluster.local:9092
+      - KAFKA_USE_SSL=false
+      - REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379
+      - FS_CLEAN_HRS=24
+
+  chalice:
+    image: public.ecr.aws/p1t3u8a3/chalice:v1.23.0
+    restart: unless-stopped
+    depends_on:
+      - postgresql
+      - redis
+      - clickhouse
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - chalice-openreplay
+          - chalice-openreplay.app.svc.cluster.local
+    environment:
+      - REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379
+      - KAFKA_SERVERS=kafka.db.svc.cluster.local
+      - ch_username=default
+      - ch_password=
+      - ch_host=clickhouse-openreplay-clickhouse.db.svc.cluster.local
+      - ch_port=9000
+      - ch_port_http=8123
+      - sourcemaps_reader=http://sourcemapreader-openreplay.app.svc.cluster.local:9000/{}/sourcemaps
+      - ASSIST_URL=http://assist-openreplay.app.svc.cluster.local:9001/assist/%s
+      - JWT_REFRESH_SECRET=$SERVICE_PASSWORD_64_JWTREFRESH
+      - JWT_SPOT_REFRESH_SECRET=$SERVICE_PASSWORD_64_JWTSPOTREFRESH
+      - ASSIST_JWT_SECRET=$SERVICE_PASSWORD_64_ASSISTJWT
+      - JWT_SECRET=$SERVICE_PASSWORD_64_JWT
+      - ASSIST_KEY=$SERVICE_PASSWORD_64_ASSISTKEY
+      - JWT_SPOT_SECRET=$SERVICE_PASSWORD_64_JWTSPOT
+      - LICENSE_KEY=
+      - version_number=v1.23.0
+      - pg_host=postgresql.db.svc.cluster.local
+      - pg_port=5432
+      - pg_dbname=postgres
+      - pg_user=postgres
+      - pg_password=$SERVICE_PASSWORD_POSTGRES
+      - SITE_URL=${SERVICE_URL_NGINX}
+      - S3_HOST=${SERVICE_URL_NGINX}
+      - S3_KEY=$SERVICE_PASSWORD_64_S3KEY
+      - S3_SECRET=$SERVICE_PASSWORD_64_S3SECRET
+      - AWS_DEFAULT_REGION=us-east-1
+      - sessions_region=us-east-1
+      - ASSIST_RECORDS_BUCKET=records
+      - sessions_bucket=mobs
+      - IOS_VIDEO_BUCKET=mobs
+      - sourcemaps_bucket=sourcemaps
+      - js_cache_bucket=sessions-assets
+      - EMAIL_HOST=${EMAIL_HOST:-}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_USER=${EMAIL_USER:-}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD:-}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-true}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL:-false}
+      - EMAIL_FROM=${EMAIL_FROM:-OpenReplay<do-not-reply@openreplay.com>}
+      - CH_COMPRESSION=false
+      - JWT_EXPIRATION=86400
+      - LOGLEVEL=INFO
+      - PYTHONUNBUFFERED=0
+
+  db:
+    image: public.ecr.aws/p1t3u8a3/db:v1.23.0
+    restart: unless-stopped
+    depends_on:
+      - postgresql
+      - redis
+      - clickhouse
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - db-openreplay
+          - db-openreplay.app.svc.cluster.local
+    environment:
+      - CH_USERNAME=default
+      - CH_PASSWORD=
+      - CLICKHOUSE_STRING=clickhouse-openreplay-clickhouse.db.svc.cluster.local:9000/default
+      - LICENSE_KEY=
+      - KAFKA_SERVERS=kafka.db.svc.cluster.local:9092
+      - KAFKA_USE_SSL=false
+      - pg_password=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_STRING=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@postgresql.db.svc.cluster.local:5432/postgres?sslmode=disable
+      - REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379
+      - ch_db=default
+
+  ender:
+    image: public.ecr.aws/p1t3u8a3/ender:v1.23.0
+    restart: unless-stopped
+    depends_on:
+      - postgresql
+      - redis
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - ender-openreplay
+          - ender-openreplay.app.svc.cluster.local
+    environment:
+      - LICENSE_KEY=
+      - KAFKA_SERVERS=kafka.db.svc.cluster.local:9092
+      - KAFKA_USE_SSL=false
+      - pg_password=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_STRING=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@postgresql.db.svc.cluster.local:5432/postgres?sslmode=disable
+      - REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379
+
+  frontend:
+    image: public.ecr.aws/p1t3u8a3/frontend:v1.23.0
+    restart: unless-stopped
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - frontend-openreplay
+          - frontend-openreplay.app.svc.cluster.local
+    environment:
+      - TRACKER_HOST=${SERVICE_URL_NGINX}/script
+      - HTTP_PORT=80
+
+  heuristics:
+    image: public.ecr.aws/p1t3u8a3/heuristics:v1.23.0
+    restart: unless-stopped
+    depends_on:
+      - redis
+    volumes:
+      - shared-volume:/mnt/efs
+    networks:
+      openreplay-net:
+        aliases:
+          - heuristics-openreplay
+          - heuristics-openreplay.app.svc.cluster.local
+    environment:
+      - LICENSE_KEY=
+      - KAFKA_SERVERS=kafka.db.svc.cluster.local:9092
+      - KAFKA_USE_SSL=false
+      - REDIS_STRING=redis://redis-master.db.svc.cluster.local:6379
+
+volumes:
+  pgdata:
+  clickhousedata:
+  redisdata:
+  miniodata:
+  shared-volume:
+
+networks:
+  openreplay-net:
