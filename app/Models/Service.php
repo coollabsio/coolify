@@ -664,6 +664,21 @@ class Service extends BaseModel
                     }
                     $fields->put('Elasticsearch', $data->toArray());
                     break;
+                case $image->contains('opensearch'):
+                    $data = collect([]);
+                    $opensearch_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_OPENSEARCH')->first();
+                    if ($opensearch_password) {
+                        $data = $data->merge([
+                            'Password (default user: opensearch)' => [
+                                'key' => data_get($opensearch_password, 'key'),
+                                'value' => data_get($opensearch_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('OPENSEARCH', $data->toArray());
+                    break;
                 case $image->contains('directus'):
                     $data = collect([]);
                     $admin_email = $this->environment_variables()->where('key', 'ADMIN_EMAIL')->first();
