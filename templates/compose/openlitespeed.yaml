@@ -1,0 +1,24 @@
+# documentation: https://docs.litespeedtech.com/cloud/docker/openlitespeed/
+# slogan: OpenLiteSpeed is a lightweight, high-performance, open-source web server with built-in PHP support.
+# category: proxy
+# tags: webserver, openlitespeed, litespeed, php, http
+# port: 80
+
+services:
+  openlitespeed:
+    image: litespeedtech/openlitespeed:${OPENLITESPEED_VERSION:-1.8.5-lsphp85}
+    environment:
+      - SERVICE_URL_OPENLITESPEED_80
+      - TZ=${TZ:-UTC}
+    volumes:
+      - openlitespeed-conf:/usr/local/lsws/conf
+      - openlitespeed-admin-conf:/usr/local/lsws/admin/conf
+      - openlitespeed-sites:/var/www/vhosts
+      - openlitespeed-acme:/root/.acme.sh
+      - openlitespeed-logs:/usr/local/lsws/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
