@@ -11,6 +11,7 @@ use App\Livewire\Project\New\SimpleDockerfile;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -212,6 +213,40 @@ describe('GithubPrivateRepository destination team scope', function () {
 });
 
 describe('GithubPrivateRepositoryDeployKey destination team scope', function () {
+    test('submit with dockerfile persists base directory', function () {
+        $rsaKey = openssl_pkey_new([
+            'private_key_bits' => 2048,
+            'private_key_type' => OPENSSL_KEYTYPE_RSA,
+        ]);
+        openssl_pkey_export($rsaKey, $pemKey);
+
+        $privateKey = PrivateKey::create([
+            'name' => 'Deploy Key',
+            'private_key' => $pemKey,
+            'team_id' => $this->teamA->id,
+        ]);
+
+        $routeParams = [
+            'project_uuid' => $this->projectA->uuid,
+            'environment_uuid' => $this->environmentA->uuid,
+        ];
+
+        Livewire::withUrlParams(['destination' => $this->destinationA->uuid])
+            ->test(GithubPrivateRepositoryDeployKey::class, $routeParams)
+            ->set('private_key_id', $privateKey->id)
+            ->set('repository_url', 'https://git.example.com/acme/monorepo')
+            ->set('branch', 'main')
+            ->set('build_pack', 'dockerfile')
+            ->set('base_directory', '/apps/api')
+            ->call('submit');
+
+        $application = Application::query()->latest('id')->first();
+
+        expect($application->base_directory)->toBe('/apps/api');
+        expect($application->build_pack)->toBe('dockerfile');
+        expect($application->private_key_id)->toBe($privateKey->id);
+    });
+
     test('submit with other team destination throws and creates no application', function () {
         $routeParams = [
             'project_uuid' => $this->projectA->uuid,
