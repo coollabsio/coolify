@@ -147,7 +147,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 
             foreach ($this->containers as $containerName) {
                 if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
-                    $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
+                    $cmd = $this->containerShellCommand($this->task->command);
                     $exec = "docker exec {$containerName} {$cmd}";
                     // Disable SSH multiplexing to prevent race conditions when multiple tasks run concurrently
                     // See: https://github.com/coollabsio/coolify/issues/6736
@@ -273,5 +273,10 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 
         // Notify team about permanent failure
         $this->team?->notify(new TaskFailed($this->task, $exception?->getMessage() ?? 'Unknown error'));
+    }
+
+    private function containerShellCommand(string $command): string
+    {
+        return "sh -c '".str_replace("'", "'\''", "($command) 2>&1")."'";
     }
 }

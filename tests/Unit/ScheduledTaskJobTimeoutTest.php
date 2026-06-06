@@ -94,3 +94,15 @@ it('failed method logs when execution cannot be found', function () {
         ->toContain('Could not find execution log')
         ->toContain('warning');
 });
+
+it('wraps scheduled task commands so stderr is captured with stdout', function () {
+    $reflection = new ReflectionClass(ScheduledTaskJob::class);
+    $job = $reflection->newInstanceWithoutConstructor();
+    $method = $reflection->getMethod('containerShellCommand');
+    $method->setAccessible(true);
+
+    expect($method->invoke($job, 'echo stdout; echo stderr >&2'))
+        ->toBe("sh -c '(echo stdout; echo stderr >&2) 2>&1'")
+        ->and($method->invoke($job, "echo 'stderr' >&2"))
+        ->toBe("sh -c '(echo '\''stderr'\'' >&2) 2>&1'");
+});
