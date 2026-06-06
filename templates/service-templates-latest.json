@@ -3557,6 +3557,23 @@
         "minversion": "0.0.0",
         "port": "3000"
     },
+    "opensearch": {
+        "documentation": "https://docs.opensearch.org/latest?utm_source=coolify.io",
+        "slogan": "OpenSearch is an open-source search and analytics engine.",
+        "compose": "c2VydmljZXM6CiAgb3BlbnNlYXJjaDoKICAgIGltYWdlOiAnb3BlbnNlYXJjaHByb2plY3Qvb3BlbnNlYXJjaDoyLjE5LjEnCiAgICByZXN0YXJ0OiB1bmxlc3Mtc3RvcHBlZAogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfT1BFTlNFQVJDSF85MjAwCiAgICAgIC0gY2x1c3Rlci5uYW1lPW9wZW5zZWFyY2gtY2x1c3RlcgogICAgICAtIG5vZGUubmFtZT1vcGVuc2VhcmNoLW5vZGUxCiAgICAgIC0gZGlzY292ZXJ5LnR5cGU9c2luZ2xlLW5vZGUKICAgICAgLSBib290c3RyYXAubWVtb3J5X2xvY2s9dHJ1ZQogICAgICAtICdPUEVOU0VBUkNIX0pBVkFfT1BUUz0tWG1zNTEybSAtWG14NTEybScKICAgICAgLSAnT1BFTlNFQVJDSF9JTklUSUFMX0FETUlOX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9PUEVOU0VBUkNIfScKICAgICAgLSBwbHVnaW5zLnNlY3VyaXR5LnNzbC5odHRwLmVuYWJsZWQ9ZmFsc2UKICAgIHVsaW1pdHM6CiAgICAgIG1lbWxvY2s6CiAgICAgICAgc29mdDogLTEKICAgICAgICBoYXJkOiAtMQogICAgICBub2ZpbGU6CiAgICAgICAgc29mdDogNjU1MzYKICAgICAgICBoYXJkOiA2NTUzNgogICAgdm9sdW1lczoKICAgICAgLSAnb3BlbnNlYXJjaC1kYXRhOi91c3Ivc2hhcmUvb3BlbnNlYXJjaC9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICdjdXJsIC0tdXNlciBhZG1pbjoke1NFUlZJQ0VfUEFTU1dPUkRfT1BFTlNFQVJDSH0gLS1zaWxlbnQgLS1mYWlsIGh0dHA6Ly9sb2NhbGhvc3Q6OTIwMC9fY2x1c3Rlci9oZWFsdGggfHwgZXhpdCAxJwogICAgICBpbnRlcnZhbDogMzBzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxMAp2b2x1bWVzOgogIG9wZW5zZWFyY2gtZGF0YTogbnVsbAo=",
+        "tags": [
+            "search",
+            "engine",
+            "fulltext",
+            "full",
+            "text",
+            "opensearch"
+        ],
+        "category": "search",
+        "logo": "svgs/opensearch.svg",
+        "minversion": "0.0.0",
+        "port": "9200"
+    },
     "opnform": {
         "documentation": "https://docs.opnform.com/introduction?utm_source=coolify.io",
         "slogan": "OpnForm is an open-source form builder that lets you create beautiful forms and share them anywhere. It's super fast, you don't need to know how to code",

@@ -1,0 +1,38 @@
+# documentation: https://docs.opensearch.org/latest
+# slogan: OpenSearch is an open-source search and analytics engine.
+# tags: search,engine,fulltext,full,text,opensearch
+# category: search
+# logo: svgs/opensearch.svg
+# port: 9200
+
+services:
+  opensearch:
+    image: 'opensearchproject/opensearch:2.19.1'
+    restart: unless-stopped
+    environment:
+      - SERVICE_URL_OPENSEARCH_9200
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch-node1
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - 'OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m'
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${SERVICE_PASSWORD_OPENSEARCH}
+      - plugins.security.ssl.http.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - 'opensearch-data:/usr/share/opensearch/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'curl --user admin:${SERVICE_PASSWORD_OPENSEARCH} --silent --fail http://localhost:9200/_cluster/health || exit 1'
+      interval: 30s
+      timeout: 10s
+      retries: 10
+volumes:
+  opensearch-data: null
