@@ -20,6 +20,10 @@ function shouldChangeOwnership(string $path): bool
 
     return $isCoolifyPath;
 }
+function runsShellCommandInsideDockerExec(string $line): bool
+{
+    return preg_match('/^\s*(sudo\s+)?docker\s+exec\b.*\b(?:sh|bash)\s+-[a-zA-Z]*c\b/', $line) === 1;
+}
 function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 {
     $commands = $commands->map(function ($line) {
@@ -90,6 +94,10 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 
     $commands = $commands->map(function ($line) {
         $line = str($line);
+
+        if (runsShellCommandInsideDockerExec($line->value())) {
+            return $line->value();
+        }
 
         // Detect complex piped commands that should be wrapped in bash -c
         $isComplexPipeCommand = (

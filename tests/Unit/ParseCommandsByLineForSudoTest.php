@@ -277,6 +277,17 @@ test('handles command with mixed operators and subshells', function () {
     expect($result[0])->toBe('sudo docker ps || sudo echo $(sudo date)');
 });
 
+test('does not inject sudo into docker exec shell commands', function () {
+    $commands = collect([
+        "docker exec postgres sh -c '/tmp/restore_database.sh && rm -f /tmp/restore.sql /tmp/restore_database.sh'",
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe("sudo docker exec postgres sh -c '/tmp/restore_database.sh && rm -f /tmp/restore.sql /tmp/restore_database.sh'");
+    expect($result[0])->not->toContain('&& sudo rm -f');
+});
+
 test('handles whitespace-only commands gracefully', function () {
     $commands = collect([
         '   ',
