@@ -7,7 +7,7 @@
 
 services:
   zpan:
-    image: ghcr.io/saltbo/zpan:2.7.1
+    image: ghcr.io/saltbo/zpan:2.7.2
     environment:
       - SERVICE_URL_ZPAN_8222
       - BETTER_AUTH_URL=${SERVICE_URL_ZPAN_8222}
@@ -23,7 +23,7 @@ services:
       start_period: 10s
 
   downloader:
-    image: ghcr.io/saltbo/zpan:2.7.1-cli
+    image: ghcr.io/saltbo/zpan:2.7.2-cli
     command: ["--config", "/data/config.yaml", "downloader", "up"]
     environment:
       - ZPAN_SERVER_URL=http://zpan:8222
