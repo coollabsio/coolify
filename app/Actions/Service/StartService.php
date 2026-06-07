@@ -42,17 +42,35 @@ class StartService
         $commands[] = 'echo Starting service.';
         $commands[] = "docker compose --project-directory {$workdir} -f {$workdir}/docker-compose.yml --project-name {$service->uuid} up -d --remove-orphans --force-recreate --build";
         $commands[] = "docker network connect $service->uuid coolify-proxy >/dev/null 2>&1 || true";
-        if (data_get($service, 'connect_to_docker_network')) {
-            $compose = data_get($service, 'docker_compose', []);
-            $safeNetwork = escapeshellarg($service->destination->network);
-            $serviceNames = data_get(Yaml::parse($compose), 'services', []);
-            foreach ($serviceNames as $serviceName => $serviceConfig) {
-                $commands[] = "docker network connect --alias {$serviceName}-{$service->uuid} {$safeNetwork} {$serviceName}-{$service->uuid} >/dev/null 2>&1 || true";
-            }
-        }
+        $commands = array_merge($commands, $this->serviceNetworkConnectCommands($service));
         $commands = array_merge($commands, $this->logDrainNetworkConnectCommands($service));
 
         return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
+    }
+
+    private function serviceNetworkConnectCommands(Service $service): array
+    {
+        if (! data_get($service, 'connect_to_docker_network')) {
+            return [];
+        }
+
+        $compose = data_get($service, 'docker_compose', []);
+        $network = data_get($service, 'destination.network');
+
+        if (blank($network)) {
+            return [];
+        }
+
+        $commands = [];
+        $safeNetwork = escapeshellarg($network);
+        $serviceNames = data_get(Yaml::parse($compose), 'services', []);
+
+        foreach ($serviceNames as $serviceName => $serviceConfig) {
+            $containerName = "{$serviceName}-{$service->uuid}";
+            $commands[] = 'docker network connect --alias '.escapeshellarg($serviceName).' --alias '.escapeshellarg($containerName).' '.$safeNetwork.' '.escapeshellarg($containerName).' >/dev/null 2>&1 || true';
+        }
+
+        return $commands;
     }
 
     private function logDrainNetworkConnectCommands(Service $service): array

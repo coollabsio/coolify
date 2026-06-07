@@ -20,6 +20,14 @@ function reflectedLogDrainNetworkCommands(object $action, Server|Service $model)
     return $method->invoke($action, $model);
 }
 
+function reflectedServiceNetworkCommands(StartService $action, Service $service): array
+{
+    $method = new ReflectionMethod($action, 'serviceNetworkConnectCommands');
+    $method->setAccessible(true);
+
+    return $method->invoke($action, $service);
+}
+
 function createServerWithTeam(): Server
 {
     $team = Team::factory()->create();
@@ -63,6 +71,28 @@ it('does not connect the log drain container when service preferred network is d
     $service = createServiceOnServer($server, 'signoz-net', false);
 
     $commands = reflectedLogDrainNetworkCommands(new StartService, $service->fresh(['destination.server.settings']));
+
+    expect($commands)->toBeEmpty();
+});
+
+it('connects service containers to the preferred network with short and generated aliases', function () {
+    $server = createServerWithTeam();
+    $service = createServiceOnServer($server, 'signoz-net', true);
+    $service->forceFill([
+        'uuid' => 'service-uuid',
+        'docker_compose' => "services:\n  signoz:\n    image: signoz/signoz:latest\n",
+    ])->save();
+
+    $commands = reflectedServiceNetworkCommands(new StartService, $service->fresh(['destination']));
+
+    expect($commands)->toContain("docker network connect --alias 'signoz' --alias 'signoz-service-uuid' 'signoz-net' 'signoz-service-uuid' >/dev/null 2>&1 || true");
+});
+
+it('does not connect service containers to the preferred network when disabled', function () {
+    $server = createServerWithTeam();
+    $service = createServiceOnServer($server, 'signoz-net', false);
+
+    $commands = reflectedServiceNetworkCommands(new StartService, $service->fresh(['destination']));
 
     expect($commands)->toBeEmpty();
 });
