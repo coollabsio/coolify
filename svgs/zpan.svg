@@ -1,0 +1,29 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">ZPan logo</title>
+  <desc id="desc">A teal rounded badge with a white stylized Z and amber accent.</desc>
+  <defs>
+    <linearGradient id="badge" x1="184" y1="142" x2="824" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2FD0C0"/>
+      <stop offset="1" stop-color="#18A99C"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="660" y1="330" x2="772" y2="424" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFC24A"/>
+      <stop offset="1" stop-color="#F2A91F"/>
+    </linearGradient>
+  </defs>
+
+  <path
+    d="M512 92C538.5 92 562.2 103.5 590.8 123.6L796.7 268.4C855.5 309.8 888 375.4 888 447.3V742C888 848.6 801.6 935 695 935H329C222.4 935 136 848.6 136 742V447.3C136 375.4 168.5 309.8 227.3 268.4L433.2 123.6C461.8 103.5 485.5 92 512 92Z"
+    fill="url(#badge)"
+  />
+
+  <path
+    d="M338.3 336C318.9 336 300.9 346.2 290.9 362.8L270.3 397.1C264.2 407.3 271.5 420.2 283.4 420.2H554.9L350.7 669.5C331.5 691.7 317.3 718.5 309.4 746.8L303.6 767.7C300.5 778.8 308.8 789.8 320.3 789.8H629.1C652.2 789.8 672.7 775.1 680.2 753.2L698.5 699.7C702.6 687.8 693.8 675.4 681.2 675.4H432.3L631.2 422.5C646.9 402.6 657.5 379.3 662.1 354.1C664 344 656.2 336 645.9 336H338.3Z"
+    fill="white"
+  />
+
+  <path
+    d="M711.5 336H791.1C805.3 336 815.1 350.2 810.1 363.5L789.4 418.5C784.5 431.5 772.1 440.1 758.3 440.1H678.7C664.5 440.1 654.7 425.9 659.7 412.6L680.4 357.6C685.3 344.6 697.7 336 711.5 336Z"
+    fill="url(#accent)"
+  />
+</svg>

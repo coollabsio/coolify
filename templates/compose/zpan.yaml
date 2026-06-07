@@ -1,0 +1,26 @@
+# documentation: https://github.com/saltbo/zpan#readme
+# slogan: S3-native file hosting platform for web drive, file sharing, and image hosting workflows.
+# category: storage
+# tags: s3,file-hosting,file-sharing,webdav,image-hosting,object-storage
+# logo: svgs/zpan.svg
+# port: 8222
+
+services:
+  zpan:
+    image: ghcr.io/saltbo/zpan:2.7.1
+    environment:
+      - SERVICE_URL_ZPAN_8222
+      - BETTER_AUTH_URL=${SERVICE_URL_ZPAN_8222}
+      - DATABASE_URL=/data/zpan.db
+      - PORT=8222
+    volumes:
+      - zpan-data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8222/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  zpan-data:
