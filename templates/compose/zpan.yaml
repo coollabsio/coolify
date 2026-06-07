@@ -1,7 +1,7 @@
 # documentation: https://github.com/saltbo/zpan#readme
-# slogan: S3-native file hosting platform for web drive, file sharing, and image hosting workflows.
+# slogan: Open-source file hosting for S3-compatible storage.
 # category: storage
-# tags: s3,file-hosting,file-sharing,webdav,image-hosting,object-storage
+# tags: s3,file-hosting,file-sharing,webdav,image-hosting,object-storage,downloader
 # logo: svgs/zpan.svg
 # port: 8222
 
@@ -22,5 +22,22 @@ services:
       retries: 12
       start_period: 10s
 
+  downloader:
+    image: ghcr.io/saltbo/zpan:2.7.1-cli
+    command: ["--config", "/data/config.yaml", "downloader", "up"]
+    environment:
+      - ZPAN_SERVER_URL=http://zpan:8222
+      - ZPAN_DOWNLOADER_ENGINE=auto
+      - ZPAN_DOWNLOADER_DOWNLOAD_DIR=/data/downloads
+      - ZPAN_DOWNLOADER_STATE_DIR=/data/state
+      - ZPAN_DOWNLOADER_BT_LISTEN_PORT=6881
+      - ZPAN_DOWNLOADER_SEED_CACHE_LIMIT=10GB
+    volumes:
+      - zpan-downloader-data:/data
+    depends_on:
+      zpan:
+        condition: service_healthy
+
 volumes:
   zpan-data:
+  zpan-downloader-data:
