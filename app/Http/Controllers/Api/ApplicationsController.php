@@ -2905,7 +2905,9 @@ class ApplicationsController extends Controller
         if ($is_preview) {
             $env = $application->environment_variables_preview->where('key', $key)->first();
             if ($env) {
-                $env->value = $request->value;
+                if ($request->has('value')) {
+                    $env->value = $request->value;
+                }
                 if ($env->is_literal != $is_literal) {
                     $env->is_literal = $is_literal;
                 }
@@ -2946,7 +2948,9 @@ class ApplicationsController extends Controller
         } else {
             $env = $application->environment_variables->where('key', $key)->first();
             if ($env) {
-                $env->value = $request->value;
+                if ($request->has('value')) {
+                    $env->value = $request->value;
+                }
                 if ($env->is_literal != $is_literal) {
                     $env->is_literal = $is_literal;
                 }
@@ -3126,7 +3130,9 @@ class ApplicationsController extends Controller
             if ($is_preview) {
                 $env = $application->environment_variables_preview->where('key', $key)->first();
                 if ($env) {
-                    $env->value = $item->get('value');
+                    if ($item->has('value')) {
+                        $env->value = $item->get('value');
+                    }
 
                     if ($env->is_literal != $is_literal) {
                         $env->is_literal = $is_literal;
@@ -3165,7 +3171,9 @@ class ApplicationsController extends Controller
             } else {
                 $env = $application->environment_variables->where('key', $key)->first();
                 if ($env) {
-                    $env->value = $item->get('value');
+                    if ($item->has('value')) {
+                        $env->value = $item->get('value');
+                    }
                     if ($env->is_literal != $is_literal) {
                         $env->is_literal = $is_literal;
                     }

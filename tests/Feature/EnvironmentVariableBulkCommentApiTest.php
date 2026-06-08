@@ -152,6 +152,87 @@ describe('PATCH /api/v1/applications/{uuid}/envs/bulk', function () {
         expect($env->comment)->toBe('Keep this comment');
     });
 
+    test('preserves existing value when not provided in bulk update', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        EnvironmentVariable::create([
+            'key' => 'API_TOKEN',
+            'value' => 'keep-this-secret',
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
+            'is_preview' => false,
+            'is_buildtime' => false,
+            'is_runtime' => true,
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->patchJson("/api/v1/applications/{$application->uuid}/envs/bulk", [
+            'data' => [
+                [
+                    'key' => 'API_TOKEN',
+                    'is_buildtime' => true,
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(201);
+
+        $env = EnvironmentVariable::where('key', 'API_TOKEN')
+            ->where('resourceable_id', $application->id)
+            ->where('is_preview', false)
+            ->first();
+
+        expect($env->value)->toBe('keep-this-secret');
+        expect((bool) $env->is_buildtime)->toBeTrue();
+    });
+
+    test('preserves existing preview value when not provided in bulk update', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        EnvironmentVariable::create([
+            'key' => 'PREVIEW_API_TOKEN',
+            'value' => 'keep-this-preview-secret',
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
+            'is_preview' => true,
+            'is_buildtime' => false,
+            'is_runtime' => true,
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->patchJson("/api/v1/applications/{$application->uuid}/envs/bulk", [
+            'data' => [
+                [
+                    'key' => 'PREVIEW_API_TOKEN',
+                    'is_preview' => true,
+                    'is_buildtime' => true,
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(201);
+
+        $env = EnvironmentVariable::where('key', 'PREVIEW_API_TOKEN')
+            ->where('resourceable_id', $application->id)
+            ->where('is_preview', true)
+            ->first();
+
+        expect($env->value)->toBe('keep-this-preview-secret');
+        expect((bool) $env->is_buildtime)->toBeTrue();
+    });
+
     test('rejects comment exceeding 256 characters', function () {
         $application = Application::factory()->create([
             'environment_id' => $this->environment->id,

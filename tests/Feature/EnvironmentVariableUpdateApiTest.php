@@ -189,6 +189,79 @@ describe('PATCH /api/v1/applications/{uuid}/envs', function () {
         $response->assertJsonMissing(['message' => 'Environment variable updated.']);
     });
 
+    test('preserves existing value when updating flags without value', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        EnvironmentVariable::create([
+            'key' => 'API_TOKEN',
+            'value' => 'keep-this-secret',
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
+            'is_preview' => false,
+            'is_buildtime' => false,
+            'is_runtime' => true,
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->patchJson("/api/v1/applications/{$application->uuid}/envs", [
+            'key' => 'API_TOKEN',
+            'is_buildtime' => true,
+        ]);
+
+        $response->assertStatus(201);
+
+        $env = EnvironmentVariable::where('key', 'API_TOKEN')
+            ->where('resourceable_id', $application->id)
+            ->where('is_preview', false)
+            ->first();
+
+        expect($env->value)->toBe('keep-this-secret');
+        expect((bool) $env->is_buildtime)->toBeTrue();
+    });
+
+    test('preserves existing preview value when updating flags without value', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        EnvironmentVariable::create([
+            'key' => 'PREVIEW_API_TOKEN',
+            'value' => 'keep-this-preview-secret',
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
+            'is_preview' => true,
+            'is_buildtime' => false,
+            'is_runtime' => true,
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->patchJson("/api/v1/applications/{$application->uuid}/envs", [
+            'key' => 'PREVIEW_API_TOKEN',
+            'is_preview' => true,
+            'is_buildtime' => true,
+        ]);
+
+        $response->assertStatus(201);
+
+        $env = EnvironmentVariable::where('key', 'PREVIEW_API_TOKEN')
+            ->where('resourceable_id', $application->id)
+            ->where('is_preview', true)
+            ->first();
+
+        expect($env->value)->toBe('keep-this-preview-secret');
+        expect((bool) $env->is_buildtime)->toBeTrue();
+    });
+
     test('returns 404 when environment variable does not exist', function () {
         $application = Application::factory()->create([
             'environment_id' => $this->environment->id,
