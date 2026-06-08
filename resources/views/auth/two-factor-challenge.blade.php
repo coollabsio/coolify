@@ -42,6 +42,33 @@
                 const lastIndex = Math.min(pasteDigits.length - 1, 5);
                 inputs[lastIndex].focus();
             }
+        },
+        toggleShowRecovery() {
+            this.showRecovery = !this.showRecovery;
+
+            if(this.showRecovery) {
+                return this.focusRecoveryCodeInput();
+            }
+
+            this.focusEmptyTwoFactorCodeInput();
+        },
+        focusEmptyTwoFactorCodeInput() {
+            this.$nextTick(() => {
+                const emptyDigitIndex = this.digits.findIndex(digit => digit === '');
+
+                if (emptyDigitIndex === -1) return;
+
+                const twoFactorCodeInput = document.getElementById(`two_factor_code_input_${emptyDigitIndex}`);
+
+                twoFactorCodeInput?.focus();
+            });
+        },
+        focusRecoveryCodeInput() {
+            this.$nextTick(() => {
+                const recoveryCodeInput = document.querySelector('input[name=\'recovery_code\']');
+
+                recoveryCodeInput?.focus();
+            });
         }
     }">
         <div class="flex flex-col items-center justify-center px-6 py-8 mx-auto md:h-screen lg:py-0">
@@ -85,27 +112,27 @@
                         </div>
                     </div>
 
-                    <form action="/two-factor-challenge" method="POST" class="flex flex-col gap-4">
+                    <form action="/two-factor-challenge" method="POST" class="flex flex-col gap-4" x-init="focusEmptyTwoFactorCodeInput()">
                         @csrf
                         <div x-show="!showRecovery">
                             <input type="hidden" name="code" x-model="code">
                             <div class="flex gap-2 justify-center" @paste="pasteCode($event)">
                                 <template x-for="(digit, index) in digits" :key="index">
-                                    <input type="text" inputmode="numeric" maxlength="1" x-model="digits[index]"
+                                    <input :id="`two_factor_code_input_${index}`" type="text" inputmode="numeric" maxlength="1" x-model="digits[index]"
                                         @input="if ($event.target.value) { focusNext($event); updateCode(); }"
                                         @keydown="focusPrevious($event)"
                                         class="w-12 h-14 text-center text-2xl font-bold bg-white dark:bg-coolgray-100 border-2 border-neutral-200 dark:border-coolgray-300 rounded-lg focus:border-coollabs dark:focus:border-warning focus:outline-none focus:ring-0 transition-colors"
                                         autocomplete="off" />
                                 </template>
                             </div>
-                            <button type="button" x-on:click="showRecovery = !showRecovery"
+                            <button type="button" x-on:click="toggleShowRecovery()"
                                 class="mt-4 text-sm dark:text-neutral-400 hover:text-black dark:hover:text-white hover:underline transition-colors cursor-pointer">
                                 Use Recovery Code Instead
                             </button>
                         </div>
                         <div x-show="showRecovery" x-cloak>
                             <x-forms.input name="recovery_code" label="{{ __('input.recovery_code') }}" />
-                            <button type="button" x-on:click="showRecovery = !showRecovery"
+                            <button type="button" x-on:click="toggleShowRecovery()"
                                 class="mt-2 text-sm dark:text-neutral-400 hover:text-black dark:hover:text-white hover:underline transition-colors cursor-pointer">
                                 Use Authenticator Code Instead
                             </button>

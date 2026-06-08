@@ -1,5 +1,5 @@
 <x-layout-simple>
-    <section class="bg-gray-50 dark:bg-base">
+    <section class="bg-gray-50 dark:bg-base" x-init="$nextTick(() => $el.querySelector('input[name=password]')?.focus())">
         <div class="flex flex-col items-center justify-center px-6 py-8 mx-auto md:h-screen lg:py-0">
             <div class="w-full max-w-md space-y-8">
                 <div class="text-center space-y-2">
