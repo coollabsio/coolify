@@ -7,7 +7,7 @@
 
 services:
   opensearch:
-    image: 'opensearchproject/opensearch:2.19.1'
+    image: 'opensearchproject/opensearch:3.6.0'
     restart: unless-stopped
     environment:
       - SERVICE_URL_OPENSEARCH_9200
