@@ -26,6 +26,7 @@ class ApiTokens extends Component
         60 => '60 days',
         90 => '90 days',
         365 => '1 year',
+        0 => 'Never',
     ];
 
     public $isApiEnabled;
@@ -103,7 +104,7 @@ class ApiTokens extends Component
 
             $this->validate([
                 'description' => 'required|min:3|max:255',
-                'expiresInDays' => 'nullable|integer|in:7,30,60,90,365',
+                'expiresInDays' => 'nullable|integer|in:0,7,30,60,90,365',
             ]);
             $expiresAt = $this->expiresInDays ? now()->addDays($this->expiresInDays) : null;
             $token = auth()->user()->createToken($this->description, array_values($this->permissions), $expiresAt);
