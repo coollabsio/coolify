@@ -704,7 +704,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $source = $parsed['source'];
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $normalizedTarget = (string) $target->value();
+                    $foundConfig = $fileStorages->get()->first(
+                        fn (\App\Models\LocalFileVolume $storage) => (string) $storage->mount_path === $normalizedTarget
+                    );
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
                         if ($foundConfig) {
@@ -757,7 +760,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
 
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $normalizedTarget = (string) $target->value();
+                    $foundConfig = $fileStorages->get()->first(
+                        fn (\App\Models\LocalFileVolume $storage) => (string) $storage->mount_path === $normalizedTarget
+                    );
                     if ($foundConfig) {
                         $contentNotNull_temp = data_get($foundConfig, 'content');
                         if ($contentNotNull_temp) {
