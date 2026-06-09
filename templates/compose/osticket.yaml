@@ -7,7 +7,7 @@
 
 services:
   osticket:
-    image: tiredofit/osticket:latest
+    image: ghcr.io/tiredofit/docker-osticket:latest
     environment:
       - SERVICE_URL_OSTICKET_80
       - APP_URL=${SERVICE_URL_OSTICKET}
