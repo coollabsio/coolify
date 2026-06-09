@@ -1,0 +1,63 @@
+# documentation: https://archon.diy
+# slogan: Workflow engine for AI coding agents - make AI development deterministic and repeatable
+# category: ai
+# tags: ai,coding,workflows,agents,claude,automation,developer-tools
+# logo: svgs/archon.svg
+# port: 3000
+
+services:
+  app:
+    image: ghcr.io/coleam00/archon:latest
+    restart: unless-stopped
+    environment:
+      - SERVICE_URL_APP_3000
+      - ARCHON_DOCKER=true
+      # AI credentials - at least one of the two below is required.
+      # Option A (recommended): OAuth token. Run `claude setup-token` locally to get one.
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
+      # Option B: API key from console.anthropic.com/settings/keys
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+      # Database - pre-filled to use the bundled PostgreSQL service
+      - DATABASE_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/archon
+      - PORT=3000
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - MAX_CONCURRENT_CONVERSATIONS=${MAX_CONCURRENT_CONVERSATIONS:-10}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
+      - SLACK_APP_TOKEN=${SLACK_APP_TOKEN:-}
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
+      - GH_TOKEN=${GH_TOKEN:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-}
+    volumes:
+      - archon_data:/.archon
+      - archon_user_home:/home/appuser
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=archon
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d archon"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  archon_data:
+  archon_user_home:
+  postgres_data:
