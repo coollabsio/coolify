@@ -1,0 +1,35 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/usage/
+# slogan: Production-ready fullstack mail server with SMTP, IMAP, Rspamd, Dovecot, Postfix, and account management.
+# category: email
+# tags: mail,email,smtp,imap,postfix,dovecot,rspamd
+# logo: svgs/default.webp
+
+services:
+  docker-mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: ${MAILSERVER_HOSTNAME:-mail.example.com}
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    volumes:
+      - docker-mailserver-data:/var/mail
+      - docker-mailserver-state:/var/mail-state
+      - docker-mailserver-logs:/var/log/mail
+      - docker-mailserver-config:/tmp/docker-mailserver
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - ENABLE_RSPAMD=${ENABLE_RSPAMD:-1}
+      - ENABLE_CLAMAV=${ENABLE_CLAMAV:-0}
+      - ENABLE_FAIL2BAN=${ENABLE_FAIL2BAN:-1}
+      - SSL_TYPE=${SSL_TYPE:-}
+      - SPOOF_PROTECTION=${SPOOF_PROTECTION:-1}
+      - POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS:-postmaster@example.com}
+    stop_grace_period: 1m
+    healthcheck:
+      test: "ss --listening --tcp | grep -P 'LISTEN.+:smtp' || exit 1"
+      timeout: 3s
+      retries: 10
+    cap_add:
+      - NET_ADMIN
