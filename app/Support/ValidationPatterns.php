@@ -15,7 +15,7 @@ class ValidationPatterns
     /**
      * Pattern for descriptions excluding all dangerous characters with some additional allowed characters
      */
-    public const DESCRIPTION_PATTERN = '/^[\p{L}\p{M}\p{N}\s\-_.,!?()\'\"+=*@\/&]+$/u';
+    public const DESCRIPTION_PATTERN = '/^[\p{L}\p{M}\p{N}\s\-_.,!?()\'\"+=*@\/&:]+$/u';
 
     /**
      * Pattern for file paths (dockerfile location, docker compose location, etc.)
@@ -125,7 +125,7 @@ class ValidationPatterns
     public static function descriptionMessages(): array
     {
         return [
-            'description.regex' => "The description may only contain letters (including Unicode), numbers, spaces, and common punctuation: - _ . , ! ? ( ) ' \" + = * / @ &",
+            'description.regex' => "The description may only contain letters (including Unicode), numbers, spaces, and common punctuation: - _ . , ! ? ( ) ' \" + = * / @ & :",
             'description.max' => 'The description may not be greater than :max characters.',
         ];
     }
