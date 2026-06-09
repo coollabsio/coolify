@@ -1,0 +1,75 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Production-ready, full-stack, simple mail server (SMTP, IMAP, LDAP, Antispam, Antivirus, etc.)
+# tags: email, smtp, imap, postfix, dovecot, rspamd, mail-server, self-hosted
+# logo: svgs/docker-mailserver.png
+# port: 25
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:14.0.0
+    container_name: mailserver
+    hostname: ${MAIL_HOSTNAME:-mail.example.com}
+    env_file: mailserver.env
+    ports:
+      - "${SMTP_PORT:-25}:25"
+      - "${SMTPS_PORT:-465}:465"
+      - "${SUBMISSION_PORT:-587}:587"
+      - "${IMAP_PORT:-143}:143"
+      - "${IMAPS_PORT:-993}:993"
+      - "${POP3_PORT:-110}:110"
+      - "${POP3S_PORT:-995}:995"
+    volumes:
+      - dms-mail-data:/var/mail
+      - dms-mail-state:/var/mail-state
+      - dms-mail-logs:/var/log/mail
+      - dms-config:/tmp/docker-mailserver
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+    stop_grace_period: 1m
+    healthcheck:
+      test: ["CMD", "ss", "--listening", "--tcp", "|", "grep", "-P", "LISTEN.+:smtp"]
+      timeout: 3s
+      retries: 0
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - ENABLE_RSPAMD=1
+      - ENABLE_CLAMAV=0
+      - ENABLE_FAIL2BAN=1
+      - SSL_TYPE=${SSL_TYPE:-letsencrypt}
+      - PERMIT_DOCKER=${PERMIT_DOCKER:-none}
+      - SPOOF_PROTECTION=1
+      - ENABLE_SPAMASSASSIN=0
+      - POSTSCREEN_ACTION=enforce
+      - POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS:-postmaster@example.com}
+      - LOG_LEVEL=${LOG_LEVEL:-warn}
+
+  # Roundcube webmail (optional — comment out if not needed)
+  roundcube:
+    image: roundcube/roundcubemail:1.6.9-apache
+    environment:
+      - ROUNDCUBEMAIL_DEFAULT_HOST=${ROUNDCUBEMAIL_DEFAULT_HOST:-mailserver}
+      - ROUNDCUBEMAIL_SMTP_SERVER=${ROUNDCUBEMAIL_SMTP_SERVER:-mailserver}
+      - ROUNDCUBEMAIL_SMTP_PORT=${ROUNDCUBEMAIL_SMTP_PORT:-587}
+      - ROUNDCUBEMAIL_SKIN=${ROUNDCUBEMAIL_SKIN:-elastic}
+      - ROUNDCUBEMAIL_DB_TYPE=${ROUNDCUBEMAIL_DB_TYPE:-sqlite}
+      - ROUNDCUBEMAIL_DB_SQLITE_FILE=${ROUNDCUBEMAIL_DB_SQLITE_FILE:-/var/roundcube/db/sqlite.db}
+    volumes:
+      - roundcube-db:/var/roundcube/db
+      - roundcube-temp:/tmp/roundcube-temp
+    depends_on:
+      mailserver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  dms-mail-data:
+  dms-mail-state:
+  dms-mail-logs:
+  dms-config:
+  roundcube-db:
+  roundcube-temp:
