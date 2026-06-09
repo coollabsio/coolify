@@ -882,6 +882,23 @@
         "logo": "svgs/diun.svg",
         "minversion": "0.0.0"
     },
+    "docker-mailserver": {
+        "documentation": "https://docker-mailserver.github.io/docker-mailserver/latest/usage/?utm_source=coolify.io",
+        "slogan": "Production-ready fullstack mail server with SMTP, IMAP, Rspamd, Dovecot, Postfix, and account management.",
+        "compose": "c2VydmljZXM6CiAgZG9ja2VyLW1haWxzZXJ2ZXI6CiAgICBpbWFnZTogZ2hjci5pby9kb2NrZXItbWFpbHNlcnZlci9kb2NrZXItbWFpbHNlcnZlcjpsYXRlc3QKICAgIGhvc3RuYW1lOiAke01BSUxTRVJWRVJfSE9TVE5BTUU6LW1haWwuZXhhbXBsZS5jb219CiAgICBwb3J0czoKICAgICAgLSAnMjU6MjUnCiAgICAgIC0gNDY1OjQ2NQogICAgICAtIDU4Nzo1ODcKICAgICAgLSA5OTM6OTkzCiAgICB2b2x1bWVzOgogICAgICAtIGRvY2tlci1tYWlsc2VydmVyLWRhdGE6L3Zhci9tYWlsCiAgICAgIC0gZG9ja2VyLW1haWxzZXJ2ZXItc3RhdGU6L3Zhci9tYWlsLXN0YXRlCiAgICAgIC0gZG9ja2VyLW1haWxzZXJ2ZXItbG9nczovdmFyL2xvZy9tYWlsCiAgICAgIC0gZG9ja2VyLW1haWxzZXJ2ZXItY29uZmlnOi90bXAvZG9ja2VyLW1haWxzZXJ2ZXIKICAgICAgLSAvZXRjL2xvY2FsdGltZTovZXRjL2xvY2FsdGltZTpybwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gRU5BQkxFX1JTUEFNRD0ke0VOQUJMRV9SU1BBTUQ6LTF9CiAgICAgIC0gRU5BQkxFX0NMQU1BVj0ke0VOQUJMRV9DTEFNQVY6LTB9CiAgICAgIC0gRU5BQkxFX0ZBSUwyQkFOPSR7RU5BQkxFX0ZBSUwyQkFOOi0xfQogICAgICAtIFNTTF9UWVBFPSR7U1NMX1RZUEU6LX0KICAgICAgLSBTUE9PRl9QUk9URUNUSU9OPSR7U1BPT0ZfUFJPVEVDVElPTjotMX0KICAgICAgLSBQT1NUTUFTVEVSX0FERFJFU1M9JHtQT1NUTUFTVEVSX0FERFJFU1M6LXBvc3RtYXN0ZXJAZXhhbXBsZS5jb219CiAgICBzdG9wX2dyYWNlX3BlcmlvZDogMW0KICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBzcyAtLWxpc3RlbmluZyAtLXRjcCB8IGdyZXAgLVAgJ0xJU1RFTi4rOnNtdHAnIHx8IGV4aXQgMQogICAgICB0aW1lb3V0OiAzcwogICAgICByZXRyaWVzOiAxMAogICAgY2FwX2FkZDoKICAgICAgLSBORVRfQURNSU4K",
+        "tags": [
+            "mail",
+            "email",
+            "smtp",
+            "imap",
+            "postfix",
+            "dovecot",
+            "rspamd"
+        ],
+        "category": "email",
+        "logo": "svgs/default.webp",
+        "minversion": "0.0.0"
+    },
     "docker-registry": {
         "documentation": "https://distribution.github.io/distribution/?utm_source=coolify.io",
         "slogan": "The Docker Registry lets you distribute Docker images.",
