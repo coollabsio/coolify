@@ -626,7 +626,7 @@ class Service extends BaseModel
                     }
                     $fields->put('Unleash', $data->toArray());
                     break;
-                case $this->isGrafanaImage($image->toString()):
+                case $this->isGrafanaServerImage($image->toString()):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GRAFANA')->first();
                     $data = $data->merge([
@@ -1380,13 +1380,19 @@ class Service extends BaseModel
         return $fields;
     }
 
-    private function isGrafanaImage(string $image): bool
+    /**
+     * Determine whether the given image is an actual Grafana server image
+     * (grafana/grafana, grafana/grafana-oss, grafana/grafana-enterprise),
+     * optionally prefixed by a registry host. Other Grafana-published images
+     * such as grafana/loki, grafana/promtail and grafana/tempo are excluded.
+     */
+    private function isGrafanaServerImage(string $image): bool
     {
-        return in_array($image, [
-            'grafana/grafana',
-            'grafana/grafana-oss',
-            'grafana/grafana-enterprise',
-        ], true);
+        $names = ['grafana/grafana', 'grafana/grafana-oss', 'grafana/grafana-enterprise'];
+
+        return collect($names)->contains(
+            fn (string $name) => $image === $name || str($image)->endsWith('/'.$name)
+        );
     }
 
     public function saveExtraFields($fields)
