@@ -60,6 +60,13 @@ return [
         'tenant' => env('GOOGLE_TENANT'),
     ],
 
+    'oidc' => [
+        'client_id' => env('OIDC_CLIENT_ID'),
+        'client_secret' => env('OIDC_CLIENT_SECRET'),
+        'redirect' => env('OIDC_REDIRECT_URI'),
+        'base_url' => env('OIDC_BASE_URL'),
+    ],
+
     'zitadel' => [
         'client_id' => env('ZITADEL_CLIENT_ID'),
         'client_secret' => env('ZITADEL_CLIENT_SECRET'),
