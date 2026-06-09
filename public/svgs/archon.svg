@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="archonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#ED10EC"/>
+      <stop offset="50%"  stop-color="#8E40C8"/>
+      <stop offset="100%" stop-color="#06CE94"/>
+    </linearGradient>
+    <linearGradient id="glyphGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#ED10EC"/>
+      <stop offset="50%"  stop-color="#8E40C8"/>
+      <stop offset="100%" stop-color="#06CE94"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Shield body fill -->
+  <path d="M50 8 L86 22 L86 52 C86 70 70 84 50 93 C30 84 14 70 14 52 L14 22 Z"
+        fill="#0F1115"/>
+
+  <!-- Shield gradient stroke -->
+  <path d="M50 8 L86 22 L86 52 C86 70 70 84 50 93 C30 84 14 70 14 52 L14 22 Z"
+        fill="none"
+        stroke="url(#archonGrad)"
+        stroke-width="3.5"
+        stroke-linejoin="round"/>
+
+  <!-- Abstract A glyph: two diagonal strokes + crossbar -->
+  <line x1="35" y1="72" x2="50" y2="34" stroke="url(#glyphGrad)" stroke-width="4.5" stroke-linecap="round"/>
+  <line x1="50" y1="34" x2="65" y2="72" stroke="url(#glyphGrad)" stroke-width="4.5" stroke-linecap="round"/>
+  <line x1="40" y1="58" x2="60" y2="58" stroke="url(#glyphGrad)" stroke-width="4.5" stroke-linecap="round"/>
+</svg>
