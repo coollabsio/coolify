@@ -41,7 +41,8 @@
                             $oauth_setting['provider'] == 'authentik' ||
                                 $oauth_setting['provider'] == 'clerk' ||
                                 $oauth_setting['provider'] == 'zitadel' ||
-                                $oauth_setting['provider'] == 'gitlab')
+                                $oauth_setting['provider'] == 'gitlab' ||
+                                $oauth_setting['provider'] == 'oidc')
                             <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.base_url"
                                 label="Base URL" />
                         @endif
