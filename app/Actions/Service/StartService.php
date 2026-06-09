@@ -65,7 +65,7 @@ class StartService
         $safeNetwork = escapeshellarg($network);
         $serviceNames = data_get(Yaml::parse($compose), 'services', []);
 
-        foreach ($serviceNames as $serviceName => $serviceConfig) {
+        foreach (array_keys($serviceNames) as $serviceName) {
             $containerName = "{$serviceName}-{$service->uuid}";
             $commands[] = 'docker network connect --alias '.escapeshellarg($serviceName).' --alias '.escapeshellarg($containerName).' '.$safeNetwork.' '.escapeshellarg($containerName).' >/dev/null 2>&1 || true';
         }
