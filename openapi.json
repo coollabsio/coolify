@@ -9176,6 +9176,241 @@
                 ]
             }
         },
+        "\/servers\/{uuid}\/proxy\/dynamic-configurations": {
+            "get": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "List Proxy Dynamic Configurations",
+                "description": "List all dynamic configuration files of the proxy on the server.",
+                "operationId": "list-proxy-dynamic-configurations-by-server-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get the dynamic configurations of the proxy.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "filename": {
+                                                "type": "string"
+                                            },
+                                            "content": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Create Proxy Dynamic Configuration",
+                "description": "Create a new dynamic configuration file for the proxy on the server. For Traefik the content must be valid YAML; for Caddy the proxy is reloaded automatically.",
+                "operationId": "create-proxy-dynamic-configuration-by-server-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "filename",
+                                    "content"
+                                ],
+                                "properties": {
+                                    "filename": {
+                                        "description": "The configuration filename. The proxy specific extension (.yaml \/ .caddy) is appended when missing.",
+                                        "type": "string"
+                                    },
+                                    "content": {
+                                        "description": "The configuration content.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Dynamic configuration created."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/{uuid}\/proxy\/dynamic-configurations\/{filename}": {
+            "delete": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Delete Proxy Dynamic Configuration",
+                "description": "Delete a dynamic configuration file of the proxy on the server. Files managed by Coolify (coolify.yaml, Caddyfile) cannot be deleted.",
+                "operationId": "delete-proxy-dynamic-configuration-by-server-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filename",
+                        "in": "path",
+                        "description": "Configuration filename",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Dynamic configuration deleted."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Update Proxy Dynamic Configuration",
+                "description": "Update an existing dynamic configuration file of the proxy on the server.",
+                "operationId": "update-proxy-dynamic-configuration-by-server-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filename",
+                        "in": "path",
+                        "description": "Configuration filename",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "content"
+                                ],
+                                "properties": {
+                                    "content": {
+                                        "description": "The configuration content.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Dynamic configuration updated."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/resources": {
             "get": {
                 "tags": [
@@ -13650,6 +13885,10 @@
             "description": "Projects"
         },
         {
+            "name": "Servers",
+            "description": "Servers"
+        },
+        {
             "name": "Resources",
             "description": "Resources"
         },
@@ -13660,10 +13899,6 @@
         {
             "name": "Private Keys",
             "description": "Private Keys"
-        },
-        {
-            "name": "Servers",
-            "description": "Servers"
         },
         {
             "name": "Services",

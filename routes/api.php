@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\HetznerController;
 use App\Http\Controllers\Api\OtherController;
 use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\Api\ProxyController;
 use App\Http\Controllers\Api\ResourcesController;
 use App\Http\Controllers\Api\ScheduledTasksController;
 use App\Http\Controllers\Api\SecurityController;
@@ -87,6 +88,11 @@ Route::group([
     Route::get('/servers/{uuid}/resources', [ServersController::class, 'resources_by_server'])->middleware(['api.ability:read']);
 
     Route::get('/servers/{uuid}/validate', [ServersController::class, 'validate_server'])->middleware(['api.ability:write']);
+
+    Route::get('/servers/{uuid}/proxy/dynamic-configurations', [ProxyController::class, 'dynamic_configurations'])->middleware(['api.ability:read']);
+    Route::post('/servers/{uuid}/proxy/dynamic-configurations', [ProxyController::class, 'create_dynamic_configuration'])->middleware(['api.ability:write']);
+    Route::patch('/servers/{uuid}/proxy/dynamic-configurations/{filename}', [ProxyController::class, 'update_dynamic_configuration'])->middleware(['api.ability:write']);
+    Route::delete('/servers/{uuid}/proxy/dynamic-configurations/{filename}', [ProxyController::class, 'delete_dynamic_configuration'])->middleware(['api.ability:write']);
 
     Route::post('/servers', [ServersController::class, 'create_server'])->middleware(['api.ability:write']);
     Route::patch('/servers/{uuid}', [ServersController::class, 'update_server'])->middleware(['api.ability:write']);
