@@ -7,7 +7,7 @@
 
 services:
   app:
-    image: ghcr.io/coleam00/archon:latest
+    image: ghcr.io/coleam00/archon:sha-d83593a
     restart: unless-stopped
     environment:
       - SERVICE_URL_APP_3000
