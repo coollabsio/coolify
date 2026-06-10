@@ -282,33 +282,54 @@
                         <option disabled>No links available</option>
                     @endif
                 </optgroup>
-                @if (!($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw)))
-                    <optgroup label="Actions">
-                        @if (!str($application->status)->startsWith('exited'))
-                            @if (!$application->destination->server->isSwarm())
-                                <option value="action:deploy">Redeploy</option>
-                            @endif
-                            @if ($application->build_pack !== 'dockercompose')
-                                @if ($application->destination->server->isSwarm())
-                                    <option value="action:deploy">Update Service</option>
-                                @else
-                                    <option value="action:restart">Restart</option>
-                                @endif
-                            @endif
-                            <option value="action:stop">Stop</option>
-                        @else
-                            <option value="action:deploy">Deploy</option>
-                        @endif
-                        @if (!$application->destination->server->isSwarm())
-                            @if ($application->status === 'running')
-                                <option value="action:force-deploy">Force deploy (without cache)</option>
-                            @else
-                                <option value="action:deploy-force">Force deploy (without cache)</option>
-                            @endif
-                        @endif
-                    </optgroup>
-                @endif
             </select>
+            @if (!($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw)))
+                <div id="application-mobile-actions" class="mt-2 flex flex-nowrap items-center gap-2 overflow-x-auto md:hidden">
+                    @if (!str($application->status)->startsWith('exited'))
+                        @if (!$application->destination->server->isSwarm())
+                            <button type="button" class="button shrink-0"
+                                @click="document.getElementById('application-mobile-deploy-trigger')?.click()">
+                                Redeploy
+                            </button>
+                        @endif
+                        @if ($application->build_pack !== 'dockercompose')
+                            @if ($application->destination->server->isSwarm())
+                                <button type="button" class="button shrink-0"
+                                    @click="document.getElementById('application-mobile-deploy-trigger')?.click()">
+                                    Update Service
+                                </button>
+                            @else
+                                <button type="button" class="button shrink-0"
+                                    @click="document.getElementById('application-mobile-restart-trigger')?.click()">
+                                    Restart
+                                </button>
+                            @endif
+                        @endif
+                        <button type="button" class="button shrink-0 text-error"
+                            @click="document.getElementById('application-mobile-stop-trigger')?.click()">
+                            Stop
+                        </button>
+                    @else
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('application-mobile-deploy-trigger')?.click()">
+                            Deploy
+                        </button>
+                    @endif
+                    @if (!$application->destination->server->isSwarm())
+                        @if ($application->status === 'running')
+                            <button type="button" class="button shrink-0"
+                                @click="document.getElementById('application-mobile-force-deploy-trigger')?.click()">
+                                Force deploy (without cache)
+                            </button>
+                        @else
+                            <button type="button" class="button shrink-0"
+                                @click="document.getElementById('application-mobile-deploy-force-trigger')?.click()">
+                                Force deploy (without cache)
+                            </button>
+                        @endif
+                    @endif
+                </div>
+            @endif
             <x-modal-confirmation title="Confirm Application Stopping?" buttonTitle="Stop"
                 submitAction="stop" :checkboxes="$checkboxes" :actions="[
                     'This application will be stopped.',

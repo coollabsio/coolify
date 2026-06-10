@@ -176,29 +176,68 @@
                         @endif
                     @endforelse
                 </optgroup>
-                @if ($service->isDeployable)
-                    <optgroup label="Actions">
-                        @if (str($service->status)->contains('running'))
-                            <option value="action:restart">Restart</option>
-                            <option value="action:stop">Stop</option>
-                            <option value="action:pullAndRestart">Pull Latest Images & Restart</option>
-                        @elseif (str($service->status)->contains('degraded'))
-                            <option value="action:restart">Restart</option>
-                            <option value="action:stop">Stop</option>
-                            <option value="action:forceDeploy">Force Restart</option>
-                        @elseif (str($service->status)->contains('exited'))
-                            <option value="action:start">Deploy</option>
-                            <option value="action:forceDeploy">Force Deploy</option>
-                            <option value="action:cleanup">Force Cleanup Containers</option>
-                        @else
-                            <option value="action:stop">Stop</option>
-                            <option value="action:start">Deploy</option>
-                            <option value="action:forceDeploy">Force Deploy</option>
-                            <option value="action:cleanup">Force Cleanup Containers</option>
-                        @endif
-                    </optgroup>
-                @endif
             </select>
+            @if ($service->isDeployable)
+                <div id="service-mobile-actions" class="mt-2 flex flex-nowrap items-center gap-2 overflow-x-auto md:hidden">
+                    @if (str($service->status)->contains('running'))
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-restart-trigger')?.click()">
+                            Restart
+                        </button>
+                        <button type="button" class="button shrink-0 text-error"
+                            @click="document.getElementById('service-stop-trigger')?.click()">
+                            Stop
+                        </button>
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-pullAndRestart-trigger')?.click()">
+                            Pull Latest Images & Restart
+                        </button>
+                    @elseif (str($service->status)->contains('degraded'))
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-restart-trigger')?.click()">
+                            Restart
+                        </button>
+                        <button type="button" class="button shrink-0 text-error"
+                            @click="document.getElementById('service-stop-trigger')?.click()">
+                            Stop
+                        </button>
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-forceDeploy-trigger')?.click()">
+                            Force Restart
+                        </button>
+                    @elseif (str($service->status)->contains('exited'))
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-start-trigger')?.click()">
+                            Deploy
+                        </button>
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-forceDeploy-trigger')?.click()">
+                            Force Deploy
+                        </button>
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-cleanup-trigger')?.click()">
+                            Force Cleanup Containers
+                        </button>
+                    @else
+                        <button type="button" class="button shrink-0 text-error"
+                            @click="document.getElementById('service-stop-trigger')?.click()">
+                            Stop
+                        </button>
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-start-trigger')?.click()">
+                            Deploy
+                        </button>
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-forceDeploy-trigger')?.click()">
+                            Force Deploy
+                        </button>
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-cleanup-trigger')?.click()">
+                            Force Cleanup Containers
+                        </button>
+                    @endif
+                </div>
+            @endif
         </div>
         <nav
             class="scrollbar hidden min-h-10 w-full flex-nowrap items-center gap-6 overflow-x-scroll overflow-y-hidden pb-1 whitespace-nowrap md:flex md:w-auto md:overflow-visible">

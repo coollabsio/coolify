@@ -6,16 +6,22 @@ it('uses native mobile menus for databases and services', function () {
     $serviceHeading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
 
     expect($applicationHeading)
+        ->toContain('application-mobile-actions')
         ->toContain("'route' => 'project.application.command'")
         ->toContain("'navigate' => false")
         ->toContain("value.startsWith('location|')")
-        ->toContain('window.location.href = url');
+        ->toContain('window.location.href = url')
+        ->toContain('application-mobile-stop-trigger')
+        ->toContain('application-mobile-deploy-trigger')
+        ->toContain('application-mobile-restart-trigger')
+        ->toContain('application-mobile-force-deploy-trigger')
+        ->not->toContain('<optgroup label="Actions">');
 
     expect($databaseHeading)
         ->toContain('database-mobile-section')
+        ->toContain('database-mobile-actions')
         ->toContain('<optgroup label="Database">')
         ->toContain('<optgroup label="Configuration">')
-        ->toContain('<optgroup label="Actions">')
         ->toContain("'route' => 'project.database.command'")
         ->toContain("'navigate' => false")
         ->toContain("value.startsWith('location|')")
@@ -25,17 +31,19 @@ it('uses native mobile menus for databases and services', function () {
         ->toContain('x-model="selected"')
         ->toContain('database-restart-trigger')
         ->toContain('database-stop-trigger')
+        ->toContain('database-start-trigger')
         ->toContain('scrollbar hidden min-h-10')
         ->not->toContain('<optgroup label="Links">')
+        ->not->toContain('<optgroup label="Actions">')
         ->not->toContain('@selected');
 
     expect($serviceHeading)
         ->toContain('service-mobile-section')
+        ->toContain('service-mobile-actions')
         ->toContain('<optgroup label="Service">')
         ->toContain('<optgroup label="Configuration">')
         ->toContain('<optgroup label="Resource">')
         ->toContain('<optgroup label="Links">')
-        ->toContain('<optgroup label="Actions">')
         ->toContain("'route' => 'project.service.command'")
         ->toContain("'navigate' => false")
         ->toContain("value.startsWith('location|')")
@@ -50,6 +58,9 @@ it('uses native mobile menus for databases and services', function () {
         ->toContain('scrollbar hidden min-h-10')
         ->toContain('mb-4 w-full md:mb-0 md:hidden')
         ->toContain('hidden flex-wrap items-center gap-2 md:flex')
+        ->toContain('flex flex-nowrap')
+        ->toContain('overflow-x-auto')
+        ->not->toContain('<optgroup label="Actions">')
         ->not->toContain('order-first flex flex-wrap items-center gap-2 sm:order-last')
         ->not->toContain('@selected');
 });

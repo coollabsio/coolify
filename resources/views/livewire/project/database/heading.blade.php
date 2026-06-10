@@ -135,17 +135,26 @@
                         </option>
                     @endforeach
                 </optgroup>
-                @if ($database->destination->server->isFunctional())
-                    <optgroup label="Actions">
-                        @if (!str($database->status)->startsWith('exited'))
-                            <option value="action:restart">Restart</option>
-                            <option value="action:stop">Stop</option>
-                        @else
-                            <option value="action:start">Start</option>
-                        @endif
-                    </optgroup>
-                @endif
             </select>
+            @if ($database->destination->server->isFunctional())
+                <div id="database-mobile-actions" class="mt-2 flex flex-nowrap items-center gap-2 overflow-x-auto md:hidden">
+                    @if (!str($database->status)->startsWith('exited'))
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('database-restart-trigger')?.click()">
+                            Restart
+                        </button>
+                        <button type="button" class="button shrink-0 text-error"
+                            @click="document.getElementById('database-stop-trigger')?.click()">
+                            Stop
+                        </button>
+                    @else
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('database-start-trigger')?.click()">
+                            Start
+                        </button>
+                    @endif
+                </div>
+            @endif
         </div>
         <nav
             class="scrollbar hidden min-h-10 w-full flex-nowrap items-center gap-6 overflow-x-scroll overflow-y-hidden pb-1 whitespace-nowrap md:flex md:w-auto md:overflow-visible">
