@@ -29,15 +29,15 @@
                         </div>
                     @endif
 
-                    <form action="/login" method="POST" class="flex flex-col gap-4">
+                    <form action="/login" method="POST" class="flex flex-col gap-4" data-passkey-autofill>
                         @csrf
                         @env('local')
-                            <x-forms.input value="test@example.com" type="email" autocomplete="email" name="email" required
+                            <x-forms.input value="test@example.com" type="email" autocomplete="email webauthn" name="email" required
                                 label="{{ __('input.email') }}" />
                             <x-forms.input value="password" type="password" autocomplete="current-password" name="password"
                                 required label="{{ __('input.password') }}" />
                         @else
-                            <x-forms.input type="email" name="email" autocomplete="email" required
+                            <x-forms.input type="email" name="email" autocomplete="email webauthn" required
                                 label="{{ __('input.email') }}" />
                             <x-forms.input type="password" name="password" autocomplete="current-password" required
                                 label="{{ __('input.password') }}" />
@@ -54,6 +54,50 @@
                             {{ __('auth.login') }}
                         </x-forms.button>
                     </form>
+
+                    <div x-data="{
+                        loading: false,
+                        error: null,
+                        supported: null,
+                        scriptMissing: false,
+                        checkSupported() {
+                            if (!window.coolifyPasskeys?.getSupportError) {
+                                this.supported = false;
+                                this.scriptMissing = true;
+                                this.error = 'Passkey scripts failed to load. When using a custom HTTPS domain, run npm run build in the Vite container and remove public/hot.';
+                                return false;
+                            }
+                            const supportError = window.coolifyPasskeys.getSupportError();
+                            this.supported = supportError === null;
+                            if (supportError) {
+                                this.error = supportError;
+                            }
+                            return this.supported;
+                        },
+                        async loginWithPasskey() {
+                            if (!this.checkSupported()) {
+                                return;
+                            }
+                            this.loading = true;
+                            this.error = null;
+                            try {
+                                await window.coolifyPasskeys.login();
+                            } catch (error) {
+                                this.error = error?.message ?? 'Passkey authentication failed. Please try again.';
+                            } finally {
+                                this.loading = false;
+                            }
+                        },
+                    }" class="flex flex-col gap-2">
+                        <x-forms.button class="w-full justify-center py-3 px-4 h-auto" type="button"
+                            x-on:click="loginWithPasskey()" x-bind:disabled="loading">
+                            <span x-text="loading ? 'Authenticating...' : 'Sign in with passkey'"></span>
+                        </x-forms.button>
+                        <p x-show="error" x-text="error" class="text-sm text-error"></p>
+                        <p x-show="supported === false" class="text-xs text-neutral-500 dark:text-neutral-400">
+                            Passkeys require a supported browser and a secure connection (HTTPS).
+                        </p>
+                    </div>
 
                     @if ($is_registration_enabled)
                         <div class="relative my-6">

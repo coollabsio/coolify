@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Listeners\SetupUserSessionAfterLogin;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use SocialiteProviders\Authentik\AuthentikExtendSocialite;
 use SocialiteProviders\Azure\AzureExtendSocialite;
@@ -15,6 +17,9 @@ use SocialiteProviders\Zitadel\ZitadelExtendSocialite;
 class EventServiceProvider extends ServiceProvider
 {
     protected $listen = [
+        Login::class => [
+            SetupUserSessionAfterLogin::class,
+        ],
         SocialiteWasCalled::class => [
             AzureExtendSocialite::class.'@handle',
             AuthentikExtendSocialite::class.'@handle',

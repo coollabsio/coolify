@@ -589,6 +589,93 @@ function base_url(bool $withPort = true): string
     return config('app.url');
 }
 
+/**
+ * @return list<string>
+ */
+function passkeyAllowedOrigins(?\Illuminate\Http\Request $request = null): array
+{
+    $origins = [];
+
+    if ($request !== null) {
+        $origins[] = $request->getSchemeAndHttpHost();
+    }
+
+    $origins[] = config('app.url');
+
+    try {
+        if (\Illuminate\Support\Facades\Schema::hasTable('instance_settings')) {
+            $fqdn = instanceSettings()->fqdn;
+            if ($fqdn) {
+                $origins[] = $fqdn;
+            }
+        }
+    } catch (\Throwable) {
+        // Database may not be ready yet.
+    }
+
+    if (isDev()) {
+        $origins[] = 'http://localhost:'.config('app.port');
+        $origins[] = 'http://localhost';
+    }
+
+    return array_values(array_unique(array_filter($origins)));
+}
+
+function passkeyRelyingPartyId(?\Illuminate\Http\Request $request = null): string
+{
+    if ($request !== null && $request->getHost() !== '') {
+        return $request->getHost();
+    }
+
+    $candidates = [];
+
+    try {
+        if (\Illuminate\Support\Facades\Schema::hasTable('instance_settings')) {
+            $fqdn = instanceSettings()->fqdn;
+            if ($fqdn) {
+                $candidates[] = $fqdn;
+            }
+        }
+    } catch (\Throwable) {
+        // Database may not be ready yet.
+    }
+
+    try {
+        $candidates[] = base_url(withPort: false);
+    } catch (\Throwable) {
+        // Database may not be ready yet (e.g. during Docker image build).
+    }
+
+    $candidates[] = config('app.url');
+
+    foreach ($candidates as $candidate) {
+        $host = parse_url($candidate, PHP_URL_HOST);
+
+        if (is_string($host) && $host !== '' && ! in_array($host, ['localhost', '127.0.0.1', '[::1]'], true)) {
+            return $host;
+        }
+    }
+
+    $fallbackHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+
+    return is_string($fallbackHost) && $fallbackHost !== '' ? $fallbackHost : 'localhost';
+}
+
+/**
+ * @param  list<string>  $allowedOrigins
+ */
+function configurePasskeyRelyingParty(string $relyingPartyId, array $allowedOrigins): void
+{
+    $allowedOrigins = array_values(array_unique(array_filter($allowedOrigins)));
+
+    config([
+        'fortify.passkeys.relying_party_id' => $relyingPartyId,
+        'fortify.passkeys.allowed_origins' => $allowedOrigins,
+        'passkeys.relying_party_id' => $relyingPartyId,
+        'passkeys.allowed_origins' => $allowedOrigins,
+    ]);
+}
+
 function isSubscribed()
 {
     return isSubscriptionActive();
@@ -3955,6 +4042,33 @@ function formatContainerStatus(string $status): string
  *
  * @return bool True if password confirmation should be skipped
  */
+function passkeyConfirmationIntendedUrl(?\Illuminate\Http\Request $request = null): string
+{
+    $request ??= request();
+    $referer = $request->headers->get('referer');
+
+    if (is_string($referer) && $referer !== '') {
+        $refererPath = parse_url($referer, PHP_URL_PATH) ?? '';
+
+        if (in_array($refererPath, ['/profile', '/profile/appearance'], true)) {
+            return appendQueryParameter($referer, 'addPasskey', '1');
+        }
+
+        if ($refererPath !== '/user/confirm-password') {
+            return $referer;
+        }
+    }
+
+    return route('profile', absolute: false).'?addPasskey=1';
+}
+
+function appendQueryParameter(string $url, string $key, string $value): string
+{
+    $separator = str_contains($url, '?') ? '&' : '?';
+
+    return $url.$separator.urlencode($key).'='.urlencode($value);
+}
+
 function shouldSkipPasswordConfirmation(): bool
 {
     // Skip if two-step confirmation is globally disabled

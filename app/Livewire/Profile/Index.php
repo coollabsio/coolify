@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Passkeys\Actions\DeletePasskey;
+use Laravel\Passkeys\Passkey;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -264,6 +266,27 @@ class Index extends Component
             $this->dispatch('reloadWindow');
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    public function deletePasskey(int $passkeyId, string $password = '')
+    {
+        try {
+            $user = Auth::user();
+            $passkey = Passkey::query()
+                ->where('user_id', $user->id)
+                ->whereKey($passkeyId)
+                ->firstOrFail();
+
+            app(DeletePasskey::class)($user, $passkey);
+
+            $this->dispatch('success', 'Passkey deleted.');
+
+            return true;
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return false;
         }
     }
 

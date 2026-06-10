@@ -7,7 +7,7 @@
                         Coolify
                     </h1>
                     <p class="text-lg dark:text-neutral-400">
-                        Confirm Your Password
+                        Confirm Your Identity
                     </p>
                 </div>
 
@@ -32,7 +32,13 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <p class="text-sm dark:text-neutral-400">
-                                This is a secure area. Please confirm your password before continuing.
+                                This is a secure area. Confirm your identity
+                                @if ($hasPasskeys ?? false)
+                                    with your password or an existing passkey
+                                @else
+                                    with your password
+                                @endif
+                                before continuing.
                             </p>
                         </div>
                     </div>
@@ -41,9 +47,59 @@
                         @csrf
                         <x-forms.input required type="password" name="password" label="{{ __('input.password') }}" />
                         <x-forms.button class="w-full justify-center py-3 box-boarding" type="submit" isHighlighted>
-                            {{ __('auth.confirm_password') }}
+                            Confirm identity
                         </x-forms.button>
                     </form>
+
+                    @if ($hasPasskeys ?? false)
+                        <div class="relative my-6">
+                            <div class="absolute inset-0 flex items-center">
+                                <div class="w-full border-t border-neutral-300 dark:border-coolgray-400"></div>
+                            </div>
+                            <div class="relative flex justify-center text-sm">
+                                <span class="px-2 bg-gray-50 dark:bg-base text-neutral-500 dark:text-neutral-400">or</span>
+                            </div>
+                        </div>
+
+                        <div x-data="{
+                            loading: false,
+                            error: null,
+                            supported: null,
+                            checkSupported() {
+                                if (!window.coolifyPasskeys?.getSupportError) {
+                                    this.supported = false;
+                                    this.error = 'Passkey scripts failed to load. When using a custom HTTPS domain, run npm run build in the Vite container and remove public/hot.';
+                                    return false;
+                                }
+                                const supportError = window.coolifyPasskeys.getSupportError();
+                                this.supported = supportError === null;
+                                if (supportError) {
+                                    this.error = supportError;
+                                }
+                                return this.supported;
+                            },
+                            async confirmWithPasskey() {
+                                if (!this.checkSupported()) {
+                                    return;
+                                }
+                                this.loading = true;
+                                this.error = null;
+                                try {
+                                    await window.coolifyPasskeys.confirm();
+                                } catch (error) {
+                                    this.error = error?.message ?? 'Passkey confirmation failed. Please try again.';
+                                } finally {
+                                    this.loading = false;
+                                }
+                            },
+                        }" class="flex flex-col gap-2">
+                            <x-forms.button class="w-full justify-center" type="button" x-on:click="confirmWithPasskey()"
+                                x-bind:disabled="loading">
+                                <span x-text="loading ? 'Confirming...' : 'Confirm with passkey'"></span>
+                            </x-forms.button>
+                            <p x-show="error" x-text="error" class="text-sm text-error"></p>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

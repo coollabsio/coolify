@@ -1,3 +1,4 @@
+import './passkeys.js';
 import { initializeTerminalComponent } from './terminal.js';
 
 // Livewire 3.5.19+ re-applies `x-cloak` to morphed elements during wire:navigate

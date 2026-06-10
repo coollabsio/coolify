@@ -70,6 +70,15 @@ function getStripeCustomerPortalSession(Team $team)
         'return_url' => $return_url,
     ]);
 }
+function allowedPathsForPasskeyAuthentication()
+{
+    return [
+        'passkeys/login',
+        'passkeys/login/options',
+        'passkeys/confirm',
+        'passkeys/confirm/options',
+    ];
+}
 function allowedPathsForUnsubscribedAccounts()
 {
     return [
@@ -78,6 +87,7 @@ function allowedPathsForUnsubscribedAccounts()
         'logout',
         'force-password-reset',
         'two-factor-challenge',
+        ...allowedPathsForPasskeyAuthentication(),
         'livewire/update',
         'admin',
     ];
@@ -97,6 +107,7 @@ function allowedPathsForInvalidAccounts()
         'verify',
         'force-password-reset',
         'two-factor-challenge',
+        ...allowedPathsForPasskeyAuthentication(),
         'livewire/update',
     ];
 }
