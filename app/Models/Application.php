@@ -1121,6 +1121,11 @@ class Application extends BaseModel
         return false;
     }
 
+    public function isPRAutoDeployable(): bool
+    {
+        return (bool) $this->settings->is_preview_auto_deploy_enabled;
+    }
+
     public function deploymentType()
     {
         $privateKeyId = data_get($this, 'private_key_id');

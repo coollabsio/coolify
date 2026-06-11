@@ -93,6 +93,7 @@ it('casts all boolean fields correctly', function () {
         'is_debug_enabled',
         'is_preview_deployments_enabled',
         'is_pr_deployments_public_enabled',
+        'is_preview_auto_deploy_enabled',
         'is_git_submodules_enabled',
         'is_git_lfs_enabled',
         'is_git_shallow_clone_enabled',

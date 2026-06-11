@@ -295,6 +295,7 @@ it('creates ApplicationSetting with all fillable attributes', function () {
         'is_spa' => true,
         'is_git_shallow_clone_enabled' => true,
         'is_pr_deployments_public_enabled' => false,
+        'is_preview_auto_deploy_enabled' => true,
         'use_build_secrets' => false,
         'inject_build_args_to_dockerfile' => true,
         'include_source_commit_in_build' => true,

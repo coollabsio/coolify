@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Application\CleanupPreviewDeployment;
+use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
@@ -19,6 +20,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Bus::fake();
+    $this->withoutMiddleware(PreventRequestsDuringMaintenance::class);
     InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
 
     $this->team = Team::factory()->create();

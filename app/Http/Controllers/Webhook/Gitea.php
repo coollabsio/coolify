@@ -216,6 +216,15 @@ class Gitea extends Controller
                                     $pr_app->generate_preview_fqdn();
                                 }
                             }
+                            if (! $application->isPRAutoDeployable()) {
+                                $return_payloads->push([
+                                    'application' => $application->name,
+                                    'status' => 'success',
+                                    'message' => 'Preview created. Auto deploy is disabled, deploy manually.',
+                                ]);
+
+                                continue;
+                            }
                             $result = queue_application_deployment(
                                 application: $application,
                                 pull_request_id: $pull_request_id,

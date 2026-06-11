@@ -155,6 +155,12 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
+        // Only auto-deploy when enabled; otherwise the preview row stays created
+        // so it can be deployed manually (UI/API).
+        if (! $application->isPRAutoDeployable()) {
+            return;
+        }
+
         // Queue the deployment
         $deployment_uuid = new Cuid2;
         queue_application_deployment(
