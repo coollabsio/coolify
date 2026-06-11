@@ -1,0 +1,149 @@
+# documentation: https://docs.firecrawl.dev
+# slogan: Web scraping and crawling API - turn any website into LLM-ready data
+# category: ai
+# tags: ai,scraping,crawling,web,llm,api
+# logo: svgs/firecrawl.svg
+# port: 3002
+
+services:
+  api:
+    image: ghcr.io/firecrawl/firecrawl:latest
+    restart: unless-stopped
+    environment:
+      - SERVICE_URL_FIRECRAWL_3002
+      - HOST=0.0.0.0
+      - PORT=3002
+      - ENV=local
+      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@redis:6379
+      - REDIS_RATE_LIMIT_URL=redis://default:${SERVICE_PASSWORD_REDIS}@redis:6379
+      - PLAYWRIGHT_MICROSERVICE_URL=http://playwright-service:3000/scrape
+      - NUQ_RABBITMQ_URL=amqp://$SERVICE_USER_RABBITMQ:$SERVICE_PASSWORD_RABBITMQ@rabbitmq:5672
+      - POSTGRES_HOST=nuq-postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-firecrawl}
+      - USE_DB_AUTHENTICATION=false
+      - AUTUMN_SECRET_KEY=${AUTUMN_SECRET_KEY:-}
+      # API key - Bearer token used to authenticate requests to the Firecrawl API
+      - TEST_API_KEY=$SERVICE_PASSWORD_FIRECRAWLAPI
+      # Queue dashboard auth (access at /admin/<BULL_AUTH_KEY>/queues)
+      - BULL_AUTH_KEY=$SERVICE_PASSWORD_BULLAUTH
+      - NUM_WORKERS_PER_QUEUE=${NUM_WORKERS_PER_QUEUE:-8}
+      - CRAWL_CONCURRENT_REQUESTS=${CRAWL_CONCURRENT_REQUESTS:-10}
+      - MAX_CONCURRENT_JOBS=${MAX_CONCURRENT_JOBS:-5}
+      - BROWSER_POOL_SIZE=${BROWSER_POOL_SIZE:-5}
+      - HARNESS_STARTUP_TIMEOUT_MS=${HARNESS_STARTUP_TIMEOUT_MS:-60000}
+      - EXTRACT_WORKER_PORT=3004
+      - WORKER_PORT=3005
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+      - MODEL_NAME=${MODEL_NAME:-}
+      - MODEL_EMBEDDING_NAME=${MODEL_EMBEDDING_NAME:-}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-}
+      - PROXY_SERVER=${PROXY_SERVER:-}
+      - PROXY_USERNAME=${PROXY_USERNAME:-}
+      - PROXY_PASSWORD=${PROXY_PASSWORD:-}
+      - SEARXNG_ENDPOINT=${SEARXNG_ENDPOINT:-}
+      - LOGGING_LEVEL=${LOGGING_LEVEL:-info}
+    depends_on:
+      redis:
+        condition: service_healthy
+      playwright-service:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      nuq-postgres-init:
+        condition: service_completed_successfully
+    command: node dist/src/harness.js --start-docker
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3002/', r => process.exit(r.statusCode < 400 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  playwright-service:
+    image: ghcr.io/firecrawl/playwright-service:latest
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - MAX_CONCURRENT_PAGES=${CRAWL_CONCURRENT_REQUESTS:-10}
+      - PROXY_SERVER=${PROXY_SERVER:-}
+      - PROXY_USERNAME=${PROXY_USERNAME:-}
+      - PROXY_PASSWORD=${PROXY_PASSWORD:-}
+      - BLOCK_MEDIA=${BLOCK_MEDIA:-true}
+    tmpfs:
+      - /tmp/.cache:noexec,nosuid,size=1g
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    command: redis-server --bind 0.0.0.0 --requirepass ${SERVICE_PASSWORD_REDIS}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${SERVICE_PASSWORD_REDIS}", "--no-auth-warning", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    restart: unless-stopped
+    environment:
+      - RABBITMQ_DEFAULT_USER=$SERVICE_USER_RABBITMQ
+      - RABBITMQ_DEFAULT_PASS=$SERVICE_PASSWORD_RABBITMQ
+    command: rabbitmq-server
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  nuq-postgres:
+    image: ghcr.io/firecrawl/nuq-postgres:latest
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-firecrawl}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    # Override cron.database_name: the image defaults to 'postgres' but our database is POSTGRES_DB.
+    command: ["postgres", "-c", "cron.database_name=${POSTGRES_DB:-firecrawl}"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Runs nuq.sql schema migration idempotently on every deploy; exits after completion.
+  nuq-postgres-init:
+    image: ghcr.io/firecrawl/nuq-postgres:latest
+    restart: "no"
+    environment:
+      - PGHOST=nuq-postgres
+      - PGPORT=5432
+      - PGUSER=$SERVICE_USER_POSTGRES
+      - PGPASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - PGDATABASE=${POSTGRES_DB:-firecrawl}
+    command: ["psql", "-f", "/docker-entrypoint-initdb.d/010-nuq.sql"]
+    depends_on:
+      nuq-postgres:
+        condition: service_healthy
+    exclude_from_hc: true
+
+volumes:
+  redis-data:
+  rabbitmq-data:
+  postgres-data:
