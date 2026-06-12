@@ -267,11 +267,11 @@ nohup bash -c "
     COMPOSE_FILES='-f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml'
     if [ -f /data/coolify/source/docker-compose.custom.yml ]; then
         log 'Using custom docker-compose.yml'
-        COMPOSE_FILES="\$COMPOSE_FILES -f /data/coolify/source/docker-compose.custom.yml"
+        COMPOSE_FILES=\"\$COMPOSE_FILES -f /data/coolify/source/docker-compose.custom.yml\"
     fi
     if [ -f /data/coolify/source/docker-compose.postgres-upgrade.yml ]; then
         log 'Using PostgreSQL upgrade compose override'
-        COMPOSE_FILES="\$COMPOSE_FILES -f /data/coolify/source/docker-compose.postgres-upgrade.yml"
+        COMPOSE_FILES=\"\$COMPOSE_FILES -f /data/coolify/source/docker-compose.postgres-upgrade.yml\"
     fi
 
     log 'Running docker compose up...'

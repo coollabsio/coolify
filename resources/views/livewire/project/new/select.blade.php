@@ -138,9 +138,14 @@
                     </div>
                 </div>
                 <div x-show="filteredServices.length > 0" class="mt-8">
-                    <div class="flex items-center gap-4" x-init="loadResources">
+                    <div class="flex flex-wrap items-center gap-4" x-init="loadResources">
                         <h2>Services</h2>
                         <x-forms.button x-on:click="loadResources">Reload List</x-forms.button>
+                        <div x-show="serviceTemplatesLastUpdated"
+                            class="text-xs text-neutral-500 dark:text-neutral-400">
+                            Last Updated on Service Templates:
+                            <span x-text="serviceTemplatesLastUpdated"></span>
+                        </div>
                     </div>
                     <x-callout type="info" title="Trademarks Policy" class="mt-4 mb-6">
                         The respective trademarks mentioned here are owned by the respective companies, and use of them
@@ -154,7 +159,14 @@
                                 <x-resource-view>
                                     <x-slot:title>
                                         <template x-if="service.name">
-                                            <span x-text="service.name"></span>
+                                            <div>
+                                                <span x-text="service.name"></span>
+                                                <template x-if="service.templateLastUpdated">
+                                                    <div class="mt-1 text-[0.7rem] font-normal text-neutral-500 dark:text-neutral-500">
+                                                        Updated: <span x-text="service.templateLastUpdated"></span>
+                                                    </div>
+                                                </template>
+                                            </div>
                                         </template>
                                     </x-slot>
                                     <x-slot:description>
@@ -237,6 +249,7 @@
                         isSticky: false,
                         selecting: false,
                         services: [],
+                        serviceTemplatesLastUpdated: null,
                         gitBasedApplications: [],
                         dockerBasedApplications: [],
                         databases: [],
@@ -251,12 +264,14 @@
                             this.loading = true;
                             const {
                                 services,
+                                serviceTemplatesLastUpdated,
                                 categories,
                                 gitBasedApplications,
                                 dockerBasedApplications,
                                 databases
                             } = await this.$wire.loadServices();
                             this.services = services;
+                            this.serviceTemplatesLastUpdated = serviceTemplatesLastUpdated;
                             this.categories = categories || [];
                             this.gitBasedApplications = gitBasedApplications;
                             this.dockerBasedApplications = dockerBasedApplications;
