@@ -20,10 +20,14 @@
                         <x-forms.select id="selected_uuid" required wire:model.live="selected_uuid">
                             <option value="default">Select a server or container</option>
                             @foreach ($servers as $server)
-                                <option value="{{ $server->uuid }}">{{ $server->name }}</option>
+                                <option value="{{ $server->uuid }}" wire:key="server-option-{{ $server->uuid }}">
+                                    {{ $server->name }}
+                                </option>
                                 @foreach ($containers as $container)
                                     @if ($container['server_uuid'] == $server->uuid)
-                                        <option value="{{ $container['uuid'] }}">
+                                        @php($containerOptionValue = $container['server_uuid'].'|'.$container['name'])
+                                        <option value="{{ $containerOptionValue }}"
+                                            wire:key="container-option-{{ $containerOptionValue }}">
                                             {{ $server->name }} -> {{ $container['name'] }}
                                         </option>
                                     @endif

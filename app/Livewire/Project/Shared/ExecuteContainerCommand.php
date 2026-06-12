@@ -134,10 +134,11 @@ class ExecuteContainerCommand extends Component
         // Sort containers alphabetically by name
         $this->containers = $this->containers->sortBy(function ($container) {
             return data_get($container, 'container.Names');
-        });
+        })->values();
 
         if ($this->containers->count() === 1) {
-            $this->selected_container = data_get($this->containers->first(), 'container.Names');
+            $first = $this->containers->first();
+            $this->selected_container = data_get($first, 'server.uuid').'|'.data_get($first, 'container.Names');
         }
     }
 
@@ -181,13 +182,24 @@ class ExecuteContainerCommand extends Component
             return;
         }
         try {
+            // Parse the composite "{server.uuid}|{container.Names}" identifier so containers
+            // with the same Names across different servers can be disambiguated.
+            if (! str_contains($this->selected_container, '|')) {
+                throw new \InvalidArgumentException('Invalid selection.');
+            }
+            [$serverUuid, $containerName] = explode('|', $this->selected_container, 2);
+            if ($serverUuid === '' || $containerName === '') {
+                throw new \InvalidArgumentException('Invalid selection.');
+            }
+
             // Validate container name format
-            if (! ValidationPatterns::isValidContainerName($this->selected_container)) {
+            if (! ValidationPatterns::isValidContainerName($containerName)) {
                 throw new \InvalidArgumentException('Invalid container name format');
             }
 
             // Verify container exists in our allowed list
-            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            $container = $this->containers->first(fn ($c) => data_get($c, 'server.uuid') === $serverUuid
+                && data_get($c, 'container.Names') === $containerName);
             if (is_null($container)) {
                 throw new \RuntimeException('Container not found.');
             }
