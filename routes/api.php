@@ -11,12 +11,11 @@ use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ResourcesController;
 use App\Http\Controllers\Api\ScheduledTasksController;
 use App\Http\Controllers\Api\SecurityController;
+use App\Http\Controllers\Api\SentinelController;
 use App\Http\Controllers\Api\ServersController;
 use App\Http\Controllers\Api\ServicesController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Middleware\ApiAllowed;
-use App\Jobs\PushServerUpdateJob;
-use App\Models\Server;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [OtherController::class, 'healthcheck']);
@@ -26,17 +25,20 @@ Route::group([
     Route::get('/health', [OtherController::class, 'healthcheck']);
 });
 
-Route::post('/feedback', [OtherController::class, 'feedback']);
+Route::post('/feedback', [OtherController::class, 'feedback'])
+    ->middleware('throttle:feedback');
 
 Route::group([
-    'middleware' => ['auth:sanctum', 'api.ability:write'],
+    'middleware' => ['auth:sanctum', 'api.token.team', 'api.ability:write'],
     'prefix' => 'v1',
 ], function () {
     Route::get('/enable', [OtherController::class, 'enable_api']);
     Route::get('/disable', [OtherController::class, 'disable_api']);
+    Route::post('/mcp/enable', [OtherController::class, 'enable_mcp']);
+    Route::post('/mcp/disable', [OtherController::class, 'disable_mcp']);
 });
 Route::group([
-    'middleware' => ['auth:sanctum', ApiAllowed::class, 'api.sensitive'],
+    'middleware' => ['auth:sanctum', 'api.token.team', ApiAllowed::class, 'api.sensitive'],
     'prefix' => 'v1',
 ], function () {
 
@@ -105,11 +107,6 @@ Route::group([
     Route::post('/applications/dockerfile', [ApplicationsController::class, 'create_dockerfile_application'])->middleware(['api.ability:write']);
     Route::post('/applications/dockerimage', [ApplicationsController::class, 'create_dockerimage_application'])->middleware(['api.ability:write']);
 
-    /**
-     * @deprecated Use POST /api/v1/services instead. This endpoint creates a Service, not an Application and is a unstable duplicate of POST /api/v1/services.
-     */
-    Route::post('/applications/dockercompose', [ApplicationsController::class, 'create_dockercompose_application'])->middleware(['api.ability:write']);
-
     Route::get('/applications/{uuid}', [ApplicationsController::class, 'application_by_uuid'])->middleware(['api.ability:read']);
     Route::patch('/applications/{uuid}', [ApplicationsController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}', [ApplicationsController::class, 'delete_by_uuid'])->middleware(['api.ability:write']);
@@ -128,6 +125,8 @@ Route::group([
     Route::match(['get', 'post'], '/applications/{uuid}/start', [ApplicationsController::class, 'action_deploy'])->middleware(['api.ability:deploy']);
     Route::match(['get', 'post'], '/applications/{uuid}/restart', [ApplicationsController::class, 'action_restart'])->middleware(['api.ability:deploy']);
     Route::match(['get', 'post'], '/applications/{uuid}/stop', [ApplicationsController::class, 'action_stop'])->middleware(['api.ability:deploy']);
+
+    Route::delete('/applications/{uuid}/previews/{pull_request_id}', [ApplicationsController::class, 'delete_preview_by_pull_request_id'])->middleware(['api.ability:write']);
 
     Route::get('/github-apps', [GithubController::class, 'list_github_apps'])->middleware(['api.ability:read']);
     Route::post('/github-apps', [GithubController::class, 'create_github_app'])->middleware(['api.ability:write']);
@@ -209,45 +208,7 @@ Route::group([
 Route::group([
     'prefix' => 'v1',
 ], function () {
-    Route::post('/sentinel/push', function () {
-        $token = request()->header('Authorization');
-        if (! $token) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-        $naked_token = str_replace('Bearer ', '', $token);
-        try {
-            $decrypted = decrypt($naked_token);
-            $decrypted_token = json_decode($decrypted, true);
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Invalid token'], 401);
-        }
-        $server_uuid = data_get($decrypted_token, 'server_uuid');
-        if (! $server_uuid) {
-            return response()->json(['message' => 'Invalid token'], 401);
-        }
-        $server = Server::where('uuid', $server_uuid)->first();
-        if (! $server) {
-            return response()->json(['message' => 'Server not found'], 404);
-        }
-
-        if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team->id !== 0) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-
-        if ($server->isFunctional() === false) {
-            return response()->json(['message' => 'Server is not functional'], 401);
-        }
-
-        if ($server->settings->sentinel_token !== $naked_token) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-        $data = request()->all();
-
-        // \App\Jobs\ServerCheckNewJob::dispatch($server, $data);
-        PushServerUpdateJob::dispatch($server, $data);
-
-        return response()->json(['message' => 'ok'], 200);
-    });
+    Route::post('/sentinel/push', [SentinelController::class, 'push']);
 });
 
 Route::any('/{any}', function () {

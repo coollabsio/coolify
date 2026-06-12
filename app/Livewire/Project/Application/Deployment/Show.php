@@ -108,19 +108,6 @@ class Show extends Component
         return decode_remote_command_output($this->application_deployment_queue);
     }
 
-    public function copyLogs(): string
-    {
-        $logs = decode_remote_command_output($this->application_deployment_queue)
-            ->map(function ($line) {
-                return $line['timestamp'].' '.
-                       (isset($line['command']) && $line['command'] ? '[CMD]: ' : '').
-                       trim($line['line']);
-            })
-            ->join("\n");
-
-        return sanitizeLogsForExport($logs);
-    }
-
     public function downloadAllLogs(): string
     {
         $logs = decode_remote_command_output($this->application_deployment_queue, includeAll: true)

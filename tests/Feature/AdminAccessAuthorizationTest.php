@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Admin\Index as AdminIndex;
+use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -70,9 +71,9 @@ test('submitSearch requires admin authorization', function () {
 test('switchUser requires root user id 0', function () {
     config()->set('constants.coolify.self_hosted', false);
 
-    $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
     $rootUser = User::factory()->create(['id' => 0]);
-    $rootTeam->members()->attach($rootUser->id, ['role' => 'admin']);
+    $rootTeam = Team::find(0);
 
     $targetUser = User::factory()->create();
     $targetTeam = Team::factory()->create();
@@ -84,7 +85,47 @@ test('switchUser requires root user id 0', function () {
     Livewire::test(AdminIndex::class)
         ->assertOk()
         ->call('switchUser', $targetUser->id)
-        ->assertRedirect();
+        ->assertRedirect(route('dashboard'));
+});
+
+test('back() redirects impersonator to admin index and clears session', function () {
+    config()->set('constants.coolify.self_hosted', false);
+
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
+    $rootUser = User::factory()->create(['id' => 0]);
+    $rootTeam = Team::find(0);
+
+    $this->actingAs($rootUser);
+    session([
+        'currentTeam' => ['id' => $rootTeam->id],
+        'impersonating' => true,
+    ]);
+
+    Livewire::test(AdminIndex::class)
+        ->call('back')
+        ->assertRedirect(route('admin.index'));
+
+    expect(session('impersonating'))->toBeNull();
+});
+
+test('switchUser ignores Referer header and uses dashboard route', function () {
+    config()->set('constants.coolify.self_hosted', false);
+
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
+    $rootUser = User::factory()->create(['id' => 0]);
+    $rootTeam = Team::find(0);
+
+    $targetUser = User::factory()->create();
+    $targetTeam = Team::factory()->create();
+    $targetTeam->members()->attach($targetUser->id, ['role' => 'admin']);
+
+    $this->actingAs($rootUser);
+    session(['currentTeam' => ['id' => $rootTeam->id]]);
+
+    Livewire::withHeaders(['Referer' => 'https://example.com/elsewhere'])
+        ->test(AdminIndex::class)
+        ->call('switchUser', $targetUser->id)
+        ->assertRedirect(route('dashboard'));
 });
 
 test('switchUser rejects non-root user', function () {

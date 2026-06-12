@@ -299,6 +299,7 @@ it('creates ApplicationSetting with all fillable attributes', function () {
         'inject_build_args_to_dockerfile' => true,
         'include_source_commit_in_build' => true,
         'docker_images_to_keep' => 5,
+        'stop_grace_period' => 300,
     ]);
 
     expect($setting->exists)->toBeTrue();
@@ -309,6 +310,7 @@ it('creates ApplicationSetting with all fillable attributes', function () {
     expect($setting->custom_internal_name)->toBe('my-custom-app');
     expect($setting->is_spa)->toBeTrue();
     expect($setting->docker_images_to_keep)->toBe(5);
+    expect($setting->stop_grace_period)->toBe(300);
 });
 
 it('creates ServerSetting with all fillable attributes', function () {

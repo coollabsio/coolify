@@ -1,15 +1,19 @@
 <?php
 
+use App\Enums\ApplicationDeploymentStatus;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\GlobalSearch;
 use App\Livewire\Project\CloneMe;
 use App\Livewire\Project\DeleteProject;
+use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -39,7 +43,7 @@ beforeEach(function () {
     session(['currentTeam' => $this->teamA]);
 });
 
-describe('Boarding Server IDOR (GHSA-qfcc-2fm3-9q42)', function () {
+describe('Boarding Server IDOR', function () {
     test('boarding mount cannot load server from another team via selectedExistingServer', function () {
         $component = Livewire::test(BoardingIndex::class, [
             'selectedServerType' => 'remote',
@@ -62,7 +66,7 @@ describe('Boarding Server IDOR (GHSA-qfcc-2fm3-9q42)', function () {
     });
 });
 
-describe('Boarding Project IDOR (GHSA-qfcc-2fm3-9q42)', function () {
+describe('Boarding Project IDOR', function () {
     test('boarding mount cannot load project from another team via selectedProject', function () {
         $component = Livewire::test(BoardingIndex::class, [
             'selectedProject' => $this->projectB->id,
@@ -91,7 +95,7 @@ describe('Boarding Project IDOR (GHSA-qfcc-2fm3-9q42)', function () {
     });
 });
 
-describe('GlobalSearch Server IDOR (GHSA-qfcc-2fm3-9q42)', function () {
+describe('GlobalSearch Server IDOR', function () {
     test('loadDestinations cannot access server from another team', function () {
         $component = Livewire::test(GlobalSearch::class)
             ->set('selectedServerId', $this->serverB->id)
@@ -102,7 +106,7 @@ describe('GlobalSearch Server IDOR (GHSA-qfcc-2fm3-9q42)', function () {
     });
 });
 
-describe('GlobalSearch Project IDOR (GHSA-qfcc-2fm3-9q42)', function () {
+describe('GlobalSearch Project IDOR', function () {
     test('loadEnvironments cannot access project from another team', function () {
         $component = Livewire::test(GlobalSearch::class)
             ->set('selectedProjectUuid', $this->projectB->uuid)
@@ -113,11 +117,11 @@ describe('GlobalSearch Project IDOR (GHSA-qfcc-2fm3-9q42)', function () {
     });
 });
 
-describe('DeleteProject IDOR (GHSA-qfcc-2fm3-9q42)', function () {
+describe('DeleteProject IDOR', function () {
     test('cannot mount DeleteProject with project from another team', function () {
         // Should throw ModelNotFoundException (404) because team-scoped query won't find it
         Livewire::test(DeleteProject::class, ['project_id' => $this->projectB->id]);
-    })->throws(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+    })->throws(ModelNotFoundException::class);
 
     test('can mount DeleteProject with own team project', function () {
         $component = Livewire::test(DeleteProject::class, ['project_id' => $this->projectA->id]);
@@ -126,14 +130,14 @@ describe('DeleteProject IDOR (GHSA-qfcc-2fm3-9q42)', function () {
     });
 });
 
-describe('CloneMe Project IDOR (GHSA-qfcc-2fm3-9q42)', function () {
+describe('CloneMe Project IDOR', function () {
     test('cannot mount CloneMe with project UUID from another team', function () {
         // Should throw ModelNotFoundException because team-scoped query won't find it
         Livewire::test(CloneMe::class, [
             'project_uuid' => $this->projectB->uuid,
             'environment_uuid' => $this->environmentB->uuid,
         ]);
-    })->throws(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+    })->throws(ModelNotFoundException::class);
 
     test('can mount CloneMe with own team project UUID', function () {
         $component = Livewire::test(CloneMe::class, [
@@ -145,21 +149,21 @@ describe('CloneMe Project IDOR (GHSA-qfcc-2fm3-9q42)', function () {
     });
 });
 
-describe('DeployController API Server IDOR (GHSA-qfcc-2fm3-9q42)', function () {
+describe('DeployController API Server IDOR', function () {
     test('deploy cancel API cannot access build server from another team', function () {
         // Create a deployment queue entry that references Team B's server as build_server
-        $application = \App\Models\Application::factory()->create([
+        $application = Application::factory()->create([
             'environment_id' => $this->environmentA->id,
             'destination_id' => StandaloneDocker::factory()->create(['server_id' => $this->serverA->id])->id,
             'destination_type' => StandaloneDocker::class,
         ]);
 
-        $deployment = \App\Models\ApplicationDeploymentQueue::create([
+        $deployment = ApplicationDeploymentQueue::create([
             'application_id' => $application->id,
             'deployment_uuid' => 'test-deploy-'.fake()->uuid(),
             'server_id' => $this->serverA->id,
             'build_server_id' => $this->serverB->id, // Cross-team build server
-            'status' => \App\Enums\ApplicationDeploymentStatus::IN_PROGRESS->value,
+            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
 
         $token = $this->userA->createToken('test-token', ['*']);
@@ -176,7 +180,7 @@ describe('DeployController API Server IDOR (GHSA-qfcc-2fm3-9q42)', function () {
         // Verify the deployment was cancelled
         $deployment->refresh();
         expect($deployment->status)->toBe(
-            \App\Enums\ApplicationDeploymentStatus::CANCELLED_BY_USER->value
+            ApplicationDeploymentStatus::CANCELLED_BY_USER->value
         );
     });
 });

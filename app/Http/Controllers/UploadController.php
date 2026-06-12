@@ -11,6 +11,27 @@ use Pion\Laravel\ChunkUpload\Receiver\FileReceiver;
 
 class UploadController extends BaseController
 {
+    private const MAX_BYTES = 10 * 1024 * 1024 * 1024; // 10 GiB
+
+    private const ALLOWED_EXTENSIONS = [
+        'sql',
+        'sql.gz',
+        'gz',
+        'zip',
+        'tar',
+        'tar.gz',
+        'tgz',
+        'dump',
+        'bak',
+        'bson',
+        'bson.gz',
+        'archive',
+        'archive.gz',
+        'bz2',
+        'xz',
+        'dmp',
+    ];
+
     public function upload(Request $request)
     {
         $databaseIdentifier = request()->route('databaseUuid');
@@ -18,6 +39,22 @@ class UploadController extends BaseController
         if (is_null($resource)) {
             return response()->json(['error' => 'You do not have permission for this database'], 500);
         }
+
+        $chunk = $request->file('file');
+        $originalName = $chunk instanceof UploadedFile ? $chunk->getClientOriginalName() : null;
+        if (blank($originalName) || ! self::hasAllowedExtension($originalName)) {
+            return response()->json([
+                'error' => 'Unsupported file type. Allowed extensions: '.implode(', ', self::ALLOWED_EXTENSIONS),
+            ], 422);
+        }
+
+        $declaredTotalSize = (int) $request->input('dzTotalFilesize', 0);
+        if ($declaredTotalSize > self::MAX_BYTES) {
+            return response()->json([
+                'error' => 'File exceeds maximum allowed size of '.self::formatMaxSize().'.',
+            ], 422);
+        }
+
         $receiver = new FileReceiver('file', $request, HandlerFactory::classFromRequest($request));
 
         if ($receiver->isUploaded() === false) {
@@ -40,29 +77,20 @@ class UploadController extends BaseController
             'status' => true,
         ]);
     }
-    // protected function saveFileToS3($file)
-    // {
-    //     $fileName = $this->createFilename($file);
 
-    //     $disk = Storage::disk('s3');
-    //     // It's better to use streaming Streaming (laravel 5.4+)
-    //     $disk->putFileAs('photos', $file, $fileName);
-
-    //     // for older laravel
-    //     // $disk->put($fileName, file_get_contents($file), 'public');
-    //     $mime = str_replace('/', '-', $file->getMimeType());
-
-    //     // We need to delete the file when uploaded to s3
-    //     unlink($file->getPathname());
-
-    //     return response()->json([
-    //         'path' => $disk->url($fileName),
-    //         'name' => $fileName,
-    //         'mime_type' => $mime
-    //     ]);
-    // }
     protected function saveFile(UploadedFile $file, string $resourceIdentifier)
     {
+        $originalName = $file->getClientOriginalName();
+        $size = $file->getSize();
+
+        if (! self::hasAllowedExtension($originalName) || $size === false || $size > self::MAX_BYTES) {
+            @unlink($file->getPathname());
+
+            return response()->json([
+                'error' => 'Uploaded file failed validation.',
+            ], 422);
+        }
+
         $mime = str_replace('/', '-', $file->getMimeType());
         $filePath = "upload/{$resourceIdentifier}";
         $finalPath = storage_path('app/'.$filePath);
@@ -73,13 +101,30 @@ class UploadController extends BaseController
         ]);
     }
 
-    protected function createFilename(UploadedFile $file)
+    private static function hasAllowedExtension(string $name): bool
     {
-        $extension = $file->getClientOriginalExtension();
-        $filename = str_replace('.'.$extension, '', $file->getClientOriginalName()); // Filename without extension
+        $lower = strtolower($name);
+        $suffixes = array_map(fn ($ext) => '.'.$ext, self::ALLOWED_EXTENSIONS);
+        usort($suffixes, fn ($a, $b) => strlen($b) <=> strlen($a));
 
-        $filename .= '_'.md5(time()).'.'.$extension;
+        foreach ($suffixes as $suffix) {
+            if (! str_ends_with($lower, $suffix)) {
+                continue;
+            }
 
-        return $filename;
+            $stem = substr($lower, 0, -strlen($suffix));
+            if ($stem !== '' && ! str_ends_with($stem, '.')) {
+                return true;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    private static function formatMaxSize(): string
+    {
+        return (self::MAX_BYTES / (1024 * 1024 * 1024)).' GiB';
     }
 }

@@ -2,8 +2,7 @@
     <x-slot:title>
         Profile | Coolify
     </x-slot>
-    <h1>Profile</h1>
-    <div class="subtitle -mt-2">Your user profile settings.</div>
+    <x-profile.navbar />
     <form wire:submit='submit' class="flex flex-col">
         <div class="flex items-center gap-2">
             <h2>General</h2>

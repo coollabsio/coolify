@@ -31,7 +31,7 @@
                         </x-callout>
                     @endif
                     <h3>Advanced</h3>
-                    <div class="pb-6 w-96">
+                    <div class="pb-6 w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$server"
                             helper="If set, all resources will only have docker container labels for {{ str($server->proxyType())->title() }}.<br>For applications, labels needs to be regenerated manually. <br>Resources needs to be restarted."
                             id="generateExactLabels"

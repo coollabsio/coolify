@@ -626,7 +626,7 @@ class Service extends BaseModel
                     }
                     $fields->put('Unleash', $data->toArray());
                     break;
-                case $image->contains('grafana'):
+                case $this->isGrafanaImage($image->toString()):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GRAFANA')->first();
                     $data = $data->merge([
@@ -778,7 +778,8 @@ class Service extends BaseModel
                     }
                     $rpc_secret = $this->environment_variables()->where('key', 'GARAGE_RPC_SECRET')->first();
                     if (is_null($rpc_secret)) {
-                        $rpc_secret = $this->environment_variables()->where('key', 'SERVICE_HEX_32_RPCSECRET')->first();
+                        $rpc_secret = $this->environment_variables()->where('key', 'SERVICE_HEX_64_RPCSECRET')->first()
+                            ?? $this->environment_variables()->where('key', 'SERVICE_HEX_32_RPCSECRET')->first();
                     }
                     $metrics_token = $this->environment_variables()->where('key', 'GARAGE_METRICS_TOKEN')->first();
                     if (is_null($metrics_token)) {
@@ -1377,6 +1378,15 @@ class Service extends BaseModel
         });
 
         return $fields;
+    }
+
+    private function isGrafanaImage(string $image): bool
+    {
+        return in_array($image, [
+            'grafana/grafana',
+            'grafana/grafana-oss',
+            'grafana/grafana-enterprise',
+        ], true);
     }
 
     public function saveExtraFields($fields)

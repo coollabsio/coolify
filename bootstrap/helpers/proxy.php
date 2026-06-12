@@ -4,6 +4,7 @@ use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Server;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Yaml\Yaml;
 
@@ -137,7 +138,7 @@ function connectProxyToNetworks(Server $server)
  * This must be called BEFORE docker compose up since the compose file declares networks as external.
  *
  * @param  Server  $server  The server to ensure networks on
- * @return \Illuminate\Support\Collection Commands to create networks if they don't exist
+ * @return Collection Commands to create networks if they don't exist
  */
 function ensureProxyNetworksExist(Server $server)
 {
@@ -215,7 +216,7 @@ function extractCustomProxyCommands(Server $server, string $existing_config): ar
                 $custom_commands[] = $command;
             }
         }
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         // If we can't parse the config, return empty array
         // Silently fail to avoid breaking the proxy regeneration
     }
@@ -436,7 +437,7 @@ function getExactTraefikVersionFromContainer(Server $server): ?string
         Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Could not detect exact version");
 
         return null;
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         Log::error("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Error: ".$e->getMessage());
 
         return null;
@@ -483,7 +484,7 @@ function getTraefikVersionFromDockerCompose(Server $server): ?string
         Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Image format doesn't match expected pattern: {$image}");
 
         return null;
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         Log::error("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Error: ".$e->getMessage());
 
         return null;

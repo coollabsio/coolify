@@ -14,6 +14,16 @@
     @endif
     @if ($type === 'password')
         <div class="relative" x-data="{ type: 'password' }" @success.window="type = 'password'">
+            <input autocomplete="{{ $autocomplete }}" value="{{ $value }}"
+                x-bind:type="type"
+                x-bind:class="{ 'truncate': type === 'text' && ! $el.disabled }"
+                {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
+                @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]" @endif
+                wire:loading.attr="disabled"
+                @readonly($readonly) @disabled($disabled) id="{{ $htmlId }}"
+                name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
+                aria-placeholder="{{ $attributes->get('placeholder') }}"
+                @if ($autofocus) x-ref="autofocusInput" @endif>
             @if ($allowToPeak)
                 <button type="button" x-on:click="type = type === 'password' ? 'text' : 'password'"
                     class="flex absolute inset-y-0 right-0 items-center pr-2 cursor-pointer dark:hover:text-white"
@@ -35,16 +45,6 @@
                     </svg>
                 </button>
             @endif
-            <input autocomplete="{{ $autocomplete }}" value="{{ $value }}"
-                x-bind:type="type"
-                x-bind:class="{ 'truncate': type === 'text' && ! $el.disabled }"
-                {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
-                @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]" @endif
-                wire:loading.attr="disabled"
-                @readonly($readonly) @disabled($disabled) id="{{ $htmlId }}"
-                name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
-                aria-placeholder="{{ $attributes->get('placeholder') }}"
-                @if ($autofocus) x-ref="autofocusInput" @endif>
 
         </div>
     @else

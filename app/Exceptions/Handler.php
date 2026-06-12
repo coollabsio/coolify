@@ -4,8 +4,10 @@ namespace App\Exceptions;
 
 use App\Models\InstanceSettings;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Psr\Log\LogLevel;
 use RuntimeException;
 use Sentry\Laravel\Integration;
 use Sentry\State\Scope;
@@ -16,7 +18,7 @@ class Handler extends ExceptionHandler
     /**
      * A list of exception types with their corresponding custom log levels.
      *
-     * @var array<class-string<\Throwable>, \Psr\Log\LogLevel::*>
+     * @var array<class-string<Throwable>, LogLevel::*>
      */
     protected $levels = [
         //
@@ -25,7 +27,7 @@ class Handler extends ExceptionHandler
     /**
      * A list of the exception types that are not reported.
      *
-     * @var array<int, class-string<\Throwable>>
+     * @var array<int, class-string<Throwable>>
      */
     protected $dontReport = [
         ProcessException::class,
@@ -49,6 +51,13 @@ class Handler extends ExceptionHandler
     protected function unauthenticated($request, AuthenticationException $exception)
     {
         if ($request->is('api/*') || $request->expectsJson() || $this->shouldReturnJson($request, $exception)) {
+            if ($request->is('api/*')) {
+                auditLog('api.auth.unauthenticated', [
+                    'reason' => $exception->getMessage(),
+                    'guards' => $exception->guards(),
+                ], 'warning');
+            }
+
             return response()->json(['message' => $exception->getMessage()], 401);
         }
 
@@ -61,8 +70,15 @@ class Handler extends ExceptionHandler
     public function render($request, Throwable $e)
     {
         // Handle authorization exceptions for API routes
-        if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+        if ($e instanceof AuthorizationException) {
             if ($request->is('api/*') || $request->expectsJson()) {
+                if ($request->is('api/*')) {
+                    auditLog('api.auth.policy_denied', [
+                        'reason' => $e->getMessage(),
+                        'route' => $request->route()?->getName() ?? $request->path(),
+                    ], 'warning');
+                }
+
                 // Get the custom message from the policy if available
                 $message = $e->getMessage();
 

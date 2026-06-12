@@ -71,6 +71,16 @@ class SwarmDocker extends BaseModel
         return $this->belongsTo(Server::class);
     }
 
+    public static function ownedByCurrentTeam()
+    {
+        return static::whereHas('server', fn ($q) => $q->whereTeamId(currentTeam()->id));
+    }
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return static::whereHas('server', fn ($q) => $q->whereTeamId($teamId));
+    }
+
     /**
      * Get the server attribute using identity map caching.
      * This intercepts lazy-loading to use cached Server lookups.

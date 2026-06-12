@@ -18,6 +18,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
@@ -25,6 +26,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -156,6 +158,73 @@ function validateShellSafePath(string $input, string $context = 'path'): string
 }
 
 /**
+ * Validate that a filename is safe for use as a plain file name (no path components).
+ *
+ * Prevents path traversal attacks by rejecting directory separators, traversal
+ * sequences, and null bytes, in addition to all shell metacharacters blocked by
+ * validateShellSafePath(). Intended for user-supplied filenames such as PostgreSQL
+ * init script names that are later written to a specific directory on the host.
+ *
+ * @param  string  $input  The filename to validate
+ * @param  string  $context  Descriptive name for error messages (e.g., 'init script filename')
+ * @return string The validated input (unchanged if valid)
+ *
+ * @throws Exception If dangerous characters or path traversal sequences are detected
+ */
+function validateFilenameSafe(string $input, string $context = 'filename'): string
+{
+    // First apply shell-metachar checks
+    validateShellSafePath($input, $context);
+
+    // Reject NUL bytes (can be used to truncate path strings in some contexts)
+    if (str_contains($input, "\0")) {
+        throw new Exception(
+            "Invalid {$context}: contains null byte. ".
+            'Null bytes are not allowed in filenames for security reasons.'
+        );
+    }
+
+    // Reject directory separators — filename must be a single path component
+    if (str_contains($input, '/') || str_contains($input, '\\')) {
+        throw new Exception(
+            "Invalid {$context}: directory separators ('/' or '\\') are not allowed. ".
+            'Provide a plain filename without path components.'
+        );
+    }
+
+    // Reject path traversal sequences (catches encoded or unusual forms)
+    if (str_contains($input, '..')) {
+        throw new Exception(
+            "Invalid {$context}: path traversal sequence ('..') is not allowed."
+        );
+    }
+
+    // Reject shell globbing / expansion metacharacters and whitespace that would
+    // split the filename into additional shell arguments if ever interpolated
+    // unquoted (defence in depth on top of escapeshellarg() at call sites).
+    $shellExpansionChars = [
+        ' ' => 'whitespace',
+        '*' => 'glob wildcard',
+        '?' => 'glob wildcard',
+        '[' => 'glob character class',
+        ']' => 'glob character class',
+        '~' => 'tilde expansion',
+        '"' => 'double quote',
+        "'" => 'single quote',
+    ];
+
+    foreach ($shellExpansionChars as $char => $description) {
+        if (str_contains($input, $char)) {
+            throw new Exception(
+                "Invalid {$context}: contains forbidden character '{$char}' ({$description})."
+            );
+        }
+    }
+
+    return $input;
+}
+
+/**
  * Validate that a databases_to_backup input string is safe from command injection.
  *
  * Supports all database formats:
@@ -259,6 +328,16 @@ function currentTeam()
     return Auth::user()?->currentTeam() ?? null;
 }
 
+function find_destination_for_current_team(?string $uuid): StandaloneDocker|SwarmDocker|null
+{
+    if (blank($uuid) || ! currentTeam()) {
+        return null;
+    }
+
+    return StandaloneDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first()
+        ?? SwarmDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first();
+}
+
 function showBoarding(): bool
 {
     if (isDev()) {
@@ -274,14 +353,30 @@ function showBoarding(): bool
 function refreshSession(?Team $team = null): void
 {
     if (! $team) {
-        if (Auth::user()->currentTeam()) {
-            $team = Team::find(Auth::user()->currentTeam()->id);
-        } else {
-            $team = User::find(Auth::id())->teams->first();
+        $currentTeam = Auth::user()->currentTeam();
+        if ($currentTeam) {
+            // currentTeam() can resolve a stale (just-deleted) team from the
+            // session/cache, so Team::find() may still return null here.
+            $team = Team::find($currentTeam->id);
+        }
+        if (! $team) {
+            // Fall back to any team the user still belongs to.
+            $team = User::query()->find(Auth::id())?->teams()->first();
         }
     }
+
     // Clear old cache key format for backwards compatibility
     Cache::forget('team:'.Auth::id());
+
+    if (! $team) {
+        // The user has no team left (e.g. just deleted their current team and
+        // belongs to no other): clear the stale session reference instead of
+        // dereferencing null.
+        session()->forget('currentTeam');
+
+        return;
+    }
+
     // Use new cache key format that includes team ID
     Cache::forget('user:'.Auth::id().':team:'.$team->id);
     Cache::remember('user:'.Auth::id().':team:'.$team->id, 3600, function () use ($team) {
@@ -511,6 +606,39 @@ function isDev(): bool
 function isCloud(): bool
 {
     return ! config('constants.coolify.self_hosted');
+}
+
+/**
+ * Resolve the queue used for application deployments, database starts and service starts.
+ *
+ * On cloud these jobs run on a dedicated `deployments` queue so they can be drained by an
+ * isolated Horizon worker pool; self-hosted keeps them on the shared `high` queue. Routing
+ * is decided by `isCloud()` (config-based) rather than `HORIZON_QUEUES`, so the dispatching
+ * process needs no special env — only the worker must be configured to drain `deployments`.
+ *
+ * IMPORTANT: on cloud a worker MUST include `deployments` in its `HORIZON_QUEUES`, otherwise
+ * these jobs are never processed.
+ */
+function deployment_queue(): string
+{
+    return isCloud() ? 'deployments' : 'high';
+}
+
+/**
+ * Resolve the queue used for scheduled jobs — the scheduler dispatcher, scheduled tasks and
+ * scheduled database backups, whether triggered automatically or manually.
+ *
+ * On cloud these jobs run on a dedicated `crons` queue so they can be drained by an isolated
+ * Horizon worker pool; self-hosted keeps them on the shared `high` queue. Routing is decided
+ * by `isCloud()` (config-based), so the dispatching process needs no special env — only the
+ * worker must be configured to drain `crons`.
+ *
+ * IMPORTANT: on cloud a worker MUST include `crons` in its `HORIZON_QUEUES`, otherwise these
+ * jobs are never processed.
+ */
+function crons_queue(): string
+{
+    return isCloud() ? 'crons' : 'high';
 }
 
 function translate_cron_expression($expression_to_validate): string
@@ -929,7 +1057,6 @@ function sslip(Server $server)
 
 function get_service_templates(bool $force = false): Collection
 {
-
     if ($force) {
         try {
             $response = Http::retry(3, 1000)->get(config('constants.services.official'));
@@ -940,15 +1067,16 @@ function get_service_templates(bool $force = false): Collection
 
             return collect($services);
         } catch (Throwable) {
-            $services = File::get(base_path('templates/'.config('constants.services.file_name')));
-
-            return collect(json_decode($services))->sortKeys();
+            return get_service_templates();
         }
-    } else {
-        $services = File::get(base_path('templates/'.config('constants.services.file_name')));
-
-        return collect(json_decode($services))->sortKeys();
     }
+
+    $path = base_path('templates/'.config('constants.services.file_name'));
+    $mtime = filemtime($path) ?: 0;
+
+    return Cache::remember("service-templates:{$mtime}", now()->addDay(), function () use ($path) {
+        return collect(json_decode(File::get($path)))->sortKeys();
+    });
 }
 
 function getResourceByUuid(string $uuid, ?int $teamId = null)
@@ -979,44 +1107,17 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
 }
 function queryDatabaseByUuidWithinTeam(string $uuid, string $teamId)
 {
-    $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
-    if ($postgresql && $postgresql->team()->id == $teamId) {
-        return $postgresql->unsetRelation('environment');
-    }
-    $redis = StandaloneRedis::whereUuid($uuid)->first();
-    if ($redis && $redis->team()->id == $teamId) {
-        return $redis->unsetRelation('environment');
-    }
-    $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
-    if ($mongodb && $mongodb->team()->id == $teamId) {
-        return $mongodb->unsetRelation('environment');
-    }
-    $mysql = StandaloneMysql::whereUuid($uuid)->first();
-    if ($mysql && $mysql->team()->id == $teamId) {
-        return $mysql->unsetRelation('environment');
-    }
-    $mariadb = StandaloneMariadb::whereUuid($uuid)->first();
-    if ($mariadb && $mariadb->team()->id == $teamId) {
-        return $mariadb->unsetRelation('environment');
-    }
-    $keydb = StandaloneKeydb::whereUuid($uuid)->first();
-    if ($keydb && $keydb->team()->id == $teamId) {
-        return $keydb->unsetRelation('environment');
-    }
-    $dragonfly = StandaloneDragonfly::whereUuid($uuid)->first();
-    if ($dragonfly && $dragonfly->team()->id == $teamId) {
-        return $dragonfly->unsetRelation('environment');
-    }
-    $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
-    if ($clickhouse && $clickhouse->team()->id == $teamId) {
-        return $clickhouse->unsetRelation('environment');
+    foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
+        $database = $modelClass::whereUuid($uuid)->first();
+        if ($database && $database->team()->id == $teamId) {
+            return $database->unsetRelation('environment');
+        }
     }
 
     return null;
 }
 function queryResourcesByUuid(string $uuid)
 {
-    $resource = null;
     $application = Application::whereUuid($uuid)->first();
     if ($application) {
         return $application;
@@ -1025,37 +1126,11 @@ function queryResourcesByUuid(string $uuid)
     if ($service) {
         return $service;
     }
-    $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
-    if ($postgresql) {
-        return $postgresql;
-    }
-    $redis = StandaloneRedis::whereUuid($uuid)->first();
-    if ($redis) {
-        return $redis;
-    }
-    $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
-    if ($mongodb) {
-        return $mongodb;
-    }
-    $mysql = StandaloneMysql::whereUuid($uuid)->first();
-    if ($mysql) {
-        return $mysql;
-    }
-    $mariadb = StandaloneMariadb::whereUuid($uuid)->first();
-    if ($mariadb) {
-        return $mariadb;
-    }
-    $keydb = StandaloneKeydb::whereUuid($uuid)->first();
-    if ($keydb) {
-        return $keydb;
-    }
-    $dragonfly = StandaloneDragonfly::whereUuid($uuid)->first();
-    if ($dragonfly) {
-        return $dragonfly;
-    }
-    $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
-    if ($clickhouse) {
-        return $clickhouse;
+    foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
+        $database = $modelClass::whereUuid($uuid)->first();
+        if ($database) {
+            return $database;
+        }
     }
 
     // Check for ServiceDatabase by its own UUID
@@ -1064,7 +1139,7 @@ function queryResourcesByUuid(string $uuid)
         return $serviceDatabase;
     }
 
-    return $resource;
+    return null;
 }
 function generateTagDeployWebhook($tag_name)
 {
@@ -1374,23 +1449,23 @@ function generateEnvValue(string $command, Service|Application|null $service = n
             break;
             // This is base64,
         case 'REALBASE64_64':
-            $generatedValue = base64_encode(Str::random(64));
+            $generatedValue = base64_encode(random_bytes(64));
             break;
         case 'REALBASE64_128':
-            $generatedValue = base64_encode(Str::random(128));
+            $generatedValue = base64_encode(random_bytes(128));
             break;
         case 'REALBASE64':
         case 'REALBASE64_32':
-            $generatedValue = base64_encode(Str::random(32));
+            $generatedValue = base64_encode(random_bytes(32));
             break;
         case 'HEX_32':
-            $generatedValue = bin2hex(Str::random(32));
+            $generatedValue = bin2hex(random_bytes(16));
             break;
         case 'HEX_64':
-            $generatedValue = bin2hex(Str::random(64));
+            $generatedValue = bin2hex(random_bytes(32));
             break;
         case 'HEX_128':
-            $generatedValue = bin2hex(Str::random(128));
+            $generatedValue = bin2hex(random_bytes(64));
             break;
         case 'USER':
             $generatedValue = Str::random(16);
@@ -1790,15 +1865,15 @@ function isBase64Encoded($strValue)
 {
     return base64_encode(base64_decode($strValue, true)) === $strValue;
 }
-function customApiValidator(Collection|array $item, array $rules)
+function customApiValidator(Collection|array $item, array $rules, array $messages = [])
 {
     if (is_array($item)) {
         $item = collect($item);
     }
 
-    return Validator::make($item->toArray(), $rules, [
+    return Validator::make($item->toArray(), $rules, array_merge([
         'required' => 'This field is required.',
-    ]);
+    ], $messages));
 }
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, ?int $preview_id = null)
 {
@@ -3453,10 +3528,10 @@ function wireNavigate(): string
     try {
         $settings = instanceSettings();
 
-        // Return wire:navigate.hover for SPA navigation with prefetching, or empty string if disabled
-        return ($settings->is_wire_navigate_enabled ?? true) ? 'wire:navigate.hover' : '';
+        // Return wire:navigate for SPA navigation with prefetching, or empty string if disabled
+        return ($settings->is_wire_navigate_enabled ?? true) ? 'wire:navigate' : '';
     } catch (Exception $e) {
-        return 'wire:navigate.hover';
+        return 'wire:navigate';
     }
 }
 
@@ -3487,34 +3562,6 @@ function getHelperVersion(): string
     }
 
     return config('constants.coolify.helper_version');
-}
-
-function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id)
-{
-    $server = Server::find($server_id)->where('team_id', $team_id)->first();
-    if (! $server) {
-        return;
-    }
-    $uuid = new Cuid2;
-    $cloneCommand = "git clone --no-checkout -b $branch $repository .";
-    $workdir = rtrim($base_directory, '/');
-    $fileList = collect([".$workdir/coolify.json"]);
-    $commands = collect([
-        "rm -rf /tmp/{$uuid}",
-        "mkdir -p /tmp/{$uuid}",
-        "cd /tmp/{$uuid}",
-        $cloneCommand,
-        'git sparse-checkout init --cone',
-        "git sparse-checkout set {$fileList->implode(' ')}",
-        'git read-tree -mu HEAD',
-        "cat .$workdir/coolify.json",
-        'rm -rf /tmp/{$uuid}',
-    ]);
-    try {
-        return instant_remote_process($commands, $server);
-    } catch (Exception) {
-        // continue
-    }
 }
 
 function loggy($message = null, array $context = [])
@@ -3660,13 +3707,21 @@ function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|
         }
     }
 
-    preg_match('/(?<=:)\d+(?=\/)/', $gitRepository, $matches);
+    $normalizedRepository = $repository;
 
-    if (count($matches) === 1) {
-        $providerInfo['port'] = $matches[0];
-        $gitHost = str($gitRepository)->before(':');
-        $gitRepo = str($gitRepository)->after('/');
-        $repository = "$gitHost:$gitRepo";
+    if (str($normalizedRepository)->contains('://')) {
+        $parsedRepository = parse_url($normalizedRepository);
+
+        if ($parsedRepository !== false && array_key_exists('port', $parsedRepository)) {
+            $providerInfo['port'] = (string) $parsedRepository['port'];
+        }
+    } else {
+        preg_match('/^(?<host>[^:]+):(?<port>\d+)\/(?<path>.+)$/', $normalizedRepository, $matches);
+
+        if (! empty($matches['port'])) {
+            $providerInfo['port'] = $matches['port'];
+            $repository = "{$matches['host']}:{$matches['path']}";
+        }
     }
 
     return [

@@ -4,6 +4,7 @@ namespace App\Console\Commands\Generate;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Process;
 use Symfony\Component\Yaml\Yaml;
 
 class Services extends Command
@@ -77,6 +78,7 @@ class Services extends Command
             'category' => $data->get('category'),
             'logo' => $data->get('logo', 'svgs/default.webp'),
             'minversion' => $data->get('minversion', '0.0.0'),
+            'template_last_updated_at' => $this->templateLastUpdatedAt($file),
         ];
 
         if ($port = $data->get('port')) {
@@ -88,7 +90,35 @@ class Services extends Command
             $payload['envs'] = base64_encode($envFileContent);
         }
 
+        if (str($data->get('amd_only'))->toBoolean()) {
+            $payload['amd_only'] = true;
+        }
+
+        if (str($data->get('arm_only'))->toBoolean()) {
+            $payload['arm_only'] = true;
+        }
+
         return $payload;
+    }
+
+    private function templateLastUpdatedAt(string $file): ?string
+    {
+        $process = Process::path(base_path())->run([
+            'git',
+            'log',
+            '-1',
+            '--format=%cI',
+            '--',
+            "templates/compose/{$file}",
+        ]);
+
+        if ($process->failed()) {
+            return null;
+        }
+
+        $timestamp = trim($process->output());
+
+        return $timestamp === '' ? null : $timestamp;
     }
 
     private function generateServiceTemplatesWithFqdn(): void
@@ -147,6 +177,7 @@ class Services extends Command
             'category' => $data->get('category'),
             'logo' => $data->get('logo', 'svgs/default.webp'),
             'minversion' => $data->get('minversion', '0.0.0'),
+            'template_last_updated_at' => $this->templateLastUpdatedAt($file),
         ];
 
         if ($port = $data->get('port')) {
@@ -158,6 +189,14 @@ class Services extends Command
             // Also replace SERVICE_URL with SERVICE_FQDN in env file content
             $modifiedEnvContent = str_replace('SERVICE_URL', 'SERVICE_FQDN', $envFileContent);
             $payload['envs'] = base64_encode($modifiedEnvContent);
+        }
+
+        if (str($data->get('amd_only'))->toBoolean()) {
+            $payload['amd_only'] = true;
+        }
+
+        if (str($data->get('arm_only'))->toBoolean()) {
+            $payload['arm_only'] = true;
         }
 
         return $payload;
@@ -216,6 +255,7 @@ class Services extends Command
             'category' => $data->get('category'),
             'logo' => $data->get('logo', 'svgs/default.webp'),
             'minversion' => $data->get('minversion', '0.0.0'),
+            'template_last_updated_at' => $this->templateLastUpdatedAt($file),
         ];
 
         if ($port = $data->get('port')) {
@@ -227,6 +267,14 @@ class Services extends Command
             // Also replace SERVICE_URL with SERVICE_FQDN in env file content (not base64 encoded)
             $modifiedEnvContent = str_replace('SERVICE_URL', 'SERVICE_FQDN', $envFileContent);
             $payload['envs'] = $modifiedEnvContent;
+        }
+
+        if (str($data->get('amd_only'))->toBoolean()) {
+            $payload['amd_only'] = true;
+        }
+
+        if (str($data->get('arm_only'))->toBoolean()) {
+            $payload['arm_only'] = true;
         }
 
         return $payload;

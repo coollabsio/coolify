@@ -1,7 +1,6 @@
 import { WebSocketServer } from 'ws';
 import http from 'http';
 import pty from 'node-pty';
-import axios from 'axios';
 import cookie from 'cookie';
 import 'dotenv/config';
 import {
@@ -9,13 +8,67 @@ import {
     extractSshArgs,
     extractTargetHost,
     extractTimeout,
+    getTerminalSessionTimeout,
     isAuthorizedTargetHost,
 } from './terminal-utils.js';
 
+async function postToCoolify(path, headers) {
+    return new Promise((resolve, reject) => {
+        const request = http.request({
+            hostname: 'coolify',
+            port: 8080,
+            path,
+            method: 'POST',
+            headers,
+        }, (response) => {
+            let responseText = '';
+
+            response.setEncoding('utf8');
+            response.on('data', (chunk) => {
+                responseText += chunk;
+            });
+            response.on('end', () => {
+                try {
+                    resolve({
+                        status: response.statusCode ?? 0,
+                        data: parseResponseData(response.headers['content-type'], responseText),
+                    });
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        });
+
+        request.on('error', reject);
+        request.end();
+    });
+}
+
+function parseResponseData(contentType = '', responseText = '') {
+    if (responseText === '') {
+        return null;
+    }
+
+    if (contentType.includes('application/json')) {
+        return JSON.parse(responseText);
+    }
+
+    return responseText;
+}
+
+function createHttpError(response) {
+    const error = new Error(`Request failed with status code ${response.status}`);
+    error.response = response;
+
+    return error;
+}
+
 const userSessions = new Map();
-const terminalDebugEnabled = ['local', 'development'].includes(
-    String(process.env.APP_ENV || process.env.NODE_ENV || '').toLowerCase()
-);
+const envName = String(process.env.APP_ENV || process.env.NODE_ENV || '').toLowerCase();
+const debugOverride = String(process.env.TERMINAL_DEBUG || '').toLowerCase();
+const terminalDebugEnabled =
+    ['local', 'development'].includes(envName)
+    || ['1', 'true', 'yes', 'on'].includes(debugOverride);
 
 function logTerminal(level, message, context = {}) {
     if (!terminalDebugEnabled) {
@@ -74,11 +127,9 @@ const verifyClient = async (info, callback) => {
 
     try {
         // Authenticate with Laravel backend
-        const response = await axios.post(`http://coolify:8080/terminal/auth`, null, {
-            headers: {
-                'Cookie': `${sessionCookieName}=${laravelSession}`,
-                'X-XSRF-TOKEN': xsrfToken
-            },
+        const response = await postToCoolify('/terminal/auth', {
+            'Cookie': `${sessionCookieName}=${laravelSession}`,
+            'X-XSRF-TOKEN': xsrfToken
         });
 
         if (response.status === 200) {
@@ -105,9 +156,24 @@ const verifyClient = async (info, callback) => {
 
 const wss = new WebSocketServer({ server, path: '/terminal/ws', verifyClient: verifyClient });
 
+const HEARTBEAT_INTERVAL_MS = 30000;
+
 wss.on('connection', async (ws, req) => {
+    ws.isAlive = true;
+    ws.on('pong', () => { ws.isAlive = true; });
+
     const userId = generateUserId();
-    const userSession = { ws, userId, ptyProcess: null, isActive: false, authorizedIPs: [] };
+    ws.userId = userId;
+    const userSession = {
+        ws,
+        userId,
+        ptyProcess: null,
+        isActive: false,
+        authorizedIPs: [],
+        authReady: false,
+        pendingMessages: [],
+        terminalSessionTimer: null,
+    };
     const { xsrfToken, laravelSession, sessionCookieName } = getSessionCookie(req);
     const connectionContext = {
         userId,
@@ -117,6 +183,26 @@ wss.on('connection', async (ws, req) => {
         hasLaravelSession: Boolean(laravelSession),
     };
 
+    // Register socket handlers up front so messages sent immediately by the client
+    // (e.g. a command replay on reconnect) are not dropped while the auth/IP fetch
+    // below is still pending.
+    ws.on('message', (message) => {
+        if (userSession.authReady) {
+            handleMessage(userSession, message);
+        } else {
+            userSession.pendingMessages.push(message);
+        }
+    });
+    ws.on('error', (err) => handleError(err, userId));
+    ws.on('close', (code, reason) => {
+        logTerminal('log', 'Terminal websocket connection closed.', {
+            userId,
+            code,
+            reason: reason?.toString(),
+        });
+        handleClose(userId);
+    });
+
     // Verify presence of required tokens
     if (!laravelSession || !xsrfToken) {
         logTerminal('warn', 'Closing websocket connection because required auth tokens are missing.', connectionContext);
@@ -125,12 +211,15 @@ wss.on('connection', async (ws, req) => {
     }
 
     try {
-        const response = await axios.post(`http://coolify:8080/terminal/auth/ips`, null, {
-            headers: {
-                'Cookie': `${sessionCookieName}=${laravelSession}`,
-                'X-XSRF-TOKEN': xsrfToken
-            },
+        const response = await postToCoolify('/terminal/auth/ips', {
+            'Cookie': `${sessionCookieName}=${laravelSession}`,
+            'X-XSRF-TOKEN': xsrfToken
         });
+
+        if (response.status !== 200) {
+            throw createHttpError(response);
+        }
+
         userSession.authorizedIPs = response.data.ipAddresses || [];
         logTerminal('log', 'Fetched authorized terminal hosts for websocket session.', {
             ...connectionContext,
@@ -148,27 +237,40 @@ wss.on('connection', async (ws, req) => {
     }
 
     userSessions.set(userId, userSession);
+    userSession.authReady = true;
     logTerminal('log', 'Terminal websocket connection established.', {
         ...connectionContext,
         authorizedHostCount: userSession.authorizedIPs.length,
+        bufferedMessages: userSession.pendingMessages.length,
     });
 
-    ws.on('message', (message) => {
-        handleMessage(userSession, message);
-    });
-    ws.on('error', (err) => handleError(err, userId));
-    ws.on('close', (code, reason) => {
-        logTerminal('log', 'Terminal websocket connection closed.', {
-            userId,
-            code,
-            reason: reason?.toString(),
-        });
-        handleClose(userId);
-    });
+    // Drain any messages that arrived while we were waiting on the IP auth call.
+    while (userSession.pendingMessages.length > 0) {
+        handleMessage(userSession, userSession.pendingMessages.shift());
+    }
 });
 
+const heartbeat = setInterval(() => {
+    wss.clients.forEach((ws) => {
+        if (ws.isAlive === false) {
+            logTerminal('warn', 'Terminating WS due to missed protocol pong.');
+            return ws.terminate();
+        }
+        ws.isAlive = false;
+        try {
+            ws.ping();
+        } catch (_) {
+            // ignore — close handler will follow
+        }
+    });
+}, HEARTBEAT_INTERVAL_MS);
+
+wss.on('close', () => clearInterval(heartbeat));
+
 const messageHandlers = {
-    message: (session, data) => session.ptyProcess.write(data),
+    message: (session, data) => {
+        session.ptyProcess.write(data);
+    },
     resize: (session, { cols, rows }) => {
         cols = cols > 0 ? cols : 80;
         rows = rows > 0 ? rows : 30;
@@ -196,12 +298,6 @@ function handleMessage(userSession, message) {
         });
         return;
     }
-
-    logTerminal('log', 'Received websocket message.', {
-        userId: userSession.userId,
-        keys: Object.keys(parsed),
-        isActive: userSession.isActive,
-    });
 
     Object.entries(parsed).forEach(([key, value]) => {
         const handler = messageHandlers[key];
@@ -246,8 +342,14 @@ async function handleCommand(ws, command, userId) {
         }
     }
 
+    if (userSession.terminalSessionTimer) {
+        clearTimeout(userSession.terminalSessionTimer);
+        userSession.terminalSessionTimer = null;
+    }
+
     const commandString = command[0].split('\n').join(' ');
-    const timeout = extractTimeout(commandString);
+    const commandTimeout = extractTimeout(commandString);
+    const terminalSessionTimeout = getTerminalSessionTimeout();
     const sshArgs = extractSshArgs(commandString);
     const hereDocContent = extractHereDocContent(commandString);
 
@@ -256,7 +358,8 @@ async function handleCommand(ws, command, userId) {
     logTerminal('log', 'Parsed terminal command metadata.', {
         userId,
         targetHost,
-        timeout,
+        commandTimeout,
+        terminalSessionTimeout,
         sshArgs,
         authorizedIPs: userSession?.authorizedIPs ?? [],
     });
@@ -295,7 +398,8 @@ async function handleCommand(ws, command, userId) {
     logTerminal('log', 'Spawning PTY process for terminal session.', {
         userId,
         targetHost,
-        timeout,
+        commandTimeout,
+        terminalSessionTimeout,
     });
     const ptyProcess = pty.spawn('ssh', sshArgs.concat([hereDocContent]), options);
 
@@ -317,13 +421,16 @@ async function handleCommand(ws, command, userId) {
         });
         ws.send('pty-exited');
         userSession.isActive = false;
+
+        if (userSession.terminalSessionTimer) {
+            clearTimeout(userSession.terminalSessionTimer);
+            userSession.terminalSessionTimer = null;
+        }
     });
 
-    if (timeout) {
-        setTimeout(async () => {
-            await killPtyProcess(userId);
-        }, timeout * 1000);
-    }
+    userSession.terminalSessionTimer = setTimeout(async () => {
+        await killPtyProcess(userId);
+    }, terminalSessionTimeout * 1000);
 }
 
 async function handleError(err, userId) {
@@ -365,6 +472,11 @@ async function killPtyProcess(userId) {
 
             setTimeout(() => {
                 if (!session.isActive || !session.ptyProcess) {
+                    if (session.terminalSessionTimer) {
+                        clearTimeout(session.terminalSessionTimer);
+                        session.terminalSessionTimer = null;
+                    }
+
                     logTerminal('log', 'PTY process terminated successfully.', {
                         userId,
                         killAttempts,

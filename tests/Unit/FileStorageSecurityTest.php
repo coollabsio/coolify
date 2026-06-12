@@ -92,7 +92,7 @@ test('file storage accepts paths with underscores and hyphens', function () {
         ->not->toThrow(Exception::class);
 });
 
-// --- Regression tests for GHSA-46hp-7m8g-7622 ---
+// --- Regression tests for file mount path validation ---
 // These verify that file mount paths (not just directory mounts) are validated,
 // and that saveStorageOnServer() validates fs_path before any shell interpolation.
 

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Jobs\ConnectProxyToNetworksJob;
 use App\Support\ValidationPatterns;
 use App\Traits\HasSafeStringAttribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class StandaloneDocker extends BaseModel
@@ -90,6 +91,16 @@ class StandaloneDocker extends BaseModel
         return $this->belongsTo(Server::class);
     }
 
+    public static function ownedByCurrentTeam()
+    {
+        return static::whereHas('server', fn ($q) => $q->whereTeamId(currentTeam()->id));
+    }
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return static::whereHas('server', fn ($q) => $q->whereTeamId($teamId));
+    }
+
     /**
      * Get the server attribute using identity map caching.
      * This intercepts lazy-loading to use cached Server lookups.
@@ -117,15 +128,18 @@ class StandaloneDocker extends BaseModel
         return $this->morphMany(Service::class, 'destination');
     }
 
-    public function databases()
+    public function databases(): Collection
     {
         $postgresqls = $this->postgresqls;
         $redis = $this->redis;
         $mongodbs = $this->mongodbs;
         $mysqls = $this->mysqls;
         $mariadbs = $this->mariadbs;
+        $keydbs = $this->keydbs;
+        $dragonflies = $this->dragonflies;
+        $clickhouses = $this->clickhouses;
 
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs);
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
     }
 
     public function attachedTo()

@@ -2,9 +2,15 @@
 
 use App\Livewire\Settings\ScheduledJobs;
 use App\Models\DockerCleanupExecution;
+use App\Models\Environment;
+use App\Models\Project;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceDatabase;
+use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\SchedulerLogParser;
@@ -12,6 +18,35 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+function withIsolatedScheduledLogsForMonitoringTest(callable $callback): mixed
+{
+    $logDir = storage_path('logs');
+    if (! is_dir($logDir)) {
+        mkdir($logDir, 0755, true);
+    }
+
+    $renamed = [];
+    foreach (glob($logDir.'/scheduled-*.log') as $log) {
+        $tmp = $log.'.scheduled-jobs-test-bak';
+        rename($log, $tmp);
+        $renamed[$tmp] = $log;
+    }
+
+    try {
+        return $callback($logDir.'/scheduled-'.now()->format('Y-m-d').'.log');
+    } finally {
+        foreach (glob($logDir.'/scheduled-*.log') as $log) {
+            @unlink($log);
+        }
+
+        foreach ($renamed as $tmp => $original) {
+            if (file_exists($tmp)) {
+                rename($tmp, $original);
+            }
+        }
+    }
+}
 
 beforeEach(function () {
     // Create root team (id 0) and root user
@@ -269,4 +304,97 @@ test('skipped jobs show fallback when resource is deleted', function () {
     foreach ($renamed as $tmp => $original) {
         rename($tmp, $original);
     }
+});
+
+test('skipped service database backups render with service backup link', function () {
+    $this->actingAs($this->rootUser);
+    session(['currentTeam' => $this->rootTeam]);
+
+    $server = Server::factory()->create(['team_id' => $this->rootTeam->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $this->rootTeam->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $service = Service::factory()->create([
+        'server_id' => $server->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'environment_id' => $environment->id,
+    ]);
+    $serviceDatabase = ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'service-postgres',
+        'image' => 'postgres:16-alpine',
+        'custom_type' => 'postgresql',
+    ]);
+    $backup = ScheduledDatabaseBackup::create([
+        'team_id' => $this->rootTeam->id,
+        'frequency' => '0 * * * *',
+        'database_id' => $serviceDatabase->id,
+        'database_type' => $serviceDatabase->getMorphClass(),
+        'enabled' => true,
+    ]);
+
+    withIsolatedScheduledLogsForMonitoringTest(function (string $logPath) use ($backup, $project, $environment, $service, $serviceDatabase) {
+        file_put_contents(
+            $logPath,
+            '['.now()->format('Y-m-d H:i:s').'] production.INFO: Backup skipped {"type":"backup","skip_reason":"server_not_functional","backup_id":'.$backup->id.',"team_id":'.$this->rootTeam->id.'}'."\n"
+        );
+
+        $expectedUrl = route('project.service.database.backups', [
+            'project_uuid' => $project->uuid,
+            'environment_uuid' => $environment->uuid,
+            'service_uuid' => $service->uuid,
+            'stack_service_uuid' => $serviceDatabase->uuid,
+        ]);
+
+        Livewire::test(ScheduledJobs::class)
+            ->assertOk()
+            ->assertSee('service-postgres')
+            ->assertSeeHtml('href="'.$expectedUrl.'"');
+    });
+});
+
+test('skipped standalone database backups keep standalone backup link', function () {
+    $this->actingAs($this->rootUser);
+    session(['currentTeam' => $this->rootTeam]);
+
+    $server = Server::factory()->create(['team_id' => $this->rootTeam->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $this->rootTeam->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $database = StandalonePostgresql::create([
+        'name' => 'standalone-postgres',
+        'image' => 'postgres:16-alpine',
+        'postgres_user' => 'postgres',
+        'postgres_password' => 'password',
+        'postgres_db' => 'postgres',
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+    $backup = ScheduledDatabaseBackup::create([
+        'team_id' => $this->rootTeam->id,
+        'frequency' => '0 * * * *',
+        'database_id' => $database->id,
+        'database_type' => $database->getMorphClass(),
+        'enabled' => true,
+    ]);
+
+    withIsolatedScheduledLogsForMonitoringTest(function (string $logPath) use ($backup, $project, $environment, $database) {
+        file_put_contents(
+            $logPath,
+            '['.now()->format('Y-m-d H:i:s').'] production.INFO: Backup skipped {"type":"backup","skip_reason":"server_not_functional","backup_id":'.$backup->id.',"team_id":'.$this->rootTeam->id.'}'."\n"
+        );
+
+        $expectedUrl = route('project.database.backup.index', [
+            'project_uuid' => $project->uuid,
+            'environment_uuid' => $environment->uuid,
+            'database_uuid' => $database->uuid,
+        ]);
+
+        Livewire::test(ScheduledJobs::class)
+            ->assertOk()
+            ->assertSee('standalone-postgres')
+            ->assertSeeHtml('href="'.$expectedUrl.'"');
+    });
 });

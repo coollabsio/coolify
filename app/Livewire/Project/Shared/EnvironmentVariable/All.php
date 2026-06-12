@@ -2,9 +2,13 @@
 
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
+use App\Models\Application;
 use App\Models\EnvironmentVariable;
+use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 class All extends Component
@@ -23,6 +27,8 @@ class All extends Component
 
     public string $view = 'normal';
 
+    public string $search = '';
+
     public bool $is_env_sorting_enabled = false;
 
     public bool $use_build_secrets = false;
@@ -33,12 +39,26 @@ class All extends Component
         'environmentVariableDeleted' => 'refreshEnvs',
     ];
 
+    public function updatedSearch(): void
+    {
+        $this->clearEnvironmentVariableCaches();
+    }
+
+    private function clearEnvironmentVariableCaches(): void
+    {
+        unset($this->environmentVariables);
+        unset($this->environmentVariablesPreview);
+        unset($this->hardcodedEnvironmentVariables);
+        unset($this->hardcodedEnvironmentVariablesPreview);
+        unset($this->hasEnvironmentVariables);
+    }
+
     public function mount()
     {
         $this->is_env_sorting_enabled = data_get($this->resource, 'settings.is_env_sorting_enabled', false);
         $this->use_build_secrets = data_get($this->resource, 'settings.use_build_secrets', false);
         $this->resourceClass = get_class($this->resource);
-        $resourceWithPreviews = [\App\Models\Application::class];
+        $resourceWithPreviews = [Application::class];
         $simpleDockerfile = filled(data_get($this->resource, 'dockerfile'));
         if (str($this->resourceClass)->contains($resourceWithPreviews) && ! $simpleDockerfile) {
             $this->showPreview = true;
@@ -63,8 +83,27 @@ class All extends Component
 
     public function getEnvironmentVariablesProperty()
     {
-        $query = $this->resource->environment_variables()
-            ->orderByRaw("CASE WHEN is_required = true AND (value IS NULL OR value = '') THEN 0 ELSE 1 END");
+        return $this->getEnvironmentVariables(false);
+    }
+
+    public function getEnvironmentVariablesPreviewProperty()
+    {
+        return $this->getEnvironmentVariables(true);
+    }
+
+    private function getEnvironmentVariables(bool $isPreview, bool $withSearch = true): Collection
+    {
+        $query = $isPreview
+            ? $this->resource->environment_variables_preview()
+            : $this->resource->environment_variables();
+
+        $query->orderByRaw("CASE WHEN is_required = true AND (value IS NULL OR value = '') THEN 0 ELSE 1 END");
+
+        if ($withSearch && $this->searchTerm() !== '') {
+            $escapedSearch = addcslashes(Str::lower($this->searchTerm()), '%_\\');
+
+            $query->whereRaw("LOWER(key) LIKE ? ESCAPE '\\'", ['%'.$escapedSearch.'%']);
+        }
 
         if ($this->is_env_sorting_enabled) {
             $query->orderBy('key');
@@ -75,18 +114,22 @@ class All extends Component
         return $query->get();
     }
 
-    public function getEnvironmentVariablesPreviewProperty()
+    private function searchTerm(): string
     {
-        $query = $this->resource->environment_variables_preview()
-            ->orderByRaw("CASE WHEN is_required = true AND (value IS NULL OR value = '') THEN 0 ELSE 1 END");
+        return trim($this->search);
+    }
 
-        if ($this->is_env_sorting_enabled) {
-            $query->orderBy('key');
-        } else {
-            $query->orderBy('order');
-        }
+    public function getHasEnvironmentVariablesProperty(): bool
+    {
+        return $this->environmentVariables->isNotEmpty() ||
+            $this->environmentVariablesPreview->isNotEmpty() ||
+            $this->hardcodedEnvironmentVariables->isNotEmpty() ||
+            $this->hardcodedEnvironmentVariablesPreview->isNotEmpty();
+    }
 
-        return $query->get();
+    public function getIsSearchActiveProperty(): bool
+    {
+        return $this->searchTerm() !== '';
     }
 
     public function getHardcodedEnvironmentVariablesProperty()
@@ -136,6 +179,12 @@ class All extends Component
             return ! in_array($var['key'], $managedKeys);
         });
 
+        if ($this->searchTerm() !== '') {
+            $hardcodedVars = $hardcodedVars->filter(function ($var) {
+                return str($var['key'])->contains($this->searchTerm(), true);
+            });
+        }
+
         // Apply sorting based on is_env_sorting_enabled
         if ($this->is_env_sorting_enabled) {
             $hardcodedVars = $hardcodedVars->sortBy('key')->values();
@@ -147,9 +196,9 @@ class All extends Component
 
     public function getDevView()
     {
-        $this->variables = $this->formatEnvironmentVariables($this->environmentVariables);
+        $this->variables = $this->formatEnvironmentVariables($this->getEnvironmentVariables(false, false));
         if ($this->showPreview) {
-            $this->variablesPreview = $this->formatEnvironmentVariables($this->environmentVariablesPreview);
+            $this->variablesPreview = $this->formatEnvironmentVariables($this->getEnvironmentVariables(true, false));
         }
     }
 
@@ -194,7 +243,7 @@ class All extends Component
 
     private function updateOrder()
     {
-        $variables = parseEnvFormatToArray($this->variables);
+        $variables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables));
         $order = 1;
         foreach ($variables as $key => $value) {
             $env = $this->resource->environment_variables()->where('key', $key)->first();
@@ -206,7 +255,7 @@ class All extends Component
         }
 
         if ($this->showPreview) {
-            $previewVariables = parseEnvFormatToArray($this->variablesPreview);
+            $previewVariables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variablesPreview));
             $order = 1;
             foreach ($previewVariables as $key => $value) {
                 $env = $this->resource->environment_variables_preview()->where('key', $key)->first();
@@ -221,7 +270,7 @@ class All extends Component
 
     private function handleBulkSubmit()
     {
-        $variables = parseEnvFormatToArray($this->variables);
+        $variables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables));
         $changesMade = false;
         $errorOccurred = false;
 
@@ -241,7 +290,7 @@ class All extends Component
         }
 
         if ($this->showPreview) {
-            $previewVariables = parseEnvFormatToArray($this->variablesPreview);
+            $previewVariables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variablesPreview));
 
             // Try to delete removed preview variables
             $deletedPreviewCount = $this->deleteRemovedVariables(true, $previewVariables);
@@ -267,6 +316,7 @@ class All extends Component
 
     private function handleSingleSubmit($data)
     {
+        $data['key'] = ValidationPatterns::validatedEnvironmentVariableKey($data['key']);
         $found = $this->resource->environment_variables()->where('key', $data['key'])->first();
         if ($found) {
             $this->dispatch('error', 'Environment variable already exists.');
@@ -279,9 +329,7 @@ class All extends Component
         $environment->order = $maxOrder + 1;
         $environment->save();
 
-        // Clear computed property cache to force refresh
-        unset($this->environmentVariables);
-        unset($this->environmentVariablesPreview);
+        $this->clearEnvironmentVariableCaches();
 
         $this->dispatch('success', 'Environment variable added.');
     }
@@ -332,6 +380,23 @@ class All extends Component
         $this->resource->$method()->whereNotIn('key', array_keys($variables))->delete();
 
         return $variablesToDelete->count();
+    }
+
+    private function normalizeEnvironmentVariables(array $variables): array
+    {
+        $normalizedVariables = [];
+
+        foreach ($variables as $key => $data) {
+            $normalizedKey = ValidationPatterns::validatedEnvironmentVariableKey((string) $key);
+
+            if (array_key_exists($normalizedKey, $normalizedVariables)) {
+                throw new \InvalidArgumentException("Duplicate environment variable key after normalization: {$normalizedKey}.");
+            }
+
+            $normalizedVariables[$normalizedKey] = $data;
+        }
+
+        return $normalizedVariables;
     }
 
     private function updateOrCreateVariables($isPreview, $variables)
@@ -393,9 +458,7 @@ class All extends Component
     public function refreshEnvs()
     {
         $this->resource->refresh();
-        // Clear computed property cache to force refresh
-        unset($this->environmentVariables);
-        unset($this->environmentVariablesPreview);
+        $this->clearEnvironmentVariableCaches();
         $this->getDevView();
     }
 }

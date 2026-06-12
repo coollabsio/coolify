@@ -6,7 +6,18 @@
     <div class="flex flex-col h-full gap-8 sm:flex-row">
         <x-server.sidebar :server="$server" activeMenu="metrics" />
         <div class="w-full">
-            <h2>Metrics</h2>
+            <div class="flex items-center gap-2">
+                <h2>Metrics</h2>
+                @if ($server->isMetricsEnabled())
+                    <x-forms.button canGate="update" :canResource="$server" wire:click='toggleMetrics'>
+                        Disable Metrics
+                    </x-forms.button>
+                @elseif ($server->isSentinelEnabled())
+                    <x-forms.button canGate="update" :canResource="$server" isHighlighted wire:click='toggleMetrics'>
+                        Enable Metrics
+                    </x-forms.button>
+                @endif
+            </div>
             <div class="pb-4">Basic metrics for your server.</div>
             @if ($server->isMetricsEnabled())
                 <div @if ($poll) wire:poll.5000ms='pollData' @endif x-init="$wire.loadData()">
@@ -288,8 +299,16 @@
                     </div>
                 </div>
             @else
-                <div>Metrics are disabled for this server. Enable them in <a class="underline dark:text-white"
-                        href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}/sentinel" {{ wireNavigate() }}>Sentinel</a> settings.</div>
+                @if ($server->isSentinelEnabled())
+                    <x-callout type="info" title="Metrics Disabled">
+                        Metrics are disabled for this server. Click "Enable Metrics" above to start collecting metrics.
+                    </x-callout>
+                @else
+                    <x-callout type="info" title="Sentinel Required">
+                        Metrics require Sentinel to be enabled.
+                        Please <a class="underline font-semibold" href="{{ route('server.sentinel', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}>enable Sentinel</a> first.
+                    </x-callout>
+                @endif
             @endif
         </div>
     </div>
