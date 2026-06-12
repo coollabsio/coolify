@@ -105,4 +105,34 @@ describe('PATCH /api/v1/applications/{uuid} docker registry image validation', f
         expect($application->docker_registry_image_name)->toBe('registry.example.com:5000/team/app')
             ->and($application->docker_registry_image_tag)->toBe('v1.2.3');
     });
+
+    test('accepts env var reference in docker registry image tag', function () {
+        $application = makeDockerRegistryValidationApplication();
+
+        $response = $this->withHeaders(dockerRegistryApiHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$application->uuid}", [
+                'docker_registry_image_name' => 'ghcr.io/coollabsio/example',
+                'docker_registry_image_tag' => '$API_VERSION',
+            ]);
+
+        $response->assertOk();
+
+        $application->refresh();
+        expect($application->docker_registry_image_tag)->toBe('$API_VERSION');
+    });
+
+    test('accepts env var reference with braces in docker registry image tag', function () {
+        $application = makeDockerRegistryValidationApplication();
+
+        $response = $this->withHeaders(dockerRegistryApiHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$application->uuid}", [
+                'docker_registry_image_name' => 'ghcr.io/coollabsio/example',
+                'docker_registry_image_tag' => 'v1.0-${API_VERSION}',
+            ]);
+
+        $response->assertOk();
+
+        $application->refresh();
+        expect($application->docker_registry_image_tag)->toBe('v1.0-${API_VERSION}');
+    });
 });

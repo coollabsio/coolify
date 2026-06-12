@@ -126,9 +126,10 @@ class ValidationPatterns
      * Pattern for Docker image tags.
      *
      * Docker tags may contain letters, digits, underscores, dots, and hyphens,
-     * must start with an alphanumeric/underscore, and are limited to 128 chars.
+     * must start with an alphanumeric/underscore/dollar sign, and are limited to 128 chars.
+     * Dollar sign, curly braces are allowed for environment variable substitution ($VAR, ${VAR}).
      */
-    public const DOCKER_IMAGE_TAG_PATTERN = '/\A[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\z/';
+    public const DOCKER_IMAGE_TAG_PATTERN = '/\A[A-Za-z0-9_$][A-Za-z0-9_.-${}]{0,127}\z/';
 
     /**
      * Normalize environment variable keys before validation and storage.

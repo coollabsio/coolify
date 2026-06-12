@@ -39,6 +39,10 @@ it('accepts valid docker registry image tags', function (string $tag) {
     'uppercase and underscore' => 'PR_123',
     'sha256 hash' => '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
     'legacy sha256 prefixed hash' => 'sha256-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+    'env var reference' => '$API_VERSION',
+    'env var reference with braces' => '${API_VERSION}',
+    'version with env var' => 'v1.0-$API_VERSION',
+    'version with env var braces' => 'v1.0_${API_VERSION}',
 ]);
 
 it('rejects docker registry image tags with shell metacharacters', function (string $tag) {
