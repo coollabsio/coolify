@@ -100,7 +100,172 @@
     <x-resources.breadcrumbs :resource="$service" :parameters="$parameters" />
     <div class="navbar-main" x-data">
         <div class="mb-4 w-full md:mb-0 md:hidden">
-            <label for="service-mobile-section" class="sr-only">Service menu</label>
+            @if ($service->isDeployable)
+                <div id="service-mobile-actions" class="mt-2 mb-3 md:hidden">
+                    <div class="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Actions</div>
+                    <div class="flex flex-nowrap items-center gap-2 overflow-x-auto">
+                    @if (str($service->status)->contains('running'))
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-restart-trigger')?.click()">
+                            <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2">
+                                    <path d="M19.933 13.041 a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
+                                    <path d="M20 4v5h-5" />
+                                </g>
+                            </svg>
+                            Restart
+                        </button>
+                        <x-forms.button isError class="shrink-0"
+                            @click="document.getElementById('service-stop-trigger')?.click()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
+                                stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                </path>
+                                <path
+                                    d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                </path>
+                            </svg>
+                            Stop
+                        </x-forms.button>
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-pullAndRestart-trigger')?.click()">
+                            <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2">
+                                    <path d="M19.933 13.041 a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
+                                    <path d="M20 4v5h-5" />
+                                </g>
+                            </svg>
+                            Pull Latest Images & Restart
+                        </button>
+                    @elseif (str($service->status)->contains('degraded'))
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-restart-trigger')?.click()">
+                            <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2">
+                                    <path d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
+                                    <path d="M20 4v5h-5" />
+                                </g>
+                            </svg>
+                            Restart
+                        </button>
+                        <x-forms.button isError class="shrink-0"
+                            @click="document.getElementById('service-stop-trigger')?.click()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
+                                stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                </path>
+                                <path
+                                    d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                </path>
+                            </svg>
+                            Stop
+                        </x-forms.button>
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-forceDeploy-trigger')?.click()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
+                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M7 4v16l13 -8z" />
+                            </svg>
+                            Force Restart
+                        </button>
+                    @elseif (str($service->status)->contains('exited'))
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-start-trigger')?.click()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
+                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M7 4v16l13 -8z" />
+                            </svg>
+                            Deploy
+                        </button>
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-forceDeploy-trigger')?.click()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
+                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M7 4v16l13 -8z" />
+                            </svg>
+                            Force Deploy
+                        </button>
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-cleanup-trigger')?.click()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
+                                stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                </path>
+                                <path
+                                    d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                </path>
+                            </svg>
+                            Force Cleanup Containers
+                        </button>
+                    @else
+                        <x-forms.button isError class="shrink-0"
+                            @click="document.getElementById('service-stop-trigger')?.click()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
+                                stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                </path>
+                                <path
+                                    d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                </path>
+                            </svg>
+                            Stop
+                        </x-forms.button>
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-start-trigger')?.click()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
+                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M7 4v16l13 -8z" />
+                            </svg>
+                            Deploy
+                        </button>
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-forceDeploy-trigger')?.click()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
+                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M7 4v16l13 -8z" />
+                            </svg>
+                            Force Deploy
+                        </button>
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('service-cleanup-trigger')?.click()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
+                                stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                </path>
+                                <path
+                                    d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                </path>
+                            </svg>
+                            Force Cleanup Containers
+                        </button>
+                    @endif
+                    </div>
+                </div>
+            @endif
+            <label id="service-mobile-section-label" for="service-mobile-section" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Section</label>
             <select id="service-mobile-section" class="select w-full" aria-label="Service menu"
                 data-current-value="{{ $activeServiceMobileValue }}"
                 x-data="{
@@ -177,67 +342,6 @@
                     @endforelse
                 </optgroup>
             </select>
-            @if ($service->isDeployable)
-                <div id="service-mobile-actions" class="mt-2 flex flex-nowrap items-center gap-2 overflow-x-auto md:hidden">
-                    @if (str($service->status)->contains('running'))
-                        <button type="button" class="button shrink-0"
-                            @click="document.getElementById('service-restart-trigger')?.click()">
-                            Restart
-                        </button>
-                        <button type="button" class="button shrink-0 text-error"
-                            @click="document.getElementById('service-stop-trigger')?.click()">
-                            Stop
-                        </button>
-                        <button type="button" class="button shrink-0"
-                            @click="document.getElementById('service-pullAndRestart-trigger')?.click()">
-                            Pull Latest Images & Restart
-                        </button>
-                    @elseif (str($service->status)->contains('degraded'))
-                        <button type="button" class="button shrink-0"
-                            @click="document.getElementById('service-restart-trigger')?.click()">
-                            Restart
-                        </button>
-                        <button type="button" class="button shrink-0 text-error"
-                            @click="document.getElementById('service-stop-trigger')?.click()">
-                            Stop
-                        </button>
-                        <button type="button" class="button shrink-0"
-                            @click="document.getElementById('service-forceDeploy-trigger')?.click()">
-                            Force Restart
-                        </button>
-                    @elseif (str($service->status)->contains('exited'))
-                        <button type="button" class="button shrink-0"
-                            @click="document.getElementById('service-start-trigger')?.click()">
-                            Deploy
-                        </button>
-                        <button type="button" class="button shrink-0"
-                            @click="document.getElementById('service-forceDeploy-trigger')?.click()">
-                            Force Deploy
-                        </button>
-                        <button type="button" class="button shrink-0"
-                            @click="document.getElementById('service-cleanup-trigger')?.click()">
-                            Force Cleanup Containers
-                        </button>
-                    @else
-                        <button type="button" class="button shrink-0 text-error"
-                            @click="document.getElementById('service-stop-trigger')?.click()">
-                            Stop
-                        </button>
-                        <button type="button" class="button shrink-0"
-                            @click="document.getElementById('service-start-trigger')?.click()">
-                            Deploy
-                        </button>
-                        <button type="button" class="button shrink-0"
-                            @click="document.getElementById('service-forceDeploy-trigger')?.click()">
-                            Force Deploy
-                        </button>
-                        <button type="button" class="button shrink-0"
-                            @click="document.getElementById('service-cleanup-trigger')?.click()">
-                            Force Cleanup Containers
-                        </button>
-                    @endif
-                </div>
-            @endif
         </div>
         <nav
             class="scrollbar hidden min-h-10 w-full flex-nowrap items-center gap-6 overflow-x-scroll overflow-y-hidden pb-1 whitespace-nowrap md:flex md:w-auto md:overflow-visible">

@@ -166,7 +166,113 @@
     <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
     <div class="navbar-main">
         <div class="w-full md:hidden">
-            <label for="application-mobile-section" class="sr-only">Application menu</label>
+            @if (!($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw)))
+                <div id="application-mobile-actions" class="mt-2 mb-3 md:hidden">
+                    <div class="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Actions</div>
+                    <div class="flex flex-nowrap items-center gap-2 overflow-x-auto">
+                    @if (!str($application->status)->startsWith('exited'))
+                        @if (!$application->destination->server->isSwarm())
+                            <button type="button" class="button shrink-0"
+                                @click="document.getElementById('application-mobile-deploy-trigger')?.click()">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-orange-400"
+                                    viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path
+                                        d="M10.09 4.01l.496 -.495a2 2 0 0 1 2.828 0l7.071 7.07a2 2 0 0 1 0 2.83l-7.07 7.07a2 2 0 0 1 -2.83 0l-7.07 -7.07a2 2 0 0 1 0 -2.83l3.535 -3.535h-3.988">
+                                    </path>
+                                    <path d="M7.05 11.038v-3.988"></path>
+                                </svg>
+                                Redeploy
+                            </button>
+                        @endif
+                        @if ($application->build_pack !== 'dockercompose')
+                            @if ($application->destination->server->isSwarm())
+                                <button type="button" class="button shrink-0"
+                                    @click="document.getElementById('application-mobile-deploy-trigger')?.click()">
+                                    <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
+                                        xmlns="http://www.w3.org/2000/svg">
+                                        <g fill="none" stroke="currentColor" stroke-linecap="round"
+                                            stroke-linejoin="round" stroke-width="2">
+                                            <path
+                                                d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
+                                            <path d="M20 4v5h-5" />
+                                        </g>
+                                    </svg>
+                                    Update Service
+                                </button>
+                            @else
+                                <button type="button" class="button shrink-0"
+                                    @click="document.getElementById('application-mobile-restart-trigger')?.click()">
+                                    <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
+                                        xmlns="http://www.w3.org/2000/svg">
+                                        <g fill="none" stroke="currentColor" stroke-linecap="round"
+                                            stroke-linejoin="round" stroke-width="2">
+                                            <path
+                                                d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
+                                            <path d="M20 4v5h-5" />
+                                        </g>
+                                    </svg>
+                                    Restart
+                                </button>
+                            @endif
+                        @endif
+                        <x-forms.button isError class="shrink-0"
+                            @click="document.getElementById('application-mobile-stop-trigger')?.click()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
+                                stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <path
+                                    d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                </path>
+                                <path
+                                    d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                </path>
+                            </svg>
+                            Stop
+                        </x-forms.button>
+                    @else
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('application-mobile-deploy-trigger')?.click()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning"
+                                viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M7 4v16l13 -8z" />
+                            </svg>
+                            Deploy
+                        </button>
+                    @endif
+                    @if (!$application->destination->server->isSwarm())
+                        @if ($application->status === 'running')
+                            <button type="button" class="button shrink-0"
+                                @click="document.getElementById('application-mobile-force-deploy-trigger')?.click()">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning"
+                                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M7 4v16l13 -8z" />
+                                </svg>
+                                Force deploy (without cache)
+                            </button>
+                        @else
+                            <button type="button" class="button shrink-0"
+                                @click="document.getElementById('application-mobile-deploy-force-trigger')?.click()">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning"
+                                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M7 4v16l13 -8z" />
+                                </svg>
+                                Force deploy (without cache)
+                            </button>
+                        @endif
+                    @endif
+                    </div>
+                </div>
+            @endif
+            <label id="application-mobile-section-label" for="application-mobile-section" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Section</label>
             <select id="application-mobile-section" class="select w-full" aria-label="Application menu"
                 data-current-value="{{ $activeMobileMenuValue }}"
                 x-data="{
@@ -283,53 +389,6 @@
                     @endif
                 </optgroup>
             </select>
-            @if (!($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw)))
-                <div id="application-mobile-actions" class="mt-2 flex flex-nowrap items-center gap-2 overflow-x-auto md:hidden">
-                    @if (!str($application->status)->startsWith('exited'))
-                        @if (!$application->destination->server->isSwarm())
-                            <button type="button" class="button shrink-0"
-                                @click="document.getElementById('application-mobile-deploy-trigger')?.click()">
-                                Redeploy
-                            </button>
-                        @endif
-                        @if ($application->build_pack !== 'dockercompose')
-                            @if ($application->destination->server->isSwarm())
-                                <button type="button" class="button shrink-0"
-                                    @click="document.getElementById('application-mobile-deploy-trigger')?.click()">
-                                    Update Service
-                                </button>
-                            @else
-                                <button type="button" class="button shrink-0"
-                                    @click="document.getElementById('application-mobile-restart-trigger')?.click()">
-                                    Restart
-                                </button>
-                            @endif
-                        @endif
-                        <button type="button" class="button shrink-0 text-error"
-                            @click="document.getElementById('application-mobile-stop-trigger')?.click()">
-                            Stop
-                        </button>
-                    @else
-                        <button type="button" class="button shrink-0"
-                            @click="document.getElementById('application-mobile-deploy-trigger')?.click()">
-                            Deploy
-                        </button>
-                    @endif
-                    @if (!$application->destination->server->isSwarm())
-                        @if ($application->status === 'running')
-                            <button type="button" class="button shrink-0"
-                                @click="document.getElementById('application-mobile-force-deploy-trigger')?.click()">
-                                Force deploy (without cache)
-                            </button>
-                        @else
-                            <button type="button" class="button shrink-0"
-                                @click="document.getElementById('application-mobile-deploy-force-trigger')?.click()">
-                                Force deploy (without cache)
-                            </button>
-                        @endif
-                    @endif
-                </div>
-            @endif
             <x-modal-confirmation title="Confirm Application Stopping?" buttonTitle="Stop"
                 submitAction="stop" :checkboxes="$checkboxes" :actions="[
                     'This application will be stopped.',
