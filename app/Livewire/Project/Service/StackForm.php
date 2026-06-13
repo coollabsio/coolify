@@ -14,6 +14,10 @@ class StackForm extends Component
 
     public Collection $fields;
 
+    public Collection $declarativeFields;
+
+    public Collection $declarativeOptions;
+
     protected $listeners = ['saveCompose'];
 
     // Explicit properties
@@ -41,6 +45,15 @@ class StackForm extends Component
         foreach ($this->fields ?? collect() as $key => $field) {
             $rules = data_get($field, 'rules', 'nullable');
             $baseRules["fields.$key.value"] = $rules;
+        }
+
+        foreach ($this->declarativeFields ?? collect() as $key => $field) {
+            $rules = data_get($field, 'rules', 'nullable');
+            $baseRules["declarativeFields.$key.value"] = $rules;
+        }
+
+        foreach ($this->declarativeOptions ?? collect() as $key => $option) {
+            $baseRules["declarativeOptions.$key.value"] = 'boolean';
         }
 
         return $baseRules;
@@ -118,6 +131,9 @@ class StackForm extends Component
         })->flatMap(function ($group) {
             return $group;
         });
+
+        $this->declarativeFields = $this->service->declarativeFields()->keyBy('key');
+        $this->declarativeOptions = $this->service->declarativeSetupOptions()->keyBy('key');
     }
 
     public function saveCompose($raw)
@@ -146,6 +162,8 @@ class StackForm extends Component
             DB::transaction(function () {
                 $this->service->save();
                 $this->service->saveExtraFields($this->fields);
+                $this->service->saveExtraFields($this->declarativeFields);
+                $this->service->saveExtraFields($this->declarativeOptions);
                 $this->service->parse();
             });
             // Refresh and write files after a successful commit

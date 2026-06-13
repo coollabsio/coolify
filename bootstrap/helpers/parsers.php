@@ -1524,6 +1524,27 @@ function serviceParser(Service $resource): Collection
     }
     $services = data_get($yaml, 'services', collect([]));
 
+    // Support for x-coolify setup options (conditional services)
+    $setupOptions = data_get($yaml, 'x-coolify.setup', []);
+    foreach ($setupOptions as $optionName => $optionConfig) {
+        $key = data_get($optionConfig, 'key');
+        if (!$key) {
+            continue;
+        }
+
+        $envVar = $resource->environment_variables()->where('key', $key)->first();
+        $isEnabled = $envVar ? (bool) $envVar->value : (bool) data_get($optionConfig, 'default', false);
+
+        $affectedServices = data_get($optionConfig, 'services', []);
+        if (!$isEnabled) {
+            foreach ($affectedServices as $serviceToDelete) {
+                if (isset($services[$serviceToDelete])) {
+                    unset($services[$serviceToDelete]);
+                }
+            }
+        }
+    }
+
     // Clean up corrupted environment variables from previous parser bugs
     // (keys starting with $ or ending with } should not exist as env var names)
     $resource->environment_variables()

@@ -52,4 +52,36 @@
             @endforeach
         </div>
     @endif
+
+    @php
+        $declarativeFields = $service->declarativeFields();
+        $declarativeOptions = $service->declarativeSetupOptions();
+    @endphp
+
+    @if ($declarativeFields->count() > 0)
+        <div>
+            <h3>Declarative Configuration</h3>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+            @foreach ($declarativeFields as $field)
+                <x-forms.input canGate="update" :canResource="$service" label="{{ $field['label'] }}"
+                    type="{{ $field['isPassword'] ? 'password' : 'text' }}"
+                    required="{{ str($field['rules'])->contains('required') }}"
+                    id="declarativeFields.{{ $field['key'] }}.value" wire:model.defer="declarativeFields.{{ $field['key'] }}.value"></x-forms.input>
+            @endforeach
+        </div>
+    @endif
+
+    @if ($declarativeOptions->count() > 0)
+        <div>
+            <h3>Setup Options</h3>
+        </div>
+        <div class="grid grid-cols-1 gap-2">
+            @foreach ($declarativeOptions as $option)
+                <x-forms.checkbox canGate="update" :canResource="$service" label="{{ $option['label'] }}"
+                    helper="{{ $option['description'] }}"
+                    id="declarativeOptions.{{ $option['key'] }}.value" wire:model.defer="declarativeOptions.{{ $option['key'] }}.value"></x-forms.checkbox>
+            @endforeach
+        </div>
+    @endif
 </form>

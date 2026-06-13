@@ -324,9 +324,118 @@ class Service extends BaseModel
         return [$status, $health, $hasNonExcluded];
     }
 
+    public function declarativeScripts()
+    {
+        $scripts = collect([]);
+        if ($this->docker_compose_raw) {
+            try {
+                $yaml = Yaml::parse($this->docker_compose_raw);
+                $declarativeScripts = data_get($yaml, 'x-coolify.scripts', []);
+                if (count($declarativeScripts) > 0) {
+                    foreach ($declarativeScripts as $scriptName => $config) {
+                        $scripts->put($scriptName, [
+                            'command' => data_get($config, 'command'),
+                            'container' => data_get($config, 'container'),
+                            'helper' => data_get($config, 'helper'),
+                        ]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                ray($e->getMessage());
+            }
+        }
+
+        return $scripts;
+    }
+
+    public function declarativeFields()
+    {
+        $fields = collect([]);
+        if ($this->docker_compose_raw) {
+            try {
+                $yaml = Yaml::parse($this->docker_compose_raw);
+                $declarativeFields = data_get($yaml, 'x-coolify.fields', []);
+                if (count($declarativeFields) > 0) {
+                    $data = collect([]);
+                    foreach ($declarativeFields as $fieldName => $config) {
+                        $key = data_get($config, 'key');
+                        $value = data_get($config, 'value');
+                        $rules = data_get($config, 'rules', 'nullable');
+                        $isPassword = data_get($config, 'is_password', false) || data_get($config, 'isPassword', false);
+                        $customHelper = data_get($config, 'helper', data_get($config, 'customHelper', false));
+
+                        if ($key) {
+                            $data->put($fieldName, [
+                                'key' => $key,
+                                'value' => $value,
+                                'rules' => $rules,
+                                'isPassword' => $isPassword,
+                                'customHelper' => $customHelper,
+                            ]);
+                        }
+                    }
+                    if ($data->count() > 0) {
+                        $fields->put('Configuration', $data->toArray());
+                    }
+                }
+            } catch (\Throwable $e) {
+                ray($e->getMessage());
+            }
+        }
+
+        return $fields;
+    }
+
+    public function declarativeSetupOptions()
+    {
+        $options = collect([]);
+        if ($this->docker_compose_raw) {
+            try {
+                $yaml = Yaml::parse($this->docker_compose_raw);
+                $setupOptions = data_get($yaml, 'x-coolify.setup', []);
+                if (count($setupOptions) > 0) {
+                    $data = collect([]);
+                    foreach ($setupOptions as $optionName => $config) {
+                        $key = data_get($config, 'key');
+                        $value = data_get($config, 'value', data_get($config, 'default', false));
+                        $rules = data_get($config, 'rules', 'required|boolean');
+                        $customHelper = data_get($config, 'helper', data_get($config, 'customHelper', false));
+
+                        if ($key) {
+                            $data->put($optionName, [
+                                'key' => $key,
+                                'value' => $value,
+                                'rules' => $rules,
+                                'isBoolean' => true,
+                                'customHelper' => $customHelper,
+                            ]);
+                        }
+                    }
+                    if ($data->count() > 0) {
+                        $options->put('Setup Options', $data->toArray());
+                    }
+                }
+            } catch (\Throwable $e) {
+                ray($e->getMessage());
+            }
+        }
+
+        return $options;
+    }
+
     public function extraFields()
     {
         $fields = collect([]);
+        $declarative = $this->declarativeFields();
+        foreach ($declarative as $key => $value) {
+            $fields->put($key, $value);
+        }
+
+        $setupOptions = $this->declarativeSetupOptions();
+        foreach ($setupOptions as $key => $value) {
+            $fields->put($key, $value);
+        }
+
         $applications = $this->applications()->get();
         foreach ($applications as $application) {
             $image = str($application->image)->before(':');
@@ -1446,6 +1555,61 @@ class Service extends BaseModel
         $service = data_get($services, str($this->name)->beforeLast('-')->value, []);
 
         return data_get($service, 'documentation', config('constants.urls.docs'));
+    }
+
+    public function declarativeFields()
+    {
+        $compose = data_get($this, 'docker_compose_raw');
+        if (!$compose) return collect([]);
+        try {
+            $yaml = \Symfony\Component\Yaml\Yaml::parse($compose);
+            $fields = data_get($yaml, 'x-coolify.fields', []);
+            return collect($fields)->map(function ($field, $key) {
+                $envVar = $this->environment_variables()->where('key', $field['key'])->first();
+                return [
+                    'label' => $field['label'] ?? $key,
+                    'key' => $field['key'],
+                    'value' => $envVar ? $envVar->value : ($field['default'] ?? ''),
+                    'isPassword' => $field['isPassword'] ?? false,
+                    'rules' => $field['rules'] ?? '',
+                ];
+            });
+        } catch (\Exception $e) {
+            return collect([]);
+        }
+    }
+
+    public function declarativeSetupOptions()
+    {
+        $compose = data_get($this, 'docker_compose_raw');
+        if (!$compose) return collect([]);
+        try {
+            $yaml = \Symfony\Component\Yaml\Yaml::parse($compose);
+            $options = data_get($yaml, 'x-coolify.setup', []);
+            return collect($options)->map(function ($option, $key) {
+                $envVar = $this->environment_variables()->where('key', $option['key'])->first();
+                return [
+                    'label' => $option['label'] ?? $key,
+                    'key' => $option['key'],
+                    'value' => $envVar ? (bool)$envVar->value : ($option['default'] ?? false),
+                    'description' => $option['description'] ?? '',
+                ];
+            });
+        } catch (\Exception $e) {
+            return collect([]);
+        }
+    }
+
+    public function declarativeScripts()
+    {
+        $compose = data_get($this, 'docker_compose_raw');
+        if (!$compose) return collect([]);
+        try {
+            $yaml = \Symfony\Component\Yaml\Yaml::parse($compose);
+            return collect(data_get($yaml, 'x-coolify.scripts', []));
+        } catch (\Exception $e) {
+            return collect([]);
+        }
     }
 
     /**

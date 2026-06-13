@@ -1,0 +1,41 @@
+# x-coolify metadata for declarative UI and setup logic
+x-coolify:
+  setup:
+    enable_mcp:
+      key: SUPABASE_MCP_ENABLED
+      label: Enable Supabase MCP
+      default: true
+      description: "Enable the Model Context Protocol worker for Supabase. This allows AI clients to interact with your database."
+      services:
+        - mcp-worker
+  fields:
+    mcp_token:
+      key: MCP_AUTH_TOKEN
+      label: MCP Auth Token
+      default: "generate_random"
+      isPassword: true
+      rules: "required|min:16"
+  scripts:
+    setup_mcp_db:
+      name: Initialize MCP Schema
+      service: mcp-worker
+      command: "npm run migrate"
+
+services:
+  supabase-db:
+    image: supabase/postgres:15.1.0.117
+    environment:
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - supabase_db_data:/var/lib/postgresql/data
+
+  mcp-worker:
+    image: supabase/mcp-worker:latest
+    environment:
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN}
+      DB_URL: postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@supabase-db:5432/postgres
+    depends_on:
+      - supabase-db
+
+volumes:
+  supabase_db_data:

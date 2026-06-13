@@ -398,6 +398,36 @@ class ResourceOperations extends Component
         }
     }
 
+    public function runScript($name)
+    {
+        try {
+            $scripts = $this->resource->declarativeScripts();
+            $script = data_get($scripts, $name);
+            if (!$script) {
+                return $this->dispatch('error', 'Script not found.');
+            }
+
+            $command = data_get($script, 'command');
+            $serviceName = data_get($script, 'service');
+
+            if (!$command || !$serviceName) {
+                return $this->dispatch('error', 'Invalid script definition.');
+            }
+
+            $containerName = "{$serviceName}-{$this->resource->uuid}";
+            $server = $this->resource->server;
+
+            $activity = remote_process([
+                "docker exec {$containerName} sh -c \"{$command}\""
+            ], $server);
+
+            $this->dispatch('activityFinished', $activity->id);
+            $this->dispatch('success', "Script '{$name}' started.");
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
+        }
+    }
+
     public function render()
     {
         return view('livewire.project.shared.resource-operations');

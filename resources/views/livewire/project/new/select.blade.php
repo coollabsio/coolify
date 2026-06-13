@@ -1,4 +1,4 @@
-<div x-data x-init="$wire.loadServers">
+﻿<div x-data x-init="$wire.loadServers">
     <div x-data="searchResources()">
         @if ($current_step === 'type')
             <div x-init="window.addEventListener('scroll', () => isSticky = window.pageYOffset > 100)"
@@ -13,7 +13,7 @@
                         </x-forms.select>
                     </div>
                 </div>
-                <div class="mb-4">Deploy resources, like Applications, Databases, Services...</div>
+                <div class="mb-4">Deploy resources, like Applications, Databases, Services... <div x-on:click="setType('external')" class="inline-block px-2 py-1 text-xs font-bold text-white bg-yellow-600 rounded cursor-pointer hover:bg-yellow-700">+ External Service</div></div>
                 <div class="flex gap-2 items-start">
                     <input autocomplete="off" x-ref="searchInput" class="input-sticky flex-1"
                         :class="{ 'input-sticky-active': isSticky }" x-model="search" placeholder="Type / to search..."
@@ -652,3 +652,4 @@
         </form>
     @endif
 </div>
+

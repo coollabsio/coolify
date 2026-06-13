@@ -166,4 +166,30 @@
             </x-callout>
         @endcan
     </div>
+
+    @if ($resource->getMorphClass() === 'App\Models\Service')
+        @php
+            $scripts = $resource->declarativeScripts();
+        @endphp
+        @if ($scripts->count() > 0)
+            <div class="pt-4">
+                <h3>Scripts</h3>
+                <div class="pb-2">Execute predefined setup scripts for this service.</div>
+                <div class="grid grid-cols-1 gap-2">
+                    @foreach ($scripts as $name => $script)
+                        <div class="flex items-center justify-between p-4 bg-coolgray-100 dark:bg-coolgray-800 rounded">
+                            <div>
+                                <div class="font-bold">{{ $script['name'] ?? $name }}</div>
+                                <div class="text-xs">Runs on: {{ $script['service'] }}</div>
+                                <div class="text-xs font-mono opacity-50">{{ $script['command'] }}</div>
+                            </div>
+                            <x-forms.button wire:click="runScript('{{ $name }}')" wire:target="runScript('{{ $name }}')">
+                                Run
+                            </x-forms.button>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+    @endif
 </div>
