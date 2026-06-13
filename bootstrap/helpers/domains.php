@@ -4,6 +4,16 @@ use App\Models\Application;
 use App\Models\ServiceApplication;
 use Illuminate\Support\Collection;
 
+function isValidDomainUrl(string $url): bool
+{
+    // PHP's FILTER_VALIDATE_URL rejects underscores in the host, but they are
+    // accepted by browsers, Let's Encrypt, and common Docker service naming
+    // (e.g. https://myapp_service.example.com). Validate against a copy with
+    // underscores replaced by hyphens (a valid host character) so such domains
+    // are not wrongly rejected; URLs without underscores are unaffected.
+    return filter_var(str_replace('_', '-', $url), FILTER_VALIDATE_URL) !== false;
+}
+
 function checkDomainUsage(ServiceApplication|Application|null $resource = null, ?string $domain = null)
 {
     $conflicts = [];
