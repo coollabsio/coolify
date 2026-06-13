@@ -12,6 +12,8 @@ class ExternalService extends Component
 {
     public $project_uuid;
     public $environment_uuid;
+    public $server_id;
+    public $destination_uuid;
     public $git_url;
     public $github_token;
     public $message;
@@ -24,6 +26,8 @@ class ExternalService extends Component
     {
         $this->project_uuid = request()->route('project_uuid');
         $this->environment_uuid = request()->route('environment_uuid');
+        $this->server_id = request()->query('server_id');
+        $this->destination_uuid = request()->query('destination');
     }
 
     public function submit()
@@ -52,12 +56,21 @@ class ExternalService extends Component
             $project = Project::where('uuid', $this->project_uuid)->first();
             $environment = $project->environments()->where('uuid', $this->environment_uuid)->first();
 
+            $standalone_docker = \App\Models\StandaloneDocker::where('uuid', $this->destination_uuid)->first();
+            $swarm_docker = \App\Models\SwarmDocker::where('uuid', $this->destination_uuid)->first();
+            $destination = $standalone_docker ?? $swarm_docker;
+
+            if (!$destination) {
+                throw new \Exception("Could not find destination with UUID: {$this->destination_uuid}");
+            }
+
             $service = Service::create([
                 'name' => Str::slug(Str::afterLast($this->git_url, '/')),
                 'docker_compose_raw' => $composeContent,
                 'environment_id' => $environment->id,
-                'server_id' => $environment->project->destination->server_id,
-                'destination_id' => $environment->project->destination->id,
+                'server_id' => $this->server_id,
+                'destination_id' => $destination->id,
+                'destination_type' => $destination->getMorphClass(),
             ]);
 
             return redirect()->route('project.service.configuration', [
