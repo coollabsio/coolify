@@ -198,7 +198,7 @@ class StartKeydb
         }
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
-        $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
+        $this->commands[] = base64_to_file($docker_compose_base64, "$this->configuration_dir/docker-compose.yml");
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
         $this->commands[] = "echo 'Pulling {$database->image} image.'";
@@ -273,7 +273,7 @@ class StartKeydb
         $filename = 'keydb.conf';
         $content = $this->database->keydb_conf;
         $content_base64 = base64_encode($content);
-        $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
+        $this->commands[] = base64_to_file($content_base64, "$this->configuration_dir/{$filename}");
     }
 
     private function buildStartCommand(): string

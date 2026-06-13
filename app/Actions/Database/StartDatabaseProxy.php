@@ -124,8 +124,8 @@ class StartDatabaseProxy
         try {
             instant_remote_process([
                 "mkdir -p $configuration_dir",
-                "echo '{$nginxconf_base64}' | base64 -d | tee $configuration_dir/nginx.conf > /dev/null",
-                "echo '{$dockercompose_base64}' | base64 -d | tee $configuration_dir/docker-compose.yaml > /dev/null",
+                base64_to_file($nginxconf_base64, "$configuration_dir/nginx.conf"),
+                base64_to_file($dockercompose_base64, "$configuration_dir/docker-compose.yaml"),
                 "docker compose --project-directory {$configuration_dir} pull",
                 "docker compose --project-directory {$configuration_dir} up -d",
             ], $server);

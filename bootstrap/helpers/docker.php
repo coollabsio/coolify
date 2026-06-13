@@ -1490,3 +1490,28 @@ function injectDockerComposeBuildArgs(string $command, string $buildArgsString):
 
     return $modifiedCommand ?? $command;
 }
+
+function base64_to_file(string $base64, string $path): string
+{
+    $tempFile = '/tmp/coolify_' . uniqid() . '.b64';
+    return implode("\n", [
+        "cat << 'EOF_COOLIFY_B64' > {$tempFile}",
+        $base64,
+        "EOF_COOLIFY_B64",
+        "cat {$tempFile} | base64 -d > {$path}",
+        "rm -f {$tempFile}"
+    ]);
+}
+
+function base64_to_file_in_docker(string $containerId, string $base64, string $path): string
+{
+    $tempFile = '/tmp/coolify_' . uniqid() . '.b64';
+    return implode("\n", [
+        "cat << 'EOF_COOLIFY_B64' > {$tempFile}",
+        $base64,
+        "EOF_COOLIFY_B64",
+        "cat {$tempFile} | base64 -d > {$tempFile}.decoded",
+        "docker cp {$tempFile}.decoded {$containerId}:{$path}",
+        "rm -f {$tempFile} {$tempFile}.decoded"
+    ]);
+}

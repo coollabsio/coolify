@@ -700,7 +700,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         $this->docker_compose_base64 = base64_encode($yaml);
         $this->execute_remote_command([
-            executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}{$this->docker_compose_location} > /dev/null"),
+            base64_to_file_in_docker($this->deployment_uuid, $this->docker_compose_base64, "{$this->workdir}{$this->docker_compose_location}"),
             'hidden' => true,
         ]);
 
@@ -1061,7 +1061,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     "mkdir -p $mainDir",
                 ],
                 [
-                    "echo '{$this->docker_compose_base64}' | base64 -d | tee $composeFileName > /dev/null",
+                    base64_to_file($this->docker_compose_base64, "$composeFileName"),
                 ],
                 [
                     "echo '{$readme}' > $mainDir/README.md",
@@ -2306,7 +2306,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     executeInDocker($this->deployment_uuid, 'mkdir -p /root/.ssh'),
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "echo '{$private_key}' | base64 -d | tee {$customSshKeyLocation} > /dev/null"),
+                    base64_to_file_in_docker($this->deployment_uuid, $private_key, "{$customSshKeyLocation}"),
                 ],
                 [
                     executeInDocker($this->deployment_uuid, "chmod 600 {$customSshKeyLocation}"),
@@ -2790,7 +2790,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 'hidden' => true,
             ],
             [
-                executeInDocker($this->deployment_uuid, "echo '{$encodedConfig}' | base64 -d | tee {$configPath} > /dev/null"),
+                base64_to_file_in_docker($this->deployment_uuid, $encodedConfig, "{$configPath}"),
                 'hidden' => true,
             ]
         );
@@ -2931,8 +2931,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         $base64_static_build = base64_encode($static_build);
         $this->execute_remote_command(
-            [executeInDocker($this->deployment_uuid, "echo '{$dockerfile}' | base64 -d | tee {$this->workdir}/Dockerfile > /dev/null")],
-            [executeInDocker($this->deployment_uuid, "echo '{$nginx_config}' | base64 -d | tee {$this->workdir}/nginx.conf > /dev/null")],
+            [base64_to_file_in_docker($this->deployment_uuid, $dockerfile, "{$this->workdir}/Dockerfile")],
+            [base64_to_file_in_docker($this->deployment_uuid, $nginx_config, "{$this->workdir}/nginx.conf")],
             [executeInDocker($this->deployment_uuid, "echo '{$base64_static_build}' | base64 -d | tee ".self::BUILD_SCRIPT_PATH.' > /dev/null'), 'hidden' => true],
             [executeInDocker($this->deployment_uuid, 'cat '.self::BUILD_SCRIPT_PATH), 'hidden' => true],
             [executeInDocker($this->deployment_uuid, 'bash '.self::BUILD_SCRIPT_PATH), 'hidden' => true],
@@ -3330,7 +3330,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->docker_compose_base64 = base64_encode($this->docker_compose);
-        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}/docker-compose.yaml > /dev/null"), 'hidden' => true]);
+        $this->execute_remote_command([base64_to_file_in_docker($this->deployment_uuid, $this->docker_compose_base64, "{$this->workdir}/docker-compose.yaml"), 'hidden' => true]);
     }
 
     private function generate_local_persistent_volumes()
@@ -3481,10 +3481,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $base64_build_command = base64_encode($build_command);
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "echo '{$dockerfile}' | base64 -d | tee {$this->workdir}/Dockerfile > /dev/null"),
+                base64_to_file_in_docker($this->deployment_uuid, $dockerfile, "{$this->workdir}/Dockerfile"),
             ],
             [
-                executeInDocker($this->deployment_uuid, "echo '{$nginx_config}' | base64 -d | tee {$this->workdir}/nginx.conf > /dev/null"),
+                base64_to_file_in_docker($this->deployment_uuid, $nginx_config, "{$this->workdir}/nginx.conf"),
             ],
             [
                 executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee ".self::BUILD_SCRIPT_PATH.' > /dev/null'),
@@ -3671,10 +3671,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $base64_build_command = base64_encode($build_command);
             $this->execute_remote_command(
                 [
-                    executeInDocker($this->deployment_uuid, "echo '{$dockerfile}' | base64 -d | tee {$this->workdir}/Dockerfile > /dev/null"),
+                    base64_to_file_in_docker($this->deployment_uuid, $dockerfile, "{$this->workdir}/Dockerfile"),
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "echo '{$nginx_config}' | base64 -d | tee {$this->workdir}/nginx.conf > /dev/null"),
+                    base64_to_file_in_docker($this->deployment_uuid, $nginx_config, "{$this->workdir}/nginx.conf"),
                 ],
                 [
                     executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee ".self::BUILD_SCRIPT_PATH.' > /dev/null'),
@@ -4238,7 +4238,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('Final Dockerfile:', type: 'info', hidden: true);
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null"),
+                base64_to_file_in_docker($this->deployment_uuid, $dockerfile_base64, "{$this->workdir}{$this->dockerfile_location}"),
                 'hidden' => true,
             ],
             [
@@ -4306,7 +4306,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             // Write the modified Dockerfile back
             $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$dockerfile_path} > /dev/null"),
+                base64_to_file_in_docker($this->deployment_uuid, $dockerfile_base64, "{$dockerfile_path}"),
                 'hidden' => true,
             ]);
         }
@@ -4468,7 +4468,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if ($totalAdded > 0) {
                 $dockerfile_base64 = base64_encode($dockerfile_lines->implode("\n"));
                 $this->execute_remote_command([
-                    executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}/{$dockerfilePath} > /dev/null"),
+                    base64_to_file_in_docker($this->deployment_uuid, $dockerfile_base64, "{$this->workdir}/{$dockerfilePath}"),
                     'hidden' => true,
                 ]);
 
