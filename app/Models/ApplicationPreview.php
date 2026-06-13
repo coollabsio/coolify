@@ -125,9 +125,15 @@ class ApplicationPreview extends BaseModel
 
     public function generate_preview_fqdn_compose()
     {
-        $services = collect(json_decode($this->application->docker_compose_domains)) ?? collect();
-        $docker_compose_domains = data_get($this, 'docker_compose_domains');
-        $docker_compose_domains = json_decode($docker_compose_domains, true) ?? [];
+        // Match the deployment lookup's key normalization so a service is never stored under two variants.
+        $normalize = fn (string $name): string => str($name)->replace('-', '_')->replace('.', '_')->toString();
+
+        $services = collect(json_decode($this->application->docker_compose_domains, true) ?? [])
+            ->keyBy(fn ($config, $key) => $normalize($key));
+
+        $docker_compose_domains = collect(json_decode($this->docker_compose_domains, true) ?? [])
+            ->keyBy(fn ($config, $key) => $normalize($key))
+            ->toArray();
 
         // Get all services from the parsed compose file to ensure all services have entries
         $parsedServices = $this->application->parse(pull_request_id: $this->pull_request_id);
@@ -135,7 +141,7 @@ class ApplicationPreview extends BaseModel
             foreach ($parsedServices['services'] as $serviceName => $service) {
                 if (! isDatabaseImage(data_get($service, 'image'))) {
                     // Remove PR suffix from service name to get original service name
-                    $originalServiceName = str($serviceName)->replaceLast('-pr-'.$this->pull_request_id, '')->toString();
+                    $originalServiceName = $normalize(str($serviceName)->replaceLast('-pr-'.$this->pull_request_id, '')->toString());
 
                     // Ensure all services have an entry, even if empty
                     if (! $services->has($originalServiceName)) {

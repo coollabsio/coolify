@@ -57,6 +57,30 @@ it('populates fqdn with multiple domains from multiple services', function () {
     expect($preview->fqdn)->toContain('api.example.com');
 });
 
+it('collapses a service stored under both dashed and underscored keys into one', function () {
+    $application = Application::factory()->create([
+        'build_pack' => 'dockercompose',
+        'docker_compose_domains' => json_encode([
+            'web-api' => ['domain' => 'https://api.example.com'],
+        ]),
+    ]);
+
+    $preview = ApplicationPreview::create([
+        'application_id' => $application->id,
+        'pull_request_id' => 13,
+        'pull_request_html_url' => 'https://github.com/example/repo/pull/13',
+        'docker_compose_domains' => json_encode([
+            'web_api' => ['domain' => ''],
+        ]),
+    ]);
+
+    $preview->generate_preview_fqdn_compose();
+
+    $keys = array_keys(json_decode($preview->fresh()->docker_compose_domains, true) ?: []);
+
+    expect($keys)->toBe(['web_api']);
+});
+
 it('sets fqdn to null when no domains are configured', function () {
     $application = Application::factory()->create([
         'build_pack' => 'dockercompose',
