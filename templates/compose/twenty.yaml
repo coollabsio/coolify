@@ -50,10 +50,10 @@ services:
         - curl
         - '-f'
         - 'http://127.0.0.1:3000/healthz'
-      interval: 2s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,7 +64,6 @@ services:
     volumes:
       - twenty-local-storage:/app/packages/twenty-server/.local-storage
     environment:
-      - SERVICE_URL_TWENTY_3000
       - SERVER_URL=${SERVICE_URL_TWENTY}
       - FRONT_BASE_URL=${SERVICE_URL_TWENTY}
       - APP_SECRET=${SERVICE_BASE64_32_SECRET}
@@ -110,7 +109,7 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
-      
+
   postgres:
     image: postgres:16-alpine
     environment:
