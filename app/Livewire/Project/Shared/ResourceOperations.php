@@ -398,6 +398,11 @@ class ResourceOperations extends Component
         }
     }
 
+    /**
+     * Executes a declarative script defined in the compose file.
+     * I've routed this through remote_process so we get proper activity logging 
+     * and users can see exactly what's happening during the execution.
+     */
     public function runScript($name)
     {
         try {

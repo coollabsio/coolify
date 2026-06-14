@@ -155,10 +155,12 @@ class StackForm extends Component
             $this->validate();
             $this->syncData(true);
 
-            // Validate for command injection BEFORE any database operations
+            // I'm doing a quick check for command injection here. 
+            // It's non-negotiable before we let this touch the database.
             validateDockerComposeForInjection($this->service->docker_compose_raw);
 
-            // Use transaction to ensure atomicity - if parse fails, save is rolled back
+            // Using a transaction to ensure we don't end up with partial state.
+            // If the parse fails, I want the whole save to roll back.
             DB::transaction(function () {
                 $this->service->save();
                 $this->service->saveExtraFields($this->fields);
@@ -166,7 +168,8 @@ class StackForm extends Component
                 $this->service->saveExtraFields($this->declarativeOptions);
                 $this->service->parse();
             });
-            // Refresh and write files after a successful commit
+            
+            // Refreshing from the DB to make sure we're showing the ground truth.
             $this->service->refresh();
             $this->service->saveComposeConfigs();
 
@@ -174,7 +177,7 @@ class StackForm extends Component
             $this->dispatch('refreshServices');
             $notify && $this->dispatch('success', 'Service saved.');
         } catch (\Throwable $e) {
-            // On error, refresh from database to restore clean state
+            // If we hit a snag, I'm restoring the model's clean state so the UI stays consistent.
             $this->service->refresh();
             $this->syncData(false);
 

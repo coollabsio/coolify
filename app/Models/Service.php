@@ -1557,6 +1557,11 @@ class Service extends BaseModel
         return data_get($service, 'documentation', config('constants.urls.docs'));
     }
 
+    /**
+     * Parse the docker-compose metadata to generate dynamic UI fields.
+     * I've designed this to be flexible so template authors can define their own 
+     * inputs without us needing to touch the core UI code every time.
+     */
     public function declarativeFields()
     {
         $compose = data_get($this, 'docker_compose_raw');
@@ -1579,6 +1584,11 @@ class Service extends BaseModel
         }
     }
 
+    /**
+     * Retrieve conditional setup options from the compose file.
+     * This allows us to toggle specific services (like workers) on or off 
+     * before deployment—much cleaner than managing multiple templates.
+     */
     public function declarativeSetupOptions()
     {
         $compose = data_get($this, 'docker_compose_raw');
@@ -1600,6 +1610,11 @@ class Service extends BaseModel
         }
     }
 
+    /**
+     * Pull maintenance or initialization scripts from the template.
+     * It's always better to keep these in the UI so users don't have to 
+     * drop into a shell for standard day-zero operations.
+     */
     public function declarativeScripts()
     {
         $compose = data_get($this, 'docker_compose_raw');

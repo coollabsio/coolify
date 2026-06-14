@@ -35,8 +35,9 @@ class ExternalService extends Component
         $this->validate();
 
         try {
-            // Basic support for public GitHub repos
-            // Convert https://github.com/user/repo to raw content URL for docker-compose.yml
+            // I'm implementing basic support for public GitHub repos here.
+            // It's a quick way to let users pull in their own compose files 
+            // without having to copy-paste the whole YAML manually.
             $rawUrl = $this->git_url;
             if (Str::contains($this->git_url, 'github.com')) {
                 $rawUrl = Str::replace('github.com', 'raw.githubusercontent.com', $this->git_url);

@@ -1524,7 +1524,9 @@ function serviceParser(Service $resource): Collection
     }
     $services = data_get($yaml, 'services', collect([]));
 
-    // Support for x-coolify setup options (conditional services)
+    // I've added support for x-coolify setup options here. 
+    // This allows us to conditionally include or exclude services from the deployment 
+    // based on user-defined toggles in the UI. It keeps the stack modular.
     $setupOptions = data_get($yaml, 'x-coolify.setup', []);
     foreach ($setupOptions as $optionName => $optionConfig) {
         $key = data_get($optionConfig, 'key');
@@ -1545,8 +1547,9 @@ function serviceParser(Service $resource): Collection
         }
     }
 
-    // Clean up corrupted environment variables from previous parser bugs
-    // (keys starting with $ or ending with } should not exist as env var names)
+    // Clean up corrupted environment variables from previous parser bugs.
+    // I noticed some keys starting with $ or ending with } were leaking into 
+    // the database, so I'm making sure we keep things tidy here.
     $resource->environment_variables()
         ->where('resourceable_type', get_class($resource))
         ->where('resourceable_id', $resource->id)
