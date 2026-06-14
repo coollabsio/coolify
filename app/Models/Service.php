@@ -1558,9 +1558,7 @@ class Service extends BaseModel
     }
 
     /**
-     * Parse the docker-compose metadata to generate dynamic UI fields.
-     * I've designed this to be flexible so template authors can define their own 
-     * inputs without us needing to touch the core UI code every time.
+     * Parse docker-compose metadata for dynamic UI fields.
      */
     public function declarativeFields()
     {
@@ -1585,9 +1583,7 @@ class Service extends BaseModel
     }
 
     /**
-     * Retrieve conditional setup options from the compose file.
-     * This allows us to toggle specific services (like workers) on or off 
-     * before deployment—much cleaner than managing multiple templates.
+     * Get conditional setup options from the compose file.
      */
     public function declarativeSetupOptions()
     {
@@ -1611,9 +1607,7 @@ class Service extends BaseModel
     }
 
     /**
-     * Pull maintenance or initialization scripts from the template.
-     * It's always better to keep these in the UI so users don't have to 
-     * drop into a shell for standard day-zero operations.
+     * Pull scripts defined in x-coolify.scripts.
      */
     public function declarativeScripts()
     {
