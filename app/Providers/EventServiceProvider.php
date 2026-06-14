@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use Kovah\Oidc\OidcExtendSocialite;
 use SocialiteProviders\Authentik\AuthentikExtendSocialite;
 use SocialiteProviders\Azure\AzureExtendSocialite;
 use SocialiteProviders\Clerk\ClerkExtendSocialite;
@@ -22,6 +23,7 @@ class EventServiceProvider extends ServiceProvider
             DiscordExtendSocialite::class.'@handle',
             GoogleExtendSocialite::class.'@handle',
             InfomaniakExtendSocialite::class.'@handle',
+            OidcExtendSocialite::class.'@handle',
             ZitadelExtendSocialite::class.'@handle',
         ],
     ];

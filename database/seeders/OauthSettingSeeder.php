@@ -24,6 +24,7 @@ class OauthSettingSeeder extends Seeder
                 'google',
                 'authentik',
                 'infomaniak',
+                'oidc',
                 'zitadel',
             ]);
 

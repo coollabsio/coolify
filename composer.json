@@ -40,6 +40,7 @@
         "pusher/pusher-php-server": "^7.2.7",
         "resend/resend-laravel": "^0.20.0",
         "sentry/sentry-laravel": "^4.20.1",
+        "kovah/laravel-socialite-oidc": "^0.8",
         "socialiteproviders/authentik": "^5.2",
         "socialiteproviders/clerk": "^5.1",
         "socialiteproviders/discord": "^4.2",
@@ -62,7 +63,6 @@
     },
     "require-dev": {
         "barryvdh/laravel-debugbar": "^3.16.5",
-        "driftingly/rector-laravel": "^2.1.9",
         "fakerphp/faker": "^1.24.1",
         "laravel/boost": "^2.1",
         "laravel/dusk": "^8.3.4",
@@ -73,7 +73,8 @@
         "pestphp/pest": "^4.3.2",
         "pestphp/pest-plugin-browser": "^4.2",
         "phpstan/phpstan": "^2.1.38",
-        "rector/rector": "^2.3.5",
+        "rector/rector": "^2.0",
+        "driftingly/rector-laravel": "^2.0",
         "serversideup/spin": "^3.1.1",
         "spatie/laravel-ignition": "^2.10.0",
         "symfony/http-client": "^7.4.5"
