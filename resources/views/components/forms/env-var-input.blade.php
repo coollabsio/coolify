@@ -10,7 +10,9 @@
         </label>
     @endif
 
-    <div class="relative" @success.window="type = '{{ $type }}'" x-data="{
+    <div class="relative" @success.window="type = '{{ $type }}'"
+        @if ($hasAutocomplete)
+        x-data="{
             type: '{{ $type }}',
             showDropdown: false,
             suggestions: [],
@@ -194,13 +196,18 @@
                 }
             }
         }"
-        @click.outside="showDropdown = false">
+        @click.outside="showDropdown = false"
+        @else
+        x-data="{ type: '{{ $type }}' }"
+        @endif>
 
         <input
+            @if ($hasAutocomplete)
             x-ref="input"
             @input="handleInput()"
             @keydown="handleKeydown($event)"
             @click="handleInput()"
+            @endif
             autocomplete="{{ $autocomplete }}"
             x-bind:type="type"
             x-bind:class="{ 'truncate': type === 'text' && ! $el.disabled }"
@@ -241,46 +248,48 @@
             </button>
         @endif
 
-        {{-- Dropdown for suggestions --}}
-        <div x-show="showDropdown"
-             x-transition
-             class="absolute z-[60] w-full mt-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-400 rounded shadow-lg">
+        @if ($hasAutocomplete)
+            {{-- Dropdown for suggestions --}}
+            <div x-show="showDropdown"
+                x-transition
+                class="absolute z-[60] w-full mt-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-400 rounded shadow-lg">
 
-            <template x-if="suggestions.length === 0 && currentScope">
-                <div class="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
-                    <div>No shared variables found in <span class="font-semibold" x-text="currentScope"></span> scope.</div>
-                    <a :href="getScopeUrl(currentScope)"
-                       class="text-coollabs dark:text-warning hover:underline text-xs mt-1 inline-block"
-                       target="_blank">
-                        Add <span x-text="currentScope"></span> variables →
-                    </a>
-                </div>
-            </template>
-
-            <div x-show="suggestions.length > 0"
-                 x-ref="dropdownList"
-                 class="max-h-48 overflow-y-scroll"
-                 style="scrollbar-width: thin;">
-                <template x-for="(suggestion, index) in suggestions" :key="index">
-                    <div :id="'suggestion-' + index"
-                         @click="selectSuggestion(suggestion)"
-                         class="px-3 py-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-coolgray-200 flex items-center gap-2"
-                         :class="{ 'bg-neutral-50 dark:bg-coolgray-300': index === selectedIndex }">
-                        <template x-if="suggestion.type === 'scope'">
-                            <span class="text-xs px-2 py-0.5 bg-coollabs/10 dark:bg-warning/10 text-coollabs dark:text-warning rounded">
-                                SCOPE
-                            </span>
-                        </template>
-                        <template x-if="suggestion.type === 'variable'">
-                            <span class="text-xs px-2 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 rounded">
-                                VAR
-                            </span>
-                        </template>
-                        <span class="text-sm font-mono" x-text="suggestion.display"></span>
+                <template x-if="suggestions.length === 0 && currentScope">
+                    <div class="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
+                        <div>No shared variables found in <span class="font-semibold" x-text="currentScope"></span> scope.</div>
+                        <a :href="getScopeUrl(currentScope)"
+                            class="text-coollabs dark:text-warning hover:underline text-xs mt-1 inline-block"
+                            target="_blank">
+                            Add <span x-text="currentScope"></span> variables →
+                        </a>
                     </div>
                 </template>
+
+                <div x-show="suggestions.length > 0"
+                    x-ref="dropdownList"
+                    class="max-h-48 overflow-y-scroll"
+                    style="scrollbar-width: thin;">
+                    <template x-for="(suggestion, index) in suggestions" :key="index">
+                        <div :id="'suggestion-' + index"
+                            @click="selectSuggestion(suggestion)"
+                            class="px-3 py-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-coolgray-200 flex items-center gap-2"
+                            :class="{ 'bg-neutral-50 dark:bg-coolgray-300': index === selectedIndex }">
+                            <template x-if="suggestion.type === 'scope'">
+                                <span class="text-xs px-2 py-0.5 bg-coollabs/10 dark:bg-warning/10 text-coollabs dark:text-warning rounded">
+                                    SCOPE
+                                </span>
+                            </template>
+                            <template x-if="suggestion.type === 'variable'">
+                                <span class="text-xs px-2 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 rounded">
+                                    VAR
+                                </span>
+                            </template>
+                            <span class="text-sm font-mono" x-text="suggestion.display"></span>
+                        </div>
+                    </template>
+                </div>
             </div>
-        </div>
+        @endif
     </div>
 
     @if (!$label && $helper)

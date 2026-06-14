@@ -71,3 +71,36 @@ it('renders env var password input before visibility toggle in tab order', funct
 
     expect(strpos($html, '<input'))->toBeLessThan(strpos($html, 'aria-label="Toggle password visibility"'));
 });
+
+it('skips env var autocomplete markup when no shared variables are available', function () {
+    $html = Blade::render('<x-forms.env-var-input type="password" id="secret" />');
+
+    expect($html)
+        ->not->toContain('availableVars:')
+        ->not->toContain('@input="handleInput()"')
+        ->not->toContain('x-show="showDropdown"');
+});
+
+it('renders env var autocomplete markup when shared variables are available', function () {
+    $html = Blade::render(
+        '<x-forms.env-var-input type="password" id="secret" :availableVars="$availableVars" />',
+        ['availableVars' => ['team' => ['API_KEY']]],
+    );
+
+    expect($html)
+        ->toContain('availableVars:')
+        ->toContain('@input="handleInput()"')
+        ->toContain('x-show="showDropdown"');
+});
+
+it('skips env var autocomplete markup when the input is disabled', function () {
+    $html = Blade::render(
+        '<x-forms.env-var-input disabled type="password" id="secret" :availableVars="$availableVars" />',
+        ['availableVars' => ['team' => ['API_KEY']]],
+    );
+
+    expect($html)
+        ->not->toContain('availableVars:')
+        ->not->toContain('@input="handleInput()"')
+        ->not->toContain('x-show="showDropdown"');
+});

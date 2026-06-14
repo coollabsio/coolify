@@ -4,8 +4,12 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
+use App\Models\Project;
+use App\Models\Server;
+use App\Models\Service;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableProtection;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -33,6 +37,8 @@ class All extends Component
 
     public bool $use_build_secrets = false;
 
+    public array $parameters = [];
+
     protected $listeners = [
         'saveKey' => 'submit',
         'refreshEnvs',
@@ -55,6 +61,7 @@ class All extends Component
 
     public function mount()
     {
+        $this->parameters = get_route_parameters();
         $this->is_env_sorting_enabled = data_get($this->resource, 'settings.is_env_sorting_enabled', false);
         $this->use_build_secrets = data_get($this->resource, 'settings.use_build_secrets', false);
         $this->resourceClass = get_class($this->resource);
@@ -63,7 +70,6 @@ class All extends Component
         if (str($this->resourceClass)->contains($resourceWithPreviews) && ! $simpleDockerfile) {
             $this->showPreview = true;
         }
-        $this->getDevView();
     }
 
     public function instantSave()
@@ -74,7 +80,9 @@ class All extends Component
             $this->resource->settings->is_env_sorting_enabled = $this->is_env_sorting_enabled;
             $this->resource->settings->use_build_secrets = $this->use_build_secrets;
             $this->resource->settings->save();
-            $this->getDevView();
+            if ($this->view === 'dev') {
+                $this->getDevView();
+            }
             $this->dispatch('success', 'Environment variable settings updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -111,7 +119,29 @@ class All extends Component
             $query->orderBy('order');
         }
 
-        return $query->get();
+        $resource = $this->resourceWithRealValueRelations();
+
+        return $query->get()
+            ->each(function (EnvironmentVariable $environmentVariable) use ($resource) {
+                $environmentVariable->setRelation('resourceable', $resource);
+            });
+    }
+
+    private function resourceWithRealValueRelations(): mixed
+    {
+        if (method_exists($this->resource, 'environment')) {
+            $this->resource->loadMissing('environment');
+        }
+
+        if (method_exists($this->resource, 'server')) {
+            $this->resource->loadMissing('server');
+        }
+
+        if (method_exists($this->resource, 'destination')) {
+            $this->resource->loadMissing('destination.server');
+        }
+
+        return $this->resource;
     }
 
     private function searchTerm(): string
@@ -122,9 +152,123 @@ class All extends Component
     public function getHasEnvironmentVariablesProperty(): bool
     {
         return $this->environmentVariables->isNotEmpty() ||
-            $this->environmentVariablesPreview->isNotEmpty() ||
             $this->hardcodedEnvironmentVariables->isNotEmpty() ||
-            $this->hardcodedEnvironmentVariablesPreview->isNotEmpty();
+            ($this->showPreview && (
+                $this->environmentVariablesPreview->isNotEmpty() ||
+                $this->hardcodedEnvironmentVariablesPreview->isNotEmpty()
+            ));
+    }
+
+    public function getAvailableSharedVariablesProperty(): array
+    {
+        $team = currentTeam();
+        $result = [
+            'team' => [],
+            'project' => [],
+            'environment' => [],
+            'server' => [],
+        ];
+
+        if (! $team) {
+            return $result;
+        }
+
+        try {
+            $this->authorize('view', $team);
+            $result['team'] = $team->environment_variables()
+                ->pluck('key')
+                ->toArray();
+        } catch (AuthorizationException $e) {
+        }
+
+        $projectUuid = data_get($this->parameters, 'project_uuid');
+        if ($projectUuid) {
+            $project = Project::where('team_id', $team->id)
+                ->where('uuid', $projectUuid)
+                ->first();
+
+            if ($project) {
+                try {
+                    $this->authorize('view', $project);
+                    $result['project'] = $project->environment_variables()
+                        ->pluck('key')
+                        ->toArray();
+
+                    $environmentUuid = data_get($this->parameters, 'environment_uuid');
+                    if ($environmentUuid) {
+                        $environment = $project->environments()
+                            ->where('uuid', $environmentUuid)
+                            ->first();
+
+                        if ($environment) {
+                            try {
+                                $this->authorize('view', $environment);
+                                $result['environment'] = $environment->environment_variables()
+                                    ->pluck('key')
+                                    ->toArray();
+                            } catch (AuthorizationException $e) {
+                            }
+                        }
+                    }
+                } catch (AuthorizationException $e) {
+                }
+            }
+        }
+
+        $serverUuid = data_get($this->parameters, 'server_uuid');
+        if ($serverUuid) {
+            $server = Server::where('team_id', $team->id)
+                ->where('uuid', $serverUuid)
+                ->first();
+
+            if ($server) {
+                try {
+                    $this->authorize('view', $server);
+                    $result['server'] = $server->environment_variables()
+                        ->pluck('key')
+                        ->toArray();
+                } catch (AuthorizationException $e) {
+                }
+            }
+        } else {
+            $applicationUuid = data_get($this->parameters, 'application_uuid');
+            if ($applicationUuid) {
+                $application = Application::whereRelation('environment.project.team', 'id', $team->id)
+                    ->where('uuid', $applicationUuid)
+                    ->with('destination.server')
+                    ->first();
+
+                if ($application && $application->destination && $application->destination->server) {
+                    try {
+                        $this->authorize('view', $application->destination->server);
+                        $result['server'] = $application->destination->server->environment_variables()
+                            ->pluck('key')
+                            ->toArray();
+                    } catch (AuthorizationException $e) {
+                    }
+                }
+            } else {
+                $serviceUuid = data_get($this->parameters, 'service_uuid');
+                if ($serviceUuid) {
+                    $service = Service::whereRelation('environment.project.team', 'id', $team->id)
+                        ->where('uuid', $serviceUuid)
+                        ->with('server')
+                        ->first();
+
+                    if ($service && $service->server) {
+                        try {
+                            $this->authorize('view', $service->server);
+                            $result['server'] = $service->server->environment_variables()
+                                ->pluck('key')
+                                ->toArray();
+                        } catch (AuthorizationException $e) {
+                        }
+                    }
+                }
+            }
+        }
+
+        return $result;
     }
 
     public function getIsSearchActiveProperty(): bool
@@ -219,7 +363,9 @@ class All extends Component
     public function switch()
     {
         $this->view = $this->view === 'normal' ? 'dev' : 'normal';
-        $this->getDevView();
+        if ($this->view === 'dev') {
+            $this->getDevView();
+        }
     }
 
     public function submit($data = null)
@@ -232,8 +378,9 @@ class All extends Component
                 $this->handleSingleSubmit($data);
             }
 
-            $this->updateOrder();
-            $this->getDevView();
+            if ($data === null) {
+                $this->updateOrder();
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
@@ -243,7 +390,7 @@ class All extends Component
 
     private function updateOrder()
     {
-        $variables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables));
+        $variables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables ?? ''));
         $order = 1;
         foreach ($variables as $key => $value) {
             $env = $this->resource->environment_variables()->where('key', $key)->first();
@@ -254,7 +401,7 @@ class All extends Component
             $order++;
         }
 
-        if ($this->showPreview) {
+        if ($this->showPreview && $this->variablesPreview !== null) {
             $previewVariables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variablesPreview));
             $order = 1;
             foreach ($previewVariables as $key => $value) {
@@ -270,7 +417,11 @@ class All extends Component
 
     private function handleBulkSubmit()
     {
-        $variables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables));
+        if ($this->variables === null) {
+            $this->getDevView();
+        }
+
+        $variables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables ?? ''));
         $changesMade = false;
         $errorOccurred = false;
 
@@ -289,7 +440,7 @@ class All extends Component
             $changesMade = true;
         }
 
-        if ($this->showPreview) {
+        if ($this->showPreview && $this->variablesPreview !== null) {
             $previewVariables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variablesPreview));
 
             // Try to delete removed preview variables
@@ -459,6 +610,8 @@ class All extends Component
     {
         $this->resource->refresh();
         $this->clearEnvironmentVariableCaches();
-        $this->getDevView();
+        if ($this->view === 'dev') {
+            $this->getDevView();
+        }
     }
 }

@@ -14,7 +14,6 @@ use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 class Show extends Component
@@ -63,6 +62,8 @@ class Show extends Component
 
     public array $problematicVariables = [];
 
+    public ?array $availableSharedVariables = null;
+
     protected $listeners = [
         'refreshEnvs' => 'refresh',
         'refresh',
@@ -97,6 +98,7 @@ class Show extends Component
             $this->isSharedVariable = true;
         }
         $this->parameters = get_route_parameters();
+        $this->availableSharedVariables ??= $this->resolveAvailableSharedVariables();
         $this->checkEnvs();
         if ($this->type === 'standalone-redis' && ($this->env->key === 'REDIS_PASSWORD' || $this->env->key === 'REDIS_USERNAME')) {
             $this->is_redis_credential = true;
@@ -226,8 +228,7 @@ class Show extends Component
         }
     }
 
-    #[Computed]
-    public function availableSharedVariables(): array
+    private function resolveAvailableSharedVariables(): array
     {
         $team = currentTeam();
         $result = [
