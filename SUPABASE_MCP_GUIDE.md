@@ -1,33 +1,31 @@
-# Supabase MCP Deployment Guide for Coolify
+# Supabase MCP: Deployment & Config Guide
 
-This guide explains how to deploy and configure the Supabase Model Context Protocol (MCP) using Coolify's new declarative service system.
+Deploying an MCP (Model Context Protocol) worker can be a bit of a headache if the architecture isn't right. This guide walks you through setting up Supabase MCP using Coolify's new declarative system. I've designed this to be as "one-click" as possible, but there are a few things you'll want to get right on the client side.
 
-## 1. Deployment
-1. Go to **Resources** > **New Service**.
-2. Select the **Supabase MCP** template.
-3. In the configuration view, you will see a new **Enable Supabase MCP** toggle.
-4. Set your **MCP Auth Token** (or leave the generated one).
-5. Click **Deploy**.
+## 1. Getting it Deployed
+1. Head over to **Resources** > **New Service** and grab the **Supabase MCP** template.
+2. You'll notice a new **Enable Supabase MCP** toggle—I've added this so you can decide if you actually want the worker running alongside your DB.
+3. Set your **MCP Auth Token**. I've defaulted it to a random string, but feel free to drop in your own. Just make sure it's secure.
+4. Hit **Deploy**.
 
-## 2. Database Initialization
-Once the services are running:
-1. Go to the service's **Operations** tab.
-2. Find the **Scripts** section.
-3. Click **Run** on the `Initialize MCP Schema` script. This will prepare your database for MCP interactions.
+## 2. Initializing the Database (Don't skip this!)
+Once the services are green, you need to prep the DB. Instead of making you SSH in, I've added a maintenance script:
+1. Go to the **Operations** tab for your service.
+2. Look for the **Scripts** section.
+3. Click **Run** on the `Initialize MCP Schema` script. This handles all the migrations so the worker can actually talk to your tables.
 
-## 3. Wireguard VPN Setup (Optional but Recommended)
-To securely connect your local AI client to the MCP worker:
-1. In Coolify, go to **Servers** > **Your Server** > **Wireguard**.
-2. Enable Wireguard and create a new client.
-3. Install Wireguard on your local machine and use the generated config.
-4. Your AI client can now reach the MCP worker at its internal container name or IP.
+## 3. Secure Access via Wireguard
+If you're like me and prefer not to expose your worker to the open internet, use the built-in Wireguard support:
+1. Go to **Servers** > **Your Server** > **Wireguard**.
+2. Set up a client for your local machine.
+3. Once connected, your AI client (like Claude Desktop) can hit the worker directly using its internal container name or IP. It's much cleaner and way more secure.
 
-## 4. AI Client Configuration
-If you are using an AI client (like Claude Desktop or a custom agent):
-1. Configure it to use the MCP worker endpoint:
-   - URL: `http://mcp-worker:3000` (within VPN) or your configured FQDN.
-   - Headers: `Authorization: Bearer <YOUR_MCP_AUTH_TOKEN>`
+## 4. Connecting your AI Client
+When you're configuring your agent or Claude Desktop, use these settings:
+- **Endpoint**: `http://mcp-worker:3000` (if you're on the VPN) or your FQDN.
+- **Header**: `Authorization: Bearer <YOUR_MCP_AUTH_TOKEN>`
 
 ## 5. Troubleshooting
-- If the MCP worker fails to connect to the database, ensure the `SERVICE_PASSWORD_POSTGRES` is correctly set in the environment variables.
-- Check the logs in the **Logs** tab of the `mcp-worker` service.
+If things aren't connecting, check the logs for the `mcp-worker` service. Usually, it's just a mismatched Postgres password or a forgotten migration script. 
+
+Happy shipping!
