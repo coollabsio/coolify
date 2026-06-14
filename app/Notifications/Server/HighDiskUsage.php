@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -67,6 +68,25 @@ class HighDiskUsage extends CustomEmailNotification
             buttons: [
                 'Change settings' => base_url().'/server/'.$this->server->uuid.'#advanced',
                 'Tips for cleanup' => 'https://coolify.io/docs/knowledge-base/server/automated-cleanup',
+            ],
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
+            title: 'High disk usage detected',
+            level: 'warning',
+            message: "Server '{$this->server->name}' high disk usage detected!\n\nDisk usage: {$this->disk_usage}%.\nThreshold: {$this->server_disk_usage_notification_threshold}%.\nPlease cleanup your disk to prevent data-loss.",
+            buttons: [
+                [
+                    'text' => 'Change settings',
+                    'url' => base_url().'/server/'.$this->server->uuid.'#advanced',
+                ],
+                [
+                    'text' => 'Tips for cleanup',
+                    'url' => 'https://coolify.io/docs/knowledge-base/server/automated-cleanup',
+                ],
             ],
         );
     }

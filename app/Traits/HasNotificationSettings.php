@@ -4,6 +4,7 @@ namespace App\Traits;
 
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\NtfyChannel;
 use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Channels\TelegramChannel;
@@ -34,6 +35,7 @@ trait HasNotificationSettings
             'slack' => $this->slackNotificationSettings,
             'pushover' => $this->pushoverNotificationSettings,
             'webhook' => $this->webhookNotificationSettings,
+            'ntfy' => $this->ntfyNotificationSettings,
             default => null,
         };
     }
@@ -82,6 +84,7 @@ trait HasNotificationSettings
             'slack' => SlackChannel::class,
             'pushover' => PushoverChannel::class,
             'webhook' => WebhookChannel::class,
+            'ntfy' => NtfyChannel::class,
         ];
 
         if ($event === 'general') {

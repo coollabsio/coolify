@@ -27,6 +27,10 @@
                 href="{{ route('notifications.webhook') }}">
                 <button>Webhook</button>
             </a>
+            <a class="{{ request()->routeIs('notifications.ntfy') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+                href="{{ route('notifications.ntfy') }}">
+                <button>Ntfy</button>
+            </a>
         </nav>
     </div>
 </div>

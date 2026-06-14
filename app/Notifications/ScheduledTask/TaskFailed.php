@@ -5,6 +5,7 @@ namespace App\Notifications\ScheduledTask;
 use App\Models\ScheduledTask;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -88,6 +89,30 @@ class TaskFailed extends CustomEmailNotification
         }
 
         return new PushoverMessage(
+            title: 'Scheduled task failed',
+            level: 'error',
+            message: $message,
+            buttons: $buttons,
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        $message = "Scheduled task ({$this->task->name}) failed";
+
+        if ($this->output) {
+            $message .= "\n\nError Output: {$this->output}";
+        }
+
+        $buttons = [];
+        if ($this->url) {
+            $buttons[] = [
+                'text' => 'Open task in Coolify',
+                'url' => (string) $this->url,
+            ];
+        }
+
+        return new NtfyMessage(
             title: 'Scheduled task failed',
             level: 'error',
             message: $message,

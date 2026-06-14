@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -176,6 +177,42 @@ class DeploymentSuccess extends CustomEmailNotification
             buttons: [
                 ...$buttons,
             ],
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        if ($this->preview) {
+            $title = "Pull request #{$this->preview->pull_request_id} successfully deployed";
+            $message = 'New PR'.$this->preview->pull_request_id.' version successfully deployed of '.$this->application_name;
+            if ($this->preview->fqdn) {
+                $buttons[] = [
+                    'text' => 'Open Application',
+                    'url' => $this->preview->fqdn,
+                ];
+            }
+        } else {
+            $title = 'New version successfully deployed';
+            $message = 'New version successfully deployed of '.$this->application_name;
+            if ($this->fqdn) {
+                $buttons[] = [
+                    'text' => 'Open Application',
+                    'url' => $this->fqdn,
+                ];
+            }
+        }
+        $buttons[] = [
+            'text' => 'Deployment logs',
+            'url' => $this->deployment_url,
+        ];
+
+        return new NtfyMessage(
+            title: $title,
+            message: $message,
+            buttons: [
+                ...$buttons,
+            ],
+            level: 'success',
         );
     }
 

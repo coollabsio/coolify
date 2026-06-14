@@ -4,6 +4,7 @@ namespace App\Notifications\Server;
 
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -54,6 +55,15 @@ class HetznerDeletionFailed extends CustomEmailNotification
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
+            title: 'Hetzner Server Deletion Failed',
+            level: 'error',
+            message: "[ACTION REQUIRED] Failed to delete Hetzner server #{$this->hetznerServerId}.\n\nError: {$this->errorMessage}\n\nThe server has been removed from Coolify, but may still exist in your Hetzner Cloud account. Please check and manually delete if needed.",
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
             title: 'Hetzner Server Deletion Failed',
             level: 'error',
             message: "[ACTION REQUIRED] Failed to delete Hetzner server #{$this->hetznerServerId}.\n\nError: {$this->errorMessage}\n\nThe server has been removed from Coolify, but may still exist in your Hetzner Cloud account. Please check and manually delete if needed.",

@@ -6,6 +6,7 @@ use App\Actions\User\RevokeUserTeamTokens;
 use App\Events\ServerReachabilityChanged;
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\Channels\SendsNtfy;
 use App\Notifications\Channels\SendsPushover;
 use App\Notifications\Channels\SendsSlack;
 use App\Traits\HasNotificationSettings;
@@ -37,7 +38,7 @@ use OpenApi\Attributes as OA;
     ]
 )]
 
-class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack
+class Team extends Model implements SendsDiscord, SendsEmail, SendsNtfy, SendsPushover, SendsSlack
 {
     use HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
 
@@ -64,6 +65,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $team->telegramNotificationSettings()->create();
             $team->pushoverNotificationSettings()->create();
             $team->webhookNotificationSettings()->create();
+            $team->ntfyNotificationSettings()->create();
         });
 
         static::saving(function ($team) {
@@ -190,6 +192,15 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         ];
     }
 
+    public function routeNotificationForNtfy()
+    {
+        return [
+            'url' => data_get($this, 'ntfy_url', null),
+            'topic' => data_get($this, 'ntfy_topic', null),
+            'token' => data_get($this, 'ntfy_token', null),
+        ];
+    }
+
     public function getRecipients(): array
     {
         $recipients = $this->members()->pluck('email')->toArray();
@@ -214,7 +225,8 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $this->getNotificationSettings('slack')?->isEnabled() ||
             $this->getNotificationSettings('telegram')?->isEnabled() ||
             $this->getNotificationSettings('pushover')?->isEnabled() ||
-            $this->getNotificationSettings('webhook')?->isEnabled();
+            $this->getNotificationSettings('webhook')?->isEnabled() ||
+            $this->getNotificationSettings('ntfy')?->isEnabled();
     }
 
     public function subscriptionEnded()
@@ -349,5 +361,10 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function webhookNotificationSettings()
     {
         return $this->hasOne(WebhookNotificationSettings::class);
+    }
+
+    public function ntfyNotificationSettings()
+    {
+        return $this->hasOne(NtfyNotificationSettings::class);
     }
 }
