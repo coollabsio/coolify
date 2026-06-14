@@ -77,3 +77,18 @@ it('rejects oauth logins when the provider does not return an email address', fu
     'null email' => [null],
     'blank email' => ['   '],
 ]);
+
+it('configures oidc provider with base_url', function () {
+    OauthSetting::create([
+        'provider' => 'oidc',
+        'client_id' => 'oidc-client-id',
+        'client_secret' => 'oidc-client-secret',
+        'redirect_uri' => 'https://coolify.example.com/auth/oidc/callback',
+        'base_url' => 'https://oidc.example.com',
+    ]);
+
+    $oauth_setting = OauthSetting::where('provider', 'oidc')->first();
+
+    expect($oauth_setting->couldBeEnabled())->toBeTrue();
+    expect($oauth_setting->base_url)->toBe('https://oidc.example.com');
+});
