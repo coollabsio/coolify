@@ -520,9 +520,24 @@ install_docker_manually() {
         chmod a+r /etc/apt/keyrings/docker.asc
 
         # Add the repository to Apt sources
+        CODENAME=$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+        case "$CODENAME" in
+            *[!0-9]*) ;;
+            *)
+                VERSION_ID=$(. /etc/os-release && echo "$VERSION_ID")
+                case "$VERSION_ID" in
+                    "13") CODENAME="trixie" ;;
+                    "12") CODENAME="bookworm" ;;
+                    "11") CODENAME="bullseye" ;;
+                    "10") CODENAME="buster" ;;
+                    "9") CODENAME="stretch" ;;
+                    *) CODENAME="bookworm" ;;
+                esac
+                ;;
+        esac
         echo \
             "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$OS_TYPE \
-                  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" |
+                  $CODENAME stable" |
             tee /etc/apt/sources.list.d/docker.list
         apt-get update
         apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin

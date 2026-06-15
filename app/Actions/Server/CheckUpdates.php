@@ -89,6 +89,26 @@ class CheckUpdates
 
                     return $out;
                 case 'apt':
+                    $versionCodename = $osInfo['UBUNTU_CODENAME'] ?? $osInfo['VERSION_CODENAME'] ?? '';
+                    $versionId = $osInfo['VERSION_ID'] ?? '';
+
+                    if (empty($versionCodename) || is_numeric($versionCodename)) {
+                        $versionCodename = match ($versionId) {
+                            '13' => 'trixie',
+                            '12' => 'bookworm',
+                            '11' => 'bullseye',
+                            '10' => 'buster',
+                            '9' => 'stretch',
+                            default => 'bookworm',
+                        };
+                    }
+
+                    if (!empty($versionCodename)) {
+                        instant_remote_process([
+                            'test -f /etc/apt/sources.list.d/docker.list && sed -i -E \'s|(download.docker.com/linux/[a-z]+)[[:space:]]+[0-9]+[[:space:]]+|\\1 ' . $versionCodename . ' |g\' /etc/apt/sources.list.d/docker.list || true'
+                        ], $server);
+                    }
+
                     instant_remote_process(['apt-get update -qq'], $server);
                     $output = instant_remote_process(['LANG=C apt list --upgradable 2>/dev/null'], $server);
 

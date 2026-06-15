@@ -120,7 +120,9 @@ class InstallDocker
             'install -m 0755 -d /etc/apt/keyrings && '.
             'curl -fsSL https://download.docker.com/linux/${ID}/gpg -o /etc/apt/keyrings/docker.asc && '.
             'chmod a+r /etc/apt/keyrings/docker.asc && '.
-            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
+            'CODENAME=${UBUNTU_CODENAME:-$VERSION_CODENAME} && '.
+            'case "$CODENAME" in *[!0-9]*) ;; *) case "$VERSION_ID" in "13") CODENAME="trixie" ;; "12") CODENAME="bookworm" ;; "11") CODENAME="bullseye" ;; "10") CODENAME="buster" ;; "9") CODENAME="stretch" ;; *) CODENAME="bookworm" ;; esac ;; esac && '.
+            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
             'apt-get update && '.
             'apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin'.
             ')';
