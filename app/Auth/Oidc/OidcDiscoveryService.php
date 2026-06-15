@@ -17,7 +17,7 @@ class OidcDiscoveryService
         $issuerUrl = rtrim($issuerUrl, '/');
         $cacheKey = 'oidc:discovery:'.hash('sha256', $issuerUrl);
 
-        $payload = Cache::remember($cacheKey, 3600, function () use ($issuerUrl): array {
+        return Cache::remember($cacheKey, 3600, function () use ($issuerUrl): OidcDiscoveryDocument {
             $url = $issuerUrl.'/.well-known/openid-configuration';
 
             try {
@@ -35,15 +35,13 @@ class OidcDiscoveryService
                 throw new OidcDiscoveryException('Discovery endpoint returned invalid JSON.');
             }
 
-            return $json;
+            $discovery = OidcDiscoveryDocument::fromArray($json);
+            if (rtrim($discovery->issuer, '/') !== $issuerUrl) {
+                throw new OidcDiscoveryException('Discovery issuer does not match the configured issuer URL.');
+            }
+
+            return $discovery;
         });
-
-        $discovery = OidcDiscoveryDocument::fromArray($payload);
-        if (rtrim($discovery->issuer, '/') !== $issuerUrl) {
-            throw new OidcDiscoveryException('Discovery issuer does not match the configured issuer URL.');
-        }
-
-        return $discovery;
     }
 
     /**

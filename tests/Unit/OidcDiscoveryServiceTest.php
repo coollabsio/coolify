@@ -38,6 +38,35 @@ it('fetches and caches discovery documents and jwks', function () {
     Http::assertSentCount(2);
 });
 
+it('does not cache discovery documents with mismatched issuers', function () {
+    Cache::flush();
+    Http::fakeSequence('https://idp.example.com/.well-known/openid-configuration')
+        ->push([
+            'issuer' => 'https://evil.example.com',
+            'authorization_endpoint' => 'https://idp.example.com/auth',
+            'token_endpoint' => 'https://idp.example.com/token',
+            'userinfo_endpoint' => 'https://idp.example.com/userinfo',
+            'jwks_uri' => 'https://idp.example.com/jwks',
+        ])
+        ->push([
+            'issuer' => 'https://idp.example.com',
+            'authorization_endpoint' => 'https://idp.example.com/auth',
+            'token_endpoint' => 'https://idp.example.com/token',
+            'userinfo_endpoint' => 'https://idp.example.com/userinfo',
+            'jwks_uri' => 'https://idp.example.com/jwks',
+        ]);
+
+    $service = app(OidcDiscoveryService::class);
+    $cacheKey = 'oidc:discovery:'.hash('sha256', 'https://idp.example.com');
+
+    expect(fn () => $service->discover('https://idp.example.com'))
+        ->toThrow(OidcDiscoveryException::class, 'Discovery issuer does not match the configured issuer URL.')
+        ->and(Cache::has($cacheKey))->toBeFalse()
+        ->and($service->discover('https://idp.example.com')->issuer)->toBe('https://idp.example.com');
+
+    Http::assertSentCount(2);
+});
+
 it('refetches jwks once on forced refresh to pick up rotated keys', function () {
     Cache::flush();
     Http::fakeSequence('https://idp.example.com/jwks')
