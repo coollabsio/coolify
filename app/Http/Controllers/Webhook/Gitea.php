@@ -11,7 +11,6 @@ use App\Models\ApplicationPreview;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Visus\Cuid2\Cuid2;
 
 class Gitea extends Controller
 {
@@ -127,7 +126,7 @@ class Gitea extends Controller
 
                                 continue;
                             }
-                            $deployment_uuid = new Cuid2;
+                            $deployment_uuid = new_public_id();
                             $result = queue_application_deployment(
                                 application: $application,
                                 deployment_uuid: $deployment_uuid,
@@ -194,7 +193,7 @@ class Gitea extends Controller
 
                                 continue;
                             }
-                            $deployment_uuid = new Cuid2;
+                            $deployment_uuid = new_public_id();
                             $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                             if (! $found) {
                                 if ($application->build_pack === 'dockercompose') {

@@ -4,15 +4,20 @@ namespace App\Livewire\Project\Service;
 
 use App\Models\Service;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class StackForm extends Component
 {
+    use AuthorizesRequests;
+
     public Service $service;
 
     public Collection $fields;
+
+    public bool $isPasswordHiddenForMember = false;
 
     protected $listeners = ['saveCompose'];
 
@@ -118,6 +123,17 @@ class StackForm extends Component
         })->flatMap(function ($group) {
             return $group;
         });
+
+        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
+        if ($this->isPasswordHiddenForMember) {
+            $this->fields = $this->fields->map(function ($field) {
+                if (data_get($field, 'isPassword')) {
+                    $field['value'] = null;
+                }
+
+                return $field;
+            });
+        }
     }
 
     public function saveCompose($raw)
@@ -128,14 +144,20 @@ class StackForm extends Component
 
     public function instantSave()
     {
-        $this->syncData(true);
-        $this->service->save();
-        $this->dispatch('success', 'Service settings saved.');
+        try {
+            $this->authorize('update', $this->service);
+            $this->syncData(true);
+            $this->service->save();
+            $this->dispatch('success', 'Service settings saved.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function submit($notify = true)
     {
         try {
+            $this->authorize('update', $this->service);
             $this->validate();
             $this->syncData(true);
 

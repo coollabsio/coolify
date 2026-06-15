@@ -4,11 +4,14 @@ namespace App\Livewire;
 
 use App\Models\InstanceSettings;
 use App\Models\OauthSetting;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class SettingsOauth extends Component
 {
+    use AuthorizesRequests;
+
     public InstanceSettings $settings;
 
     public $oauth_settings_map;
@@ -209,6 +212,7 @@ class SettingsOauth extends Component
     public function instantSave(string $provider)
     {
         try {
+            $this->authorize('update', instanceSettings());
             $this->updateOauthSettings($provider);
         } catch (\Exception $e) {
             return handleError($e, $this);
@@ -218,6 +222,8 @@ class SettingsOauth extends Component
     public function toggleProvider(string $provider)
     {
         try {
+            $this->authorize('update', instanceSettings());
+
             if (! array_key_exists($provider, $this->oauth_settings_map)) {
                 abort(404);
             }
@@ -263,6 +269,7 @@ class SettingsOauth extends Component
 
     public function saveRegistrationPolicy(): void
     {
+        $this->authorize('update', instanceSettings());
         $this->validate([
             'disable_registration_when_oauth_enabled' => 'boolean',
         ]);
@@ -277,6 +284,7 @@ class SettingsOauth extends Component
     public function submit(): void
     {
         try {
+            $this->authorize('update', instanceSettings());
             $this->updateOauthSettings($this->selectedProvider);
 
             if ($this->selectedProvider === null) {

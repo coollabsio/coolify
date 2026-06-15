@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Jobs\DatabaseBackupJob;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
 use Exception;
@@ -186,6 +187,18 @@ class BackupEdit extends Component
         } catch (Exception $e) {
             $this->dispatch('error', 'Failed to delete backup: '.$e->getMessage());
 
+            return handleError($e, $this);
+        }
+    }
+
+    public function backupNow()
+    {
+        try {
+            $this->authorize('manageBackups', $this->backup->database);
+
+            DatabaseBackupJob::dispatch($this->backup);
+            $this->dispatch('success', 'Backup queued. It will be available in a few minutes.');
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }

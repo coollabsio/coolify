@@ -369,7 +369,9 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <x-services.advanced :service="$service" />
                     @if (str($service->status)->contains('running'))
-                        <x-forms.button title="Restart" @click="document.getElementById('service-restart-trigger')?.click()">
+
+                        <x-forms.button canGate="deploy" :canResource="$service" title="Restart" @click="document.getElementById('service-restart-trigger')?.click()">
+
                             <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                                     stroke-width="2">
@@ -379,7 +381,8 @@
                             </svg>
                             Restart
                         </x-forms.button>
-                        <x-forms.button isError title="Stop" @click="document.getElementById('service-stop-trigger')?.click()">
+
+                        <x-forms.button canGate="stop" :canResource="$service" isError title="Stop" @click="document.getElementById('service-stop-trigger')?.click()">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                                 stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -393,7 +396,8 @@
                             Stop
                         </x-forms.button>
                     @elseif (str($service->status)->contains('degraded'))
-                        <x-forms.button title="Restart" @click="document.getElementById('service-restart-trigger')?.click()">
+                        <x-forms.button canGate="deploy" :canResource="$service" title="Restart" @click="document.getElementById('service-restart-trigger')?.click()">
+
                             <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                                     stroke-width="2">
@@ -403,7 +407,8 @@
                             </svg>
                             Restart
                         </x-forms.button>
-                        <x-forms.button isError title="Stop" @click="document.getElementById('service-stop-trigger')?.click()">
+
+                        <x-forms.button canGate="stop" :canResource="$service" isError title="Stop" @click="document.getElementById('service-stop-trigger')?.click()">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                                 stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -417,7 +422,8 @@
                             Stop
                         </x-forms.button>
                     @elseif (str($service->status)->contains('exited'))
-                        <button @click="document.getElementById('service-start-trigger')?.click()" class="gap-2 button">
+                        <x-forms.button canGate="deploy" :canResource="$service" @click="document.getElementById('service-start-trigger')?.click()" class="gap-2">
+
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -425,9 +431,10 @@
                                 <path d="M7 4v16l13 -8z" />
                             </svg>
                             Deploy
-                        </button>
+                        </x-forms.button>
                     @else
-                        <x-forms.button isError title="Stop" @click="document.getElementById('service-stop-trigger')?.click()">
+
+                        <x-forms.button canGate="stop" :canResource="$service" isError title="Stop" @click="document.getElementById('service-stop-trigger')?.click()">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                                 stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -440,7 +447,8 @@
                             </svg>
                             Stop
                         </x-forms.button>
-                        <button @click="document.getElementById('service-start-trigger')?.click()" class="gap-2 button">
+                        <x-forms.button canGate="deploy" :canResource="$service" @click="document.getElementById('service-start-trigger')?.click()" class="gap-2">
+
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -448,7 +456,7 @@
                                 <path d="M7 4v16l13 -8z" />
                             </svg>
                             Deploy
-                        </button>
+                        </x-forms.button>
                     @endif
                 </div>
             </div>
@@ -522,11 +530,9 @@
                     );
                     return;
                 }
-                window.dispatchEvent(new CustomEvent('startservice'));
                 $wire.$call('start');
             });
             $wire.$on('forceDeployEvent', () => {
-                window.dispatchEvent(new CustomEvent('startservice'));
                 $wire.$call('forceDeploy');
             });
             $wire.$on('restartEvent', async () => {
@@ -539,12 +545,10 @@
                 }
                 $wire.$dispatch('info',
                     'Gracefully stopping service.<br/><br/>It could take a while depending on the service.');
-                window.dispatchEvent(new CustomEvent('startservice'));
                 $wire.$call('restart');
             });
             $wire.$on('pullAndRestartEvent', () => {
                 $wire.$dispatch('info', 'Pulling new images and restarting service.');
-                window.dispatchEvent(new CustomEvent('startservice'));
                 $wire.$call('pullAndRestartEvent');
             });
             $wire.$on('cleanupEvent', () => {
