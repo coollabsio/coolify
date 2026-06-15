@@ -15,6 +15,7 @@ use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\Sanctum;
 use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
 use Laravel\Telescope\TelescopeServiceProvider;
+use Stripe\StripeClient;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -23,6 +24,8 @@ class AppServiceProvider extends ServiceProvider
         if (App::isLocal()) {
             $this->app->register(TelescopeServiceProvider::class);
         }
+
+        $this->app->bind(StripeClient::class, fn () => new StripeClient(config('subscription.stripe_api_key')));
     }
 
     public function boot(): void

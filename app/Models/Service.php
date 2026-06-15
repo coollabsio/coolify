@@ -626,7 +626,7 @@ class Service extends BaseModel
                     }
                     $fields->put('Unleash', $data->toArray());
                     break;
-                case $image->contains('grafana'):
+                case $this->isGrafanaImage($image->toString()):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GRAFANA')->first();
                     $data = $data->merge([
@@ -1378,6 +1378,15 @@ class Service extends BaseModel
         });
 
         return $fields;
+    }
+
+    private function isGrafanaImage(string $image): bool
+    {
+        return in_array($image, [
+            'grafana/grafana',
+            'grafana/grafana-oss',
+            'grafana/grafana-enterprise',
+        ], true);
     }
 
     public function saveExtraFields($fields)
