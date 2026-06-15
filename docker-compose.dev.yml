@@ -10,8 +10,10 @@ services:
         - GROUP_ID=${GROUPID:-1000}
     ports:
       - "${APP_PORT:-8000}:8080"
+      - "${FORWARD_FLUX_PORT:-6443}:6443"
     environment:
       AUTORUN_ENABLED: false
+      COOLIFY_CONTAINER_ROLE: "${COOLIFY_CONTAINER_ROLE:-all}"
       PUSHER_HOST: "${PUSHER_HOST}"
       PUSHER_PORT: "${PUSHER_PORT}"
       PUSHER_SCHEME: "${PUSHER_SCHEME:-http}"

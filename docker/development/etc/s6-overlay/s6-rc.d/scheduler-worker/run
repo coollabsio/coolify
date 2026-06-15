@@ -2,6 +2,20 @@
 
 cd /var/www/html
 
+role="${COOLIFY_CONTAINER_ROLE:-}"
+if [ -z "$role" ]; then
+    role="$(grep -E '^COOLIFY_CONTAINER_ROLE=' .env 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
+fi
+role="${role:-all}"
+
+case "$role" in
+    all|worker) ;;
+    *)
+        echo "   INFO  Scheduler worker is disabled for role '$role', sleeping."
+        exec sleep infinity
+        ;;
+esac
+
 if grep -qE '^SCHEDULER_ENABLED=false' .env 2>/dev/null; then
     echo "   INFO  Scheduler is disabled, sleeping."
     exec sleep infinity

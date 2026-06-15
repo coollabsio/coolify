@@ -8,6 +8,7 @@
     },
     "devDependencies": {
         "@tailwindcss/postcss": "4.1.18",
+        "@vitejs/plugin-react": "^5.2.0",
         "laravel-vite-plugin": "2.0.1",
         "postcss": "8.5.15",
         "tailwind-scrollbar": "4.0.2",
@@ -15,10 +16,14 @@
         "vite": "7.3.2"
     },
     "dependencies": {
+        "@inertiajs/react": "^3.3.0",
+        "@inertiajs/vite": "^3.3.0",
         "@tailwindcss/forms": "0.5.10",
         "@tailwindcss/typography": "0.5.16",
         "@xterm/addon-fit": "0.10.0",
         "@xterm/xterm": "5.5.0",
-        "playwright": "^1.58.2"
+        "playwright": "^1.58.2",
+        "react": "^19.2.7",
+        "react-dom": "^19.2.7"
     }
 }

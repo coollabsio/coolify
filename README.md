@@ -29,6 +29,31 @@ You can find the installation script source [here](./scripts/install.sh).
 > [!NOTE]
 > Please refer to the [docs](https://coolify.io/docs/installation) for more information about the installation.
 
+
+## Container roles and Flux
+
+The Coolify image can run different process roles with `COOLIFY_CONTAINER_ROLE`:
+
+- `all` (default): self-hosted mode; runs the web process, worker services, and Flux when configured.
+- `web`: web/API process only; s6 worker services and Flux sleep.
+- `worker`: Horizon, Laravel scheduler worker, and optional Nightwatch agent.
+- `flux`: Flux only; used by Cloud/HA deployments that scale coold connection routers separately.
+
+Flux is installed from the coold nightly release into `/usr/local/bin/flux`. Containers running the `all` or `flux` role expose Flux on port `6443` and use these runtime variables:
+
+```env
+COOLIFY_FLUX_GRPC_BIND=0.0.0.0:6443
+COOLIFY_FLUX_UNIX_SOCKET_PATH=/run/coolify/flux.sock
+COOLIFY_FLUX_JWT_PRIVATE_KEY_PATH=/var/www/html/storage/app/flux/jwt.priv
+COOLIFY_FLUX_JWT_PUBLIC_KEY_PATH=/var/www/html/storage/app/flux/jwt.pub
+COOLIFY_FLUX_ALLOW_PUBLIC_BIND=1
+COOLIFY_FLUX_ID=flux-eu-1
+COOLIFY_FLUX_PUBLIC_URL=grpcs://flux-eu-1.example.com:6443
+COOLIFY_FLUX_INTERNAL_URL=http://coolify-flux-eu-1.internal:6443
+```
+
+If `COOLIFY_FLUX_ENABLED=false` is set, the Flux s6 service sleeps even for `all` and `flux` roles. The Flux s6 service creates a persistent JWT keypair on first boot when the key files are missing. The current Coolify image only installs the nightly Flux artifact during the Docker build; the s6 service verifies the binary at runtime and sleeps with a clear error if the published artifact is not compatible with the Alpine base image.
+
 ## Support
 
 Contact us at [coolify.io/docs/contact](https://coolify.io/docs/contact).

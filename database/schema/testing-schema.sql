@@ -1321,6 +1321,16 @@ CREATE TABLE IF NOT EXISTS "users" (
     "email_change_code_expires_at" TEXT
 );
 
+CREATE TABLE IF NOT EXISTS "v5_projects" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "team_id" INTEGER NOT NULL,
+    "created_by_user_id" INTEGER NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "created_at" TEXT,
+    "updated_at" TEXT
+);
+
 CREATE TABLE IF NOT EXISTS "webhook_notification_settings" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     "team_id" INTEGER NOT NULL,
@@ -1752,3 +1762,4 @@ INSERT INTO "migrations" ("id", "migration", "batch") VALUES (311, '2025_12_10_1
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (312, '2025_12_15_143052_trim_s3_storage_credentials', 312);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (313, '2025_12_17_000001_add_is_wire_navigate_enabled_to_instance_settings_table', 313);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (314, '2025_12_17_000002_add_restart_tracking_to_standalone_databases', 314);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (315, '2026_06_04_050157_create_v5_projects_table', 315);
