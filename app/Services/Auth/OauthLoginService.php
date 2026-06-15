@@ -18,8 +18,8 @@ class OauthLoginService
     public function login(string $provider, object $oauthUser, OauthSetting $oauthSetting): User
     {
         $email = strtolower(trim((string) $oauthUser->email));
-        if ($email === '') {
-            throw new HttpException(403, 'OAuth provider did not return an email address');
+        if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new HttpException(403, 'OAuth provider did not return a valid email address');
         }
 
         $user = $provider === 'oidc'

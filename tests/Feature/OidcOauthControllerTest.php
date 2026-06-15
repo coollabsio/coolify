@@ -113,6 +113,7 @@ it('creates the root user when oidc provisions the first account', function () {
     $response->assertRedirect('/');
     $this->assertDatabaseHas('users', ['id' => 0, 'email' => 'root@example.com']);
     $this->assertDatabaseHas('team_user', ['team_id' => 0, 'user_id' => 0, 'role' => 'owner']);
+    expect(InstanceSettings::find(0)->is_registration_enabled)->toBeFalse();
 });
 
 it('rejects callbacks for disabled oidc provider', function () {

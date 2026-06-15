@@ -41,8 +41,20 @@ class OidcTokenValidator
         $this->assertAudience($claims, $clientId);
         $this->assertTimestamps($claims, $clockSkewSeconds);
         $this->assertNonce($claims, $expectedNonce);
+        $this->assertSubject($claims);
 
         return $claims;
+    }
+
+    /**
+     * @param  array<string, mixed>  $claims
+     */
+    private function assertSubject(array $claims): void
+    {
+        $subject = $claims['sub'] ?? null;
+        if (! is_string($subject) || $subject === '') {
+            throw new OidcTokenException('id_token subject is missing or invalid.');
+        }
     }
 
     /**
@@ -102,6 +114,10 @@ class OidcTokenValidator
 
         if (! is_array($audience) || ! in_array($clientId, $audience, true)) {
             throw new OidcTokenException('id_token audience does not include configured client id.');
+        }
+
+        if (count($audience) > 1 && (! isset($claims['azp']) || $claims['azp'] !== $clientId)) {
+            throw new OidcTokenException('id_token azp is required when aud contains multiple values and must match configured client id.');
         }
 
         if (isset($claims['azp']) && $claims['azp'] !== $clientId) {

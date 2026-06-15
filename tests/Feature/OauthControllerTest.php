@@ -80,4 +80,6 @@ it('rejects oauth logins when the provider does not return an email address', fu
 })->with([
     'null email' => [null],
     'blank email' => ['   '],
+    'malformed email' => ['not-an-email'],
+    'missing domain' => ['user@'],
 ]);

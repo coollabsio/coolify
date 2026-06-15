@@ -28,7 +28,7 @@ final readonly class OidcConfig
             redirectUri: filled($setting->redirect_uri) ? $setting->redirect_uri : route('auth.callback', 'oidc'),
             scopes: $setting->scopeList(),
             usePkce: $setting->use_pkce ?? true,
-            clockSkewSeconds: $setting->clock_skew_seconds ?: 60,
+            clockSkewSeconds: $setting->clock_skew_seconds ?? 60,
         );
     }
 }

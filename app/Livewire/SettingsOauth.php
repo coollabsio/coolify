@@ -2,11 +2,15 @@
 
 namespace App\Livewire;
 
+use App\Models\InstanceSettings;
 use App\Models\OauthSetting;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class SettingsOauth extends Component
 {
+    public InstanceSettings $settings;
+
     public $oauth_settings_map;
 
     public ?string $selectedProvider = null;
@@ -54,8 +58,9 @@ class SettingsOauth extends Component
             return redirect()->route('home');
         }
 
+        $this->settings = instanceSettings();
         $this->selectedProvider = $provider;
-        $this->disable_registration_when_oauth_enabled = (bool) instanceSettings()->disable_registration_when_oauth_enabled;
+        $this->disable_registration_when_oauth_enabled = (bool) $this->settings->disable_registration_when_oauth_enabled;
         $this->oauth_settings_map = OauthSetting::all()->sortBy('provider')->reduce(function ($carry, $setting) {
             $carry[$setting->provider] = $this->oauthSettingToArray($setting);
 
@@ -271,10 +276,23 @@ class SettingsOauth extends Component
 
     public function submit(): void
     {
-        $this->updateOauthSettings($this->selectedProvider);
+        try {
+            $this->updateOauthSettings($this->selectedProvider);
 
-        if ($this->selectedProvider === null) {
-            $this->dispatch('success', 'Instance settings updated successfully!');
+            if ($this->selectedProvider === null) {
+                $this->dispatch('success', 'Instance settings updated successfully!');
+            }
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            if ($this->selectedProvider !== null) {
+                $oauth = OauthSetting::where('provider', $this->selectedProvider)->first();
+                if ($oauth) {
+                    $this->oauth_settings_map[$this->selectedProvider] = $this->oauthSettingToArray($oauth);
+                }
+            }
+
+            handleError($e, $this);
         }
     }
 }

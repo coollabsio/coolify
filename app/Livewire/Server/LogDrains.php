@@ -177,8 +177,12 @@ class LogDrains extends Component
         }
     }
 
-    public function toggleLogDrain(string $type)
+    public function toggleLogDrain(string $type): void
     {
+        $previousNewRelicEnabled = $this->server->settings->is_logdrain_newrelic_enabled;
+        $previousAxiomEnabled = $this->server->settings->is_logdrain_axiom_enabled;
+        $previousCustomEnabled = $this->server->settings->is_logdrain_custom_enabled;
+
         try {
             $this->authorize('update', $this->server);
             $this->resetErrorBag();
@@ -204,9 +208,15 @@ class LogDrains extends Component
                 $this->dispatch('success', 'Log drain service stopped.');
             }
         } catch (\Throwable $e) {
+            // Restore the previously persisted enabled flags so the UI/DB never
+            // claim a runtime state that the Start/StopLogDrain action failed to apply.
+            $this->server->settings->is_logdrain_newrelic_enabled = $previousNewRelicEnabled;
+            $this->server->settings->is_logdrain_axiom_enabled = $previousAxiomEnabled;
+            $this->server->settings->is_logdrain_custom_enabled = $previousCustomEnabled;
+            $this->server->settings->save();
             $this->syncData();
 
-            return handleError($e, $this);
+            handleError($e, $this);
         }
     }
 

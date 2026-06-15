@@ -36,14 +36,14 @@
                 <div class="flex items-center gap-2">
                     <h3>SMTP Server</h3>
                     @if ($smtpEnabled)
-                        <x-forms.button type="submit">
+                        <x-forms.button canGate="update" :canResource="$settings" type="submit">
                             Save
                         </x-forms.button>
-                        <x-forms.button wire:click="toggleSmtp">
+                        <x-forms.button canGate="update" :canResource="$settings" wire:click="toggleSmtp">
                             Disable SMTP Server
                         </x-forms.button>
                     @else
-                        <x-forms.button isHighlighted wire:click="toggleSmtp">
+                        <x-forms.button canGate="update" :canResource="$settings" isHighlighted wire:click="toggleSmtp">
                             Enable SMTP Server
                         </x-forms.button>
                     @endif
@@ -70,14 +70,14 @@
                 <div class="flex items-center gap-2">
                     <h3>Resend</h3>
                     @if ($resendEnabled)
-                        <x-forms.button type="submit">
+                        <x-forms.button canGate="update" :canResource="$settings" type="submit">
                             Save
                         </x-forms.button>
-                        <x-forms.button wire:click="toggleResend">
+                        <x-forms.button canGate="update" :canResource="$settings" wire:click="toggleResend">
                             Disable Resend
                         </x-forms.button>
                     @else
-                        <x-forms.button isHighlighted wire:click="toggleResend">
+                        <x-forms.button canGate="update" :canResource="$settings" isHighlighted wire:click="toggleResend">
                             Enable Resend
                         </x-forms.button>
                     @endif

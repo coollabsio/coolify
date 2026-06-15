@@ -12,6 +12,8 @@ class OidcDiscoveryService
 {
     public function discover(string $issuerUrl): OidcDiscoveryDocument
     {
+        $this->assertHttpsUrl($issuerUrl, new OidcDiscoveryException('Issuer URL must be an absolute HTTPS URL.'));
+
         $issuerUrl = rtrim($issuerUrl, '/');
         $cacheKey = 'oidc:discovery:'.hash('sha256', $issuerUrl);
 
@@ -49,6 +51,8 @@ class OidcDiscoveryService
      */
     public function jwks(string $jwksUri): array
     {
+        $this->assertHttpsUrl($jwksUri, new OidcJwksException('JWKS URI must be an absolute HTTPS URL.'));
+
         $cacheKey = 'oidc:jwks:'.hash('sha256', $jwksUri);
 
         return Cache::remember($cacheKey, 21600, function () use ($jwksUri): array {
@@ -69,5 +73,14 @@ class OidcDiscoveryService
 
             return $json;
         });
+    }
+
+    private function assertHttpsUrl(string $url, Throwable $exception): void
+    {
+        $parts = parse_url($url);
+
+        if (($parts['scheme'] ?? null) !== 'https' || ! is_string($parts['host'] ?? null) || $parts['host'] === '') {
+            throw $exception;
+        }
     }
 }

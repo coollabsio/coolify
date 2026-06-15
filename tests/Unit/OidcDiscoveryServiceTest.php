@@ -55,3 +55,17 @@ it('rejects jwks responses without keys', function () {
 
     app(OidcDiscoveryService::class)->jwks('https://idp.example.com/jwks');
 })->throws(OidcJwksException::class);
+
+it('rejects non-https issuer urls', function () {
+    Cache::flush();
+    Http::fake();
+
+    app(OidcDiscoveryService::class)->discover('http://idp.example.com');
+})->throws(OidcDiscoveryException::class, 'Issuer URL must be an absolute HTTPS URL.');
+
+it('rejects non-https jwks uris', function () {
+    Cache::flush();
+    Http::fake();
+
+    app(OidcDiscoveryService::class)->jwks('http://idp.example.com/jwks');
+})->throws(OidcJwksException::class, 'JWKS URI must be an absolute HTTPS URL.');

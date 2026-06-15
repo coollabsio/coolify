@@ -42,7 +42,8 @@
                         </div>
                     @endif
                     <div class="md:w-96">
-                        <x-forms.checkbox instantSave id="disable_registration_when_oauth_enabled"
+                        <x-forms.checkbox instantSave canGate="update" canResource="$settings"
+                            id="disable_registration_when_oauth_enabled"
                             helper="When enabled, the normal registration page is hidden if at least one OAuth provider is enabled. OAuth providers can still create users if their provider-specific registration option allows it."
                             label="Disable Registration When OAuth Is Enabled" />
                     </div>

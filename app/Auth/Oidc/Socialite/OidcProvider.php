@@ -18,6 +18,8 @@ use Laravel\Socialite\Two\ProviderInterface;
 
 class OidcProvider extends AbstractProvider implements ProviderInterface
 {
+    private const int OIDC_FLOW_TTL_MINUTES = 10;
+
     /**
      * @var array<int, string>
      */
@@ -65,12 +67,12 @@ class OidcProvider extends AbstractProvider implements ProviderInterface
     {
         $config = $this->getConfig();
         $nonce = Str::random(40);
-        $this->request->session()->put($this->nonceSessionKey(), $nonce);
+        $this->putOidcFlowValue($this->nonceSessionKey($state), $nonce);
 
         $extra = ['nonce' => $nonce];
         if ($config->usePkce) {
             $verifier = $this->generateCodeVerifier();
-            $this->request->session()->put($this->verifierSessionKey(), $verifier);
+            $this->putOidcFlowValue($this->verifierSessionKey($state), $verifier);
             $extra['code_challenge'] = $this->codeChallenge($verifier);
             $extra['code_challenge_method'] = 'S256';
         }
@@ -94,6 +96,8 @@ class OidcProvider extends AbstractProvider implements ProviderInterface
                 'Accept' => 'application/json',
                 'Authorization' => 'Bearer '.$token,
             ],
+            RequestOptions::CONNECT_TIMEOUT => 5,
+            RequestOptions::TIMEOUT => 10,
         ]);
 
         $decoded = json_decode((string) $response->getBody(), true);
@@ -135,12 +139,17 @@ class OidcProvider extends AbstractProvider implements ProviderInterface
 
         $discovery = $this->resolveDiscovery();
         $config = $this->getConfig();
+        $expectedNonce = $this->pullOidcFlowValue($this->nonceSessionKey((string) $this->request->input('state')));
+        if ($expectedNonce === null) {
+            throw new OidcException('OIDC login session expired. Please try again.');
+        }
+
         $claims = $this->tokenValidator->validate(
             idToken: $idToken,
             discovery: $discovery,
             jwks: $this->discoveryService->jwks($discovery->jwksUri),
             clientId: $config->clientId,
-            expectedNonce: $this->request->session()->pull($this->nonceSessionKey()),
+            expectedNonce: $expectedNonce,
             clockSkewSeconds: $config->clockSkewSeconds,
         );
 
@@ -164,8 +173,8 @@ class OidcProvider extends AbstractProvider implements ProviderInterface
     {
         $fields = $this->getTokenFields($code);
         if ($this->getConfig()->usePkce) {
-            $verifier = $this->request->session()->pull($this->verifierSessionKey());
-            if (is_string($verifier) && $verifier !== '') {
+            $verifier = $this->pullOidcFlowValue($this->verifierSessionKey((string) $this->request->input('state')));
+            if ($verifier !== null) {
                 $fields['code_verifier'] = $verifier;
             }
         }
@@ -173,6 +182,8 @@ class OidcProvider extends AbstractProvider implements ProviderInterface
         $response = $this->getHttpClient()->post($this->getTokenUrl(), [
             RequestOptions::HEADERS => ['Accept' => 'application/json'],
             RequestOptions::FORM_PARAMS => $fields,
+            RequestOptions::CONNECT_TIMEOUT => 5,
+            RequestOptions::TIMEOUT => 10,
         ]);
 
         $decoded = json_decode((string) $response->getBody(), true);
@@ -209,13 +220,43 @@ class OidcProvider extends AbstractProvider implements ProviderInterface
         return $name === '' ? null : $name;
     }
 
-    protected function nonceSessionKey(): string
+    protected function putOidcFlowValue(string $key, string $value): void
     {
-        return 'oidc.nonce';
+        $this->request->session()->put($key, [
+            'value' => $value,
+            'expires_at' => now()->addMinutes(self::OIDC_FLOW_TTL_MINUTES)->timestamp,
+        ]);
     }
 
-    protected function verifierSessionKey(): string
+    protected function pullOidcFlowValue(string $key): ?string
     {
-        return 'oidc.code_verifier';
+        $entry = $this->request->session()->pull($key);
+
+        if (! is_array($entry)) {
+            return null;
+        }
+
+        $value = $entry['value'] ?? null;
+        $expiresAt = $entry['expires_at'] ?? null;
+
+        if (! is_string($value) || $value === '' || ! is_int($expiresAt)) {
+            return null;
+        }
+
+        if ($expiresAt < now()->timestamp) {
+            return null;
+        }
+
+        return $value;
+    }
+
+    protected function nonceSessionKey(string $state): string
+    {
+        return "oidc.nonce.{$state}";
+    }
+
+    protected function verifierSessionKey(string $state): string
+    {
+        return "oidc.code_verifier.{$state}";
     }
 }

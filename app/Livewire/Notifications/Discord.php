@@ -163,7 +163,7 @@ class Discord extends Component
         }
     }
 
-    public function toggleDiscordEnabled()
+    public function toggleDiscordEnabled(): void
     {
         try {
             $this->resetErrorBag();
@@ -183,7 +183,7 @@ class Discord extends Component
         } catch (\Throwable $e) {
             $this->syncData();
 
-            return handleError($e, $this);
+            handleError($e, $this);
         }
     }
 

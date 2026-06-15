@@ -246,7 +246,7 @@ class Telegram extends Component
         }
     }
 
-    public function toggleTelegramEnabled()
+    public function toggleTelegramEnabled(): void
     {
         try {
             $this->resetErrorBag();
@@ -268,7 +268,7 @@ class Telegram extends Component
         } catch (\Throwable $e) {
             $this->syncData();
 
-            return handleError($e, $this);
+            handleError($e, $this);
         } finally {
             $this->dispatch('refresh');
         }

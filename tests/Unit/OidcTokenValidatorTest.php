@@ -111,6 +111,9 @@ it('rejects invalid token claims', function (array $claimOverrides, string $mess
     'expired token' => [['exp' => time() - 3600], 'expired'],
     'future issued at' => [['iat' => time() + 3600], 'issued'],
     'nonce mismatch' => [['nonce' => 'wrong-nonce'], 'nonce'],
+    'missing subject' => [['sub' => null], 'subject'],
+    'empty subject' => [['sub' => ''], 'subject'],
+    'non-string subject' => [['sub' => 123], 'subject'],
 ]);
 
 it('rejects a bad signature and unknown key id', function (string $kid) {

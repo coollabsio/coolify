@@ -25,7 +25,7 @@
                                         Disable New Relic
                                     </x-forms.button>
                                 @elseif ($isLogDrainAxiomEnabled || $isLogDrainCustomEnabled)
-                                    <x-forms.button disabled>
+                                    <x-forms.button canGate="update" :canResource="$server" disabled>
                                         Enable New Relic
                                     </x-forms.button>
                                 @else
@@ -72,7 +72,7 @@
                                         Disable Axiom
                                     </x-forms.button>
                                 @elseif ($isLogDrainNewRelicEnabled || $isLogDrainCustomEnabled)
-                                    <x-forms.button disabled>
+                                    <x-forms.button canGate="update" :canResource="$server" disabled>
                                         Enable Axiom
                                     </x-forms.button>
                                 @else
@@ -113,7 +113,7 @@
                                         Disable Custom FluentBit
                                     </x-forms.button>
                                 @elseif ($isLogDrainNewRelicEnabled || $isLogDrainAxiomEnabled)
-                                    <x-forms.button disabled>
+                                    <x-forms.button canGate="update" :canResource="$server" disabled>
                                         Enable Custom FluentBit
                                     </x-forms.button>
                                 @else

@@ -215,6 +215,25 @@ it('keeps provider disabled in the ui when enable validation fails', function ()
     expect(OauthSetting::where('provider', 'authentik')->first()->enabled)->toBeFalse();
 });
 
+it('disables an enabled provider gracefully when required fields become incomplete', function () {
+    actingAsInstanceAdmin();
+
+    OauthSetting::where('provider', 'authentik')->first()->forceFill([
+        'enabled' => true,
+        'client_id' => 'authentik-client',
+        'client_secret' => 'authentik-secret',
+        'base_url' => 'https://authentik.example.com',
+    ])->save();
+
+    Livewire::test(SettingsOauth::class, ['provider' => 'authentik'])
+        ->set('oauth_settings_map.authentik.client_secret', '')
+        ->call('submit')
+        ->assertDispatched('error')
+        ->assertSet('oauth_settings_map.authentik.enabled', false);
+
+    expect(OauthSetting::where('provider', 'authentik')->first()->enabled)->toBeFalse();
+});
+
 it('toggles provider enabled state from the action button', function () {
     actingAsInstanceAdmin();
 

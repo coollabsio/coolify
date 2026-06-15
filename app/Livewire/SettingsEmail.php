@@ -187,6 +187,10 @@ class SettingsEmail extends Component
         try {
             $this->validateSmtpSettings();
 
+            if ($this->smtpEnabled) {
+                $this->settings->resend_enabled = $this->resendEnabled = false;
+            }
+
             $this->settings->smtp_enabled = $this->smtpEnabled;
             $this->settings->smtp_host = $this->smtpHost;
             $this->settings->smtp_port = $this->smtpPort;
@@ -211,6 +215,10 @@ class SettingsEmail extends Component
     {
         try {
             $this->validateResendSettings();
+
+            if ($this->resendEnabled) {
+                $this->settings->smtp_enabled = $this->smtpEnabled = false;
+            }
 
             $this->settings->resend_enabled = $this->resendEnabled;
             $this->settings->resend_api_key = $this->resendApiKey;
