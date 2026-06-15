@@ -1,5 +1,6 @@
 <?php
 
+use App\Auth\Oidc\Exceptions\OidcException;
 use App\Auth\Oidc\OidcConfig;
 use App\Auth\Oidc\OidcDiscoveryDocument;
 use App\Auth\Oidc\OidcDiscoveryService;
@@ -128,7 +129,7 @@ it('sends a fresh oidc pkce verifier during token exchange', function () {
         ->and($session->has('oidc.code_verifier.state-value'))->toBeFalse();
 });
 
-it('does not send an expired oidc pkce verifier during token exchange', function () {
+it('throws a session expired error for an expired oidc pkce verifier during token exchange', function () {
     $session = oidc_provider_session();
     $session->put('oidc.code_verifier.state-value', [
         'value' => 'expired-verifier',
@@ -144,9 +145,4 @@ it('does not send an expired oidc pkce verifier during token exchange', function
     $provider->setHttpClient(new Client(['handler' => $handler]));
 
     $provider->getAccessTokenResponse('authorization-code');
-
-    parse_str((string) $history[0]['request']->getBody(), $tokenRequestFields);
-
-    expect($tokenRequestFields)->not->toHaveKey('code_verifier')
-        ->and($session->has('oidc.code_verifier.state-value'))->toBeFalse();
-});
+})->throws(OidcException::class, 'OIDC login session expired. Please try again.');

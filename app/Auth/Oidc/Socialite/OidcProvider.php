@@ -209,9 +209,11 @@ class OidcProvider extends AbstractProvider implements ProviderInterface
         $fields = $this->getTokenFields($code);
         if ($this->getConfig()->usePkce) {
             $verifier = $this->pullOidcFlowValue($this->verifierSessionKey((string) $this->request->input('state')));
-            if ($verifier !== null) {
-                $fields['code_verifier'] = $verifier;
+            if ($verifier === null) {
+                throw new OidcException('OIDC login session expired. Please try again.');
             }
+
+            $fields['code_verifier'] = $verifier;
         }
 
         $response = $this->getHttpClient()->post($this->getTokenUrl(), [

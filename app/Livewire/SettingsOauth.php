@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\InstanceSettings;
 use App\Models\OauthSetting;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
@@ -55,7 +56,7 @@ class SettingsOauth extends Component
         return $rules;
     }
 
-    public function mount(?string $provider = null)
+    public function mount(?string $provider = null): ?RedirectResponse
     {
         if (! isInstanceAdmin()) {
             return redirect()->route('home');
@@ -73,6 +74,8 @@ class SettingsOauth extends Component
         if ($this->selectedProvider !== null && ! array_key_exists($this->selectedProvider, $this->oauth_settings_map)) {
             abort(404);
         }
+
+        return null;
     }
 
     private function updateOauthSettings(?string $provider = null): void
