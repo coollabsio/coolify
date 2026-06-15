@@ -483,13 +483,14 @@
                     <div class="flex flex-wrap gap-2">
                         @if (!str($application->status)->startsWith('exited'))
                             @if (!$application->destination->server->isSwarm())
+
                                 <x-modal-confirmation title="Confirm Application Deployment?" buttonTitle="Redeploy"
                                     submitAction="deploy" :actions="[
                                         'This application will be redeployed.',
                                     ]" :confirmWithText="false" :confirmWithPassword="false"
                                     step2ButtonText="Confirm">
                                     <x-slot:content>
-                                        <x-forms.button title="With rolling update if possible">
+                                        <x-forms.button canGate="deploy" :canResource="$application" title="With rolling update if possible">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-orange-400"
                                                 viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
                                                 stroke-linecap="round" stroke-linejoin="round">
@@ -512,7 +513,7 @@
                                         ]" :confirmWithText="false" :confirmWithPassword="false"
                                         step2ButtonText="Confirm">
                                         <x-slot:content>
-                                            <x-forms.button title="Redeploy Swarm Service (rolling update)">
+                                            <x-forms.button canGate="deploy" :canResource="$application" title="Redeploy Swarm Service (rolling update)">
                                                 <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                                     xmlns="http://www.w3.org/2000/svg">
                                                     <g fill="none" stroke="currentColor" stroke-linecap="round"
@@ -533,7 +534,7 @@
                                         ]" :confirmWithText="false" :confirmWithPassword="false"
                                         step2ButtonText="Confirm">
                                         <x-slot:content>
-                                            <x-forms.button title="Restart without rebuilding">
+                                            <x-forms.button canGate="deploy" :canResource="$application" title="Restart without rebuilding">
                                                 <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                                     xmlns="http://www.w3.org/2000/svg">
                                                     <g fill="none" stroke="currentColor" stroke-linecap="round"
@@ -547,9 +548,10 @@
                                             </x-forms.button>
                                         </x-slot:content>
                                     </x-modal-confirmation>
+
                                 @endif
                             @endif
-                            <x-modal-confirmation title="Confirm Application Stopping?" buttonTitle="Stop"
+                            <x-modal-confirmation :disabled="!auth()->user()->can('deploy', $application)" :authDisabled="!auth()->user()->can('deploy', $application)" title="Confirm Application Stopping?" buttonTitle="Stop"
                                 submitAction="stop" :checkboxes="$checkboxes" :actions="[
                                     'This application will be stopped.',
                                     'All non-persistent data of this application will be deleted.',
@@ -571,13 +573,14 @@
                                 </x-slot:button-title>
                             </x-modal-confirmation>
                         @else
+
                             <x-modal-confirmation title="Confirm Application Deployment?" buttonTitle="Deploy"
                                 submitAction="deploy" :actions="[
                                     'This application will be deployed.',
                                 ]" :confirmWithText="false" :confirmWithPassword="false"
                                 step2ButtonText="Confirm">
                                 <x-slot:content>
-                                    <x-forms.button>
+                                    <x-forms.button canGate="deploy" :canResource="$application">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning"
                                             viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
                                             stroke-linecap="round" stroke-linejoin="round">
@@ -588,6 +591,7 @@
                                     </x-forms.button>
                                 </x-slot:content>
                             </x-modal-confirmation>
+
                         @endif
                     </div>
                 </div>

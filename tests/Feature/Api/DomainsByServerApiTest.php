@@ -26,7 +26,7 @@ beforeEach(function () {
     $this->environment = Environment::factory()->create(['project_id' => $this->project->id]);
 });
 
-function authHeaders(): array
+function domainApiAuthHeaders(): array
 {
     return [
         'Authorization' => 'Bearer '.test()->bearerToken,
@@ -41,7 +41,7 @@ test('returns domains for own team application via uuid query param', function (
         'destination_type' => $this->destination->getMorphClass(),
     ]);
 
-    $response = $this->withHeaders(authHeaders())
+    $response = $this->withHeaders(domainApiAuthHeaders())
         ->getJson("/api/v1/servers/{$this->server->uuid}/domains?uuid={$application->uuid}");
 
     $response->assertOk();
@@ -65,7 +65,7 @@ test('returns 404 when application uuid belongs to another team', function () {
         'destination_type' => $otherDestination->getMorphClass(),
     ]);
 
-    $response = $this->withHeaders(authHeaders())
+    $response = $this->withHeaders(domainApiAuthHeaders())
         ->getJson("/api/v1/servers/{$this->server->uuid}/domains?uuid={$otherApplication->uuid}");
 
     $response->assertNotFound();
@@ -73,7 +73,7 @@ test('returns 404 when application uuid belongs to another team', function () {
 });
 
 test('returns 404 for nonexistent application uuid', function () {
-    $response = $this->withHeaders(authHeaders())
+    $response = $this->withHeaders(domainApiAuthHeaders())
         ->getJson("/api/v1/servers/{$this->server->uuid}/domains?uuid=nonexistent-uuid");
 
     $response->assertNotFound();

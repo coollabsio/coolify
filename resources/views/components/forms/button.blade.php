@@ -1,3 +1,24 @@
+@if ($authDisabled)
+<span class="relative inline-flex"
+    x-data="{ visible: false, _t: null }"
+    @mouseenter="_t = setTimeout(() => {
+        visible = true;
+        $nextTick(() => requestAnimationFrame(() => {
+            const tip = $refs.tip;
+            if (!tip) return;
+            const r = $el.getBoundingClientRect();
+            const t = tip.getBoundingClientRect();
+            let top = r.top - t.height - 6;
+            let left = r.left;
+            if (top < 4) top = r.bottom + 6;
+            if (left + t.width > innerWidth - 8) left = innerWidth - 8 - t.width;
+            if (left < 4) left = 4;
+            tip.style.top = top + 'px';
+            tip.style.left = left + 'px';
+        }));
+    }, 300)"
+    @mouseleave="clearTimeout(_t); visible = false">
+@endif
 <button @disabled($disabled) {{ $attributes->merge(['class' => $defaultClass]) }}
     {{ $attributes->merge(['type' => 'button']) }}
     @isset($confirm)
@@ -18,3 +39,9 @@
         @endif
     @endif
 </button>
+@if ($authDisabled)
+    <div x-ref="tip" x-show="visible" x-cloak class="auth-tooltip">
+        You do not have permission to perform this action.
+    </div>
+</span>
+@endif

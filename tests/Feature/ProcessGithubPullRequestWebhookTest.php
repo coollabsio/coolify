@@ -48,19 +48,7 @@ it('cleans up a closed pull request preview when pull request comment cleanup fa
             'status' => 'success',
         ]);
 
-    $job = new class(
-        applicationId: $this->application->id,
-        githubAppId: null,
-        action: 'closed',
-        pullRequestId: 42,
-        pullRequestHtmlUrl: 'https://github.com/example/repo/pull/42',
-        pullRequestTitle: null,
-        beforeSha: null,
-        afterSha: null,
-        commitSha: 'HEAD',
-        authorAssociation: 'OWNER',
-        fullName: 'example/repo',
-    ) extends ProcessGithubPullRequestWebhook
+    $job = new class(applicationId: $this->application->id, githubAppId: null, action: 'closed', pullRequestId: 42, pullRequestHtmlUrl: 'https://github.com/example/repo/pull/42', pullRequestTitle: null, beforeSha: null, afterSha: null, commitSha: 'HEAD', authorAssociation: 'OWNER', fullName: 'example/repo') extends ProcessGithubPullRequestWebhook
     {
         protected function dispatchPullRequestClosedUpdate(Application $application, ApplicationPreview $preview): void
         {

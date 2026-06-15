@@ -21,8 +21,12 @@ class Index extends Component
 
     public function cleanupUnusedKeys()
     {
-        $this->authorize('create', PrivateKey::class);
-        PrivateKey::cleanupUnusedKeys();
-        $this->dispatch('success', 'Unused keys have been cleaned up.');
+        try {
+            $this->authorize('create', PrivateKey::class);
+            PrivateKey::cleanupUnusedKeys();
+            $this->dispatch('success', 'Unused keys have been cleaned up.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 }
