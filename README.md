@@ -32,12 +32,17 @@ You can find the installation script source [here](./scripts/install.sh).
 
 ## Container roles and Flux
 
-The Coolify image can run different process roles with `COOLIFY_CONTAINER_ROLE`:
+The Coolify image can run different process roles with `COOLIFY_CONTAINER_ROLE`. The value can be a single role or a comma-separated list. If `all` is present anywhere in the list, every role starts.
 
 - `all` (default): self-hosted mode; runs the web process, worker services, and Flux when configured.
-- `web`: web/API process only; s6 worker services and Flux sleep.
+- `web`: web/API process only; s6 worker services and Flux sleep unless they are also listed.
 - `worker`: Horizon, Laravel scheduler worker, and optional Nightwatch agent.
+- `horizon`: Horizon only.
+- `scheduler` or `scheduler-worker`: Laravel scheduler worker only.
+- `nightwatch` or `nightwatch-agent`: optional Nightwatch agent only.
 - `flux`: Flux only; used by Cloud/HA deployments that scale coold connection routers separately.
+
+For example, `COOLIFY_CONTAINER_ROLE=web,flux` starts the web container plus Flux, while `COOLIFY_CONTAINER_ROLE=web,all` still starts all services.
 
 Flux is installed from the coold nightly release into `/usr/local/bin/flux`. Containers running the `all` or `flux` role expose Flux on port `6443` and use these runtime variables:
 

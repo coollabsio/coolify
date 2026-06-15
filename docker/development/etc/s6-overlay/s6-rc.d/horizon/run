@@ -2,19 +2,13 @@
 
 cd /var/www/html
 
-role="${COOLIFY_CONTAINER_ROLE:-}"
-if [ -z "$role" ]; then
-    role="$(grep -E '^COOLIFY_CONTAINER_ROLE=' .env 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
-fi
-role="${role:-all}"
+. /etc/s6-overlay/scripts/container-role
+role="$(coolify_container_role_value)"
 
-case "$role" in
-    all|worker) ;;
-    *)
-        echo "   INFO  Horizon is disabled for role '$role', sleeping."
-        exec sleep infinity
-        ;;
-esac
+if ! coolify_container_has_role worker && ! coolify_container_has_role horizon; then
+    echo "   INFO  Horizon is disabled for role '$role', sleeping."
+    exec sleep infinity
+fi
 
 if grep -qE '^HORIZON_ENABLED=false' .env 2>/dev/null; then
     echo "   INFO  Horizon is disabled, sleeping."
