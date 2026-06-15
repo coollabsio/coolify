@@ -131,6 +131,43 @@ it('creates the root user when oidc provisions the first account', function () {
     expect(InstanceSettings::find(0)->is_registration_enabled)->toBeFalse();
 });
 
+it('persists raw claims as an array on the oauth identity', function () {
+    OauthSetting::where('provider', 'oidc')->update(['allow_registration' => true]);
+
+    fakeOidcProvider(['email' => 'claims@example.com']);
+
+    $this->get(route('auth.callback', 'oidc'))->assertRedirect('/');
+
+    $identity = OauthIdentity::where('email', 'claims@example.com')->first();
+    expect($identity->raw_claims)->toBeArray()
+        ->and($identity->raw_claims['sub'])->toBe('okta-user-1');
+});
+
+it('stores empty raw claims when the provider returns no user payload', function () {
+    OauthSetting::where('provider', 'oidc')->update(['allow_registration' => true]);
+
+    $user = (new OidcUser)->setIdTokenClaims([
+        'iss' => 'https://idp.example.com',
+        'sub' => 'okta-no-payload',
+        'email_verified' => true,
+    ])->map([
+        'id' => 'okta-no-payload',
+        'name' => 'No Payload',
+        'email' => 'nopayload@example.com',
+    ]);
+    $user->user = null;
+
+    $provider = Mockery::mock();
+    $provider->shouldReceive('setConfig')->andReturnSelf();
+    $provider->shouldReceive('user')->andReturn($user);
+    Socialite::shouldReceive('driver')->with('oidc')->andReturn($provider);
+
+    $this->get(route('auth.callback', 'oidc'))->assertRedirect('/');
+
+    $identity = OauthIdentity::where('email', 'nopayload@example.com')->first();
+    expect($identity->raw_claims)->toBe([]);
+});
+
 it('rejects callbacks for disabled oidc provider', function () {
     OauthSetting::where('provider', 'oidc')->update(['enabled' => false]);
 

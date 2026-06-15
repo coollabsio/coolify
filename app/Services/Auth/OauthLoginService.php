@@ -66,7 +66,9 @@ class OauthLoginService
             throw new HttpException(403, 'OIDC provider did not verify the email address');
         }
 
-        return DB::transaction(function () use ($oauthUser, $oauthSetting, $email, $issuer, $subject, $emailVerified) {
+        $rawClaims = is_array($oauthUser->user ?? null) ? $oauthUser->user : [];
+
+        return DB::transaction(function () use ($oauthUser, $oauthSetting, $email, $issuer, $subject, $emailVerified, $rawClaims) {
             $identity = OauthIdentity::where([
                 'provider' => 'oidc',
                 'issuer' => $issuer,
@@ -76,7 +78,7 @@ class OauthLoginService
             if ($identity) {
                 $identity->update([
                     'email' => $email,
-                    'raw_claims' => $oauthUser->user,
+                    'raw_claims' => $rawClaims,
                     'last_login_at' => now(),
                 ]);
 
@@ -107,7 +109,7 @@ class OauthLoginService
                 'issuer' => $issuer,
                 'provider_user_id' => $subject,
                 'email' => $email,
-                'raw_claims' => $oauthUser->user,
+                'raw_claims' => $rawClaims,
                 'last_login_at' => now(),
             ]);
 

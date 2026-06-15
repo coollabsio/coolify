@@ -108,6 +108,7 @@ it('rejects invalid token claims', function (array $claimOverrides, string $mess
 })->throws(OidcTokenException::class)->with([
     'issuer mismatch' => [['iss' => 'https://evil.example.com'], 'issuer'],
     'audience mismatch' => [['aud' => 'other-client'], 'audience'],
+    'azp missing for multi audience' => [['aud' => ['client-id', 'other-client']], 'azp'],
     'azp mismatch' => [['aud' => ['client-id', 'other-client'], 'azp' => 'other-client'], 'azp'],
     'expired token' => [['exp' => time() - 3600], 'expired'],
     'future issued at' => [['iat' => time() + 3600], 'issued'],
