@@ -66,7 +66,7 @@ class OauthLoginService
             throw new HttpException(403, 'OIDC provider did not verify the email address');
         }
 
-        return DB::transaction(function () use ($oauthUser, $oauthSetting, $email, $issuer, $subject) {
+        return DB::transaction(function () use ($oauthUser, $oauthSetting, $email, $issuer, $subject, $emailVerified) {
             $identity = OauthIdentity::where([
                 'provider' => 'oidc',
                 'issuer' => $issuer,
@@ -84,6 +84,15 @@ class OauthLoginService
             }
 
             $user = User::whereEmail($email)->first();
+
+            // Linking a new OIDC identity to an existing local account by email
+            // is account takeover unless the provider attests the email. This
+            // guard is independent of the require_email_verified toggle, which
+            // only governs the broader login flow.
+            if ($user && ! $emailVerified) {
+                throw new HttpException(403, 'OIDC provider must verify the email address before linking to an existing account');
+            }
+
             if (! $user) {
                 if (! $this->canCreateUser($oauthSetting)) {
                     throw new HttpException(403, 'Registration is disabled');

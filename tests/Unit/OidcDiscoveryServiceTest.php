@@ -38,6 +38,25 @@ it('fetches and caches discovery documents and jwks', function () {
     Http::assertSentCount(2);
 });
 
+it('refetches jwks once on forced refresh to pick up rotated keys', function () {
+    Cache::flush();
+    Http::fakeSequence('https://idp.example.com/jwks')
+        ->push(['keys' => [['kid' => 'old']]])
+        ->push(['keys' => [['kid' => 'new']]]);
+
+    $service = app(OidcDiscoveryService::class);
+
+    expect($service->jwks('https://idp.example.com/jwks')['keys'][0]['kid'])->toBe('old');
+
+    // Forced refresh bypasses the cache and sees the rotated key.
+    expect($service->jwks('https://idp.example.com/jwks', true)['keys'][0]['kid'])->toBe('new');
+    Http::assertSentCount(2);
+
+    // Cooldown prevents a second immediate upstream fetch; cached value returned.
+    expect($service->jwks('https://idp.example.com/jwks', true)['keys'][0]['kid'])->toBe('new');
+    Http::assertSentCount(2);
+});
+
 it('rejects invalid discovery and jwks payloads', function () {
     Cache::flush();
     Http::fake([

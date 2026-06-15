@@ -3,6 +3,7 @@
 namespace App\Auth\Oidc\Socialite;
 
 use App\Auth\Oidc\Exceptions\OidcException;
+use App\Auth\Oidc\Exceptions\OidcSigningKeyNotFoundException;
 use App\Auth\Oidc\OidcConfig;
 use App\Auth\Oidc\OidcDiscoveryDocument;
 use App\Auth\Oidc\OidcDiscoveryService;
@@ -144,16 +145,17 @@ class OidcProvider extends AbstractProvider implements ProviderInterface
             throw new OidcException('OIDC login session expired. Please try again.');
         }
 
-        $claims = $this->tokenValidator->validate(
-            idToken: $idToken,
-            discovery: $discovery,
-            jwks: $this->discoveryService->jwks($discovery->jwksUri),
-            clientId: $config->clientId,
-            expectedNonce: $expectedNonce,
-            clockSkewSeconds: $config->clockSkewSeconds,
-        );
+        $claims = $this->validateIdToken($idToken, $discovery, $config, $expectedNonce);
 
         $userinfo = $this->getUserByToken($accessToken);
+
+        // OIDC core §5.3.2: the userinfo sub MUST match the id_token sub.
+        // Reject the response rather than trust unsigned userinfo claims.
+        $userinfoSub = $userinfo['sub'] ?? null;
+        if (is_string($userinfoSub) && $userinfoSub !== '' && $userinfoSub !== ($claims['sub'] ?? null)) {
+            throw new OidcException('OIDC userinfo subject does not match the id_token subject.');
+        }
+
         $merged = array_merge($userinfo, $claims);
 
         /** @var OidcUser $user */
@@ -164,6 +166,39 @@ class OidcProvider extends AbstractProvider implements ProviderInterface
             ->setExpiresIn(Arr::get($tokenResponse, 'expires_in'));
 
         return $this->user = $user;
+    }
+
+    /**
+     * Validate the id_token, retrying once against a freshly fetched JWKS when
+     * the signing key is unknown. This keeps logins working immediately after
+     * the IdP rotates keys instead of failing until the JWKS cache expires.
+     *
+     * @return array<string, mixed>
+     */
+    protected function validateIdToken(
+        string $idToken,
+        OidcDiscoveryDocument $discovery,
+        OidcConfig $config,
+        ?string $expectedNonce,
+    ): array {
+        foreach ([false, true] as $forceRefresh) {
+            try {
+                return $this->tokenValidator->validate(
+                    idToken: $idToken,
+                    discovery: $discovery,
+                    jwks: $this->discoveryService->jwks($discovery->jwksUri, $forceRefresh),
+                    clientId: $config->clientId,
+                    expectedNonce: $expectedNonce,
+                    clockSkewSeconds: $config->clockSkewSeconds,
+                );
+            } catch (OidcSigningKeyNotFoundException $e) {
+                if ($forceRefresh) {
+                    throw $e;
+                }
+            }
+        }
+
+        throw new OidcSigningKeyNotFoundException('No matching JWKS key found for id_token kid.');
     }
 
     /**

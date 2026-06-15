@@ -1,5 +1,6 @@
 <?php
 
+use App\Auth\Oidc\Exceptions\OidcSigningKeyNotFoundException;
 use App\Auth\Oidc\Exceptions\OidcTokenException;
 use App\Auth\Oidc\OidcDiscoveryDocument;
 use App\Auth\Oidc\OidcTokenValidator;
@@ -152,5 +153,34 @@ it('rejects disallowed algorithms', function () {
         'exp' => $now + 600,
     ], $keyset['private_pem'], algorithm: 'HS256');
 
+    app(OidcTokenValidator::class)->validate($token, oidc_discovery(), $keyset['jwks'], 'client-id');
+})->throws(OidcTokenException::class);
+
+it('throws a dedicated exception when the signing key is unknown', function () {
+    $keyset = oidc_keyset('current-key');
+    $token = oidc_token([
+        'iss' => 'https://idp.example.com',
+        'aud' => 'client-id',
+        'sub' => 'okta-user-1',
+        'iat' => time(),
+        'exp' => time() + 600,
+    ], $keyset['private_pem'], 'rotated-key');
+
+    app(OidcTokenValidator::class)->validate($token, oidc_discovery(), $keyset['jwks'], 'client-id');
+})->throws(OidcSigningKeyNotFoundException::class);
+
+it('rejects a jwks key not designated for signing', function () {
+    $keyset = oidc_keyset();
+    $keyset['jwks']['keys'][0]['use'] = 'enc';
+    $now = time();
+    $token = oidc_token([
+        'iss' => 'https://idp.example.com',
+        'aud' => 'client-id',
+        'sub' => 'okta-user-1',
+        'iat' => $now,
+        'exp' => $now + 600,
+    ], $keyset['private_pem']);
+
+    // An encryption-only key is dropped from the keyset, so the kid no longer resolves.
     app(OidcTokenValidator::class)->validate($token, oidc_discovery(), $keyset['jwks'], 'client-id');
 })->throws(OidcTokenException::class);

@@ -93,6 +93,21 @@ it('creates a new oidc user when provider registration is allowed while normal r
     ]);
 });
 
+it('rejects linking an unverified oidc email to an existing local account', function () {
+    $user = User::factory()->create(['email' => 'victim@example.com']);
+
+    fakeOidcProvider(['email' => 'victim@example.com', 'email_verified' => false]);
+
+    $response = $this->from('/login')->get(route('auth.callback', 'oidc'));
+
+    $response->assertRedirect('/login');
+    $this->assertGuest();
+    $this->assertDatabaseMissing('oauth_identities', [
+        'user_id' => $user->id,
+        'provider' => 'oidc',
+    ]);
+});
+
 it('rejects new oidc users when neither normal nor provider registration is enabled', function () {
     fakeOidcProvider(['email' => 'blocked@example.com']);
 

@@ -47,13 +47,26 @@ class OidcDiscoveryService
     }
 
     /**
+     * Fetch the JWKS for the given URI.
+     *
+     * When $forceRefresh is true the cached document is bypassed so freshly
+     * rotated signing keys become visible immediately. A short cooldown still
+     * prevents a flood of upstream requests if many logins miss the same kid.
+     *
      * @return array<string, mixed>
      */
-    public function jwks(string $jwksUri): array
+    public function jwks(string $jwksUri, bool $forceRefresh = false): array
     {
         $this->assertHttpsUrl($jwksUri, new OidcJwksException('JWKS URI must be an absolute HTTPS URL.'));
 
         $cacheKey = 'oidc:jwks:'.hash('sha256', $jwksUri);
+
+        if ($forceRefresh) {
+            $cooldownKey = $cacheKey.':refresh';
+            if (Cache::add($cooldownKey, true, 60)) {
+                Cache::forget($cacheKey);
+            }
+        }
 
         return Cache::remember($cacheKey, 21600, function () use ($jwksUri): array {
             try {
