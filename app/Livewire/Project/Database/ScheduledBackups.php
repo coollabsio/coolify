@@ -56,22 +56,30 @@ class ScheduledBackups extends Component
 
     public function setCustomType()
     {
-        $this->authorize('update', $this->database);
+        try {
+            $this->authorize('update', $this->database);
 
-        $this->database->custom_type = $this->custom_type;
-        $this->database->save();
-        $this->dispatch('success', 'Database type set.');
-        $this->refreshScheduledBackups();
+            $this->database->custom_type = $this->custom_type;
+            $this->database->save();
+            $this->dispatch('success', 'Database type set.');
+            $this->refreshScheduledBackups();
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
     public function delete($scheduled_backup_id): void
     {
-        $backup = $this->database->scheduledBackups->find($scheduled_backup_id);
-        $this->authorize('manageBackups', $this->database);
+        try {
+            $this->authorize('manageBackups', $this->database);
 
-        $backup->delete();
-        $this->dispatch('success', 'Scheduled backup deleted.');
-        $this->refreshScheduledBackups();
+            $backup = $this->database->scheduledBackups->find($scheduled_backup_id);
+            $backup->delete();
+            $this->dispatch('success', 'Scheduled backup deleted.');
+            $this->refreshScheduledBackups();
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
     public function refreshScheduledBackups(?int $id = null): void

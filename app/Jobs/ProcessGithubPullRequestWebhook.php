@@ -15,7 +15,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Throwable;
-use Visus\Cuid2\Cuid2;
 
 class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
 {
@@ -166,7 +165,7 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
         }
 
         // Queue the deployment
-        $deployment_uuid = new Cuid2;
+        $deployment_uuid = new_public_id();
         queue_application_deployment(
             application: $application,
             pull_request_id: $this->pullRequestId,

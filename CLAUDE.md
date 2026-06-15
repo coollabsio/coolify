@@ -38,6 +38,43 @@ npm run dev                     # vite dev server
 npm run build                   # production build
 ```
 
+## Browser Tests (Pest Browser Plugin)
+
+Uses `pestphp/pest-plugin-browser` with Laravel Dusk 8. New browser tests go in `tests/v4/Browser/`.
+
+```bash
+# Run all browser tests
+php artisan test --compact tests/v4/Browser/
+
+# Run a specific browser test file
+php artisan test --compact tests/v4/Browser/LoginTest.php
+
+# Run a specific test by name
+php artisan test --compact --filter='can login with valid credentials'
+```
+
+### Writing Browser Tests
+
+- Place new tests in `tests/v4/Browser/` — legacy Dusk tests in `tests/Browser/` should not be used as reference.
+- Use `RefreshDatabase` and seed required data (at minimum `InstanceSettings::create(['id' => 0])`) in `beforeEach`.
+- Key API: `visit()`, `fill(field, value)`, `click(text)`, `assertSee()`, `assertDontSee()`, `assertPathIs()`, `screenshot()`.
+- Always call `screenshot()` at the end of each test for debugging.
+- For authenticated tests, create a helper function that logs in via the UI:
+
+```php
+function loginAsRoot(): mixed
+{
+    return visit('/login')
+        ->fill('email', 'test@example.com')
+        ->fill('password', 'password')
+        ->click('Login');
+}
+```
+
+- See `tests/v4/Browser/LoginTest.php`, `tests/v4/Browser/DashboardTest.php`, and `tests/v4/Browser/RegistrationTest.php` for conventions.
+- Chrome driver runs on `localhost:4444`, app on `localhost:8000` (configured in `tests/DuskTestCase.php`).
+- Legacy Dusk macros in `app/Providers/DuskServiceProvider.php` use the old `type()`/`press()` API — do not mix with Pest Browser Plugin's `fill()`/`click()` API.
+
 ## Architecture
 
 ### Backend Structure (app/)

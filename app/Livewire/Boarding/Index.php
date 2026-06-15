@@ -9,13 +9,15 @@ use App\Models\Server;
 use App\Models\Team;
 use App\Services\ConfigurationRepository;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Index extends Component
 {
+    use AuthorizesRequests;
+
     protected $listeners = [
         'refreshBoardingIndex' => 'validateServer',
         'prerequisitesInstalled' => 'handlePrerequisitesInstalled',
@@ -174,6 +176,9 @@ class Index extends Component
 
     public function skipBoarding()
     {
+        if (auth()->user()?->isMember()) {
+            return redirect()->route('dashboard');
+        }
         Team::find(currentTeam()->id)->update([
             'show_boarding' => false,
         ]);
@@ -276,6 +281,7 @@ class Index extends Component
         ]);
 
         try {
+            $this->authorize('create', PrivateKey::class);
             $privateKey = PrivateKey::createAndStore([
                 'name' => $this->privateKeyName,
                 'description' => $this->privateKeyDescription,
@@ -293,6 +299,12 @@ class Index extends Component
     public function saveServer()
     {
         $this->validate();
+
+        try {
+            $this->authorize('create', Server::class);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
 
         $this->privateKey = formatPrivateKey($this->privateKey);
         $foundServer = Server::whereIp($this->remoteServerHost)->first();
@@ -457,7 +469,7 @@ class Index extends Component
         $this->createdProject = Project::create([
             'name' => 'My first project',
             'team_id' => currentTeam()->id,
-            'uuid' => (string) new Cuid2,
+            'uuid' => new_public_id(),
         ]);
         $this->currentState = 'create-resource';
     }

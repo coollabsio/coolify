@@ -216,7 +216,8 @@
             <div class="flex flex-wrap gap-2 items-center">
                 <div class="hidden flex-wrap items-center gap-2 md:flex">
                     @if (!str($database->status)->startsWith('exited'))
-                        <x-forms.button title="Restart" @click="document.getElementById('database-restart-trigger')?.click()">
+
+                        <x-forms.button canGate="manage" :canResource="$database" title="Restart" @click="document.getElementById('database-restart-trigger')?.click()">
                             <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                 xmlns="http://www.w3.org/2000/svg">
                                 <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -227,7 +228,7 @@
                             </svg>
                             Restart
                         </x-forms.button>
-                        <x-forms.button isError title="Stop" @click="document.getElementById('database-stop-trigger')?.click()">
+                        <x-forms.button canGate="manage" :canResource="$database" isError title="Stop" @click="document.getElementById('database-stop-trigger')?.click()">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                                 stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -241,7 +242,8 @@
                             Stop
                         </x-forms.button>
                     @else
-                        <button @click="document.getElementById('database-start-trigger')?.click()" class="gap-2 button">
+                        <x-forms.button canGate="manage" :canResource="$database" @click="document.getElementById('database-start-trigger')?.click()" class="gap-2">
+
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -249,7 +251,7 @@
                                 <path d="M7 4v16l13 -8z" />
                             </svg>
                             Start
-                        </button>
+                        </x-forms.button>
                     @endif
                 </div>
                 @script

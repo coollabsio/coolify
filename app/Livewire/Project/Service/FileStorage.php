@@ -110,8 +110,7 @@ class FileStorage extends Component
     public function loadStorageOnServer()
     {
         try {
-            // Loading content is a read operation, so we use 'view' permission
-            $this->authorize('view', $this->resource);
+            $this->authorize('update', $this->resource);
 
             $this->fileStorage->loadStorageOnServer();
             $this->syncData();

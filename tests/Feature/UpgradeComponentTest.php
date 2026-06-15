@@ -10,7 +10,7 @@ uses(RefreshDatabase::class);
 
 it('initializes latest version during mount from cached versions data', function () {
     config(['constants.coolify.version' => '4.0.0-beta.998']);
-    InstanceSettings::create([
+    InstanceSettings::forceCreate([
         'id' => 0,
         'new_version_available' => true,
     ]);
@@ -34,8 +34,22 @@ it('initializes latest version during mount from cached versions data', function
         ->assertSee('4.0.0-beta.999');
 });
 
+it('uses sidebar state css instead of nested alpine state for upgrade labels', function () {
+    $upgradeView = file_get_contents(resource_path('views/livewire/upgrade.blade.php'));
+    $utilitiesCss = file_get_contents(resource_path('css/utilities.css'));
+
+    expect($upgradeView)
+        ->toContain('class="text-left menu-item-label sidebar-collapsed-label"')
+        ->toContain('>In progress</span>')
+        ->toContain('>Upgrade</span>')
+        ->not->toContain(':class="collapsed && \'lg:hidden\'"')
+        ->and($utilitiesCss)
+        ->toContain('.sidebar-collapsed .sidebar-collapsed-label')
+        ->toContain('display: none;');
+});
+
 it('falls back to 0.0.0 during mount when cached versions data is unavailable', function () {
-    InstanceSettings::create([
+    InstanceSettings::forceCreate([
         'id' => 0,
         'new_version_available' => false,
     ]);
@@ -51,7 +65,7 @@ it('falls back to 0.0.0 during mount when cached versions data is unavailable', 
 
 it('clears stale upgrade availability when current version already matches latest version', function () {
     config(['constants.coolify.version' => '4.0.0-beta.999']);
-    InstanceSettings::create([
+    InstanceSettings::forceCreate([
         'id' => 0,
         'new_version_available' => true,
     ]);
@@ -71,12 +85,12 @@ it('clears stale upgrade availability when current version already matches lates
         ->assertSet('latestVersion', '4.0.0-beta.999')
         ->assertSet('isUpgradeAvailable', false);
 
-    expect(InstanceSettings::findOrFail(0)->new_version_available)->toBeFalse();
+    expect((bool) InstanceSettings::findOrFail(0)->new_version_available)->toBeFalse();
 });
 
 it('clears stale upgrade availability when current version is newer than cached latest version', function () {
     config(['constants.coolify.version' => '4.0.0-beta.1000']);
-    InstanceSettings::create([
+    InstanceSettings::forceCreate([
         'id' => 0,
         'new_version_available' => true,
     ]);
@@ -96,5 +110,5 @@ it('clears stale upgrade availability when current version is newer than cached 
         ->assertSet('latestVersion', '4.0.0-beta.999')
         ->assertSet('isUpgradeAvailable', false);
 
-    expect(InstanceSettings::findOrFail(0)->new_version_available)->toBeFalse();
+    expect((bool) InstanceSettings::findOrFail(0)->new_version_available)->toBeFalse();
 });

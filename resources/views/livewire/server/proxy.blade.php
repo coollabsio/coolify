@@ -174,7 +174,7 @@
                         </x-forms.button> --}}
                     </div>
                 @else
-                    <x-callout type="warning" title="Permission Required" class="mb-4">
+                    <x-callout type="danger" title="Insufficient Permissions" class="mb-4">
                         You don't have permission to configure proxy settings for this server.
                     </x-callout>
                 @endcan

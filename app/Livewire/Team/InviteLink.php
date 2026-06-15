@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class InviteLink extends Component
 {
@@ -61,7 +60,7 @@ class InviteLink extends Component
             if ($member_emails->contains($this->email)) {
                 return handleError(livewire: $this, customErrorMessage: "$this->email is already a member of ".currentTeam()->name.'.');
             }
-            $uuid = (string) new Cuid2(32);
+            $uuid = new_public_id(32);
             $link = url('/').config('constants.invitation.link.base_url').$uuid;
             $user = User::whereEmail($this->email)->first();
 

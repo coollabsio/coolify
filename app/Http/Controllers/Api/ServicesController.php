@@ -39,6 +39,10 @@ class ServicesController extends Controller
             ]);
         }
 
+        if ($service->is_shown_once ?? false) {
+            $service->makeHidden(['value', 'real_value']);
+        }
+
         return serializeApiResponse($service);
     }
 

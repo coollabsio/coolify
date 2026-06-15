@@ -78,8 +78,12 @@ class HealthChecks extends Component
 
     public function mount()
     {
-        $this->authorize('view', $this->resource);
-        $this->syncData();
+        try {
+            $this->authorize('view', $this->resource);
+            $this->syncData();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function syncData(bool $toModel = false): void
