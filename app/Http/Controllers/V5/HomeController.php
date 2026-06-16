@@ -20,33 +20,11 @@ class HomeController extends Controller
 {
     public function __invoke(Request $request, FluxHealth $fluxHealth): Response
     {
-        /** @var User $user */
-        $user = $request->user();
         $currentTeam = $request->attributes->get('v5.currentTeam');
 
         return Inertia::render('Home', [
             'flux' => $fluxHealth->check(),
             'clusters' => $this->clusters($currentTeam),
-            'cooldServers' => $this->cooldServers($currentTeam),
-            'privateKeys' => $this->privateKeys($currentTeam),
-            'currentTeam' => $currentTeam instanceof Team ? [
-                'id' => $currentTeam->id,
-                'name' => $currentTeam->name,
-                'description' => $currentTeam->description,
-                'role' => $currentTeam->pivot?->role ?? $user->roleInTeam($currentTeam->id),
-                'personal' => $currentTeam->personal_team,
-            ] : null,
-            'teams' => $user->teams()
-                ->select('teams.id', 'teams.name', 'teams.description', 'teams.personal_team')
-                ->orderBy('teams.name')
-                ->get()
-                ->map(fn (Team $team) => [
-                    'id' => $team->id,
-                    'name' => $team->name,
-                    'description' => $team->description,
-                    'role' => $team->pivot->role,
-                    'personal' => $team->personal_team,
-                ]),
         ]);
     }
 
@@ -125,27 +103,6 @@ class HomeController extends Controller
     }
 
     /**
-     * @return array<int, array{uuid: string, name: string}>
-     */
-    private function privateKeys(mixed $currentTeam): array
-    {
-        if (! $currentTeam instanceof Team) {
-            return [];
-        }
-
-        return PrivateKey::query()
-            ->where('team_id', $currentTeam->id)
-            ->select('uuid', 'name')
-            ->orderBy('name')
-            ->get()
-            ->map(fn (PrivateKey $privateKey) => [
-                'uuid' => $privateKey->uuid,
-                'name' => $privateKey->name,
-            ])
-            ->all();
-    }
-
-    /**
      * @return array<int, array{id: string, name: string, description: string|null, serversCount: int, servers: array<int, array{id: string, name: string, host: string, status: string, capabilities: array<int, string>}>}>
      */
     private function clusters(mixed $currentTeam): array
@@ -172,33 +129,6 @@ class HomeController extends Controller
                     'status' => $server->status,
                     'capabilities' => $server->capabilities ?? [],
                 ])->all(),
-            ])
-            ->all();
-    }
-
-    /**
-     * @return array<int, array{id: string, host: string, sshUser: string, sshPort: int, status: string, capabilities: array<int, string>, builderEnabled: bool, builderCapacity: int, lastBootstrappedAt: string|null}>
-     */
-    private function cooldServers(mixed $currentTeam): array
-    {
-        if (! $currentTeam instanceof Team) {
-            return [];
-        }
-
-        return V5Server::query()
-            ->where('team_id', $currentTeam->id)
-            ->orderBy('name')
-            ->get()
-            ->map(fn (V5Server $server) => [
-                'id' => (string) $server->id,
-                'host' => $server->host,
-                'sshUser' => $server->ssh_user,
-                'sshPort' => $server->ssh_port,
-                'status' => $server->status,
-                'capabilities' => $server->capabilities ?? [],
-                'builderEnabled' => $server->builder_enabled,
-                'builderCapacity' => $server->builder_capacity,
-                'lastBootstrappedAt' => $server->last_bootstrapped_at?->toISOString(),
             ])
             ->all();
     }

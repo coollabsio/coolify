@@ -24,7 +24,6 @@ beforeEach(function () {
 
     Schema::dropIfExists('v5_servers');
     Schema::dropIfExists('v5_clusters');
-    Schema::dropIfExists('v5_projects');
     Schema::dropIfExists('private_keys');
     Schema::dropIfExists('team_user');
     Schema::dropIfExists('teams');
@@ -52,22 +51,9 @@ it('uses separated v5 middleware groups', function () {
         ->and($groups['v5.authenticated'])->toContain(EnsureCurrentTeam::class);
 });
 
-it('creates v5 project tables in the shared database', function () {
-    createSharedUserAndTeamTables();
-
-    $migration = include database_path('migrations/2026_06_04_050157_create_v5_projects_table.php');
-    $migration->up();
-
-    expect(Schema::hasTable('v5_projects'))->toBeTrue()
-        ->and(Schema::hasColumns('v5_projects', [
-            'id',
-            'team_id',
-            'created_by_user_id',
-            'name',
-            'description',
-            'created_at',
-            'updated_at',
-        ]))->toBeTrue();
+it('reuses existing projects instead of creating v5 projects', function () {
+    expect(file_exists(database_path('migrations/2026_06_04_050157_v5_create_projects_table.php')))->toBeFalse()
+        ->and(file_exists(app_path('Models/V5/Project.php')))->toBeFalse();
 });
 
 it('creates v5 cluster tables and lets each server belong to one cluster', function () {
@@ -75,7 +61,7 @@ it('creates v5 cluster tables and lets each server belong to one cluster', funct
     Schema::dropIfExists('v5_servers');
     Schema::dropIfExists('v5_clusters');
 
-    $clusterMigration = include database_path('migrations/2026_06_16_130649_create_v5_clusters_table.php');
+    $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
     $clusterMigration->up();
 
     expect(Schema::hasTable('v5_clusters'))->toBeTrue()
@@ -89,13 +75,8 @@ it('creates v5 cluster tables and lets each server belong to one cluster', funct
             'updated_at',
         ]))->toBeTrue();
 
-    Schema::dropIfExists('v5_servers');
-
-    $serverMigration = include database_path('migrations/2026_06_16_130650_create_v5_servers_table.php');
+    $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
     $serverMigration->up();
-
-    $serverClusterMigration = include database_path('migrations/2026_06_16_131229_add_cluster_id_to_v5_servers_table.php');
-    $serverClusterMigration->up();
 
     expect(Schema::hasColumn('v5_servers', 'cluster_id'))->toBeTrue();
 });
@@ -106,14 +87,11 @@ it('creates v5 server tables in the shared database', function () {
     Schema::dropIfExists('v5_servers');
     Schema::dropIfExists('v5_clusters');
 
-    $clusterMigration = include database_path('migrations/2026_06_16_130649_create_v5_clusters_table.php');
+    $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
     $clusterMigration->up();
 
-    $migration = include database_path('migrations/2026_06_16_130650_create_v5_servers_table.php');
+    $migration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
     $migration->up();
-
-    $serverClusterMigration = include database_path('migrations/2026_06_16_131229_add_cluster_id_to_v5_servers_table.php');
-    $serverClusterMigration->up();
 
     expect(Schema::hasTable('v5_servers'))->toBeTrue()
         ->and(Schema::hasColumns('v5_servers', [
@@ -136,20 +114,21 @@ it('creates v5 server tables in the shared database', function () {
         ]))->toBeTrue();
 });
 
-it('includes v5 project tables in the dev testing schema', function () {
+it('includes v5 tables in the dev testing schema', function () {
     $schema = file_get_contents(database_path('schema/testing-schema.sql'));
 
-    expect($schema)->toContain('CREATE TABLE IF NOT EXISTS "v5_projects"')
-        ->and($schema)->toContain('"team_id" INTEGER NOT NULL')
+    expect($schema)->toContain('"team_id" INTEGER NOT NULL')
         ->and($schema)->toContain('"created_by_user_id" INTEGER NOT NULL')
-        ->and($schema)->toContain('2026_06_04_050157_create_v5_projects_table')
+        ->and($schema)->not->toContain('CREATE TABLE IF NOT EXISTS "v5_projects"')
+        ->and($schema)->not->toContain('2026_06_04_050157_v5_create_projects_table')
         ->and($schema)->toContain('CREATE TABLE IF NOT EXISTS "v5_servers"')
         ->and($schema)->toContain('"cluster_id" INTEGER')
         ->and($schema)->toContain('CREATE TABLE IF NOT EXISTS "v5_clusters"')
         ->and($schema)->toContain('"private_key_id" INTEGER')
-        ->and($schema)->toContain('2026_06_16_130650_create_v5_servers_table')
-        ->and($schema)->toContain('2026_06_16_130649_create_v5_clusters_table')
-        ->and($schema)->toContain('2026_06_16_131229_add_cluster_id_to_v5_servers_table')
+        ->and($schema)->toContain('2026_06_16_130650_v5_create_servers_table')
+        ->and($schema)->toContain('2026_06_16_130649_v5_create_clusters_table')
+        ->and($schema)->not->toContain('2026_06_16_131229_add_cluster_id_to_v5_servers_table')
+        ->and($schema)->not->toContain('2026_06_16_132000_make_v5_server_private_key_nullable')
         ->and($schema)->not->toContain('v5_hosts');
 });
 
@@ -186,16 +165,20 @@ it('serves the v5 inertia shell', function () {
         ->assertSee('Home', false)
         ->assertDontSee('v5-ready', false)
         ->assertDontSee('This page is served from Laravel through Inertia and React')
+        ->assertDontSee('Bootstrap server')
+        ->assertDontSee('privateKeys', false)
         ->assertSee('Running')
         ->assertSee('Flux is running.')
         ->assertSee('"clusters":[]', false)
-        ->assertSee('"cooldServers":[]', false)
+        ->assertDontSee('cooldServers', false)
         ->assertDontSee('coold-dev')
         ->assertDontSee('100.64.0.1')
-        ->assertSee('V5 Shared Team')
-        ->assertSee('Shared team details')
-        ->assertSee('owner')
-        ->assertSee($user->email);
+        ->assertDontSee('Current team')
+        ->assertDontSee('Your teams')
+        ->assertDontSee('currentTeam', false)
+        ->assertDontSee('teams', false)
+        ->assertDontSee('V5 Shared Team')
+        ->assertDontSee('Shared team details');
 });
 
 it('shows v5 clusters with their servers on the inertia shell', function () {
@@ -263,8 +246,8 @@ it('selects a shared team when the session has no current team', function () {
         ->get('/v5')
         ->assertSuccessful()
         ->assertSessionHas('currentTeam')
-        ->assertSee('Auto Selected Team')
-        ->assertSee('admin');
+        ->assertDontSee('Auto Selected Team')
+        ->assertDontSee('admin');
 });
 
 it('shows when flux is unavailable', function () {
@@ -430,9 +413,10 @@ it('runs coolify bootstrap from dynamic UI input and a selected team private key
         ->withSession(['currentTeam' => $team])
         ->get('/v5')
         ->assertSuccessful()
-        ->assertSee('"host":"192.0.2.10"', false)
-        ->assertSee('"status":"installed"', false)
-        ->assertSee('"capabilities":["coold","builder"]', false);
+        ->assertDontSee('"host":"192.0.2.10"', false)
+        ->assertDontSee('"capabilities":["coold","builder"]', false);
+
+    expect(V5Server::query()->where('host', '192.0.2.10')->where('status', 'installed')->exists())->toBeTrue();
 
     $sshKeyPath = null;
 

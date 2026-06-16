@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('v5_servers', function (Blueprint $table) {
             $table->id();
             $table->foreignId('team_id')->constrained('teams')->cascadeOnDelete();
+            $table->foreignId('cluster_id')->nullable()->constrained('v5_clusters')->nullOnDelete();
             $table->foreignId('created_by_user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('private_key_id')->nullable()->constrained('private_keys')->nullOnDelete();
             $table->string('name');
@@ -28,6 +29,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['team_id', 'host', 'ssh_port']);
+            $table->index(['team_id', 'cluster_id']);
             $table->index(['team_id', 'status']);
         });
     }
