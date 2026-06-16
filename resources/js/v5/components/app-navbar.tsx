@@ -1,3 +1,4 @@
+import { Link } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -76,13 +77,13 @@ export function AppNavbar({
     return (
         <header className="fixed inset-x-0 top-0 z-40 border-b border-border bg-background">
             <nav className="flex h-16 items-center gap-4 px-6" aria-label="Main navigation">
-                <a
+                <Link
                     href="/v5"
                     className="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     aria-label="Coolify home"
                 >
                     <img src="/coolify-logo.svg" alt="Coolify" className="size-8" />
-                </a>
+                </Link>
 
                 <div className="flex min-w-0 items-center gap-2">
                     <Select
@@ -129,6 +130,13 @@ export function AppNavbar({
                 </div>
 
                 <div className="ml-auto flex items-center gap-3">
+                    <Link
+                        href="/v5/clusters"
+                        className="rounded-md px-3 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                        Clusters
+                    </Link>
+
                     <div
                         className="hidden rounded-md border border-border bg-muted/40 px-3 py-1 text-xs text-muted-foreground lg:block"
                         title={flux?.socket ?? flux?.message ?? undefined}

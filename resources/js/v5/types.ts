@@ -9,8 +9,14 @@ export type V5Server = {
     id: string;
     name: string;
     host: string;
+    sshUser: string;
+    sshPort: number;
     status: string;
     capabilities: string[];
+    builderEnabled: boolean;
+    builderCapacity: number;
+    privateKeyName: string | null;
+    lastBootstrappedAt: string | null;
 };
 
 export type V5Cluster = {

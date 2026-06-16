@@ -6,6 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title inertia>{{ config('app.name') }} v5</title>
+    @env('local')
+        <link rel="icon" href="{{ asset('coolify-logo-dev-transparent.png') }}" type="image/png" />
+    @else
+        <link rel="icon" href="{{ asset('coolify-logo.svg') }}" type="image/svg+xml" />
+    @endenv
     @php
         $viteHotFile = public_path('hot');
         $viteDevServerUrl = null;

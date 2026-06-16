@@ -5,7 +5,6 @@ import type { V5HomeProps } from '@/types';
 
 export default function Home({
     flux,
-    clusters = [],
     projects = [],
     selectedProjectUuid = null,
     selectedEnvironmentUuid = null,
@@ -17,7 +16,6 @@ export default function Home({
             <div className="h-dvh overflow-hidden bg-background text-foreground">
                 <AppNavbar
                     flux={flux}
-                    clusters={clusters}
                     projects={projects}
                     selectedProjectUuid={selectedProjectUuid}
                     selectedEnvironmentUuid={selectedEnvironmentUuid}

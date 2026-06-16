@@ -8,4 +8,9 @@ createInertiaApp({
         extension: '.tsx',
     },
     strictMode: true,
+    progress: {
+        delay: 10,
+        color: '#fcd452',
+        showSpinner: false,
+    },
 });

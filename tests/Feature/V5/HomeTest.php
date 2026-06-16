@@ -16,7 +16,6 @@ use App\Services\Flux\FluxHealth;
 use Database\Seeders\V5DevLimaSeeder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Mockery\MockInterface;
@@ -35,7 +34,11 @@ beforeEach(function () {
 
 it('registers the v5 home route', function () {
     expect(Route::has('v5.home'))->toBeTrue()
-        ->and(Route::has('v5.selection.update'))->toBeTrue();
+        ->and(Route::has('v5.selection.update'))->toBeTrue()
+        ->and(Route::has('v5.clusters.index'))->toBeTrue()
+        ->and(Route::has('v5.clusters.store'))->toBeTrue()
+        ->and(Route::has('v5.coolify.version'))->toBeFalse()
+        ->and(Route::has('v5.coolify.bootstrap'))->toBeFalse();
 });
 
 it('uses separated v5 middleware groups', function () {
@@ -142,6 +145,8 @@ it('redirects guests to the shared login', function () {
 });
 
 it('serves the v5 inertia shell', function () {
+    app()->detectEnvironment(fn () => 'local');
+
     $this->withoutVite();
     fakeFluxHealth();
     createSharedUserAndTeamTables();
@@ -166,6 +171,8 @@ it('serves the v5 inertia shell', function () {
         ->get('/v5')
         ->assertSuccessful()
         ->assertSee('<html lang="en" class="dark">', false)
+        ->assertSee('coolify-logo-dev-transparent.png', false)
+        ->assertDontSee('coolify-logo.svg', false)
         ->assertSee('v5-app', false)
         ->assertSee('Home', false)
         ->assertDontSee('v5-ready', false)
@@ -174,9 +181,11 @@ it('serves the v5 inertia shell', function () {
         ->assertDontSee('privateKeys', false)
         ->assertSee('Running')
         ->assertSee('Flux is running.')
-        ->assertSee('"clusters":[]', false)
+        ->assertDontSee('"clusters":', false)
         ->assertDontSee('cooldServers', false)
         ->assertDontSee('coold-dev')
+        ->assertDontSee('Create cluster')
+        ->assertDontSee('Cluster details')
         ->assertDontSee('100.64.0.1')
         ->assertDontSee('Current team')
         ->assertDontSee('Your teams')
@@ -186,7 +195,25 @@ it('serves the v5 inertia shell', function () {
         ->assertDontSee('Shared team details');
 });
 
-it('shows v5 clusters with their servers on the inertia shell', function () {
+it('serves the production v5 favicon outside local environments', function () {
+    app()->detectEnvironment(fn () => 'production');
+
+    $this->withoutVite();
+    fakeFluxHealth();
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->get('/v5')
+        ->assertSuccessful()
+        ->assertSee('coolify-logo.svg', false)
+        ->assertDontSee('coolify-logo-dev-transparent.png', false);
+});
+
+it('shows v5 clusters with their servers on the cluster page', function () {
     $this->withoutVite();
     fakeFluxHealth();
     createSharedUserAndTeamTables();
@@ -218,13 +245,128 @@ it('shows v5 clusters with their servers on the inertia shell', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->get('/v5')
+        ->get('/v5/clusters')
         ->assertSuccessful()
+        ->assertSee('Clusters', false)
         ->assertSee('"clusters":[', false)
         ->assertSee('"name":"Development-Lima"', false)
         ->assertSee('"serversCount":1', false)
         ->assertSee('"name":"coold-dev"', false)
-        ->assertSee('"host":"lima-coold-dev"', false);
+        ->assertSee('"host":"lima-coold-dev"', false)
+        ->assertSee('"sshUser":"developer"', false)
+        ->assertSee('"sshPort":22', false)
+        ->assertSee('"builderEnabled":true', false)
+        ->assertSee('"builderCapacity":2', false)
+        ->assertSee('"privateKeyName":"Lima Key"', false)
+        ->assertSee('"lastBootstrappedAt":"', false);
+});
+
+it('creates a v5 cluster for the current team', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson('/v5/clusters', [
+            'name' => 'Production Mesh',
+            'description' => 'Primary production cluster.',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('cluster.name', 'Production Mesh')
+        ->assertJsonPath('cluster.description', 'Primary production cluster.')
+        ->assertJsonPath('cluster.serversCount', 0)
+        ->assertJsonPath('cluster.servers', []);
+
+    expect(Cluster::query()
+        ->where('team_id', $team->id)
+        ->where('created_by_user_id', $user->id)
+        ->where('name', 'Production Mesh')
+        ->where('description', 'Primary production cluster.')
+        ->exists())->toBeTrue();
+});
+
+it('validates v5 cluster creation input', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson('/v5/clusters', [
+            'name' => '',
+            'description' => str_repeat('a', 1001),
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['name', 'description']);
+});
+
+it('rejects duplicate v5 cluster names in the same team', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson('/v5/clusters', [
+            'name' => 'Production Mesh',
+            'description' => null,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['name']);
+});
+
+it('allows the same v5 cluster name in another team without leaking it', function () {
+    $this->withoutVite();
+    fakeFluxHealth();
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $otherTeam = Team::withoutEvents(fn () => Team::query()->create([
+        'name' => 'Other V5 Team',
+        'description' => null,
+        'personal_team' => false,
+        'show_boarding' => false,
+    ]));
+    $otherUser = User::withoutEvents(fn () => User::query()->create([
+        'name' => 'Other User',
+        'email' => 'other@example.com',
+        'email_verified_at' => now(),
+        'password' => 'password',
+    ]));
+    Cluster::query()->create([
+        'team_id' => $otherTeam->id,
+        'created_by_user_id' => $otherUser->id,
+        'name' => 'Production Mesh',
+        'description' => 'Other team cluster.',
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson('/v5/clusters', [
+            'name' => 'Production Mesh',
+            'description' => 'Current team cluster.',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('cluster.description', 'Current team cluster.');
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->get('/v5/clusters')
+        ->assertSuccessful()
+        ->assertSee('Current team cluster.')
+        ->assertDontSee('Other team cluster.');
 });
 
 it('shares existing projects and environments with the v5 home page', function () {
@@ -318,17 +460,28 @@ it('rejects persisted v5 selections outside the current team', function () {
 
 it('defines the v5 home page as a shadcn styled canvas shell', function () {
     $homePage = file_get_contents(resource_path('js/v5/Pages/Home.tsx'));
+    $app = file_get_contents(resource_path('js/v5/app.tsx'));
     $navbarPath = resource_path('js/v5/components/app-navbar.tsx');
 
     expect(file_exists($navbarPath))->toBeTrue();
 
     $navbar = file_get_contents($navbarPath);
 
+    expect($app)
+        ->toContain('progress: {')
+        ->toContain('delay: 250')
+        ->toContain("color: '#fcd452'")
+        ->toContain('showSpinner: false')
+        ->not->toContain('TopNavigationLoadingIndicator')
+        ->not->toContain('withApp:');
+
     expect($homePage)
         ->toContain('Magic')
         ->toContain("import { AppNavbar } from '@/components/app-navbar';")
-        ->not->toContain("import { csrfToken } from '@/lib/csrf';")
         ->not->toContain('function csrfToken()')
+        ->not->toContain("import { csrfToken } from '@/lib/csrf';")
+        ->not->toContain("import { Button } from '@/components/ui/button';")
+        ->not->toContain("fetch('/v5/clusters'")
         ->toContain('<AppNavbar')
         ->toContain('bg-background text-foreground')
         ->toContain('h-dvh overflow-hidden bg-background text-foreground')
@@ -338,14 +491,15 @@ it('defines the v5 home page as a shadcn styled canvas shell', function () {
         ->not->toContain('flex h-dvh flex-col overflow-hidden bg-background text-foreground')
         ->toContain('This is where the magic happens.')
         ->not->toContain("import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';")
-        ->not->toContain("fetch('/v5/selection'")
-        ->not->toContain("'X-CSRF-TOKEN': csrfToken()");
+        ->not->toContain("fetch('/v5/selection'");
 
     expect($navbar)
+        ->toContain("import { Link } from '@inertiajs/react';")
         ->toContain("import { csrfToken } from '@/lib/csrf';")
         ->not->toContain('function csrfToken()')
         ->toContain('export function AppNavbar')
         ->toContain('/coolify-logo.svg')
+        ->toContain('<Link')
         ->toContain('className="fixed inset-x-0 top-0 z-40 border-b border-border bg-background"')
         ->not->toContain('className="sticky top-0 z-40 shrink-0 border-b border-border bg-background"')
         ->toContain('bg-muted/40')
@@ -357,8 +511,12 @@ it('defines the v5 home page as a shadcn styled canvas shell', function () {
         ->toContain('sideOffset={4}')
         ->toContain('Select a project')
         ->toContain('Select an environment')
+        ->toContain('href="/v5"')
+        ->toContain('href="/v5/clusters"')
+        ->toContain('Clusters')
         ->toContain("fetch('/v5/selection'")
         ->toContain("'X-CSRF-TOKEN': csrfToken()")
+        ->not->toContain('<a')
         ->not->toContain("import { Button } from '@/components/ui/button';")
         ->not->toContain('<Button')
         ->not->toContain("import { Separator } from '@/components/ui/separator';")
@@ -374,6 +532,61 @@ it('defines the v5 home page as a shadcn styled canvas shell', function () {
         ->not->toContain('className="w-[12rem]"')
         ->not->toContain('<h1>Coolify v5</h1>')
         ->not->toContain('<h2 id="clusters-heading">Clusters</h2>');
+
+    expect(file_exists(resource_path('js/v5/components/top-navigation-loading-indicator.tsx')))->toBeFalse();
+});
+
+it('defines the v5 cluster management page and create cluster form', function () {
+    $clustersPagePath = resource_path('js/v5/Pages/Clusters.tsx');
+    $clustersPage = file_get_contents($clustersPagePath);
+    $types = file_get_contents(resource_path('js/v5/types.ts'));
+
+    expect(file_exists($clustersPagePath))->toBeTrue();
+
+    expect($clustersPage)
+        ->toContain("import { Button } from '@/components/ui/button';")
+        ->toContain("} from '@/components/ui/dialog';")
+        ->toContain("import { csrfToken } from '@/lib/csrf';")
+        ->toContain("fetch('/v5/clusters'")
+        ->toContain('aria-label="Create cluster"')
+        ->toContain('setIsCreateDialogOpen(true)')
+        ->toContain('Add cluster')
+        ->toContain('border-warning bg-warning/10 text-foreground')
+        ->not->toContain('border-primary bg-primary/10 text-foreground')
+        ->toContain('<Dialog')
+        ->toContain('<DialogTitle>Create cluster</DialogTitle>')
+        ->toContain('<DialogDescription>')
+        ->toContain('<DialogFooter>')
+        ->toContain('<DialogClose')
+        ->toContain('Create cluster')
+        ->toContain('Cluster details')
+        ->toContain('Servers in this cluster')
+        ->toContain('selectedCluster')
+        ->toContain('builderCapacity')
+        ->toContain('privateKeyName')
+        ->toContain('lastBootstrappedAt')
+        ->toContain('lg:grid-cols-[20rem_minmax(0,1fr)]')
+        ->not->toContain('lg:grid-cols-[20rem_minmax(0,1fr)_22rem]')
+        ->not->toContain('New cluster')
+        ->not->toContain('<aside className="rounded-lg border border-border bg-card p-5">')
+        ->not->toContain('This is where the magic happens.');
+
+    expect(file_get_contents(resource_path('js/v5/components/ui/dialog.tsx')))
+        ->toContain('@base-ui/react/dialog')
+        ->toContain('DialogTitle')
+        ->toContain('DialogDescription');
+
+    expect(file_get_contents(resource_path('css/v5/app.css')))
+        ->toContain('--color-warning: var(--warning);')
+        ->toContain('--warning: #fcd452;');
+
+    expect($types)
+        ->toContain('sshUser: string;')
+        ->toContain('sshPort: number;')
+        ->toContain('builderEnabled: boolean;')
+        ->toContain('builderCapacity: number;')
+        ->toContain('privateKeyName: string | null;')
+        ->toContain('lastBootstrappedAt: string | null;');
 });
 
 it('defines a ghost variant for compact v5 select triggers', function () {
@@ -528,149 +741,6 @@ it('renders flux status as a compact summary', function () {
         ->not->toContain('<h2 id="flux-status-heading">Flux status</h2>')
         ->not->toContain('<p>{flux.message}</p>')
         ->not->toContain('Socket: {flux.socket}');
-});
-
-it('checks the installed coolify version', function () {
-    createSharedUserAndTeamTables();
-    [$user, $team] = createV5UserWithTeam();
-
-    Process::fake([
-        '*' => Process::result(output: 'coolify nightly-20260616', exitCode: 0),
-    ]);
-
-    $this
-        ->actingAs($user)
-        ->withSession(['currentTeam' => $team])
-        ->getJson('/v5/coolify/version')
-        ->assertSuccessful()
-        ->assertJson([
-            'available' => true,
-            'label' => 'Installed',
-            'version' => 'coolify nightly-20260616',
-            'message' => 'Installed version: coolify nightly-20260616.',
-            'binary' => '/usr/local/bin/coolify',
-        ]);
-});
-
-it('shows when coolify version check fails', function () {
-    createSharedUserAndTeamTables();
-    [$user, $team] = createV5UserWithTeam();
-
-    Process::fake([
-        '*' => Process::result(errorOutput: 'not found', exitCode: 127),
-    ]);
-
-    $this
-        ->actingAs($user)
-        ->withSession(['currentTeam' => $team])
-        ->getJson('/v5/coolify/version')
-        ->assertSuccessful()
-        ->assertJson([
-            'available' => false,
-            'label' => 'Unavailable',
-            'version' => null,
-            'message' => 'not found',
-            'binary' => '/usr/local/bin/coolify',
-        ]);
-});
-
-it('rejects coolify bootstrap when the selected private key is not owned by the current team', function () {
-    createSharedUserAndTeamTables();
-    [$user, $team] = createV5UserWithTeam();
-    $otherTeam = Team::withoutEvents(fn () => Team::query()->create([
-        'name' => 'Other Team',
-        'description' => null,
-        'personal_team' => false,
-        'show_boarding' => false,
-    ]));
-    $privateKey = createV5PrivateKey($otherTeam, 'Other Key');
-
-    Process::fake();
-
-    $this
-        ->actingAs($user)
-        ->withSession(['currentTeam' => $team])
-        ->postJson('/v5/coolify/bootstrap', [
-            'host' => '192.0.2.10',
-            'ssh_user' => 'root',
-            'ssh_port' => 22,
-            'private_key_uuid' => $privateKey->uuid,
-        ])
-        ->assertForbidden()
-        ->assertJson([
-            'successful' => false,
-            'label' => 'Private key unavailable',
-        ]);
-
-    Process::assertDidntRun(fn () => true);
-});
-
-it('runs coolify bootstrap from dynamic UI input and a selected team private key', function () {
-    createSharedUserAndTeamTables();
-    [$user, $team] = createV5UserWithTeam();
-    $privateKey = createV5PrivateKey($team, 'Bootstrap Key');
-
-    Config::set('coold.coolify_cli_bin', '/usr/local/bin/coolify');
-    Config::set('coold.dev_builder_capacity', 2);
-
-    Process::fake([
-        '*' => Process::result(output: 'Bootstrapping mesh...', exitCode: 0),
-    ]);
-
-    $this
-        ->actingAs($user)
-        ->withSession(['currentTeam' => $team])
-        ->postJson('/v5/coolify/bootstrap', [
-            'host' => '192.0.2.10',
-            'ssh_user' => 'ubuntu',
-            'ssh_port' => 2222,
-            'private_key_uuid' => $privateKey->uuid,
-            'wg_listen_port' => 51821,
-            'wg_endpoint' => 'example.test:51821',
-            'enable_builder' => true,
-            'builder_capacity' => 3,
-        ])
-        ->assertSuccessful()
-        ->assertJson([
-            'successful' => true,
-            'label' => 'Bootstrap finished',
-            'message' => 'coolify init bootstrap completed successfully.',
-            'output' => 'Bootstrapping mesh...',
-            'exitCode' => 0,
-        ]);
-
-    $this
-        ->actingAs($user)
-        ->withSession(['currentTeam' => $team])
-        ->get('/v5')
-        ->assertSuccessful()
-        ->assertDontSee('"host":"192.0.2.10"', false)
-        ->assertDontSee('"capabilities":["coold","builder"]', false);
-
-    expect(V5Server::query()->where('host', '192.0.2.10')->where('status', 'installed')->exists())->toBeTrue();
-
-    $sshKeyPath = null;
-
-    Process::assertRan(function ($process) use (&$sshKeyPath) {
-        preg_match("/'--ssh-key' '([^']+)'/", $process->command, $matches);
-        $sshKeyPath = $matches[1] ?? null;
-
-        return $process->timeout === 300
-            && str_contains($process->command, "'/usr/local/bin/coolify' 'init' 'bootstrap'")
-            && str_contains($process->command, "'--nodes' '192.0.2.10:2222'")
-            && str_contains($process->command, "'--ssh-user' 'ubuntu'")
-            && str_contains($process->command, "'--wg-listen-port-overrides' '192.0.2.10:2222=51821'")
-            && str_contains($process->command, "'--wg-endpoint-overrides' '192.0.2.10:2222=example.test:51821'")
-            && str_contains($process->command, "'--coold-version' 'nightly'")
-            && str_contains($process->command, "'--corrosion-version' 'v1.0.0'")
-            && str_contains($process->command, "'--enable-builder'")
-            && str_contains($process->command, "'--builder-capacity' '3'")
-            && str_contains($process->command, "'--yes'")
-            && ! str_contains($process->command, 'COOLIFY_CLI_NODES');
-    });
-
-    expect($sshKeyPath)->not->toBeNull()
-        ->and(file_exists($sshKeyPath))->toBeFalse();
 });
 
 it('syncs dev Lima VMs into v5 clusters and servers', function () {
