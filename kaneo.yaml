@@ -8,8 +8,6 @@
 services:
   kaneo:
     image: 'ghcr.io/usekaneo/kaneo:latest'
-    ports:
-      - '5173:5173'
     environment:
       - SERVICE_URL_KANEO
       - 'KANEO_CLIENT_URL=${SERVICE_URL_KANEO}'
