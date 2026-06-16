@@ -7,7 +7,7 @@
 
 services:
   kaneo:
-    image: 'ghcr.io/usekaneo/kaneo:latest'
+    image: 'ghcr.io/usekaneo/kaneo:2.7.7'
     environment:
       - SERVICE_URL_KANEO_5173
       - 'KANEO_CLIENT_URL=${SERVICE_URL_KANEO}'
