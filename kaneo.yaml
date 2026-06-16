@@ -77,7 +77,7 @@ services:
       - '9000:9000'
       - '9001:9001'
     volumes:
-      - './minio_data:/data'
+      - 'minio_data:/data'
     restart: unless-stopped
     healthcheck:
       test:
