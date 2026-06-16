@@ -6,8 +6,10 @@ use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\InstanceSettings;
 use App\Models\Project;
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
+use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -108,60 +110,298 @@ it('does not change preview variables when preview developer view data is not lo
 });
 
 it('renders many environment variables without reloading the resource for every row', function () {
-    $application = Application::factory()->create([
-        'environment_id' => $this->environment->id,
-    ]);
-
-    for ($i = 1; $i <= 20; $i++) {
-        EnvironmentVariable::create([
-            'key' => 'KEY_'.$i,
-            'value' => 'secret-'.$i,
-            'resourceable_type' => Application::class,
-            'resourceable_id' => $application->id,
+    $countQueriesForRows = function (int $rows): int {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
         ]);
-    }
 
-    $queryCount = 0;
-    DB::listen(function () use (&$queryCount) {
-        $queryCount++;
-    });
+        for ($i = 1; $i <= $rows; $i++) {
+            EnvironmentVariable::create([
+                'key' => 'KEY_'.$i,
+                'value' => 'secret-'.$i,
+                'resourceable_type' => Application::class,
+                'resourceable_id' => $application->id,
+            ]);
+        }
 
-    Livewire::test(All::class, ['resource' => $application]);
+        DB::flushQueryLog();
+        DB::enableQueryLog();
 
-    expect($queryCount)->toBeLessThan(15);
+        Livewire::test(All::class, ['resource' => $application])
+            ->assertSee('KEY_1')
+            ->assertSee('KEY_'.$rows);
+
+        $queryCount = count(DB::getQueryLog());
+
+        DB::disableQueryLog();
+        DB::flushQueryLog();
+
+        return $queryCount;
+    };
+
+    $oneVariableQueries = $countQueriesForRows(1);
+    $manyVariableQueries = $countQueriesForRows(20);
+
+    expect($manyVariableQueries - $oneVariableQueries)->toBeLessThan(5);
 });
 
 it('resolves shared variable autocomplete data once for many environment variables', function () {
+    session(['currentTeam' => $this->team]);
+
+    SharedEnvironmentVariable::create([
+        'key' => 'TEAM_API_TOKEN',
+        'value' => 'team-secret',
+        'type' => 'team',
+        'team_id' => $this->team->id,
+    ]);
+
+    $countQueriesForRows = function (int $rows): int {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+        ]);
+
+        for ($i = 1; $i <= $rows; $i++) {
+            EnvironmentVariable::create([
+                'key' => 'KEY_'.$i,
+                'value' => 'secret-'.$i,
+                'resourceable_type' => Application::class,
+                'resourceable_id' => $application->id,
+            ]);
+        }
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        Livewire::test(All::class, ['resource' => $application])
+            ->assertSee('KEY_1')
+            ->assertSee('KEY_'.$rows)
+            ->assertSee('TEAM_API_TOKEN');
+
+        $queryCount = count(DB::getQueryLog());
+
+        DB::disableQueryLog();
+        DB::flushQueryLog();
+
+        return $queryCount;
+    };
+
+    $oneVariableQueries = $countQueriesForRows(1);
+    $manyVariableQueries = $countQueriesForRows(20);
+
+    expect($manyVariableQueries - $oneVariableQueries)->toBeLessThan(5);
+});
+
+it('scopes shared variable autocomplete data to the current route and team', function () {
+    session(['currentTeam' => $this->team]);
+
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first()
+        ?? StandaloneDocker::factory()->create([
+            'server_id' => $server->id,
+            'network' => 'coolify-test-'.$server->id,
+        ]);
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'server_id' => $server->id,
+    ]);
+
+    SharedEnvironmentVariable::create([
+        'key' => 'TEAM_API_TOKEN',
+        'value' => 'team-secret',
+        'type' => 'team',
+        'team_id' => $this->team->id,
+    ]);
+    SharedEnvironmentVariable::create([
+        'key' => 'PROJECT_API_TOKEN',
+        'value' => 'project-secret',
+        'type' => 'project',
+        'project_id' => $this->project->id,
+        'team_id' => $this->team->id,
+    ]);
+    SharedEnvironmentVariable::create([
+        'key' => 'ENVIRONMENT_API_TOKEN',
+        'value' => 'environment-secret',
+        'type' => 'environment',
+        'environment_id' => $this->environment->id,
+        'project_id' => $this->project->id,
+        'team_id' => $this->team->id,
+    ]);
+    SharedEnvironmentVariable::create([
+        'key' => 'SERVER_API_TOKEN',
+        'value' => 'server-secret',
+        'type' => 'server',
+        'server_id' => $server->id,
+        'team_id' => $this->team->id,
+    ]);
+
+    $otherTeam = Team::factory()->create();
+    $otherProject = Project::factory()->create(['team_id' => $this->team->id]);
+    $otherEnvironment = Environment::factory()->create(['project_id' => $this->project->id]);
+    $otherServer = Server::factory()->create(['team_id' => $this->team->id]);
+
+    SharedEnvironmentVariable::create([
+        'key' => 'OTHER_TEAM_TOKEN',
+        'value' => 'other-team-secret',
+        'type' => 'team',
+        'team_id' => $otherTeam->id,
+    ]);
+    SharedEnvironmentVariable::create([
+        'key' => 'OTHER_PROJECT_TOKEN',
+        'value' => 'other-project-secret',
+        'type' => 'project',
+        'project_id' => $otherProject->id,
+        'team_id' => $this->team->id,
+    ]);
+    SharedEnvironmentVariable::create([
+        'key' => 'OTHER_ENVIRONMENT_TOKEN',
+        'value' => 'other-environment-secret',
+        'type' => 'environment',
+        'environment_id' => $otherEnvironment->id,
+        'project_id' => $this->project->id,
+        'team_id' => $this->team->id,
+    ]);
+    SharedEnvironmentVariable::create([
+        'key' => 'OTHER_SERVER_TOKEN',
+        'value' => 'other-server-secret',
+        'type' => 'server',
+        'server_id' => $otherServer->id,
+        'team_id' => $this->team->id,
+    ]);
+
+    $component = Livewire::test(All::class, ['resource' => $application])
+        ->set('parameters', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'application_uuid' => $application->uuid,
+        ]);
+
+    $availableSharedVariables = $component->get('availableSharedVariables');
+
+    expect($availableSharedVariables['team'])
+        ->toContain('TEAM_API_TOKEN')
+        ->not->toContain('OTHER_TEAM_TOKEN');
+    expect($availableSharedVariables['project'])
+        ->toContain('PROJECT_API_TOKEN')
+        ->not->toContain('OTHER_PROJECT_TOKEN');
+    expect($availableSharedVariables['environment'])
+        ->toContain('ENVIRONMENT_API_TOKEN')
+        ->not->toContain('OTHER_ENVIRONMENT_TOKEN');
+    expect($availableSharedVariables['server'])
+        ->toContain('SERVER_API_TOKEN')
+        ->not->toContain('OTHER_SERVER_TOKEN');
+
+    $serverRouteSharedVariables = Livewire::test(All::class, ['resource' => $application])
+        ->set('parameters', [
+            'server_uuid' => $server->uuid,
+        ])
+        ->get('availableSharedVariables');
+
+    expect($serverRouteSharedVariables['server'])
+        ->toContain('SERVER_API_TOKEN')
+        ->not->toContain('OTHER_SERVER_TOKEN');
+
+    $serviceRouteSharedVariables = Livewire::test(All::class, ['resource' => $service])
+        ->set('parameters', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'service_uuid' => $service->uuid,
+        ])
+        ->get('availableSharedVariables');
+
+    expect($serviceRouteSharedVariables['server'])
+        ->toContain('SERVER_API_TOKEN')
+        ->not->toContain('OTHER_SERVER_TOKEN');
+});
+
+it('does not expose shared variables from cross-team route parameters', function () {
     session(['currentTeam' => $this->team]);
 
     $application = Application::factory()->create([
         'environment_id' => $this->environment->id,
     ]);
 
-    SharedEnvironmentVariable::create([
-        'key' => 'TEAM_API_TOKEN',
-        'value' => 'shared-secret',
-        'type' => 'team',
-        'team_id' => $this->team->id,
+    $otherTeam = Team::factory()->create();
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnvironment = Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+    $otherDestination = StandaloneDocker::where('server_id', $otherServer->id)->first()
+        ?? StandaloneDocker::factory()->create([
+            'server_id' => $otherServer->id,
+            'network' => 'coolify-test-'.$otherServer->id,
+        ]);
+    $otherApplication = Application::factory()->create([
+        'environment_id' => $otherEnvironment->id,
+        'destination_id' => $otherDestination->id,
+        'destination_type' => $otherDestination->getMorphClass(),
+    ]);
+    $otherService = Service::factory()->create([
+        'environment_id' => $otherEnvironment->id,
+        'destination_id' => $otherDestination->id,
+        'destination_type' => $otherDestination->getMorphClass(),
+        'server_id' => $otherServer->id,
     ]);
 
-    for ($i = 1; $i <= 20; $i++) {
-        EnvironmentVariable::create([
-            'key' => 'KEY_'.$i,
-            'value' => 'secret-'.$i,
-            'resourceable_type' => Application::class,
-            'resourceable_id' => $application->id,
-        ]);
-    }
+    SharedEnvironmentVariable::create([
+        'key' => 'OTHER_PROJECT_TOKEN',
+        'value' => 'other-project-secret',
+        'type' => 'project',
+        'project_id' => $otherProject->id,
+        'team_id' => $otherTeam->id,
+    ]);
+    SharedEnvironmentVariable::create([
+        'key' => 'OTHER_ENVIRONMENT_TOKEN',
+        'value' => 'other-environment-secret',
+        'type' => 'environment',
+        'environment_id' => $otherEnvironment->id,
+        'project_id' => $otherProject->id,
+        'team_id' => $otherTeam->id,
+    ]);
+    SharedEnvironmentVariable::create([
+        'key' => 'OTHER_SERVER_TOKEN',
+        'value' => 'other-server-secret',
+        'type' => 'server',
+        'server_id' => $otherServer->id,
+        'team_id' => $otherTeam->id,
+    ]);
 
-    $queryCount = 0;
-    DB::listen(function () use (&$queryCount) {
-        $queryCount++;
-    });
+    $applicationRouteSharedVariables = Livewire::test(All::class, ['resource' => $application])
+        ->set('parameters', [
+            'project_uuid' => $otherProject->uuid,
+            'environment_uuid' => $otherEnvironment->uuid,
+            'application_uuid' => $otherApplication->uuid,
+        ])
+        ->get('availableSharedVariables');
 
-    Livewire::test(All::class, ['resource' => $application]);
+    expect($applicationRouteSharedVariables['project'])->not->toContain('OTHER_PROJECT_TOKEN');
+    expect($applicationRouteSharedVariables['environment'])->not->toContain('OTHER_ENVIRONMENT_TOKEN');
+    expect($applicationRouteSharedVariables['server'])->not->toContain('OTHER_SERVER_TOKEN');
 
-    expect($queryCount)->toBeLessThan(30);
+    $serverRouteSharedVariables = Livewire::test(All::class, ['resource' => $application])
+        ->set('parameters', [
+            'server_uuid' => $otherServer->uuid,
+        ])
+        ->get('availableSharedVariables');
+
+    expect($serverRouteSharedVariables['server'])->not->toContain('OTHER_SERVER_TOKEN');
+
+    $serviceRouteSharedVariables = Livewire::test(All::class, ['resource' => $otherService])
+        ->set('parameters', [
+            'project_uuid' => $otherProject->uuid,
+            'environment_uuid' => $otherEnvironment->uuid,
+            'service_uuid' => $otherService->uuid,
+        ])
+        ->get('availableSharedVariables');
+
+    expect($serviceRouteSharedVariables['project'])->not->toContain('OTHER_PROJECT_TOKEN');
+    expect($serviceRouteSharedVariables['environment'])->not->toContain('OTHER_ENVIRONMENT_TOKEN');
+    expect($serviceRouteSharedVariables['server'])->not->toContain('OTHER_SERVER_TOKEN');
 });
 
 it('filters production environment variables by key case-insensitively', function () {
