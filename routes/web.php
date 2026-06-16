@@ -45,6 +45,7 @@ use App\Livewire\Server\Advanced as ServerAdvanced;
 use App\Livewire\Server\CaCertificate\Show as CaCertificateShow;
 use App\Livewire\Server\Charts as ServerCharts;
 use App\Livewire\Server\CloudflareTunnel;
+use App\Livewire\Deployments\Index as DeploymentsIndex;
 use App\Livewire\Server\CloudProviderToken\Show as CloudProviderTokenShow;
 use App\Livewire\Server\Delete as DeleteServer;
 use App\Livewire\Server\Destinations as ServerDestinations;
@@ -275,6 +276,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
         Route::get('/tasks/{task_uuid}', ServiceConfiguration::class)->name('project.service.scheduled-tasks');
     });
+
+    Route::get('/deployments', DeploymentsIndex::class)->name('deployments.index');
 
     Route::get('/servers', ServerIndex::class)->name('server.index');
     // Route::get('/server/new', ServerCreate::class)->name('server.create');
