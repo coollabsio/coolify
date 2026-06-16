@@ -1,0 +1,93 @@
+# documentation: https://kaneo.app/docs/core
+# slogan: All you need. Nothing you don't.
+# category: productivity
+# tags: open source, task, productivity
+# logo: svgs/kaneo.svg
+# port: 5173
+
+services:
+  kaneo:
+    image: 'ghcr.io/usekaneo/kaneo:latest'
+    ports:
+      - '5173:5173'
+    environment:
+      - SERVICE_URL_KANEO
+      - 'KANEO_CLIENT_URL=${SERVICE_URL_KANEO}'
+      - 'POSTGRES_DB=${POSTGRES_DB:-kaneo}'
+      - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - 'POSTGRES_HOST=${POSTGRES_HOST:-postgres}'
+      - 'POSTGRES_PORT=${POSTGRES_PORT:-5432}'
+      - AUTH_SECRET=$SERVICE_REALBASE64_32_KANEO
+      - 'S3_ENDPOINT=${SERVICE_FQDN_MINIO}'
+      - 'S3_BUCKET=${S3_BUCKET_CUSTOM:-kaneo-uploads}'
+      - 'S3_ACCESS_KEY_ID=${SERVICE_USER_MINIO}'
+      - 'S3_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}'
+      - 'S3_REGION=${MINIO_REGION_CUSTOM:-us-east-1}'
+      - 'S3_FORCE_PATH_STYLE=${MINIO_FORCE_PATH_STYLE_CUSTOM:-true}'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--no-verbose'
+        - '--tries=1'
+        - '--spider'
+        - 'http://kaneo:5173/api/health'
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+  postgres:
+    image: 'postgres:16-alpine'
+    environment:
+      - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
+      - 'POSTGRES_DB=${POSTGRES_DB:-kaneo}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - 'POSTGRES_HOST=${POSTGRES_HOST:-postgres}'
+      - 'POSTGRES_PORT=${POSTGRES_PORT:-5432}'
+    ports:
+      - '5432:5432'
+    volumes:
+      - './postgres_data:/var/lib/postgresql/data'
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U ${SERVICE_USER_POSTGRES} -d ${SERVICE_PASSWORD_POSTGRES}'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  minio:
+    image: 'minio/minio:latest'
+    command: 'server /data --console-address ":9001"'
+    environment:
+      - 'MINIO_ROOT_USER=${SERVICE_USER_MINIO}'
+      - 'MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}'
+      - 'S3_ENDPOINT=${SERVICE_FQDN_MINIO}'
+      - 'S3_BUCKET=${S3_BUCKET_CUSTOM:-kaneo-uploads}'
+      - 'S3_ACCESS_KEY_ID=${SERVICE_USER_MINIO}'
+      - 'S3_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}'
+      - 'S3_REGION=${MINIO_REGION_CUSTOM:-us-east-1}'
+      - 'S3_FORCE_PATH_STYLE=${MINIO_FORCE_PATH_STYLE_CUSTOM:-true}'
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - './minio_data:/data'
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://localhost:9000/minio/health/live'
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
