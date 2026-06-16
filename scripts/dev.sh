@@ -100,30 +100,11 @@ host_os() {
   esac
 }
 
-cooldctl_bin() {
-  printf '%s\n' "$ROOT/.dev/bin/cooldctl"
+coolify_cli_bin() {
+  printf '%s\n' "$ROOT/.dev/bin/coolify"
 }
 
-build_local_cooldctl() {
-  local bin
-  local coold_repo
-
-  bin="$(cooldctl_bin)"
-  coold_repo="$(read_coolify_env COOLIFY_COOLD_REPO /Users/heyandras/devel/coold)"
-
-  if [ ! -d "$coold_repo/cooldctl" ]; then
-    echo "ERROR: macOS cooldctl release artifact is not available yet and local coold repo was not found at ${coold_repo}." >&2
-    echo "Set COOLIFY_COOLD_REPO=/path/to/coold or build/copy cooldctl to ${bin}." >&2
-    exit 1
-  fi
-
-  echo "==> Building local macOS cooldctl from ${coold_repo}"
-  (cd "$coold_repo" && cargo build -p cooldctl)
-  mkdir -p "$(dirname "$bin")"
-  install -m 0755 "$coold_repo/target/debug/cooldctl" "$bin"
-}
-
-ensure_cooldctl() {
+ensure_coolify() {
   local bin
   local version
   local arch
@@ -131,63 +112,84 @@ ensure_cooldctl() {
   local url
   local tmpdir
 
-  bin="$(cooldctl_bin)"
-  version="$(read_coolify_env COOLIFY_COOLDCTL_VERSION "$(read_coolify_env COOLIFY_COOLD_VERSION nightly)")"
+  bin="$(coolify_cli_bin)"
+  version="$(read_coolify_env COOLIFY_CLI_VERSION "$(read_coolify_env COOLIFY_COOLD_VERSION nightly)")"
   arch="$(host_arch)"
   os="$(host_os)"
 
-  if [ "$os" = "darwin" ]; then
-    build_local_cooldctl
+  if [ -x "$bin" ] && "$bin" --version >/dev/null 2>&1 && [ "${COOLIFY_CLI_FORCE_DOWNLOAD:-false}" != "true" ]; then
     return
   fi
 
-  if [ -x "$bin" ] && "$bin" --version >/dev/null 2>&1 && [ "${COOLIFY_COOLDCTL_FORCE_DOWNLOAD:-false}" != "true" ]; then
-    return
-  fi
-
-  url="https://github.com/coollabsio/coold/releases/download/${version}/cooldctl-${os}-${arch}.tar.gz"
-  echo "==> Installing cooldctl from ${url}"
+  url="https://github.com/coollabsio/coold/releases/download/${version}/coolify-${os}-${arch}.tar.gz"
+  echo "==> Installing coolify from ${url}"
 
   mkdir -p "$(dirname "$bin")"
   tmpdir="$(mktemp -d)"
-  trap 'rm -rf "$tmpdir"' RETURN
-  curl -fsSL --retry 3 --max-time 120 -o "$tmpdir/cooldctl.tar.gz" "$url"
-  tar -xzf "$tmpdir/cooldctl.tar.gz" -C "$tmpdir"
-  install -m 0755 "$tmpdir/cooldctl" "$bin"
+  if ! curl -fsSL --retry 3 --max-time 120 -o "$tmpdir/coolify.tar.gz" "$url"; then
+    rm -rf "$tmpdir"
+    return 1
+  fi
+  tar -xzf "$tmpdir/coolify.tar.gz" -C "$tmpdir"
+  install -m 0755 "$tmpdir/coolify" "$bin"
+  rm -rf "$tmpdir"
 }
 
 lima_ssh_target() {
   local index="$1"
   local instance
-  local ssh
 
   instance="$(coold_vm_instance "$index")"
-  ssh="$(limactl list 2>/dev/null | awk -v name="$instance" 'NR > 1 && $1 == name {print $3}')"
 
-  if [ -z "$ssh" ] || [ "$ssh" = "-" ]; then
-    echo "ERROR: could not determine SSH target for Lima VM ${instance}. Start it first with scripts/dev.sh up." >&2
+  if [ ! -f "$HOME/.lima/${instance}/ssh.config" ]; then
+    echo "ERROR: Lima SSH config for ${instance} was not found. Start it first with scripts/dev.sh up." >&2
     exit 1
   fi
 
-  printf '%s\n' "$ssh"
+  printf 'lima-%s\n' "$instance"
 }
 
-cooldctl_nodes_arg() {
+lima_ssh_config() {
+  local count
+  local config="$ROOT/.dev/lima/ssh.config"
+  local instance
+  count="$(coold_vm_count)"
+
+  mkdir -p "$(dirname "$config")"
+  : > "$config"
+
+  for index in $(seq 1 "$count"); do
+    instance="$(coold_vm_instance "$index")"
+    if [ ! -f "$HOME/.lima/${instance}/ssh.config" ]; then
+      echo "ERROR: Lima SSH config for ${instance} was not found. Start it first with scripts/dev.sh up." >&2
+      exit 1
+    fi
+
+    cat "$HOME/.lima/${instance}/ssh.config" >> "$config"
+    printf '\n' >> "$config"
+  done
+
+  printf '%s\n' "$config"
+}
+
+coolify_nodes_arg() {
   local count
   local nodes=""
+  local node
   count="$(coold_vm_count)"
 
   for index in $(seq 1 "$count"); do
+    node="$(lima_ssh_target "$index")" || return 1
     if [ -n "$nodes" ]; then
       nodes="${nodes},"
     fi
-    nodes="${nodes}$(lima_ssh_target "$index")"
+    nodes="${nodes}${node}"
   done
 
   printf '%s\n' "$nodes"
 }
 
-cooldctl_wg_listen_overrides_arg() {
+coolify_wg_listen_overrides_arg() {
   local count
   local overrides=""
   local node
@@ -204,7 +206,7 @@ cooldctl_wg_listen_overrides_arg() {
   printf '%s\n' "$overrides"
 }
 
-cooldctl_wg_endpoint_overrides_arg() {
+coolify_wg_endpoint_overrides_arg() {
   local count
   local overrides=""
   local node
@@ -221,45 +223,63 @@ cooldctl_wg_endpoint_overrides_arg() {
   printf '%s\n' "$overrides"
 }
 
-cooldctl_ssh_key() {
-  read_coolify_env COOLIFY_COOLDCTL_SSH_KEY "$HOME/.lima/_config/user"
+coolify_ssh_key() {
+  read_coolify_env COOLIFY_CLI_SSH_KEY "$HOME/.lima/_config/user"
 }
 
-cooldctl_ssh_user() {
-  read_coolify_env COOLIFY_COOLDCTL_SSH_USER "$USER"
+coolify_ssh_user() {
+  read_coolify_env COOLIFY_CLI_SSH_USER "$USER"
 }
 
-cooldctl_bootstrap_command() {
-  ensure_cooldctl
+coolify_bootstrap_command() {
+  local nodes
+  local ssh_config
+  local listen_overrides
+  local endpoint_overrides
+  ensure_coolify
+
+  nodes="$(coolify_nodes_arg)" || return 1
+  ssh_config="$(lima_ssh_config)" || return 1
+  listen_overrides="$(coolify_wg_listen_overrides_arg)" || return 1
+  endpoint_overrides="$(coolify_wg_endpoint_overrides_arg)" || return 1
 
   cat <<CMD
-$(cooldctl_bin) init bootstrap \\
-  --nodes "$(cooldctl_nodes_arg)" \\
-  --ssh-key "$(cooldctl_ssh_key)" \\
-  --ssh-user "$(cooldctl_ssh_user)" \\
-  --wg-listen-port-overrides "$(cooldctl_wg_listen_overrides_arg)" \\
-  --wg-endpoint-overrides "$(cooldctl_wg_endpoint_overrides_arg)" \\
+$(coolify_cli_bin) init bootstrap \\
+  --nodes "${nodes}" \\
+  --ssh-config "${ssh_config}" \\
+  --ssh-user "$(coolify_ssh_user)" \\
+  --wg-listen-port-overrides "${listen_overrides}" \\
+  --wg-endpoint-overrides "${endpoint_overrides}" \\
   --coold-version "$(read_coolify_env COOLIFY_COOLD_VERSION nightly)" \\
   --corrosion-version "$(read_coolify_env COOLIFY_CORROSION_VERSION v1.0.0)" \\
   --yes
 CMD
 }
 
-cooldctl_bootstrap() {
-  ensure_cooldctl
+coolify_bootstrap() {
+  local nodes
+  local ssh_config
+  local listen_overrides
+  local endpoint_overrides
+  ensure_coolify
 
-  "$(cooldctl_bin)" init bootstrap \
-    --nodes "$(cooldctl_nodes_arg)" \
-    --ssh-key "$(cooldctl_ssh_key)" \
-    --ssh-user "$(cooldctl_ssh_user)" \
-    --wg-listen-port-overrides "$(cooldctl_wg_listen_overrides_arg)" \
-    --wg-endpoint-overrides "$(cooldctl_wg_endpoint_overrides_arg)" \
+  nodes="$(coolify_nodes_arg)" || return 1
+  ssh_config="$(lima_ssh_config)" || return 1
+  listen_overrides="$(coolify_wg_listen_overrides_arg)" || return 1
+  endpoint_overrides="$(coolify_wg_endpoint_overrides_arg)" || return 1
+
+  "$(coolify_cli_bin)" init bootstrap \
+    --nodes "$nodes" \
+    --ssh-config "$ssh_config" \
+    --ssh-user "$(coolify_ssh_user)" \
+    --wg-listen-port-overrides "$listen_overrides" \
+    --wg-endpoint-overrides "$endpoint_overrides" \
     --coold-version "$(read_coolify_env COOLIFY_COOLD_VERSION nightly)" \
     --corrosion-version "$(read_coolify_env COOLIFY_CORROSION_VERSION v1.0.0)" \
     --yes
 }
 
-cooldctl_dev() {
+coolify_dev() {
   local command="${1:-help}"
   if [ $# -gt 0 ]; then
     shift
@@ -267,37 +287,37 @@ cooldctl_dev() {
 
   case "$command" in
     install)
-      ensure_cooldctl
-      "$(cooldctl_bin)" --version
+      ensure_coolify
+      "$(coolify_cli_bin)" --version
       ;;
     path)
-      ensure_cooldctl
-      cooldctl_bin
+      ensure_coolify
+      coolify_cli_bin
       ;;
     bootstrap-command)
-      cooldctl_bootstrap_command
+      coolify_bootstrap_command
       ;;
     run)
-      ensure_cooldctl
-      exec "$(cooldctl_bin)" "$@"
+      ensure_coolify
+      exec "$(coolify_cli_bin)" "$@"
       ;;
     -h|--help|help)
       cat <<'USAGE'
-Usage: scripts/dev.sh cooldctl <command>
+Usage: scripts/dev.sh coolify <command>
 
 Commands:
-  install             Download/install the nightly cooldctl dev binary
-  path                Print the local cooldctl path
+  install             Download/install the nightly coolify dev binary
+  path                Print the local coolify path
   bootstrap-command   Print the dev Lima bootstrap command without running it
-  run <args>          Run cooldctl with arbitrary args
+  run <args>          Run coolify with arbitrary args
 
 Example:
-  scripts/dev.sh cooldctl bootstrap-command
+  scripts/dev.sh coolify bootstrap-command
 USAGE
       ;;
     *)
-      echo "unknown cooldctl command: $command" >&2
-      echo "Run: scripts/dev.sh cooldctl help" >&2
+      echo "unknown coolify command: $command" >&2
+      echo "Run: scripts/dev.sh coolify help" >&2
       exit 1
       ;;
   esac
@@ -415,15 +435,8 @@ up() {
 
   if [ "$coold_vm_enabled" != "false" ]; then
     echo "==> Starting ${count} Coolify coold VM(s) before Spin..."
-    vm_pids=""
     for index in $(seq 1 "$count"); do
-      (
-        coold_vm "$index" up
-      ) &
-      vm_pids="${vm_pids} $!"
-    done
-    for pid in $vm_pids; do
-      wait "$pid"
+      coold_vm "$index" up
     done
   else
     echo "==> COOLIFY_COOLD_VM_ENABLED=false; skipping coold VM."
@@ -433,8 +446,8 @@ up() {
   spin up -d "$@"
 
   if [ "$coold_vm_enabled" != "false" ]; then
-    echo "==> Bootstrapping coold VM mesh with cooldctl..."
-    cooldctl_bootstrap
+    echo "==> Bootstrapping coold VM mesh with coolify..."
+    coolify_bootstrap
 
     for index in $(seq 1 "$count"); do
       configure_flux_dev_for_vm "$index"
@@ -911,7 +924,7 @@ Commands:
   corrosion <command> Inspect Corrosion state, config, logs, and registered containers
   firewall <command>  Manage dev coold firewall allow rules
   example-nginx <command> Start/check example nginx containers with coold DNS
-  cooldctl <command> Install/run the released cooldctl dev helper
+  coolify <command> Install/run the released coolify dev helper
 USAGE
 }
 
@@ -945,8 +958,8 @@ case "$cmd" in
   example-nginx)
     example_nginx "$@"
     ;;
-  cooldctl)
-    cooldctl_dev "$@"
+  coolify)
+    coolify_dev "$@"
     ;;
   -h|--help|help|"")
     usage

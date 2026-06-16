@@ -42,4 +42,6 @@ tests/Browser/Screenshots
 tests/v4/Browser/Screenshots
 
 # Local generated Lima configs
+.dev/bin/
 .dev/lima/*.generated.yaml
+.dev/lima/ssh.config

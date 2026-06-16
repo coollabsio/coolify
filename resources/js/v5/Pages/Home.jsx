@@ -1,6 +1,34 @@
 import { Head } from '@inertiajs/react';
+import { useState } from 'react';
 
 export default function Home({ status, currentTeam, teams, flux, cooldHosts }) {
+    const [coolify, setCoolify] = useState(null);
+    const [checkingCoolify, setCheckingCoolify] = useState(false);
+
+    async function checkCoolifyCliVersion() {
+        setCheckingCoolify(true);
+
+        try {
+            const response = await fetch('/v5/coolify/version', {
+                headers: {
+                    Accept: 'application/json',
+                },
+            });
+
+            setCoolify(await response.json());
+        } catch (error) {
+            setCoolify({
+                available: false,
+                label: 'Unavailable',
+                version: null,
+                message: 'Could not check the installed coolify version.',
+                binary: null,
+            });
+        } finally {
+            setCheckingCoolify(false);
+        }
+    }
+
     return (
         <>
             <Head title="V5" />
@@ -43,6 +71,25 @@ export default function Home({ status, currentTeam, teams, flux, cooldHosts }) {
                             </li>
                         ))}
                     </ul>
+                </section>
+
+                <section aria-labelledby="coolify-heading">
+                    <h2 id="coolify-heading">coolify</h2>
+
+                    <button type="button" onClick={checkCoolifyCliVersion} disabled={checkingCoolify}>
+                        {checkingCoolify ? 'Checking coolify...' : 'Check coolify version'}
+                    </button>
+
+                    {coolify ? (
+                        <div>
+                            <p>
+                                <strong>{coolify.label}</strong>
+                            </p>
+                            {coolify.version ? <p>Version: {coolify.version}</p> : null}
+                            <p>{coolify.message}</p>
+                            {coolify.binary ? <p>Binary: {coolify.binary}</p> : null}
+                        </div>
+                    ) : null}
                 </section>
 
                 <h2>Current team</h2>

@@ -1,4 +1,4 @@
-# Lima VM for testing Coolify v5 against cooldctl-provisioned hosts.
+# Lima VM for testing Coolify v5 against coolify-provisioned hosts.
 # Start with: scripts/coold-vm.sh up
 #
 # This file is copied into .dev/lima/coold.generated.yaml by the wrapper script,
@@ -58,4 +58,4 @@ provision:
       mkdir -p /etc/coolify /var/lib/coolify-dev
       chmod 755 /etc/coolify
 
-      echo "[coold-vm] Minimal provisioning complete. cooldctl bootstrap will install WireGuard, Podman, Corrosion, coold, and builder."
+      echo "[coold-vm] Minimal provisioning complete. coolify bootstrap will install WireGuard, Podman, Corrosion, coold, and builder."

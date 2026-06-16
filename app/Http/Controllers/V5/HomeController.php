@@ -5,7 +5,9 @@ namespace App\Http\Controllers\V5;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Coold\CoolifyCliVersion;
 use App\Services\Flux\FluxHealth;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -41,6 +43,11 @@ class HomeController extends Controller
                     'personal' => $team->personal_team,
                 ]),
         ]);
+    }
+
+    public function coolifyCliVersion(CoolifyCliVersion $coolifyCliVersion): JsonResponse
+    {
+        return response()->json($coolifyCliVersion->check());
     }
 
     /**

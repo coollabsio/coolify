@@ -9,6 +9,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\Flux\FluxHealth;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Mockery\MockInterface;
@@ -105,10 +106,10 @@ it('serves the v5 inertia shell', function () {
         ->assertSee('v5-ready', false)
         ->assertSee('Running')
         ->assertSee('Flux is running.')
-        ->assertSee('coolify-coold-dev')
-        ->assertSee('coolify-coold-dev-2')
-        ->assertSee('100.64.0.10')
-        ->assertSee('100.64.0.11')
+        ->assertSee('coold-dev')
+        ->assertSee('coold-dev-2')
+        ->assertSee('100.64.0.1')
+        ->assertSee('100.64.0.2')
         ->assertSee('builder')
         ->assertSee('builderCapacity')
         ->assertSee('V5 Shared Team')
@@ -173,6 +174,50 @@ it('shows when flux is unavailable', function () {
         ->assertSee('Flux socket was not found.');
 });
 
+it('checks the installed coolify version', function () {
+    createSharedUserAndTeamTables();
+    [$user, $team] = createV5UserWithTeam();
+
+    Process::fake([
+        '*' => Process::result(output: 'coolify nightly-20260616', exitCode: 0),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->getJson('/v5/coolify/version')
+        ->assertSuccessful()
+        ->assertJson([
+            'available' => true,
+            'label' => 'Installed',
+            'version' => 'coolify nightly-20260616',
+            'message' => 'Installed version: coolify nightly-20260616.',
+            'binary' => '/usr/local/bin/coolify',
+        ]);
+});
+
+it('shows when coolify version check fails', function () {
+    createSharedUserAndTeamTables();
+    [$user, $team] = createV5UserWithTeam();
+
+    Process::fake([
+        '*' => Process::result(errorOutput: 'not found', exitCode: 127),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->getJson('/v5/coolify/version')
+        ->assertSuccessful()
+        ->assertJson([
+            'available' => false,
+            'label' => 'Unavailable',
+            'version' => null,
+            'message' => 'not found',
+            'binary' => '/usr/local/bin/coolify',
+        ]);
+});
+
 function fakeFluxHealth(bool $available = true, string $message = 'Flux is running.'): void
 {
     app()->instance(FluxHealth::class, Mockery::mock(FluxHealth::class, function (MockInterface $mock) use ($available, $message) {
@@ -217,4 +262,26 @@ function createSharedUserAndTeamTables(): void
 
         $table->unique(['team_id', 'user_id']);
     });
+}
+
+/**
+ * @return array{0: User, 1: Team}
+ */
+function createV5UserWithTeam(): array
+{
+    $user = User::withoutEvents(fn () => User::query()->create([
+        'name' => 'Margaret Hamilton',
+        'email' => 'margaret@example.com',
+        'email_verified_at' => now(),
+        'password' => 'password',
+    ]));
+    $team = Team::withoutEvents(fn () => Team::query()->create([
+        'name' => 'V5 Tooling Team',
+        'description' => null,
+        'personal_team' => false,
+        'show_boarding' => false,
+    ]));
+    $user->teams()->attach($team, ['role' => 'owner']);
+
+    return [$user, $team];
 }

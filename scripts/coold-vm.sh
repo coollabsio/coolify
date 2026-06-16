@@ -40,7 +40,7 @@ if [ "$BUILDER_CAPACITY" = "0" ]; then
   BUILDER_ENABLED="false"
 fi
 TEMPLATE="$ROOT/dev/lima/coold.yaml"
-GENERATED="$ROOT/.dev/lima/coold.generated.yaml"
+GENERATED="$ROOT/.dev/lima/${INSTANCE}.generated.yaml"
 GUEST_COOLIFY_ROOT="/workspace/coolify"
 
 usage() {
@@ -436,8 +436,11 @@ wait_for_lima_start() {
       lima_shell sudo sh -c 'test -f /var/log/cloud-init-output.log && tail -n 12 /var/log/cloud-init-output.log || true' 2>/dev/null         | awk '{ print "[guest] " $0; fflush(); }' || true
 
       if ! printf '%s' "$status" | grep -q running; then
-        kill "$start_pid" >/dev/null 2>&1 || true
-        break
+        if kill -0 "$start_pid" 2>/dev/null; then
+          kill "$start_pid" >/dev/null 2>&1 || true
+          disown "$start_pid" >/dev/null 2>&1 || true
+        fi
+        return
       fi
     else
       message="$(latest_lima_message)"
@@ -503,7 +506,7 @@ up_with_logs() {
   wait_for_lima_start
   wait_for_guest_provisioning
 
-  echo "==> VM is ready. Run cooldctl bootstrap via: scripts/dev.sh up"
+  echo "==> VM is ready. Run coolify bootstrap via: scripts/dev.sh up"
 }
 
 cmd="${1:-}"

@@ -6,7 +6,7 @@ This file documents the current local v5/coold dev setup in Coolify.
 
 - `scripts/dev.sh` owns local developer convenience.
 - Lima VMs act like real deployment servers.
-- `cooldctl init bootstrap` owns host wiring:
+- `coolify init bootstrap` owns host wiring:
   - WireGuard
   - Podman mesh networks
   - Corrosion config/schema/service
@@ -32,16 +32,16 @@ scripts/dev.sh list
 containers, WireGuard keys, Corrosion DB, installed binaries, and firewall state.
 It does not delete the Coolify repo.
 
-## cooldctl helper
+## coolify helper
 
 ```bash
-scripts/dev.sh cooldctl install
-scripts/dev.sh cooldctl path
-scripts/dev.sh cooldctl bootstrap-command
-scripts/dev.sh cooldctl run <args>
+scripts/dev.sh coolify install
+scripts/dev.sh coolify path
+scripts/dev.sh coolify bootstrap-command
+scripts/dev.sh coolify run <args>
 ```
 
-On macOS, the helper builds `cooldctl` from the local coold repo because the
+On macOS, the helper builds `coolify` from the local coold repo because the
 nightly release currently publishes Linux binaries. On Linux, it downloads the
 nightly release artifact.
 
@@ -49,7 +49,7 @@ The generated bootstrap command uses Lima's forwarded SSH ports and dev
 WireGuard endpoint overrides, for example:
 
 ```bash
-.dev/bin/cooldctl init bootstrap \
+.dev/bin/coolify init bootstrap \
   --nodes "127.0.0.1:<ssh1>,127.0.0.1:<ssh2>" \
   --ssh-key "$HOME/.lima/_config/user" \
   --ssh-user "$USER" \
@@ -61,12 +61,12 @@ WireGuard endpoint overrides, for example:
 ```
 
 Lima does not allow direct root SSH by default, so dev uses the normal Lima user
-with passwordless sudo. `cooldctl` wraps remote commands in `sudo -n bash -lc`
+with passwordless sudo. `coolify` wraps remote commands in `sudo -n bash -lc`
 when the SSH user is not `root`.
 
 ## Default dev topology
 
-After `cooldctl init bootstrap`, defaults are:
+After `coolify init bootstrap`, defaults are:
 
 | VM | WireGuard IP | WireGuard endpoint | Podman subnet | Gateway |
 | --- | --- | --- | --- | --- |

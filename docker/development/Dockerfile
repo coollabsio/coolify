@@ -7,6 +7,7 @@ ARG MINIO_VERSION=RELEASE.2025-05-21T01-59-54Z
 ARG CLOUDFLARED_VERSION=2025.7.0
 # https://github.com/coollabsio/coold/releases/tag/nightly
 ARG COOLIFY_FLUX_VERSION=nightly
+ARG COOLIFY_CLI_VERSION=nightly
 # https://www.postgresql.org/support/versioning/
 # Note: We are using version 18 of the postgres client (while still using postgres 15 for the postgres server) as version 15 has been removed from Alpine 3.23+ https://pkgs.alpinelinux.org/packages?name=postgresql*-client&branch=v3.23&repo=&arch=x86_64&origin=&flagged=&maintainer=
 ARG POSTGRES_VERSION=18
@@ -30,6 +31,7 @@ ARG TARGETARCH
 ARG POSTGRES_VERSION
 ARG CLOUDFLARED_VERSION
 ARG COOLIFY_FLUX_VERSION
+ARG COOLIFY_CLI_VERSION
 ARG NGINX_VERSION
 
 WORKDIR /var/www/html
@@ -107,6 +109,27 @@ RUN set -eux; \
     test -f /tmp/flux; \
     install -m 0755 /tmp/flux /usr/local/bin/flux; \
     rm -f /tmp/flux /tmp/flux.tar.gz
+
+# Install coolify from coold nightly release based on architecture
+RUN set -eux; \
+    mkdir -p /usr/local/bin; \
+    case "${TARGETARCH:-}" in \
+        amd64|arm64) COOLIFY_CLI_ARCH="${TARGETARCH}" ;; \
+        "") \
+            case "$(uname -m)" in \
+                x86_64) COOLIFY_CLI_ARCH="amd64" ;; \
+                aarch64) COOLIFY_CLI_ARCH="arm64" ;; \
+                *) echo "unsupported coolify arch: $(uname -m)" >&2; exit 1 ;; \
+            esac ;; \
+        *) echo "unsupported coolify TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL --retry 3 --max-time 120 \
+        -o /tmp/coolify.tar.gz \
+        "https://github.com/coollabsio/coold/releases/download/${COOLIFY_CLI_VERSION}/coolify-linux-musl-${COOLIFY_CLI_ARCH}.tar.gz"; \
+    tar -xzf /tmp/coolify.tar.gz -C /tmp; \
+    test -f /tmp/coolify; \
+    install -m 0755 /tmp/coolify /usr/local/bin/coolify; \
+    rm -f /tmp/coolify /tmp/coolify.tar.gz
 
 # Configure PHP
 COPY docker/development/etc/php/conf.d/zzz-custom-php.ini /usr/local/etc/php/conf.d/zzz-custom-php.ini
