@@ -689,7 +689,7 @@ CREATE TABLE IF NOT EXISTS "servers" (
     "port" INTEGER DEFAULT 22 NOT NULL,
     "user" TEXT DEFAULT 'root' NOT NULL,
     "team_id" INTEGER NOT NULL,
-    "private_key_id" INTEGER NOT NULL,
+    "private_key_id" INTEGER,
     "proxy" TEXT,
     "created_at" TEXT,
     "updated_at" TEXT,
@@ -1321,9 +1321,39 @@ CREATE TABLE IF NOT EXISTS "users" (
     "email_change_code_expires_at" TEXT
 );
 
+CREATE TABLE IF NOT EXISTS "v5_clusters" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "team_id" INTEGER NOT NULL,
+    "created_by_user_id" INTEGER NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "created_at" TEXT,
+    "updated_at" TEXT
+);
+
+CREATE TABLE IF NOT EXISTS "v5_servers" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "team_id" INTEGER NOT NULL,
+    "cluster_id" INTEGER,
+    "created_by_user_id" INTEGER NOT NULL,
+    "private_key_id" INTEGER,
+    "name" TEXT NOT NULL,
+    "host" TEXT NOT NULL,
+    "ssh_user" TEXT NOT NULL,
+    "ssh_port" INTEGER DEFAULT '22' NOT NULL,
+    "status" TEXT DEFAULT 'installed' NOT NULL,
+    "capabilities" TEXT,
+    "builder_enabled" INTEGER DEFAULT false NOT NULL,
+    "builder_capacity" INTEGER DEFAULT '0' NOT NULL,
+    "last_bootstrapped_at" TEXT,
+    "created_at" TEXT,
+    "updated_at" TEXT
+);
+
 CREATE TABLE IF NOT EXISTS "v5_projects" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     "team_id" INTEGER NOT NULL,
+    "cluster_id" INTEGER,
     "created_by_user_id" INTEGER NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
@@ -1763,3 +1793,7 @@ INSERT INTO "migrations" ("id", "migration", "batch") VALUES (312, '2025_12_15_1
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (313, '2025_12_17_000001_add_is_wire_navigate_enabled_to_instance_settings_table', 313);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (314, '2025_12_17_000002_add_restart_tracking_to_standalone_databases', 314);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (315, '2026_06_04_050157_create_v5_projects_table', 315);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (316, '2026_06_16_130650_create_v5_servers_table', 316);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (317, '2026_06_16_130649_create_v5_clusters_table', 317);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (318, '2026_06_16_131229_add_cluster_id_to_v5_servers_table', 318);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (319, '2026_06_16_132000_make_v5_server_private_key_nullable', 319);

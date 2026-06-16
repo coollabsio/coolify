@@ -279,6 +279,24 @@ coolify_bootstrap() {
     --yes
 }
 
+coolify_bootstrap_with_retry() {
+  local attempt
+  local attempts=5
+
+  for attempt in $(seq 1 "$attempts"); do
+    if coolify_bootstrap; then
+      return
+    fi
+
+    if [ "$attempt" = "$attempts" ]; then
+      return 1
+    fi
+
+    echo "WARN: coolify bootstrap failed on attempt ${attempt}/${attempts}; retrying because fresh Lima hosts can finish setup after partial bootstrap phases..." >&2
+    sleep 3
+  done
+}
+
 coolify_dev() {
   local command="${1:-help}"
   if [ $# -gt 0 ]; then
@@ -398,6 +416,32 @@ follow_logs() {
   spin logs -f
 }
 
+sync_v5_dev_lima_servers() {
+  local count
+  local builder_capacity
+  local args=()
+  local instance
+  local node
+
+  count="$(coold_vm_count)"
+  builder_capacity="$(read_coolify_env COOLIFY_COOLD_VM_BUILDER_CAPACITY 2)"
+
+  for index in $(seq 1 "$count"); do
+    instance="$(coold_vm_instance "$index")"
+    node="$(lima_ssh_target "$index")"
+    args+=(--server "${instance}|${node}|$(coolify_ssh_user)|22")
+  done
+
+  echo "==> Running pending migrations before syncing v5 dev Lima state..."
+  spin exec -T coolify php artisan migrate --force
+
+  echo "==> Syncing dev Lima VM(s) into v5 clusters/servers..."
+  spin exec -T coolify php artisan v5:sync-dev-lima-servers \
+    --cluster="Development-Lima" \
+    --builder-capacity="$builder_capacity" \
+    "${args[@]}"
+}
+
 configure_flux_dev_for_vm() {
   local index="$1"
   local host_id
@@ -429,9 +473,24 @@ up() {
   local coold_vm_enabled
   local follow_dev_logs
   local count
+  local naked=false
+  local spin_args=()
   coold_vm_enabled="$(read_coolify_env COOLIFY_COOLD_VM_ENABLED true)"
   follow_dev_logs="$(read_coolify_env COOLIFY_DEV_FOLLOW_LOGS true)"
   count="$(coold_vm_count)"
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --naked)
+        naked=true
+        shift
+        ;;
+      *)
+        spin_args+=("$1")
+        shift
+        ;;
+    esac
+  done
 
   if [ "$coold_vm_enabled" != "false" ]; then
     echo "==> Starting ${count} Coolify coold VM(s) before Spin..."
@@ -443,15 +502,26 @@ up() {
   fi
 
   echo "==> Starting Coolify Docker stack with Spin..."
-  spin up -d "$@"
+  if [ "${#spin_args[@]}" -gt 0 ]; then
+    spin up -d "${spin_args[@]}"
+  else
+    spin up -d
+  fi
+
+  if [ "$naked" = "true" ]; then
+    echo "==> --naked enabled. Skipping coolify bootstrap and Flux VM wiring. Use /v5 to bootstrap hosts from the UI."
+    return
+  fi
 
   if [ "$coold_vm_enabled" != "false" ]; then
     echo "==> Bootstrapping coold VM mesh with coolify..."
-    coolify_bootstrap
+    coolify_bootstrap_with_retry
 
     for index in $(seq 1 "$count"); do
       configure_flux_dev_for_vm "$index"
     done
+
+    sync_v5_dev_lima_servers
   fi
 
   if [ "$follow_dev_logs" = "false" ]; then
@@ -465,8 +535,23 @@ up() {
 down() {
   local coold_vm_enabled
   local stop_coold_vm
+  local cleanup=false
+  local spin_args=()
   coold_vm_enabled="$(read_coolify_env COOLIFY_COOLD_VM_ENABLED true)"
   stop_coold_vm="$(read_coolify_env COOLIFY_COOLD_VM_STOP_ON_DOWN false)"
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --cleanup)
+        cleanup=true
+        shift
+        ;;
+      *)
+        spin_args+=("$1")
+        shift
+        ;;
+    esac
+  done
 
   if [ "$coold_vm_enabled" != "false" ]; then
     for index in $(seq 1 "$(coold_vm_count)"); do
@@ -476,7 +561,16 @@ down() {
   fi
 
   echo "==> Stopping Coolify Docker stack with Spin..."
-  spin down "$@"
+  if [ "${#spin_args[@]}" -gt 0 ]; then
+    spin down "${spin_args[@]}"
+  else
+    spin down
+  fi
+
+  if [ "$cleanup" = "true" ]; then
+    clean_vms
+    return
+  fi
 
   if [ "$stop_coold_vm" = "true" ]; then
     echo "==> Stopping Coolify coold VM..."
@@ -765,11 +859,11 @@ firewall_help() {
 Usage: scripts/dev.sh firewall <command>
 
 Commands:
-  allow <src> <dst> [proto] [port]  Allow traffic on every coold VM (proto/port optional)
+  allow <src> <dst> [proto] [port]  Allow traffic through the coolify CLI (proto/port optional)
   revoke [id|src] [dst] [proto] [port]
-                                    Remove an allow rule from every coold VM
-  list                              List allow rules on every coold VM
-  reconcile                         Re-apply firewall snapshot on every coold VM
+                                    Remove an allow rule through the coolify CLI
+  list                              List allow rules through the coolify CLI
+  containers                        List registered containers through the coolify CLI
 
 Examples:
   scripts/dev.sh firewall allow 10.210.0.2 10.210.1.2 tcp 80
@@ -780,29 +874,21 @@ Examples:
 USAGE
 }
 
-firewall_api_for_each_vm() {
-  local label="$1"
-  local method="$2"
-  local path="$3"
-  local body="${4:-}"
-  local count
-  count="$(coold_vm_count)"
+coolify_firewall() {
+  local command="$1"
+  shift
+  local nodes
+  local ssh_config
 
-  for index in $(seq 1 "$count"); do
-    instance="$(coold_vm_instance "$index")"
-    api_ip="$(coold_vm_wg_ip "$index")"
-    echo "--- ${instance}: ${label} ---"
-    COOLIFY_COOLD_LIMA_INSTANCE="$instance" scripts/coold-vm.sh shell <<SH
-set -e
-token="\$(sudo cat /etc/coolify/api-token)"
-curl_args=(-fsS --max-time 10 -X "${method}" "http://${api_ip}:8443${path}" -H "Authorization: Bearer \${token}")
-if [ -n '${body}' ]; then
-  curl_args+=(-H 'Content-Type: application/json' -d '${body}')
-fi
-curl "\${curl_args[@]}"
-echo
-SH
-  done
+  ensure_coolify
+  nodes="$(coolify_nodes_arg)" || return 1
+  ssh_config="$(lima_ssh_config)" || return 1
+
+  "$(coolify_cli_bin)" firewall "$command" \
+    --nodes "$nodes" \
+    --ssh-config "$ssh_config" \
+    --ssh-user "$(coolify_ssh_user)" \
+    "$@"
 }
 
 firewall_allow() {
@@ -810,7 +896,7 @@ firewall_allow() {
   local dst="${2:-}"
   local proto="${3:-}"
   local port="${4:-}"
-  local body
+  local args=()
 
   if [ -z "$src" ] || [ -z "$dst" ]; then
     firewall_help >&2
@@ -822,31 +908,15 @@ firewall_allow() {
     exit 1
   fi
 
-  body="$(printf '{"namespace":"default","src":"%s","dst":"%s"' "$src" "$dst")"
+  args+=(--from "$src" --to "$dst")
   if [ -n "$proto" ]; then
-    body="${body}$(printf ',"proto":"%s"' "$proto")"
+    args+=(--proto "$proto")
   fi
   if [ -n "$port" ]; then
-    body="${body}$(printf ',"port":%s' "$port")"
-  fi
-  body="${body}}"
-
-  firewall_api_for_each_vm "allow ${src} -> ${dst}" POST /api/v1/firewall/allow "$body"
-}
-
-firewall_rule_id() {
-  local src="$1"
-  local dst="$2"
-  local proto="${3:-}"
-  local port="${4:-0}"
-
-  if [ -z "$proto" ]; then
-    port=0
+    args+=(--port "$port")
   fi
 
-  printf 'default|%s|%s|%s|%s' "$src" "$dst" "$proto" "$port" \
-    | shasum -a 256 \
-    | awk '{print substr($1, 1, 12)}'
+  coolify_firewall allow "${args[@]}"
 }
 
 firewall_revoke() {
@@ -854,7 +924,7 @@ firewall_revoke() {
   local dst="${2:-}"
   local proto="${3:-}"
   local port="${4:-}"
-  local id
+  local args=()
 
   if [ -z "$id_or_src" ]; then
     echo "Current firewall allow rule IDs:"
@@ -865,20 +935,26 @@ firewall_revoke() {
   fi
 
   if [ -z "$dst" ]; then
-    id="$id_or_src"
+    args+=(--id "$id_or_src")
   else
-    id="$(firewall_rule_id "$id_or_src" "$dst" "$proto" "$port")"
+    args+=(--from "$id_or_src" --to "$dst")
+    if [ -n "$proto" ]; then
+      args+=(--proto "$proto")
+    fi
+    if [ -n "$port" ]; then
+      args+=(--port "$port")
+    fi
   fi
 
-  firewall_api_for_each_vm "revoke ${id}" DELETE "/api/v1/firewall/allow/${id}"
+  coolify_firewall revoke "${args[@]}"
 }
 
 firewall_list() {
-  firewall_api_for_each_vm list GET '/api/v1/firewall/allow?namespace=default'
+  coolify_firewall list "$@"
 }
 
-firewall_reconcile() {
-  firewall_api_for_each_vm reconcile POST /api/v1/firewall/reconcile
+firewall_containers() {
+  coolify_firewall containers "$@"
 }
 
 firewall() {
@@ -895,10 +971,10 @@ firewall() {
       firewall_revoke "$@"
       ;;
     list)
-      firewall_list
+      firewall_list "$@"
       ;;
-    reconcile)
-      firewall_reconcile
+    containers)
+      firewall_containers "$@"
       ;;
     -h|--help|help)
       firewall_help
@@ -917,10 +993,14 @@ Usage: scripts/dev.sh <command> [spin args]
 
 Commands:
   up      Start the coold VM, Spin stack, and dev coold agent
+  up --naked
+          Start the coold VM(s) and Spin stack only; skip host bootstrap so /v5 can bootstrap
   down    Stop the dev coold agent and Spin stack
+  down --cleanup
+          Stop the dev stack, then delete the coold Lima VM(s) and VM-local state
   shell [n] Open a shell inside coold VM n (default: 1)
   list      Show Lima instances
-  clean-vms Delete the coold Lima VMs and all VM-local runtime state
+  clean-vms Delete the coold Lima VMs and all VM-local runtime state (alias for down --cleanup)
   corrosion <command> Inspect Corrosion state, config, logs, and registered containers
   firewall <command>  Manage dev coold firewall allow rules
   example-nginx <command> Start/check example nginx containers with coold DNS
@@ -947,7 +1027,7 @@ case "$cmd" in
     limactl list
     ;;
   clean-vms|clean-vm|reset-vms)
-    clean_vms
+    down --cleanup
     ;;
   corrosion)
     corrosion "$@"
