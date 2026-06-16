@@ -30,6 +30,25 @@ You can find the installation script source [here](./scripts/install.sh).
 > Please refer to the [docs](https://coolify.io/docs/installation) for more information about the installation.
 
 
+## Local dev with coold VM
+
+For v5 development that needs a packaged `coold` endpoint VM with Corrosion, use:
+
+```bash
+scripts/dev.sh up
+```
+
+This starts two Lima endpoint VMs by default, configures a WireGuard mesh between them, starts the Docker stack in the background, mints dev host JWTs with `php artisan flux:dev --caps=coold,builder`, installs them into the VMs, starts each VM `coold` agent service with builder capacity, and follows Coolify + VM agent logs by default. Flux runs with the Coolify container, not inside the VM. Set `COOLIFY_COOLD_VM_COUNT=1` for a single endpoint, `COOLIFY_COOLD_VM_ENABLED=false` to skip the VMs, `COOLIFY_COOLD_VM_BUILDER_CAPACITY=0` to disable builder capability, or `COOLIFY_DEV_FOLLOW_LOGS=false` to leave `up` detached. Use `scripts/dev.sh down` to stop the stack and VM agent; set `COOLIFY_COOLD_VM_STOP_ON_DOWN=true` if you also want the VM stopped. The dev entrypoints are intentionally kept to `scripts/dev.sh` for the full stack and `scripts/coold-vm.sh` for VM-only operations.
+
+Useful Corrosion checks:
+
+```bash
+scripts/dev.sh corrosion check
+scripts/dev.sh corrosion containers
+scripts/dev.sh corrosion config
+scripts/dev.sh corrosion sql 'select count(*) from service_endpoints;'
+```
+
 ## Container roles and Flux
 
 The Coolify image can run different process roles with `COOLIFY_CONTAINER_ROLE`. The value can be a single role or a comma-separated list. If `all` is present anywhere in the list, every role starts.

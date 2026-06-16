@@ -8,14 +8,18 @@ services:
       args:
         - USER_ID=${USERID:-1000}
         - GROUP_ID=${GROUPID:-1000}
+        - COOLIFY_FLUX_VERSION=${COOLIFY_FLUX_VERSION:-nightly}
     ports:
       - "${APP_PORT:-8000}:8080"
       - "${FORWARD_FLUX_PORT:-6443}:6443"
     environment:
       AUTORUN_ENABLED: false
       COOLIFY_CONTAINER_ROLE: "${COOLIFY_CONTAINER_ROLE:-all}"
-      PUSHER_HOST: "${PUSHER_HOST}"
-      PUSHER_PORT: "${PUSHER_PORT}"
+      COOLIFY_COOLD_VERSION: "${COOLIFY_COOLD_VERSION:-nightly}"
+      COOLIFY_FLUX_VERSION: "${COOLIFY_FLUX_VERSION:-nightly}"
+      COOLIFY_CORROSION_VERSION: "${COOLIFY_CORROSION_VERSION:-v1.0.0}"
+      PUSHER_HOST: "${PUSHER_HOST:-}"
+      PUSHER_PORT: "${PUSHER_PORT:-}"
       PUSHER_SCHEME: "${PUSHER_SCHEME:-http}"
       PUSHER_APP_ID: "${PUSHER_APP_ID:-coolify}"
       PUSHER_APP_KEY: "${PUSHER_APP_KEY:-coolify}"

@@ -40,3 +40,6 @@ CHANGELOG.md
 /.workspaces
 tests/Browser/Screenshots
 tests/v4/Browser/Screenshots
+
+# Local generated Lima configs
+.dev/lima/*.generated.yaml

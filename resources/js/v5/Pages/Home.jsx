@@ -1,6 +1,6 @@
 import { Head } from '@inertiajs/react';
 
-export default function Home({ status, currentTeam, teams, flux }) {
+export default function Home({ status, currentTeam, teams, flux, cooldHosts }) {
     return (
         <>
             <Head title="V5" />
@@ -25,6 +25,24 @@ export default function Home({ status, currentTeam, teams, flux }) {
                     <p>{flux.message}</p>
 
                     {flux.socket ? <p>Socket: {flux.socket}</p> : null}
+                </section>
+
+                <section aria-labelledby="coold-host-heading">
+                    <h2 id="coold-host-heading">coold host</h2>
+
+                    <ul>
+                        {cooldHosts.map((host) => (
+                            <li key={host.id}>
+                                <strong>{host.id}</strong>
+                                {host.wireguardIp ? ` (${host.wireguardIp})` : ''}:
+                                {' '}
+                                {host.capabilities.join(', ')}; builder{' '}
+                                {host.builderEnabled
+                                    ? `enabled, capacity ${host.builderCapacity}`
+                                    : 'disabled'}
+                            </li>
+                        ))}
+                    </ul>
                 </section>
 
                 <h2>Current team</h2>
