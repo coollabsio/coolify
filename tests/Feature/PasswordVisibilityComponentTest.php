@@ -104,3 +104,15 @@ it('skips env var autocomplete markup when the input is disabled', function () {
         ->not->toContain('@input="handleInput()"')
         ->not->toContain('x-show="showDropdown"');
 });
+
+it('skips env var autocomplete markup when the input is readonly', function () {
+    $html = Blade::render(
+        '<x-forms.env-var-input readonly type="password" id="secret" :availableVars="$availableVars" />',
+        ['availableVars' => ['team' => ['API_KEY']]],
+    );
+
+    expect($html)
+        ->not->toContain('availableVars:')
+        ->not->toContain('@input="handleInput()"')
+        ->not->toContain('x-show="showDropdown"');
+});
