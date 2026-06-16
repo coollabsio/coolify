@@ -5,7 +5,9 @@ use App\Http\Middleware\CheckForcePasswordReset;
 use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Http\Middleware\V5\EnsureCurrentTeam;
 use App\Http\Middleware\V5\HandleInertiaRequests;
+use App\Models\Environment;
 use App\Models\PrivateKey;
+use App\Models\Project;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\V5\Cluster;
@@ -32,7 +34,8 @@ beforeEach(function () {
 });
 
 it('registers the v5 home route', function () {
-    expect(Route::has('v5.home'))->toBeTrue();
+    expect(Route::has('v5.home'))->toBeTrue()
+        ->and(Route::has('v5.selection.update'))->toBeTrue();
 });
 
 it('uses separated v5 middleware groups', function () {
@@ -162,6 +165,7 @@ it('serves the v5 inertia shell', function () {
         ->withSession(['currentTeam' => $team])
         ->get('/v5')
         ->assertSuccessful()
+        ->assertSee('<html lang="en" class="dark">', false)
         ->assertSee('v5-app', false)
         ->assertSee('Home', false)
         ->assertDontSee('v5-ready', false)
@@ -223,6 +227,178 @@ it('shows v5 clusters with their servers on the inertia shell', function () {
         ->assertSee('"host":"lima-coold-dev"', false);
 });
 
+it('shares existing projects and environments with the v5 home page', function () {
+    $this->withoutVite();
+    fakeFluxHealth();
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'gravy-truck', 'production');
+    createV5ProjectWithEnvironment($team, 'rocket-bike', 'staging');
+    $otherTeam = Team::withoutEvents(fn () => Team::query()->create([
+        'name' => 'Other V5 Team',
+        'description' => null,
+        'personal_team' => false,
+        'show_boarding' => false,
+    ]));
+    [$otherProject, $otherEnvironment] = createV5ProjectWithEnvironment($otherTeam, 'secret-saucer', 'private');
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->get('/v5')
+        ->assertSuccessful()
+        ->assertSee('"projects":[', false)
+        ->assertSee('"name":"gravy-truck"', false)
+        ->assertSee('"uuid":"'.$project->uuid.'"', false)
+        ->assertSee('"environments":[', false)
+        ->assertSee('"name":"production"', false)
+        ->assertSee('"uuid":"'.$environment->uuid.'"', false)
+        ->assertSee('"selectedProjectUuid":"'.$project->uuid.'"', false)
+        ->assertSee('"selectedEnvironmentUuid":"'.$environment->uuid.'"', false)
+        ->assertDontSee('"id":"'.$project->id.'","uuid":"'.$project->uuid.'"', false)
+        ->assertDontSee('"id":"'.$environment->id.'","uuid":"'.$environment->uuid.'"', false)
+        ->assertDontSee($otherProject->name)
+        ->assertDontSee($otherProject->uuid)
+        ->assertDontSee($otherEnvironment->name)
+        ->assertDontSee($otherEnvironment->uuid);
+});
+
+it('persists the selected v5 project and environment in the session', function () {
+    $this->withoutVite();
+    fakeFluxHealth();
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    createV5ProjectWithEnvironment($team, 'alpha-project', 'production');
+    [$selectedProject, $selectedEnvironment] = createV5ProjectWithEnvironment($team, 'zebra-project', 'staging');
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson('/v5/selection', [
+            'project_uuid' => $selectedProject->uuid,
+            'environment_uuid' => $selectedEnvironment->uuid,
+        ])
+        ->assertNoContent()
+        ->assertSessionHas('v5.selectedProjectUuid', $selectedProject->uuid)
+        ->assertSessionHas('v5.selectedEnvironmentUuid', $selectedEnvironment->uuid);
+
+    $this
+        ->actingAs($user)
+        ->get('/v5')
+        ->assertSuccessful()
+        ->assertSee('"selectedProjectUuid":"'.$selectedProject->uuid.'"', false)
+        ->assertSee('"selectedEnvironmentUuid":"'.$selectedEnvironment->uuid.'"', false);
+});
+
+it('rejects persisted v5 selections outside the current team', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $otherTeam = Team::withoutEvents(fn () => Team::query()->create([
+        'name' => 'Other V5 Team',
+        'description' => null,
+        'personal_team' => false,
+        'show_boarding' => false,
+    ]));
+    [$otherProject, $otherEnvironment] = createV5ProjectWithEnvironment($otherTeam, 'secret-saucer', 'private');
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson('/v5/selection', [
+            'project_uuid' => $otherProject->uuid,
+            'environment_uuid' => $otherEnvironment->uuid,
+        ])
+        ->assertForbidden()
+        ->assertSessionMissing('v5.selectedProjectUuid')
+        ->assertSessionMissing('v5.selectedEnvironmentUuid');
+});
+
+it('defines the v5 home page as a shadcn styled canvas shell', function () {
+    $homePage = file_get_contents(resource_path('js/v5/Pages/Home.jsx'));
+    $navbarPath = resource_path('js/v5/components/app-navbar.jsx');
+
+    expect(file_exists($navbarPath))->toBeTrue();
+
+    $navbar = file_get_contents($navbarPath);
+
+    expect($homePage)
+        ->toContain('Magic')
+        ->toContain("import { AppNavbar } from '@/components/app-navbar';")
+        ->toContain('<AppNavbar')
+        ->toContain('bg-background text-foreground')
+        ->toContain('h-dvh overflow-hidden bg-background text-foreground')
+        ->toContain('flex h-full min-h-0 items-center justify-center overflow-hidden px-6 pt-16')
+        ->not->toContain('<header')
+        ->not->toContain('h-[calc(100dvh-4rem)]')
+        ->not->toContain('flex h-dvh flex-col overflow-hidden bg-background text-foreground')
+        ->toContain('This is where the magic happens.')
+        ->not->toContain("import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';")
+        ->not->toContain("fetch('/v5/selection'")
+        ->not->toContain("'X-CSRF-TOKEN': csrfToken()");
+
+    expect($navbar)
+        ->toContain('export function AppNavbar')
+        ->toContain('/coolify-logo.svg')
+        ->toContain('className="fixed inset-x-0 top-0 z-40 border-b border-border bg-background"')
+        ->not->toContain('className="sticky top-0 z-40 shrink-0 border-b border-border bg-background"')
+        ->toContain('bg-muted/40')
+        ->toContain('text-muted-foreground')
+        ->toContain('SelectGroup')
+        ->toContain('variant="ghost"')
+        ->toContain('className="max-w-[10rem]"')
+        ->toContain('position="popper"')
+        ->toContain('sideOffset={4}')
+        ->toContain('Select a project')
+        ->toContain('Select an environment')
+        ->toContain("fetch('/v5/selection'")
+        ->toContain("'X-CSRF-TOKEN': csrfToken()")
+        ->not->toContain("import { Button } from '@/components/ui/button';")
+        ->not->toContain('<Button')
+        ->not->toContain("import { Separator } from '@/components/ui/separator';")
+        ->not->toContain('<Separator')
+        ->not->toContain('min-h-[calc(100vh-4rem)]')
+        ->not->toContain('py-10')
+        ->not->toContain('bg-background/95')
+        ->not->toContain('backdrop-blur')
+        ->not->toContain('supports-[backdrop-filter]')
+        ->not->toContain('bg-coolgray')
+        ->not->toContain('border-coolgray')
+        ->not->toContain('text-warning')
+        ->not->toContain('className="w-[12rem]"')
+        ->not->toContain('<h1>Coolify v5</h1>')
+        ->not->toContain('<h2 id="clusters-heading">Clusters</h2>');
+});
+
+it('defines a ghost variant for compact v5 select triggers', function () {
+    $select = file_get_contents(resource_path('js/v5/components/ui/select.jsx'));
+
+    expect($select)
+        ->toContain('variant = "default"')
+        ->toContain('variant === "default"')
+        ->toContain('variant === "ghost"')
+        ->toContain('border-transparent')
+        ->toContain('h-auto')
+        ->toContain('text-sm');
+});
+
+it('uses the requested shadcn preset configuration for v5', function () {
+    $components = json_decode(file_get_contents(base_path('components.json')), true);
+    $css = file_get_contents(resource_path('css/v5/app.css'));
+
+    expect($components['style'])
+        ->toBe('radix-lyra')
+        ->and($components['iconLibrary'])->toBe('phosphor')
+        ->and($components['tailwind']['css'])->toBe('resources/css/v5/app.css')
+        ->and($components['tailwind']['baseColor'])->toBe('zinc')
+        ->and($css)->toContain('@import "@fontsource-variable/geist";')
+        ->and($css)->toContain('--foreground: oklch(0.141 0.005 285.823);')
+        ->and($css)->toContain('--background: #101010;')
+        ->and($css)->toContain('button:not(:disabled)');
+});
+
 it('selects a shared team when the session has no current team', function () {
     $this->withoutVite();
     fakeFluxHealth();
@@ -249,6 +425,52 @@ it('selects a shared team when the session has no current team', function () {
         ->assertSessionHas('currentTeam')
         ->assertDontSee('Auto Selected Team')
         ->assertDontSee('admin');
+});
+
+it('serves v5 dev assets from the current request host', function (string $url, string $viteHost) {
+    fakeFluxHealth();
+    createSharedUserAndTeamTables();
+    [$user, $team] = createV5UserWithTeam();
+
+    $hotFile = public_path('hot');
+    $originalHotFile = file_exists($hotFile) ? file_get_contents($hotFile) : null;
+
+    file_put_contents($hotFile, 'http://configured-vite-host.test:5173');
+
+    try {
+        $response = $this
+            ->actingAs($user)
+            ->withSession(['currentTeam' => $team])
+            ->get($url);
+
+        $response
+            ->assertSuccessful()
+            ->assertSee("import RefreshRuntime from 'http://{$viteHost}:5173/@react-refresh'", false)
+            ->assertSee("src=\"http://{$viteHost}:5173/@vite/client\"", false)
+            ->assertSee("src=\"http://{$viteHost}:5173/resources/js/v5/app.jsx\"", false)
+            ->assertDontSee('configured-vite-host.test', false);
+    } finally {
+        if ($originalHotFile === null) {
+            @unlink($hotFile);
+        } else {
+            file_put_contents($hotFile, $originalHotFile);
+        }
+    }
+})->with([
+    'localhost' => ['http://localhost:8000/v5', 'localhost'],
+    'tailscale ip' => ['http://100.64.0.10:8000/v5', '100.64.0.10'],
+]);
+
+it('configures the vite dev server for remote v5 access', function () {
+    $viteConfig = file_get_contents(base_path('vite.config.js'));
+
+    expect($viteConfig)
+        ->toContain('host: "0.0.0.0"')
+        ->toContain('allowedHosts: true')
+        ->toContain('cors: true')
+        ->toContain('const viteHmrHost = env.VITE_HMR_HOST || null;')
+        ->toContain('hmr: viteHmrHost')
+        ->not->toContain('hmr: viteHost');
 });
 
 it('shows when flux is unavailable', function () {
@@ -289,12 +511,12 @@ it('does not include coolify version controls on the v5 home page', function () 
 });
 
 it('renders flux status as a compact summary', function () {
-    $homePage = file_get_contents(resource_path('js/v5/Pages/Home.jsx'));
+    $navbar = file_get_contents(resource_path('js/v5/components/app-navbar.jsx'));
 
-    expect($homePage)
-        ->toContain('<strong>Flux:</strong>')
-        ->toContain('{flux.label}')
-        ->toContain('{flux.socket ? flux.socket : flux.message}')
+    expect($navbar)
+        ->toContain('Flux: {flux?.label ??')
+        ->toContain('title={flux?.socket ?? flux?.message}')
+        ->toContain('{clusters.length} clusters')
         ->not->toContain('<h2 id="flux-status-heading">Flux status</h2>')
         ->not->toContain('<p>{flux.message}</p>')
         ->not->toContain('Socket: {flux.socket}');
@@ -535,6 +757,24 @@ function createSharedUserAndTeamTables(): void
         $table->timestamps();
     });
 
+    Schema::create('projects', function ($table) {
+        $table->id();
+        $table->string('uuid');
+        $table->string('name');
+        $table->text('description')->nullable();
+        $table->foreignId('team_id');
+        $table->timestamps();
+    });
+
+    Schema::create('environments', function ($table) {
+        $table->id();
+        $table->string('name');
+        $table->foreignId('project_id');
+        $table->timestamps();
+        $table->text('description')->nullable();
+        $table->string('uuid');
+    });
+
     Schema::create('v5_clusters', function ($table) {
         $table->id();
         $table->foreignId('team_id');
@@ -571,6 +811,28 @@ function createSharedUserAndTeamTables(): void
 
         $table->unique(['team_id', 'user_id']);
     });
+}
+
+/**
+ * @return array{0: Project, 1: Environment}
+ */
+function createV5ProjectWithEnvironment(Team $team, string $projectName, string $environmentName): array
+{
+    $project = Project::withoutEvents(fn () => Project::query()->forceCreate([
+        'uuid' => str($projectName)->slug().'-uuid',
+        'name' => $projectName,
+        'description' => null,
+        'team_id' => $team->id,
+    ]));
+
+    $environment = Environment::withoutEvents(fn () => Environment::query()->forceCreate([
+        'uuid' => str($environmentName)->slug().'-uuid',
+        'name' => $environmentName,
+        'description' => null,
+        'project_id' => $project->id,
+    ]));
+
+    return [$project, $environment];
 }
 
 function createV5PrivateKey(Team $team, string $name): PrivateKey

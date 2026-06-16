@@ -1,47 +1,34 @@
 import { Head } from '@inertiajs/react';
 
-export default function Home({ flux, clusters }) {
+import { AppNavbar } from '@/components/app-navbar';
+
+export default function Home({
+    flux,
+    clusters = [],
+    projects = [],
+    selectedProjectUuid = null,
+    selectedEnvironmentUuid = null,
+}) {
     return (
         <>
-            <Head title="V5" />
+            <Head title="Magic" />
 
-            <main>
-                <h1>Coolify v5</h1>
+            <div className="h-dvh overflow-hidden bg-background text-foreground">
+                <AppNavbar
+                    flux={flux}
+                    clusters={clusters}
+                    projects={projects}
+                    selectedProjectUuid={selectedProjectUuid}
+                    selectedEnvironmentUuid={selectedEnvironmentUuid}
+                />
 
-                <section aria-label="Flux status">
-                    <p>
-                        <strong>Flux:</strong> {flux.label} — {flux.socket ? flux.socket : flux.message}
-                    </p>
-                </section>
-
-                <section aria-labelledby="clusters-heading">
-                    <h2 id="clusters-heading">Clusters</h2>
-
-                    {clusters.length === 0 ? (
-                        <p>No clusters have been added yet.</p>
-                    ) : (
-                        <ul>
-                            {clusters.map((cluster) => (
-                                <li key={cluster.id}>
-                                    <strong>{cluster.name}</strong> — {cluster.serversCount}{' '}
-                                    {cluster.serversCount === 1 ? 'server' : 'servers'}
-                                    {cluster.description ? <p>{cluster.description}</p> : null}
-                                    {cluster.servers.length > 0 ? (
-                                        <ul>
-                                            {cluster.servers.map((server) => (
-                                                <li key={server.id}>
-                                                    {server.name} ({server.status}) — {server.host};{' '}
-                                                    {server.capabilities.join(', ')}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    ) : null}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </section>
-            </main>
+                <main className="flex h-full min-h-0 items-center justify-center overflow-hidden px-6 pt-16">
+                    <section className="flex w-full max-w-5xl flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-card px-8 py-24 text-center">
+                        <p className="text-sm font-medium text-foreground">Magic</p>
+                        <p className="max-w-md text-sm text-muted-foreground">This is where the magic happens.</p>
+                    </section>
+                </main>
+            </div>
         </>
     );
 }
