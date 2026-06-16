@@ -13,6 +13,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class All extends Component
@@ -37,6 +38,7 @@ class All extends Component
 
     public bool $use_build_secrets = false;
 
+    #[Locked]
     public array $parameters = [];
 
     protected $listeners = [
@@ -59,9 +61,9 @@ class All extends Component
         unset($this->hasEnvironmentVariables);
     }
 
-    public function mount()
+    public function mount(?array $parameters = null)
     {
-        $this->parameters = get_route_parameters();
+        $this->parameters = $parameters ?? get_route_parameters();
         $this->is_env_sorting_enabled = data_get($this->resource, 'settings.is_env_sorting_enabled', false);
         $this->use_build_secrets = data_get($this->resource, 'settings.use_build_secrets', false);
         $this->resourceClass = get_class($this->resource);
@@ -242,6 +244,7 @@ class All extends Component
 
                 if ($application && $application->destination && $application->destination->server) {
                     try {
+                        $this->authorize('view', $application);
                         $this->authorize('view', $application->destination->server);
                         $result['server'] = $application->destination->server->environment_variables()
                             ->pluck('key')
@@ -259,6 +262,7 @@ class All extends Component
 
                     if ($service && $service->server) {
                         try {
+                            $this->authorize('view', $service);
                             $this->authorize('view', $service->server);
                             $result['server'] = $service->server->environment_variables()
                                 ->pluck('key')
@@ -281,6 +285,7 @@ class All extends Component
             if ($env->is_shown_once || $isMember) {
                 $env->value = null;
                 $env->real_value = null;
+                $env->syncOriginalAttributes(['value', 'real_value']);
             }
         });
 

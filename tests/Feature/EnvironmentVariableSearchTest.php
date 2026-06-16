@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Project\Shared\EnvironmentVariable\All;
+use App\Livewire\Project\Shared\EnvironmentVariable\Show;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
@@ -76,6 +77,145 @@ it('adds an environment variable from normal view without developer view data', 
         ->toBe('new-secret')
         ->and($component->get('variables'))
         ->toBeNull();
+});
+
+it('preserves locked environment variable values when saving non-value fields', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+    ]);
+
+    $environmentVariable = EnvironmentVariable::create([
+        'key' => 'LOCKED_KEY',
+        'value' => 'locked-secret-value',
+        'comment' => 'old comment',
+        'resourceable_type' => Application::class,
+        'resourceable_id' => $application->id,
+        'is_multiline' => false,
+        'is_literal' => false,
+        'is_shown_once' => true,
+        'is_runtime' => true,
+        'is_buildtime' => true,
+        'is_required' => true,
+    ]);
+
+    $redactedEnvironmentVariable = Livewire::test(All::class, ['resource' => $application])
+        ->get('environmentVariables')
+        ->firstWhere('key', 'LOCKED_KEY');
+
+    expect($redactedEnvironmentVariable->value)->not->toBe('locked-secret-value')
+        ->and($redactedEnvironmentVariable->isDirty('value'))->toBeFalse();
+
+    Livewire::test(Show::class, [
+        'env' => $redactedEnvironmentVariable,
+        'type' => 'application',
+        'availableSharedVariables' => [],
+    ])
+        ->set('value', 'client-supplied-value')
+        ->set('is_shown_once', false)
+        ->set('comment', 'updated comment')
+        ->call('submit');
+
+    $environmentVariable->refresh();
+
+    expect($environmentVariable->value)->toBe('locked-secret-value')
+        ->and($environmentVariable->is_shown_once)->toBeTruthy()
+        ->and($environmentVariable->comment)->toBe('updated comment');
+});
+
+it('keeps member redacted environment variables clean', function () {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member, ['role' => 'member']);
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+    ]);
+
+    $environmentVariable = EnvironmentVariable::create([
+        'key' => 'MEMBER_HIDDEN_KEY',
+        'value' => 'member-hidden-secret',
+        'resourceable_type' => Application::class,
+        'resourceable_id' => $application->id,
+        'is_multiline' => false,
+        'is_literal' => false,
+        'is_shown_once' => false,
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+
+    $redactedEnvironmentVariable = Livewire::test(All::class, ['resource' => $application])
+        ->get('environmentVariables')
+        ->firstWhere('key', 'MEMBER_HIDDEN_KEY');
+
+    expect($redactedEnvironmentVariable->value)->not->toBe('member-hidden-secret')
+        ->and($redactedEnvironmentVariable->isDirty('value'))->toBeFalse();
+
+    Livewire::test(Show::class, [
+        'env' => $redactedEnvironmentVariable,
+        'type' => 'application',
+        'availableSharedVariables' => [],
+    ])
+        ->set('is_shown_once', true)
+        ->call('syncData', true)
+        ->assertForbidden();
+
+    $environmentVariable->refresh();
+
+    expect($environmentVariable->value)->toBe('member-hidden-secret')
+        ->and($environmentVariable->is_shown_once)->toBeFalsy();
+});
+
+it('updates visible environment variable values when saving the row', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+    ]);
+
+    $environmentVariable = EnvironmentVariable::create([
+        'key' => 'VISIBLE_KEY',
+        'value' => 'visible-secret-value',
+        'resourceable_type' => Application::class,
+        'resourceable_id' => $application->id,
+        'is_multiline' => false,
+        'is_literal' => false,
+        'is_shown_once' => false,
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+
+    Livewire::test(Show::class, [
+        'env' => $environmentVariable,
+        'type' => 'application',
+        'availableSharedVariables' => [],
+    ])
+        ->set('value', 'updated-visible-secret')
+        ->call('submit');
+
+    expect($environmentVariable->refresh()->value)->toBe('updated-visible-secret');
+});
+
+it('renders an environment variable row without parent autocomplete data', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+    ]);
+
+    $environmentVariable = EnvironmentVariable::create([
+        'key' => 'DIRECT_ROW_KEY',
+        'value' => 'direct-row-secret',
+        'resourceable_type' => Application::class,
+        'resourceable_id' => $application->id,
+        'is_multiline' => false,
+        'is_literal' => false,
+        'is_shown_once' => false,
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+
+    Livewire::test(Show::class, [
+        'env' => $environmentVariable,
+        'type' => 'application',
+    ])
+        ->assertSee('DIRECT_ROW_KEY');
 });
 
 it('does not change preview variables when preview developer view data is not loaded', function () {
@@ -275,12 +415,13 @@ it('scopes shared variable autocomplete data to the current route and team', fun
         'team_id' => $this->team->id,
     ]);
 
-    $component = Livewire::test(All::class, ['resource' => $application])
-        ->set('parameters', [
-            'project_uuid' => $this->project->uuid,
-            'environment_uuid' => $this->environment->uuid,
-            'application_uuid' => $application->uuid,
-        ]);
+    $parameters = [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $application->uuid,
+    ];
+
+    $component = Livewire::test(All::class, ['resource' => $application, 'parameters' => $parameters]);
 
     $availableSharedVariables = $component->get('availableSharedVariables');
 
@@ -297,22 +438,24 @@ it('scopes shared variable autocomplete data to the current route and team', fun
         ->toContain('SERVER_API_TOKEN')
         ->not->toContain('OTHER_SERVER_TOKEN');
 
-    $serverRouteSharedVariables = Livewire::test(All::class, ['resource' => $application])
-        ->set('parameters', [
-            'server_uuid' => $server->uuid,
-        ])
+    $parameters = [
+        'server_uuid' => $server->uuid,
+    ];
+
+    $serverRouteSharedVariables = Livewire::test(All::class, ['resource' => $application, 'parameters' => $parameters])
         ->get('availableSharedVariables');
 
     expect($serverRouteSharedVariables['server'])
         ->toContain('SERVER_API_TOKEN')
         ->not->toContain('OTHER_SERVER_TOKEN');
 
-    $serviceRouteSharedVariables = Livewire::test(All::class, ['resource' => $service])
-        ->set('parameters', [
-            'project_uuid' => $this->project->uuid,
-            'environment_uuid' => $this->environment->uuid,
-            'service_uuid' => $service->uuid,
-        ])
+    $parameters = [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'service_uuid' => $service->uuid,
+    ];
+
+    $serviceRouteSharedVariables = Livewire::test(All::class, ['resource' => $service, 'parameters' => $parameters])
         ->get('availableSharedVariables');
 
     expect($serviceRouteSharedVariables['server'])
@@ -371,32 +514,35 @@ it('does not expose shared variables from cross-team route parameters', function
         'team_id' => $otherTeam->id,
     ]);
 
-    $applicationRouteSharedVariables = Livewire::test(All::class, ['resource' => $application])
-        ->set('parameters', [
-            'project_uuid' => $otherProject->uuid,
-            'environment_uuid' => $otherEnvironment->uuid,
-            'application_uuid' => $otherApplication->uuid,
-        ])
+    $parameters = [
+        'project_uuid' => $otherProject->uuid,
+        'environment_uuid' => $otherEnvironment->uuid,
+        'application_uuid' => $otherApplication->uuid,
+    ];
+
+    $applicationRouteSharedVariables = Livewire::test(All::class, ['resource' => $application, 'parameters' => $parameters])
         ->get('availableSharedVariables');
 
     expect($applicationRouteSharedVariables['project'])->not->toContain('OTHER_PROJECT_TOKEN');
     expect($applicationRouteSharedVariables['environment'])->not->toContain('OTHER_ENVIRONMENT_TOKEN');
     expect($applicationRouteSharedVariables['server'])->not->toContain('OTHER_SERVER_TOKEN');
 
-    $serverRouteSharedVariables = Livewire::test(All::class, ['resource' => $application])
-        ->set('parameters', [
-            'server_uuid' => $otherServer->uuid,
-        ])
+    $parameters = [
+        'server_uuid' => $otherServer->uuid,
+    ];
+
+    $serverRouteSharedVariables = Livewire::test(All::class, ['resource' => $application, 'parameters' => $parameters])
         ->get('availableSharedVariables');
 
     expect($serverRouteSharedVariables['server'])->not->toContain('OTHER_SERVER_TOKEN');
 
-    $serviceRouteSharedVariables = Livewire::test(All::class, ['resource' => $otherService])
-        ->set('parameters', [
-            'project_uuid' => $otherProject->uuid,
-            'environment_uuid' => $otherEnvironment->uuid,
-            'service_uuid' => $otherService->uuid,
-        ])
+    $parameters = [
+        'project_uuid' => $otherProject->uuid,
+        'environment_uuid' => $otherEnvironment->uuid,
+        'service_uuid' => $otherService->uuid,
+    ];
+
+    $serviceRouteSharedVariables = Livewire::test(All::class, ['resource' => $otherService, 'parameters' => $parameters])
         ->get('availableSharedVariables');
 
     expect($serviceRouteSharedVariables['project'])->not->toContain('OTHER_PROJECT_TOKEN');
