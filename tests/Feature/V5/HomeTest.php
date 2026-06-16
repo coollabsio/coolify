@@ -327,6 +327,8 @@ it('defines the v5 home page as a shadcn styled canvas shell', function () {
     expect($homePage)
         ->toContain('Magic')
         ->toContain("import { AppNavbar } from '@/components/app-navbar';")
+        ->not->toContain("import { csrfToken } from '@/lib/csrf';")
+        ->not->toContain('function csrfToken()')
         ->toContain('<AppNavbar')
         ->toContain('bg-background text-foreground')
         ->toContain('h-dvh overflow-hidden bg-background text-foreground')
@@ -340,6 +342,8 @@ it('defines the v5 home page as a shadcn styled canvas shell', function () {
         ->not->toContain("'X-CSRF-TOKEN': csrfToken()");
 
     expect($navbar)
+        ->toContain("import { csrfToken } from '@/lib/csrf';")
+        ->not->toContain('function csrfToken()')
         ->toContain('export function AppNavbar')
         ->toContain('/coolify-logo.svg')
         ->toContain('className="fixed inset-x-0 top-0 z-40 border-b border-border bg-background"')

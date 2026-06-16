@@ -1,10 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
-function csrfToken() {
-    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
-}
+import { csrfToken } from '@/lib/csrf';
 
 function persistSelection(projectUuid, environmentUuid) {
     void fetch('/v5/selection', {
