@@ -14,6 +14,7 @@ use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Reactive;
 use Livewire\Component;
 
 class Show extends Component
@@ -62,6 +63,7 @@ class Show extends Component
 
     public array $problematicVariables = [];
 
+    #[Reactive]
     public ?array $availableSharedVariables = null;
 
     protected $listeners = [
