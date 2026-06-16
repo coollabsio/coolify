@@ -29,55 +29,6 @@ You can find the installation script source [here](./scripts/install.sh).
 > [!NOTE]
 > Please refer to the [docs](https://coolify.io/docs/installation) for more information about the installation.
 
-
-## Local dev with coold VM
-
-For v5 development that needs a packaged `coold` endpoint VM with Corrosion, use:
-
-```bash
-scripts/dev.sh up
-```
-
-This starts two Lima endpoint VMs by default, configures a WireGuard mesh between them, starts the Docker stack in the background, mints dev host JWTs with `php artisan flux:dev --caps=coold,builder`, installs them into the VMs, starts each VM `coold` agent service with builder capacity, and follows Coolify + VM agent logs by default. Flux runs with the Coolify container, not inside the VM. Set `COOLIFY_COOLD_VM_COUNT=1` for a single endpoint, `COOLIFY_COOLD_VM_ENABLED=false` to skip the VMs, `COOLIFY_COOLD_VM_BUILDER_CAPACITY=0` to disable builder capability, or `COOLIFY_DEV_FOLLOW_LOGS=false` to leave `up` detached. Use `scripts/dev.sh down` to stop the stack and VM agent; set `COOLIFY_COOLD_VM_STOP_ON_DOWN=true` if you also want the VM stopped. The dev entrypoints are intentionally kept to `scripts/dev.sh` for the full stack and `scripts/coold-vm.sh` for VM-only operations.
-
-Useful Corrosion checks:
-
-```bash
-scripts/dev.sh corrosion check
-scripts/dev.sh corrosion containers
-scripts/dev.sh corrosion config
-scripts/dev.sh corrosion sql 'select count(*) from service_endpoints;'
-```
-
-## Container roles and Flux
-
-The Coolify image can run different process roles with `COOLIFY_CONTAINER_ROLE`. The value can be a single role or a comma-separated list. If `all` is present anywhere in the list, every role starts.
-
-- `all` (default): self-hosted mode; runs the web process, worker services, and Flux when configured.
-- `web`: web/API process only; s6 worker services and Flux sleep unless they are also listed.
-- `worker`: Horizon, Laravel scheduler worker, and optional Nightwatch agent.
-- `horizon`: Horizon only.
-- `scheduler` or `scheduler-worker`: Laravel scheduler worker only.
-- `nightwatch` or `nightwatch-agent`: optional Nightwatch agent only.
-- `flux`: Flux only; used by Cloud/HA deployments that scale coold connection routers separately.
-
-For example, `COOLIFY_CONTAINER_ROLE=web,flux` starts the web container plus Flux, while `COOLIFY_CONTAINER_ROLE=web,all` still starts all services.
-
-Flux is installed from the coold nightly release into `/usr/local/bin/flux`. Containers running the `all` or `flux` role expose Flux on port `6443` and use these runtime variables:
-
-```env
-COOLIFY_FLUX_GRPC_BIND=0.0.0.0:6443
-COOLIFY_FLUX_UNIX_SOCKET_PATH=/run/coolify/flux.sock
-COOLIFY_FLUX_JWT_PRIVATE_KEY_PATH=/var/www/html/storage/app/flux/jwt.priv
-COOLIFY_FLUX_JWT_PUBLIC_KEY_PATH=/var/www/html/storage/app/flux/jwt.pub
-COOLIFY_FLUX_ALLOW_PUBLIC_BIND=1
-COOLIFY_FLUX_ID=flux-eu-1
-COOLIFY_FLUX_PUBLIC_URL=grpcs://flux-eu-1.example.com:6443
-COOLIFY_FLUX_INTERNAL_URL=http://coolify-flux-eu-1.internal:6443
-```
-
-If `COOLIFY_FLUX_ENABLED=false` is set, the Flux s6 service sleeps even for `all` and `flux` roles. The Flux s6 service creates a persistent JWT keypair on first boot when the key files are missing. The current Coolify image only installs the nightly Flux artifact during the Docker build; the s6 service verifies the binary at runtime and sleeps with a clear error if the published artifact is not compatible with the Alpine base image.
-
 ## Support
 
 Contact us at [coolify.io/docs/contact](https://coolify.io/docs/contact).
