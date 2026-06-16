@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react';
 
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { csrfToken } from '@/lib/csrf';
+import type { SelectItemOption, V5HomeProps, V5Project } from '@/types';
 
-function persistSelection(projectUuid, environmentUuid) {
+function persistSelection(projectUuid: string, environmentUuid: string): void {
     void fetch('/v5/selection', {
         method: 'POST',
         credentials: 'same-origin',
@@ -19,27 +20,33 @@ function persistSelection(projectUuid, environmentUuid) {
     });
 }
 
+type AppNavbarProps = V5HomeProps;
+
 export function AppNavbar({
     flux,
     clusters = [],
     projects = [],
     selectedProjectUuid = null,
     selectedEnvironmentUuid = null,
-}) {
+}: AppNavbarProps) {
     const firstProject = projects[0] ?? null;
-    const [projectUuid, setProjectUuid] = useState(selectedProjectUuid ?? firstProject?.uuid ?? '');
-    const selectedProject = useMemo(
+    const [projectUuid, setProjectUuid] = useState<string>(selectedProjectUuid ?? firstProject?.uuid ?? '');
+    const selectedProject = useMemo<V5Project | null>(
         () => projects.find((project) => project.uuid === projectUuid) ?? firstProject,
         [firstProject, projectUuid, projects],
     );
     const firstEnvironment = selectedProject?.environments?.[0] ?? null;
-    const [environmentUuid, setEnvironmentUuid] = useState(selectedEnvironmentUuid ?? firstEnvironment?.uuid ?? '');
+    const [environmentUuid, setEnvironmentUuid] = useState<string>(selectedEnvironmentUuid ?? firstEnvironment?.uuid ?? '');
     const selectedEnvironment = useMemo(
         () => selectedProject?.environments?.find((environment) => environment.uuid === environmentUuid) ?? firstEnvironment,
         [environmentUuid, firstEnvironment, selectedProject],
     );
 
-    function selectProject(nextProjectUuid) {
+    function selectProject(nextProjectUuid: string | null): void {
+        if (nextProjectUuid === null) {
+            return;
+        }
+
         const nextProject = projects.find((project) => project.uuid === nextProjectUuid);
         const nextEnvironmentUuid = nextProject?.environments?.[0]?.uuid ?? '';
 
@@ -48,16 +55,20 @@ export function AppNavbar({
         persistSelection(nextProjectUuid, nextEnvironmentUuid);
     }
 
-    function selectEnvironment(nextEnvironmentUuid) {
+    function selectEnvironment(nextEnvironmentUuid: string | null): void {
+        if (nextEnvironmentUuid === null) {
+            return;
+        }
+
         setEnvironmentUuid(nextEnvironmentUuid);
         persistSelection(projectUuid, nextEnvironmentUuid);
     }
 
-    const projectItems = projects.map((project) => ({
+    const projectItems: SelectItemOption[] = projects.map((project) => ({
         label: project.name,
         value: project.uuid,
     }));
-    const environmentItems = (selectedProject?.environments ?? []).map((environment) => ({
+    const environmentItems: SelectItemOption[] = (selectedProject?.environments ?? []).map((environment) => ({
         label: environment.name,
         value: environment.uuid,
     }));
@@ -120,7 +131,7 @@ export function AppNavbar({
                 <div className="ml-auto flex items-center gap-3">
                     <div
                         className="hidden rounded-md border border-border bg-muted/40 px-3 py-1 text-xs text-muted-foreground lg:block"
-                        title={flux?.socket ?? flux?.message}
+                        title={flux?.socket ?? flux?.message ?? undefined}
                     >
                         Flux: {flux?.label ?? 'Unknown'} · {clusters.length} clusters
                     </div>

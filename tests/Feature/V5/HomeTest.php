@@ -317,8 +317,8 @@ it('rejects persisted v5 selections outside the current team', function () {
 });
 
 it('defines the v5 home page as a shadcn styled canvas shell', function () {
-    $homePage = file_get_contents(resource_path('js/v5/Pages/Home.jsx'));
-    $navbarPath = resource_path('js/v5/components/app-navbar.jsx');
+    $homePage = file_get_contents(resource_path('js/v5/Pages/Home.tsx'));
+    $navbarPath = resource_path('js/v5/components/app-navbar.tsx');
 
     expect(file_exists($navbarPath))->toBeTrue();
 
@@ -377,18 +377,18 @@ it('defines the v5 home page as a shadcn styled canvas shell', function () {
 });
 
 it('defines a ghost variant for compact v5 select triggers', function () {
-    $select = file_get_contents(resource_path('js/v5/components/ui/select.jsx'));
+    $select = file_get_contents(resource_path('js/v5/components/ui/select.tsx'));
 
     expect($select)
         ->toContain('@base-ui/react/select')
         ->not->toContain('radix-ui')
-        ->toContain('variant = "default"')
-        ->toContain('variant === "default"')
-        ->toContain('variant === "ghost"')
+        ->toContain("variant = 'default'")
+        ->toContain("variant === 'default'")
+        ->toContain("variant === 'ghost'")
         ->toContain('border-transparent')
         ->toContain('h-auto')
         ->toContain('text-sm')
-        ->toContain('position === "popper" ? false : true');
+        ->toContain("position === 'popper' ? false : true");
 });
 
 it('uses the requested shadcn preset configuration for v5', function () {
@@ -397,6 +397,7 @@ it('uses the requested shadcn preset configuration for v5', function () {
 
     expect($components['style'])
         ->toBe('base-lyra')
+        ->and($components['tsx'])->toBeTrue()
         ->and($components['iconLibrary'])->toBe('phosphor')
         ->and($components['tailwind']['css'])->toBe('resources/css/v5/app.css')
         ->and($components['tailwind']['baseColor'])->toBe('zinc')
@@ -454,7 +455,7 @@ it('serves v5 dev assets from the current request host', function (string $url, 
             ->assertSuccessful()
             ->assertSee("import RefreshRuntime from 'http://{$viteHost}:5173/@react-refresh'", false)
             ->assertSee("src=\"http://{$viteHost}:5173/@vite/client\"", false)
-            ->assertSee("src=\"http://{$viteHost}:5173/resources/js/v5/app.jsx\"", false)
+            ->assertSee("src=\"http://{$viteHost}:5173/resources/js/v5/app.tsx\"", false)
             ->assertDontSee('configured-vite-host.test', false);
     } finally {
         if ($originalHotFile === null) {
@@ -509,7 +510,7 @@ it('shows when flux is unavailable', function () {
 });
 
 it('does not include coolify version controls on the v5 home page', function () {
-    $homePage = file_get_contents(resource_path('js/v5/Pages/Home.jsx'));
+    $homePage = file_get_contents(resource_path('js/v5/Pages/Home.tsx'));
 
     expect($homePage)
         ->not->toContain('Check coolify version')
@@ -518,11 +519,11 @@ it('does not include coolify version controls on the v5 home page', function () 
 });
 
 it('renders flux status as a compact summary', function () {
-    $navbar = file_get_contents(resource_path('js/v5/components/app-navbar.jsx'));
+    $navbar = file_get_contents(resource_path('js/v5/components/app-navbar.tsx'));
 
     expect($navbar)
         ->toContain('Flux: {flux?.label ??')
-        ->toContain('title={flux?.socket ?? flux?.message}')
+        ->toContain('title={flux?.socket ?? flux?.message ?? undefined}')
         ->toContain('{clusters.length} clusters')
         ->not->toContain('<h2 id="flux-status-heading">Flux status</h2>')
         ->not->toContain('<p>{flux.message}</p>')

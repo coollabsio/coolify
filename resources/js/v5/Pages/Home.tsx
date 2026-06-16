@@ -1,6 +1,7 @@
 import { Head } from '@inertiajs/react';
 
 import { AppNavbar } from '@/components/app-navbar';
+import type { V5HomeProps } from '@/types';
 
 export default function Home({
     flux,
@@ -8,7 +9,7 @@ export default function Home({
     projects = [],
     selectedProjectUuid = null,
     selectedEnvironmentUuid = null,
-}) {
+}: V5HomeProps) {
     return (
         <>
             <Head title="Magic" />

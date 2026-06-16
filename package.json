@@ -4,16 +4,20 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "vite build"
+        "build": "vite build",
+        "typecheck": "tsc --noEmit"
     },
     "devDependencies": {
         "@tailwindcss/postcss": "4.1.18",
+        "@types/react": "^19.2.17",
+        "@types/react-dom": "^19.2.3",
         "@vitejs/plugin-react": "^5.2.0",
         "laravel-vite-plugin": "2.0.1",
         "postcss": "8.5.15",
         "shadcn": "^4.11.0",
         "tailwind-scrollbar": "4.0.2",
         "tailwindcss": "4.1.18",
+        "typescript": "^6.0.3",
         "vite": "7.3.2"
     },
     "dependencies": {

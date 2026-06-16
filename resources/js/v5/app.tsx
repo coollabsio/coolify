@@ -5,7 +5,7 @@ createInertiaApp({
     id: 'v5-app',
     pages: {
         path: './Pages',
-        extension: '.jsx',
+        extension: '.tsx',
     },
     strictMode: true,
 });

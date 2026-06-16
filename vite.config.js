@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
                 input: [
                     "resources/css/app.css",
                     "resources/js/app.js",
-                    "resources/js/v5/app.jsx",
+                    "resources/js/v5/app.tsx",
                 ],
                 refresh: true,
             }),

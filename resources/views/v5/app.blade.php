@@ -28,10 +28,10 @@
             window.__vite_plugin_react_preamble_installed__ = true
         </script>
         <script type="module" src="{{ $viteDevServerUrl }}/@@vite/client"></script>
-        <script type="module" src="{{ $viteDevServerUrl }}/resources/js/v5/app.jsx"></script>
+        <script type="module" src="{{ $viteDevServerUrl }}/resources/js/v5/app.tsx"></script>
     @else
         @viteReactRefresh
-        @vite('resources/js/v5/app.jsx')
+        @vite('resources/js/v5/app.tsx')
     @endif
     <x-inertia::head />
 </head>

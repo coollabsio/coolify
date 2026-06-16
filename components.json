@@ -2,7 +2,7 @@
   "$schema": "https://ui.shadcn.com/schema.json",
   "style": "base-lyra",
   "rsc": false,
-  "tsx": false,
+  "tsx": true,
   "tailwind": {
     "config": "",
     "css": "resources/css/v5/app.css",

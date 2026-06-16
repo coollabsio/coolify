@@ -3,7 +3,7 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
-@source '../../js/v5/**/*.{js,jsx}';
+@source '../../js/v5/**/*.{js,jsx,ts,tsx}';
 @source '../../../storage/framework/views/*.php';
 
 @custom-variant dark (&:where(.dark, .dark *));
