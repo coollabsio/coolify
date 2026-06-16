@@ -48,7 +48,7 @@ usage() {
 Usage: scripts/coold-vm.sh <command>
 
 Commands:
-  up       Create/start the Lima VM and install packaged coold endpoint binaries
+  up       Create/start the Lima VM with minimal server prerequisites
   dev      Start packaged coold + Corrosion inside the VM
   start-agent
            Start production-like coold.service + corrosion.service inside the VM
@@ -490,13 +490,8 @@ wait_for_guest_provisioning() {
   fi
 
   echo "==> Final guest provisioning status:"
-  lima_shell bash -lc 'cloud-init status 2>/dev/null || true; if command -v coold >/dev/null; then coold --version; else echo "coold not installed yet"; fi; if command -v corrosion >/dev/null; then echo "corrosion installed"; else echo "corrosion not installed yet"; fi; if command -v builder >/dev/null; then echo "builder installed"; else echo "builder not installed yet"; fi; true'     | awk '{ print "[guest] " $0; fflush(); }' || true
-
-  if ! lima_shell bash -lc 'command -v coold >/dev/null && command -v corrosion >/dev/null && command -v builder >/dev/null' >/dev/null 2>&1; then
-    echo "ERROR: VM provisioning finished but coold, corrosion, or builder is missing." >&2
-    echo "Check with: scripts/coold-vm.sh shell" >&2
-    exit 1
-  fi
+  lima_shell bash -lc 'cloud-init status 2>/dev/null || true; echo "minimal VM ready"; true' \
+    | awk '{ print "[guest] " $0; fflush(); }' || true
 }
 
 up_with_logs() {
@@ -508,7 +503,7 @@ up_with_logs() {
   wait_for_lima_start
   wait_for_guest_provisioning
 
-  echo "==> VM is ready. Run: scripts/coold-vm.sh dev"
+  echo "==> VM is ready. Run cooldctl bootstrap via: scripts/dev.sh up"
 }
 
 cmd="${1:-}"
@@ -561,7 +556,7 @@ case "$cmd" in
   shell)
     require_lima
     start_vm >/dev/null
-    exec bash -lc "cd /tmp && limactl shell '$INSTANCE' -- env TERM=xterm-256color SYSTEMD_PAGER=cat SYSTEMD_LESS=FRXMK bash -l"
+    exec bash -lc "cd /tmp && limactl shell '$INSTANCE' -- sudo env TERM=xterm-256color SYSTEMD_PAGER=cat SYSTEMD_LESS=FRXMK bash -l"
     ;;
   status)
     require_lima

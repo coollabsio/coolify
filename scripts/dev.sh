@@ -52,7 +52,7 @@ coold_vm_instance() {
 
 coold_vm_wg_ip() {
   local index="$1"
-  read_coolify_env "COOLIFY_COOLD_VM_WG_IP_${index}" "100.64.0.$((9 + index))"
+  read_coolify_env "COOLIFY_COOLD_VM_WG_IP_${index}" "100.64.0.${index}"
 }
 
 coold_vm_wg_port() {
@@ -68,6 +68,239 @@ coold_vm_container_subnet() {
 coold_vm_container_gateway() {
   local index="$1"
   read_coolify_env "COOLIFY_COOLD_VM_CONTAINER_GATEWAY_${index}" "10.210.$((index - 1)).1"
+}
+
+host_arch() {
+  case "$(uname -m)" in
+    x86_64|amd64)
+      printf '%s\n' amd64
+      ;;
+    arm64|aarch64)
+      printf '%s\n' arm64
+      ;;
+    *)
+      echo "ERROR: unsupported host architecture: $(uname -m)" >&2
+      exit 1
+      ;;
+  esac
+}
+
+host_os() {
+  case "$(uname -s)" in
+    Darwin)
+      printf '%s\n' darwin
+      ;;
+    Linux)
+      printf '%s\n' linux
+      ;;
+    *)
+      echo "ERROR: unsupported host OS: $(uname -s)" >&2
+      exit 1
+      ;;
+  esac
+}
+
+cooldctl_bin() {
+  printf '%s\n' "$ROOT/.dev/bin/cooldctl"
+}
+
+build_local_cooldctl() {
+  local bin
+  local coold_repo
+
+  bin="$(cooldctl_bin)"
+  coold_repo="$(read_coolify_env COOLIFY_COOLD_REPO /Users/heyandras/devel/coold)"
+
+  if [ ! -d "$coold_repo/cooldctl" ]; then
+    echo "ERROR: macOS cooldctl release artifact is not available yet and local coold repo was not found at ${coold_repo}." >&2
+    echo "Set COOLIFY_COOLD_REPO=/path/to/coold or build/copy cooldctl to ${bin}." >&2
+    exit 1
+  fi
+
+  echo "==> Building local macOS cooldctl from ${coold_repo}"
+  (cd "$coold_repo" && cargo build -p cooldctl)
+  mkdir -p "$(dirname "$bin")"
+  install -m 0755 "$coold_repo/target/debug/cooldctl" "$bin"
+}
+
+ensure_cooldctl() {
+  local bin
+  local version
+  local arch
+  local os
+  local url
+  local tmpdir
+
+  bin="$(cooldctl_bin)"
+  version="$(read_coolify_env COOLIFY_COOLDCTL_VERSION "$(read_coolify_env COOLIFY_COOLD_VERSION nightly)")"
+  arch="$(host_arch)"
+  os="$(host_os)"
+
+  if [ "$os" = "darwin" ]; then
+    build_local_cooldctl
+    return
+  fi
+
+  if [ -x "$bin" ] && "$bin" --version >/dev/null 2>&1 && [ "${COOLIFY_COOLDCTL_FORCE_DOWNLOAD:-false}" != "true" ]; then
+    return
+  fi
+
+  url="https://github.com/coollabsio/coold/releases/download/${version}/cooldctl-${os}-${arch}.tar.gz"
+  echo "==> Installing cooldctl from ${url}"
+
+  mkdir -p "$(dirname "$bin")"
+  tmpdir="$(mktemp -d)"
+  trap 'rm -rf "$tmpdir"' RETURN
+  curl -fsSL --retry 3 --max-time 120 -o "$tmpdir/cooldctl.tar.gz" "$url"
+  tar -xzf "$tmpdir/cooldctl.tar.gz" -C "$tmpdir"
+  install -m 0755 "$tmpdir/cooldctl" "$bin"
+}
+
+lima_ssh_target() {
+  local index="$1"
+  local instance
+  local ssh
+
+  instance="$(coold_vm_instance "$index")"
+  ssh="$(limactl list 2>/dev/null | awk -v name="$instance" 'NR > 1 && $1 == name {print $3}')"
+
+  if [ -z "$ssh" ] || [ "$ssh" = "-" ]; then
+    echo "ERROR: could not determine SSH target for Lima VM ${instance}. Start it first with scripts/dev.sh up." >&2
+    exit 1
+  fi
+
+  printf '%s\n' "$ssh"
+}
+
+cooldctl_nodes_arg() {
+  local count
+  local nodes=""
+  count="$(coold_vm_count)"
+
+  for index in $(seq 1 "$count"); do
+    if [ -n "$nodes" ]; then
+      nodes="${nodes},"
+    fi
+    nodes="${nodes}$(lima_ssh_target "$index")"
+  done
+
+  printf '%s\n' "$nodes"
+}
+
+cooldctl_wg_listen_overrides_arg() {
+  local count
+  local overrides=""
+  local node
+  count="$(coold_vm_count)"
+
+  for index in $(seq 1 "$count"); do
+    node="$(lima_ssh_target "$index")"
+    if [ -n "$overrides" ]; then
+      overrides="${overrides},"
+    fi
+    overrides="${overrides}${node}=$(coold_vm_wg_port "$index")"
+  done
+
+  printf '%s\n' "$overrides"
+}
+
+cooldctl_wg_endpoint_overrides_arg() {
+  local count
+  local overrides=""
+  local node
+  count="$(coold_vm_count)"
+
+  for index in $(seq 1 "$count"); do
+    node="$(lima_ssh_target "$index")"
+    if [ -n "$overrides" ]; then
+      overrides="${overrides},"
+    fi
+    overrides="${overrides}${node}=host.lima.internal:$(coold_vm_wg_port "$index")"
+  done
+
+  printf '%s\n' "$overrides"
+}
+
+cooldctl_ssh_key() {
+  read_coolify_env COOLIFY_COOLDCTL_SSH_KEY "$HOME/.lima/_config/user"
+}
+
+cooldctl_ssh_user() {
+  read_coolify_env COOLIFY_COOLDCTL_SSH_USER "$USER"
+}
+
+cooldctl_bootstrap_command() {
+  ensure_cooldctl
+
+  cat <<CMD
+$(cooldctl_bin) init bootstrap \\
+  --nodes "$(cooldctl_nodes_arg)" \\
+  --ssh-key "$(cooldctl_ssh_key)" \\
+  --ssh-user "$(cooldctl_ssh_user)" \\
+  --wg-listen-port-overrides "$(cooldctl_wg_listen_overrides_arg)" \\
+  --wg-endpoint-overrides "$(cooldctl_wg_endpoint_overrides_arg)" \\
+  --coold-version "$(read_coolify_env COOLIFY_COOLD_VERSION nightly)" \\
+  --corrosion-version "$(read_coolify_env COOLIFY_CORROSION_VERSION v1.0.0)" \\
+  --yes
+CMD
+}
+
+cooldctl_bootstrap() {
+  ensure_cooldctl
+
+  "$(cooldctl_bin)" init bootstrap \
+    --nodes "$(cooldctl_nodes_arg)" \
+    --ssh-key "$(cooldctl_ssh_key)" \
+    --ssh-user "$(cooldctl_ssh_user)" \
+    --wg-listen-port-overrides "$(cooldctl_wg_listen_overrides_arg)" \
+    --wg-endpoint-overrides "$(cooldctl_wg_endpoint_overrides_arg)" \
+    --coold-version "$(read_coolify_env COOLIFY_COOLD_VERSION nightly)" \
+    --corrosion-version "$(read_coolify_env COOLIFY_CORROSION_VERSION v1.0.0)" \
+    --yes
+}
+
+cooldctl_dev() {
+  local command="${1:-help}"
+  if [ $# -gt 0 ]; then
+    shift
+  fi
+
+  case "$command" in
+    install)
+      ensure_cooldctl
+      "$(cooldctl_bin)" --version
+      ;;
+    path)
+      ensure_cooldctl
+      cooldctl_bin
+      ;;
+    bootstrap-command)
+      cooldctl_bootstrap_command
+      ;;
+    run)
+      ensure_cooldctl
+      exec "$(cooldctl_bin)" "$@"
+      ;;
+    -h|--help|help)
+      cat <<'USAGE'
+Usage: scripts/dev.sh cooldctl <command>
+
+Commands:
+  install             Download/install the nightly cooldctl dev binary
+  path                Print the local cooldctl path
+  bootstrap-command   Print the dev Lima bootstrap command without running it
+  run <args>          Run cooldctl with arbitrary args
+
+Example:
+  scripts/dev.sh cooldctl bootstrap-command
+USAGE
+      ;;
+    *)
+      echo "unknown cooldctl command: $command" >&2
+      echo "Run: scripts/dev.sh cooldctl help" >&2
+      exit 1
+      ;;
+  esac
 }
 
 coold_vm() {
@@ -108,29 +341,6 @@ mint_host_jwt_for_host() {
   return 1
 }
 
-setup_wireguard_mesh() {
-  local count="$1"
-
-  if [ "$count" -lt 2 ]; then
-    return
-  fi
-
-  echo "==> Configuring WireGuard mesh for ${count} coold VMs..."
-
-  local pub1 pub2 ip1 ip2 port1 port2 subnet1 subnet2
-  pub1="$(coold_vm 1 wg-public-key)"
-  pub2="$(coold_vm 2 wg-public-key)"
-  ip1="$(coold_vm_wg_ip 1)"
-  ip2="$(coold_vm_wg_ip 2)"
-  port1="$(coold_vm_wg_port 1)"
-  port2="$(coold_vm_wg_port 2)"
-  subnet1="$(coold_vm_container_subnet 1)"
-  subnet2="$(coold_vm_container_subnet 2)"
-
-  coold_vm 1 setup-wireguard "$ip1" "$ip2" "host.lima.internal" "$pub2" "$port1" "$port2" "$subnet2"
-  coold_vm 2 setup-wireguard "$ip2" "$ip1" "host.lima.internal" "$pub1" "$port2" "$port1" "$subnet1"
-}
-
 follow_logs() {
   local coold_vm_enabled="$1"
   local count
@@ -168,6 +378,33 @@ follow_logs() {
   spin logs -f
 }
 
+configure_flux_dev_for_vm() {
+  local index="$1"
+  local host_id
+  local host_jwt
+  local flux_url
+
+  host_id="$(coold_vm_wg_ip "$index")"
+  flux_url="$(read_coolify_env COOLIFY_COOLD_VM_FLUX_URL http://host.lima.internal:6443)"
+
+  echo "==> Minting Flux dev host JWT for ${host_id}..."
+  host_jwt="$(mint_host_jwt_for_host "$host_id")"
+  echo "==> Installing Flux dev env/JWT into $(coold_vm_instance "$index")..."
+  coold_vm "$index" install-host-jwt "$host_jwt"
+
+  COOLIFY_COOLD_LIMA_INSTANCE="$(coold_vm_instance "$index")" scripts/coold-vm.sh shell <<SH
+set -e
+sudo install -d -m 0755 /etc/systemd/system/coold.service.d
+sudo tee /etc/systemd/system/coold.service.d/10-flux-dev.conf >/dev/null <<UNIT
+[Service]
+Environment=COOLIFY_COOLD_FLUX_URL=${flux_url}
+Environment=COOLIFY_COOLD_HOST_JWT_PATH=/etc/coolify/host-jwt
+UNIT
+sudo systemctl daemon-reload
+sudo systemctl restart coold.service
+SH
+}
+
 up() {
   local coold_vm_enabled
   local follow_dev_logs
@@ -178,10 +415,16 @@ up() {
 
   if [ "$coold_vm_enabled" != "false" ]; then
     echo "==> Starting ${count} Coolify coold VM(s) before Spin..."
+    vm_pids=""
     for index in $(seq 1 "$count"); do
-      coold_vm "$index" up
+      (
+        coold_vm "$index" up
+      ) &
+      vm_pids="${vm_pids} $!"
     done
-    setup_wireguard_mesh "$count"
+    for pid in $vm_pids; do
+      wait "$pid"
+    done
   else
     echo "==> COOLIFY_COOLD_VM_ENABLED=false; skipping coold VM."
   fi
@@ -190,25 +433,11 @@ up() {
   spin up -d "$@"
 
   if [ "$coold_vm_enabled" != "false" ]; then
-    for index in $(seq 1 "$count"); do
-      host_id="$(coold_vm_instance "$index")"
-      echo "==> Minting Flux dev host JWT for ${host_id}..."
-      host_jwt="$(mint_host_jwt_for_host "$host_id")"
-      echo "==> Installing host JWT into ${host_id}..."
-      coold_vm "$index" install-host-jwt "$host_jwt"
-    done
+    echo "==> Bootstrapping coold VM mesh with cooldctl..."
+    cooldctl_bootstrap
 
     for index in $(seq 1 "$count"); do
-      echo "==> Starting coold VM agent service on $(coold_vm_instance "$index")..."
-      if [ "$count" -ge 2 ]; then
-        peer_index=1
-        if [ "$index" = "1" ]; then
-          peer_index=2
-        fi
-        COOLIFY_COOLD_VM_WG_PEER_IP="$(coold_vm_wg_ip "$peer_index")" coold_vm "$index" start-agent
-      else
-        coold_vm "$index" start-agent
-      fi
+      configure_flux_dev_for_vm "$index"
     done
   fi
 
@@ -242,6 +471,48 @@ down() {
       coold_vm "$index" stop
     done
   fi
+}
+
+clean_vms() {
+  local count
+  count="$(coold_vm_count)"
+
+  echo "==> Deleting ${count} coold Lima VM(s). This removes VM-local state."
+  for index in $(seq 1 "$count"); do
+    instance="$(coold_vm_instance "$index")"
+    echo "==> Deleting ${instance}..."
+    limactl stop --force --tty=false "$instance" >/dev/null 2>&1 || true
+    if ! run_with_timeout 60 limactl delete --force --tty=false "$instance"; then
+      echo "WARN: limactl delete timed out for ${instance}; killing matching limactl clients." >&2
+      pkill -f "limactl.*${instance}" >/dev/null 2>&1 || true
+      rm -rf "$HOME/.lima/${instance}"
+    fi
+  done
+}
+
+run_with_timeout() {
+  local timeout_seconds="$1"
+  shift
+  local pid
+  local elapsed=0
+
+  "$@" &
+  pid="$!"
+
+  while kill -0 "$pid" >/dev/null 2>&1; do
+    if [ "$elapsed" -ge "$timeout_seconds" ]; then
+      kill "$pid" >/dev/null 2>&1 || true
+      sleep 2
+      kill -9 "$pid" >/dev/null 2>&1 || true
+      wait "$pid" >/dev/null 2>&1 || true
+      return 124
+    fi
+
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  wait "$pid"
 }
 
 corrosion_for_each_vm() {
@@ -511,7 +782,7 @@ firewall_api_for_each_vm() {
     COOLIFY_COOLD_LIMA_INSTANCE="$instance" scripts/coold-vm.sh shell <<SH
 set -e
 token="\$(sudo cat /etc/coolify/api-token)"
-curl_args=(-fsS -X "${method}" "http://${api_ip}:8443${path}" -H "Authorization: Bearer \${token}")
+curl_args=(-fsS --max-time 10 -X "${method}" "http://${api_ip}:8443${path}" -H "Authorization: Bearer \${token}")
 if [ -n '${body}' ]; then
   curl_args+=(-H 'Content-Type: application/json' -d '${body}')
 fi
@@ -636,9 +907,11 @@ Commands:
   down    Stop the dev coold agent and Spin stack
   shell [n] Open a shell inside coold VM n (default: 1)
   list      Show Lima instances
+  clean-vms Delete the coold Lima VMs and all VM-local runtime state
   corrosion <command> Inspect Corrosion state, config, logs, and registered containers
   firewall <command>  Manage dev coold firewall allow rules
   example-nginx <command> Start/check example nginx containers with coold DNS
+  cooldctl <command> Install/run the released cooldctl dev helper
 USAGE
 }
 
@@ -660,6 +933,9 @@ case "$cmd" in
   list)
     limactl list
     ;;
+  clean-vms|clean-vm|reset-vms)
+    clean_vms
+    ;;
   corrosion)
     corrosion "$@"
     ;;
@@ -668,6 +944,9 @@ case "$cmd" in
     ;;
   example-nginx)
     example_nginx "$@"
+    ;;
+  cooldctl)
+    cooldctl_dev "$@"
     ;;
   -h|--help|help|"")
     usage

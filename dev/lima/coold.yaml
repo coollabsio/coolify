@@ -1,6 +1,5 @@
-# Lima VM for testing Coolify v5 against a packaged coold endpoint.
+# Lima VM for testing Coolify v5 against cooldctl-provisioned hosts.
 # Start with: scripts/coold-vm.sh up
-# Run endpoint: scripts/coold-vm.sh dev
 #
 # This file is copied into .dev/lima/coold.generated.yaml by the wrapper script,
 # with {{COOLIFY_REPO}}, {{COOLIFY_COOLD_VERSION}}, and {{COOLIFY_CORROSION_VERSION}} replaced before Lima sees it.
@@ -41,85 +40,22 @@ provision:
       export DEBIAN_FRONTEND=noninteractive
       echo "[coold-vm] Updating Ubuntu package index..."
       apt-get update
-      echo "[coold-vm] Installing VM dependencies..."
+      echo "[coold-vm] Installing minimal VM dependencies..."
       apt-get install -y --no-install-recommends \
         bash \
-        buildah \
         ca-certificates \
-        clang \
         curl \
-        git \
         iproute2 \
-        iptables \
         jq \
-        libssl-dev \
-        mold \
-        nftables \
         openssl \
-        perl \
-        pkg-config \
-        podman \
-        protobuf-compiler \
         sqlite3 \
-        sudo \
-        wireguard-tools
-      echo "[coold-vm] Enabling Podman socket..."
-      systemctl enable --now podman.socket
+        sudo
       cat >/usr/local/bin/rtk <<'SH'
       #!/usr/bin/env bash
       exec "$@"
       SH
       chmod +x /usr/local/bin/rtk
-      mkdir -p /etc/coolify /var/lib/corrosion /run/corrosion /var/lib/coolify-dev /var/lib/coolify-builder/work
+      mkdir -p /etc/coolify /var/lib/coolify-dev
       chmod 755 /etc/coolify
-      chmod 777 /var/lib/corrosion /run/corrosion
 
-      install_coolify_binary() {
-        name="$1"
-        version="{{COOLIFY_COOLD_VERSION}}"
-        arch_raw="$(uname -m)"
-        case "$arch_raw" in
-          x86_64) arch=amd64 ;;
-          aarch64) arch=arm64 ;;
-          *) echo "unsupported arch: $arch_raw" >&2; exit 1 ;;
-        esac
-
-        url="https://github.com/coollabsio/coold/releases/download/${version}/${name}-linux-${arch}.tar.gz"
-        echo "[coold-vm] Installing ${name} from ${url}..."
-        tmpdir="$(mktemp -d)"
-        trap 'rm -rf "$tmpdir"' RETURN
-        curl -fsSL --retry 3 --max-time 120 -o "$tmpdir/${name}.tar.gz" "$url"
-        tar -xzf "$tmpdir/${name}.tar.gz" -C "$tmpdir"
-        test -f "$tmpdir/$name"
-        install -m 0755 "$tmpdir/$name" "/usr/local/bin/${name}.tmp"
-        mv "/usr/local/bin/${name}.tmp" "/usr/local/bin/${name}"
-        echo "$version" > "/usr/local/bin/${name}.version"
-      }
-
-      install_corrosion_binary() {
-        version="{{COOLIFY_CORROSION_VERSION}}"
-        arch_raw="$(uname -m)"
-        case "$arch_raw" in
-          x86_64) arch=x86_64-unknown-linux-gnu ;;
-          aarch64) arch=aarch64-unknown-linux-gnu ;;
-          *) echo "unsupported arch: $arch_raw" >&2; exit 1 ;;
-        esac
-
-        url="https://github.com/superfly/corrosion/releases/download/${version}/corrosion-${arch}.tar.gz"
-        echo "[coold-vm] Installing corrosion from ${url}..."
-        tmpdir="$(mktemp -d)"
-        trap 'rm -rf "$tmpdir"' RETURN
-        curl -fsSL --retry 3 --max-time 180 -o "$tmpdir/corrosion.tar.gz" "$url"
-        tar -xzf "$tmpdir/corrosion.tar.gz" -C "$tmpdir"
-        test -f "$tmpdir/corrosion"
-        install -m 0755 "$tmpdir/corrosion" /usr/local/bin/corrosion.tmp
-        mv /usr/local/bin/corrosion.tmp /usr/local/bin/corrosion
-        echo "$version" > /usr/local/bin/corrosion.version
-      }
-
-      install_coolify_binary coold
-      install_coolify_binary builder
-      install_corrosion_binary
-      echo "[coold-vm] Endpoint binaries installed."
-
-      echo "[coold-vm] Provisioning complete."
+      echo "[coold-vm] Minimal provisioning complete. cooldctl bootstrap will install WireGuard, Podman, Corrosion, coold, and builder."
