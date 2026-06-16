@@ -9,7 +9,7 @@ services:
   kaneo:
     image: 'ghcr.io/usekaneo/kaneo:latest'
     environment:
-      - SERVICE_URL_KANEO
+      - SERVICE_URL_KANEO_5173
       - 'KANEO_CLIENT_URL=${SERVICE_URL_KANEO}'
       - 'POSTGRES_DB=${POSTGRES_DB:-kaneo}'
       - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
