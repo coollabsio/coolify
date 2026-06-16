@@ -15,6 +15,8 @@ class EnvVarInput extends Component
 
     public array $scopeUrls = [];
 
+    public bool $hasAutocomplete = false;
+
     public function __construct(
         public ?string $id = null,
         public ?string $name = null,
@@ -77,20 +79,26 @@ class EnvVarInput extends Component
             $this->defaultClass = $this->defaultClass.'  pr-[2.8rem]';
         }
 
-        $this->scopeUrls = [
-            'team' => route('shared-variables.team.index'),
-            'project' => route('shared-variables.project.index'),
-            'environment' => $this->projectUuid && $this->environmentUuid
-                ? route('shared-variables.environment.show', [
-                    'project_uuid' => $this->projectUuid,
-                    'environment_uuid' => $this->environmentUuid,
-                ])
-                : route('shared-variables.environment.index'),
-            'server' => $this->serverUuid
-                ? route('shared-variables.server.show', ['server_uuid' => $this->serverUuid])
-                : route('shared-variables.server.index'),
-            'default' => route('shared-variables.index'),
-        ];
+        $this->hasAutocomplete = ! $this->disabled
+            && ! $this->readonly
+            && collect($this->availableVars)->flatten()->isNotEmpty();
+
+        if ($this->hasAutocomplete) {
+            $this->scopeUrls = [
+                'team' => route('shared-variables.team.index'),
+                'project' => route('shared-variables.project.index'),
+                'environment' => $this->projectUuid && $this->environmentUuid
+                    ? route('shared-variables.environment.show', [
+                        'project_uuid' => $this->projectUuid,
+                        'environment_uuid' => $this->environmentUuid,
+                    ])
+                    : route('shared-variables.environment.index'),
+                'server' => $this->serverUuid
+                    ? route('shared-variables.server.show', ['server_uuid' => $this->serverUuid])
+                    : route('shared-variables.server.index'),
+                'default' => route('shared-variables.index'),
+            ];
+        }
 
         return view('components.forms.env-var-input');
     }

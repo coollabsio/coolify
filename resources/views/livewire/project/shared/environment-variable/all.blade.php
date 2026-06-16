@@ -70,6 +70,7 @@
         @if ($this->isSearchActive && ! $this->hasEnvironmentVariables)
             <div>No environment variables found.</div>
         @else
+            @php($availableSharedVariables = $this->availableSharedVariables)
             @if ($this->environmentVariables->isNotEmpty() || $this->hardcodedEnvironmentVariables->isNotEmpty())
                 <div>
                     <h3>Production Environment Variables</h3>
@@ -77,7 +78,7 @@
                 </div>
                 @foreach ($this->environmentVariables as $env)
                     <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}" :env="$env"
-                        :type="$resource->type()" />
+                        :type="$resource->type()" :availableSharedVariables="$availableSharedVariables" />
                 @endforeach
                 @if (($resource->type() === 'service' || $resource?->build_pack === 'dockercompose') && $this->hardcodedEnvironmentVariables->isNotEmpty())
                     @foreach ($this->hardcodedEnvironmentVariables as $index => $env)
@@ -97,7 +98,7 @@
                 </div>
                 @foreach ($this->environmentVariablesPreview as $env)
                     <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}" :env="$env"
-                        :type="$resource->type()" />
+                        :type="$resource->type()" :availableSharedVariables="$availableSharedVariables" />
                 @endforeach
                 @if (($resource->type() === 'service' || $resource?->build_pack === 'dockercompose') && $this->hardcodedEnvironmentVariablesPreview->isNotEmpty())
                     @foreach ($this->hardcodedEnvironmentVariablesPreview as $index => $env)
