@@ -25,7 +25,6 @@ class HomeController extends Controller
         $currentTeam = $request->attributes->get('v5.currentTeam');
 
         return Inertia::render('Home', [
-            'status' => 'v5-ready',
             'flux' => $fluxHealth->check(),
             'clusters' => $this->clusters($currentTeam),
             'cooldServers' => $this->cooldServers($currentTeam),

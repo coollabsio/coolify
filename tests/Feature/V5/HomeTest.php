@@ -184,7 +184,8 @@ it('serves the v5 inertia shell', function () {
         ->assertSuccessful()
         ->assertSee('v5-app', false)
         ->assertSee('Home', false)
-        ->assertSee('v5-ready', false)
+        ->assertDontSee('v5-ready', false)
+        ->assertDontSee('This page is served from Laravel through Inertia and React')
         ->assertSee('Running')
         ->assertSee('Flux is running.')
         ->assertSee('"clusters":[]', false)
@@ -292,6 +293,27 @@ it('shows when flux is unavailable', function () {
         ->assertSuccessful()
         ->assertSee('Unavailable')
         ->assertSee('Flux socket was not found.');
+});
+
+it('does not include coolify version controls on the v5 home page', function () {
+    $homePage = file_get_contents(resource_path('js/v5/Pages/Home.jsx'));
+
+    expect($homePage)
+        ->not->toContain('Check coolify version')
+        ->not->toContain('/v5/coolify/version')
+        ->not->toContain('Installed version:');
+});
+
+it('renders flux status as a compact summary', function () {
+    $homePage = file_get_contents(resource_path('js/v5/Pages/Home.jsx'));
+
+    expect($homePage)
+        ->toContain('<strong>Flux:</strong>')
+        ->toContain('{flux.label}')
+        ->toContain('{flux.socket ? flux.socket : flux.message}')
+        ->not->toContain('<h2 id="flux-status-heading">Flux status</h2>')
+        ->not->toContain('<p>{flux.message}</p>')
+        ->not->toContain('Socket: {flux.socket}');
 });
 
 it('checks the installed coolify version', function () {

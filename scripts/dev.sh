@@ -816,14 +816,67 @@ sudo podman exec coolify-example-nginx nslookup coolify-example-nginx-2.default.
 SH
 }
 
+example_nginx_require_pair() {
+  if [ "$(coold_vm_count)" = "1" ]; then
+    echo "ERROR: example-nginx ping/firewall commands require COOLIFY_COOLD_VM_COUNT=2." >&2
+    exit 1
+  fi
+}
+
+example_nginx_container_ip() {
+  local index="$1"
+  local name
+  name="$(example_nginx_name "$index")"
+
+  COOLIFY_COOLD_LIMA_INSTANCE="$(coold_vm_instance "$index")" scripts/coold-vm.sh shell <<SH
+set -e
+sudo podman inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${name}
+SH
+}
+
+example_nginx_ping() {
+  example_nginx_require_pair
+
+  COOLIFY_COOLD_LIMA_INSTANCE="$(coold_vm_instance 1)" scripts/coold-vm.sh shell <<'SH'
+set -e
+sudo podman exec coolify-example-nginx wget -qO- --timeout=3 http://coolify-example-nginx-2.default.coolify.internal/ >/dev/null
+echo 'ok: coolify-example-nginx can reach coolify-example-nginx-2 on tcp/80'
+SH
+}
+
+example_nginx_firewall_up() {
+  local src
+  local dst
+  example_nginx_require_pair
+
+  src="$(example_nginx_container_ip 1)"
+  dst="$(example_nginx_container_ip 2)"
+
+  scripts/dev.sh firewall allow "$src" "$dst" tcp 80
+}
+
+example_nginx_firewall_down() {
+  local src
+  local dst
+  example_nginx_require_pair
+
+  src="$(example_nginx_container_ip 1)"
+  dst="$(example_nginx_container_ip 2)"
+
+  scripts/dev.sh firewall revoke "$src" "$dst" tcp 80
+}
+
 example_nginx_help() {
   cat <<'USAGE'
 Usage: scripts/dev.sh example-nginx <command>
 
 Commands:
-  up          Start one nginx container on each coold VM with coold DNS configured
-  down        Remove the example nginx containers
-  check-dns   Verify host 1 nginx can resolve host 2 nginx through coold DNS
+  up             Start one nginx container on each coold VM with coold DNS configured
+  down           Remove the example nginx containers
+  check-dns      Verify host 1 nginx can resolve host 2 nginx through coold DNS
+  ping           Verify host 1 nginx can reach host 2 nginx on tcp/80
+  firewall up    Allow host 1 nginx to reach host 2 nginx through the coolify CLI
+  firewall down  Revoke the example nginx tcp/80 allow rule through the coolify CLI
 USAGE
 }
 
@@ -842,6 +895,24 @@ example_nginx() {
       ;;
     check-dns)
       example_nginx_check_dns
+      ;;
+    ping)
+      example_nginx_ping
+      ;;
+    firewall)
+      case "${1:-help}" in
+        up)
+          example_nginx_firewall_up
+          ;;
+        down)
+          example_nginx_firewall_down
+          ;;
+        *)
+          echo "unknown example-nginx firewall command: ${1:-help}" >&2
+          echo "Run: scripts/dev.sh example-nginx help" >&2
+          exit 1
+          ;;
+      esac
       ;;
     -h|--help|help)
       example_nginx_help

@@ -1,10 +1,8 @@
 import { Head } from '@inertiajs/react';
 import { useState } from 'react';
 
-export default function Home({ status, currentTeam, teams, flux, clusters, cooldServers, privateKeys }) {
+export default function Home({ currentTeam, teams, flux, clusters, cooldServers, privateKeys }) {
     const firstPrivateKey = privateKeys[0]?.uuid || '';
-    const [coolify, setCoolify] = useState(null);
-    const [checkingCoolify, setCheckingCoolify] = useState(false);
     const [bootstrapResult, setBootstrapResult] = useState(null);
     const [bootstrapping, setBootstrapping] = useState(false);
     const [bootstrapForm, setBootstrapForm] = useState({
@@ -27,30 +25,6 @@ export default function Home({ status, currentTeam, teams, flux, clusters, coold
             ...current,
             [field]: value,
         }));
-    }
-
-    async function checkCoolifyCliVersion() {
-        setCheckingCoolify(true);
-
-        try {
-            const response = await fetch('/v5/coolify/version', {
-                headers: {
-                    Accept: 'application/json',
-                },
-            });
-
-            setCoolify(await response.json());
-        } catch (error) {
-            setCoolify({
-                available: false,
-                label: 'Unavailable',
-                version: null,
-                message: 'Could not check the installed coolify version.',
-                binary: null,
-            });
-        } finally {
-            setCheckingCoolify(false);
-        }
     }
 
     async function bootstrapCoolifyMesh(event) {
@@ -101,25 +75,12 @@ export default function Home({ status, currentTeam, teams, flux, clusters, coold
             <Head title="V5" />
 
             <main>
-                <p>{status}</p>
-
                 <h1>Coolify v5</h1>
 
-                <p>
-                    This page is served from Laravel through Inertia and React, with routes,
-                    assets, and future v5 tables isolated from the current v4 Livewire app.
-                </p>
-
-                <section aria-labelledby="flux-status-heading">
-                    <h2 id="flux-status-heading">Flux status</h2>
-
+                <section aria-label="Flux status">
                     <p>
-                        <strong>{flux.label}</strong>
+                        <strong>Flux:</strong> {flux.label} — {flux.socket ? flux.socket : flux.message}
                     </p>
-
-                    <p>{flux.message}</p>
-
-                    {flux.socket ? <p>Socket: {flux.socket}</p> : null}
                 </section>
 
                 <section aria-labelledby="clusters-heading">
@@ -172,21 +133,6 @@ export default function Home({ status, currentTeam, teams, flux, clusters, coold
 
                 <section aria-labelledby="coolify-heading">
                     <h2 id="coolify-heading">coolify</h2>
-
-                    <button type="button" onClick={checkCoolifyCliVersion} disabled={checkingCoolify}>
-                        {checkingCoolify ? 'Checking coolify...' : 'Check coolify version'}
-                    </button>
-
-                    {coolify ? (
-                        <div>
-                            <p>
-                                <strong>{coolify.label}</strong>
-                            </p>
-                            {coolify.version ? <p>Version: {coolify.version}</p> : null}
-                            <p>{coolify.message}</p>
-                            {coolify.binary ? <p>Binary: {coolify.binary}</p> : null}
-                        </div>
-                    ) : null}
 
                     <form onSubmit={bootstrapCoolifyMesh}>
                         <h3>Bootstrap server</h3>
