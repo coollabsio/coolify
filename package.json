@@ -17,6 +17,7 @@
         "vite": "7.3.2"
     },
     "dependencies": {
+        "@base-ui/react": "^1.5.0",
         "@fontsource-variable/geist": "^5.2.9",
         "@inertiajs/react": "^3.3.0",
         "@inertiajs/vite": "^3.3.0",
@@ -28,7 +29,6 @@
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "playwright": "^1.58.2",
-        "radix-ui": "^1.6.0",
         "react": "^19.2.7",
         "react-dom": "^19.2.7",
         "tailwind-merge": "^3.6.0",

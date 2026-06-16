@@ -380,12 +380,15 @@ it('defines a ghost variant for compact v5 select triggers', function () {
     $select = file_get_contents(resource_path('js/v5/components/ui/select.jsx'));
 
     expect($select)
+        ->toContain('@base-ui/react/select')
+        ->not->toContain('radix-ui')
         ->toContain('variant = "default"')
         ->toContain('variant === "default"')
         ->toContain('variant === "ghost"')
         ->toContain('border-transparent')
         ->toContain('h-auto')
-        ->toContain('text-sm');
+        ->toContain('text-sm')
+        ->toContain('position === "popper" ? false : true');
 });
 
 it('uses the requested shadcn preset configuration for v5', function () {
@@ -393,7 +396,7 @@ it('uses the requested shadcn preset configuration for v5', function () {
     $css = file_get_contents(resource_path('css/v5/app.css'));
 
     expect($components['style'])
-        ->toBe('radix-lyra')
+        ->toBe('base-lyra')
         ->and($components['iconLibrary'])->toBe('phosphor')
         ->and($components['tailwind']['css'])->toBe('resources/css/v5/app.css')
         ->and($components['tailwind']['baseColor'])->toBe('zinc')

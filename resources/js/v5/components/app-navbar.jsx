@@ -53,6 +53,15 @@ export function AppNavbar({
         persistSelection(projectUuid, nextEnvironmentUuid);
     }
 
+    const projectItems = projects.map((project) => ({
+        label: project.name,
+        value: project.uuid,
+    }));
+    const environmentItems = (selectedProject?.environments ?? []).map((environment) => ({
+        label: environment.name,
+        value: environment.uuid,
+    }));
+
     return (
         <header className="fixed inset-x-0 top-0 z-40 border-b border-border bg-background">
             <nav className="flex h-16 items-center gap-4 px-6" aria-label="Main navigation">
@@ -65,7 +74,12 @@ export function AppNavbar({
                 </a>
 
                 <div className="flex min-w-0 items-center gap-2">
-                    <Select value={selectedProject?.uuid ?? ''} onValueChange={selectProject} disabled={projects.length === 0}>
+                    <Select
+                        items={projectItems}
+                        value={selectedProject?.uuid ?? ''}
+                        onValueChange={selectProject}
+                        disabled={projects.length === 0}
+                    >
                         <SelectTrigger aria-label="Select a project" variant="ghost" className="max-w-[10rem]">
                             <SelectValue placeholder="Select a project" />
                         </SelectTrigger>
@@ -83,6 +97,7 @@ export function AppNavbar({
                     <span className="text-muted-foreground">/</span>
 
                     <Select
+                        items={environmentItems}
                         value={selectedEnvironment?.uuid ?? ''}
                         onValueChange={selectEnvironment}
                         disabled={!selectedProject || (selectedProject.environments ?? []).length === 0}
