@@ -48,6 +48,37 @@ it('logs in an existing user when the oauth provider returns a mixed-case email'
     expect(User::count())->toBe(1);
 });
 
+it('logs in an existing user through the oidc provider', function () {
+    config()->set('app.maintenance.driver', 'file');
+
+    OauthSetting::create([
+        'provider' => 'oidc',
+        'client_id' => 'oidc-client-id',
+        'client_secret' => 'oidc-client-secret',
+        'redirect_uri' => 'https://coolify.example.com/auth/oidc/callback',
+        'base_url' => 'https://idp.example.com',
+    ]);
+
+    $user = User::factory()->create([
+        'email' => 'username@example.edu',
+    ]);
+
+    $provider = Mockery::mock();
+    $provider->shouldReceive('setConfig')->once()->andReturnSelf();
+    $provider->shouldReceive('user')->once()->andReturn((object) [
+        'email' => 'username@example.edu',
+        'name' => 'Example User',
+        'id' => 'oidc-user-id',
+    ]);
+
+    Socialite::shouldReceive('driver')->once()->with('oidc')->andReturn($provider);
+
+    $response = $this->get(route('auth.callback', 'oidc'));
+
+    $response->assertRedirect('/');
+    $this->assertAuthenticatedAs($user);
+});
+
 it('rejects oauth logins when the provider does not return an email address', function (?string $providerEmail) {
     config()->set('app.maintenance.driver', 'file');
     InstanceSettings::firstOrCreate([
