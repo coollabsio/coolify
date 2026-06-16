@@ -73,9 +73,6 @@ services:
       - 'S3_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}'
       - 'S3_REGION=${MINIO_REGION_CUSTOM:-us-east-1}'
       - 'S3_FORCE_PATH_STYLE=${MINIO_FORCE_PATH_STYLE_CUSTOM:-true}'
-    ports:
-      - '9000:9000'
-      - '9001:9001'
     volumes:
       - 'minio_data:/data'
     restart: unless-stopped
