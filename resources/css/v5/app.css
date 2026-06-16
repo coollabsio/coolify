@@ -29,6 +29,11 @@
     --color-destructive: var(--destructive);
     --color-destructive-foreground: var(--destructive-foreground);
     --color-warning: var(--warning);
+    --color-coollabs-50: #f5f0ff;
+    --color-coollabs: #6b16ed;
+    --color-coollabs-100: #7317ff;
+    --color-coollabs-200: #5a12c7;
+    --color-coollabs-300: #4a0fa3;
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);
@@ -76,7 +81,7 @@
     --warning: #fcd452;
     --border: oklch(0.92 0.004 286.32);
     --input: oklch(0.92 0.004 286.32);
-    --ring: oklch(0.705 0.015 286.067);
+    --ring: var(--warning);
     --chart-1: oklch(0.871 0.006 286.286);
     --chart-2: oklch(0.552 0.016 285.938);
     --chart-3: oklch(0.442 0.017 285.786);
@@ -112,7 +117,7 @@
     --warning: #fcd452;
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.552 0.016 285.938);
+    --ring: var(--warning);
     --chart-1: oklch(0.871 0.006 286.286);
     --chart-2: oklch(0.552 0.016 285.938);
     --chart-3: oklch(0.442 0.017 285.786);

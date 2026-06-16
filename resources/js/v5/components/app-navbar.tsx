@@ -1,9 +1,11 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { csrfToken } from '@/lib/csrf';
-import type { SelectItemOption, V5HomeProps, V5Project } from '@/types';
+import { cn } from '@/lib/utils';
+import type { SelectItemOption, V5DashboardProps, V5Project } from '@/types';
 
 function persistSelection(projectUuid: string, environmentUuid: string): void {
     void fetch('/v5/selection', {
@@ -21,7 +23,7 @@ function persistSelection(projectUuid: string, environmentUuid: string): void {
     });
 }
 
-type AppNavbarProps = V5HomeProps;
+type AppNavbarProps = V5DashboardProps;
 
 export function AppNavbar({
     flux,
@@ -30,6 +32,7 @@ export function AppNavbar({
     selectedProjectUuid = null,
     selectedEnvironmentUuid = null,
 }: AppNavbarProps) {
+    const { url } = usePage();
     const firstProject = projects[0] ?? null;
     const [projectUuid, setProjectUuid] = useState<string>(selectedProjectUuid ?? firstProject?.uuid ?? '');
     const selectedProject = useMemo<V5Project | null>(
@@ -73,26 +76,27 @@ export function AppNavbar({
         label: environment.name,
         value: environment.uuid,
     }));
+    const isClustersPage = url.startsWith('/v5/clusters');
 
     return (
         <header className="fixed inset-x-0 top-0 z-40 border-b border-border bg-background">
-            <nav className="flex h-16 items-center gap-4 px-6" aria-label="Main navigation">
+            <nav className="relative flex h-16 items-center gap-3 px-4 sm:px-6" aria-label="Main navigation">
                 <Link
                     href="/v5"
                     className="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    aria-label="Coolify home"
+                    aria-label="Coolify dashboard"
                 >
                     <img src="/coolify-logo.svg" alt="Coolify" className="size-8" />
                 </Link>
 
-                <div className="flex min-w-0 items-center gap-2">
+                <div className="absolute left-1/2 flex min-w-0 -translate-x-1/2 items-center justify-center gap-1 md:static md:flex-1 md:translate-x-0 md:justify-start md:gap-2">
                     <Select
                         items={projectItems}
                         value={selectedProject?.uuid ?? ''}
                         onValueChange={selectProject}
                         disabled={projects.length === 0}
                     >
-                        <SelectTrigger aria-label="Select a project" variant="ghost" className="max-w-[10rem]">
+                        <SelectTrigger aria-label="Select a project" variant="ghost" className="max-w-[38vw] md:max-w-[10rem]">
                             <SelectValue placeholder="Select a project" />
                         </SelectTrigger>
                         <SelectContent position="popper" align="start" sideOffset={4}>
@@ -114,7 +118,7 @@ export function AppNavbar({
                         onValueChange={selectEnvironment}
                         disabled={!selectedProject || (selectedProject.environments ?? []).length === 0}
                     >
-                        <SelectTrigger aria-label="Select an environment" variant="ghost" className="max-w-[10rem]">
+                        <SelectTrigger aria-label="Select an environment" variant="ghost" className="max-w-[30vw] md:max-w-[10rem]">
                             <SelectValue placeholder="Select an environment" />
                         </SelectTrigger>
                         <SelectContent position="popper" align="start" sideOffset={4}>
@@ -132,7 +136,7 @@ export function AppNavbar({
                 <div className="ml-auto flex items-center gap-3">
                     <Link
                         href="/v5/clusters"
-                        className="rounded-md px-3 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        className="hidden rounded-md px-3 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:inline-flex"
                     >
                         Clusters
                     </Link>
@@ -143,6 +147,50 @@ export function AppNavbar({
                     >
                         Flux: {flux?.label ?? 'Unknown'} · {clusters.length} clusters
                     </div>
+
+                    <Sheet>
+                        <SheetTrigger
+                            className="inline-flex rounded-md p-2 text-warning transition-colors hover:bg-muted hover:text-warning md:hidden"
+                            aria-label="Open mobile menu"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="size-6" viewBox="0 0 24 24" aria-hidden="true">
+                                <path
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M4 6h16M4 12h16M4 18h16"
+                                />
+                            </svg>
+                        </SheetTrigger>
+                        <SheetContent side="right" className="w-72 max-w-[85vw] bg-background">
+                            <SheetHeader>
+                                <SheetTitle>Coolify</SheetTitle>
+                                <SheetDescription className="sr-only">Move between Coolify v5 pages.</SheetDescription>
+                            </SheetHeader>
+                            <nav className="flex flex-col gap-1 px-4" aria-label="Mobile navigation">
+                                <SheetClose
+                                    render={<Link href="/v5" />}
+                                    className={cn(
+                                        'rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-warning',
+                                        !isClustersPage && 'bg-accent text-accent-foreground',
+                                    )}
+                                >
+                                    Dashboard
+                                </SheetClose>
+                                <SheetClose
+                                    render={<Link href="/v5/clusters" />}
+                                    className={cn(
+                                        'rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-warning',
+                                        isClustersPage && 'bg-accent text-accent-foreground',
+                                    )}
+                                >
+                                    Clusters
+                                </SheetClose>
+                            </nav>
+                        </SheetContent>
+                    </Sheet>
                 </div>
             </nav>
         </header>

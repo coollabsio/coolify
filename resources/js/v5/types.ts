@@ -38,7 +38,7 @@ export type V5Project = {
     environments: V5Environment[];
 };
 
-export type V5HomeProps = {
+export type V5DashboardProps = {
     flux: FluxStatus | null;
     clusters?: V5Cluster[];
     projects?: V5Project[];

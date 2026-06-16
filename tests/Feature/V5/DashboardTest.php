@@ -32,8 +32,9 @@ beforeEach(function () {
     Schema::dropIfExists('users');
 });
 
-it('registers the v5 home route', function () {
-    expect(Route::has('v5.home'))->toBeTrue()
+it('registers the v5 dashboard route', function () {
+    expect(Route::has('v5.dashboard'))->toBeTrue()
+        ->and(Route::has('v5.home'))->toBeFalse()
         ->and(Route::has('v5.selection.update'))->toBeTrue()
         ->and(Route::has('v5.clusters.index'))->toBeTrue()
         ->and(Route::has('v5.clusters.store'))->toBeTrue()
@@ -174,7 +175,8 @@ it('serves the v5 inertia shell', function () {
         ->assertSee('coolify-logo-dev-transparent.png', false)
         ->assertDontSee('coolify-logo.svg', false)
         ->assertSee('v5-app', false)
-        ->assertSee('Home', false)
+        ->assertSee('Dashboard', false)
+        ->assertDontSee('Home', false)
         ->assertDontSee('v5-ready', false)
         ->assertDontSee('This page is served from Laravel through Inertia and React')
         ->assertDontSee('Bootstrap server')
@@ -369,7 +371,7 @@ it('allows the same v5 cluster name in another team without leaking it', functio
         ->assertDontSee('Other team cluster.');
 });
 
-it('shares existing projects and environments with the v5 home page', function () {
+it('shares existing projects and environments with the v5 dashboard page', function () {
     $this->withoutVite();
     fakeFluxHealth();
     createSharedUserAndTeamTables();
@@ -458,25 +460,28 @@ it('rejects persisted v5 selections outside the current team', function () {
         ->assertSessionMissing('v5.selectedEnvironmentUuid');
 });
 
-it('defines the v5 home page as a shadcn styled canvas shell', function () {
-    $homePage = file_get_contents(resource_path('js/v5/Pages/Home.tsx'));
+it('defines the v5 dashboard page as a shadcn styled canvas shell', function () {
+    $dashboardPage = file_get_contents(resource_path('js/v5/Pages/Dashboard.tsx'));
     $app = file_get_contents(resource_path('js/v5/app.tsx'));
     $navbarPath = resource_path('js/v5/components/app-navbar.tsx');
 
     expect(file_exists($navbarPath))->toBeTrue();
 
     $navbar = file_get_contents($navbarPath);
+    $sheetPath = resource_path('js/v5/components/ui/sheet.tsx');
+
+    expect(file_exists($sheetPath))->toBeTrue();
 
     expect($app)
         ->toContain('progress: {')
-        ->toContain('delay: 250')
+        ->toContain('delay: 10')
         ->toContain("color: '#fcd452'")
         ->toContain('showSpinner: false')
         ->not->toContain('TopNavigationLoadingIndicator')
         ->not->toContain('withApp:');
 
-    expect($homePage)
-        ->toContain('Magic')
+    expect($dashboardPage)
+        ->toContain('Dashboard')
         ->toContain("import { AppNavbar } from '@/components/app-navbar';")
         ->not->toContain('function csrfToken()')
         ->not->toContain("import { csrfToken } from '@/lib/csrf';")
@@ -494,7 +499,9 @@ it('defines the v5 home page as a shadcn styled canvas shell', function () {
         ->not->toContain("fetch('/v5/selection'");
 
     expect($navbar)
-        ->toContain("import { Link } from '@inertiajs/react';")
+        ->toContain("import { Link, usePage } from '@inertiajs/react';")
+        ->toContain("import { cn } from '@/lib/utils';")
+        ->toContain("import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';")
         ->toContain("import { csrfToken } from '@/lib/csrf';")
         ->not->toContain('function csrfToken()')
         ->toContain('export function AppNavbar')
@@ -506,16 +513,44 @@ it('defines the v5 home page as a shadcn styled canvas shell', function () {
         ->toContain('text-muted-foreground')
         ->toContain('SelectGroup')
         ->toContain('variant="ghost"')
-        ->toContain('className="max-w-[10rem]"')
         ->toContain('position="popper"')
         ->toContain('sideOffset={4}')
         ->toContain('Select a project')
         ->toContain('Select an environment')
+        ->toContain('const { url } = usePage();')
+        ->toContain("const isClustersPage = url.startsWith('/v5/clusters');")
         ->toContain('href="/v5"')
         ->toContain('href="/v5/clusters"')
         ->toContain('Clusters')
+        ->toContain('className="relative flex h-16 items-center gap-3 px-4 sm:px-6"')
+        ->toContain('className="absolute left-1/2 flex min-w-0 -translate-x-1/2 items-center justify-center gap-1 md:static md:flex-1 md:translate-x-0 md:justify-start md:gap-2"')
+        ->toContain('className="max-w-[38vw] md:max-w-[10rem]"')
+        ->toContain('className="max-w-[30vw] md:max-w-[10rem]"')
+        ->toContain('aria-label="Open mobile menu"')
+        ->toContain('<Sheet>')
+        ->toContain('<SheetTrigger')
+        ->toContain('<SheetContent side="right" className="w-72 max-w-[85vw] bg-background"')
+        ->toContain('<SheetHeader>')
+        ->toContain('<SheetTitle>Coolify</SheetTitle>')
+        ->toContain('<SheetDescription className="sr-only">')
+        ->toContain('<SheetClose')
+        ->toContain('Move between Coolify v5 pages.')
+        ->not->toContain('<SheetTitle className="sr-only">Navigation</SheetTitle>')
+        ->toContain('className="hidden rounded-md px-3 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:inline-flex"')
+        ->toContain('className="inline-flex rounded-md p-2 text-warning transition-colors hover:bg-muted hover:text-warning md:hidden"')
+        ->toContain('Dashboard')
+        ->not->toContain('Home')
         ->toContain("fetch('/v5/selection'")
         ->toContain("'X-CSRF-TOKEN': csrfToken()")
+        ->not->toContain('isMobileMenuOpen')
+        ->not->toContain('setIsMobileMenuOpen')
+        ->not->toContain('isProjectEnvironmentMenuOpen')
+        ->not->toContain('setIsProjectEnvironmentMenuOpen')
+        ->not->toContain('Open project and environment selector')
+        ->not->toContain('Close project and environment selector')
+        ->not->toContain('DropdownMenu')
+        ->not->toContain('fixed inset-0 bg-black/80')
+        ->not->toContain('fixed inset-y-0 right-0')
         ->not->toContain('<a')
         ->not->toContain("import { Button } from '@/components/ui/button';")
         ->not->toContain('<Button')
@@ -526,9 +561,7 @@ it('defines the v5 home page as a shadcn styled canvas shell', function () {
         ->not->toContain('bg-background/95')
         ->not->toContain('backdrop-blur')
         ->not->toContain('supports-[backdrop-filter]')
-        ->not->toContain('bg-coolgray')
         ->not->toContain('border-coolgray')
-        ->not->toContain('text-warning')
         ->not->toContain('className="w-[12rem]"')
         ->not->toContain('<h1>Coolify v5</h1>')
         ->not->toContain('<h2 id="clusters-heading">Clusters</h2>');
@@ -539,6 +572,7 @@ it('defines the v5 home page as a shadcn styled canvas shell', function () {
 it('defines the v5 cluster management page and create cluster form', function () {
     $clustersPagePath = resource_path('js/v5/Pages/Clusters.tsx');
     $clustersPage = file_get_contents($clustersPagePath);
+    $buttonComponent = file_get_contents(resource_path('js/v5/components/ui/button.tsx'));
     $types = file_get_contents(resource_path('js/v5/types.ts'));
 
     expect(file_exists($clustersPagePath))->toBeTrue();
@@ -551,6 +585,7 @@ it('defines the v5 cluster management page and create cluster form', function ()
         ->toContain('aria-label="Create cluster"')
         ->toContain('setIsCreateDialogOpen(true)')
         ->toContain('Add cluster')
+        ->toContain('variant="coolify"')
         ->toContain('border-warning bg-warning/10 text-foreground')
         ->not->toContain('border-primary bg-primary/10 text-foreground')
         ->toContain('<Dialog')
@@ -571,14 +606,26 @@ it('defines the v5 cluster management page and create cluster form', function ()
         ->not->toContain('<aside className="rounded-lg border border-border bg-card p-5">')
         ->not->toContain('This is where the magic happens.');
 
+    expect(substr_count($clustersPage, 'variant="coolify"'))->toBe(2)
+        ->and($buttonComponent)
+        ->toContain('coolify:')
+        ->toContain('bg-coollabs-50')
+        ->toContain('hover:bg-coollabs');
+
     expect(file_get_contents(resource_path('js/v5/components/ui/dialog.tsx')))
         ->toContain('@base-ui/react/dialog')
         ->toContain('DialogTitle')
         ->toContain('DialogDescription');
 
-    expect(file_get_contents(resource_path('css/v5/app.css')))
+    $v5Css = file_get_contents(resource_path('css/v5/app.css'));
+
+    expect($v5Css)
         ->toContain('--color-warning: var(--warning);')
-        ->toContain('--warning: #fcd452;');
+        ->toContain('--warning: #fcd452;')
+        ->not->toContain('--ring: oklch(0.705 0.015 286.067);')
+        ->not->toContain('--ring: oklch(0.552 0.016 285.938);');
+
+    expect(substr_count($v5Css, '--ring: var(--warning);'))->toBe(2);
 
     expect($types)
         ->toContain('sshUser: string;')
@@ -722,10 +769,10 @@ it('shows when flux is unavailable', function () {
         ->assertSee('Flux socket was not found.');
 });
 
-it('does not include coolify version controls on the v5 home page', function () {
-    $homePage = file_get_contents(resource_path('js/v5/Pages/Home.tsx'));
+it('does not include coolify version controls on the v5 dashboard page', function () {
+    $dashboardPage = file_get_contents(resource_path('js/v5/Pages/Dashboard.tsx'));
 
-    expect($homePage)
+    expect($dashboardPage)
         ->not->toContain('Check coolify version')
         ->not->toContain('/v5/coolify/version')
         ->not->toContain('Installed version:');

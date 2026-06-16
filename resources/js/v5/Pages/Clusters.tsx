@@ -14,7 +14,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { csrfToken } from '@/lib/csrf';
-import type { V5Cluster, V5HomeProps } from '@/types';
+import type { V5Cluster, V5DashboardProps } from '@/types';
 
 type ClusterFormErrors = {
     name?: string[];
@@ -50,7 +50,7 @@ export default function Clusters({
     projects = [],
     selectedProjectUuid = null,
     selectedEnvironmentUuid = null,
-}: V5HomeProps) {
+}: V5DashboardProps) {
     const [clusterList, setClusterList] = useState<V5Cluster[]>(clusters);
     const [selectedClusterId, setSelectedClusterId] = useState<string>(clusters[0]?.id ?? '');
     const [name, setName] = useState('');
@@ -134,7 +134,7 @@ export default function Clusters({
                                 </div>
                                 <Button
                                     type="button"
-                                    variant="outline"
+                                    variant="coolify"
                                     size="sm"
                                     aria-label="Create cluster"
                                     onClick={() => setIsCreateDialogOpen(true)}
@@ -323,7 +323,7 @@ export default function Clusters({
 
                                     <DialogFooter>
                                         <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-                                        <Button type="submit" disabled={isSubmitting}>
+                                        <Button type="submit" variant="coolify" disabled={isSubmitting}>
                                             {isSubmitting ? 'Creating...' : 'Create cluster'}
                                         </Button>
                                     </DialogFooter>

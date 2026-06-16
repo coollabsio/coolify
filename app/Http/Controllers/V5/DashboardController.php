@@ -16,7 +16,7 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class HomeController extends Controller
+class DashboardController extends Controller
 {
     private const SELECTED_PROJECT_SESSION_KEY = 'v5.selectedProjectUuid';
 
@@ -28,7 +28,7 @@ class HomeController extends Controller
         $projects = $this->projects($currentTeam);
         [$selectedProject, $selectedEnvironment] = $this->selectedProjectAndEnvironment($request, $projects);
 
-        return Inertia::render('Home', [
+        return Inertia::render('Dashboard', [
             'flux' => $fluxHealth->check(),
             'projects' => $projects,
             'selectedProjectUuid' => $selectedProject['uuid'] ?? null,
