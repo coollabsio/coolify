@@ -40,7 +40,13 @@
                                 confirmationLabel="Please type the confirmation text to enable registration."
                                 shortConfirmationLabel="Confirmation text" />
                         </div>
+                        <div class="md:w-96" wire:key="oauth-registration">
+                            <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                                helper="Allow users to self-register via OAuth providers (e.g. GitHub, Google) even when general registration is disabled. Existing OAuth logins are always allowed — this only controls new account creation via OAuth."
+                                label="Allow OAuth Registration" />
+                        </div>
                     @endif
+
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."
