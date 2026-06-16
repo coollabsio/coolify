@@ -49,8 +49,6 @@ services:
       - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
       - 'POSTGRES_HOST=${POSTGRES_HOST:-postgres}'
       - 'POSTGRES_PORT=${POSTGRES_PORT:-5432}'
-    ports:
-      - '5432:5432'
     volumes:
       - 'postgres_data:/var/lib/postgresql/data'
     restart: unless-stopped
