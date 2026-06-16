@@ -6,4 +6,5 @@ return [
     'corrosion_version' => env('COOLIFY_CORROSION_VERSION', 'v1.0.0'),
     'dev_builder_capacity' => (int) env('COOLIFY_COOLD_VM_BUILDER_CAPACITY', 2),
     'dev_builder_enabled' => (int) env('COOLIFY_COOLD_VM_BUILDER_CAPACITY', 2) > 0,
+    'dev_ssh_user' => env('COOLIFY_CLI_SSH_USER', get_current_user()),
 ];

@@ -29,3 +29,11 @@ it('defaults coold dev VM settings in Laravel config', function () {
         ->and(config('coold.dev_builder_capacity'))->toBe(2)
         ->and(config('coold.dev_builder_enabled'))->toBeTrue();
 });
+
+it('runs the v5 dev Lima seeder with the normal development database seeder', function () {
+    $databaseSeeder = file_get_contents(database_path('seeders/DatabaseSeeder.php'));
+    $developmentSeederBlock = str($databaseSeeder)->after("if (in_array(config('app.env'), ['local', 'development', 'dev'], true)) {")->before('        }')->toString();
+
+    expect($developmentSeederBlock)->toContain('DevelopmentRailpackExamplesSeeder::class')
+        ->and($developmentSeederBlock)->toContain('V5DevLimaSeeder::class');
+});

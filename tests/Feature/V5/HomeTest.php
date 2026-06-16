@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\V5\Cluster;
 use App\Models\V5\Server as V5Server;
 use App\Services\Flux\FluxHealth;
+use Database\Seeders\V5DevLimaSeeder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Process;
@@ -463,6 +464,28 @@ it('syncs dev Lima VMs into v5 clusters and servers', function () {
         ->and(Cluster::query()->where('name', 'Development-Lima')->count())->toBe(1)
         ->and(V5Server::query()->where('name', 'coold-dev')->where('host', 'lima-coold-dev')->exists())->toBeTrue()
         ->and(V5Server::query()->where('name', 'coold-dev-2')->where('host', 'lima-coold-dev-2')->exists())->toBeTrue();
+});
+
+it('seeds dev Lima VMs into v5 clusters and servers idempotently', function () {
+    createSharedUserAndTeamTables();
+    [$user, $team] = createV5UserWithTeam();
+    createV5PrivateKey($team, 'Dev Lima Key');
+    config()->set('coold.dev_builder_capacity', 2);
+
+    (new V5DevLimaSeeder)->run();
+    (new V5DevLimaSeeder)->run();
+
+    $cluster = Cluster::query()->where('name', 'Development-Lima')->sole();
+
+    expect($cluster->team_id)->toBe($team->id)
+        ->and($cluster->created_by_user_id)->toBe($user->id)
+        ->and($cluster->description)->toBe('Local Lima development cluster managed by scripts/dev.sh.')
+        ->and(V5Server::query()->count())->toBe(2)
+        ->and(V5Server::query()->where('name', 'coold-dev')->where('host', 'lima-coold-dev')->where('ssh_user', get_current_user())->where('ssh_port', 22)->exists())->toBeTrue()
+        ->and(V5Server::query()->where('name', 'coold-dev-2')->where('host', 'lima-coold-dev-2')->where('ssh_user', get_current_user())->where('ssh_port', 22)->exists())->toBeTrue()
+        ->and(V5Server::query()->where('status', 'installed')->count())->toBe(2)
+        ->and(V5Server::query()->where('builder_enabled', true)->where('builder_capacity', 2)->count())->toBe(2)
+        ->and(V5Server::query()->where('cluster_id', $cluster->id)->count())->toBe(2);
 });
 
 function fakeFluxHealth(bool $available = true, string $message = 'Flux is running.'): void

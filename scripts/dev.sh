@@ -417,29 +417,17 @@ follow_logs() {
 }
 
 sync_v5_dev_lima_servers() {
-  local count
-  local builder_capacity
-  local args=()
-  local instance
-  local node
+  local ssh_user
 
-  count="$(coold_vm_count)"
-  builder_capacity="$(read_coolify_env COOLIFY_COOLD_VM_BUILDER_CAPACITY 2)"
-
-  for index in $(seq 1 "$count"); do
-    instance="$(coold_vm_instance "$index")"
-    node="$(lima_ssh_target "$index")"
-    args+=(--server "${instance}|${node}|$(coolify_ssh_user)|22")
-  done
+  ssh_user="$(coolify_ssh_user)"
 
   echo "==> Running pending migrations before syncing v5 dev Lima state..."
   spin exec -T coolify php artisan migrate --force
 
-  echo "==> Syncing dev Lima VM(s) into v5 clusters/servers..."
-  spin exec -T coolify php artisan v5:sync-dev-lima-servers \
-    --cluster="Development-Lima" \
-    --builder-capacity="$builder_capacity" \
-    "${args[@]}"
+  echo "==> Seeding dev Lima VM(s) into v5 clusters/servers..."
+  spin exec -T \
+    -e COOLIFY_CLI_SSH_USER="$ssh_user" \
+    coolify php artisan db:seed --class=V5DevLimaSeeder --force
 }
 
 configure_flux_dev_for_vm() {

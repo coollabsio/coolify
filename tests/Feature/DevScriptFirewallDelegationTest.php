@@ -59,13 +59,14 @@ it('retries dev coolify bootstrap because fresh Lima setup can complete across p
         ->and($script)->toContain('fresh Lima hosts can finish setup after partial bootstrap phases');
 });
 
-it('syncs bootstrapped Lima VMs into v5 development server state', function () {
+it('seeds bootstrapped Lima VMs into v5 development server state', function () {
     $script = file_get_contents(base_path('scripts/dev.sh'));
 
     expect($script)->toContain('sync_v5_dev_lima_servers()')
-        ->and($script)->toContain('v5:sync-dev-lima-servers')
-        ->and($script)->toContain('--cluster="Development-Lima"')
-        ->and($script)->toContain('--server "${instance}|${node}|$(coolify_ssh_user)|22"');
+        ->and($script)->toContain('COOLIFY_CLI_SSH_USER="$ssh_user"')
+        ->and($script)->toContain('db:seed --class=V5DevLimaSeeder --force')
+        ->and($script)->not->toContain('v5:sync-dev-lima-servers')
+        ->and($script)->not->toContain('--server "${instance}|${node}|$(coolify_ssh_user)|22"');
 });
 
 it('supports down cleanup as the preferred VM cleanup command', function () {
