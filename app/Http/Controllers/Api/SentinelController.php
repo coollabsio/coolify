@@ -97,12 +97,12 @@ class SentinelController extends Controller
 
         if ($this->shouldDispatchUpdate($server, $data)) {
             PushServerUpdateJob::dispatch($server, $data);
-        }
 
-        auditLog('sentinel.metrics_pushed', [
-            'server_uuid' => $server->uuid,
-            'team_id' => $server->team_id,
-        ]);
+            auditLog('sentinel.metrics_pushed', [
+                'server_uuid' => $server->uuid,
+                'team_id' => $server->team_id,
+            ]);
+        }
 
         return response()->json(['message' => 'ok'], 200);
     }

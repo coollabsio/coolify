@@ -3,6 +3,8 @@
 namespace App\Actions\Stripe;
 
 use App\Models\Team;
+use Carbon\Carbon;
+use Stripe\Exception\InvalidRequestException;
 use Stripe\StripeClient;
 
 class RefundSubscription
@@ -13,7 +15,7 @@ class RefundSubscription
 
     public function __construct(?StripeClient $stripe = null)
     {
-        $this->stripe = $stripe ?? new StripeClient(config('subscription.stripe_api_key'));
+        $this->stripe = $stripe ?? app(StripeClient::class);
     }
 
     /**
@@ -39,7 +41,7 @@ class RefundSubscription
 
         try {
             $stripeSubscription = $this->stripe->subscriptions->retrieve($subscription->stripe_subscription_id);
-        } catch (\Stripe\Exception\InvalidRequestException $e) {
+        } catch (InvalidRequestException $e) {
             return $this->ineligible('Subscription not found in Stripe.');
         }
 
@@ -49,7 +51,7 @@ class RefundSubscription
             return $this->ineligible("Subscription status is '{$stripeSubscription->status}'.", $currentPeriodEnd);
         }
 
-        $startDate = \Carbon\Carbon::createFromTimestamp($stripeSubscription->start_date);
+        $startDate = Carbon::createFromTimestamp($stripeSubscription->start_date);
         $daysSinceStart = (int) $startDate->diffInDays(now());
         $daysRemaining = self::REFUND_WINDOW_DAYS - $daysSinceStart;
 
@@ -130,7 +132,7 @@ class RefundSubscription
             \Log::info("Refunded and cancelled subscription {$subscription->stripe_subscription_id} for team {$team->name}");
 
             return ['success' => true, 'error' => null];
-        } catch (\Stripe\Exception\InvalidRequestException $e) {
+        } catch (InvalidRequestException $e) {
             \Log::error("Stripe refund error for team {$team->id}: ".$e->getMessage());
 
             return ['success' => false, 'error' => 'Stripe error: '.$e->getMessage()];

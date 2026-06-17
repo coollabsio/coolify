@@ -6,7 +6,6 @@ use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\Project;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class SimpleDockerfile extends Component
 {
@@ -48,7 +47,7 @@ CMD ["nginx", "-g", "daemon off;"]
             $port = 80;
         }
         $application = Application::create([
-            'name' => 'dockerfile-'.new Cuid2,
+            'name' => 'dockerfile-'.new_public_id(),
             'repository_project_id' => 0,
             'git_repository' => 'coollabsio/coolify',
             'git_branch' => 'main',

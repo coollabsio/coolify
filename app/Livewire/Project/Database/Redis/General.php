@@ -45,6 +45,8 @@ class General extends Component
 
     public string $redisVersion;
 
+    public bool $isPasswordHiddenForMember = false;
+
     protected $listeners = [
         'envsUpdated' => 'refresh',
     ];
@@ -117,6 +119,11 @@ class General extends Component
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+
+        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
+        if ($this->isPasswordHiddenForMember) {
+            $this->redisPassword = '';
         }
     }
 

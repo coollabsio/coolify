@@ -1,14 +1,23 @@
 <?php
 
 use App\Models\CloudProviderToken;
+use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Once;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::query()->whereKey(0)->delete();
+    $settings = new InstanceSettings(['is_api_enabled' => true]);
+    $settings->id = 0;
+    $settings->save();
+    Once::flush();
+
     // Create a team with owner
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -409,5 +418,34 @@ describe('POST /api/v1/cloud-tokens/{uuid}/validate', function () {
 
         $response->assertStatus(200);
         $response->assertJson(['valid' => true, 'message' => 'Token is valid.']);
+    });
+
+    test('writes an audit log entry when validating a stored token', function () {
+        $token = CloudProviderToken::factory()->create([
+            'team_id' => $this->team->id,
+            'provider' => 'hetzner',
+            'name' => 'Audit Token',
+        ]);
+
+        Http::fake([
+            'https://api.hetzner.cloud/v1/servers' => Http::response([], 200),
+        ]);
+
+        $auditChannel = Mockery::mock();
+        $auditChannel->shouldReceive('info')
+            ->once()
+            ->with('api.cloud_token.validated', Mockery::on(function (array $context) use ($token) {
+                return $context['cloud_token_uuid'] === $token->uuid
+                    && $context['provider'] === 'hetzner'
+                    && $context['valid'] === true;
+            }));
+
+        Log::shouldReceive('channel')->with('audit')->andReturn($auditChannel);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson("/api/v1/cloud-tokens/{$token->uuid}/validate")
+            ->assertOk();
     });
 });

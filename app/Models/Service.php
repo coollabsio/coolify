@@ -16,7 +16,6 @@ use OpenApi\Attributes as OA;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Service model',
@@ -71,7 +70,7 @@ class Service extends BaseModel
     {
         static::creating(function ($service) {
             if (blank($service->name)) {
-                $service->name = 'service-'.(new Cuid2);
+                $service->name = 'service-'.new_public_id();
             }
         });
         static::created(function ($service) {
@@ -1564,7 +1563,7 @@ class Service extends BaseModel
             "cd $workdir",
         ], $this->server);
 
-        $filename = new Cuid2.'-docker-compose.yml';
+        $filename = new_public_id().'-docker-compose.yml';
         Storage::disk('local')->put("tmp/{$filename}", $this->docker_compose);
         $path = Storage::path("tmp/{$filename}");
         instant_scp($path, "{$workdir}/docker-compose.yml", $this->server);

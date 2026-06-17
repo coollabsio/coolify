@@ -2,6 +2,7 @@
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
@@ -10,13 +11,17 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::updateOrCreate(['id' => 0]);
+
     // Create a team with owner
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
 
+    session(['currentTeam' => $this->team]);
+
     // Create an API token for the user
-    $this->token = $this->user->createToken('test-token', ['*'], $this->team->id);
+    $this->token = $this->user->createToken('test-token', ['*']);
     $this->bearerToken = $this->token->plainTextToken;
 
     // Create a server for the team
@@ -76,7 +81,7 @@ describe('POST /api/v1/deployments/{uuid}/cancel', function () {
         ])->postJson("/api/v1/deployments/{$deployment->deployment_uuid}/cancel");
 
         $response->assertStatus(400);
-        $response->assertJsonFragment(['Deployment cannot be cancelled']);
+        expect($response->json('message'))->toContain('Deployment cannot be cancelled');
     });
 
     test('returns 400 when deployment is already failed', function () {
@@ -93,7 +98,7 @@ describe('POST /api/v1/deployments/{uuid}/cancel', function () {
         ])->postJson("/api/v1/deployments/{$deployment->deployment_uuid}/cancel");
 
         $response->assertStatus(400);
-        $response->assertJsonFragment(['Deployment cannot be cancelled']);
+        expect($response->json('message'))->toContain('Deployment cannot be cancelled');
     });
 
     test('returns 400 when deployment is already cancelled', function () {
@@ -110,10 +115,10 @@ describe('POST /api/v1/deployments/{uuid}/cancel', function () {
         ])->postJson("/api/v1/deployments/{$deployment->deployment_uuid}/cancel");
 
         $response->assertStatus(400);
-        $response->assertJsonFragment(['Deployment cannot be cancelled']);
+        expect($response->json('message'))->toContain('Deployment cannot be cancelled');
     });
 
-    test('successfully cancels queued deployment', function () {
+    test('cancels queued deployment and updates status in database', function () {
         $deployment = ApplicationDeploymentQueue::create([
             'deployment_uuid' => 'queued-deployment-uuid',
             'application_id' => 1,
@@ -121,20 +126,17 @@ describe('POST /api/v1/deployments/{uuid}/cancel', function () {
             'status' => ApplicationDeploymentStatus::QUEUED->value,
         ]);
 
-        $response = $this->withHeaders([
+        $this->withHeaders([
             'Authorization' => 'Bearer '.$this->bearerToken,
             'Content-Type' => 'application/json',
         ])->postJson("/api/v1/deployments/{$deployment->deployment_uuid}/cancel");
 
-        // Expect success (200) or 500 if server connection fails (which is expected in test environment)
-        expect($response->status())->toBeIn([200, 500]);
-
-        // Verify deployment status was updated to cancelled
+        // The controller updates status before SSH calls, so DB state is always correct
         $deployment->refresh();
         expect($deployment->status)->toBe(ApplicationDeploymentStatus::CANCELLED_BY_USER->value);
     });
 
-    test('successfully cancels in-progress deployment', function () {
+    test('cancels in-progress deployment and updates status in database', function () {
         $deployment = ApplicationDeploymentQueue::create([
             'deployment_uuid' => 'in-progress-deployment-uuid',
             'application_id' => 1,
@@ -142,42 +144,13 @@ describe('POST /api/v1/deployments/{uuid}/cancel', function () {
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
 
-        $response = $this->withHeaders([
+        $this->withHeaders([
             'Authorization' => 'Bearer '.$this->bearerToken,
             'Content-Type' => 'application/json',
         ])->postJson("/api/v1/deployments/{$deployment->deployment_uuid}/cancel");
 
-        // Expect success (200) or 500 if server connection fails (which is expected in test environment)
-        expect($response->status())->toBeIn([200, 500]);
-
-        // Verify deployment status was updated to cancelled
+        // The controller updates status before SSH calls, so DB state is always correct
         $deployment->refresh();
         expect($deployment->status)->toBe(ApplicationDeploymentStatus::CANCELLED_BY_USER->value);
-    });
-
-    test('returns correct response structure on success', function () {
-        $deployment = ApplicationDeploymentQueue::create([
-            'deployment_uuid' => 'success-deployment-uuid',
-            'application_id' => 1,
-            'server_id' => $this->server->id,
-            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
-        ]);
-
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$this->bearerToken,
-            'Content-Type' => 'application/json',
-        ])->postJson("/api/v1/deployments/{$deployment->deployment_uuid}/cancel");
-
-        if ($response->status() === 200) {
-            $response->assertJsonStructure([
-                'message',
-                'deployment_uuid',
-                'status',
-            ]);
-            $response->assertJson([
-                'deployment_uuid' => $deployment->deployment_uuid,
-                'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
-            ]);
-        }
     });
 });

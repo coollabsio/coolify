@@ -3,12 +3,15 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class BackupExecutions extends Component
 {
+    use AuthorizesRequests;
+
     public ?ScheduledDatabaseBackup $backup = null;
 
     public $database;
@@ -44,29 +47,45 @@ class BackupExecutions extends Component
 
     public function cleanupFailed()
     {
-        if ($this->backup) {
-            $this->backup->executions()->where('status', 'failed')->delete();
-            $this->refreshBackupExecutions();
-            $this->dispatch('success', 'Failed backups cleaned up.');
+        try {
+            $this->authorize('manageBackups', $this->database);
+            if ($this->backup) {
+                $this->backup->executions()->where('status', 'failed')->delete();
+                $this->refreshBackupExecutions();
+                $this->dispatch('success', 'Failed backups cleaned up.');
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 
     public function cleanupDeleted()
     {
-        if ($this->backup) {
-            $deletedCount = $this->backup->executions()->where('local_storage_deleted', true)->count();
-            if ($deletedCount > 0) {
-                $this->backup->executions()->where('local_storage_deleted', true)->delete();
-                $this->refreshBackupExecutions();
-                $this->dispatch('success', "Cleaned up {$deletedCount} backup entries deleted from local storage.");
-            } else {
-                $this->dispatch('info', 'No backup entries found that are deleted from local storage.');
+        try {
+            $this->authorize('manageBackups', $this->database);
+            if ($this->backup) {
+                $deletedCount = $this->backup->executions()->where('local_storage_deleted', true)->count();
+                if ($deletedCount > 0) {
+                    $this->backup->executions()->where('local_storage_deleted', true)->delete();
+                    $this->refreshBackupExecutions();
+                    $this->dispatch('success', "Cleaned up {$deletedCount} backup entries deleted from local storage.");
+                } else {
+                    $this->dispatch('info', 'No backup entries found that are deleted from local storage.');
+                }
             }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 
     public function deleteBackup($executionId, $password, $selectedActions = [])
     {
+        try {
+            $this->authorize('manageBackups', $this->database);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+
         if (! verifyPasswordConfirmation($password, $this)) {
             return 'The provided password is incorrect.';
         }

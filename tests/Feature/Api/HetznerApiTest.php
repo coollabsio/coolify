@@ -1,15 +1,23 @@
 <?php
 
 use App\Models\CloudProviderToken;
+use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Once;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::query()->whereKey(0)->delete();
+    $settings = new InstanceSettings(['is_api_enabled' => true]);
+    $settings->id = 0;
+    $settings->save();
+    Once::flush();
+
     // Create a team with owner
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -72,6 +80,27 @@ describe('GET /api/v1/hetzner/locations', function () {
         ])->getJson('/api/v1/hetzner/locations?cloud_provider_token_id=non-existent-uuid');
 
         $response->assertStatus(404);
+    });
+
+    test('member read token cannot use a stored cloud provider token', function () {
+        $member = User::factory()->create();
+        $this->team->members()->attach($member->id, ['role' => 'member']);
+        session(['currentTeam' => $this->team]);
+        $memberToken = $member->createToken('member-read', ['read'])->plainTextToken;
+
+        Http::fake([
+            'https://api.hetzner.cloud/v1/locations*' => Http::response([
+                'locations' => [['id' => 1, 'name' => 'nbg1']],
+            ], 200),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$memberToken,
+            'Content-Type' => 'application/json',
+        ])->getJson('/api/v1/hetzner/locations?cloud_provider_token_id='.$this->hetznerToken->uuid);
+
+        $response->assertForbidden();
+        Http::assertNothingSent();
     });
 });
 
