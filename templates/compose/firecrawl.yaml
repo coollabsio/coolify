@@ -7,7 +7,7 @@
 
 services:
   api:
-    image: ghcr.io/firecrawl/firecrawl:latest
+    image: 'ghcr.io/firecrawl/firecrawl@sha256:44f8e44e5cb7427c6e5759ec8f88950dfac2b4ee042ad00987303f53e69b96bc'
     restart: unless-stopped
     environment:
       - SERVICE_URL_FIRECRAWL_3002
@@ -64,7 +64,7 @@ services:
       start_period: 60s
 
   playwright-service:
-    image: ghcr.io/firecrawl/playwright-service:latest
+    'ghcr.io/firecrawl/playwright-service@sha256:1f6eba6403207d501a63d9b1d4685b6316b4fc7968fe64a5839ab1bfec9d1c14'
     restart: unless-stopped
     environment:
       - PORT=3000
@@ -129,7 +129,7 @@ services:
 
   # Runs nuq.sql schema migration idempotently on every deploy; exits after completion.
   nuq-postgres-init:
-    image: ghcr.io/firecrawl/nuq-postgres:latest
+    image: 'ghcr.io/firecrawl/nuq-postgres@sha256:f9388bd25ae2e1f1d034518236f993ce236173c1d8800ce24092ea6643a95a33'
     restart: "no"
     environment:
       - PGHOST=nuq-postgres
