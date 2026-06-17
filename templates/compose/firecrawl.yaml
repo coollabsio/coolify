@@ -64,7 +64,7 @@ services:
       start_period: 60s
 
   playwright-service:
-    'ghcr.io/firecrawl/playwright-service@sha256:1f6eba6403207d501a63d9b1d4685b6316b4fc7968fe64a5839ab1bfec9d1c14'
+     image: 'ghcr.io/firecrawl/playwright-service@sha256:1f6eba6403207d501a63d9b1d4685b6316b4fc7968fe64a5839ab1bfec9d1c14'
     restart: unless-stopped
     environment:
       - PORT=3000
