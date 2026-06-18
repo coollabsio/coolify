@@ -174,6 +174,90 @@ class ServersController extends Controller
     }
 
     #[OA\Get(
+        summary: 'Metrics',
+        description: 'Get current CPU and memory metrics by server UUID.',
+        path: '/servers/{uuid}/metrics',
+        operationId: 'get-server-metrics-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server\'s UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get current server metrics.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'cpu' => [
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'time' => ['type' => 'string'],
+                                        'percent' => ['type' => 'number'],
+                                    ],
+                                ],
+                                'memory' => [
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'time' => ['type' => 'string'],
+                                        'total' => ['type' => 'integer'],
+                                        'available' => ['type' => 'integer'],
+                                        'used' => ['type' => 'integer'],
+                                        'usedPercent' => ['type' => 'number'],
+                                        'free' => ['type' => 'integer'],
+                                    ],
+                                ],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 409,
+                description: 'Metrics are disabled for this server.',
+            ),
+        ]
+    )]
+    public function metrics_by_server(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (is_null($server)) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+
+        if (! $server->isMetricsEnabled()) {
+            return response()->json(['message' => 'Metrics are disabled for this server.'], 409);
+        }
+
+        return response()->json(serializeApiResponse([
+            'cpu' => $this->sentinelMetric($server, '/cpu/current'),
+            'memory' => $this->sentinelMetric($server, '/memory/current'),
+        ]));
+    }
+
+    #[OA\Get(
         summary: 'Resources',
         description: 'Get resources by server.',
         path: '/servers/{uuid}/resources',
@@ -244,6 +328,32 @@ class ServersController extends Controller
         $server = $this->removeSensitiveData($server);
 
         return response()->json(serializeApiResponse(data_get($server, 'resources')));
+    }
+
+    private function sentinelMetric(ModelsServer $server, string $path): array
+    {
+        $token = $server->settings->ensureValidSentinelToken();
+        $endpoint = "http://localhost:8888/api{$path}";
+        $response = instant_remote_process(
+            ["docker exec coolify-sentinel sh -c 'curl -sS -H \"Authorization: Bearer {$token}\" {$endpoint}'"],
+            $server,
+            false
+        );
+        $metric = json_decode($response, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \Exception('Sentinel returned invalid JSON: '.json_last_error_msg());
+        }
+
+        if (! is_array($metric)) {
+            throw new \Exception('Sentinel returned an invalid metrics payload.');
+        }
+
+        if (data_get($metric, 'error')) {
+            throw new \Exception(data_get($metric, 'error'));
+        }
+
+        return $metric;
     }
 
     #[OA\Get(
