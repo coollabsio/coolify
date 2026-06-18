@@ -1,0 +1,33 @@
+# documentation: https://docs.linuxserver.io/images/docker-obsidian
+# slogan: Note-taking app with linking, organizing, and hundreds of plugins - runs in your browser via remote desktop
+# category: productivity
+# tags: notes,obsidian,markdown,desktop,gui,productivity
+# logo: svgs/obsidian.svg
+# port: 3000
+
+services:
+  obsidian:
+    image: lscr.io/linuxserver/obsidian:latest
+    environment:
+      # Coolify routing - do not remove
+      - SERVICE_URL_OBSIDIAN_3000
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-Etc/UTC}
+      # HTTP Basic Auth - auto-generated on first deploy; change via Coolify env vars
+      - CUSTOM_USER=${SERVICE_USER_OBSIDIAN}
+      - PASSWORD=${SERVICE_PASSWORD_OBSIDIAN}
+    volumes:
+      - obsidian-config:/config
+    # Required for Electron/Chromium shared memory
+    shm_size: "1gb"
+    # Needed on hosts with older kernels or libseccomp; safe to remove on modern hosts
+    security_opt:
+      - seccomp=unconfined
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://127.0.0.1:3000/"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+      start_period: 90s
+    restart: unless-stopped
