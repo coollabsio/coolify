@@ -1,0 +1,43 @@
+# documentation: https://github.com/NousResearch/hermes-agent
+# slogan: Hermes Agent - autonomous AI agent with persistent memory, scheduling, and built-in web dashboard.
+# category: ai
+# tags: ai, agent, llm, chatbot, hermes, openrouter, anthropic, openai
+# logo: svgs/hermes-agent.png
+# port: 9119
+
+services:
+  hermes-agent:
+    image: 'nousresearch/hermes-agent:v2026.6.5'
+    command: 'gateway run'
+    environment:
+      - SERVICE_URL_HERMESAGENT_9119
+      - HERMES_DASHBOARD=1
+      - HERMES_DASHBOARD_HOST=0.0.0.0
+      - HERMES_DASHBOARD_PORT=9119
+      - 'HERMES_DASHBOARD_BASIC_AUTH_USERNAME=${SERVICE_USER_HERMESAGENT}'
+      - 'HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=${SERVICE_PASSWORD_HERMESAGENT}'
+      - 'HERMES_DASHBOARD_BASIC_AUTH_SECRET=${SERVICE_BASE64_64_HERMESAGENT}'
+      - HERMES_HOME=/opt/data
+      - GATEWAY_ALLOW_ALL_USERS=true
+      - HERMES_REDACT_SECRETS=true
+      - HERMES_UID=1000
+      - HERMES_GID=1000
+      - 'HERMES_ENABLE_PROJECT_PLUGINS=${HERMES_ENABLE_PROJECT_PLUGINS:-true}'
+      - 'HERMES_ALLOW_PRIVATE_URLS=${HERMES_ALLOW_PRIVATE_URLS:-true}'
+      - 'FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}'
+      - 'FIRECRAWL_API_URL=${FIRECRAWL_API_URL:-https://api.firecrawl.dev}'
+      - 'OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}'
+      - 'ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}'
+      - 'OPENAI_API_KEY=${OPENAI_API_KEY:-}'
+      - 'GOOGLE_API_KEY=${GOOGLE_API_KEY:-}'
+    volumes:
+      - 'hermes-home:/opt/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'test -d /opt/data || exit 1'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  hermes-home:
