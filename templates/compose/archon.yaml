@@ -57,7 +57,3 @@ services:
       timeout: 5s
       retries: 5
 
-volumes:
-  archon_data:
-  archon_user_home:
-  postgres_data:
