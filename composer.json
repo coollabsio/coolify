@@ -46,6 +46,7 @@
         "socialiteproviders/google": "^4.1",
         "socialiteproviders/infomaniak": "^4.0",
         "socialiteproviders/microsoft-azure": "^5.2",
+        "socialiteproviders/oidc": "^5.2",
         "socialiteproviders/zitadel": "^4.2",
         "spatie/laravel-activitylog": "^4.11.0",
         "spatie/laravel-data": "^4.19.1",
