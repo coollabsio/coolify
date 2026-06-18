@@ -64,8 +64,3 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-volumes:
-  hermes-home:
-  hermes-skills:
-  hermes-agent-src:
-  hermes-workspace:
