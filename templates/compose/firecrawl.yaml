@@ -143,7 +143,3 @@ services:
         condition: service_healthy
     exclude_from_hc: true
 
-volumes:
-  redis-data:
-  rabbitmq-data:
-  postgres-data:
