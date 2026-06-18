@@ -16,7 +16,7 @@
         <div class="flex flex-col gap-2 pt-4">
             @foreach ($oauth_settings_map as $oauth_setting)
                 <div class="p-4 border dark:border-coolgray-300 border-neutral-200">
-                    <h3>{{ ucfirst($oauth_setting['provider']) }}</h3>
+                    <h3>{{ $oauth_setting['provider'] === 'oidc' ? 'OIDC' : ucfirst($oauth_setting['provider']) }}</h3>
                     <div class="w-32">
                         <x-forms.checkbox instantSave="instantSave('{{ $oauth_setting['provider'] }}')"
                             id="oauth_settings_map.{{ $oauth_setting['provider'] }}.enabled" label="Enabled" />
@@ -28,6 +28,8 @@
                             type="password" label="Client Secret" autocomplete="new-password" />
                         <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.redirect_uri"
                             placeholder="{{ route('auth.callback', $oauth_setting['provider']) }}" label="Redirect URI" />
+                        <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.custom_label"
+                            label="Custom Button Label" placeholder="e.g. Login with Okta" />
                         @if ($oauth_setting['provider'] == 'azure')
                             <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.tenant"
                                 label="Tenant" />
@@ -41,7 +43,8 @@
                             $oauth_setting['provider'] == 'authentik' ||
                                 $oauth_setting['provider'] == 'clerk' ||
                                 $oauth_setting['provider'] == 'zitadel' ||
-                                $oauth_setting['provider'] == 'gitlab')
+                                $oauth_setting['provider'] == 'gitlab' ||
+                                $oauth_setting['provider'] == 'oidc')
                             <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.base_url"
                                 label="Base URL" />
                         @endif

@@ -11,7 +11,7 @@ class OauthSetting extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['provider', 'client_id', 'client_secret', 'redirect_uri', 'tenant', 'base_url', 'enabled'];
+    protected $fillable = ['provider', 'client_id', 'client_secret', 'redirect_uri', 'tenant', 'base_url', 'enabled', 'custom_label'];
 
     protected function clientSecret(): Attribute
     {
@@ -28,6 +28,7 @@ class OauthSetting extends Model
                 return filled($this->client_id) && filled($this->client_secret) && filled($this->tenant);
             case 'authentik':
             case 'clerk':
+            case 'oidc':
                 return filled($this->client_id) && filled($this->client_secret) && filled($this->base_url);
             default:
                 return filled($this->client_id) && filled($this->client_secret);

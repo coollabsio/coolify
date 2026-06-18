@@ -77,3 +77,39 @@ it('rejects oauth logins when the provider does not return an email address', fu
     'null email' => [null],
     'blank email' => ['   '],
 ]);
+
+it('logs in an existing user via generic OIDC provider', function () {
+    config()->set('app.maintenance.driver', 'file');
+
+    OauthSetting::create([
+        'provider' => 'oidc',
+        'client_id' => 'oidc-client-id',
+        'client_secret' => 'oidc-client-secret',
+        'redirect_uri' => 'https://coolify.example.com/auth/oidc/callback',
+        'base_url' => 'https://oidc.example.com',
+        'custom_label' => 'Login with Keycloak',
+    ]);
+
+    $oauth = OauthSetting::where('provider', 'oidc')->first();
+    expect($oauth->custom_label)->toBe('Login with Keycloak');
+
+    $user = User::factory()->create([
+        'email' => 'oidcuser@example.com',
+    ]);
+
+    $provider = Mockery::mock();
+    $provider->shouldReceive('setConfig')->once()->andReturnSelf();
+    $provider->shouldReceive('user')->once()->andReturn((object) [
+        'email' => 'oidcuser@example.com',
+        'name' => 'OIDC User',
+        'id' => 'oidc-user-id',
+    ]);
+
+    Socialite::shouldReceive('driver')->once()->with('oidc')->andReturn($provider);
+
+    $response = $this->get(route('auth.callback', 'oidc'));
+
+    $response->assertRedirect('/');
+    $this->assertAuthenticatedAs($user);
+    expect(User::count())->toBe(1);
+});

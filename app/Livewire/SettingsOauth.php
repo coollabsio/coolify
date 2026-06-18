@@ -18,6 +18,7 @@ class SettingsOauth extends Component
             $carry["oauth_settings_map.$setting->provider.redirect_uri"] = 'nullable';
             $carry["oauth_settings_map.$setting->provider.tenant"] = 'nullable';
             $carry["oauth_settings_map.$setting->provider.base_url"] = 'nullable';
+            $carry["oauth_settings_map.$setting->provider.custom_label"] = 'nullable|string';
 
             return $carry;
         }, []);
@@ -38,6 +39,7 @@ class SettingsOauth extends Component
                 'redirect_uri' => $setting->redirect_uri,
                 'tenant' => $setting->tenant,
                 'base_url' => $setting->base_url,
+                'custom_label' => $setting->custom_label,
             ];
 
             return $carry;
@@ -61,6 +63,7 @@ class SettingsOauth extends Component
                 'redirect_uri' => $oauthData['redirect_uri'],
                 'tenant' => $oauthData['tenant'],
                 'base_url' => $oauthData['base_url'],
+                'custom_label' => $oauthData['custom_label'],
             ]);
 
             if (! $oauth->couldBeEnabled()) {
@@ -79,6 +82,7 @@ class SettingsOauth extends Component
                 'redirect_uri' => $oauth->redirect_uri,
                 'tenant' => $oauth->tenant,
                 'base_url' => $oauth->base_url,
+                'custom_label' => $oauth->custom_label,
             ];
 
             $this->dispatch('success', 'OAuth settings for '.$oauth->provider.' updated successfully!');
@@ -100,6 +104,7 @@ class SettingsOauth extends Component
                     'redirect_uri' => $settingData['redirect_uri'],
                     'tenant' => $settingData['tenant'],
                     'base_url' => $settingData['base_url'],
+                    'custom_label' => $settingData['custom_label'],
                 ]);
 
                 if ($settingData['enabled'] && ! $oauth->couldBeEnabled()) {
@@ -119,6 +124,7 @@ class SettingsOauth extends Component
                     'redirect_uri' => $oauth->redirect_uri,
                     'tenant' => $oauth->tenant,
                     'base_url' => $oauth->base_url,
+                    'custom_label' => $oauth->custom_label,
                 ];
             }
 

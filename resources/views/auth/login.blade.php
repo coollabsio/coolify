@@ -90,7 +90,7 @@
                             @foreach ($enabled_oauth_providers as $provider_setting)
                                 <x-forms.button class="w-full justify-center" type="button"
                                     onclick="document.location.href='/auth/{{ $provider_setting->provider }}/redirect'">
-                                    {{ __("auth.login.$provider_setting->provider") }}
+                                    {{ $provider_setting->custom_label ?? __("auth.login.$provider_setting->provider") }}
                                 </x-forms.button>
                             @endforeach
                         </div>
