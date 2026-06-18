@@ -1,7 +1,13 @@
-@props(['text'])
+@props(['text', 'label' => null])
 
-<div class="relative" x-data="{ copied: false, isSecure: window.isSecureContext }">
-    <input type="text" value="{{ $text }}" readonly class="input">
+<div class="w-full" x-data="{ copied: false, isSecure: window.isSecureContext }">
+    @if ($label)
+        <label class="flex gap-1 items-center mb-1 text-sm font-medium">{{ $label }}</label>
+    @endif
+    <div class="relative">
+        <input type="text" value="{{ $text }}" class="input pr-10"
+            @keydown.prevent @paste.prevent @cut.prevent @drop.prevent
+            @focus="$event.target.select()">
     <button
         x-show="isSecure"
         @click.prevent="copied = true; navigator.clipboard.writeText({{ Js::from($text) }}); setTimeout(() => copied = false, 1000)"
@@ -15,4 +21,5 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
         </svg>
     </button>
+    </div>
 </div>

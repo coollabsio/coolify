@@ -2,6 +2,7 @@
 
 namespace App\Actions\Docker;
 
+use App\Actions\Application\StopApplication;
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Actions\Shared\ComplexStatusCheck;
@@ -9,6 +10,7 @@ use App\Events\ServiceChecked;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
+use App\Notifications\Application\RestartLimitReached as ApplicationRestartLimitReached;
 use App\Services\ContainerStatusAggregator;
 use App\Traits\CalculatesExcludedStatus;
 use Illuminate\Support\Arr;
@@ -327,6 +329,12 @@ class GetContainersStatus
             if (str($exitedService->status)->startsWith('exited')) {
                 continue;
             }
+
+            // Only protection: If no containers at all, Docker query might have failed
+            if ($this->containers->isEmpty()) {
+                continue;
+            }
+
             $name = data_get($exitedService, 'name');
             $fqdn = data_get($exitedService, 'fqdn');
             if ($name) {
@@ -406,6 +414,12 @@ class GetContainersStatus
             if (str($database->status)->startsWith('exited')) {
                 continue;
             }
+
+            // Only protection: If no containers at all, Docker query might have failed
+            if ($this->containers->isEmpty()) {
+                continue;
+            }
+
             // Reset restart tracking when database exits completely
             $database->update([
                 'status' => 'exited',
@@ -452,7 +466,9 @@ class GetContainersStatus
                 }
 
                 // Wrap all database updates in a transaction to ensure consistency
-                DB::transaction(function () use ($application, $maxRestartCount, $containerStatuses) {
+                $restartLimitReached = false;
+
+                DB::transaction(function () use ($application, $maxRestartCount, $containerStatuses, &$restartLimitReached) {
                     $previousRestartCount = $application->restart_count ?? 0;
 
                     if ($maxRestartCount > $previousRestartCount) {
@@ -463,16 +479,10 @@ class GetContainersStatus
                             'last_restart_type' => 'crash',
                         ]);
 
-                        // Send notification
-                        $containerName = $application->name;
-                        $projectUuid = data_get($application, 'environment.project.uuid');
-                        $environmentName = data_get($application, 'environment.name');
-                        $applicationUuid = data_get($application, 'uuid');
-
-                        if ($projectUuid && $applicationUuid && $environmentName) {
-                            $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/application/'.$applicationUuid;
-                        } else {
-                            $url = null;
+                        // Check if restart limit has been reached
+                        $maxAllowedRestarts = $application->max_restart_count ?? 0;
+                        if ($maxAllowedRestarts > 0 && $maxRestartCount >= $maxAllowedRestarts && $previousRestartCount < $maxAllowedRestarts) {
+                            $restartLimitReached = true;
                         }
                     }
 
@@ -487,6 +497,12 @@ class GetContainersStatus
                         }
                     }
                 });
+
+                if ($restartLimitReached) {
+                    $application->refresh();
+                    StopApplication::dispatch($application, false, true, false);
+                    $application->environment->project->team?->notify(new ApplicationRestartLimitReached($application));
+                }
             }
         }
 

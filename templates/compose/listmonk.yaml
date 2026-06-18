@@ -12,7 +12,7 @@ services:
       - SERVICE_URL_LISTMONK_9000
       - LISTMONK_app__address=0.0.0.0:9000
       - LISTMONK_db__host=postgres
-      - LISTMONK_db__name=listmonk
+      - LISTMONK_db__database=listmonk
       - LISTMONK_db__user=$SERVICE_USER_POSTGRES
       - LISTMONK_db__password=$SERVICE_PASSWORD_POSTGRES
       - LISTMONK_db__port=5432
@@ -37,7 +37,7 @@ services:
         condition: service_healthy
     environment:
       - LISTMONK_db__host=postgres
-      - LISTMONK_db__name=listmonk
+      - LISTMONK_db__database=listmonk
       - LISTMONK_db__user=$SERVICE_USER_POSTGRES
       - LISTMONK_db__password=$SERVICE_PASSWORD_POSTGRES
       - LISTMONK_db__port=5432

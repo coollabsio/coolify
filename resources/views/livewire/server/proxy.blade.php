@@ -1,7 +1,7 @@
 @php use App\Enums\ProxyTypes; @endphp
 <div>
     @if ($server->proxyType())
-        <div x-init="$wire.loadProxyConfiguration">
+        <div>
             @if ($selectedProxy !== 'NONE')
                 <form wire:submit='submit'>
                     <div class="flex items-center gap-2">
@@ -31,7 +31,7 @@
                         </x-callout>
                     @endif
                     <h3>Advanced</h3>
-                    <div class="pb-6 w-96">
+                    <div class="pb-6 w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$server"
                             helper="If set, all resources will only have docker container labels for {{ str($server->proxyType())->title() }}.<br>For applications, labels needs to be regenerated manually. <br>Resources needs to be restarted."
                             id="generateExactLabels"
@@ -55,24 +55,19 @@
                             <div class="flex items-center gap-2">
                                 <h3>{{ $proxyTitle }}</h3>
                                 @can('update', $server)
-                                    <div wire:loading wire:target="loadProxyConfiguration">
-                                        <x-forms.button disabled>Reset Configuration</x-forms.button>
-                                    </div>
-                                    <div wire:loading.remove wire:target="loadProxyConfiguration">
-                                        @if ($proxySettings)
-                                            <x-modal-confirmation title="Reset Proxy Configuration?"
-                                                buttonTitle="Reset Configuration" submitAction="resetProxyConfiguration"
-                                                :actions="[
-                                                    'Reset proxy configuration to default settings',
-                                                    'All custom configurations will be lost',
-                                                    'Custom ports and entrypoints will be removed',
-                                                ]" confirmationText="{{ $server->name }}"
-                                                confirmationLabel="Please confirm by entering the server name below"
-                                                shortConfirmationLabel="Server Name" step2ButtonText="Reset Configuration"
-                                                :confirmWithPassword="false" :confirmWithText="true">
-                                            </x-modal-confirmation>
-                                        @endif
-                                    </div>
+                                    @if ($proxySettings)
+                                        <x-modal-confirmation title="Reset Proxy Configuration?"
+                                            buttonTitle="Reset Configuration" submitAction="resetProxyConfiguration"
+                                            :actions="[
+                                                'Reset proxy configuration to default settings',
+                                                'All custom configurations will be lost',
+                                                'Custom ports and entrypoints will be removed',
+                                            ]" confirmationText="{{ $server->name }}"
+                                            confirmationLabel="Please confirm by entering the server name below"
+                                            shortConfirmationLabel="Server Name" step2ButtonText="Reset Configuration"
+                                            :confirmWithPassword="false" :confirmWithText="true">
+                                        </x-modal-confirmation>
+                                    @endif
                                 @endcan
                                 @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
                                     <button type="button" x-show="traefikWarningsDismissed"
@@ -134,19 +129,14 @@
                             @endif
                         </div>
                     @endif
-                    <div wire:loading wire:target="loadProxyConfiguration" class="pt-4">
-                        <x-loading text="Loading proxy configuration..." />
-                    </div>
-                    <div wire:loading.remove wire:target="loadProxyConfiguration">
-                        @if ($proxySettings)
-                            <div class="flex flex-col gap-2 pt-2">
-                                <x-forms.textarea canGate="update" :canResource="$server" useMonacoEditor
-                                    monacoEditorLanguage="yaml"
-                                    label="Configuration file ( {{ $this->configurationFilePath }} )"
-                                    name="proxySettings" id="proxySettings" rows="30" />
-                            </div>
-                        @endif
-                    </div>
+                    @if ($proxySettings)
+                        <div class="flex flex-col gap-2 pt-2">
+                            <x-forms.textarea canGate="update" :canResource="$server" useMonacoEditor
+                                monacoEditorLanguage="yaml"
+                                label="Configuration file ( {{ $this->configurationFilePath }} )"
+                                name="proxySettings" id="proxySettings" rows="30" />
+                        </div>
+                    @endif
                 </form>
             @elseif($selectedProxy === 'NONE')
                 <div class="flex items-center gap-2">

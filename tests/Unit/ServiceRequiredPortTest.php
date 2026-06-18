@@ -2,7 +2,6 @@
 
 use App\Models\Service;
 use App\Models\ServiceApplication;
-use Mockery;
 
 it('returns required port from service template', function () {
     // Mock get_service_templates() function

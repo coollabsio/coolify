@@ -9,13 +9,13 @@ use App\Http\Controllers\Api\HetznerController;
 use App\Http\Controllers\Api\OtherController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ResourcesController;
+use App\Http\Controllers\Api\ScheduledTasksController;
 use App\Http\Controllers\Api\SecurityController;
+use App\Http\Controllers\Api\SentinelController;
 use App\Http\Controllers\Api\ServersController;
 use App\Http\Controllers\Api\ServicesController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Middleware\ApiAllowed;
-use App\Jobs\PushServerUpdateJob;
-use App\Models\Server;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [OtherController::class, 'healthcheck']);
@@ -25,17 +25,20 @@ Route::group([
     Route::get('/health', [OtherController::class, 'healthcheck']);
 });
 
-Route::post('/feedback', [OtherController::class, 'feedback']);
+Route::post('/feedback', [OtherController::class, 'feedback'])
+    ->middleware('throttle:feedback');
 
 Route::group([
-    'middleware' => ['auth:sanctum', 'api.ability:write'],
+    'middleware' => ['auth:sanctum', 'api.token.team', 'api.ability:write'],
     'prefix' => 'v1',
 ], function () {
     Route::get('/enable', [OtherController::class, 'enable_api']);
     Route::get('/disable', [OtherController::class, 'disable_api']);
+    Route::post('/mcp/enable', [OtherController::class, 'enable_mcp']);
+    Route::post('/mcp/disable', [OtherController::class, 'disable_mcp']);
 });
 Route::group([
-    'middleware' => ['auth:sanctum', ApiAllowed::class, 'api.sensitive'],
+    'middleware' => ['auth:sanctum', 'api.token.team', ApiAllowed::class, 'api.sensitive'],
     'prefix' => 'v1',
 ], function () {
 
@@ -54,7 +57,7 @@ Route::group([
     Route::post('/projects/{uuid}/environments', [ProjectController::class, 'create_environment'])->middleware(['api.ability:write']);
     Route::delete('/projects/{uuid}/environments/{environment_name_or_uuid}', [ProjectController::class, 'delete_environment'])->middleware(['api.ability:write']);
 
-    Route::post('/projects', [ProjectController::class, 'create_project'])->middleware(['api.ability:read']);
+    Route::post('/projects', [ProjectController::class, 'create_project'])->middleware(['api.ability:write']);
     Route::patch('/projects/{uuid}', [ProjectController::class, 'update_project'])->middleware(['api.ability:write']);
     Route::delete('/projects/{uuid}', [ProjectController::class, 'delete_project'])->middleware(['api.ability:write']);
 
@@ -70,7 +73,7 @@ Route::group([
     Route::get('/cloud-tokens/{uuid}', [CloudProviderTokensController::class, 'show'])->middleware(['api.ability:read']);
     Route::patch('/cloud-tokens/{uuid}', [CloudProviderTokensController::class, 'update'])->middleware(['api.ability:write']);
     Route::delete('/cloud-tokens/{uuid}', [CloudProviderTokensController::class, 'destroy'])->middleware(['api.ability:write']);
-    Route::post('/cloud-tokens/{uuid}/validate', [CloudProviderTokensController::class, 'validateToken'])->middleware(['api.ability:read']);
+    Route::post('/cloud-tokens/{uuid}/validate', [CloudProviderTokensController::class, 'validateToken'])->middleware(['api.ability:write']);
 
     Route::match(['get', 'post'], '/deploy', [DeployController::class, 'deploy'])->middleware(['api.ability:deploy']);
     Route::get('/deployments', [DeployController::class, 'deployments'])->middleware(['api.ability:read']);
@@ -83,9 +86,9 @@ Route::group([
     Route::get('/servers/{uuid}/domains', [ServersController::class, 'domains_by_server'])->middleware(['api.ability:read']);
     Route::get('/servers/{uuid}/resources', [ServersController::class, 'resources_by_server'])->middleware(['api.ability:read']);
 
-    Route::get('/servers/{uuid}/validate', [ServersController::class, 'validate_server'])->middleware(['api.ability:read']);
+    Route::get('/servers/{uuid}/validate', [ServersController::class, 'validate_server'])->middleware(['api.ability:write']);
 
-    Route::post('/servers', [ServersController::class, 'create_server'])->middleware(['api.ability:read']);
+    Route::post('/servers', [ServersController::class, 'create_server'])->middleware(['api.ability:write']);
     Route::patch('/servers/{uuid}', [ServersController::class, 'update_server'])->middleware(['api.ability:write']);
     Route::delete('/servers/{uuid}', [ServersController::class, 'delete_server'])->middleware(['api.ability:write']);
 
@@ -104,11 +107,6 @@ Route::group([
     Route::post('/applications/dockerfile', [ApplicationsController::class, 'create_dockerfile_application'])->middleware(['api.ability:write']);
     Route::post('/applications/dockerimage', [ApplicationsController::class, 'create_dockerimage_application'])->middleware(['api.ability:write']);
 
-    /**
-     * @deprecated Use POST /api/v1/services instead. This endpoint creates a Service, not an Application and is a unstable duplicate of POST /api/v1/services.
-     */    
-    Route::post('/applications/dockercompose', [ApplicationsController::class, 'create_dockercompose_application'])->middleware(['api.ability:write']);
-
     Route::get('/applications/{uuid}', [ApplicationsController::class, 'application_by_uuid'])->middleware(['api.ability:read']);
     Route::patch('/applications/{uuid}', [ApplicationsController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}', [ApplicationsController::class, 'delete_by_uuid'])->middleware(['api.ability:write']);
@@ -119,10 +117,16 @@ Route::group([
     Route::patch('/applications/{uuid}/envs', [ApplicationsController::class, 'update_env_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/envs/{env_uuid}', [ApplicationsController::class, 'delete_env_by_uuid'])->middleware(['api.ability:write']);
     Route::get('/applications/{uuid}/logs', [ApplicationsController::class, 'logs_by_uuid'])->middleware(['api.ability:read']);
+    Route::get('/applications/{uuid}/storages', [ApplicationsController::class, 'storages'])->middleware(['api.ability:read']);
+    Route::post('/applications/{uuid}/storages', [ApplicationsController::class, 'create_storage'])->middleware(['api.ability:write']);
+    Route::patch('/applications/{uuid}/storages', [ApplicationsController::class, 'update_storage'])->middleware(['api.ability:write']);
+    Route::delete('/applications/{uuid}/storages/{storage_uuid}', [ApplicationsController::class, 'delete_storage'])->middleware(['api.ability:write']);
 
-    Route::match(['get', 'post'], '/applications/{uuid}/start', [ApplicationsController::class, 'action_deploy'])->middleware(['api.ability:write']);
-    Route::match(['get', 'post'], '/applications/{uuid}/restart', [ApplicationsController::class, 'action_restart'])->middleware(['api.ability:write']);
-    Route::match(['get', 'post'], '/applications/{uuid}/stop', [ApplicationsController::class, 'action_stop'])->middleware(['api.ability:write']);
+    Route::match(['get', 'post'], '/applications/{uuid}/start', [ApplicationsController::class, 'action_deploy'])->middleware(['api.ability:deploy']);
+    Route::match(['get', 'post'], '/applications/{uuid}/restart', [ApplicationsController::class, 'action_restart'])->middleware(['api.ability:deploy']);
+    Route::match(['get', 'post'], '/applications/{uuid}/stop', [ApplicationsController::class, 'action_stop'])->middleware(['api.ability:deploy']);
+
+    Route::delete('/applications/{uuid}/previews/{pull_request_id}', [ApplicationsController::class, 'delete_preview_by_pull_request_id'])->middleware(['api.ability:write']);
 
     Route::get('/github-apps', [GithubController::class, 'list_github_apps'])->middleware(['api.ability:read']);
     Route::post('/github-apps', [GithubController::class, 'create_github_app'])->middleware(['api.ability:write']);
@@ -151,9 +155,20 @@ Route::group([
     Route::delete('/databases/{uuid}/backups/{scheduled_backup_uuid}', [DatabasesController::class, 'delete_backup_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/databases/{uuid}/backups/{scheduled_backup_uuid}/executions/{execution_uuid}', [DatabasesController::class, 'delete_execution_by_uuid'])->middleware(['api.ability:write']);
 
-    Route::match(['get', 'post'], '/databases/{uuid}/start', [DatabasesController::class, 'action_deploy'])->middleware(['api.ability:write']);
-    Route::match(['get', 'post'], '/databases/{uuid}/restart', [DatabasesController::class, 'action_restart'])->middleware(['api.ability:write']);
-    Route::match(['get', 'post'], '/databases/{uuid}/stop', [DatabasesController::class, 'action_stop'])->middleware(['api.ability:write']);
+    Route::get('/databases/{uuid}/storages', [DatabasesController::class, 'storages'])->middleware(['api.ability:read']);
+    Route::post('/databases/{uuid}/storages', [DatabasesController::class, 'create_storage'])->middleware(['api.ability:write']);
+    Route::patch('/databases/{uuid}/storages', [DatabasesController::class, 'update_storage'])->middleware(['api.ability:write']);
+    Route::delete('/databases/{uuid}/storages/{storage_uuid}', [DatabasesController::class, 'delete_storage'])->middleware(['api.ability:write']);
+
+    Route::get('/databases/{uuid}/envs', [DatabasesController::class, 'envs'])->middleware(['api.ability:read']);
+    Route::post('/databases/{uuid}/envs', [DatabasesController::class, 'create_env'])->middleware(['api.ability:write']);
+    Route::patch('/databases/{uuid}/envs/bulk', [DatabasesController::class, 'create_bulk_envs'])->middleware(['api.ability:write']);
+    Route::patch('/databases/{uuid}/envs', [DatabasesController::class, 'update_env_by_uuid'])->middleware(['api.ability:write']);
+    Route::delete('/databases/{uuid}/envs/{env_uuid}', [DatabasesController::class, 'delete_env_by_uuid'])->middleware(['api.ability:write']);
+
+    Route::match(['get', 'post'], '/databases/{uuid}/start', [DatabasesController::class, 'action_deploy'])->middleware(['api.ability:deploy']);
+    Route::match(['get', 'post'], '/databases/{uuid}/restart', [DatabasesController::class, 'action_restart'])->middleware(['api.ability:deploy']);
+    Route::match(['get', 'post'], '/databases/{uuid}/stop', [DatabasesController::class, 'action_stop'])->middleware(['api.ability:deploy']);
 
     Route::get('/services', [ServicesController::class, 'services'])->middleware(['api.ability:read']);
     Route::post('/services', [ServicesController::class, 'create_service'])->middleware(['api.ability:write']);
@@ -162,59 +177,38 @@ Route::group([
     Route::patch('/services/{uuid}', [ServicesController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/services/{uuid}', [ServicesController::class, 'delete_by_uuid'])->middleware(['api.ability:write']);
 
+    Route::get('/services/{uuid}/storages', [ServicesController::class, 'storages'])->middleware(['api.ability:read']);
+    Route::post('/services/{uuid}/storages', [ServicesController::class, 'create_storage'])->middleware(['api.ability:write']);
+    Route::patch('/services/{uuid}/storages', [ServicesController::class, 'update_storage'])->middleware(['api.ability:write']);
+    Route::delete('/services/{uuid}/storages/{storage_uuid}', [ServicesController::class, 'delete_storage'])->middleware(['api.ability:write']);
+
     Route::get('/services/{uuid}/envs', [ServicesController::class, 'envs'])->middleware(['api.ability:read']);
     Route::post('/services/{uuid}/envs', [ServicesController::class, 'create_env'])->middleware(['api.ability:write']);
     Route::patch('/services/{uuid}/envs/bulk', [ServicesController::class, 'create_bulk_envs'])->middleware(['api.ability:write']);
     Route::patch('/services/{uuid}/envs', [ServicesController::class, 'update_env_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/services/{uuid}/envs/{env_uuid}', [ServicesController::class, 'delete_env_by_uuid'])->middleware(['api.ability:write']);
 
-    Route::match(['get', 'post'], '/services/{uuid}/start', [ServicesController::class, 'action_deploy'])->middleware(['api.ability:write']);
-    Route::match(['get', 'post'], '/services/{uuid}/restart', [ServicesController::class, 'action_restart'])->middleware(['api.ability:write']);
-    Route::match(['get', 'post'], '/services/{uuid}/stop', [ServicesController::class, 'action_stop'])->middleware(['api.ability:write']);
+    Route::match(['get', 'post'], '/services/{uuid}/start', [ServicesController::class, 'action_deploy'])->middleware(['api.ability:deploy']);
+    Route::match(['get', 'post'], '/services/{uuid}/restart', [ServicesController::class, 'action_restart'])->middleware(['api.ability:deploy']);
+    Route::match(['get', 'post'], '/services/{uuid}/stop', [ServicesController::class, 'action_stop'])->middleware(['api.ability:deploy']);
+
+    Route::get('/applications/{uuid}/scheduled-tasks', [ScheduledTasksController::class, 'scheduled_tasks_by_application_uuid'])->middleware(['api.ability:read']);
+    Route::post('/applications/{uuid}/scheduled-tasks', [ScheduledTasksController::class, 'create_scheduled_task_by_application_uuid'])->middleware(['api.ability:write']);
+    Route::patch('/applications/{uuid}/scheduled-tasks/{task_uuid}', [ScheduledTasksController::class, 'update_scheduled_task_by_application_uuid'])->middleware(['api.ability:write']);
+    Route::delete('/applications/{uuid}/scheduled-tasks/{task_uuid}', [ScheduledTasksController::class, 'delete_scheduled_task_by_application_uuid'])->middleware(['api.ability:write']);
+    Route::get('/applications/{uuid}/scheduled-tasks/{task_uuid}/executions', [ScheduledTasksController::class, 'executions_by_application_uuid'])->middleware(['api.ability:read']);
+
+    Route::get('/services/{uuid}/scheduled-tasks', [ScheduledTasksController::class, 'scheduled_tasks_by_service_uuid'])->middleware(['api.ability:read']);
+    Route::post('/services/{uuid}/scheduled-tasks', [ScheduledTasksController::class, 'create_scheduled_task_by_service_uuid'])->middleware(['api.ability:write']);
+    Route::patch('/services/{uuid}/scheduled-tasks/{task_uuid}', [ScheduledTasksController::class, 'update_scheduled_task_by_service_uuid'])->middleware(['api.ability:write']);
+    Route::delete('/services/{uuid}/scheduled-tasks/{task_uuid}', [ScheduledTasksController::class, 'delete_scheduled_task_by_service_uuid'])->middleware(['api.ability:write']);
+    Route::get('/services/{uuid}/scheduled-tasks/{task_uuid}/executions', [ScheduledTasksController::class, 'executions_by_service_uuid'])->middleware(['api.ability:read']);
 });
 
 Route::group([
     'prefix' => 'v1',
 ], function () {
-    Route::post('/sentinel/push', function () {
-        $token = request()->header('Authorization');
-        if (! $token) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-        $naked_token = str_replace('Bearer ', '', $token);
-        try {
-            $decrypted = decrypt($naked_token);
-            $decrypted_token = json_decode($decrypted, true);
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Invalid token'], 401);
-        }
-        $server_uuid = data_get($decrypted_token, 'server_uuid');
-        if (! $server_uuid) {
-            return response()->json(['message' => 'Invalid token'], 401);
-        }
-        $server = Server::where('uuid', $server_uuid)->first();
-        if (! $server) {
-            return response()->json(['message' => 'Server not found'], 404);
-        }
-
-        if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team->id !== 0) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-
-        if ($server->isFunctional() === false) {
-            return response()->json(['message' => 'Server is not functional'], 401);
-        }
-
-        if ($server->settings->sentinel_token !== $naked_token) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-        $data = request()->all();
-
-        // \App\Jobs\ServerCheckNewJob::dispatch($server, $data);
-        PushServerUpdateJob::dispatch($server, $data);
-
-        return response()->json(['message' => 'ok'], 200);
-    });
+    Route::post('/sentinel/push', [SentinelController::class, 'push']);
 });
 
 Route::any('/{any}', function () {

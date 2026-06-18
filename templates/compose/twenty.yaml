@@ -1,6 +1,6 @@
 # documentation: https://docs.twenty.com
 # slogan: Twenty is a CRM designed to fit your unique business needs.
-# category: cms
+# category: productivity
 # tags: crm, self-hosted, dashboard
 # logo: svgs/twenty.svg
 # port: 3000
@@ -53,7 +53,7 @@ services:
       interval: 2s
       timeout: 5s
       retries: 10
-      start_period: 10s
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,7 +102,15 @@ services:
     depends_on:
       twenty:
         condition: service_healthy
-
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "ps aux | grep 'dist/queue-worker/queue-worker' | grep -v grep || exit 1"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+      
   postgres:
     image: postgres:16-alpine
     environment:

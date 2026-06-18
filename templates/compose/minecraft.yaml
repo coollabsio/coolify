@@ -1,6 +1,6 @@
 # documentation: https://github.com/itzg/docker-minecraft-server
 # slogan: Minecraft Server that will automatically download selected version at startup.
-# category: media
+# category: games
 # tags: minecraft
 # logo: svgs/minecraft.svg
 # port: 25565

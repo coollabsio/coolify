@@ -1,23 +1,12 @@
 ---
 name: livewire-development
-description: >-
-  Develops reactive Livewire 3 components. Activates when creating, updating, or modifying
-  Livewire components; working with wire:model, wire:click, wire:loading, or any wire: directives;
-  adding real-time updates, loading states, or reactivity; debugging component behavior;
-  writing Livewire tests; or when the user mentions Livewire, component, counter, or reactive UI.
+description: "Use for any task or question involving Livewire. Activate if user mentions Livewire, wire: directives, or Livewire-specific concepts like wire:model, wire:click, invoke this skill. Covers building new components, debugging reactivity issues, real-time form validation, loading states, migrating from Livewire 2 to 3, converting component formats (SFC/MFC/class-based), and performance optimization. Do not use for non-Livewire reactive UI (React, Vue, Alpine-only, Inertia.js) or standard Laravel forms without Livewire."
+license: MIT
+metadata:
+  author: laravel
 ---
 
 # Livewire Development
-
-## When to Apply
-
-Activate this skill when:
-- Creating new Livewire components
-- Modifying existing component state or behavior
-- Debugging reactivity or lifecycle issues
-- Writing Livewire component tests
-- Adding Alpine.js interactivity to components
-- Working with wire: directives
 
 ## Documentation
 
@@ -62,33 +51,31 @@ These things changed in Livewire 3, but may not have been updated in this applic
 
 ### Using Keys in Loops
 
-<code-snippet name="Wire Key in Loops" lang="blade">
-
+<!-- Wire Key in Loops -->
+```blade
 @foreach ($items as $item)
     <div wire:key="item-{{ $item->id }}">
         {{ $item->name }}
     </div>
 @endforeach
-
-</code-snippet>
+```
 
 ### Lifecycle Hooks
 
 Prefer lifecycle hooks like `mount()`, `updatedFoo()` for initialization and reactive side effects:
 
-<code-snippet name="Lifecycle Hook Examples" lang="php">
-
+<!-- Lifecycle Hook Examples -->
+```php
 public function mount(User $user) { $this->user = $user; }
 public function updatedSearch() { $this->resetPage(); }
-
-</code-snippet>
+```
 
 ## JavaScript Hooks
 
 You can listen for `livewire:init` to hook into Livewire initialization:
 
-<code-snippet name="Livewire Init Hook Example" lang="js">
-
+<!-- Livewire Init Hook Example -->
+```js
 document.addEventListener('livewire:init', function () {
     Livewire.hook('request', ({ fail }) => {
         if (fail && fail.status === 419) {
@@ -100,28 +87,25 @@ document.addEventListener('livewire:init', function () {
         console.error(message);
     });
 });
-
-</code-snippet>
+```
 
 ## Testing
 
-<code-snippet name="Example Livewire Component Test" lang="php">
-
+<!-- Example Livewire Component Test -->
+```php
 Livewire::test(Counter::class)
     ->assertSet('count', 0)
     ->call('increment')
     ->assertSet('count', 1)
     ->assertSee(1)
     ->assertStatus(200);
+```
 
-</code-snippet>
-
-<code-snippet name="Testing Livewire Component Exists on Page" lang="php">
-
+<!-- Testing Livewire Component Exists on Page -->
+```php
 $this->get('/posts/create')
     ->assertSeeLivewire(CreatePost::class);
-
-</code-snippet>
+```
 
 ## Common Pitfalls
 

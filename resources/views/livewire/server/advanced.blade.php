@@ -22,6 +22,7 @@
                             id="serverDiskUsageCheckFrequency" label="Disk usage check frequency" required
                             helper="Cron expression for disk usage check frequency.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every night at 11:00 PM." />
                         <x-forms.input canGate="update" :canResource="$server" id="serverDiskUsageNotificationThreshold"
+                            type="number" min="1" max="99"
                             label="Server disk usage notification threshold (%)" required
                             helper="If the server disk usage exceeds this threshold, Coolify will send a notification to the team members." />
                     </div>
@@ -31,12 +32,15 @@
                     <h3>Builds</h3>
                     <div class="flex flex-wrap gap-2 sm:flex-nowrap pt-4">
                         <x-forms.input canGate="update" :canResource="$server" id="concurrentBuilds"
+                            type="number" min="1"
                             label="Number of concurrent builds" required
                             helper="You can specify the number of simultaneous build processes/deployments that should run concurrently." />
                         <x-forms.input canGate="update" :canResource="$server" id="dynamicTimeout"
+                            type="number" min="1"
                             label="Deployment timeout (seconds)" required
                             helper="You can define the maximum duration for a deployment to run before timing it out." />
                         <x-forms.input canGate="update" :canResource="$server" id="deploymentQueueLimit"
+                            type="number" min="1"
                             label="Deployment queue limit" required
                             helper="Maximum number of queued deployments allowed. New deployments will be rejected with a 429 status when the limit is reached." />
                     </div>

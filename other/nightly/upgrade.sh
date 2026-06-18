@@ -56,6 +56,9 @@ log "Downloading docker-compose.prod.yml from ${CDN}/docker-compose.prod.yml"
 curl -fsSL -L $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
 log "Downloading .env.production from ${CDN}/.env.production"
 curl -fsSL -L $CDN/.env.production -o /data/coolify/source/.env.production
+log "Downloading upgrade-postgres.sh from ${CDN}/upgrade-postgres.sh"
+curl -fsSL -L $CDN/upgrade-postgres.sh -o /data/coolify/source/upgrade-postgres.sh
+chmod +x /data/coolify/source/upgrade-postgres.sh
 log "Configuration files downloaded successfully"
 echo "     Done."
 
@@ -67,6 +70,12 @@ COMPOSE_FILES="-f /data/coolify/source/docker-compose.yml -f /data/coolify/sourc
 if [ -f /data/coolify/source/docker-compose.custom.yml ]; then
     COMPOSE_FILES="$COMPOSE_FILES -f /data/coolify/source/docker-compose.custom.yml"
     log "Including custom docker-compose.yml in image extraction"
+fi
+
+# Check if PostgreSQL upgrade override exists
+if [ -f /data/coolify/source/docker-compose.postgres-upgrade.yml ]; then
+    COMPOSE_FILES="$COMPOSE_FILES -f /data/coolify/source/docker-compose.postgres-upgrade.yml"
+    log "Including PostgreSQL upgrade compose override in image extraction"
 fi
 
 # Get all unique images from docker compose config
@@ -236,15 +245,18 @@ nohup bash -c "
     echo '============================================================' >>\"\$LOGFILE\"
     write_status '5' 'Starting new containers'
 
+    COMPOSE_FILES='-f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml'
     if [ -f /data/coolify/source/docker-compose.custom.yml ]; then
         log 'Using custom docker-compose.yml'
-        log 'Running docker compose up with custom configuration...'
-        docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock \${DOCKER_CONFIG_MOUNT} --rm \${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:\${LATEST_HELPER_VERSION} bash -c \"LATEST_IMAGE=\${LATEST_IMAGE} docker compose --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml -f /data/coolify/source/docker-compose.custom.yml up -d --remove-orphans --wait --wait-timeout 60\" >>\"\$LOGFILE\" 2>&1
-    else
-        log 'Using standard docker-compose configuration'
-        log 'Running docker compose up...'
-        docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock \${DOCKER_CONFIG_MOUNT} --rm \${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:\${LATEST_HELPER_VERSION} bash -c \"LATEST_IMAGE=\${LATEST_IMAGE} docker compose --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 60\" >>\"\$LOGFILE\" 2>&1
+        COMPOSE_FILES=\"\$COMPOSE_FILES -f /data/coolify/source/docker-compose.custom.yml\"
     fi
+    if [ -f /data/coolify/source/docker-compose.postgres-upgrade.yml ]; then
+        log 'Using PostgreSQL upgrade compose override'
+        COMPOSE_FILES=\"\$COMPOSE_FILES -f /data/coolify/source/docker-compose.postgres-upgrade.yml\"
+    fi
+
+    log 'Running docker compose up...'
+    docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock \${DOCKER_CONFIG_MOUNT} --rm \${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:\${LATEST_HELPER_VERSION} bash -c \"LATEST_IMAGE=\${LATEST_IMAGE} docker compose --env-file /data/coolify/source/.env \${COMPOSE_FILES} up -d --remove-orphans --wait --wait-timeout 60\" >>\"\$LOGFILE\" 2>&1
     log 'Docker compose up completed'
 
     # Final log entry

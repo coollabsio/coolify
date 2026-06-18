@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use App\Actions\User\RevokeUserTeamTokens;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 
@@ -17,6 +18,7 @@ trait DeletesUserSessions
         Session::invalidate();
         Session::regenerateToken();
         DB::table('sessions')->where('user_id', $this->id)->delete();
+        RevokeUserTeamTokens::forUser($this->id);
     }
 
     /**
