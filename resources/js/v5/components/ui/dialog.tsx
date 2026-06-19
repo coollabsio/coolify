@@ -1,6 +1,8 @@
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
+import { XIcon } from '@phosphor-icons/react';
 import type * as React from 'react';
 
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -21,18 +23,37 @@ function DialogOverlay({ className, ...props }: React.ComponentProps<typeof Dial
     );
 }
 
-function DialogContent({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Popup>) {
+function DialogContent({
+    className,
+    children,
+    showCloseButton = true,
+    ...props
+}: React.ComponentProps<typeof DialogPrimitive.Popup> & {
+    showCloseButton?: boolean;
+}) {
     return (
         <DialogPortal>
             <DialogOverlay />
             <DialogPrimitive.Popup
                 data-slot="dialog-content"
                 className={cn(
-                    'fixed left-1/2 top-1/2 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-6 shadow-lg outline-none',
+                    'fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-card p-6 shadow-lg outline-none',
                     className,
                 )}
                 {...props}
-            />
+            >
+                {children}
+                {showCloseButton && (
+                    <DialogPrimitive.Close
+                        data-slot="dialog-close"
+                        aria-label="Close dialog"
+                        render={<Button type="button" variant="ghost" size="icon-sm" className="absolute top-3 right-3" />}
+                    >
+                        <XIcon />
+                        <span className="sr-only">Close</span>
+                    </DialogPrimitive.Close>
+                )}
+            </DialogPrimitive.Popup>
         </DialogPortal>
     );
 }

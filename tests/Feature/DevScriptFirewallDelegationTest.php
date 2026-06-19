@@ -61,12 +61,55 @@ it('retries dev coolify bootstrap because fresh Lima setup can complete across p
 
 it('seeds bootstrapped Lima VMs into v5 development server state', function () {
     $script = file_get_contents(base_path('scripts/dev.sh'));
+    $compose = file_get_contents(base_path('docker-compose.dev.yml'));
 
     expect($script)->toContain('sync_v5_dev_lima_servers()')
         ->and($script)->toContain('COOLIFY_CLI_SSH_USER="$ssh_user"')
-        ->and($script)->toContain('db:seed --class=V5DevLimaSeeder --force')
-        ->and($script)->not->toContain('v5:sync-dev-lima-servers')
+        ->and($script)->toContain('COOLIFY_CLI_SSH_USER="$(coolify_ssh_user)" spin up -d')
+        ->and($script)->toContain('lima_ssh_port "$index"')
+        ->and($script)->toContain('host.docker.internal')
+        ->and($script)->toContain('v5:sync-dev-lima-servers')
+        ->and($script)->toContain('--server="${instance}|host.docker.internal|${ssh_user}|${ssh_port}"')
+        ->and($compose)->toContain('COOLIFY_CLI_SSH_USER: "${COOLIFY_CLI_SSH_USER:-}"')
+        ->and($script)->not->toContain('db:seed --class=V5DevLimaSeeder --force')
         ->and($script)->not->toContain('--server "${instance}|${node}|$(coolify_ssh_user)|22"');
+});
+
+it('configures predictable Lima SSH local ports for dev VMs', function () {
+    $script = file_get_contents(base_path('scripts/dev.sh'));
+    $vmScript = file_get_contents(base_path('scripts/coold-vm.sh'));
+    $template = file_get_contents(base_path('dev/lima/coold.yaml'));
+
+    expect($script)->toContain('coold_vm_ssh_port()')
+        ->and($script)->toContain('COOLIFY_COOLD_VM_SSH_PORT_')
+        ->and($script)->toContain('6000${index}')
+        ->and($script)->toContain('COOLIFY_COOLD_VM_SSH_PORT="$(coold_vm_ssh_port "$index")"')
+        ->and($vmScript)->toContain('SSH_PORT="$(read_coolify_env COOLIFY_COOLD_VM_SSH_PORT 60002)"')
+        ->and($vmScript)->toContain('{{COOLIFY_COOLD_VM_SSH_PORT}}')
+        ->and($template)->toContain('ssh:')
+        ->and($template)->toContain('localPort: {{COOLIFY_COOLD_VM_SSH_PORT}}');
+});
+
+it('authorizes the seeded testing host key in dev Lima VMs', function () {
+    $template = file_get_contents(base_path('dev/lima/coold.yaml'));
+
+    expect($template)->toContain('coolify_test_public_key=')
+        ->and($template)->toContain('ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFuGmoeGq/pojrsyP1pszcNVuZx9iFkCELtxrh31QJ68')
+        ->and($template)->toContain('authorized_keys')
+        ->and($template)->toContain('grep -qxF "$coolify_test_public_key"')
+        ->and($template)->toContain('install -d -m 700 /root/.ssh')
+        ->and($template)->toContain('/root/.ssh/authorized_keys')
+        ->and($template)->toContain('target_home="$(getent passwd 501 | cut -d: -f6 || true)"')
+        ->and($template)->toContain('owner="$(stat -c \'%u:%g\' "$target_home")"')
+        ->and($template)->not->toContain('mode: user')
+        ->and($template)->not->toContain('user="$(basename "$home")"');
+});
+
+it('hardcodes the naked Lima VM ssh port for bootstrap testing', function () {
+    $template = file_get_contents(base_path('.dev/lima/coolify-naked-test.yaml'));
+
+    expect($template)->toContain('ssh:')
+        ->and($template)->toContain('localPort: 60003');
 });
 
 it('supports down cleanup as the preferred VM cleanup command', function () {

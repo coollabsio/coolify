@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\V5\DashboardController;
 use App\Http\Kernel;
 use App\Http\Middleware\CheckForcePasswordReset;
 use App\Http\Middleware\DecideWhatToDoWithUser;
@@ -16,6 +17,7 @@ use App\Services\Flux\FluxHealth;
 use Database\Seeders\V5DevLimaSeeder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Mockery\MockInterface;
@@ -38,6 +40,12 @@ it('registers the v5 dashboard route', function () {
         ->and(Route::has('v5.selection.update'))->toBeTrue()
         ->and(Route::has('v5.clusters.index'))->toBeTrue()
         ->and(Route::has('v5.clusters.store'))->toBeTrue()
+        ->and(Route::has('v5.clusters.destroy'))->toBeTrue()
+        ->and(Route::has('v5.clusters.servers.store'))->toBeTrue()
+        ->and(Route::has('v5.clusters.servers.update'))->toBeTrue()
+        ->and(Route::has('v5.clusters.servers.check'))->toBeTrue()
+        ->and(Route::has('v5.clusters.servers.bootstrap'))->toBeTrue()
+        ->and(Route::has('v5.clusters.servers.destroy'))->toBeTrue()
         ->and(Route::has('v5.coolify.version'))->toBeFalse()
         ->and(Route::has('v5.coolify.bootstrap'))->toBeFalse();
 });
@@ -72,6 +80,15 @@ it('creates v5 cluster tables and lets each server belong to one cluster', funct
     $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
     $clusterMigration->up();
 
+    $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
+    $serverMigration->up();
+
+    $configurationMigration = include database_path('migrations/2026_06_16_204644_v5_add_wireguard_cli_configuration_to_clusters_and_servers.php');
+    $configurationMigration->up();
+
+    $statusCheckMigration = include database_path('migrations/2026_06_17_172845_add_status_check_fields_to_v5_servers_table.php');
+    $statusCheckMigration->up();
+
     expect(Schema::hasTable('v5_clusters'))->toBeTrue()
         ->and(Schema::hasColumns('v5_clusters', [
             'id',
@@ -79,14 +96,30 @@ it('creates v5 cluster tables and lets each server belong to one cluster', funct
             'created_by_user_id',
             'name',
             'description',
+            'wireguard_interface',
+            'wireguard_management_pool',
+            'wireguard_listen_port',
+            'container_network_pool',
+            'container_network_prefix',
+            'namespaces',
+            'default_deny_containers',
+            'coold_version',
+            'corrosion_version',
+            'corrosion_gossip_port',
+            'corrosion_api_port',
+            'builder_enabled',
+            'builder_capacity',
+            'builder_cpu_quota',
+            'builder_memory_max',
+            'builder_timeout_secs',
+            'last_cli_action',
+            'last_cli_status',
+            'last_cli_summary',
+            'last_cli_ran_at',
             'created_at',
             'updated_at',
-        ]))->toBeTrue();
-
-    $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
-    $serverMigration->up();
-
-    expect(Schema::hasColumn('v5_servers', 'cluster_id'))->toBeTrue();
+        ]))->toBeTrue()
+        ->and(Schema::hasColumn('v5_servers', 'cluster_id'))->toBeTrue();
 });
 
 it('creates v5 server tables in the shared database', function () {
@@ -100,6 +133,12 @@ it('creates v5 server tables in the shared database', function () {
 
     $migration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
     $migration->up();
+
+    $configurationMigration = include database_path('migrations/2026_06_16_204644_v5_add_wireguard_cli_configuration_to_clusters_and_servers.php');
+    $configurationMigration->up();
+
+    $statusCheckMigration = include database_path('migrations/2026_06_17_172845_add_status_check_fields_to_v5_servers_table.php');
+    $statusCheckMigration->up();
 
     expect(Schema::hasTable('v5_servers'))->toBeTrue()
         ->and(Schema::hasColumns('v5_servers', [
@@ -116,10 +155,40 @@ it('creates v5 server tables in the shared database', function () {
             'capabilities',
             'builder_enabled',
             'builder_capacity',
+            'builder_cpu_quota',
+            'node_address',
+            'wireguard_listen_port_override',
+            'wireguard_endpoint_override',
+            'wireguard_management_ip',
+            'wireguard_public_key',
+            'container_subnets',
             'last_bootstrapped_at',
+            'last_status_check',
+            'last_status_output',
+            'last_status_checked_at',
             'created_at',
             'updated_at',
         ]))->toBeTrue();
+});
+
+it('adds builder cpu quota to existing v5 server tables safely', function () {
+    Schema::dropIfExists('v5_servers');
+
+    Schema::create('v5_servers', function ($table) {
+        $table->id();
+        $table->unsignedInteger('builder_capacity')->default(0);
+    });
+
+    $migration = include database_path('migrations/2026_06_17_165112_v5_add_builder_cpu_quota_to_servers_table.php');
+    $migration->up();
+    $migration->up();
+
+    expect(Schema::hasColumn('v5_servers', 'builder_cpu_quota'))->toBeTrue();
+
+    $migration->down();
+    $migration->down();
+
+    expect(Schema::hasColumn('v5_servers', 'builder_cpu_quota'))->toBeFalse();
 });
 
 it('includes v5 tables in the dev testing schema', function () {
@@ -132,9 +201,20 @@ it('includes v5 tables in the dev testing schema', function () {
         ->and($schema)->toContain('CREATE TABLE IF NOT EXISTS "v5_servers"')
         ->and($schema)->toContain('"cluster_id" INTEGER')
         ->and($schema)->toContain('CREATE TABLE IF NOT EXISTS "v5_clusters"')
+        ->and($schema)->toContain('"wireguard_interface" TEXT DEFAULT \'wg0\' NOT NULL')
+        ->and($schema)->toContain('"wireguard_management_pool" TEXT DEFAULT \'100.64.0.0/16\' NOT NULL')
+        ->and($schema)->toContain('"container_network_pool" TEXT DEFAULT \'10.210.0.0/16\' NOT NULL')
+        ->and($schema)->toContain('"builder_timeout_secs" INTEGER NOT NULL DEFAULT \'1800\'')
         ->and($schema)->toContain('"private_key_id" INTEGER')
+        ->and($schema)->toContain('"builder_cpu_quota" TEXT DEFAULT \'200%\' NOT NULL')
+        ->and($schema)->toContain('"wireguard_management_ip" TEXT')
+        ->and($schema)->toContain('"container_subnets" JSON')
+        ->and($schema)->toContain('"last_status_output" TEXT')
         ->and($schema)->toContain('2026_06_16_130650_v5_create_servers_table')
         ->and($schema)->toContain('2026_06_16_130649_v5_create_clusters_table')
+        ->and($schema)->toContain('2026_06_16_204644_v5_add_wireguard_cli_configuration_to_clusters_and_servers')
+        ->and($schema)->toContain('2026_06_17_165112_v5_add_builder_cpu_quota_to_servers_table')
+        ->and($schema)->toContain('2026_06_17_172845_add_status_check_fields_to_v5_servers_table')
         ->and($schema)->not->toContain('2026_06_16_131229_add_cluster_id_to_v5_servers_table')
         ->and($schema)->not->toContain('2026_06_16_132000_make_v5_server_private_key_nullable')
         ->and($schema)->not->toContain('v5_hosts');
@@ -251,15 +331,31 @@ it('shows v5 clusters with their servers on the cluster page', function () {
         ->assertSuccessful()
         ->assertSee('Clusters', false)
         ->assertSee('"clusters":[', false)
+        ->assertSee('"privateKeys":[', false)
+        ->assertSee('"name":"Lima Key"', false)
         ->assertSee('"name":"Development-Lima"', false)
         ->assertSee('"serversCount":1', false)
         ->assertSee('"name":"coold-dev"', false)
         ->assertSee('"host":"lima-coold-dev"', false)
-        ->assertSee('"sshUser":"developer"', false)
-        ->assertSee('"sshPort":22', false)
+        ->assertDontSee('"sshUser"', false)
+        ->assertDontSee('"sshPort"', false)
         ->assertSee('"builderEnabled":true', false)
         ->assertSee('"builderCapacity":2', false)
+        ->assertSee('"wireguardInterface":"wg0"', false)
+        ->assertSee('"wireguardManagementPool":"100.64.0.0\\/16"', false)
+        ->assertSee('"containerNetworkPool":"10.210.0.0\\/16"', false)
+        ->assertSee('"namespaces":["default"]', false)
+        ->assertSee('"defaultDenyContainers":true', false)
+        ->assertSee('"cooldVersion":"nightly"', false)
+        ->assertSee('"corrosionVersion":"v1.0.0"', false)
+        ->assertSee('"builderCpuQuota":"200%"', false)
+        ->assertSee('"builderMemoryMax":"2G"', false)
+        ->assertSee('"builderTimeoutSecs":1800', false)
+        ->assertSee('"lastCliStatus":null', false)
         ->assertSee('"privateKeyName":"Lima Key"', false)
+        ->assertSee('"nodeAddress":null', false)
+        ->assertSee('"wireguardManagementIp":null', false)
+        ->assertSee('"containerSubnets":[]', false)
         ->assertSee('"lastBootstrappedAt":"', false);
 });
 
@@ -278,6 +374,26 @@ it('creates a v5 cluster for the current team', function () {
         ->assertCreated()
         ->assertJsonPath('cluster.name', 'Production Mesh')
         ->assertJsonPath('cluster.description', 'Primary production cluster.')
+        ->assertJsonPath('cluster.wireguardInterface', 'wg0')
+        ->assertJsonPath('cluster.wireguardManagementPool', '100.64.0.0/16')
+        ->assertJsonPath('cluster.wireguardListenPort', 51820)
+        ->assertJsonPath('cluster.containerNetworkPool', '10.210.0.0/16')
+        ->assertJsonPath('cluster.containerNetworkPrefix', 24)
+        ->assertJsonPath('cluster.namespaces', ['default'])
+        ->assertJsonPath('cluster.defaultDenyContainers', true)
+        ->assertJsonPath('cluster.cooldVersion', 'nightly')
+        ->assertJsonPath('cluster.corrosionVersion', 'v1.0.0')
+        ->assertJsonPath('cluster.corrosionGossipPort', 8787)
+        ->assertJsonPath('cluster.corrosionApiPort', 8080)
+        ->assertJsonPath('cluster.builderEnabled', true)
+        ->assertJsonPath('cluster.builderCapacity', 2)
+        ->assertJsonPath('cluster.builderCpuQuota', '200%')
+        ->assertJsonPath('cluster.builderMemoryMax', '2G')
+        ->assertJsonPath('cluster.builderTimeoutSecs', 1800)
+        ->assertJsonPath('cluster.lastCliAction', null)
+        ->assertJsonPath('cluster.lastCliStatus', null)
+        ->assertJsonPath('cluster.lastCliSummary', null)
+        ->assertJsonPath('cluster.lastCliRanAt', null)
         ->assertJsonPath('cluster.serversCount', 0)
         ->assertJsonPath('cluster.servers', []);
 
@@ -286,7 +402,779 @@ it('creates a v5 cluster for the current team', function () {
         ->where('created_by_user_id', $user->id)
         ->where('name', 'Production Mesh')
         ->where('description', 'Primary production cluster.')
+        ->where('wireguard_interface', 'wg0')
+        ->where('wireguard_management_pool', '100.64.0.0/16')
+        ->where('container_network_pool', '10.210.0.0/16')
         ->exists())->toBeTrue();
+});
+
+it('creates a v5 cluster with advanced cli configuration', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson('/v5/clusters', [
+            'name' => 'Custom Mesh',
+            'description' => null,
+            'wireguard_interface' => 'wg-prod',
+            'wireguard_management_pool' => '100.65.0.0/16',
+            'wireguard_listen_port' => 51830,
+            'container_network_pool' => '10.211.0.0/16',
+            'container_network_prefix' => 25,
+            'namespaces' => ['default', 'preview'],
+            'default_deny_containers' => false,
+            'coold_version' => 'v0.2.0',
+            'corrosion_version' => 'v1.1.0',
+            'corrosion_gossip_port' => 8788,
+            'corrosion_api_port' => 8081,
+            'builder_enabled' => true,
+            'builder_capacity' => 4,
+            'builder_cpu_quota' => '400%',
+            'builder_memory_max' => '4G',
+            'builder_timeout_secs' => 2400,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('cluster.wireguardInterface', 'wg-prod')
+        ->assertJsonPath('cluster.wireguardManagementPool', '100.65.0.0/16')
+        ->assertJsonPath('cluster.wireguardListenPort', 51830)
+        ->assertJsonPath('cluster.containerNetworkPool', '10.211.0.0/16')
+        ->assertJsonPath('cluster.containerNetworkPrefix', 25)
+        ->assertJsonPath('cluster.namespaces', ['default', 'preview'])
+        ->assertJsonPath('cluster.defaultDenyContainers', false)
+        ->assertJsonPath('cluster.cooldVersion', 'v0.2.0')
+        ->assertJsonPath('cluster.corrosionVersion', 'v1.1.0')
+        ->assertJsonPath('cluster.builderCapacity', 4)
+        ->assertJsonPath('cluster.builderCpuQuota', '400%')
+        ->assertJsonPath('cluster.builderMemoryMax', '4G')
+        ->assertJsonPath('cluster.builderTimeoutSecs', 2400);
+});
+
+it('validates advanced v5 cluster cli configuration', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson('/v5/clusters', [
+            'name' => 'Broken Mesh',
+            'wireguard_management_pool' => 'not-a-cidr',
+            'container_network_pool' => '10.211.0.0',
+            'wireguard_listen_port' => 70000,
+            'namespaces' => ['Default'],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors([
+            'wireguard_management_pool',
+            'container_network_pool',
+            'wireguard_listen_port',
+            'namespaces.0',
+        ]);
+});
+
+it('adds a v5 server to a cluster for the current team', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+        'builder_enabled' => true,
+        'builder_capacity' => 3,
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson("/v5/clusters/{$cluster->id}/servers", [
+            'name' => 'prod-01',
+            'host' => '203.0.113.10',
+            'ssh_user' => 'root',
+            'ssh_port' => 22,
+            'private_key_id' => $privateKey->id,
+            'node_address' => '203.0.113.10',
+            'builder_enabled' => true,
+            'builder_capacity' => 3,
+            'wireguard_listen_port_override' => 51821,
+            'wireguard_endpoint_override' => 'prod-01.example.com:51821',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('cluster.serversCount', 1)
+        ->assertJsonPath('cluster.servers.0.name', 'prod-01')
+        ->assertJsonPath('cluster.servers.0.host', '203.0.113.10')
+        ->assertJsonMissingPath('cluster.servers.0.sshUser')
+        ->assertJsonMissingPath('cluster.servers.0.sshPort')
+        ->assertJsonPath('cluster.servers.0.privateKeyName', 'Production SSH Key')
+        ->assertJsonPath('cluster.servers.0.nodeAddress', '203.0.113.10')
+        ->assertJsonPath('cluster.servers.0.builderEnabled', true)
+        ->assertJsonPath('cluster.servers.0.builderCapacity', 3)
+        ->assertJsonPath('cluster.servers.0.builderCpuQuota', '200%')
+        ->assertJsonPath('cluster.servers.0.capabilities', ['coold', 'builder'])
+        ->assertJsonPath('cluster.servers.0.wireguardListenPortOverride', 51821)
+        ->assertJsonPath('cluster.servers.0.wireguardEndpointOverride', 'prod-01.example.com:51821')
+        ->assertJsonPath('cluster.servers.0.wireguardManagementIp', null)
+        ->assertJsonPath('cluster.servers.0.containerSubnets', []);
+
+    expect(V5Server::query()
+        ->where('team_id', $team->id)
+        ->where('cluster_id', $cluster->id)
+        ->where('created_by_user_id', $user->id)
+        ->where('name', 'prod-01')
+        ->where('host', '203.0.113.10')
+        ->where('ssh_user', 'root')
+        ->where('ssh_port', 22)
+        ->where('private_key_id', $privateKey->id)
+        ->where('node_address', '203.0.113.10')
+        ->exists())->toBeTrue();
+
+    expect(V5Server::query()->where('name', 'prod-01')->first()->capabilities)
+        ->toBe(['coold', 'builder']);
+});
+
+it('defaults dev Lima wireguard overrides for host docker internal servers', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Testing Host Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Development-Lima',
+        'description' => null,
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson("/v5/clusters/{$cluster->id}/servers", [
+            'name' => 'coolify-naked-test',
+            'host' => 'host.docker.internal',
+            'ssh_user' => 'root',
+            'ssh_port' => 60003,
+            'private_key_id' => $privateKey->id,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('cluster.servers.0.wireguardListenPortOverride', 51823)
+        ->assertJsonPath('cluster.servers.0.wireguardEndpointOverride', 'host.lima.internal:51823');
+});
+
+it('rejects adding a v5 server to another teams cluster', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $otherTeam = Team::withoutEvents(fn () => Team::query()->create([
+        'name' => 'Other V5 Team',
+        'description' => null,
+        'personal_team' => false,
+        'show_boarding' => false,
+    ]));
+    $cluster = Cluster::query()->create([
+        'team_id' => $otherTeam->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Other Mesh',
+        'description' => null,
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson("/v5/clusters/{$cluster->id}/servers", [
+            'name' => 'prod-01',
+            'host' => '203.0.113.10',
+            'ssh_user' => 'root',
+            'ssh_port' => 22,
+        ])
+        ->assertForbidden();
+});
+
+it('validates v5 server creation input', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson("/v5/clusters/{$cluster->id}/servers", [
+            'name' => '',
+            'host' => '',
+            'ssh_user' => '',
+            'ssh_port' => 70000,
+            'private_key_id' => null,
+            'wireguard_listen_port_override' => 70000,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors([
+            'name',
+            'host',
+            'ssh_user',
+            'ssh_port',
+            'private_key_id',
+            'wireguard_listen_port_override',
+        ]);
+});
+
+it('rejects private keys from another team when adding a v5 server', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $otherTeam = Team::withoutEvents(fn () => Team::query()->create([
+        'name' => 'Other V5 Team',
+        'description' => null,
+        'personal_team' => false,
+        'show_boarding' => false,
+    ]));
+    $otherPrivateKey = createV5PrivateKey($otherTeam, 'Other SSH Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson("/v5/clusters/{$cluster->id}/servers", [
+            'name' => 'prod-01',
+            'host' => '203.0.113.10',
+            'ssh_user' => 'root',
+            'ssh_port' => 22,
+            'private_key_id' => $otherPrivateKey->id,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['private_key_id']);
+});
+
+it('checks v5 server ssh status and stores diagnostic output', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'pending',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+    ]);
+
+    Process::fake([
+        '*' => Process::result(output: "SSH connection OK\nprod-01\nLinux aarch64\n/usr/bin/docker\n"),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/check")
+        ->assertSuccessful()
+        ->assertJsonPath('cluster.servers.0.status', 'pending')
+        ->assertJsonPath('cluster.servers.0.lastStatusCheck', 'reachable')
+        ->assertJsonPath('cluster.servers.0.lastStatusOutput', "SSH connection OK\nprod-01\nLinux aarch64\n/usr/bin/docker");
+
+    Process::assertRan(fn ($process) => str_contains(json_encode($process->command), '203.0.113.10'));
+    Process::assertRan(fn ($process) => in_array('LogLevel=ERROR', $process->command, true));
+
+    $server->refresh();
+
+    expect($server->status)->toBe('pending')
+        ->and($server->last_status_check)->toBe('reachable')
+        ->and($server->last_status_output)->toContain('SSH connection OK')
+        ->and($server->last_status_checked_at)->not->toBeNull();
+});
+
+it('writes quiet ssh options for v5 bootstrap ssh config', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+    ]);
+    $server->load('privateKey');
+
+    $tempDirectory = storage_path('framework/testing/v5_bootstrap_'.str()->random(8));
+    mkdir($tempDirectory, 0700, true);
+
+    try {
+        $controller = app(DashboardController::class);
+        $reflection = new ReflectionClass($controller);
+        $method = $reflection->getMethod('writeBootstrapSshConfig');
+        $method->setAccessible(true);
+
+        $sshConfigLocation = $method->invoke($controller, collect([$server]), $tempDirectory);
+        $config = file_get_contents($sshConfigLocation);
+
+        expect($config)->toContain('  LogLevel ERROR')
+            ->and($config)->toContain('  UserKnownHostsFile /dev/null')
+            ->and($config)->toContain('  StrictHostKeyChecking no');
+    } finally {
+        collect(scandir($tempDirectory) ?: [])
+            ->reject(fn (string $file) => in_array($file, ['.', '..'], true))
+            ->each(fn (string $file) => @unlink($tempDirectory.'/'.$file));
+        @rmdir($tempDirectory);
+    }
+});
+
+it('bootstraps a single v5 server with the Coolify CLI', function () {
+    createSharedUserAndTeamTables();
+    Config::set('coold.coolify_cli_bin', '/tmp/coolify');
+
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+        'namespaces' => ['default', 'preview'],
+        'container_network_pool' => '10.211.0.0/16',
+        'container_network_prefix' => 25,
+        'wireguard_management_pool' => '100.65.0.0/16',
+        'wireguard_interface' => 'wg-prod',
+        'wireguard_listen_port' => 51830,
+        'coold_version' => 'v0.2.0',
+        'corrosion_version' => 'v1.1.0',
+        'corrosion_gossip_port' => 8788,
+        'corrosion_api_port' => 8081,
+        'builder_enabled' => true,
+        'builder_capacity' => 4,
+        'builder_cpu_quota' => '400%',
+        'builder_memory_max' => '4G',
+        'builder_timeout_secs' => 2400,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 2222,
+        'status' => 'pending',
+        'capabilities' => ['builder'],
+        'builder_enabled' => true,
+        'builder_capacity' => 4,
+        'wireguard_listen_port_override' => 51831,
+        'wireguard_endpoint_override' => 'prod-01.example.com:51831',
+    ]);
+
+    Process::fake([
+        '*' => Process::result(output: "Bootstrap completed\n"),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/bootstrap")
+        ->assertSuccessful()
+        ->assertJsonPath('cluster.lastCliAction', 'bootstrap')
+        ->assertJsonPath('cluster.lastCliStatus', 'succeeded')
+        ->assertJsonPath('cluster.lastCliSummary', 'Bootstrap completed')
+        ->assertJsonPath('cluster.servers.0.status', 'installed')
+        ->assertJsonPath('cluster.servers.0.capabilities', ['builder', 'coold'])
+        ->assertJsonPath('cluster.servers.0.lastBootstrappedAt', fn (?string $value) => $value !== null);
+
+    Process::assertRan(function ($process) use ($server): bool {
+        $command = $process->command;
+        $node = "v5-server-{$server->id}";
+
+        return $command[0] === '/tmp/coolify'
+            && in_array('init', $command, true)
+            && in_array('bootstrap', $command, true)
+            && in_array($node, $command, true)
+            && in_array('--ssh-config', $command, true)
+            && in_array('default,preview', $command, true)
+            && in_array('10.211.0.0/16', $command, true)
+            && in_array('100.65.0.0/16', $command, true)
+            && in_array('wg-prod', $command, true)
+            && in_array('v0.2.0', $command, true)
+            && in_array('v1.1.0', $command, true)
+            && in_array("{$node}=51831", $command, true)
+            && in_array("{$node}=prod-01.example.com:51831", $command, true)
+            && in_array('--enable-builder', $command, true)
+            && in_array('--yes', $command, true)
+            && ! in_array('--new-nodes', $command, true);
+    });
+
+    $cluster->refresh();
+    $server->refresh();
+
+    expect($cluster->last_cli_status)->toBe('succeeded')
+        ->and($cluster->last_cli_summary)->toBe('Bootstrap completed')
+        ->and($server->status)->toBe('installed')
+        ->and($server->last_bootstrapped_at)->not->toBeNull();
+});
+
+it('does not run a macOS development Coolify CLI binary from Docker during v5 server bootstrap', function () {
+    createSharedUserAndTeamTables();
+    Config::set('coold.coolify_cli_bin', '/usr/local/bin/coolify');
+
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'pending',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+    ]);
+
+    Process::fake([
+        '*' => Process::result(output: "Bootstrap completed\n"),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/bootstrap")
+        ->assertSuccessful();
+
+    Process::assertRan(fn ($process): bool => $process->command[0] === '/usr/local/bin/coolify');
+});
+
+it('keeps a v5 server pending when Coolify CLI bootstrap fails', function () {
+    createSharedUserAndTeamTables();
+    Config::set('coold.coolify_cli_bin', '/tmp/coolify');
+
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'pending',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+    ]);
+
+    Process::fake([
+        '*' => Process::result(errorOutput: "bootstrap failed\n", exitCode: 1),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/bootstrap")
+        ->assertServerError()
+        ->assertJsonPath('message', 'bootstrap failed')
+        ->assertJsonPath('cluster.lastCliAction', 'bootstrap')
+        ->assertJsonPath('cluster.lastCliStatus', 'failed')
+        ->assertJsonPath('cluster.lastCliSummary', 'bootstrap failed')
+        ->assertJsonPath('cluster.servers.0.status', 'pending')
+        ->assertJsonPath('cluster.servers.0.lastBootstrappedAt', null);
+
+    $server->refresh();
+
+    expect($server->status)->toBe('pending')
+        ->and($server->last_bootstrapped_at)->toBeNull();
+});
+
+it('extends a v5 cluster when bootstrapping a new server', function () {
+    createSharedUserAndTeamTables();
+    Config::set('coold.coolify_cli_bin', '/tmp/coolify');
+
+    [$user, $team] = createV5UserWithTeam();
+    $oldPrivateKey = createV5PrivateKey($team, 'Old SSH Key');
+    $newPrivateKey = createV5PrivateKey($team, 'New SSH Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $oldServer = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $oldPrivateKey->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'ubuntu',
+        'ssh_port' => 2222,
+        'status' => 'installed',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+        'last_bootstrapped_at' => now()->subDay(),
+    ]);
+    $newServer = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $newPrivateKey->id,
+        'name' => 'prod-02',
+        'host' => '203.0.113.11',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'pending',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+    ]);
+
+    Process::fake([
+        '*' => Process::result(output: "Extend completed\n"),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson("/v5/clusters/{$cluster->id}/servers/{$newServer->id}/bootstrap")
+        ->assertSuccessful()
+        ->assertJsonPath('cluster.lastCliAction', 'extend')
+        ->assertJsonPath('cluster.lastCliStatus', 'succeeded')
+        ->assertJsonPath('cluster.lastCliSummary', 'Extend completed')
+        ->assertJsonPath('cluster.servers.0.status', 'installed')
+        ->assertJsonPath('cluster.servers.1.status', 'installed');
+
+    Process::assertRan(function ($process) use ($oldServer, $newServer): bool {
+        $command = $process->command;
+        $oldNode = "v5-server-{$oldServer->id}";
+        $newNode = "v5-server-{$newServer->id}";
+
+        return in_array('extend', $command, true)
+            && in_array("{$oldNode},{$newNode}", $command, true)
+            && in_array('--new-nodes', $command, true)
+            && in_array($newNode, $command, true)
+            && in_array('--ssh-config', $command, true);
+    });
+
+    $oldServer->refresh();
+    $newServer->refresh();
+
+    expect($oldServer->status)->toBe('installed')
+        ->and($newServer->status)->toBe('installed')
+        ->and($newServer->last_bootstrapped_at)->not->toBeNull();
+});
+
+it('deletes an unbootstrapped v5 server from a cluster', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'pending',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->deleteJson("/v5/clusters/{$cluster->id}/servers/{$server->id}")
+        ->assertSuccessful()
+        ->assertJsonPath('cluster.serversCount', 0)
+        ->assertJsonPath('cluster.servers', []);
+
+    expect(V5Server::query()->whereKey($server->id)->exists())->toBeFalse();
+});
+
+it('does not delete a bootstrapped v5 server', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+        'last_bootstrapped_at' => now(),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->deleteJson("/v5/clusters/{$cluster->id}/servers/{$server->id}")
+        ->assertConflict()
+        ->assertJsonPath('message', 'Only unbootstrapped servers can be deleted.');
+
+    expect(V5Server::query()->whereKey($server->id)->exists())->toBeTrue();
+});
+
+it('updates editable v5 server builder details without changing networking', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+        'builder_cpu_quota' => '100%',
+        'node_address' => '10.0.0.10',
+        'wireguard_listen_port_override' => 51821,
+        'wireguard_endpoint_override' => 'prod-01.example.com:51821',
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->patchJson("/v5/clusters/{$cluster->id}/servers/{$server->id}", [
+            'builder_enabled' => true,
+            'builder_capacity' => 5,
+            'builder_cpu_quota' => '350%',
+            'host' => '198.51.100.99',
+            'ssh_user' => 'admin',
+            'ssh_port' => 2222,
+            'node_address' => '10.0.0.99',
+            'wireguard_endpoint_override' => 'changed.example.com:51821',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('cluster.servers.0.builderEnabled', true)
+        ->assertJsonPath('cluster.servers.0.builderCapacity', 5)
+        ->assertJsonPath('cluster.servers.0.builderCpuQuota', '350%')
+        ->assertJsonPath('cluster.servers.0.host', '203.0.113.10')
+        ->assertJsonMissingPath('cluster.servers.0.sshUser')
+        ->assertJsonMissingPath('cluster.servers.0.sshPort')
+        ->assertJsonPath('cluster.servers.0.nodeAddress', '10.0.0.10')
+        ->assertJsonPath('cluster.servers.0.wireguardEndpointOverride', 'prod-01.example.com:51821');
+
+    $server->refresh();
+
+    expect($server->builder_enabled)->toBeTrue()
+        ->and($server->builder_capacity)->toBe(5)
+        ->and($server->builder_cpu_quota)->toBe('350%')
+        ->and($server->capabilities)->toBe(['coold', 'builder'])
+        ->and($server->host)->toBe('203.0.113.10')
+        ->and($server->ssh_user)->toBe('root')
+        ->and($server->ssh_port)->toBe(22)
+        ->and($server->node_address)->toBe('10.0.0.10')
+        ->and($server->wireguard_endpoint_override)->toBe('prod-01.example.com:51821');
+});
+
+it('validates editable v5 server builder details', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['builder'],
+        'builder_enabled' => true,
+        'builder_capacity' => 2,
+        'builder_cpu_quota' => '200%',
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->patchJson("/v5/clusters/{$cluster->id}/servers/{$server->id}", [
+            'builder_enabled' => true,
+            'builder_capacity' => 1001,
+            'builder_cpu_quota' => str_repeat('a', 33),
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['builder_capacity', 'builder_cpu_quota']);
 });
 
 it('validates v5 cluster creation input', function () {
@@ -325,6 +1213,95 @@ it('rejects duplicate v5 cluster names in the same team', function () {
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['name']);
+});
+
+it('deletes an empty v5 cluster in the current team', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Empty Mesh',
+        'description' => null,
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->deleteJson('/v5/clusters/'.$cluster->id)
+        ->assertNoContent();
+
+    expect(Cluster::query()->whereKey($cluster->id)->exists())->toBeFalse();
+});
+
+it('does not delete a v5 cluster that has servers', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Lima Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Development-Lima',
+        'description' => null,
+    ]);
+    V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'coold-dev',
+        'host' => 'lima-coold-dev',
+        'ssh_user' => 'developer',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold', 'builder'],
+        'builder_enabled' => true,
+        'builder_capacity' => 2,
+        'last_bootstrapped_at' => now(),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->deleteJson('/v5/clusters/'.$cluster->id)
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Only empty clusters can be deleted.');
+
+    expect(Cluster::query()->whereKey($cluster->id)->exists())->toBeTrue();
+});
+
+it('does not delete a v5 cluster outside the current team', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $otherTeam = Team::withoutEvents(fn () => Team::query()->create([
+        'name' => 'Other V5 Team',
+        'description' => null,
+        'personal_team' => false,
+        'show_boarding' => false,
+    ]));
+    $otherUser = User::withoutEvents(fn () => User::query()->create([
+        'name' => 'Other User',
+        'email' => 'other-delete@example.com',
+        'email_verified_at' => now(),
+        'password' => 'password',
+    ]));
+    $cluster = Cluster::query()->create([
+        'team_id' => $otherTeam->id,
+        'created_by_user_id' => $otherUser->id,
+        'name' => 'Other Mesh',
+        'description' => null,
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->deleteJson('/v5/clusters/'.$cluster->id)
+        ->assertNotFound();
+
+    expect(Cluster::query()->whereKey($cluster->id)->exists())->toBeTrue();
 });
 
 it('allows the same v5 cluster name in another team without leaking it', function () {
@@ -569,10 +1546,34 @@ it('defines the v5 dashboard page as a shadcn styled canvas shell', function () 
     expect(file_exists(resource_path('js/v5/components/top-navigation-loading-indicator.tsx')))->toBeFalse();
 });
 
+it('tracks v5 server actions with reusable per-id loading state', function () {
+    $clustersPage = file_get_contents(resource_path('js/v5/Pages/Clusters.tsx'));
+    $pendingIdsHook = file_get_contents(resource_path('js/v5/lib/use-pending-ids.ts'));
+
+    expect($clustersPage)
+        ->toContain("import { usePendingIds } from '@/lib/use-pending-ids';")
+        ->toContain('const checkingServers = usePendingIds<string>()')
+        ->toContain('const isCheckingServer = checkingServers.has(server.id)')
+        ->toContain('checkingServers.start(server.id)')
+        ->toContain('checkingServers.finish(server.id)')
+        ->not->toContain('const [checkingServerId, setCheckingServerId] = useState<string | null>(null)')
+        ->not->toContain('setCheckingServerId(server.id)')
+        ->not->toContain('setCheckingServerId(null)');
+
+    expect($pendingIdsHook)
+        ->toContain('export function usePendingIds')
+        ->toContain('const [pendingIds, setPendingIds] = useState<Set<T>>(() => new Set())')
+        ->toContain('start')
+        ->toContain('finish')
+        ->toContain('has')
+        ->toContain('hasAny');
+});
+
 it('defines the v5 cluster management page and create cluster form', function () {
     $clustersPagePath = resource_path('js/v5/Pages/Clusters.tsx');
     $clustersPage = file_get_contents($clustersPagePath);
     $buttonComponent = file_get_contents(resource_path('js/v5/components/ui/button.tsx'));
+    $dialogComponent = file_get_contents(resource_path('js/v5/components/ui/dialog.tsx'));
     $types = file_get_contents(resource_path('js/v5/types.ts'));
 
     expect(file_exists($clustersPagePath))->toBeTrue();
@@ -592,7 +1593,54 @@ it('defines the v5 cluster management page and create cluster form', function ()
         ->toContain('<DialogTitle>Create cluster</DialogTitle>')
         ->toContain('<DialogDescription>')
         ->toContain('<DialogFooter>')
-        ->toContain('<DialogClose')
+        ->not->toContain('<DialogClose')
+        ->toContain('Cancel')
+        ->toContain('<DialogContent className="max-w-md" showCloseButton={false}>')
+        ->toContain('<DialogTitle>Confirm deletion</DialogTitle>')
+        ->toContain('variant="delete"')
+        ->toContain('aria-label="Add server to cluster"')
+        ->toContain('setIsAddServerDialogOpen(true)')
+        ->toContain('Add server')
+        ->toContain('className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"')
+        ->toContain('<DialogTitle>Add server</DialogTitle>')
+        ->toContain('DialogContent className="max-w-3xl"')
+        ->toContain('DialogContent className="max-w-2xl"')
+        ->not->toContain('DialogContent className="max-h-[90dvh] max-w-3xl overflow-y-auto"')
+        ->not->toContain('DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto"')
+        ->toContain('fetch(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/bootstrap`')
+        ->toContain('Bootstrap')
+        ->toContain('lastCliSummary')
+        ->toContain('Unable to bootstrap this server. Check the CLI state output.')
+        ->toContain('border-destructive/30')
+        ->toContain('fetch(`/v5/clusters/${selectedCluster.id}/servers`')
+        ->toContain('fetch(`/v5/clusters/${selectedCluster.id}/servers/${editingServer.id}`')
+        ->toContain('fetch(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/check`')
+        ->toContain('fetch(`/v5/clusters/${cluster.id}/servers/${server.id}`')
+        ->toContain("method: 'PATCH'")
+        ->toContain("method: 'DELETE'")
+        ->toContain('Check SSH')
+        ->toContain('Bootstrap: {server.status}')
+        ->toContain('Latest SSH check')
+        ->toContain('Delete')
+        ->toContain('<DialogTitle>Edit server</DialogTitle>')
+        ->toContain('Edit server')
+        ->toContain('Save server')
+        ->toContain('editServerBuilderCapacity')
+        ->toContain('editServerBuilderCpuQuota')
+        ->toContain('Networking and bootstrap settings stay locked after creation.')
+        ->toContain('Bootstrap SSH user')
+        ->toContain('Bootstrap SSH port')
+        ->not->toContain('{server.sshUser}@{server.host}:{server.sshPort}')
+        ->toContain('showAdvancedServerConfiguration')
+        ->toContain('wireguardListenPortOverride')
+        ->toContain('wireguardEndpointOverride')
+        ->toContain('privateKeys')
+        ->toContain('selectedPrivateKeyId')
+        ->toContain('Private key')
+        ->toContain('Select a private key')
+        ->toContain('appearance-none')
+        ->toContain('backgroundImage: `url("data:image/svg+xml')
+        ->not->toContain('No private key')
         ->toContain('Create cluster')
         ->toContain('Cluster details')
         ->toContain('Servers in this cluster')
@@ -600,20 +1648,43 @@ it('defines the v5 cluster management page and create cluster form', function ()
         ->toContain('builderCapacity')
         ->toContain('privateKeyName')
         ->toContain('lastBootstrappedAt')
+        ->toContain('deleteCluster')
+        ->toContain('fetch(`/v5/clusters/${cluster.id}`')
+        ->toContain("method: 'DELETE'")
+        ->toContain('Delete cluster')
+        ->toContain('selectedCluster.serversCount === 0')
+        ->toContain('Only empty clusters can be deleted.')
+        ->toContain('min-h-dvh overflow-y-auto bg-background text-foreground lg:h-dvh lg:overflow-hidden')
+        ->toContain('flex min-h-dvh overflow-visible px-4 pt-16 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-6')
+        ->toContain('flex max-h-80 flex-col rounded-lg border border-border bg-card lg:max-h-none lg:min-h-0')
+        ->toContain('overflow-visible rounded-lg border border-border bg-card lg:min-h-0 lg:overflow-y-auto')
+        ->toContain('flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end')
+        ->toContain('mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2')
         ->toContain('lg:grid-cols-[20rem_minmax(0,1fr)]')
         ->not->toContain('lg:grid-cols-[20rem_minmax(0,1fr)_22rem]')
         ->not->toContain('New cluster')
         ->not->toContain('<aside className="rounded-lg border border-border bg-card p-5">')
         ->not->toContain('This is where the magic happens.');
 
-    expect(substr_count($clustersPage, 'variant="coolify"'))->toBe(2)
+    expect(substr_count($clustersPage, 'variant="coolify"'))->toBe(5)
         ->and($buttonComponent)
         ->toContain('coolify:')
         ->toContain('bg-coollabs-50')
-        ->toContain('hover:bg-coollabs');
+        ->toContain('hover:bg-coollabs')
+        ->toContain('delete:');
 
-    expect(file_get_contents(resource_path('js/v5/components/ui/dialog.tsx')))
+    expect($dialogComponent)
         ->toContain('@base-ui/react/dialog')
+        ->toContain('z-50')
+        ->toContain('max-h-[calc(100dvh-2rem)]')
+        ->toContain('overflow-y-auto')
+        ->toContain('top-1/2')
+        ->toContain('-translate-y-1/2')
+        ->not->toContain('top-4 bottom-4')
+        ->not->toContain('top-1/2 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2')
+        ->toContain('showCloseButton = true')
+        ->toContain('aria-label="Close dialog"')
+        ->toContain('<XIcon />')
         ->toContain('DialogTitle')
         ->toContain('DialogDescription');
 
@@ -628,10 +1699,11 @@ it('defines the v5 cluster management page and create cluster form', function ()
     expect(substr_count($v5Css, '--ring: var(--warning);'))->toBe(2);
 
     expect($types)
-        ->toContain('sshUser: string;')
-        ->toContain('sshPort: number;')
+        ->not->toContain('sshUser: string;')
+        ->not->toContain('sshPort: number;')
         ->toContain('builderEnabled: boolean;')
         ->toContain('builderCapacity: number;')
+        ->toContain('builderCpuQuota: string;')
         ->toContain('privateKeyName: string | null;')
         ->toContain('lastBootstrappedAt: string | null;');
 });
@@ -649,6 +1721,49 @@ it('defines a ghost variant for compact v5 select triggers', function () {
         ->toContain('h-auto')
         ->toContain('text-sm')
         ->toContain("position === 'popper' ? false : true");
+});
+
+it('provides reusable v5 form field primitives with reserved validation error space', function () {
+    $fieldPath = resource_path('js/v5/components/ui/field.tsx');
+    $inputPath = resource_path('js/v5/components/ui/input.tsx');
+    $textareaPath = resource_path('js/v5/components/ui/textarea.tsx');
+    $clustersPage = file_get_contents(resource_path('js/v5/Pages/Clusters.tsx'));
+
+    expect(file_exists($fieldPath))->toBeTrue()
+        ->and(file_exists($inputPath))->toBeTrue()
+        ->and(file_exists($textareaPath))->toBeTrue();
+
+    $field = file_get_contents($fieldPath);
+    $input = file_get_contents($inputPath);
+    $textarea = file_get_contents($textareaPath);
+
+    expect($field)
+        ->toContain('function Field(')
+        ->toContain('function FieldLabel(')
+        ->toContain('function FieldError(')
+        ->toContain('min-h-4')
+        ->toContain('aria-live="polite"')
+        ->toContain('message ? undefined : true')
+        ->toContain('export { Field, FieldError, FieldLabel }');
+
+    expect($input)
+        ->toContain('function Input(')
+        ->toContain('aria-invalid:border-destructive')
+        ->toContain('export { Input };');
+
+    expect($textarea)
+        ->toContain('function Textarea(')
+        ->toContain('aria-invalid:border-destructive')
+        ->toContain('export { Textarea };');
+
+    expect($clustersPage)
+        ->toContain("import { Field, FieldError, FieldLabel } from '@/components/ui/field';")
+        ->toContain("import { Input } from '@/components/ui/input';")
+        ->toContain("import { Textarea } from '@/components/ui/textarea';")
+        ->toContain('<FieldError message={errors.name?.[0]} />')
+        ->toContain('<FieldError message={serverErrors.private_key_id?.[0]} />')
+        ->not->toContain('{errors.name ? <span className="text-xs text-destructive">{errors.name[0]}</span> : null}')
+        ->not->toContain('{serverErrors.name ? (');
 });
 
 it('uses the requested shadcn preset configuration for v5', function () {
@@ -798,19 +1913,60 @@ it('syncs dev Lima VMs into v5 clusters and servers', function () {
     $exitCode = Artisan::call('v5:sync-dev-lima-servers', [
         '--team-id' => $team->id,
         '--user-id' => $user->id,
-        '--private-key-id' => $privateKey->id,
         '--cluster' => 'Development-Lima',
         '--builder-capacity' => 2,
         '--server' => [
-            'coold-dev|lima-coold-dev|developer|22',
-            'coold-dev-2|lima-coold-dev-2|developer|22',
+            'coold-dev|host.docker.internal|developer|61332',
+            'coold-dev-2|host.docker.internal|developer|61379',
         ],
     ]);
 
     expect($exitCode)->toBe(0)
         ->and(Cluster::query()->where('name', 'Development-Lima')->count())->toBe(1)
-        ->and(V5Server::query()->where('name', 'coold-dev')->where('host', 'lima-coold-dev')->exists())->toBeTrue()
-        ->and(V5Server::query()->where('name', 'coold-dev-2')->where('host', 'lima-coold-dev-2')->exists())->toBeTrue();
+        ->and(V5Server::query()->where('name', 'coold-dev')->where('host', 'host.docker.internal')->where('ssh_port', 61332)->where('private_key_id', $privateKey->id)->exists())->toBeTrue()
+        ->and(V5Server::query()->where('name', 'coold-dev-2')->where('host', 'host.docker.internal')->where('ssh_port', 61379)->where('private_key_id', $privateKey->id)->exists())->toBeTrue();
+});
+
+it('updates legacy dev Lima hostnames to Docker reachable SSH endpoints', function () {
+    createSharedUserAndTeamTables();
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Dev Lima Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Development-Lima',
+        'description' => 'Local Lima development cluster managed by scripts/dev.sh.',
+    ]);
+
+    V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'coold-dev',
+        'host' => 'lima-coold-dev',
+        'ssh_user' => 'developer',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'builder_enabled' => true,
+        'builder_capacity' => 2,
+        'last_bootstrapped_at' => now(),
+    ]);
+
+    $exitCode = Artisan::call('v5:sync-dev-lima-servers', [
+        '--team-id' => $team->id,
+        '--user-id' => $user->id,
+        '--cluster' => 'Development-Lima',
+        '--builder-capacity' => 2,
+        '--server' => [
+            'coold-dev|host.docker.internal|developer|61332',
+        ],
+    ]);
+
+    expect($exitCode)->toBe(0)
+        ->and(V5Server::query()->where('name', 'coold-dev')->count())->toBe(1)
+        ->and(V5Server::query()->where('name', 'coold-dev')->where('host', 'host.docker.internal')->where('ssh_port', 61332)->exists())->toBeTrue()
+        ->and(V5Server::query()->where('host', 'lima-coold-dev')->exists())->toBeFalse();
 });
 
 it('seeds dev Lima VMs into v5 clusters and servers idempotently', function () {
@@ -828,8 +1984,8 @@ it('seeds dev Lima VMs into v5 clusters and servers idempotently', function () {
         ->and($cluster->created_by_user_id)->toBe($user->id)
         ->and($cluster->description)->toBe('Local Lima development cluster managed by scripts/dev.sh.')
         ->and(V5Server::query()->count())->toBe(2)
-        ->and(V5Server::query()->where('name', 'coold-dev')->where('host', 'lima-coold-dev')->where('ssh_user', get_current_user())->where('ssh_port', 22)->exists())->toBeTrue()
-        ->and(V5Server::query()->where('name', 'coold-dev-2')->where('host', 'lima-coold-dev-2')->where('ssh_user', get_current_user())->where('ssh_port', 22)->exists())->toBeTrue()
+        ->and(V5Server::query()->where('name', 'coold-dev')->where('host', 'host.docker.internal')->where('ssh_user', get_current_user())->where('ssh_port', 60001)->exists())->toBeTrue()
+        ->and(V5Server::query()->where('name', 'coold-dev-2')->where('host', 'host.docker.internal')->where('ssh_user', get_current_user())->where('ssh_port', 60002)->exists())->toBeTrue()
         ->and(V5Server::query()->where('status', 'installed')->count())->toBe(2)
         ->and(V5Server::query()->where('builder_enabled', true)->where('builder_capacity', 2)->count())->toBe(2)
         ->and(V5Server::query()->where('cluster_id', $cluster->id)->count())->toBe(2);
@@ -906,6 +2062,26 @@ function createSharedUserAndTeamTables(): void
         $table->foreignId('created_by_user_id');
         $table->string('name');
         $table->text('description')->nullable();
+        $table->string('wireguard_interface')->default('wg0');
+        $table->string('wireguard_management_pool')->default('100.64.0.0/16');
+        $table->unsignedInteger('wireguard_listen_port')->default(51820);
+        $table->string('container_network_pool')->default('10.210.0.0/16');
+        $table->unsignedTinyInteger('container_network_prefix')->default(24);
+        $table->json('namespaces')->nullable();
+        $table->boolean('default_deny_containers')->default(true);
+        $table->string('coold_version')->default('nightly');
+        $table->string('corrosion_version')->default('v1.0.0');
+        $table->unsignedInteger('corrosion_gossip_port')->default(8787);
+        $table->unsignedInteger('corrosion_api_port')->default(8080);
+        $table->boolean('builder_enabled')->default(true);
+        $table->unsignedInteger('builder_capacity')->default(2);
+        $table->string('builder_cpu_quota')->default('200%');
+        $table->string('builder_memory_max')->default('2G');
+        $table->unsignedInteger('builder_timeout_secs')->default(1800);
+        $table->string('last_cli_action')->nullable();
+        $table->string('last_cli_status')->nullable();
+        $table->text('last_cli_summary')->nullable();
+        $table->timestamp('last_cli_ran_at')->nullable();
         $table->timestamps();
     });
 
@@ -923,7 +2099,17 @@ function createSharedUserAndTeamTables(): void
         $table->json('capabilities')->nullable();
         $table->boolean('builder_enabled')->default(false);
         $table->unsignedInteger('builder_capacity')->default(0);
+        $table->string('builder_cpu_quota')->default('200%');
+        $table->string('node_address')->nullable();
+        $table->unsignedInteger('wireguard_listen_port_override')->nullable();
+        $table->string('wireguard_endpoint_override')->nullable();
+        $table->string('wireguard_management_ip')->nullable();
+        $table->string('wireguard_public_key')->nullable();
+        $table->json('container_subnets')->nullable();
         $table->timestamp('last_bootstrapped_at')->nullable();
+        $table->string('last_status_check')->nullable();
+        $table->text('last_status_output')->nullable();
+        $table->timestamp('last_status_checked_at')->nullable();
         $table->timestamps();
     });
 

@@ -1327,6 +1327,26 @@ CREATE TABLE IF NOT EXISTS "v5_clusters" (
     "created_by_user_id" INTEGER NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
+    "wireguard_interface" TEXT DEFAULT 'wg0' NOT NULL,
+    "wireguard_management_pool" TEXT DEFAULT '100.64.0.0/16' NOT NULL,
+    "wireguard_listen_port" INTEGER DEFAULT '51820' NOT NULL,
+    "container_network_pool" TEXT DEFAULT '10.210.0.0/16' NOT NULL,
+    "container_network_prefix" INTEGER DEFAULT '24' NOT NULL,
+    "namespaces" JSON,
+    "default_deny_containers" INTEGER DEFAULT true NOT NULL,
+    "coold_version" TEXT DEFAULT 'nightly' NOT NULL,
+    "corrosion_version" TEXT DEFAULT 'v1.0.0' NOT NULL,
+    "corrosion_gossip_port" INTEGER DEFAULT '8787' NOT NULL,
+    "corrosion_api_port" INTEGER DEFAULT '8080' NOT NULL,
+    "builder_enabled" INTEGER DEFAULT true NOT NULL,
+    "builder_capacity" INTEGER DEFAULT '2' NOT NULL,
+    "builder_cpu_quota" TEXT DEFAULT '200%' NOT NULL,
+    "builder_memory_max" TEXT DEFAULT '2G' NOT NULL,
+    "builder_timeout_secs" INTEGER NOT NULL DEFAULT '1800',
+    "last_cli_action" TEXT,
+    "last_cli_status" TEXT,
+    "last_cli_summary" TEXT,
+    "last_cli_ran_at" TEXT,
     "created_at" TEXT,
     "updated_at" TEXT
 );
@@ -1345,7 +1365,17 @@ CREATE TABLE IF NOT EXISTS "v5_servers" (
     "capabilities" TEXT,
     "builder_enabled" INTEGER DEFAULT false NOT NULL,
     "builder_capacity" INTEGER DEFAULT '0' NOT NULL,
+    "builder_cpu_quota" TEXT DEFAULT '200%' NOT NULL,
+    "node_address" TEXT,
+    "wireguard_listen_port_override" INTEGER,
+    "wireguard_endpoint_override" TEXT,
+    "wireguard_management_ip" TEXT,
+    "wireguard_public_key" TEXT,
+    "container_subnets" JSON,
     "last_bootstrapped_at" TEXT,
+    "last_status_check" TEXT,
+    "last_status_output" TEXT,
+    "last_status_checked_at" TEXT,
     "created_at" TEXT,
     "updated_at" TEXT
 );
@@ -1783,3 +1813,6 @@ INSERT INTO "migrations" ("id", "migration", "batch") VALUES (313, '2025_12_17_0
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (314, '2025_12_17_000002_add_restart_tracking_to_standalone_databases', 314);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (316, '2026_06_16_130650_v5_create_servers_table', 316);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (317, '2026_06_16_130649_v5_create_clusters_table', 317);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (318, '2026_06_16_204644_v5_add_wireguard_cli_configuration_to_clusters_and_servers', 318);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (319, '2026_06_17_165112_v5_add_builder_cpu_quota_to_servers_table', 319);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (320, '2026_06_17_172845_add_status_check_fields_to_v5_servers_table', 320);

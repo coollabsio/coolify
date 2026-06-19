@@ -24,7 +24,17 @@ class Server extends V5Model
         'capabilities',
         'builder_enabled',
         'builder_capacity',
+        'builder_cpu_quota',
+        'node_address',
+        'wireguard_listen_port_override',
+        'wireguard_endpoint_override',
+        'wireguard_management_ip',
+        'wireguard_public_key',
+        'container_subnets',
         'last_bootstrapped_at',
+        'last_status_check',
+        'last_status_output',
+        'last_status_checked_at',
     ];
 
     protected function casts(): array
@@ -32,7 +42,9 @@ class Server extends V5Model
         return [
             'capabilities' => 'array',
             'builder_enabled' => 'boolean',
+            'container_subnets' => 'array',
             'last_bootstrapped_at' => 'datetime',
+            'last_status_checked_at' => 'datetime',
         ];
     }
 

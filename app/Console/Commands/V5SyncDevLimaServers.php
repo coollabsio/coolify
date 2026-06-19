@@ -33,7 +33,13 @@ class V5SyncDevLimaServers extends Command
         $team = Team::query()->find((int) $this->option('team-id')) ?? Team::query()->orderBy('id')->first();
         $user = User::query()->find((int) $this->option('user-id')) ?? User::query()->orderBy('id')->first();
         $privateKeyId = $this->option('private-key-id');
-        $privateKey = is_numeric($privateKeyId) ? PrivateKey::query()->find((int) $privateKeyId) : null;
+        $privateKey = is_numeric($privateKeyId)
+            ? PrivateKey::query()->find((int) $privateKeyId)
+            : PrivateKey::query()
+                ->where('team_id', $team?->id)
+                ->where('is_git_related', false)
+                ->orderBy('id')
+                ->first();
 
         if (! $team instanceof Team || ! $user instanceof User) {
             $this->warn('Cannot sync dev Lima servers without an existing team and user.');
@@ -74,14 +80,14 @@ class V5SyncDevLimaServers extends Command
 
             Server::query()->updateOrCreate([
                 'team_id' => $team->id,
-                'host' => $host,
-                'ssh_port' => (int) $sshPort,
-            ], [
                 'cluster_id' => $cluster->id,
+                'name' => $name,
+            ], [
                 'created_by_user_id' => $user->id,
                 'private_key_id' => $privateKey?->id,
-                'name' => $name,
+                'host' => $host,
                 'ssh_user' => $sshUser,
+                'ssh_port' => (int) $sshPort,
                 'status' => 'installed',
                 'capabilities' => $capabilities,
                 'builder_enabled' => $builderEnabled,

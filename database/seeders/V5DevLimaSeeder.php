@@ -59,26 +59,32 @@ class V5DevLimaSeeder extends Seeder
                 'capabilities' => $capabilities,
                 'builder_enabled' => $builderEnabled,
                 'builder_capacity' => $builderCapacity,
+                'wireguard_listen_port_override' => $server['wireguard_listen_port_override'],
+                'wireguard_endpoint_override' => $server['wireguard_endpoint_override'],
                 'last_bootstrapped_at' => now(),
             ]);
         }
     }
 
     /**
-     * @return array<int, array{name: string, host: string, ssh_port: int}>
+     * @return array<int, array{name: string, host: string, ssh_port: int, wireguard_listen_port_override: int, wireguard_endpoint_override: string}>
      */
     private function servers(): array
     {
         return [
             [
                 'name' => 'coold-dev',
-                'host' => 'lima-coold-dev',
-                'ssh_port' => 22,
+                'host' => 'host.docker.internal',
+                'ssh_port' => 60001,
+                'wireguard_listen_port_override' => 51821,
+                'wireguard_endpoint_override' => 'host.lima.internal:51821',
             ],
             [
                 'name' => 'coold-dev-2',
-                'host' => 'lima-coold-dev-2',
-                'ssh_port' => 22,
+                'host' => 'host.docker.internal',
+                'ssh_port' => 60002,
+                'wireguard_listen_port_override' => 51822,
+                'wireguard_endpoint_override' => 'host.lima.internal:51822',
             ],
         ];
     }

@@ -29,6 +29,7 @@ VERSION="$(read_coolify_env COOLIFY_COOLD_VERSION nightly)"
 CORROSION_VERSION="$(read_coolify_env COOLIFY_CORROSION_VERSION v1.0.0)"
 FLUX_URL="$(read_coolify_env COOLIFY_COOLD_VM_FLUX_URL http://host.lima.internal:6443)"
 BUILDER_CAPACITY="$(read_coolify_env COOLIFY_COOLD_VM_BUILDER_CAPACITY 2)"
+SSH_PORT="$(read_coolify_env COOLIFY_COOLD_VM_SSH_PORT 60002)"
 WG_IP="$(read_coolify_env COOLIFY_COOLD_VM_WG_IP "")"
 WG_PEER_IP="$(read_coolify_env COOLIFY_COOLD_VM_WG_PEER_IP "")"
 WG_PEER_ENDPOINT="$(read_coolify_env COOLIFY_COOLD_VM_WG_PEER_ENDPOINT "")"
@@ -69,6 +70,7 @@ Environment:
   COOLIFY_CORROSION_VERSION    corrosion release tag to install (default: v1.0.0)
   COOLIFY_COOLD_VM_FLUX_URL    Flux gRPC URL visible from the VM (default: http://host.lima.internal:6443)
   COOLIFY_COOLD_VM_BUILDER_CAPACITY VM builder capacity to advertise (default: 2; set 0 to disable)
+  COOLIFY_COOLD_VM_SSH_PORT    Host SSH port forwarded to this VM (default: 60002)
   COOLIFY_COOLD_VM_WG_IP       Optional WireGuard mgmt IP for this host
   COOLIFY_COOLD_VM_CONTAINER_SUBNET Podman mesh subnet for this host
   COOLIFY_COOLD_VM_CONTAINER_GATEWAY Podman mesh gateway for this host
@@ -395,6 +397,7 @@ generate_yaml() {
     -e "s#{{COOLIFY_REPO}}#$ROOT#g" \
     -e "s#{{COOLIFY_COOLD_VERSION}}#$VERSION#g" \
     -e "s#{{COOLIFY_CORROSION_VERSION}}#$CORROSION_VERSION#g" \
+    -e "s#{{COOLIFY_COOLD_VM_SSH_PORT}}#$SSH_PORT#g" \
     "$TEMPLATE" > "$GENERATED"
 }
 

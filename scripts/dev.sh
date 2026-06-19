@@ -60,6 +60,11 @@ coold_vm_wg_port() {
   read_coolify_env "COOLIFY_COOLD_VM_WG_PORT_${index}" "$((51820 + index))"
 }
 
+coold_vm_ssh_port() {
+  local index="$1"
+  read_coolify_env "COOLIFY_COOLD_VM_SSH_PORT_${index}" "6000${index}"
+}
+
 coold_vm_container_subnet() {
   local index="$1"
   read_coolify_env "COOLIFY_COOLD_VM_CONTAINER_SUBNET_${index}" "10.210.$((index - 1)).0/24"
@@ -170,6 +175,28 @@ lima_ssh_config() {
   done
 
   printf '%s\n' "$config"
+}
+
+lima_ssh_port() {
+  local index="$1"
+  local instance
+  local port
+
+  instance="$(coold_vm_instance "$index")"
+
+  if [ ! -f "$HOME/.lima/${instance}/ssh.config" ]; then
+    echo "ERROR: Lima SSH config for ${instance} was not found. Start it first with scripts/dev.sh up." >&2
+    exit 1
+  fi
+
+  port="$(awk 'tolower($1) == "port" { print $2; exit }' "$HOME/.lima/${instance}/ssh.config")"
+
+  if [ -z "$port" ]; then
+    echo "ERROR: Lima SSH port for ${instance} was not found in $HOME/.lima/${instance}/ssh.config." >&2
+    exit 1
+  fi
+
+  printf '%s\n' "$port"
 }
 
 coolify_nodes_arg() {
@@ -346,6 +373,7 @@ coold_vm() {
   shift
   COOLIFY_COOLD_LIMA_INSTANCE="$(coold_vm_instance "$index")" \
   COOLIFY_COOLD_VM_WG_IP="$(coold_vm_wg_ip "$index")" \
+  COOLIFY_COOLD_VM_SSH_PORT="$(coold_vm_ssh_port "$index")" \
   COOLIFY_COOLD_VM_CONTAINER_SUBNET="$(coold_vm_container_subnet "$index")" \
   COOLIFY_COOLD_VM_CONTAINER_GATEWAY="$(coold_vm_container_gateway "$index")" \
     scripts/coold-vm.sh "$@"
@@ -417,9 +445,21 @@ follow_logs() {
 }
 
 sync_v5_dev_lima_servers() {
+  local count
+  local index
+  local instance
+  local server_args=()
+  local ssh_port
   local ssh_user
 
+  count="$(coold_vm_count)"
   ssh_user="$(coolify_ssh_user)"
+
+  for index in $(seq 1 "$count"); do
+    instance="$(coold_vm_instance "$index")"
+    ssh_port="$(lima_ssh_port "$index")"
+    server_args+=(--server="${instance}|host.docker.internal|${ssh_user}|${ssh_port}")
+  done
 
   echo "==> Running pending migrations before syncing v5 dev Lima state..."
   spin exec -T coolify php artisan migrate --force
@@ -427,7 +467,9 @@ sync_v5_dev_lima_servers() {
   echo "==> Seeding dev Lima VM(s) into v5 clusters/servers..."
   spin exec -T \
     -e COOLIFY_CLI_SSH_USER="$ssh_user" \
-    coolify php artisan db:seed --class=V5DevLimaSeeder --force
+    coolify php artisan v5:sync-dev-lima-servers \
+      --builder-capacity="$(read_coolify_env COOLIFY_COOLD_VM_BUILDER_CAPACITY 2)" \
+      "${server_args[@]}"
 }
 
 configure_flux_dev_for_vm() {
@@ -491,9 +533,9 @@ up() {
 
   echo "==> Starting Coolify Docker stack with Spin..."
   if [ "${#spin_args[@]}" -gt 0 ]; then
-    spin up -d "${spin_args[@]}"
+    COOLIFY_CLI_SSH_USER="$(coolify_ssh_user)" spin up -d "${spin_args[@]}"
   else
-    spin up -d
+    COOLIFY_CLI_SSH_USER="$(coolify_ssh_user)" spin up -d
   fi
 
   if [ "$naked" = "true" ]; then
