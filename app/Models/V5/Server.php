@@ -12,6 +12,7 @@ class Server extends V5Model
     protected $table = 'v5_servers';
 
     protected $fillable = [
+        'uuid',
         'team_id',
         'cluster_id',
         'created_by_user_id',
@@ -32,6 +33,10 @@ class Server extends V5Model
         'wireguard_public_key',
         'container_subnets',
         'last_bootstrapped_at',
+        'last_bootstrap_action',
+        'last_bootstrap_status',
+        'last_bootstrap_output',
+        'last_bootstrap_ran_at',
         'last_status_check',
         'last_status_output',
         'last_status_checked_at',
@@ -44,6 +49,7 @@ class Server extends V5Model
             'builder_enabled' => 'boolean',
             'container_subnets' => 'array',
             'last_bootstrapped_at' => 'datetime',
+            'last_bootstrap_ran_at' => 'datetime',
             'last_status_checked_at' => 'datetime',
         ];
     }

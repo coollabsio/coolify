@@ -5,8 +5,11 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware('v5.authenticated')->group(function () {
     Route::get('/', DashboardController::class)->name('dashboard');
+    Route::get('/realtime-test', [DashboardController::class, 'realtimeTest'])->name('realtime-test');
+    Route::post('/realtime-test', [DashboardController::class, 'broadcastRealtimeTest'])->name('realtime-test.broadcast');
     Route::post('/selection', [DashboardController::class, 'updateSelection'])->name('selection.update');
     Route::get('/clusters', [DashboardController::class, 'clustersIndex'])->name('clusters.index');
+    Route::get('/clusters/{cluster}', [DashboardController::class, 'showCluster'])->name('clusters.show');
     Route::post('/clusters', [DashboardController::class, 'storeCluster'])->name('clusters.store');
     Route::delete('/clusters/{cluster}', [DashboardController::class, 'destroyCluster'])->name('clusters.destroy');
     Route::post('/clusters/{cluster}/servers', [DashboardController::class, 'storeServer'])->name('clusters.servers.store');

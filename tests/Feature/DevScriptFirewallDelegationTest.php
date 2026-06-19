@@ -46,6 +46,9 @@ it('supports a naked up mode that starts VMs and Spin but skips server bootstrap
         ->and($script)->toContain('if [ "$naked" = "true" ]; then')
         ->and($script)->toContain('Skipping coolify bootstrap and Flux VM wiring')
         ->and($script)->toContain('coolify_bootstrap_with_retry')
+        ->and($script)->toContain('--concurrency "$(coolify_bootstrap_concurrency)"')
+        ->and($script)->toContain('--ssh-timeout "$(coolify_bootstrap_ssh_timeout)"')
+        ->and($script)->toContain('--debug')
         ->and($script)->toContain('configure_flux_dev_for_vm "$index"')
         ->and($script)->toContain('sync_v5_dev_lima_servers');
 });
@@ -56,6 +59,9 @@ it('retries dev coolify bootstrap because fresh Lima setup can complete across p
     expect($script)->toContain('coolify_bootstrap_with_retry()')
         ->and($script)->toContain('local attempts=5')
         ->and($script)->toContain('if coolify_bootstrap; then')
+        ->and($script)->toContain('diagnose_coold_bootstrap_failure')
+        ->and($script)->toContain('systemctl --failed --no-pager')
+        ->and($script)->toContain('systemctl --no-pager --full status wg-quick@wg0 podman.socket corrosion coold')
         ->and($script)->toContain('fresh Lima hosts can finish setup after partial bootstrap phases');
 });
 
@@ -121,4 +127,41 @@ it('supports down cleanup as the preferred VM cleanup command', function () {
         ->and($script)->toContain('clean_vms')
         ->and($script)->toContain('down --cleanup')
         ->and($script)->toContain('clean-vms Delete the coold Lima VMs and all VM-local runtime state (alias for down --cleanup)');
+});
+
+it('scripts a full fresh dev reset with bounded Lima startup retries', function () {
+    $script = file_get_contents(base_path('scripts/dev.sh'));
+    $vmScript = file_get_contents(base_path('scripts/coold-vm.sh'));
+
+    expect($script)->toContain('fresh()')
+        ->and($script)->toContain('down --cleanup')
+        ->and($script)->toContain('COOLIFY_DEV_FOLLOW_LOGS=false up')
+        ->and($script)->toContain('php artisan migrate:fresh --seed --force')
+        ->and($script)->toContain('sync_v5_dev_lima_servers')
+        ->and($script)->toContain('recreate_naked_lima_vm')
+        ->and($script)->toContain('COOLIFY_NAKED_VM_START_TIMEOUT')
+        ->and($script)->toContain('limactl start --tty=false --name="$instance" "$config"')
+        ->and($script)->toContain('cleanup_lima_instance_processes "$instance"')
+        ->and($script)->toContain('did not become ready after ${attempts} attempts')
+        ->and($script)->toContain('refresh_test_host_key')
+        ->and($script)->toContain('coold_vm_up_with_retry()')
+        ->and($script)->toContain('COOLIFY_COOLD_BOOTSTRAP_CONCURRENCY 1')
+        ->and($script)->toContain('COOLIFY_COOLD_BOOTSTRAP_SSH_TIMEOUT 90s')
+        ->and($script)->toContain('local attempts=2')
+        ->and($script)->toContain('deleting and retrying with a fresh Lima instance')
+        ->and($script)->toContain('cleanup_lima_instance_processes()')
+        ->and($script)->toContain('kill_matching_processes()')
+        ->and($script)->toContain('kill -9 $pids')
+        ->and($script)->toContain('limactl hostagent .*${instance}')
+        ->and($script)->toContain('ssh: .*/.lima/${instance}/ssh.sock')
+        ->and($vmScript)->toContain('COOLIFY_COOLD_VM_START_TIMEOUT')
+        ->and($vmScript)->toContain('lima_shell_timeout()')
+        ->and($vmScript)->toContain('cleanup_lima_probe_processes()')
+        ->and($vmScript)->toContain('cleanup_lima_hostagent_processes()')
+        ->and($vmScript)->toContain('kill_matching_processes()')
+        ->and($vmScript)->toContain('pkill -P "$pid"')
+        ->and($vmScript)->toContain('lima_shell_timeout 5 true')
+        ->and($vmScript)->toContain('Lima start timed out after ${START_TIMEOUT}s')
+        ->and($vmScript)->toContain('Guest SSH timed out after ${START_TIMEOUT}s')
+        ->and($vmScript)->toContain('Guest provisioning timed out after ${START_TIMEOUT}s');
 });

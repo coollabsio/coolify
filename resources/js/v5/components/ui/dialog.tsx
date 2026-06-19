@@ -63,7 +63,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
 }
 
 function DialogFooter({ className, ...props }: React.ComponentProps<'div'>) {
-    return <div data-slot="dialog-footer" className={cn('flex justify-end gap-2', className)} {...props} />;
+    return <div data-slot="dialog-footer" className={cn('mt-6 flex justify-end gap-2', className)} {...props} />;
 }
 
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {

@@ -4,7 +4,15 @@ This file documents the current local v5/coold dev setup in Coolify.
 
 ## Roles
 
-- `scripts/dev.sh` owns local developer convenience.
+- `scripts/dev.sh` is the main developer-facing entrypoint. Use it for normal
+  local workflows such as starting/stopping the stack, creating fresh dev state,
+  inspecting Corrosion, managing firewall allow rules, and running example
+  containers.
+- `scripts/coold-vm.sh` is a lower-level Lima VM helper used by `scripts/dev.sh`.
+  It exists separately to keep VM lifecycle and guest setup details out of the
+  main dev orchestration script. Call it directly only when debugging or
+  operating an individual VM, for example `shell`, `status`, `logs-agent`, or
+  `delete`.
 - Lima VMs act like real deployment servers.
 - `coolify init bootstrap` owns host wiring:
   - WireGuard

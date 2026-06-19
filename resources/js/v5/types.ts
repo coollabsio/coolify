@@ -14,6 +14,7 @@ export type V5Server = {
     builderEnabled: boolean;
     builderCapacity: number;
     builderCpuQuota: string;
+    uuid: string | null;
     nodeAddress: string | null;
     wireguardListenPortOverride: number | null;
     wireguardEndpointOverride: string | null;
@@ -22,9 +23,10 @@ export type V5Server = {
     containerSubnets: Record<string, string> | string[];
     privateKeyName: string | null;
     lastBootstrappedAt: string | null;
-    lastStatusCheck: string | null;
-    lastStatusOutput: string | null;
-    lastStatusCheckedAt: string | null;
+    lastBootstrapAction: string | null;
+    lastBootstrapStatus: string | null;
+    lastBootstrapOutput: string | null;
+    lastBootstrapRanAt: string | null;
 };
 
 export type V5Cluster = {
@@ -73,6 +75,9 @@ export type V5PrivateKey = {
 
 export type V5DashboardProps = {
     flux: FluxStatus | null;
+    currentTeam?: {
+        id: number;
+    } | null;
     clusters?: V5Cluster[];
     privateKeys?: V5PrivateKey[];
     projects?: V5Project[];

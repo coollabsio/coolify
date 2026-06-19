@@ -20,6 +20,9 @@ class HandleInertiaRequests extends Middleware
                     'email' => $request->user()->email,
                 ] : null,
             ],
+            'currentTeam' => $request->attributes->get('v5.currentTeam') ? [
+                'id' => $request->attributes->get('v5.currentTeam')->id,
+            ] : null,
         ];
     }
 }

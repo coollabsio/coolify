@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers\V5;
 
+use App\Events\V5ClusterUpdated;
+use App\Events\V5RealtimeTestEvent;
 use App\Http\Controllers\Controller;
+use App\Jobs\V5BootstrapServerJob;
 use App\Models\Environment;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -53,6 +56,56 @@ class DashboardController extends Controller
             'selectedProjectUuid' => $selectedProject['uuid'] ?? null,
             'selectedEnvironmentUuid' => $selectedEnvironment['uuid'] ?? null,
         ]);
+    }
+
+    public function showCluster(Request $request, V5Cluster $cluster): JsonResponse
+    {
+        $currentTeam = $request->attributes->get('v5.currentTeam');
+
+        if (! $currentTeam instanceof Team || $cluster->team_id !== $currentTeam->id) {
+            abort(404);
+        }
+
+        return response()->json([
+            'cluster' => $this->freshSerializedCluster($cluster),
+        ]);
+    }
+
+    public function realtimeTest(Request $request): Response
+    {
+        $currentTeam = $request->attributes->get('v5.currentTeam');
+
+        if (! $currentTeam instanceof Team) {
+            abort(403);
+        }
+
+        return Inertia::render('RealtimeTest', [
+            'currentTeam' => [
+                'id' => $currentTeam->id,
+            ],
+        ]);
+    }
+
+    public function broadcastRealtimeTest(Request $request): JsonResponse
+    {
+        $currentTeam = $request->attributes->get('v5.currentTeam');
+
+        if (! $currentTeam instanceof Team) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'message' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        V5RealtimeTestEvent::dispatch(
+            $currentTeam->id,
+            $validated['message'] ?? 'Manual v5 realtime test'
+        );
+
+        return response()->json([
+            'message' => 'Realtime test event broadcasted.',
+        ], 202);
     }
 
     public function updateSelection(Request $request): \Illuminate\Http\Response
@@ -115,7 +168,9 @@ class DashboardController extends Controller
             'corrosion_gossip_port' => ['sometimes', 'integer', 'min:1', 'max:65535'],
             'corrosion_api_port' => ['sometimes', 'integer', 'min:1', 'max:65535'],
             'builder_enabled' => ['sometimes', 'boolean'],
-            'builder_capacity' => ['sometimes', 'integer', 'min:0', 'max:1000'],
+            'builder_capacity' => $this->builderCapacityRules(
+                $this->requestedBuilderEnabled($request, true)
+            ),
             'builder_cpu_quota' => ['sometimes', 'string', 'max:32'],
             'builder_memory_max' => ['sometimes', 'string', 'max:32'],
             'builder_timeout_secs' => ['sometimes', 'integer', 'min:1', 'max:86400'],
@@ -159,12 +214,18 @@ class DashboardController extends Controller
             ], 409);
         }
 
+        if (in_array($server->last_bootstrap_status, ['queued', 'running'], true)) {
+            return response()->json([
+                'cluster' => $this->freshSerializedCluster($cluster),
+                'message' => 'Bootstrap is already queued or running for this server.',
+            ], 409);
+        }
+
         $installedServers = $cluster->servers()
             ->with('privateKey')
             ->whereNotNull('last_bootstrapped_at')
             ->orderBy('name')
             ->get();
-        $action = $installedServers->isEmpty() ? 'bootstrap' : 'extend';
         $server->load('privateKey');
         $servers = $installedServers->toBase()
             ->push($server)
@@ -177,75 +238,20 @@ class DashboardController extends Controller
             ], 422);
         }
 
-        $cluster->update([
-            'last_cli_action' => $action,
-            'last_cli_status' => 'running',
-            'last_cli_summary' => "Starting Coolify CLI {$action} for {$server->name}...",
-            'last_cli_ran_at' => now(),
+        $server->update([
+            'last_bootstrap_action' => $installedServers->isEmpty() ? 'bootstrap' : 'extend',
+            'last_bootstrap_status' => 'queued',
+            'last_bootstrap_output' => "Queued Coolify bootstrap for {$server->name}.",
+            'last_bootstrap_ran_at' => now(),
         ]);
 
-        $keyDirectory = storage_path('app/ssh/keys');
-        if (! is_dir($keyDirectory)) {
-            mkdir($keyDirectory, 0700, true);
-        }
+        V5ClusterUpdated::dispatch($currentTeam->id, $cluster->id);
+        V5BootstrapServerJob::dispatch($cluster->id, $server->id);
 
-        $tempDirectory = $keyDirectory.'/v5_bootstrap_'.str()->random(16);
-        if (! mkdir($tempDirectory, 0700, true) && ! is_dir($tempDirectory)) {
-            $cluster->update([
-                'last_cli_status' => 'failed',
-                'last_cli_summary' => 'Could not create a temporary SSH configuration directory.',
-                'last_cli_ran_at' => now(),
-            ]);
-
-            return response()->json([
-                'cluster' => $this->freshSerializedCluster($cluster),
-            ], 500);
-        }
-
-        try {
-            $sshConfigLocation = $this->writeBootstrapSshConfig($servers, $tempDirectory);
-            $result = Process::timeout(max(60, (int) $cluster->builder_timeout_secs + 120))
-                ->run($this->bootstrapCommand($cluster, $servers, $server, $sshConfigLocation, $action));
-            $output = trim($result->output()."\n".$result->errorOutput());
-            $successful = $result->successful();
-        } catch (\Throwable $e) {
-            $output = $e->getMessage();
-            $successful = false;
-        } finally {
-            $this->deleteDirectory($tempDirectory);
-        }
-
-        $cluster->update([
-            'last_cli_action' => $action,
-            'last_cli_status' => $successful ? 'succeeded' : 'failed',
-            'last_cli_summary' => str($output !== '' ? $output : 'No output returned.')->limit(20000)->toString(),
-            'last_cli_ran_at' => now(),
-        ]);
-
-        if ($successful) {
-            $capabilities = collect($server->capabilities ?? [])
-                ->push('coold')
-                ->when($server->builder_enabled, fn ($capabilities) => $capabilities->push('builder'))
-                ->unique()
-                ->values()
-                ->all();
-
-            $server->update([
-                'status' => 'installed',
-                'capabilities' => $capabilities,
-                'last_bootstrapped_at' => now(),
-            ]);
-        }
-
-        $payload = [
+        return response()->json([
             'cluster' => $this->freshSerializedCluster($cluster),
-        ];
-
-        if (! $successful) {
-            $payload['message'] = $cluster->last_cli_summary;
-        }
-
-        return response()->json($payload, $successful ? 200 : 500);
+            'message' => 'Bootstrap queued.',
+        ], 202);
     }
 
     public function storeServer(Request $request, V5Cluster $cluster): JsonResponse
@@ -275,7 +281,9 @@ class DashboardController extends Controller
             ],
             'node_address' => ['nullable', 'string', 'max:255'],
             'builder_enabled' => ['sometimes', 'boolean'],
-            'builder_capacity' => ['sometimes', 'integer', 'min:0', 'max:1000'],
+            'builder_capacity' => $this->builderCapacityRules(
+                $this->requestedBuilderEnabled($request, $cluster->builder_enabled)
+            ),
             'builder_cpu_quota' => ['sometimes', 'string', 'max:32'],
             'wireguard_listen_port_override' => ['nullable', 'integer', 'min:1', 'max:65535'],
             'wireguard_endpoint_override' => ['nullable', 'string', 'max:255'],
@@ -295,10 +303,10 @@ class DashboardController extends Controller
             'ssh_user' => $validated['ssh_user'],
             'ssh_port' => $validated['ssh_port'],
             'private_key_id' => $validated['private_key_id'] ?? null,
-            'status' => 'pending',
+            'status' => 'added',
             'capabilities' => $builderEnabled ? ['coold', 'builder'] : ['coold'],
             'builder_enabled' => $builderEnabled,
-            'builder_capacity' => $builderEnabled ? $builderCapacity : 0,
+            'builder_capacity' => $builderCapacity,
             'builder_cpu_quota' => $builderCpuQuota,
             'node_address' => $validated['node_address'] ?? $validated['host'],
             'wireguard_listen_port_override' => $validated['wireguard_listen_port_override'] ?? $devWireguardOverrides['listen_port'],
@@ -330,7 +338,10 @@ class DashboardController extends Controller
 
         $validated = $request->validate([
             'builder_enabled' => ['required', 'boolean'],
-            'builder_capacity' => ['required', 'integer', 'min:0', 'max:1000'],
+            'builder_capacity' => $this->builderCapacityRules(
+                $request->boolean('builder_enabled'),
+                required: true
+            ),
             'builder_cpu_quota' => ['required', 'string', 'max:32'],
         ]);
 
@@ -346,7 +357,7 @@ class DashboardController extends Controller
         $server->update([
             'capabilities' => $capabilities,
             'builder_enabled' => $builderEnabled,
-            'builder_capacity' => $builderEnabled ? (int) $validated['builder_capacity'] : 0,
+            'builder_capacity' => (int) $validated['builder_capacity'],
             'builder_cpu_quota' => $validated['builder_cpu_quota'],
         ]);
 
@@ -374,14 +385,10 @@ class DashboardController extends Controller
         }
 
         if (! $server->privateKey instanceof PrivateKey) {
-            $server->update([
-                'last_status_check' => 'failed',
-                'last_status_output' => 'No private key is attached to this server.',
-                'last_status_checked_at' => now(),
-            ]);
-
             return response()->json([
-                'cluster' => $this->freshSerializedCluster($cluster),
+                'status' => 'failed',
+                'output' => 'No private key is attached to this server.',
+                'checkedAt' => now()->toJSON(),
             ]);
         }
 
@@ -392,14 +399,10 @@ class DashboardController extends Controller
 
         $keyLocation = tempnam($keyDirectory, 'v5_ssh_key_');
         if ($keyLocation === false) {
-            $server->update([
-                'last_status_check' => 'failed',
-                'last_status_output' => 'Could not create a temporary SSH key file.',
-                'last_status_checked_at' => now(),
-            ]);
-
             return response()->json([
-                'cluster' => $this->freshSerializedCluster($cluster),
+                'status' => 'failed',
+                'output' => 'Could not create a temporary SSH key file.',
+                'checkedAt' => now()->toJSON(),
             ]);
         }
 
@@ -440,14 +443,10 @@ class DashboardController extends Controller
             @unlink($keyLocation);
         }
 
-        $server->update([
-            'last_status_check' => $status,
-            'last_status_output' => str($output !== '' ? $output : 'No output returned.')->limit(10000)->toString(),
-            'last_status_checked_at' => now(),
-        ]);
-
         return response()->json([
-            'cluster' => $this->freshSerializedCluster($cluster),
+            'status' => $status,
+            'output' => str($output !== '' ? $output : 'No output returned.')->limit(10000)->toString(),
+            'checkedAt' => now()->toJSON(),
         ]);
     }
 
@@ -462,12 +461,6 @@ class DashboardController extends Controller
             || $server->cluster_id !== $cluster->id
         ) {
             abort(404);
-        }
-
-        if ($server->last_bootstrapped_at !== null) {
-            return response()->json([
-                'message' => 'Only unbootstrapped servers can be deleted.',
-            ], 409);
         }
 
         $server->delete();
@@ -800,6 +793,7 @@ class DashboardController extends Controller
                 'builderEnabled' => $server->builder_enabled,
                 'builderCapacity' => $server->builder_capacity,
                 'builderCpuQuota' => $server->builder_cpu_quota,
+                'uuid' => $server->uuid,
                 'nodeAddress' => $server->node_address,
                 'wireguardListenPortOverride' => $server->wireguard_listen_port_override,
                 'wireguardEndpointOverride' => $server->wireguard_endpoint_override,
@@ -808,9 +802,10 @@ class DashboardController extends Controller
                 'containerSubnets' => $server->container_subnets ?? [],
                 'privateKeyName' => $server->privateKey?->name,
                 'lastBootstrappedAt' => $server->last_bootstrapped_at?->toJSON(),
-                'lastStatusCheck' => $server->last_status_check,
-                'lastStatusOutput' => $server->last_status_output,
-                'lastStatusCheckedAt' => $server->last_status_checked_at?->toJSON(),
+                'lastBootstrapAction' => $server->last_bootstrap_action,
+                'lastBootstrapStatus' => $server->last_bootstrap_status,
+                'lastBootstrapOutput' => $server->last_bootstrap_output,
+                'lastBootstrapRanAt' => $server->last_bootstrap_ran_at?->toJSON(),
             ])->all(),
         ];
     }
@@ -873,6 +868,28 @@ class DashboardController extends Controller
                 $fail('The :attribute must be a valid IPv4 CIDR range.');
             }
         };
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function builderCapacityRules(bool $builderEnabled, bool $required = false): array
+    {
+        return [
+            $required ? 'required' : 'sometimes',
+            'integer',
+            $builderEnabled ? 'min:1' : 'min:0',
+            'max:1000',
+        ];
+    }
+
+    private function requestedBuilderEnabled(Request $request, bool $default): bool
+    {
+        if (! $request->has('builder_enabled')) {
+            return $default;
+        }
+
+        return $request->boolean('builder_enabled');
     }
 
     /**

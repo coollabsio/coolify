@@ -29,6 +29,7 @@ VERSION="$(read_coolify_env COOLIFY_COOLD_VERSION nightly)"
 CORROSION_VERSION="$(read_coolify_env COOLIFY_CORROSION_VERSION v1.0.0)"
 FLUX_URL="$(read_coolify_env COOLIFY_COOLD_VM_FLUX_URL http://host.lima.internal:6443)"
 BUILDER_CAPACITY="$(read_coolify_env COOLIFY_COOLD_VM_BUILDER_CAPACITY 2)"
+START_TIMEOUT="$(read_coolify_env COOLIFY_COOLD_VM_START_TIMEOUT 300)"
 SSH_PORT="$(read_coolify_env COOLIFY_COOLD_VM_SSH_PORT 60002)"
 WG_IP="$(read_coolify_env COOLIFY_COOLD_VM_WG_IP "")"
 WG_PEER_IP="$(read_coolify_env COOLIFY_COOLD_VM_WG_PEER_IP "")"
@@ -70,6 +71,7 @@ Environment:
   COOLIFY_CORROSION_VERSION    corrosion release tag to install (default: v1.0.0)
   COOLIFY_COOLD_VM_FLUX_URL    Flux gRPC URL visible from the VM (default: http://host.lima.internal:6443)
   COOLIFY_COOLD_VM_BUILDER_CAPACITY VM builder capacity to advertise (default: 2; set 0 to disable)
+  COOLIFY_COOLD_VM_START_TIMEOUT Seconds to wait for Lima SSH/provisioning (default: 300)
   COOLIFY_COOLD_VM_SSH_PORT    Host SSH port forwarded to this VM (default: 60002)
   COOLIFY_COOLD_VM_WG_IP       Optional WireGuard mgmt IP for this host
   COOLIFY_COOLD_VM_CONTAINER_SUBNET Podman mesh subnet for this host
@@ -101,6 +103,60 @@ instance_running() {
 
 lima_shell() {
   (cd /tmp && limactl shell "$INSTANCE" -- "$@")
+}
+
+kill_matching_processes() {
+  local pattern="$1"
+  local pids
+
+  pids="$(pgrep -f "$pattern" 2>/dev/null || true)"
+  if [ -z "$pids" ]; then
+    return
+  fi
+
+  kill $pids >/dev/null 2>&1 || true
+  sleep 1
+  kill -9 $pids >/dev/null 2>&1 || true
+}
+
+cleanup_lima_probe_processes() {
+  kill_matching_processes "limactl shell ${INSTANCE} -- true"
+  kill_matching_processes "ssh .*ControlPath=.*${INSTANCE}/ssh.sock"
+  kill_matching_processes "ssh: .*/.lima/${INSTANCE}/ssh.sock"
+  rm -f "$HOME/.lima/${INSTANCE}/ssh.sock"
+}
+
+cleanup_lima_hostagent_processes() {
+  kill_matching_processes "limactl hostagent .*${INSTANCE}"
+  rm -f "$HOME/.lima/${INSTANCE}/ha.sock"
+}
+
+lima_shell_timeout() {
+  local timeout_seconds="$1"
+  shift
+  local pid
+  local elapsed=0
+
+  lima_shell "$@" &
+  pid="$!"
+
+  while kill -0 "$pid" >/dev/null 2>&1; do
+    if [ "$elapsed" -ge "$timeout_seconds" ]; then
+      pkill -P "$pid" >/dev/null 2>&1 || true
+      kill "$pid" >/dev/null 2>&1 || true
+      sleep 1
+      pkill -P "$pid" >/dev/null 2>&1 || true
+      kill -9 "$pid" >/dev/null 2>&1 || true
+      wait "$pid" >/dev/null 2>&1 || true
+      cleanup_lima_probe_processes
+      return 124
+    fi
+
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  wait "$pid"
 }
 
 vm_primary_ip() {
@@ -408,6 +464,9 @@ start_vm() {
     return
   fi
 
+  cleanup_lima_probe_processes
+  cleanup_lima_hostagent_processes
+
   if instance_exists; then
     limactl start --tty=false "$INSTANCE"
   else
@@ -432,7 +491,16 @@ wait_for_lima_start() {
   elapsed=0
 
   while kill -0 "$start_pid" 2>/dev/null; do
-    if instance_exists && lima_shell true >/dev/null 2>&1; then
+    if [ "$elapsed" -ge "$START_TIMEOUT" ]; then
+      echo "ERROR: Lima start timed out after ${START_TIMEOUT}s for ${INSTANCE}." >&2
+      kill "$start_pid" >/dev/null 2>&1 || true
+      sleep 2
+      kill -9 "$start_pid" >/dev/null 2>&1 || true
+      wait "$start_pid" >/dev/null 2>&1 || true
+      return 124
+    fi
+
+    if instance_exists && lima_shell_timeout 5 true >/dev/null 2>&1; then
       status="$(lima_shell cloud-init status 2>/dev/null || true)"
       printf '==> [%3ss] Lima start: guest SSH ready, cloud-init %s
 ' "$elapsed" "${status:-unknown}"
@@ -460,11 +528,18 @@ wait_for_lima_start() {
 
 wait_for_guest_provisioning() {
   echo "==> Waiting for guest SSH..."
-  until instance_exists && lima_shell true >/dev/null 2>&1; do
+  elapsed=0
+  until instance_exists && lima_shell_timeout 5 true >/dev/null 2>&1; do
+    if [ "$elapsed" -ge "$START_TIMEOUT" ]; then
+      echo "ERROR: Guest SSH timed out after ${START_TIMEOUT}s for ${INSTANCE}." >&2
+      return 124
+    fi
+
     message="$(latest_lima_message)"
     printf '==> Waiting for guest SSH: %s
 ' "${message:-booting}"
     sleep 5
+    elapsed=$((elapsed + 5))
   done
 
   status="$(lima_shell cloud-init status 2>/dev/null || true)"
@@ -477,6 +552,13 @@ wait_for_guest_provisioning() {
     tail_pid=$!
 
     while true; do
+      if [ "$elapsed" -ge "$START_TIMEOUT" ]; then
+        echo "ERROR: Guest provisioning timed out after ${START_TIMEOUT}s for ${INSTANCE}." >&2
+        kill "$tail_pid" >/dev/null 2>&1 || true
+        wait "$tail_pid" 2>/dev/null || true
+        return 124
+      fi
+
       status="$(lima_shell cloud-init status 2>/dev/null || true)"
       printf '==> Guest cloud-init: %s
 ' "${status:-unknown}"
@@ -486,6 +568,7 @@ wait_for_guest_provisioning() {
       fi
 
       sleep 5
+      elapsed=$((elapsed + 5))
     done
 
     kill "$tail_pid" >/dev/null 2>&1 || true

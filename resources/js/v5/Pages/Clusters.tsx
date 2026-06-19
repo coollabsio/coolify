@@ -1,9 +1,18 @@
 import { Head } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { DotsThreeIcon } from '@phosphor-icons/react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 
 import { AppNavbar } from '@/components/app-navbar';
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuGroup,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,6 +24,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { csrfToken } from '@/lib/csrf';
 import { usePendingIds } from '@/lib/use-pending-ids';
 import type { V5Cluster, V5DashboardProps, V5Server } from '@/types';
@@ -67,17 +77,48 @@ type UpdateServerResponse = {
 };
 
 type CheckServerResponse = {
-    cluster: V5Cluster;
+    status: string;
+    output: string;
+    checkedAt: string;
 };
 
 type DeleteServerResponse = {
     cluster: V5Cluster;
 };
 
+
 type BootstrapServerResponse = {
     cluster?: V5Cluster;
     message?: string;
 };
+
+type ServerSshCheck = {
+    status: string;
+    output: string;
+    checkedAt: string;
+};
+
+type V5ClusterUpdatedEvent = {
+    cluster: V5Cluster | null;
+};
+
+type EchoChannel = {
+    listen: (event: string, callback: (payload: unknown) => void) => EchoChannel;
+    subscribed?: (callback: () => void) => EchoChannel;
+    error?: (callback: (error: unknown) => void) => EchoChannel;
+};
+
+type EchoClient = {
+    private: (channel: string) => EchoChannel;
+    leave?: (channel: string) => void;
+    leaveChannel?: (channel: string) => void;
+};
+
+declare global {
+    interface Window {
+        Echo?: EchoClient;
+    }
+}
 
 const clusterDefaults = {
     wireguardInterface: 'wg0',
@@ -109,16 +150,9 @@ function formatDate(value: string | null): string {
     }).format(new Date(value));
 }
 
-function normalizeCapabilities(capabilities: string[]): string {
-    if (capabilities.length === 0) {
-        return 'No capabilities';
-    }
-
-    return capabilities.join(', ');
-}
-
 export default function Clusters({
     flux,
+    currentTeam = null,
     clusters = [],
     privateKeys = [],
     projects = [],
@@ -167,6 +201,8 @@ export default function Clusters({
     const [isServerSubmitting, setIsServerSubmitting] = useState(false);
     const [isServerUpdateSubmitting, setIsServerUpdateSubmitting] = useState(false);
     const checkingServers = usePendingIds<string>();
+    const [sshChecks, setSshChecks] = useState<Record<string, ServerSshCheck>>({});
+    const [visibleBootstrapLogs, setVisibleBootstrapLogs] = useState<Record<string, boolean>>({});
     const bootstrappingServers = usePendingIds<string>();
     const [bootstrapServerError, setBootstrapServerError] = useState<string | null>(null);
     const deletingServers = usePendingIds<string>();
@@ -185,6 +221,106 @@ export default function Clusters({
         () => clusterList.find((cluster) => cluster.id === selectedClusterId) ?? clusterList[0] ?? null,
         [clusterList, selectedClusterId],
     );
+
+    const notInitializedServers = selectedCluster?.servers.filter((server) => server.lastBootstrappedAt === null) ?? [];
+    const initializedServers = selectedCluster?.servers.filter((server) => server.lastBootstrappedAt !== null) ?? [];
+    const hasBootstrapInProgress =
+        selectedCluster?.servers.some((server) => ['queued', 'running'].includes(server.lastBootstrapStatus ?? '')) ?? false;
+
+    useEffect(() => {
+        if (!currentTeam) {
+            return;
+        }
+
+        let isCancelled = false;
+        let attempts = 0;
+        const channelName = `team.${currentTeam.id}`;
+
+        const interval = window.setInterval(() => {
+            attempts += 1;
+
+            if (!window.Echo) {
+                if (attempts === 1) {
+                    console.debug('Waiting for window.Echo before subscribing to cluster updates');
+                }
+
+                if (attempts >= 20) {
+                    window.clearInterval(interval);
+                }
+
+                return;
+            }
+
+            window.clearInterval(interval);
+
+            if (isCancelled) {
+                return;
+            }
+
+            const channel = window.Echo.private(channelName);
+
+            channel.subscribed?.(() => console.debug(`Subscribed to private-${channelName} for cluster updates`));
+            channel.error?.((error) => console.error(`Subscription error on private-${channelName}`, error));
+            channel.listen('.v5.cluster.updated', (payload) => {
+                const event = payload as V5ClusterUpdatedEvent;
+
+                if (!event.cluster) {
+                    return;
+                }
+
+                setClusterList((currentClusters) =>
+                    currentClusters.map((cluster) => (cluster.id === event.cluster?.id ? event.cluster : cluster)),
+                );
+            });
+        }, 500);
+
+        return () => {
+            isCancelled = true;
+            window.clearInterval(interval);
+            window.Echo?.leave?.(channelName) ?? window.Echo?.leaveChannel?.(`private-${channelName}`);
+        };
+    }, [currentTeam]);
+
+    useEffect(() => {
+        if (!selectedCluster || !hasBootstrapInProgress) {
+            return;
+        }
+
+        let isCancelled = false;
+
+        async function refreshCluster(): Promise<void> {
+            if (!selectedCluster) {
+                return;
+            }
+
+            const response = await fetch(`/v5/clusters/${selectedCluster.id}`, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                },
+            });
+
+            if (!response.ok || isCancelled) {
+                return;
+            }
+
+            const payload = (await response.json()) as { cluster?: V5Cluster };
+
+            if (payload.cluster) {
+                setClusterList((currentClusters) =>
+                    currentClusters.map((cluster) => (cluster.id === payload.cluster?.id ? payload.cluster : cluster)),
+                );
+            }
+        }
+
+        const interval = window.setInterval(() => void refreshCluster(), 3000);
+
+        return () => {
+            isCancelled = true;
+            window.clearInterval(interval);
+        };
+    }, [hasBootstrapInProgress, selectedCluster]);
 
     async function createCluster(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
@@ -393,10 +529,10 @@ export default function Clusters({
 
         if (response.ok) {
             const payload = (await response.json()) as CheckServerResponse;
-
-            setClusterList((currentClusters) =>
-                currentClusters.map((cluster) => (cluster.id === payload.cluster.id ? payload.cluster : cluster)),
-            );
+            setSshChecks((currentChecks) => ({
+                ...currentChecks,
+                [server.id]: payload,
+            }));
         }
 
         checkingServers.finish(server.id);
@@ -428,7 +564,7 @@ export default function Clusters({
         }
 
         if (!response.ok) {
-            setBootstrapServerError(payload.message ?? 'Unable to bootstrap this server. Check the CLI state output.');
+            setBootstrapServerError(payload.message ?? 'Unable to queue bootstrap for this server.');
         }
 
         bootstrappingServers.finish(server.id);
@@ -448,7 +584,7 @@ export default function Clusters({
     }
 
     function openDeleteServerDialog(server: V5Server): void {
-        if (!selectedCluster || server.lastBootstrappedAt !== null) {
+        if (!selectedCluster) {
             return;
         }
 
@@ -458,11 +594,7 @@ export default function Clusters({
         setIsDeleteDialogOpen(true);
     }
 
-    async function deleteUnbootstrappedServer(cluster: V5Cluster, server: V5Server): Promise<void> {
-        if (server.lastBootstrappedAt !== null) {
-            return;
-        }
-
+    async function deleteServer(cluster: V5Cluster, server: V5Server): Promise<void> {
         deletingServers.start(server.id);
 
         const response = await fetch(`/v5/clusters/${cluster.id}/servers/${server.id}`, {
@@ -548,7 +680,7 @@ export default function Clusters({
         }
 
         if (serverPendingDelete) {
-            await deleteUnbootstrappedServer(clusterPendingDelete, serverPendingDelete);
+            await deleteServer(clusterPendingDelete, serverPendingDelete);
 
             return;
         }
@@ -600,6 +732,168 @@ export default function Clusters({
         setEditServerErrors({});
     }
 
+
+    function renderServerCard(server: V5Server) {
+        const isCheckingServer = checkingServers.has(server.id);
+        const isBootstrapInProgress = ['queued', 'running'].includes(server.lastBootstrapStatus ?? '');
+        const isBootstrappingServer = bootstrappingServers.has(server.id) || isBootstrapInProgress;
+        const isDeletingServer = deletingServers.has(server.id);
+        const isServerInitialized = server.lastBootstrappedAt !== null;
+        const latestSshCheck = sshChecks[server.id] ?? null;
+        const hasBootstrapLogs = server.lastBootstrapOutput !== null && server.lastBootstrapOutput.trim() !== '';
+        const canShowBootstrapLogs = hasBootstrapLogs || isBootstrapInProgress;
+        const isBootstrapLogVisible =
+            isBootstrapInProgress || (canShowBootstrapLogs && (visibleBootstrapLogs[server.id] ?? false));
+
+        return (
+            <article key={server.id} className="rounded-lg border border-border bg-background p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                        <h4 className="break-words text-sm font-semibold text-foreground">{server.name}</h4>
+                        <p className="mt-1 break-all text-xs text-muted-foreground">{server.host}</p>
+                    </div>
+                    <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                        {!isServerInitialized ? (
+                            <div role="group" aria-label="Server initialization" className="inline-flex">
+                                <span className="inline-flex h-7 items-center rounded-l-md border border-r-0 border-destructive/30 bg-destructive/10 px-2 text-xs font-medium text-destructive">
+                                    Not initialized
+                                </span>
+                                <Button
+                                    type="button"
+                                    variant="coolify"
+                                    size="sm"
+                                    className="rounded-r-md"
+                                    disabled={isBootstrappingServer}
+                                    onClick={() => void bootstrapServer(server)}
+                                >
+                                    {isBootstrapInProgress
+                                        ? 'Bootstrapping...'
+                                        : isBootstrappingServer
+                                          ? 'Queueing...'
+                                          : 'Bootstrap'}
+                                </Button>
+                            </div>
+                        ) : null}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger
+                                render={
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        aria-label="Server actions"
+                                    />
+                                }
+                            >
+                                <DotsThreeIcon data-icon="inline-start" weight="bold" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuGroup>
+                                    <DropdownMenuItem
+                                        disabled={isCheckingServer}
+                                        onClick={() => void checkServer(server)}
+                                    >
+                                        {isCheckingServer ? 'Checking...' : 'Check connection'}
+                                    </DropdownMenuItem>
+                                    {canShowBootstrapLogs ? (
+                                        <DropdownMenuItem
+                                            disabled={isBootstrapInProgress}
+                                            onClick={() =>
+                                                setVisibleBootstrapLogs((currentLogs) => ({
+                                                    ...currentLogs,
+                                                    [server.id]: !isBootstrapLogVisible,
+                                                }))
+                                            }
+                                        >
+                                            {isBootstrapInProgress
+                                                ? 'Install logs shown'
+                                                : isBootstrapLogVisible
+                                                  ? 'Hide install logs'
+                                                  : 'Show install logs'}
+                                        </DropdownMenuItem>
+                                    ) : null}
+                                    <DropdownMenuItem onClick={() => openEditServerDialog(server)}>
+                                        Edit server
+                                    </DropdownMenuItem>
+                                </DropdownMenuGroup>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                    variant="destructive"
+                                    disabled={isDeletingServer}
+                                    onClick={() => openDeleteServerDialog(server)}
+                                >
+                                    {isDeletingServer ? 'Deleting...' : 'Delete server'}
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                </div>
+
+                <dl className="mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
+                    <div>
+                        <dt className="text-muted-foreground">Builder capacity</dt>
+                        <dd className="mt-1 break-words font-medium text-foreground">
+                            {server.builderEnabled ? server.builderCapacity : 'Disabled'}
+                        </dd>
+                    </div>
+                    {server.builderEnabled ? (
+                        <div>
+                            <dt className="text-muted-foreground">Builder CPU quota</dt>
+                            <dd className="mt-1 break-words font-medium text-foreground">{server.builderCpuQuota}</dd>
+                        </div>
+                    ) : null}
+                    <div>
+                        <dt className="text-muted-foreground">WireGuard IP</dt>
+                        <dd className="mt-1 break-words font-medium text-foreground">
+                            {server.wireguardManagementIp ?? 'Not assigned'}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt className="text-muted-foreground">Server IP</dt>
+                        <dd className="mt-1 break-words font-medium text-foreground">{server.host}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-muted-foreground">Private key</dt>
+                        <dd className="mt-1 break-words font-medium text-foreground">
+                            {server.privateKeyName ?? 'No key'}
+                        </dd>
+                    </div>
+                </dl>
+
+                {latestSshCheck ? (
+                    <div className="mt-4 rounded-md border border-border bg-muted/30 p-3 text-xs">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                            <span className="font-medium text-foreground">Latest SSH check: {latestSshCheck.status}</span>
+                            <span className="text-muted-foreground">{formatDate(latestSshCheck.checkedAt)}</span>
+                        </div>
+                        <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-background p-2 text-muted-foreground">
+                            {latestSshCheck.output}
+                        </pre>
+                    </div>
+                ) : null}
+
+                {isBootstrapLogVisible ? (
+                    <div className="mt-4 rounded-md border border-border bg-muted/30 p-3 text-xs">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                            <span className="font-medium text-foreground">
+                                Install logs
+                                {server.lastBootstrapStatus ? `: ${server.lastBootstrapStatus}` : ''}
+                            </span>
+                            <span className="text-muted-foreground">{formatDate(server.lastBootstrapRanAt)}</span>
+                        </div>
+                        {server.lastBootstrapOutput ? (
+                            <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-background p-2 text-muted-foreground">
+                                {server.lastBootstrapOutput}
+                            </pre>
+                        ) : (
+                            <p className="mt-2 text-muted-foreground">No install logs captured yet.</p>
+                        )}
+                    </div>
+                ) : null}
+            </article>
+        );
+    }
+
     return (
         <>
             <Head title="Clusters" />
@@ -614,56 +908,69 @@ export default function Clusters({
                 />
 
                 <main className="flex min-h-dvh overflow-visible px-4 pt-16 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-6">
-                    <section className="grid w-full grid-cols-1 gap-4 py-4 lg:min-h-0 lg:py-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
-                        <aside className="flex max-h-80 flex-col rounded-lg border border-border bg-card lg:max-h-none lg:min-h-0">
-                            <div className="flex items-start justify-between gap-3 border-b border-border p-4">
-                                <div>
+                    <section className="flex w-full flex-col gap-4 py-4 lg:min-h-0 lg:py-6">
+                        <div className="rounded-lg border border-border bg-card p-4">
+                            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                                <div className="min-w-0">
                                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                                         Clusters
                                     </p>
                                     <h1 className="mt-1 text-lg font-semibold text-foreground">Cluster inventory</h1>
                                 </div>
-                                <Button
-                                    type="button"
-                                    variant="coolify"
-                                    size="sm"
-                                    aria-label="Create cluster"
-                                    onClick={() => setIsCreateDialogOpen(true)}
-                                >
-                                    <span className="text-base leading-none">+</span>
-                                    Add cluster
-                                </Button>
-                            </div>
 
-                            <div className="min-h-0 flex-1 overflow-y-auto p-2">
-                                {clusterList.length === 0 ? (
-                                    <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-                                        No clusters yet. Create your first cluster to group servers.
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col gap-2">
-                                        {clusterList.map((cluster) => (
-                                            <button
-                                                key={cluster.id}
-                                                type="button"
-                                                onClick={() => setSelectedClusterId(cluster.id)}
-                                                className={`rounded-md border p-3 text-left transition-colors ${
-                                                    selectedCluster?.id === cluster.id
-                                                        ? 'border-warning bg-warning/10 text-foreground'
-                                                        : 'border-border bg-background hover:bg-muted/50'
-                                                }`}
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                    {clusterList.length === 0 ? (
+                                        <div className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+                                            No clusters yet.
+                                        </div>
+                                    ) : (
+                                        <Select
+                                            items={clusterList.map((cluster) => ({
+                                                label: cluster.name,
+                                                value: cluster.id,
+                                            }))}
+                                            value={selectedClusterId}
+                                            onValueChange={(value) => {
+                                                if (value !== null) {
+                                                    setSelectedClusterId(value);
+                                                }
+                                            }}
+                                        >
+                                            <SelectTrigger
+                                                aria-label="Select a cluster"
+                                                className="w-full sm:w-72"
                                             >
-                                                <span className="block text-sm font-medium">{cluster.name}</span>
-                                                <span className="mt-1 block text-xs text-muted-foreground">
-                                                    {cluster.serversCount}{' '}
-                                                    {cluster.serversCount === 1 ? 'server' : 'servers'}
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
+                                                <SelectValue placeholder="Select a cluster" />
+                                            </SelectTrigger>
+                                            <SelectContent position="popper" align="end" sideOffset={4}>
+                                                <SelectGroup>
+                                                    {clusterList.map((cluster) => (
+                                                        <SelectItem
+                                                            key={cluster.id}
+                                                            value={cluster.id}
+                                                        >
+                                                            {cluster.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectGroup>
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+
+                                    <Button
+                                        type="button"
+                                        variant="coolify"
+                                        size="default"
+                                        aria-label="Create cluster"
+                                        onClick={() => setIsCreateDialogOpen(true)}
+                                        className="sm:shrink-0"
+                                    >
+                                        <span className="text-base leading-none">+</span>
+                                        Add cluster
+                                    </Button>
+                                </div>
                             </div>
-                        </aside>
+                        </div>
 
                         <section className="overflow-visible rounded-lg border border-border bg-card lg:min-h-0 lg:overflow-y-auto">
                             {selectedCluster ? (
@@ -686,7 +993,7 @@ export default function Clusters({
                                                     <Button
                                                         type="button"
                                                         variant="delete"
-                                                        size="sm"
+                                                        size="default"
                                                         onClick={openDeleteClusterDialog}
                                                         disabled={isDeletingCluster}
                                                     >
@@ -803,7 +1110,6 @@ export default function Clusters({
                                             <Button
                                                 type="button"
                                                 variant="coolify"
-                                                size="sm"
                                                 aria-label="Add server to cluster"
                                                 onClick={() => {
                                                     setServerBuilderEnabled(selectedCluster.builderEnabled);
@@ -822,11 +1128,6 @@ export default function Clusters({
                                                 <p className="text-sm font-medium text-destructive">
                                                     {bootstrapServerError}
                                                 </p>
-                                                {selectedCluster.lastCliSummary ? (
-                                                    <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-background p-2 text-xs text-muted-foreground">
-                                                        {selectedCluster.lastCliSummary}
-                                                    </pre>
-                                                ) : null}
                                             </div>
                                         ) : null}
 
@@ -840,157 +1141,44 @@ export default function Clusters({
                                                 </p>
                                             </div>
                                         ) : (
-                                            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                                                {selectedCluster.servers.map((server) => {
-                                                    const isCheckingServer = checkingServers.has(server.id);
-                                                    const isBootstrappingServer = bootstrappingServers.has(server.id);
-                                                    const isDeletingServer = deletingServers.has(server.id);
-
-                                                    return (
-                                                        <article
-                                                            key={server.id}
-                                                        className="rounded-lg border border-border bg-background p-4"
-                                                    >
-                                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                                            <div className="min-w-0">
-                                                                <h4 className="break-words text-sm font-semibold text-foreground">
-                                                                    {server.name}
-                                                                </h4>
-                                                                <p className="mt-1 break-all text-xs text-muted-foreground">
-                                                                    {server.host}
-                                                                </p>
-                                                            </div>
-                                                            <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-                                                                <span className="rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
-                                                                    Bootstrap: {server.status}
-                                                                </span>
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    disabled={isCheckingServer}
-                                                                    onClick={() => void checkServer(server)}
-                                                                >
-                                                                    {isCheckingServer
-                                                                        ? 'Checking...'
-                                                                        : 'Check SSH'}
-                                                                </Button>
-                                                                {server.lastBootstrappedAt === null ? (
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        disabled={isBootstrappingServer}
-                                                                        onClick={() => void bootstrapServer(server)}
-                                                                    >
-                                                                        {isBootstrappingServer
-                                                                            ? 'Bootstrapping...'
-                                                                            : 'Bootstrap'}
-                                                                    </Button>
-                                                                ) : null}
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => openEditServerDialog(server)}
-                                                                >
-                                                                    Edit server
-                                                                </Button>
-                                                                {server.lastBootstrappedAt === null ? (
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="delete"
-                                                                        size="sm"
-                                                                        disabled={isDeletingServer}
-                                                                        onClick={() => openDeleteServerDialog(server)}
-                                                                    >
-                                                                        {isDeletingServer
-                                                                            ? 'Deleting...'
-                                                                            : 'Delete'}
-                                                                    </Button>
-                                                                ) : null}
-                                                            </div>
+                                            <div className="flex flex-col gap-6">
+                                                {notInitializedServers.length > 0 ? (
+                                                    <section aria-labelledby="not-initialized-servers-heading">
+                                                        <div className="mb-3">
+                                                            <h4
+                                                                id="not-initialized-servers-heading"
+                                                                className="text-sm font-semibold text-foreground"
+                                                            >
+                                                                Not initialized servers
+                                                            </h4>
+                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                                Bootstrap these servers before using them for workloads.
+                                                            </p>
                                                         </div>
-
-                                                        <dl className="mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
-                                                            <div>
-                                                                <dt className="text-muted-foreground">
-                                                                    Builder capacity
-                                                                </dt>
-                                                                <dd className="mt-1 break-words font-medium text-foreground">
-                                                                    {server.builderEnabled
-                                                                        ? server.builderCapacity
-                                                                        : 'Disabled'}
-                                                                </dd>
-                                                            </div>
-                                                            <div>
-                                                                <dt className="text-muted-foreground">
-                                                                    Builder CPU quota
-                                                                </dt>
-                                                                <dd className="mt-1 break-words font-medium text-foreground">
-                                                                    {server.builderCpuQuota}
-                                                                </dd>
-                                                            </div>
-                                                            <div>
-                                                                <dt className="text-muted-foreground">WireGuard IP</dt>
-                                                                <dd className="mt-1 break-words font-medium text-foreground">
-                                                                    {server.wireguardManagementIp ?? 'Not assigned'}
-                                                                </dd>
-                                                            </div>
-                                                            <div>
-                                                                <dt className="text-muted-foreground">CLI node</dt>
-                                                                <dd className="mt-1 break-words font-medium text-foreground">
-                                                                    {server.nodeAddress ?? server.host}
-                                                                </dd>
-                                                            </div>
-                                                            <div>
-                                                                <dt className="text-muted-foreground">Private key</dt>
-                                                                <dd className="mt-1 break-words font-medium text-foreground">
-                                                                    {server.privateKeyName ?? 'No key'}
-                                                                </dd>
-                                                            </div>
-                                                            <div>
-                                                                <dt className="text-muted-foreground">
-                                                                    Last bootstrap
-                                                                </dt>
-                                                                <dd className="mt-1 break-words font-medium text-foreground">
-                                                                    {formatDate(server.lastBootstrappedAt)}
-                                                                </dd>
-                                                            </div>
-                                                        </dl>
-
-                                                        <p className="mt-4 text-xs text-muted-foreground">
-                                                            Capabilities: {normalizeCapabilities(server.capabilities)}
-                                                        </p>
-
-                                                        <div className="mt-4 rounded-md border border-border bg-muted/30 p-3 text-xs">
-                                                            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                                                <span className="font-medium text-foreground">
-                                                                    Latest SSH check
-                                                                    {server.lastStatusCheck
-                                                                        ? `: ${server.lastStatusCheck}`
-                                                                        : ''}
-                                                                </span>
-                                                                <span className="text-muted-foreground">
-                                                                    {server.lastStatusCheckedAt
-                                                                        ? formatDate(server.lastStatusCheckedAt)
-                                                                        : 'Never run'}
-                                                                </span>
-                                                            </div>
-                                                            {server.lastStatusOutput ? (
-                                                                <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-background p-2 text-muted-foreground">
-                                                                    {server.lastStatusOutput}
-                                                                </pre>
-                                                            ) : (
-                                                                <p className="mt-2 text-muted-foreground">
-                                                                    Run Check SSH to verify connectivity and capture
-                                                                    diagnostic output.
-                                                                </p>
-                                                            )}
+                                                        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                                                            {notInitializedServers.map(renderServerCard)}
                                                         </div>
-                                                        </article>
-                                                    );
-                                                })}
+                                                    </section>
+                                                ) : null}
+
+                                                {initializedServers.length > 0 ? (
+                                                    <section aria-labelledby="initialized-servers-heading">
+                                                        <div className="mb-3">
+                                                            <h4
+                                                                id="initialized-servers-heading"
+                                                                className="text-sm font-semibold text-foreground"
+                                                            >
+                                                                Servers
+                                                            </h4>
+                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                                Initialized servers currently assigned to this cluster.
+                                                            </p>
+                                                        </div>
+                                                        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                                                            {initializedServers.map(renderServerCard)}
+                                                        </div>
+                                                    </section>
+                                                ) : null}
                                             </div>
                                         )}
                                     </div>
@@ -1023,7 +1211,7 @@ export default function Clusters({
                                     <DialogTitle>Confirm deletion</DialogTitle>
                                     <DialogDescription>
                                         {serverPendingDelete
-                                            ? `Delete unbootstrapped server ${serverPendingDelete.name}? This only removes it from this cluster.`
+                                            ? `Delete server ${serverPendingDelete.name}? This removes it from this cluster inventory so you can add it again later.`
                                             : `Delete cluster ${clusterPendingDelete?.name ?? ''}? This cannot be undone.`}
                                     </DialogDescription>
                                 </DialogHeader>
@@ -1088,10 +1276,10 @@ export default function Clusters({
                                         <FieldError message={errors.description?.[0]} />
                                     </Field>
 
-                                    <div className="rounded-lg border border-border bg-muted/20">
+                                    <div className="rounded-lg border border-border bg-muted/20 transition-colors focus-within:border-ring">
                                         <button
                                             type="button"
-                                            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-medium text-foreground"
+                                            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-medium text-foreground outline-none"
                                             onClick={() => setShowAdvancedConfiguration((value) => !value)}
                                         >
                                             <span>Advanced configuration</span>
@@ -1361,7 +1549,7 @@ export default function Clusters({
                                         <select
                                             value={selectedPrivateKeyId}
                                             onChange={(event) => setSelectedPrivateKeyId(event.target.value)}
-                                            className="appearance-none rounded-md border border-border bg-background bg-[length:1rem_1rem] bg-[position:right_0.75rem_center] bg-no-repeat px-3 py-2 pr-10 text-sm outline-none transition focus:border-ring focus:ring-1 focus:ring-ring aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
+                                            className="appearance-none rounded-md border border-border bg-background bg-[length:1rem_1rem] bg-[position:right_0.75rem_center] bg-no-repeat px-3 py-2 pr-10 text-sm outline-none transition focus:border-ring focus:ring-0 aria-invalid:border-destructive aria-invalid:ring-0 dark:aria-invalid:border-destructive/50"
                                             aria-invalid={serverErrors.private_key_id ? true : undefined}
                                             style={{
                                                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 256 256' fill='none' stroke='%23ffffff' stroke-width='28' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m64 96 64 64 64-64'/%3E%3C/svg%3E")`,
@@ -1377,10 +1565,10 @@ export default function Clusters({
                                         <FieldError message={serverErrors.private_key_id?.[0]} />
                                     </Field>
 
-                                    <div className="rounded-lg border border-border bg-muted/20">
+                                    <div className="rounded-lg border border-border bg-muted/20 transition-colors focus-within:border-ring">
                                         <button
                                             type="button"
-                                            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-medium text-foreground"
+                                            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-medium text-foreground outline-none"
                                             onClick={() => setShowAdvancedServerConfiguration((value) => !value)}
                                         >
                                             <span>Advanced server configuration</span>
@@ -1392,11 +1580,11 @@ export default function Clusters({
                                         {showAdvancedServerConfiguration ? (
                                             <div className="grid grid-cols-1 gap-4 border-t border-border p-4 sm:grid-cols-2">
                                                 <Field>
-                                                    <FieldLabel>CLI node address</FieldLabel>
+                                                    <FieldLabel>Node address override</FieldLabel>
                                                     <Input
                                                         value={serverNodeAddress}
                                                         onChange={(event) => setServerNodeAddress(event.target.value)}
-                                                        placeholder="Defaults to host"
+                                                        placeholder="Defaults to server IP"
                                                         aria-invalid={serverErrors.node_address ? true : undefined}
                                                     />
                                                     <FieldError message={serverErrors.node_address?.[0]} />

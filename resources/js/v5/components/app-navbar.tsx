@@ -26,8 +26,6 @@ function persistSelection(projectUuid: string, environmentUuid: string): void {
 type AppNavbarProps = V5DashboardProps;
 
 export function AppNavbar({
-    flux,
-    clusters = [],
     projects = [],
     selectedProjectUuid = null,
     selectedEnvironmentUuid = null,
@@ -86,7 +84,7 @@ export function AppNavbar({
                     className="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     aria-label="Coolify dashboard"
                 >
-                    <img src="/coolify-logo.svg" alt="Coolify" className="size-8" />
+                    <img src="/coolify-logo.svg" alt="Coolify" className="size-6" />
                 </Link>
 
                 <div className="absolute left-1/2 flex min-w-0 -translate-x-1/2 items-center justify-center gap-1 md:static md:flex-1 md:translate-x-0 md:justify-start md:gap-2">
@@ -140,13 +138,6 @@ export function AppNavbar({
                     >
                         Clusters
                     </Link>
-
-                    <div
-                        className="hidden rounded-md border border-border bg-muted/40 px-3 py-1 text-xs text-muted-foreground lg:block"
-                        title={flux?.socket ?? flux?.message ?? undefined}
-                    >
-                        Flux: {flux?.label ?? 'Unknown'} · {clusters.length} clusters
-                    </div>
 
                     <Sheet>
                         <SheetTrigger

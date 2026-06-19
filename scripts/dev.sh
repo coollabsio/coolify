@@ -258,6 +258,14 @@ coolify_ssh_user() {
   read_coolify_env COOLIFY_CLI_SSH_USER "$USER"
 }
 
+coolify_bootstrap_concurrency() {
+  read_coolify_env COOLIFY_COOLD_BOOTSTRAP_CONCURRENCY 1
+}
+
+coolify_bootstrap_ssh_timeout() {
+  read_coolify_env COOLIFY_COOLD_BOOTSTRAP_SSH_TIMEOUT 90s
+}
+
 coolify_bootstrap_command() {
   local nodes
   local ssh_config
@@ -275,6 +283,9 @@ $(coolify_cli_bin) init bootstrap \\
   --nodes "${nodes}" \\
   --ssh-config "${ssh_config}" \\
   --ssh-user "$(coolify_ssh_user)" \\
+  --concurrency "$(coolify_bootstrap_concurrency)" \\
+  --ssh-timeout "$(coolify_bootstrap_ssh_timeout)" \\
+  --debug \\
   --wg-listen-port-overrides "${listen_overrides}" \\
   --wg-endpoint-overrides "${endpoint_overrides}" \\
   --coold-version "$(read_coolify_env COOLIFY_COOLD_VERSION nightly)" \\
@@ -299,11 +310,43 @@ coolify_bootstrap() {
     --nodes "$nodes" \
     --ssh-config "$ssh_config" \
     --ssh-user "$(coolify_ssh_user)" \
+    --concurrency "$(coolify_bootstrap_concurrency)" \
+    --ssh-timeout "$(coolify_bootstrap_ssh_timeout)" \
+    --debug \
     --wg-listen-port-overrides "$listen_overrides" \
     --wg-endpoint-overrides "$endpoint_overrides" \
     --coold-version "$(read_coolify_env COOLIFY_COOLD_VERSION nightly)" \
     --corrosion-version "$(read_coolify_env COOLIFY_CORROSION_VERSION v1.0.0)" \
     --yes
+}
+
+diagnose_coold_bootstrap_failure() {
+  local count
+  local instance
+  count="$(coold_vm_count)"
+
+  echo "==> Bootstrap failed; collecting quick VM diagnostics..." >&2
+  for index in $(seq 1 "$count"); do
+    instance="$(coold_vm_instance "$index")"
+    echo "--- ${instance}: diagnostics ---" >&2
+    run_with_timeout 45 env COOLIFY_COOLD_LIMA_INSTANCE="$instance" scripts/coold-vm.sh shell <<'SH' >&2 || true
+set +e
+echo '[cloud-init]'
+cloud-init status 2>/dev/null || true
+echo '[systemd]'
+systemctl is-system-running 2>/dev/null || true
+echo '[apt/dpkg locks]'
+for lock in /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock; do
+  fuser "$lock" 2>/dev/null && echo "busy: $lock" || true
+done
+echo '[failed units]'
+systemctl --failed --no-pager 2>/dev/null || true
+echo '[coolify services]'
+systemctl --no-pager --full status wg-quick@wg0 podman.socket corrosion coold 2>/dev/null | tail -n 120 || true
+echo '[disk]'
+df -h / /var 2>/dev/null || true
+SH
+  done
 }
 
 coolify_bootstrap_with_retry() {
@@ -314,6 +357,8 @@ coolify_bootstrap_with_retry() {
     if coolify_bootstrap; then
       return
     fi
+
+    diagnose_coold_bootstrap_failure
 
     if [ "$attempt" = "$attempts" ]; then
       return 1
@@ -377,6 +422,32 @@ coold_vm() {
   COOLIFY_COOLD_VM_CONTAINER_SUBNET="$(coold_vm_container_subnet "$index")" \
   COOLIFY_COOLD_VM_CONTAINER_GATEWAY="$(coold_vm_container_gateway "$index")" \
     scripts/coold-vm.sh "$@"
+}
+
+coold_vm_up_with_retry() {
+  local index="$1"
+  local attempt
+  local attempts=2
+  local instance
+
+  instance="$(coold_vm_instance "$index")"
+
+  for attempt in $(seq 1 "$attempts"); do
+    if coold_vm "$index" up; then
+      return
+    fi
+
+    if [ "$attempt" = "$attempts" ]; then
+      echo "ERROR: ${instance} did not become ready after ${attempts} attempts." >&2
+      return 1
+    fi
+
+    echo "WARN: ${instance} did not become ready; deleting and retrying with a fresh Lima instance..." >&2
+    limactl stop --force --tty=false "$instance" >/dev/null 2>&1 || true
+    cleanup_lima_instance_processes "$instance"
+    limactl delete --force --tty=false "$instance" >/dev/null 2>&1 || true
+    cleanup_lima_instance_processes "$instance"
+  done
 }
 
 mint_host_jwt_for_host() {
@@ -525,7 +596,7 @@ up() {
   if [ "$coold_vm_enabled" != "false" ]; then
     echo "==> Starting ${count} Coolify coold VM(s) before Spin..."
     for index in $(seq 1 "$count"); do
-      coold_vm "$index" up
+      coold_vm_up_with_retry "$index"
     done
   else
     echo "==> COOLIFY_COOLD_VM_ENABLED=false; skipping coold VM."
@@ -610,6 +681,29 @@ down() {
   fi
 }
 
+kill_matching_processes() {
+  local pattern="$1"
+  local pids
+
+  pids="$(pgrep -f "$pattern" 2>/dev/null || true)"
+  if [ -z "$pids" ]; then
+    return
+  fi
+
+  kill $pids >/dev/null 2>&1 || true
+  sleep 1
+  kill -9 $pids >/dev/null 2>&1 || true
+}
+
+cleanup_lima_instance_processes() {
+  local instance="$1"
+
+  kill_matching_processes "limactl hostagent .*${instance}"
+  kill_matching_processes "ssh: .*/.lima/${instance}/ssh.sock"
+  kill_matching_processes "ssh .*ControlPath=.*${instance}/ssh.sock"
+  rm -f "$HOME/.lima/${instance}/ssh.sock" "$HOME/.lima/${instance}/ha.sock"
+}
+
 clean_vms() {
   local count
   count="$(coold_vm_count)"
@@ -619,11 +713,13 @@ clean_vms() {
     instance="$(coold_vm_instance "$index")"
     echo "==> Deleting ${instance}..."
     limactl stop --force --tty=false "$instance" >/dev/null 2>&1 || true
+    cleanup_lima_instance_processes "$instance"
     if ! run_with_timeout 60 limactl delete --force --tty=false "$instance"; then
       echo "WARN: limactl delete timed out for ${instance}; killing matching limactl clients." >&2
       pkill -f "limactl.*${instance}" >/dev/null 2>&1 || true
       rm -rf "$HOME/.lima/${instance}"
     fi
+    cleanup_lima_instance_processes "$instance"
   done
 }
 
@@ -1088,12 +1184,74 @@ firewall() {
   esac
 }
 
+
+refresh_test_host_key() {
+  echo "==> Refreshing /tmp/testhostkey inside coolify..."
+  spin exec -T coolify php artisan tinker --execute='file_put_contents("/tmp/testhostkey", \App\Models\PrivateKey::query()->where("name", "Testing Host Key")->sole()->private_key); chmod("/tmp/testhostkey", 0600);'
+}
+
+recreate_naked_lima_vm() {
+  local instance="${1:-coolify-naked-test}"
+  local config="${2:-.dev/lima/coolify-naked-test.yaml}"
+  local attempt
+  local attempts=2
+  local start_timeout
+
+  start_timeout="$(read_coolify_env COOLIFY_NAKED_VM_START_TIMEOUT "$(read_coolify_env COOLIFY_COOLD_VM_START_TIMEOUT 300)")"
+
+  if [ ! -f "$config" ]; then
+    echo "ERROR: naked Lima config not found: ${config}" >&2
+    exit 1
+  fi
+
+  echo "==> Recreating naked Lima VM: ${instance}..."
+  for attempt in $(seq 1 "$attempts"); do
+    limactl stop --force --tty=false "$instance" >/dev/null 2>&1 || true
+    cleanup_lima_instance_processes "$instance"
+    limactl delete --force --tty=false "$instance" >/dev/null 2>&1 || true
+    cleanup_lima_instance_processes "$instance"
+
+    if run_with_timeout "$start_timeout" limactl start --tty=false --name="$instance" "$config"; then
+      return
+    fi
+
+    echo "WARN: ${instance} did not become ready on attempt ${attempt}/${attempts}; deleting and retrying..." >&2
+  done
+
+  echo "ERROR: ${instance} did not become ready after ${attempts} attempts." >&2
+  return 1
+}
+
+fresh() {
+  echo "==> Recreating coold Lima VMs and Coolify dev stack..."
+  down --cleanup
+  COOLIFY_DEV_FOLLOW_LOGS=false up
+
+  echo "==> Refreshing Coolify database with seed data..."
+  spin exec -T coolify php artisan migrate:fresh --seed --force
+
+  if [ "$(read_coolify_env COOLIFY_COOLD_VM_ENABLED true)" != "false" ]; then
+    echo "==> Re-syncing seeded v5 Lima servers after DB refresh..."
+    sync_v5_dev_lima_servers
+  fi
+
+  recreate_naked_lima_vm
+  refresh_test_host_key
+
+  echo "==> Restarting Horizon so workers use the latest code..."
+  spin exec -T coolify php artisan horizon:terminate || true
+
+  echo "==> Fresh dev environment is ready."
+  limactl list | grep -E 'NAME|coold-dev|coolify-naked-test' || true
+}
+
 usage() {
   cat <<'USAGE'
 Usage: scripts/dev.sh <command> [spin args]
 
 Commands:
   up      Start the coold VM, Spin stack, and dev coold agent
+  fresh   Recreate coold/naked Lima VMs, refresh DB, seed, sync v5 dev servers
   up --naked
           Start the coold VM(s) and Spin stack only; skip host bootstrap so /v5 can bootstrap
   down    Stop the dev coold agent and Spin stack
@@ -1102,6 +1260,7 @@ Commands:
   shell [n] Open a shell inside coold VM n (default: 1)
   list      Show Lima instances
   clean-vms Delete the coold Lima VMs and all VM-local runtime state (alias for down --cleanup)
+  naked-vm Recreate the naked Lima VM used for bootstrap testing
   corrosion <command> Inspect Corrosion state, config, logs, and registered containers
   firewall <command>  Manage dev coold firewall allow rules
   example-nginx <command> Start/check example nginx containers with coold DNS
@@ -1121,6 +1280,9 @@ case "$cmd" in
   down)
     down "$@"
     ;;
+  fresh)
+    fresh
+    ;;
   shell)
     coold_vm "${1:-1}" shell
     ;;
@@ -1129,6 +1291,9 @@ case "$cmd" in
     ;;
   clean-vms|clean-vm|reset-vms)
     down --cleanup
+    ;;
+  naked-vm)
+    recreate_naked_lima_vm
     ;;
   corrosion)
     corrosion "$@"

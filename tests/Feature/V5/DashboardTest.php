@@ -1,11 +1,14 @@
 <?php
 
+use App\Events\V5ClusterUpdated;
+use App\Events\V5RealtimeTestEvent;
 use App\Http\Controllers\V5\DashboardController;
 use App\Http\Kernel;
 use App\Http\Middleware\CheckForcePasswordReset;
 use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Http\Middleware\V5\EnsureCurrentTeam;
 use App\Http\Middleware\V5\HandleInertiaRequests;
+use App\Jobs\V5BootstrapServerJob;
 use App\Models\Environment;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -15,15 +18,19 @@ use App\Models\V5\Cluster;
 use App\Models\V5\Server as V5Server;
 use App\Services\Flux\FluxHealth;
 use Database\Seeders\V5DevLimaSeeder;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Mockery\MockInterface;
 
 beforeEach(function () {
     Config::set('app.maintenance.store', 'array');
+    Config::set('broadcasting.default', 'log');
     Config::set('cache.default', 'array');
 
     Schema::dropIfExists('v5_servers');
@@ -39,6 +46,7 @@ it('registers the v5 dashboard route', function () {
         ->and(Route::has('v5.home'))->toBeFalse()
         ->and(Route::has('v5.selection.update'))->toBeTrue()
         ->and(Route::has('v5.clusters.index'))->toBeTrue()
+        ->and(Route::has('v5.clusters.show'))->toBeTrue()
         ->and(Route::has('v5.clusters.store'))->toBeTrue()
         ->and(Route::has('v5.clusters.destroy'))->toBeTrue()
         ->and(Route::has('v5.clusters.servers.store'))->toBeTrue()
@@ -46,6 +54,8 @@ it('registers the v5 dashboard route', function () {
         ->and(Route::has('v5.clusters.servers.check'))->toBeTrue()
         ->and(Route::has('v5.clusters.servers.bootstrap'))->toBeTrue()
         ->and(Route::has('v5.clusters.servers.destroy'))->toBeTrue()
+        ->and(Route::has('v5.realtime-test'))->toBeTrue()
+        ->and(Route::has('v5.realtime-test.broadcast'))->toBeTrue()
         ->and(Route::has('v5.coolify.version'))->toBeFalse()
         ->and(Route::has('v5.coolify.bootstrap'))->toBeFalse();
 });
@@ -82,12 +92,6 @@ it('creates v5 cluster tables and lets each server belong to one cluster', funct
 
     $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
     $serverMigration->up();
-
-    $configurationMigration = include database_path('migrations/2026_06_16_204644_v5_add_wireguard_cli_configuration_to_clusters_and_servers.php');
-    $configurationMigration->up();
-
-    $statusCheckMigration = include database_path('migrations/2026_06_17_172845_add_status_check_fields_to_v5_servers_table.php');
-    $statusCheckMigration->up();
 
     expect(Schema::hasTable('v5_clusters'))->toBeTrue()
         ->and(Schema::hasColumns('v5_clusters', [
@@ -134,12 +138,6 @@ it('creates v5 server tables in the shared database', function () {
     $migration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
     $migration->up();
 
-    $configurationMigration = include database_path('migrations/2026_06_16_204644_v5_add_wireguard_cli_configuration_to_clusters_and_servers.php');
-    $configurationMigration->up();
-
-    $statusCheckMigration = include database_path('migrations/2026_06_17_172845_add_status_check_fields_to_v5_servers_table.php');
-    $statusCheckMigration->up();
-
     expect(Schema::hasTable('v5_servers'))->toBeTrue()
         ->and(Schema::hasColumns('v5_servers', [
             'id',
@@ -159,10 +157,15 @@ it('creates v5 server tables in the shared database', function () {
             'node_address',
             'wireguard_listen_port_override',
             'wireguard_endpoint_override',
+            'uuid',
             'wireguard_management_ip',
             'wireguard_public_key',
             'container_subnets',
             'last_bootstrapped_at',
+            'last_bootstrap_action',
+            'last_bootstrap_status',
+            'last_bootstrap_output',
+            'last_bootstrap_ran_at',
             'last_status_check',
             'last_status_output',
             'last_status_checked_at',
@@ -171,24 +174,27 @@ it('creates v5 server tables in the shared database', function () {
         ]))->toBeTrue();
 });
 
-it('adds builder cpu quota to existing v5 server tables safely', function () {
+it('keeps v5 server fields in the initial migration', function () {
+    createSharedUserAndTeamTables();
+
     Schema::dropIfExists('v5_servers');
+    Schema::dropIfExists('v5_clusters');
 
-    Schema::create('v5_servers', function ($table) {
-        $table->id();
-        $table->unsignedInteger('builder_capacity')->default(0);
-    });
+    $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
+    $clusterMigration->up();
 
-    $migration = include database_path('migrations/2026_06_17_165112_v5_add_builder_cpu_quota_to_servers_table.php');
-    $migration->up();
-    $migration->up();
+    $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
+    $serverMigration->up();
 
-    expect(Schema::hasColumn('v5_servers', 'builder_cpu_quota'))->toBeTrue();
-
-    $migration->down();
-    $migration->down();
-
-    expect(Schema::hasColumn('v5_servers', 'builder_cpu_quota'))->toBeFalse();
+    expect(Schema::hasColumns('v5_servers', [
+        'uuid',
+        'builder_cpu_quota',
+        'node_address',
+        'wireguard_management_ip',
+        'container_subnets',
+        'last_bootstrap_output',
+        'last_status_output',
+    ]))->toBeTrue();
 });
 
 it('includes v5 tables in the dev testing schema', function () {
@@ -207,14 +213,18 @@ it('includes v5 tables in the dev testing schema', function () {
         ->and($schema)->toContain('"builder_timeout_secs" INTEGER NOT NULL DEFAULT \'1800\'')
         ->and($schema)->toContain('"private_key_id" INTEGER')
         ->and($schema)->toContain('"builder_cpu_quota" TEXT DEFAULT \'200%\' NOT NULL')
+        ->and($schema)->toContain('"uuid" TEXT')
         ->and($schema)->toContain('"wireguard_management_ip" TEXT')
         ->and($schema)->toContain('"container_subnets" JSON')
+        ->and($schema)->toContain('"last_bootstrap_output" TEXT')
         ->and($schema)->toContain('"last_status_output" TEXT')
         ->and($schema)->toContain('2026_06_16_130650_v5_create_servers_table')
         ->and($schema)->toContain('2026_06_16_130649_v5_create_clusters_table')
-        ->and($schema)->toContain('2026_06_16_204644_v5_add_wireguard_cli_configuration_to_clusters_and_servers')
-        ->and($schema)->toContain('2026_06_17_165112_v5_add_builder_cpu_quota_to_servers_table')
-        ->and($schema)->toContain('2026_06_17_172845_add_status_check_fields_to_v5_servers_table')
+        ->and($schema)->not->toContain('2026_06_16_204644_v5_add_wireguard_cli_configuration_to_clusters_and_servers')
+        ->and($schema)->not->toContain('2026_06_17_165112_v5_add_builder_cpu_quota_to_servers_table')
+        ->and($schema)->not->toContain('2026_06_17_172845_add_status_check_fields_to_v5_servers_table')
+        ->and($schema)->not->toContain('2026_06_19_064539_add_bootstrap_log_fields_to_v5_servers_table')
+        ->and($schema)->not->toContain('2026_06_19_090217_add_uuid_to_v5_servers_table')
         ->and($schema)->not->toContain('2026_06_16_131229_add_cluster_id_to_v5_servers_table')
         ->and($schema)->not->toContain('2026_06_16_132000_make_v5_server_private_key_nullable')
         ->and($schema)->not->toContain('v5_hosts');
@@ -254,6 +264,9 @@ it('serves the v5 inertia shell', function () {
         ->assertSee('<html lang="en" class="dark">', false)
         ->assertSee('coolify-logo-dev-transparent.png', false)
         ->assertDontSee('coolify-logo.svg', false)
+        ->assertSee('js/echo.js', false)
+        ->assertSee('js/pusher.js', false)
+        ->assertSee('window.Echo', false)
         ->assertSee('v5-app', false)
         ->assertSee('Dashboard', false)
         ->assertDontSee('Home', false)
@@ -271,10 +284,149 @@ it('serves the v5 inertia shell', function () {
         ->assertDontSee('100.64.0.1')
         ->assertDontSee('Current team')
         ->assertDontSee('Your teams')
-        ->assertDontSee('currentTeam', false)
+        ->assertSee('currentTeam', false)
         ->assertDontSee('teams', false)
         ->assertDontSee('V5 Shared Team')
         ->assertDontSee('Shared team details');
+});
+
+it('broadcasts v5 cluster updates when bootstrap state changes', function () {
+    createSharedUserAndTeamTables();
+    Config::set('coold.coolify_cli_bin', '/tmp/coolify');
+
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'added',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+    ]);
+
+    Queue::fake();
+    Event::fake([V5ClusterUpdated::class]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/bootstrap")
+        ->assertAccepted();
+
+    Event::assertDispatched(V5ClusterUpdated::class, fn ($event): bool => $event->clusterId === $cluster->id
+        && $event->teamId === $team->id);
+
+    Process::fake([
+        '*' => Process::result(output: "Bootstrap completed\n"),
+    ]);
+
+    Event::fake([V5ClusterUpdated::class]);
+
+    (new V5BootstrapServerJob($cluster->id, $server->id))->handle();
+
+    expect(Event::dispatched(V5ClusterUpdated::class)->count())->toBeGreaterThanOrEqual(2);
+});
+
+it('returns fresh v5 cluster bootstrap state for realtime fallback refreshes', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'added',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+        'last_bootstrap_action' => 'bootstrap',
+        'last_bootstrap_status' => 'running',
+        'last_bootstrap_output' => 'Starting Coolify CLI bootstrap for prod-01...',
+        'last_bootstrap_ran_at' => now(),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->getJson("/v5/clusters/{$cluster->id}")
+        ->assertSuccessful()
+        ->assertJsonPath('cluster.id', (string) $cluster->id)
+        ->assertJsonPath('cluster.servers.0.id', (string) $server->id)
+        ->assertJsonPath('cluster.servers.0.lastBootstrapStatus', 'running')
+        ->assertJsonPath('cluster.servers.0.lastBootstrapOutput', 'Starting Coolify CLI bootstrap for prod-01...');
+});
+
+it('broadcasts v5 cluster updates immediately with an explicit echo event name', function () {
+    $clustersPage = file_get_contents(resource_path('js/v5/Pages/Clusters.tsx'));
+    $event = new V5ClusterUpdated(1, 1);
+
+    expect($event)->toBeInstanceOf(ShouldBroadcastNow::class)
+        ->and($event->broadcastAs())->toBe('v5.cluster.updated')
+        ->and($clustersPage)->toContain("listen('.v5.cluster.updated'")
+        ->and($clustersPage)->toContain('Waiting for window.Echo before subscribing to cluster updates');
+});
+
+it('serves a v5 realtime test page for manual websocket diagnostics', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $page = file_get_contents(resource_path('js/v5/Pages/RealtimeTest.tsx'));
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->get('/v5/realtime-test')
+        ->assertSuccessful()
+        ->assertSee('RealtimeTest', false)
+        ->assertSee((string) $team->id, false);
+
+    expect($page)
+        ->toContain("listen('.v5.realtime.test'")
+        ->toContain('Subscribing to private-')
+        ->toContain('Broadcast event');
+});
+
+it('broadcasts manual v5 realtime test events immediately', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+
+    Event::fake([V5RealtimeTestEvent::class]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson('/v5/realtime-test', [
+            'message' => 'hello socket',
+        ])
+        ->assertAccepted()
+        ->assertJsonPath('message', 'Realtime test event broadcasted.');
+
+    Event::assertDispatched(V5RealtimeTestEvent::class, fn (V5RealtimeTestEvent $event): bool => $event->teamId === $team->id
+        && $event->message === 'hello socket'
+        && $event->broadcastAs() === 'v5.realtime.test'
+        && $event instanceof ShouldBroadcastNow);
 });
 
 it('serves the production v5 favicon outside local environments', function () {
@@ -476,6 +628,23 @@ it('validates advanced v5 cluster cli configuration', function () {
         ]);
 });
 
+it('requires positive v5 cluster builder capacity when builders are enabled', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson('/v5/clusters', [
+            'name' => 'Zero Builder Mesh',
+            'builder_enabled' => true,
+            'builder_capacity' => 0,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['builder_capacity']);
+});
+
 it('adds a v5 server to a cluster for the current team', function () {
     createSharedUserAndTeamTables();
 
@@ -504,6 +673,8 @@ it('adds a v5 server to a cluster for the current team', function () {
             'builder_capacity' => 3,
             'wireguard_listen_port_override' => 51821,
             'wireguard_endpoint_override' => 'prod-01.example.com:51821',
+            'coold_version' => 'v9.9.9',
+            'corrosion_version' => 'v8.8.8',
         ])
         ->assertCreated()
         ->assertJsonPath('cluster.serversCount', 1)
@@ -511,7 +682,10 @@ it('adds a v5 server to a cluster for the current team', function () {
         ->assertJsonPath('cluster.servers.0.host', '203.0.113.10')
         ->assertJsonMissingPath('cluster.servers.0.sshUser')
         ->assertJsonMissingPath('cluster.servers.0.sshPort')
+        ->assertJsonMissingPath('cluster.servers.0.cooldVersion')
+        ->assertJsonMissingPath('cluster.servers.0.corrosionVersion')
         ->assertJsonPath('cluster.servers.0.privateKeyName', 'Production SSH Key')
+        ->assertJsonPath('cluster.servers.0.status', 'added')
         ->assertJsonPath('cluster.servers.0.nodeAddress', '203.0.113.10')
         ->assertJsonPath('cluster.servers.0.builderEnabled', true)
         ->assertJsonPath('cluster.servers.0.builderCapacity', 3)
@@ -536,6 +710,72 @@ it('adds a v5 server to a cluster for the current team', function () {
 
     expect(V5Server::query()->where('name', 'prod-01')->first()->capabilities)
         ->toBe(['coold', 'builder']);
+});
+
+it('keeps added v5 server builder capacity when builder is disabled', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+        'builder_enabled' => true,
+        'builder_capacity' => 3,
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson("/v5/clusters/{$cluster->id}/servers", [
+            'name' => 'prod-01',
+            'host' => '203.0.113.10',
+            'ssh_user' => 'root',
+            'ssh_port' => 22,
+            'private_key_id' => $privateKey->id,
+            'builder_enabled' => false,
+            'builder_capacity' => 3,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('cluster.servers.0.builderEnabled', false)
+        ->assertJsonPath('cluster.servers.0.builderCapacity', 3)
+        ->assertJsonPath('cluster.servers.0.capabilities', ['coold']);
+
+    $server = V5Server::query()->where('name', 'prod-01')->first();
+
+    expect($server->builder_enabled)->toBeFalse()
+        ->and($server->builder_capacity)->toBe(3)
+        ->and($server->capabilities)->toBe(['coold']);
+});
+
+it('requires positive v5 server builder capacity when builder is enabled', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson("/v5/clusters/{$cluster->id}/servers", [
+            'name' => 'prod-01',
+            'host' => '203.0.113.10',
+            'ssh_user' => 'root',
+            'ssh_port' => 22,
+            'private_key_id' => $privateKey->id,
+            'builder_enabled' => true,
+            'builder_capacity' => 0,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['builder_capacity']);
 });
 
 it('defaults dev Lima wireguard overrides for host docker internal servers', function () {
@@ -659,7 +899,7 @@ it('rejects private keys from another team when adding a v5 server', function ()
         ->assertJsonValidationErrors(['private_key_id']);
 });
 
-it('checks v5 server ssh status and stores diagnostic output', function () {
+it('checks v5 server ssh status without storing diagnostic output', function () {
     createSharedUserAndTeamTables();
 
     [$user, $team] = createV5UserWithTeam();
@@ -679,7 +919,7 @@ it('checks v5 server ssh status and stores diagnostic output', function () {
         'host' => '203.0.113.10',
         'ssh_user' => 'root',
         'ssh_port' => 22,
-        'status' => 'pending',
+        'status' => 'added',
         'builder_enabled' => false,
         'builder_capacity' => 0,
     ]);
@@ -693,19 +933,19 @@ it('checks v5 server ssh status and stores diagnostic output', function () {
         ->withSession(['currentTeam' => $team])
         ->postJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/check")
         ->assertSuccessful()
-        ->assertJsonPath('cluster.servers.0.status', 'pending')
-        ->assertJsonPath('cluster.servers.0.lastStatusCheck', 'reachable')
-        ->assertJsonPath('cluster.servers.0.lastStatusOutput', "SSH connection OK\nprod-01\nLinux aarch64\n/usr/bin/docker");
+        ->assertJsonPath('status', 'reachable')
+        ->assertJsonPath('output', "SSH connection OK\nprod-01\nLinux aarch64\n/usr/bin/docker")
+        ->assertJsonPath('checkedAt', fn (?string $value) => $value !== null);
 
     Process::assertRan(fn ($process) => str_contains(json_encode($process->command), '203.0.113.10'));
     Process::assertRan(fn ($process) => in_array('LogLevel=ERROR', $process->command, true));
 
     $server->refresh();
 
-    expect($server->status)->toBe('pending')
-        ->and($server->last_status_check)->toBe('reachable')
-        ->and($server->last_status_output)->toContain('SSH connection OK')
-        ->and($server->last_status_checked_at)->not->toBeNull();
+    expect($server->status)->toBe('added')
+        ->and($server->last_status_check)->toBeNull()
+        ->and($server->last_status_output)->toBeNull()
+        ->and($server->last_status_checked_at)->toBeNull();
 });
 
 it('writes quiet ssh options for v5 bootstrap ssh config', function () {
@@ -790,7 +1030,7 @@ it('bootstraps a single v5 server with the Coolify CLI', function () {
         'host' => '203.0.113.10',
         'ssh_user' => 'root',
         'ssh_port' => 2222,
-        'status' => 'pending',
+        'status' => 'added',
         'capabilities' => ['builder'],
         'builder_enabled' => true,
         'builder_capacity' => 4,
@@ -798,50 +1038,59 @@ it('bootstraps a single v5 server with the Coolify CLI', function () {
         'wireguard_endpoint_override' => 'prod-01.example.com:51831',
     ]);
 
-    Process::fake([
-        '*' => Process::result(output: "Bootstrap completed\n"),
-    ]);
+    Queue::fake();
 
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
         ->postJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/bootstrap")
-        ->assertSuccessful()
-        ->assertJsonPath('cluster.lastCliAction', 'bootstrap')
-        ->assertJsonPath('cluster.lastCliStatus', 'succeeded')
-        ->assertJsonPath('cluster.lastCliSummary', 'Bootstrap completed')
-        ->assertJsonPath('cluster.servers.0.status', 'installed')
-        ->assertJsonPath('cluster.servers.0.capabilities', ['builder', 'coold'])
-        ->assertJsonPath('cluster.servers.0.lastBootstrappedAt', fn (?string $value) => $value !== null);
+        ->assertAccepted()
+        ->assertJsonPath('message', 'Bootstrap queued.')
+        ->assertJsonPath('cluster.servers.0.status', 'added')
+        ->assertJsonPath('cluster.servers.0.lastBootstrapAction', 'bootstrap')
+        ->assertJsonPath('cluster.servers.0.lastBootstrapStatus', 'queued')
+        ->assertJsonPath('cluster.servers.0.lastBootstrapOutput', 'Queued Coolify bootstrap for prod-01.');
 
-    Process::assertRan(function ($process) use ($server): bool {
+    Queue::assertPushed(V5BootstrapServerJob::class);
+
+    Process::fake([
+        '*' => Process::result(output: "Bootstrap completed\n"),
+    ]);
+
+    Event::fake([V5ClusterUpdated::class]);
+
+    (new V5BootstrapServerJob($cluster->id, $server->id))->handle();
+
+    $server->refresh();
+
+    Process::assertRan(function ($process): bool {
         $command = $process->command;
-        $node = "v5-server-{$server->id}";
+        $node = cliFlagValue($command, '--nodes');
 
         return $command[0] === '/tmp/coolify'
             && in_array('init', $command, true)
             && in_array('bootstrap', $command, true)
-            && in_array($node, $command, true)
             && in_array('--ssh-config', $command, true)
-            && in_array('default,preview', $command, true)
-            && in_array('10.211.0.0/16', $command, true)
-            && in_array('100.65.0.0/16', $command, true)
-            && in_array('wg-prod', $command, true)
-            && in_array('v0.2.0', $command, true)
-            && in_array('v1.1.0', $command, true)
-            && in_array("{$node}=51831", $command, true)
-            && in_array("{$node}=prod-01.example.com:51831", $command, true)
+            && is_string($node)
+            && str_starts_with($node, 'v5-server-')
+            && cliFlagValue($command, '--namespaces') === 'default,preview'
+            && cliFlagValue($command, '--container-pool') === '10.211.0.0/16'
+            && cliFlagValue($command, '--wg-mgmt-pool') === '100.65.0.0/16'
+            && cliFlagValue($command, '--wg-interface') === 'wg-prod'
+            && cliFlagValue($command, '--coold-version') === 'v0.2.0'
+            && cliFlagValue($command, '--corrosion-version') === 'v1.1.0'
+            && cliFlagValue($command, '--wg-listen-port-overrides') === $node.'=51831'
+            && cliFlagValue($command, '--wg-endpoint-overrides') === $node.'=prod-01.example.com:51831'
             && in_array('--enable-builder', $command, true)
             && in_array('--yes', $command, true)
             && ! in_array('--new-nodes', $command, true);
     });
 
     $cluster->refresh();
-    $server->refresh();
 
-    expect($cluster->last_cli_status)->toBe('succeeded')
-        ->and($cluster->last_cli_summary)->toBe('Bootstrap completed')
-        ->and($server->status)->toBe('installed')
+    expect($server->status)->toBe('installed')
+        ->and($server->last_bootstrap_status)->toBe('succeeded')
+        ->and($server->last_bootstrap_output)->toBe('Bootstrap completed')
         ->and($server->last_bootstrapped_at)->not->toBeNull();
 });
 
@@ -866,25 +1115,31 @@ it('does not run a macOS development Coolify CLI binary from Docker during v5 se
         'host' => '203.0.113.10',
         'ssh_user' => 'root',
         'ssh_port' => 22,
-        'status' => 'pending',
+        'status' => 'added',
         'builder_enabled' => false,
         'builder_capacity' => 0,
     ]);
 
-    Process::fake([
-        '*' => Process::result(output: "Bootstrap completed\n"),
-    ]);
+    Queue::fake();
 
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
         ->postJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/bootstrap")
-        ->assertSuccessful();
+        ->assertAccepted();
+
+    Process::fake([
+        '*' => Process::result(output: "Bootstrap completed\n"),
+    ]);
+
+    Event::fake([V5ClusterUpdated::class]);
+
+    (new V5BootstrapServerJob($cluster->id, $server->id))->handle();
 
     Process::assertRan(fn ($process): bool => $process->command[0] === '/usr/local/bin/coolify');
 });
 
-it('keeps a v5 server pending when Coolify CLI bootstrap fails', function () {
+it('keeps a v5 server added when Coolify CLI bootstrap fails', function () {
     createSharedUserAndTeamTables();
     Config::set('coold.coolify_cli_bin', '/tmp/coolify');
 
@@ -905,30 +1160,35 @@ it('keeps a v5 server pending when Coolify CLI bootstrap fails', function () {
         'host' => '203.0.113.10',
         'ssh_user' => 'root',
         'ssh_port' => 22,
-        'status' => 'pending',
+        'status' => 'added',
         'builder_enabled' => false,
         'builder_capacity' => 0,
     ]);
 
-    Process::fake([
-        '*' => Process::result(errorOutput: "bootstrap failed\n", exitCode: 1),
-    ]);
+    Queue::fake();
 
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
         ->postJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/bootstrap")
-        ->assertServerError()
-        ->assertJsonPath('message', 'bootstrap failed')
-        ->assertJsonPath('cluster.lastCliAction', 'bootstrap')
-        ->assertJsonPath('cluster.lastCliStatus', 'failed')
-        ->assertJsonPath('cluster.lastCliSummary', 'bootstrap failed')
-        ->assertJsonPath('cluster.servers.0.status', 'pending')
-        ->assertJsonPath('cluster.servers.0.lastBootstrappedAt', null);
+        ->assertAccepted()
+        ->assertJsonPath('cluster.servers.0.status', 'added')
+        ->assertJsonPath('cluster.servers.0.lastBootstrappedAt', null)
+        ->assertJsonPath('cluster.servers.0.lastBootstrapStatus', 'queued');
+
+    Process::fake([
+        '*' => Process::result(errorOutput: "bootstrap failed\n", exitCode: 1),
+    ]);
+
+    Event::fake([V5ClusterUpdated::class]);
+
+    (new V5BootstrapServerJob($cluster->id, $server->id))->handle();
 
     $server->refresh();
 
-    expect($server->status)->toBe('pending')
+    expect($server->status)->toBe('added')
+        ->and($server->last_bootstrap_status)->toBe('failed')
+        ->and($server->last_bootstrap_output)->toBe('bootstrap failed')
         ->and($server->last_bootstrapped_at)->toBeNull();
 });
 
@@ -944,6 +1204,8 @@ it('extends a v5 cluster when bootstrapping a new server', function () {
         'created_by_user_id' => $user->id,
         'name' => 'Production Mesh',
         'description' => null,
+        'coold_version' => 'v0.3.0',
+        'corrosion_version' => 'v1.2.0',
     ]);
     $oldServer = V5Server::query()->create([
         'team_id' => $team->id,
@@ -968,36 +1230,41 @@ it('extends a v5 cluster when bootstrapping a new server', function () {
         'host' => '203.0.113.11',
         'ssh_user' => 'root',
         'ssh_port' => 22,
-        'status' => 'pending',
+        'status' => 'added',
         'builder_enabled' => false,
         'builder_capacity' => 0,
     ]);
 
-    Process::fake([
-        '*' => Process::result(output: "Extend completed\n"),
-    ]);
+    Queue::fake();
 
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
         ->postJson("/v5/clusters/{$cluster->id}/servers/{$newServer->id}/bootstrap")
-        ->assertSuccessful()
-        ->assertJsonPath('cluster.lastCliAction', 'extend')
-        ->assertJsonPath('cluster.lastCliStatus', 'succeeded')
-        ->assertJsonPath('cluster.lastCliSummary', 'Extend completed')
-        ->assertJsonPath('cluster.servers.0.status', 'installed')
-        ->assertJsonPath('cluster.servers.1.status', 'installed');
+        ->assertAccepted()
+        ->assertJsonPath('cluster.servers.1.lastBootstrapAction', 'extend')
+        ->assertJsonPath('cluster.servers.1.lastBootstrapStatus', 'queued');
+
+    Process::fake([
+        '*' => Process::result(output: "Extend completed\n"),
+    ]);
+
+    Event::fake([V5ClusterUpdated::class]);
+
+    (new V5BootstrapServerJob($cluster->id, $newServer->id))->handle();
 
     Process::assertRan(function ($process) use ($oldServer, $newServer): bool {
         $command = $process->command;
-        $oldNode = "v5-server-{$oldServer->id}";
-        $newNode = "v5-server-{$newServer->id}";
+        $oldNode = "v5-server-{$oldServer->uuid}";
+        $newNode = "v5-server-{$newServer->uuid}";
 
         return in_array('extend', $command, true)
             && in_array("{$oldNode},{$newNode}", $command, true)
             && in_array('--new-nodes', $command, true)
             && in_array($newNode, $command, true)
-            && in_array('--ssh-config', $command, true);
+            && in_array('--ssh-config', $command, true)
+            && cliFlagValue($command, '--coold-version') === 'v0.3.0'
+            && cliFlagValue($command, '--corrosion-version') === 'v1.2.0';
     });
 
     $oldServer->refresh();
@@ -1005,7 +1272,110 @@ it('extends a v5 cluster when bootstrapping a new server', function () {
 
     expect($oldServer->status)->toBe('installed')
         ->and($newServer->status)->toBe('installed')
+        ->and($newServer->last_bootstrap_status)->toBe('succeeded')
+        ->and($newServer->last_bootstrap_output)->toBe('Extend completed')
         ->and($newServer->last_bootstrapped_at)->not->toBeNull();
+});
+
+it('adopts a re-added v5 server that is already bootstrapped for the same cluster', function () {
+    createSharedUserAndTeamTables();
+    Config::set('coold.coolify_cli_bin', '/tmp/coolify');
+
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'added',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+    ]);
+
+    Process::fake([
+        '*' => Process::result(output: json_encode([
+            'cluster_id' => $cluster->id,
+            'server_uuid' => 'server-previous-uuid',
+            'wireguard_management_ip' => '100.64.0.10',
+            'wireguard_public_key' => 'public-key',
+            'container_subnets' => ['default' => '10.210.0.0/24'],
+        ], JSON_THROW_ON_ERROR)."\n"),
+    ]);
+
+    Event::fake([V5ClusterUpdated::class]);
+
+    (new V5BootstrapServerJob($cluster->id, $server->id))->handle();
+
+    Process::assertNotRan(fn ($process): bool => $process->command[0] === '/tmp/coolify');
+
+    $server->refresh();
+
+    expect($server->status)->toBe('installed')
+        ->and($server->uuid)->toBe('server-previous-uuid')
+        ->and($server->wireguard_management_ip)->toBe('100.64.0.10')
+        ->and($server->wireguard_public_key)->toBe('public-key')
+        ->and($server->container_subnets)->toBe(['default' => '10.210.0.0/24'])
+        ->and($server->last_bootstrap_status)->toBe('succeeded')
+        ->and($server->last_bootstrap_output)->toBe('Adopted existing Coolify bootstrap state for this cluster.')
+        ->and($server->last_bootstrapped_at)->not->toBeNull();
+});
+
+it('blocks bootstrapping a v5 server that belongs to another cluster', function () {
+    createSharedUserAndTeamTables();
+    Config::set('coold.coolify_cli_bin', '/tmp/coolify');
+
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'added',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+    ]);
+
+    Process::fake([
+        '*' => Process::result(output: json_encode([
+            'cluster_id' => $cluster->id + 100,
+            'server_uuid' => 'server-other-uuid',
+        ], JSON_THROW_ON_ERROR)."\n"),
+    ]);
+
+    Event::fake([V5ClusterUpdated::class]);
+
+    (new V5BootstrapServerJob($cluster->id, $server->id))->handle();
+
+    Process::assertNotRan(fn ($process): bool => $process->command[0] === '/tmp/coolify');
+
+    $server->refresh();
+
+    expect($server->status)->toBe('added')
+        ->and($server->last_bootstrap_status)->toBe('failed')
+        ->and($server->last_bootstrap_output)->toContain('already bootstrapped for another cluster')
+        ->and($server->last_bootstrapped_at)->toBeNull();
 });
 
 it('deletes an unbootstrapped v5 server from a cluster', function () {
@@ -1026,7 +1396,7 @@ it('deletes an unbootstrapped v5 server from a cluster', function () {
         'host' => '203.0.113.10',
         'ssh_user' => 'root',
         'ssh_port' => 22,
-        'status' => 'pending',
+        'status' => 'added',
         'builder_enabled' => false,
         'builder_capacity' => 0,
     ]);
@@ -1042,7 +1412,7 @@ it('deletes an unbootstrapped v5 server from a cluster', function () {
     expect(V5Server::query()->whereKey($server->id)->exists())->toBeFalse();
 });
 
-it('does not delete a bootstrapped v5 server', function () {
+it('deletes a bootstrapped v5 server from a cluster', function () {
     createSharedUserAndTeamTables();
 
     [$user, $team] = createV5UserWithTeam();
@@ -1070,10 +1440,11 @@ it('does not delete a bootstrapped v5 server', function () {
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
         ->deleteJson("/v5/clusters/{$cluster->id}/servers/{$server->id}")
-        ->assertConflict()
-        ->assertJsonPath('message', 'Only unbootstrapped servers can be deleted.');
+        ->assertSuccessful()
+        ->assertJsonPath('cluster.serversCount', 0)
+        ->assertJsonPath('cluster.servers', []);
 
-    expect(V5Server::query()->whereKey($server->id)->exists())->toBeTrue();
+    expect(V5Server::query()->whereKey($server->id)->exists())->toBeFalse();
 });
 
 it('updates editable v5 server builder details without changing networking', function () {
@@ -1140,6 +1511,51 @@ it('updates editable v5 server builder details without changing networking', fun
         ->and($server->wireguard_endpoint_override)->toBe('prod-01.example.com:51821');
 });
 
+it('keeps editable v5 server builder capacity when disabling builder', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold', 'builder'],
+        'builder_enabled' => true,
+        'builder_capacity' => 5,
+        'builder_cpu_quota' => '350%',
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->patchJson("/v5/clusters/{$cluster->id}/servers/{$server->id}", [
+            'builder_enabled' => false,
+            'builder_capacity' => 5,
+            'builder_cpu_quota' => '350%',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('cluster.servers.0.builderEnabled', false)
+        ->assertJsonPath('cluster.servers.0.builderCapacity', 5);
+
+    $server->refresh();
+
+    expect($server->builder_enabled)->toBeFalse()
+        ->and($server->builder_capacity)->toBe(5)
+        ->and($server->builder_cpu_quota)->toBe('350%')
+        ->and($server->capabilities)->toBe(['coold']);
+});
+
 it('validates editable v5 server builder details', function () {
     createSharedUserAndTeamTables();
 
@@ -1175,6 +1591,43 @@ it('validates editable v5 server builder details', function () {
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['builder_capacity', 'builder_cpu_quota']);
+});
+
+it('requires positive editable v5 server builder capacity when builder is enabled', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+        'builder_cpu_quota' => '200%',
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->patchJson("/v5/clusters/{$cluster->id}/servers/{$server->id}", [
+            'builder_enabled' => true,
+            'builder_capacity' => 0,
+            'builder_cpu_quota' => '200%',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['builder_capacity']);
 });
 
 it('validates v5 cluster creation input', function () {
@@ -1578,16 +2031,25 @@ it('defines the v5 cluster management page and create cluster form', function ()
 
     expect(file_exists($clustersPagePath))->toBeTrue();
 
+    preg_match('/<Button\s+type="button"\s+variant="coolify"\s+aria-label="Add server to cluster"/m', $clustersPage, $addServerButtonMatches);
+
+    expect($addServerButtonMatches)->not->toBeEmpty();
+
     expect($clustersPage)
         ->toContain("import { Button } from '@/components/ui/button';")
         ->toContain("} from '@/components/ui/dialog';")
+        ->toContain("} from '@/components/ui/dropdown-menu';")
+        ->toContain("import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';")
         ->toContain("import { csrfToken } from '@/lib/csrf';")
         ->toContain("fetch('/v5/clusters'")
+        ->toContain('aria-label="Select a cluster"')
+        ->toContain('Select a cluster')
+        ->toContain('setSelectedClusterId(value)')
         ->toContain('aria-label="Create cluster"')
         ->toContain('setIsCreateDialogOpen(true)')
         ->toContain('Add cluster')
         ->toContain('variant="coolify"')
-        ->toContain('border-warning bg-warning/10 text-foreground')
+        ->not->toContain('border-warning bg-warning/10 text-foreground')
         ->not->toContain('border-primary bg-primary/10 text-foreground')
         ->toContain('<Dialog')
         ->toContain('<DialogTitle>Create cluster</DialogTitle>')
@@ -1608,9 +2070,11 @@ it('defines the v5 cluster management page and create cluster form', function ()
         ->not->toContain('DialogContent className="max-h-[90dvh] max-w-3xl overflow-y-auto"')
         ->not->toContain('DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto"')
         ->toContain('fetch(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/bootstrap`')
+        ->toContain('fetch(`/v5/clusters/${selectedCluster.id}`')
+        ->toContain('hasBootstrapInProgress')
         ->toContain('Bootstrap')
-        ->toContain('lastCliSummary')
-        ->toContain('Unable to bootstrap this server. Check the CLI state output.')
+        ->toContain('lastBootstrapOutput')
+        ->toContain('Unable to queue bootstrap for this server.')
         ->toContain('border-destructive/30')
         ->toContain('fetch(`/v5/clusters/${selectedCluster.id}/servers`')
         ->toContain('fetch(`/v5/clusters/${selectedCluster.id}/servers/${editingServer.id}`')
@@ -1618,10 +2082,43 @@ it('defines the v5 cluster management page and create cluster form', function ()
         ->toContain('fetch(`/v5/clusters/${cluster.id}/servers/${server.id}`')
         ->toContain("method: 'PATCH'")
         ->toContain("method: 'DELETE'")
-        ->toContain('Check SSH')
-        ->toContain('Bootstrap: {server.status}')
-        ->toContain('Latest SSH check')
-        ->toContain('Delete')
+        ->toContain('<DropdownMenu>')
+        ->toContain('<DropdownMenuTrigger')
+        ->toContain("import { DotsThreeIcon } from '@phosphor-icons/react';")
+        ->toContain('variant="ghost"')
+        ->toContain('size="icon-sm"')
+        ->toContain('aria-label="Server actions"')
+        ->toContain('<DotsThreeIcon data-icon="inline-start" weight="bold" />')
+        ->not->toContain('>Server actions</DropdownMenuTrigger>')
+        ->toContain('<DropdownMenuGroup>')
+        ->toContain('<DropdownMenuSeparator />')
+        ->toContain('Check connection')
+        ->not->toContain('Check SSH')
+        ->toContain('Not initialized')
+        ->toContain('role="group"')
+        ->toContain('aria-label="Server initialization"')
+        ->toContain('rounded-l-md border border-r-0 border-destructive/30 bg-destructive/10')
+        ->toContain('variant="coolify"')
+        ->toContain('className="rounded-r-md"')
+        ->toContain('onClick={() => void bootstrapServer(server)}')
+        ->not->toContain('<DropdownMenuItem
+                                                                                    disabled={isBootstrappingServer}')
+        ->not->toContain('Bootstrap: {serverStatusLabel(server.status)}')
+        ->not->toContain('Last bootstrap')
+        ->not->toContain('{formatDate(server.lastBootstrappedAt)}')
+        ->toContain('Latest SSH check: {latestSshCheck.status}')
+        ->toContain('const notInitializedServers = selectedCluster?.servers.filter((server) => server.lastBootstrappedAt === null) ?? []')
+        ->toContain('const initializedServers = selectedCluster?.servers.filter((server) => server.lastBootstrappedAt !== null) ?? []')
+        ->toContain('Not initialized servers')
+        ->toContain('{notInitializedServers.map(renderServerCard)}')
+        ->toContain('{initializedServers.map(renderServerCard)}')
+        ->toContain('{!isServerInitialized ? (')
+        ->toContain('Show install logs')
+        ->toContain('{canShowBootstrapLogs ? (')
+        ->not->toContain('{!isServerInitialized && isBootstrapLogVisible ? (')
+        ->toContain('Delete server')
+        ->toContain('This removes it from this cluster inventory so you can add it again later.')
+        ->not->toContain('<Button\n                                                                    type="button"\n                                                                    variant="outline"\n                                                                    size="sm"\n                                                                    disabled={isCheckingServer}')
         ->toContain('<DialogTitle>Edit server</DialogTitle>')
         ->toContain('Edit server')
         ->toContain('Save server')
@@ -1632,6 +2129,9 @@ it('defines the v5 cluster management page and create cluster form', function ()
         ->toContain('Bootstrap SSH port')
         ->not->toContain('{server.sshUser}@{server.host}:{server.sshPort}')
         ->toContain('showAdvancedServerConfiguration')
+        ->toContain('Node address override')
+        ->toContain('Defaults to server IP')
+        ->not->toContain('CLI node address')
         ->toContain('wireguardListenPortOverride')
         ->toContain('wireguardEndpointOverride')
         ->toContain('privateKeys')
@@ -1645,9 +2145,19 @@ it('defines the v5 cluster management page and create cluster form', function ()
         ->toContain('Cluster details')
         ->toContain('Servers in this cluster')
         ->toContain('selectedCluster')
+        ->toContain('Server IP')
+        ->toContain('{server.host}')
+        ->not->toContain('<dt className="text-muted-foreground">CLI node</dt>')
+        ->not->toContain('CLI node')
+        ->not->toContain('{server.nodeAddress ?? server.host}')
         ->toContain('builderCapacity')
+        ->toContain('{server.builderEnabled ? (')
+        ->toContain('<dt className="text-muted-foreground">Builder CPU quota</dt>')
+        ->toContain('server.builderCpuQuota')
+        ->toContain(') : null}')
         ->toContain('privateKeyName')
         ->toContain('lastBootstrappedAt')
+        ->toContain('This removes it from this cluster inventory so you can add it again later.')
         ->toContain('deleteCluster')
         ->toContain('fetch(`/v5/clusters/${cluster.id}`')
         ->toContain("method: 'DELETE'")
@@ -1656,17 +2166,21 @@ it('defines the v5 cluster management page and create cluster form', function ()
         ->toContain('Only empty clusters can be deleted.')
         ->toContain('min-h-dvh overflow-y-auto bg-background text-foreground lg:h-dvh lg:overflow-hidden')
         ->toContain('flex min-h-dvh overflow-visible px-4 pt-16 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-6')
-        ->toContain('flex max-h-80 flex-col rounded-lg border border-border bg-card lg:max-h-none lg:min-h-0')
+        ->toContain('flex w-full flex-col gap-4 py-4 lg:min-h-0 lg:py-6')
+        ->toContain('rounded-lg border border-border bg-card p-4')
+        ->toContain('aria-label="Select a cluster"')
+        ->toContain('setSelectedClusterId(value)')
+        ->not->toContain('flex max-h-80 flex-col rounded-lg border border-border bg-card lg:max-h-none lg:min-h-0')
         ->toContain('overflow-visible rounded-lg border border-border bg-card lg:min-h-0 lg:overflow-y-auto')
         ->toContain('flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end')
         ->toContain('mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2')
-        ->toContain('lg:grid-cols-[20rem_minmax(0,1fr)]')
+        ->not->toContain('lg:grid-cols-[20rem_minmax(0,1fr)]')
         ->not->toContain('lg:grid-cols-[20rem_minmax(0,1fr)_22rem]')
         ->not->toContain('New cluster')
         ->not->toContain('<aside className="rounded-lg border border-border bg-card p-5">')
         ->not->toContain('This is where the magic happens.');
 
-    expect(substr_count($clustersPage, 'variant="coolify"'))->toBe(5)
+    expect(substr_count($clustersPage, 'variant="coolify"'))->toBe(6)
         ->and($buttonComponent)
         ->toContain('coolify:')
         ->toContain('bg-coollabs-50')
@@ -1686,7 +2200,8 @@ it('defines the v5 cluster management page and create cluster form', function ()
         ->toContain('aria-label="Close dialog"')
         ->toContain('<XIcon />')
         ->toContain('DialogTitle')
-        ->toContain('DialogDescription');
+        ->toContain('DialogDescription')
+        ->toContain("'mt-6 flex justify-end gap-2'");
 
     $v5Css = file_get_contents(resource_path('css/v5/app.css'));
 
@@ -1705,7 +2220,17 @@ it('defines the v5 cluster management page and create cluster form', function ()
         ->toContain('builderCapacity: number;')
         ->toContain('builderCpuQuota: string;')
         ->toContain('privateKeyName: string | null;')
-        ->toContain('lastBootstrappedAt: string | null;');
+        ->toContain('lastBootstrappedAt: string | null;')
+        ->toContain('lastBootstrapStatus: string | null;')
+        ->not->toContain('lastStatusOutput: string | null;');
+});
+
+it('uses the standard button size for the v5 delete cluster action', function () {
+    $clustersPage = file_get_contents(resource_path('js/v5/Pages/Clusters.tsx'));
+
+    expect($clustersPage)
+        ->toContain("variant=\"delete\"\n                                                        size=\"default\"\n                                                        onClick={openDeleteClusterDialog}")
+        ->not->toContain("variant=\"delete\"\n                                                        size=\"sm\"\n                                                        onClick={openDeleteClusterDialog}");
 });
 
 it('defines a ghost variant for compact v5 select triggers', function () {
@@ -1893,13 +2418,13 @@ it('does not include coolify version controls on the v5 dashboard page', functio
         ->not->toContain('Installed version:');
 });
 
-it('renders flux status as a compact summary', function () {
+it('does not render flux status in the v5 navbar', function () {
     $navbar = file_get_contents(resource_path('js/v5/components/app-navbar.tsx'));
 
     expect($navbar)
-        ->toContain('Flux: {flux?.label ??')
-        ->toContain('title={flux?.socket ?? flux?.message ?? undefined}')
-        ->toContain('{clusters.length} clusters')
+        ->not->toContain('Flux: {flux?.label ??')
+        ->not->toContain('title={flux?.socket ?? flux?.message ?? undefined}')
+        ->not->toContain('{clusters.length} clusters')
         ->not->toContain('<h2 id="flux-status-heading">Flux status</h2>')
         ->not->toContain('<p>{flux.message}</p>')
         ->not->toContain('Socket: {flux.socket}');
@@ -2087,6 +2612,7 @@ function createSharedUserAndTeamTables(): void
 
     Schema::create('v5_servers', function ($table) {
         $table->id();
+        $table->string('uuid')->nullable()->unique();
         $table->foreignId('team_id');
         $table->foreignId('cluster_id')->nullable();
         $table->foreignId('created_by_user_id');
@@ -2107,6 +2633,10 @@ function createSharedUserAndTeamTables(): void
         $table->string('wireguard_public_key')->nullable();
         $table->json('container_subnets')->nullable();
         $table->timestamp('last_bootstrapped_at')->nullable();
+        $table->string('last_bootstrap_action')->nullable();
+        $table->string('last_bootstrap_status')->nullable();
+        $table->text('last_bootstrap_output')->nullable();
+        $table->timestamp('last_bootstrap_ran_at')->nullable();
         $table->string('last_status_check')->nullable();
         $table->text('last_status_output')->nullable();
         $table->timestamp('last_status_checked_at')->nullable();
@@ -2127,6 +2657,20 @@ function createSharedUserAndTeamTables(): void
 /**
  * @return array{0: Project, 1: Environment}
  */
+/**
+ * @param  array<int, string>  $command
+ */
+function cliFlagValue(array $command, string $flag): ?string
+{
+    $index = array_search($flag, $command, true);
+
+    if ($index === false || ! isset($command[$index + 1])) {
+        return null;
+    }
+
+    return $command[$index + 1];
+}
+
 function createV5ProjectWithEnvironment(Team $team, string $projectName, string $environmentName): array
 {
     $project = Project::withoutEvents(fn () => Project::query()->forceCreate([

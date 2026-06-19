@@ -1353,6 +1353,7 @@ CREATE TABLE IF NOT EXISTS "v5_clusters" (
 
 CREATE TABLE IF NOT EXISTS "v5_servers" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "uuid" TEXT,
     "team_id" INTEGER NOT NULL,
     "cluster_id" INTEGER,
     "created_by_user_id" INTEGER NOT NULL,
@@ -1373,6 +1374,10 @@ CREATE TABLE IF NOT EXISTS "v5_servers" (
     "wireguard_public_key" TEXT,
     "container_subnets" JSON,
     "last_bootstrapped_at" TEXT,
+    "last_bootstrap_action" TEXT,
+    "last_bootstrap_status" TEXT,
+    "last_bootstrap_output" TEXT,
+    "last_bootstrap_ran_at" TEXT,
     "last_status_check" TEXT,
     "last_status_output" TEXT,
     "last_status_checked_at" TEXT,
@@ -1494,6 +1499,7 @@ CREATE INDEX IF NOT EXISTS "user_changelog_reads_release_tag_index" ON "user_cha
 CREATE INDEX IF NOT EXISTS "user_changelog_reads_user_id_index" ON "user_changelog_reads" (user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS "user_changelog_reads_user_id_release_tag_unique" ON "user_changelog_reads" (user_id, release_tag);
 CREATE UNIQUE INDEX IF NOT EXISTS "users_email_unique" ON "users" (email);
+CREATE UNIQUE INDEX IF NOT EXISTS "v5_servers_uuid_unique" ON "v5_servers" (uuid);
 CREATE UNIQUE INDEX IF NOT EXISTS "webhook_notification_settings_team_id_unique" ON "webhook_notification_settings" (team_id);
 
 -- Migration records
@@ -1811,8 +1817,5 @@ INSERT INTO "migrations" ("id", "migration", "batch") VALUES (311, '2025_12_10_1
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (312, '2025_12_15_143052_trim_s3_storage_credentials', 312);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (313, '2025_12_17_000001_add_is_wire_navigate_enabled_to_instance_settings_table', 313);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (314, '2025_12_17_000002_add_restart_tracking_to_standalone_databases', 314);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (316, '2026_06_16_130650_v5_create_servers_table', 316);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (317, '2026_06_16_130649_v5_create_clusters_table', 317);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (318, '2026_06_16_204644_v5_add_wireguard_cli_configuration_to_clusters_and_servers', 318);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (319, '2026_06_17_165112_v5_add_builder_cpu_quota_to_servers_table', 319);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (320, '2026_06_17_172845_add_status_check_fields_to_v5_servers_table', 320);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (316, '2026_06_16_130649_v5_create_clusters_table', 316);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (317, '2026_06_16_130650_v5_create_servers_table', 317);
