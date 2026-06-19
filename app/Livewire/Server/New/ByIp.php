@@ -5,6 +5,7 @@ namespace App\Livewire\Server\New;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
 use App\Models\Team;
+use App\Rules\ValidServerIp;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
@@ -55,8 +56,8 @@ class ByIp extends Component
             'new_private_key_value' => 'nullable|string',
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'ip' => 'required|string',
-            'user' => 'required|string',
+            'ip' => ['required', 'string', new ValidServerIp],
+            'user' => ValidationPatterns::serverUsernameRules(),
             'port' => 'required|integer|between:1,65535',
             'is_build_server' => 'required|boolean',
         ];
@@ -74,6 +75,7 @@ class ByIp extends Component
             'ip.string' => 'The IP Address/Domain must be a string.',
             'user.required' => 'The User field is required.',
             'user.string' => 'The User field must be a string.',
+            ...ValidationPatterns::serverUsernameMessages(),
             'port.required' => 'The Port field is required.',
             'port.integer' => 'The Port field must be an integer.',
             'port.between' => 'The Port field must be between 1 and 65535.',
@@ -97,10 +99,13 @@ class ByIp extends Component
         $this->validate();
         try {
             $this->authorize('create', Server::class);
-            if (Server::where('team_id', currentTeam()->id)
-                ->where('ip', $this->ip)
-                ->exists()) {
-                return $this->dispatch('error', 'This IP/Domain is already in use by another server in your team.');
+            $foundServer = Server::whereIp($this->ip)->first();
+            if ($foundServer) {
+                if ($foundServer->team_id === currentTeam()->id) {
+                    return $this->dispatch('error', 'A server with this IP/Domain already exists in your team.');
+                }
+
+                return $this->dispatch('error', 'A server with this IP/Domain is already in use by another team.');
             }
 
             if (is_null($this->private_key_id)) {

@@ -37,7 +37,7 @@ services:
       - ADMINMAIL=${ADMINMAIL:-admin@kimai.local}
       - ADMINPASS=${SERVICE_PASSWORD_ADMINPASS}
       - DATABASE_URL=mysql://${SERVICE_USER_MYSQL}:${SERVICE_PASSWORD_MYSQL}@mysql/${MYSQL_DATABASE}?charset=utf8mb4&serverVersion=8.3.0
-      - TRUSTED_HOSTS=localhost
+      - 'TRUSTED_HOSTS=${TRUSTED_HOSTS}|localhost|127.0.0.1'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8001"]
       interval: 2s

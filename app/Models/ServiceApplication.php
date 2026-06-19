@@ -5,12 +5,31 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Symfony\Component\Yaml\Yaml;
 
 class ServiceApplication extends BaseModel
 {
     use HasFactory, SoftDeletes;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'service_id',
+        'name',
+        'human_name',
+        'description',
+        'fqdn',
+        'ports',
+        'exposes',
+        'status',
+        'exclude_from_status',
+        'required_fqdn',
+        'image',
+        'is_log_drain_enabled',
+        'is_include_timestamps',
+        'is_gzip_enabled',
+        'is_stripprefix_enabled',
+        'last_online_at',
+        'is_migrated',
+    ];
 
     protected static function booted()
     {
@@ -21,7 +40,7 @@ class ServiceApplication extends BaseModel
         });
         static::saving(function ($service) {
             if ($service->isDirty('status')) {
-                $service->forceFill(['last_online_at' => now()]);
+                $service->last_online_at = now();
             }
         });
     }
@@ -88,7 +107,7 @@ class ServiceApplication extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'environment.project.team');
+        return data_get($this, 'service.environment.project.team');
     }
 
     public function workdir()
@@ -211,7 +230,7 @@ class ServiceApplication extends BaseModel
                 return $this->service->getRequiredPort();
             }
 
-            $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($dockerComposeRaw);
+            $dockerCompose = Yaml::parse($dockerComposeRaw);
             $serviceConfig = data_get($dockerCompose, "services.{$this->name}");
             if (! $serviceConfig) {
                 return $this->service->getRequiredPort();

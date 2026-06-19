@@ -16,9 +16,13 @@
         @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')
             <div class="subtitle ">A simple Docker network.</div>
         @else
-            <div class="subtitle ">A swarm Docker network. WIP</div>
+            <div class="subtitle flex items-center gap-2">A swarm Docker network.
+                <x-deprecated-badge />
+            </div>
         @endif
-        <div class="flex gap-2">
+        @include('livewire.destination.navbar', ['destination' => $destination])
+
+        <div class="flex gap-2 pt-4">
             <x-forms.input canGate="update" :canResource="$destination" id="name" label="Name" />
             <x-forms.input id="serverIp" label="Server IP" readonly />
             @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')

@@ -47,14 +47,10 @@ class ForcePasswordReset extends Component
         try {
             $this->rateLimit(10);
             $this->validate();
-            $firstLogin = auth()->user()->created_at == auth()->user()->updated_at;
-            auth()->user()->forceFill([
+            auth()->user()->fill([
                 'password' => Hash::make($this->password),
                 'force_password_reset' => false,
             ])->save();
-            if ($firstLogin) {
-                send_internal_notification('First login for '.auth()->user()->email);
-            }
 
             return redirect()->route('dashboard');
         } catch (\Throwable $e) {

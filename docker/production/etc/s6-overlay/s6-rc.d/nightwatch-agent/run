@@ -1,0 +1,11 @@
+#!/bin/sh
+
+cd /var/www/html
+
+if grep -qE '^NIGHTWATCH_ENABLED=true' .env 2>/dev/null; then
+    echo "   INFO  Nightwatch is enabled, starting..."
+    exec php artisan nightwatch:agent
+fi
+
+echo "   INFO  Nightwatch is disabled, sleeping."
+exec sleep infinity

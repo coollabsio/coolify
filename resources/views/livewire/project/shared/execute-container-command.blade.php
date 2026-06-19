@@ -21,7 +21,8 @@
             <div>No containers are running or terminal access is disabled on this server.</div>
         @else
             <form class="w-96 min-w-fit flex gap-2 items-end" wire:submit="$dispatchSelf('connectToContainer')"
-                x-data="{ autoConnected: false }" x-init="if ({{ count($containers) }} === 1 && !autoConnected) {
+                x-data="{ autoConnected: false }"
+                x-on:terminal-websocket-ready.window="if ({{ count($containers) }} === 1 && !autoConnected) {
                     autoConnected = true;
                     $nextTick(() => $wire.dispatchSelf('connectToContainer'));
                 }">

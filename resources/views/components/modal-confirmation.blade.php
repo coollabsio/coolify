@@ -35,7 +35,7 @@
     $skipPasswordConfirmation = shouldSkipPasswordConfirmation();
     if ($temporaryDisableTwoStepConfirmation) {
         $disableTwoStepConfirmation = false;
-        $skipPasswordConfirmation = false;
+        // Password confirmation requirement is not affected by temporary two-step disable
     }
     // When password step is skipped, Step 2 becomes final - change button text from "Continue" to "Confirm"
     $effectiveStep2ButtonText = ($skipPasswordConfirmation && $step2ButtonText === 'Continue') ? 'Confirm' : $step2ButtonText;
@@ -59,6 +59,7 @@
     confirmWithPassword: @js($confirmWithPassword && !$skipPasswordConfirmation),
     submitAction: @js($submitAction),
     dispatchAction: @js($dispatchAction),
+    submitting: false,
     passwordError: '',
     selectedActions: @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all()),
     dispatchEvent: @js($dispatchEvent),
@@ -70,6 +71,7 @@
         this.step = this.initialStep;
         this.deleteText = '';
         this.password = '';
+        this.submitting = false;
         this.userConfirmationText = '';
         this.selectedActions = @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all());
         $wire.$refresh();
@@ -92,7 +94,7 @@
         }
         if (this.dispatchAction) {
             $wire.dispatch(this.submitAction);
-            return true;
+            return Promise.resolve(true);
         }
 
         const methodName = this.submitAction.split('(')[0];
@@ -127,7 +129,11 @@
 }"
     @keydown.escape.window="if (modalOpen) { modalOpen = false; resetModal(); }" :class="{ 'z-40': modalOpen }"
     class="relative w-auto h-auto">
-    @if ($customButton)
+    @if (isset($trigger))
+        <div @click="modalOpen=true">
+            {{ $trigger }}
+        </div>
+    @elseif ($customButton)
         @if ($buttonFullWidth)
             <x-forms.button @click="modalOpen=true" class="w-full">
                 {{ $customButton }}
@@ -188,7 +194,7 @@
     @endif
     <template x-teleport="body">
         <div x-show="modalOpen"
-            class="fixed top-0 left-0 z-99 flex items-center justify-center w-screen h-screen p-4" x-cloak>
+            class="fixed top-0 left-0 z-99 flex items-center justify-center w-screen h-screen p-0 sm:p-4" x-cloak>
             <div x-show="modalOpen" class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs">
             </div>
             <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
@@ -197,7 +203,7 @@
                 x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                class="relative w-full border rounded-sm min-w-full lg:min-w-[36rem] max-w-[48rem] max-h-[calc(100vh-2rem)] bg-neutral-100 border-neutral-400 dark:bg-base dark:border-coolgray-300 flex flex-col">
+                class="relative w-full border rounded-none sm:rounded-sm min-w-full lg:min-w-[36rem] max-w-full sm:max-w-[48rem] h-screen sm:h-auto max-h-screen sm:max-h-[calc(100vh-2rem)] bg-neutral-100 border-neutral-400 dark:bg-base dark:border-coolgray-300 flex flex-col">
                 <div class="flex justify-between items-center py-6 px-7 shrink-0">
                     <h3 class="pr-8 text-2xl font-bold">{{ $title }}</h3>
                     <button @click="modalOpen = false; resetModal()"
@@ -320,8 +326,8 @@
                                 </x-forms.button>
                             @endif
                             <x-forms.button
-                                x-bind:disabled="!disableTwoStepConfirmation && confirmWithText && userConfirmationText !==
-                                    confirmationText"
+                                x-bind:disabled="submitting || (!disableTwoStepConfirmation && confirmWithText && userConfirmationText !==
+                                    confirmationText)"
                                 class="w-auto" isError
                                 @click="
                                     if (dispatchEvent) {
@@ -330,12 +336,18 @@
                                     if (confirmWithPassword && !skipPasswordConfirmation) {
                                         step++;
                                     } else {
-                                        modalOpen = false;
-                                        resetModal();
-                                        submitForm();
+                                        submitting = true;
+                                        submitForm().then((result) => {
+                                            submitting = false;
+                                            modalOpen = false;
+                                            resetModal();
+                                        }).catch(() => {
+                                            submitting = false;
+                                        });
                                     }
                                 ">
-                                <span x-text="step2ButtonText"></span>
+                                <span x-show="!submitting" x-text="step2ButtonText"></span>
+                                <x-loading x-show="submitting" text="Processing..." />
                             </x-forms.button>
                         </div>
                     </div>
@@ -373,22 +385,27 @@
                                     class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
                                     Back
                                 </x-forms.button>
-                                <x-forms.button x-bind:disabled="!password" class="w-auto" isError
+                                <x-forms.button x-bind:disabled="!password || submitting" class="w-auto" isError
                                     @click="
                                     if (dispatchEvent) {
                                         $wire.dispatch(dispatchEventType, dispatchEventMessage);
                                     }
+                                    submitting = true;
                                     submitForm().then((result) => {
+                                        submitting = false;
                                         if (result === true) {
                                             modalOpen = false;
                                             resetModal();
                                         } else {
                                             passwordError = result;
-                                            password = ''; // Clear the password field
+                                            password = '';
                                         }
+                                    }).catch(() => {
+                                        submitting = false;
                                     });
                                     ">
-                                    <span x-text="step3ButtonText"></span>
+                                    <span x-show="!submitting" x-text="step3ButtonText"></span>
+                                    <x-loading x-show="submitting" text="Processing..." />
                                 </x-forms.button>
                             </div>
                         </div>

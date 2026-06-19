@@ -91,6 +91,13 @@ class TrustHosts extends Middleware
         // Trust all subdomains of APP_URL as fallback
         $trustedHosts[] = $this->allSubdomainsOfApplicationUrl();
 
+        // Always trust loopback addresses so local access works even when FQDN is configured
+        foreach (['localhost', '127.0.0.1', '[::1]'] as $localHost) {
+            if (! in_array($localHost, $trustedHosts, true)) {
+                $trustedHosts[] = $localHost;
+            }
+        }
+
         return array_filter($trustedHosts);
     }
 }
