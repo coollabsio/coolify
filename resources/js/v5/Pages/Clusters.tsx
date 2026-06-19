@@ -1000,10 +1000,6 @@ export default function Clusters({
                                                         {isDeletingCluster ? 'Deleting...' : 'Delete cluster'}
                                                     </Button>
                                                 ) : null}
-                                                <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                                                    {selectedCluster.serversCount}{' '}
-                                                    {selectedCluster.serversCount === 1 ? 'server' : 'servers'}
-                                                </div>
                                             </div>
                                         </div>
                                         {deleteClusterError ? (
@@ -1067,7 +1063,7 @@ export default function Clusters({
 
                                             <div className="rounded-lg border border-border bg-background p-4">
                                                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                                    CLI state
+                                                    Cluster state
                                                 </p>
                                                 <dl className="mt-3 space-y-2 text-xs">
                                                     <div className="flex justify-between gap-3">
@@ -1082,18 +1078,7 @@ export default function Clusters({
                                                             {selectedCluster.corrosionVersion}
                                                         </dd>
                                                     </div>
-                                                    <div className="flex justify-between gap-3">
-                                                        <dt className="text-muted-foreground">Last run</dt>
-                                                        <dd className="font-medium text-foreground">
-                                                            {selectedCluster.lastCliStatus ?? 'Never'}
-                                                        </dd>
-                                                    </div>
                                                 </dl>
-                                                {selectedCluster.lastCliSummary ? (
-                                                    <pre className="mt-3 max-h-28 overflow-auto whitespace-pre-wrap rounded bg-muted/30 p-2 text-xs text-muted-foreground">
-                                                        {selectedCluster.lastCliSummary}
-                                                    </pre>
-                                                ) : null}
                                             </div>
                                         </div>
 
@@ -1493,8 +1478,7 @@ export default function Clusters({
                                 <DialogHeader>
                                     <DialogTitle>Add server</DialogTitle>
                                     <DialogDescription>
-                                        Add a remote server to this WireGuard cluster. CLI-generated mesh values are
-                                        saved after bootstrap or extend runs.
+                                        Add a remote server to this WireGuard cluster. Generated mesh values are saved after bootstrap or extend runs.
                                     </DialogDescription>
                                 </DialogHeader>
 
