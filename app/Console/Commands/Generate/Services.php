@@ -88,6 +88,14 @@ class Services extends Command
             $payload['envs'] = base64_encode($envFileContent);
         }
 
+        if (str($data->get('amd_only'))->toBoolean()) {
+            $payload['amd_only'] = true;
+        }
+
+        if (str($data->get('arm_only'))->toBoolean()) {
+            $payload['arm_only'] = true;
+        }
+
         return $payload;
     }
 
@@ -160,6 +168,14 @@ class Services extends Command
             $payload['envs'] = base64_encode($modifiedEnvContent);
         }
 
+        if (str($data->get('amd_only'))->toBoolean()) {
+            $payload['amd_only'] = true;
+        }
+
+        if (str($data->get('arm_only'))->toBoolean()) {
+            $payload['arm_only'] = true;
+        }
+
         return $payload;
     }
 
@@ -227,6 +243,14 @@ class Services extends Command
             // Also replace SERVICE_URL with SERVICE_FQDN in env file content (not base64 encoded)
             $modifiedEnvContent = str_replace('SERVICE_URL', 'SERVICE_FQDN', $envFileContent);
             $payload['envs'] = $modifiedEnvContent;
+        }
+
+        if (str($data->get('amd_only'))->toBoolean()) {
+            $payload['amd_only'] = true;
+        }
+
+        if (str($data->get('arm_only'))->toBoolean()) {
+            $payload['arm_only'] = true;
         }
 
         return $payload;

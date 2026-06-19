@@ -3,6 +3,7 @@
 namespace App\Livewire\Storage;
 
 use App\Models\S3Storage;
+use App\Rules\SafeWebhookUrl;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
@@ -42,7 +43,7 @@ class Form extends Component
             'key' => 'required|max:255',
             'secret' => 'required|max:255',
             'bucket' => 'required|max:255',
-            'endpoint' => 'required|url|max:255',
+            'endpoint' => ['required', 'max:255', new SafeWebhookUrl],
         ];
     }
 
@@ -60,7 +61,6 @@ class Form extends Component
                 'bucket.required' => 'The Bucket field is required.',
                 'bucket.max' => 'The Bucket may not be greater than 255 characters.',
                 'endpoint.required' => 'The Endpoint field is required.',
-                'endpoint.url' => 'The Endpoint must be a valid URL.',
                 'endpoint.max' => 'The Endpoint may not be greater than 255 characters.',
             ]
         );

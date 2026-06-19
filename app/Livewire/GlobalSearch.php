@@ -1496,7 +1496,10 @@ class GlobalSearch extends Component
                 'category' => 'Services',
                 'resourceType' => 'service',
                 'logo' => data_get($service, 'logo'),
-            ]);
+            ] + array_filter([
+                'amd_only' => data_get($service, 'amd_only') ? true : null,
+                'arm_only' => data_get($service, 'arm_only') ? true : null,
+            ]));
         }
 
         $cachedServices = $items->toArray();

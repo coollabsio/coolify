@@ -37,7 +37,7 @@ class Index extends Component
             Auth::login($user);
             refreshSession($team_to_switch_to);
 
-            return redirect(request()->header('Referer'));
+            return redirect()->route('admin.index');
         }
     }
 
@@ -70,7 +70,7 @@ class Index extends Component
         Auth::login($user);
         refreshSession($team_to_switch_to);
 
-        return redirect(request()->header('Referer'));
+        return redirect()->route('dashboard');
     }
 
     private function authorizeAdminAccess(): void

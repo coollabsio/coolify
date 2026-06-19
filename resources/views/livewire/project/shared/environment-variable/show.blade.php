@@ -43,6 +43,12 @@
                                 @endif
                             @else
                                 @if ($is_shared)
+                                    <x-forms.checkbox instantSave id="is_buildtime"
+                                        helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
+                                        label="Available at Buildtime" />
+                                    <x-forms.checkbox instantSave id="is_runtime"
+                                        helper="Make this variable available in the running container at runtime."
+                                        label="Available at Runtime" />
                                     <x-forms.checkbox instantSave id="is_literal"
                                         helper="This means that when you use $VARIABLES in a value, it should be interpreted as the actual characters '$VARIABLES' and not as the value of a variable named VARIABLE.<br><br>Useful if you have $ sign in your value and there are some characters after it, but you would not like to interpolate it from another value. In this case, you should set this to true."
                                         label="Is Literal?" />
@@ -52,7 +58,7 @@
                                             <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
                                         @endif
                                     @else
-                                        @if (!$env->is_nixpacks)
+                                        @if (!$env->is_buildpack_control)
                                             <x-forms.checkbox instantSave id="is_buildtime"
                                                 helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
                                                 label="Available at Buildtime" />
@@ -61,7 +67,7 @@
                                             helper="Make this variable available in the running container at runtime."
                                             label="Available at Runtime" />
                                         @if (!$isMagicVariable)
-                                            @if (!$env->is_nixpacks)
+                                            @if (!$env->is_buildpack_control)
                                                 <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
                                                 @if ($is_multiline === false)
                                                     <x-forms.checkbox instantSave id="is_literal"
@@ -89,6 +95,12 @@
                                 @endif
                             @else
                                 @if ($is_shared)
+                                    <x-forms.checkbox disabled id="is_buildtime"
+                                        helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
+                                        label="Available at Buildtime" />
+                                    <x-forms.checkbox disabled id="is_runtime"
+                                        helper="Make this variable available in the running container at runtime."
+                                        label="Available at Runtime" />
                                     <x-forms.checkbox disabled id="is_literal"
                                         helper="This means that when you use $VARIABLES in a value, it should be interpreted as the actual characters '$VARIABLES' and not as the value of a variable named VARIABLE.<br><br>Useful if you have $ sign in your value and there are some characters after it, but you would not like to interpolate it from another value. In this case, you should set this to true."
                                         label="Is Literal?" />
@@ -209,6 +221,12 @@
                                 @endif
                             @else
                                 @if ($is_shared)
+                                    <x-forms.checkbox instantSave id="is_buildtime"
+                                        helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
+                                        label="Available at Buildtime" />
+                                    <x-forms.checkbox instantSave id="is_runtime"
+                                        helper="Make this variable available in the running container at runtime."
+                                        label="Available at Runtime" />
                                     <x-forms.checkbox instantSave id="is_literal"
                                         helper="This means that when you use $VARIABLES in a value, it should be interpreted as the actual characters '$VARIABLES' and not as the value of a variable named VARIABLE.<br><br>Useful if you have $ sign in your value and there are some characters after it, but you would not like to interpolate it from another value. In this case, you should set this to true."
                                         label="Is Literal?" />
@@ -218,7 +236,7 @@
                                             <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
                                         @endif
                                     @else
-                                        @if (!$env->is_nixpacks)
+                                        @if (!$env->is_buildpack_control)
                                             <x-forms.checkbox instantSave id="is_buildtime"
                                                 helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
                                                 label="Available at Buildtime" />
@@ -227,7 +245,7 @@
                                             helper="Make this variable available in the running container at runtime."
                                             label="Available at Runtime" />
                                         @if (!$isMagicVariable)
-                                            @if (!$env->is_nixpacks)
+                                            @if (!$env->is_buildpack_control)
                                                 <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
                                                 @if ($is_multiline === false)
                                                     <x-forms.checkbox instantSave id="is_literal"
@@ -283,6 +301,12 @@
                                 @endif
                             @else
                                 @if ($is_shared)
+                                    <x-forms.checkbox disabled id="is_buildtime"
+                                        helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
+                                        label="Available at Buildtime" />
+                                    <x-forms.checkbox disabled id="is_runtime"
+                                        helper="Make this variable available in the running container at runtime."
+                                        label="Available at Runtime" />
                                     <x-forms.checkbox disabled id="is_literal"
                                         helper="This means that when you use $VARIABLES in a value, it should be interpreted as the actual characters '$VARIABLES' and not as the value of a variable named VARIABLE.<br><br>Useful if you have $ sign in your value and there are some characters after it, but you would not like to interpolate it from another value. In this case, you should set this to true."
                                         label="Is Literal?" />

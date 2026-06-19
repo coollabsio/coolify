@@ -43,27 +43,34 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
 
     protected function cloneLocalVolume()
     {
+        $srcVol = escapeshellarg($this->sourceVolume);
+        $tgtVol = escapeshellarg($this->targetVolume);
+
         instant_remote_process([
-            "docker volume create $this->targetVolume",
-            "docker run --rm -v $this->sourceVolume:/source -v $this->targetVolume:/target alpine sh -c 'cp -a /source/. /target/ && chown -R 1000:1000 /target'",
+            "docker volume create {$tgtVol}",
+            "docker run --rm -v {$srcVol}:/source -v {$tgtVol}:/target alpine sh -c 'cp -a /source/. /target/ && chown -R 1000:1000 /target'",
         ], $this->sourceServer);
     }
 
     protected function cloneRemoteVolume()
     {
+        $srcVol = escapeshellarg($this->sourceVolume);
+        $tgtVol = escapeshellarg($this->targetVolume);
         $sourceCloneDir = "{$this->cloneDir}/{$this->sourceVolume}";
         $targetCloneDir = "{$this->cloneDir}/{$this->targetVolume}";
+        $srcDir = escapeshellarg($sourceCloneDir);
+        $tgtDir = escapeshellarg($targetCloneDir);
 
         try {
             instant_remote_process([
-                "mkdir -p $sourceCloneDir",
-                "chmod 777 $sourceCloneDir",
-                "docker run --rm -v $this->sourceVolume:/source -v $sourceCloneDir:/clone alpine sh -c 'cd /source && tar czf /clone/volume-data.tar.gz .'",
+                "mkdir -p {$srcDir}",
+                "chmod 777 {$srcDir}",
+                "docker run --rm -v {$srcVol}:/source -v {$srcDir}:/clone alpine sh -c 'cd /source && tar czf /clone/volume-data.tar.gz .'",
             ], $this->sourceServer);
 
             instant_remote_process([
-                "mkdir -p $targetCloneDir",
-                "chmod 777 $targetCloneDir",
+                "mkdir -p {$tgtDir}",
+                "chmod 777 {$tgtDir}",
             ], $this->targetServer);
 
             instant_scp(
@@ -74,8 +81,8 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
             );
 
             instant_remote_process([
-                "docker volume create $this->targetVolume",
-                "docker run --rm -v $this->targetVolume:/target -v $targetCloneDir:/clone alpine sh -c 'cd /target && tar xzf /clone/volume-data.tar.gz && chown -R 1000:1000 /target'",
+                "docker volume create {$tgtVol}",
+                "docker run --rm -v {$tgtVol}:/target -v {$tgtDir}:/clone alpine sh -c 'cd /target && tar xzf /clone/volume-data.tar.gz && chown -R 1000:1000 /target'",
             ], $this->targetServer);
 
         } catch (\Exception $e) {
@@ -84,7 +91,7 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
         } finally {
             try {
                 instant_remote_process([
-                    "rm -rf $sourceCloneDir",
+                    "rm -rf {$srcDir}",
                 ], $this->sourceServer, false);
             } catch (\Exception $e) {
                 \Log::warning('Failed to clean up source server clone directory: '.$e->getMessage());
@@ -93,7 +100,7 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
             try {
                 if ($this->targetServer) {
                     instant_remote_process([
-                        "rm -rf $targetCloneDir",
+                        "rm -rf {$tgtDir}",
                     ], $this->targetServer, false);
                 }
             } catch (\Exception $e) {

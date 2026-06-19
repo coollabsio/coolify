@@ -232,6 +232,13 @@ class SecurityController extends Controller
             'private_key' => $request->private_key,
         ]);
 
+        auditLog('api.private_key.created', [
+            'team_id' => $teamId,
+            'private_key_uuid' => $key->uuid,
+            'private_key_name' => $key->name,
+            'fingerprint' => $fingerPrint,
+        ]);
+
         return response()->json(serializeApiResponse([
             'uuid' => $key->uuid,
         ]))->setStatusCode(201);
@@ -333,6 +340,13 @@ class SecurityController extends Controller
         }
         $foundKey->update($request->only($allowedFields));
 
+        auditLog('api.private_key.updated', [
+            'team_id' => $teamId,
+            'private_key_uuid' => $foundKey->uuid,
+            'private_key_name' => $foundKey->name,
+            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
+        ]);
+
         return response()->json(serializeApiResponse([
             'uuid' => $foundKey->uuid,
         ]))->setStatusCode(201);
@@ -415,7 +429,15 @@ class SecurityController extends Controller
             ], 422);
         }
 
+        $keyUuid = $key->uuid;
+        $keyName = $key->name;
         $key->forceDelete();
+
+        auditLog('api.private_key.deleted', [
+            'team_id' => $teamId,
+            'private_key_uuid' => $keyUuid,
+            'private_key_name' => $keyName,
+        ]);
 
         return response()->json([
             'message' => 'Private Key deleted.',

@@ -1,5 +1,6 @@
 # documentation: https://autobase.tech/docs/
 # slogan: Autobase for PostgreSQL® is an open-source alternative to cloud-managed databases (self-hosted DBaaS).
+# category: database
 # tags: database, postgres, automation, self-hosted, dbaas
 # logo: svgs/autobase.svg
 # port: 80

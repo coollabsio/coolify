@@ -29,9 +29,47 @@
     $currentProjectUuid = data_get($resource, 'environment.project.uuid');
     $currentEnvironmentUuid = data_get($resource, 'environment.uuid');
     $currentResourceUuid = data_get($resource, 'uuid');
+    $resourceUuid = data_get($resource, 'uuid');
+    $resourceType = $resource->getMorphClass();
+    $isApplication = $resourceType === 'App\Models\Application';
+    $isService = $resourceType === 'App\Models\Service';
+    $isDatabase = str_contains($resourceType, 'Database') || str_contains($resourceType, 'Standalone');
+    $hasMultipleServers = $isApplication && method_exists($resource, 'additional_servers') &&
+        ($resource->relationLoaded('additional_servers') ? $resource->additional_servers->count() > 0 : ($resource->additional_servers_count ?? 0) > 0);
+    $serverName = $hasMultipleServers ? null : data_get($resource, 'destination.server.name');
+    $routeParams = [
+        'project_uuid' => $currentProjectUuid,
+        'environment_uuid' => $currentEnvironmentUuid,
+    ];
+    if ($isApplication) {
+        $routeParams['application_uuid'] = $resourceUuid;
+    } elseif ($isService) {
+        $routeParams['service_uuid'] = $resourceUuid;
+    } else {
+        $routeParams['database_uuid'] = $resourceUuid;
+    }
 @endphp
-<nav class="flex pt-2 pb-10">
-    <ol class="flex flex-wrap items-center gap-y-1">
+<nav class="pt-2 pb-4 md:pb-10">
+    <div class="flex min-w-0 flex-col gap-1 md:hidden">
+        <div class="flex min-w-0 items-center text-xs text-neutral-400">
+            <a class="min-w-0 truncate text-neutral-300 hover:text-warning" {{ wireNavigate() }}
+                href="{{ $isApplication
+                    ? route('project.application.configuration', $routeParams)
+                    : ($isService
+                        ? route('project.service.configuration', $routeParams)
+                        : route('project.database.configuration', $routeParams)) }}"
+                title="{{ data_get($resource, 'name') }}{{ $serverName ? ' ('.$serverName.')' : '' }}">
+                {{ data_get($resource, 'name') }}
+            </a>
+        </div>
+        @if ($resource->getMorphClass() == 'App\Models\Service')
+            <x-status.services :service="$resource" />
+        @else
+            <x-status.index :resource="$resource" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
+        @endif
+    </div>
+
+    <ol class="hidden flex-wrap items-center gap-y-1 md:flex">
         <!-- Project Level -->
         <li class="inline-flex items-center" x-data="{ projectOpen: false, closeTimeout: null, toggle() { this.projectOpen = !this.projectOpen }, open() { clearTimeout(this.closeTimeout); this.projectOpen = true }, close() { this.closeTimeout = setTimeout(() => { this.projectOpen = false }, 100) } }">
             <div class="flex items-center relative" @mouseenter="open()" @mouseleave="close()">
@@ -204,27 +242,6 @@
         </li>
 
         <!-- Resource Level -->
-        @php
-            $resourceUuid = data_get($resource, 'uuid');
-            $resourceType = $resource->getMorphClass();
-            $isApplication = $resourceType === 'App\Models\Application';
-            $isService = $resourceType === 'App\Models\Service';
-            $isDatabase = str_contains($resourceType, 'Database') || str_contains($resourceType, 'Standalone');
-            $hasMultipleServers = $isApplication && method_exists($resource, 'additional_servers') &&
-                ($resource->relationLoaded('additional_servers') ? $resource->additional_servers->count() > 0 : ($resource->additional_servers_count ?? 0) > 0);
-            $serverName = $hasMultipleServers ? null : data_get($resource, 'destination.server.name');
-            $routeParams = [
-                'project_uuid' => $currentProjectUuid,
-                'environment_uuid' => $currentEnvironmentUuid,
-            ];
-            if ($isApplication) {
-                $routeParams['application_uuid'] = $resourceUuid;
-            } elseif ($isService) {
-                $routeParams['service_uuid'] = $resourceUuid;
-            } else {
-                $routeParams['database_uuid'] = $resourceUuid;
-            }
-        @endphp
         <li class="inline-flex items-center mr-2">
             <a class="text-xs truncate lg:text-sm hover:text-warning" {{ wireNavigate() }}
                 href="{{ $isApplication

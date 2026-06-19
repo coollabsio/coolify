@@ -10,8 +10,7 @@ services:
     image: ghcr.io/homarr-labs/homarr:v1.40.0
     environment:
       - SERVICE_URL_HOMARR_7575
-      - SERVICE_HEX_32_HOMARR
-      - 'SECRET_ENCRYPTION_KEY=${SERVICE_HEX_32_HOMARR}'
+      - 'SECRET_ENCRYPTION_KEY=${SERVICE_HEX_64_HOMARR}'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./homarr/appdata:/appdata

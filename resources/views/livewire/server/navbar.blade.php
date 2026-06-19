@@ -58,6 +58,17 @@
                 </div>
             </div>
         @endif
+        @if ($server->isSentinelEnabled())
+            <div class="flex">
+                <div class="flex items-center">
+                    @if ($server->isSentinelLive())
+                        <x-status.running status="Sentinel In Sync" noLoading />
+                    @else
+                        <x-status.stopped status="Sentinel Out of Sync" noLoading />
+                    @endif
+                </div>
+            </div>
+        @endif
     </div>
     <div class="subtitle">{{ data_get($server, 'name') }}</div>
     <div class="navbar-main">
@@ -70,11 +81,24 @@
             </a>
 
             @if (!$server->isSwarmWorker() && !$server->settings->is_build_server)
-                        <a class="{{ request()->routeIs('server.proxy') ? 'dark:text-white' : '' }} flex items-center gap-1" href="{{ route('server.proxy', [
+                        <a class="{{ request()->routeIs('server.proxy') || request()->routeIs('server.proxy.*') ? 'dark:text-white' : '' }} flex items-center gap-1" href="{{ route('server.proxy', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}" {{ wireNavigate() }}>
                             Proxy
                             @if ($this->hasTraefikOutdated)
+                                <svg class="w-4 h-4 text-warning" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+                                    <path fill="currentColor"
+                                        d="M236.8 188.09L149.35 36.22a24.76 24.76 0 0 0-42.7 0L19.2 188.09a23.51 23.51 0 0 0 0 23.72A24.35 24.35 0 0 0 40.55 224h174.9a24.35 24.35 0 0 0 21.33-12.19a23.51 23.51 0 0 0 .02-23.72m-13.87 15.71a8.5 8.5 0 0 1-7.48 4.2H40.55a8.5 8.5 0 0 1-7.48-4.2a7.59 7.59 0 0 1 0-7.72l87.45-151.87a8.75 8.75 0 0 1 15 0l87.45 151.87a7.59 7.59 0 0 1-.04 7.72M120 144v-40a8 8 0 0 1 16 0v40a8 8 0 0 1-16 0m20 36a12 12 0 1 1-12-12a12 12 0 0 1 12 12" />
+                                </svg>
+                            @endif
+                        </a>
+            @endif
+            @if ($server->isFunctional() && !$server->isSwarm() && !$server->settings->is_build_server)
+                        <a class="{{ request()->routeIs('server.sentinel') || request()->routeIs('server.sentinel.*') ? 'dark:text-white' : '' }} flex items-center gap-1" href="{{ route('server.sentinel', [
+                    'server_uuid' => data_get($server, 'uuid'),
+                ]) }}" {{ wireNavigate() }}>
+                            Sentinel
+                            @if ($server->isSentinelEnabled() && !$server->isSentinelLive())
                                 <svg class="w-4 h-4 text-warning" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
                                     <path fill="currentColor"
                                         d="M236.8 188.09L149.35 36.22a24.76 24.76 0 0 0-42.7 0L19.2 188.09a23.51 23.51 0 0 0 0 23.72A24.35 24.35 0 0 0 40.55 224h174.9a24.35 24.35 0 0 0 21.33-12.19a23.51 23.51 0 0 0 .02-23.72m-13.87 15.71a8.5 8.5 0 0 1-7.48 4.2H40.55a8.5 8.5 0 0 1-7.48-4.2a7.59 7.59 0 0 1 0-7.72l87.45-151.87a8.75 8.75 0 0 1 15 0l87.45 151.87a7.59 7.59 0 0 1-.04 7.72M120 144v-40a8 8 0 0 1 16 0v40a8 8 0 0 1-16 0m20 36a12 12 0 1 1-12-12a12 12 0 0 1 12 12" />

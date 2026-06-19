@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ServiceDatabase;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
@@ -48,6 +50,20 @@ class CreateScheduledBackup extends Component
 
             $this->validate();
 
+            if ($this->saveToS3) {
+                $s3StorageExists = ! is_null($this->s3StorageId)
+                    && S3Storage::where('team_id', currentTeam()->id)
+                        ->where('is_usable', true)
+                        ->whereKey($this->s3StorageId)
+                        ->exists();
+
+                if (! $s3StorageExists) {
+                    $this->dispatch('error', 'Please select a valid S3 storage to enable S3 backups.');
+
+                    return;
+                }
+            }
+
             $isValid = validate_cron_expression($this->frequency);
             if (! $isValid) {
                 $this->dispatch('error', 'Invalid Cron / Human expression.');
@@ -74,7 +90,7 @@ class CreateScheduledBackup extends Component
             }
 
             $databaseBackup = ScheduledDatabaseBackup::create($payload);
-            if ($this->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
+            if ($this->database->getMorphClass() === ServiceDatabase::class) {
                 $this->dispatch('refreshScheduledBackups', $databaseBackup->id);
             } else {
                 $this->dispatch('refreshScheduledBackups');

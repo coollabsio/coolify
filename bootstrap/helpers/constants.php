@@ -1,7 +1,26 @@
 <?php
 
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
+
 const REDACTED = '<REDACTED>';
 const DATABASE_TYPES = ['postgresql', 'redis', 'mongodb', 'mysql', 'mariadb', 'keydb', 'dragonfly', 'clickhouse'];
+const STANDALONE_DATABASE_MODELS = [
+    'postgresql' => StandalonePostgresql::class,
+    'redis' => StandaloneRedis::class,
+    'mongodb' => StandaloneMongodb::class,
+    'mysql' => StandaloneMysql::class,
+    'mariadb' => StandaloneMariadb::class,
+    'keydb' => StandaloneKeydb::class,
+    'dragonfly' => StandaloneDragonfly::class,
+    'clickhouse' => StandaloneClickhouse::class,
+];
 const VALID_CRON_STRINGS = [
     'every_minute' => '* * * * *',
     'hourly' => '0 * * * *',
@@ -16,6 +35,9 @@ const VALID_CRON_STRINGS = [
     '@yearly' => '0 0 1 1 *',
 ];
 const RESTART_MODE = 'unless-stopped';
+const DEFAULT_STOP_GRACE_PERIOD_SECONDS = 30;
+const MIN_STOP_GRACE_PERIOD_SECONDS = 1;
+const MAX_STOP_GRACE_PERIOD_SECONDS = 3600;
 
 const DATABASE_DOCKER_IMAGES = [
     'bitnami/mariadb',

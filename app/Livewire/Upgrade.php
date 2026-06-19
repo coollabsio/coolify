@@ -23,22 +23,40 @@ class Upgrade extends Component
 
     public function mount()
     {
-        $this->currentVersion = config('constants.coolify.version');
-        $this->devMode = isDev();
+        $this->refreshUpgradeState();
     }
 
     public function checkUpdate()
     {
         try {
-            $this->latestVersion = get_latest_version_of_coolify();
-            $this->currentVersion = config('constants.coolify.version');
-            $this->isUpgradeAvailable = data_get(InstanceSettings::get(), 'new_version_available', false);
-            if (isDev()) {
-                $this->isUpgradeAvailable = true;
-            }
+            $this->refreshUpgradeState();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    protected function refreshUpgradeState(): void
+    {
+        $this->currentVersion = config('constants.coolify.version');
+        $this->latestVersion = get_latest_version_of_coolify();
+        $this->devMode = isDev();
+
+        if ($this->devMode) {
+            $this->isUpgradeAvailable = true;
+
+            return;
+        }
+
+        $settings = InstanceSettings::find(0);
+        $hasNewerVersion = version_compare($this->latestVersion, $this->currentVersion, '>');
+        $newVersionAvailable = (bool) data_get($settings, 'new_version_available', false);
+
+        if ($settings && $newVersionAvailable && ! $hasNewerVersion) {
+            $settings->update(['new_version_available' => false]);
+            $newVersionAvailable = false;
+        }
+
+        $this->isUpgradeAvailable = $hasNewerVersion && $newVersionAvailable;
     }
 
     public function upgrade()

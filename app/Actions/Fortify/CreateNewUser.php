@@ -2,6 +2,7 @@
 
 namespace App\Actions\Fortify;
 
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -44,7 +45,10 @@ class CreateNewUser implements CreatesNewUsers
                 'password' => Hash::make($input['password']),
             ]);
             $user->save();
-            $team = $user->teams()->first();
+            $team = $user->teams()->first() ?? Team::find(0);
+            if ($team !== null && ! $user->teams()->where('team_id', $team->id)->exists()) {
+                $user->teams()->attach($team, ['role' => 'owner']);
+            }
 
             // Disable registration after first user is created
             $settings = instanceSettings();

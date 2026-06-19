@@ -4,7 +4,7 @@
 An open-source & self-hostable Heroku / Netlify / Vercel alternative. 
 
 ![Latest Release Version](https://img.shields.io/badge/dynamic/json?labelColor=grey&color=6366f1&label=Latest%20released%20version&url=https%3A%2F%2Fcdn.coollabs.io%2Fcoolify%2Fversions.json&query=coolify.v4.version&style=for-the-badge
-) [![Bounty Issues](https://img.shields.io/static/v1?labelColor=grey&color=6366f1&label=Algora&message=%F0%9F%92%8E+Bounty+issues&style=for-the-badge)](https://console.algora.io/org/coollabsio/bounties/new)
+)
 </div>
 
 ## About the Project
@@ -59,24 +59,23 @@ Thank you so much!
 
 * [MVPS](https://www.mvps.net?ref=coolify.io) - Cheap VPS servers at the highest possible quality
 * [SerpAPI](https://serpapi.com?ref=coolify.io) - Google Search API — Scrape Google and other search engines from our fast, easy, and complete API
+* [Seibert Group](https://seibert.link/coolifysoftware?ref=coolify.io) - Boost productivity company-wide with AI agents like Claude Code
 * [ScreenshotOne](https://screenshotone.com?ref=coolify.io) - Screenshot API for devs
-*
+* [PrivateAlps](https://privatealps.net?ref=coolify.io) - Cloud Services Provider, VPS, servers infrastructure for people who care about privacy and control
 
 ### Big Sponsors
 
 * [23M](https://23m.com?ref=coolify.io) - Your experts for high-availability hosting solutions!
-* [Algora](https://algora.io?ref=coolify.io) - Open source contribution platform
 * [American Cloud](https://americancloud.com?ref=coolify.io) - US-based cloud infrastructure services
 * [Arcjet](https://arcjet.com?ref=coolify.io) - Advanced web security and performance solutions
 * [BC Direct](https://bc.direct?ref=coolify.io) - Your trusted technology consulting partner
 * [Blacksmith](https://blacksmith.sh?ref=coolify.io) - Infrastructure automation platform
-* [Context.dev](https://context.dev?ref=coolify.io) - API to personalize your product with logos, colors, and company info from any domain
+* [Capture.page](https://capture.page/?ref=coolify.io) - Fast & Reliable Screenshot API for Developers
 * [ByteBase](https://www.bytebase.com?ref=coolify.io) - Database CI/CD and Security at Scale
 * [CodeRabbit](https://coderabbit.ai?ref=coolify.io) - Cut Code Review Time & Bugs in Half
 * [COMIT](https://comit.international?ref=coolify.io) - New York Times award–winning contractor
 * [CompAI](https://www.trycomp.ai?ref=coolify.io) - Open source compliance automation platform
 * [Convex](https://convex.link/coolify.io) - Open-source reactive database for web app developers
-* [CubePath](https://cubepath.com/?ref=coolify.io) - Dedicated Servers & Instant Deploy
 * [Darweb](https://darweb.nl/?ref=coolify.io) - 3D CPQ solutions for ecommerce design
 * [Dataforest Cloud](https://cloud.dataforest.net/en?ref=coolify.io) - Deploy cloud servers as seeds independently in seconds. Enterprise hardware, premium network, 100% made in Germany.
 * [Formbricks](https://formbricks.com?ref=coolify.io) - The open source feedback platform
@@ -88,6 +87,7 @@ Thank you so much!
 * [Juxtdigital](https://juxtdigital.com?ref=coolify.io) - Digital PR & AI Authority Building Agency
 * [LiquidWeb](https://liquidweb.com?ref=coolify.io) - Premium managed hosting solutions
 * [Logto](https://logto.io?ref=coolify.io) - The better identity infrastructure for developers
+* [LumaDock](https://lumadock.com/vps-hosting/coolify?utm_source=coolify&utm_medium=sponsorship&utm_campaign=coolify_oss_sponsor_2026&utm_content=github_readme) - Fast and reliable virtual server hosting
 * [Macarne](https://macarne.com?ref=coolify.io) - Best IP Transit & Carrier Ethernet Solutions for Simplified Network Connectivity
 * [Mobb](https://vibe.mobb.ai/?ref=coolify.io) - Secure Your AI-Generated Code to Unlock Dev Productivity
 * [PetroSky Cloud](https://petrosky.io?ref=coolify.io) - Open source cloud deployment solutions
@@ -152,6 +152,10 @@ Thank you so much!
 <a href="https://capgo.app/?utm_source=coolify.io"><img width="60px" alt="Cap-go" src="https://github.com/cap-go.png"/></a>
 <a href="https://interviewpal.com/?utm_source=coolify.io"><img width="60px" alt="InterviewPal" src="/public/svgs/interviewpal.svg"/></a>
 <a href="https://transcript.lol/?utm_source=coolify.io"><img width="60px" alt="Transcript LOL" src="https://transcript.lol/logo.png"/></a>
+<a href="https://youstable.com/?utm_source=coolify.io"><img width="60px" alt="YouStable" src="https://github.com/youstable.png"/></a>
+<a href="https://github.com/mindedtech?utm_source=coolify.io"><img width="60px" alt="MindedTech" src="https://github.com/mindedtech.png"/></a>
+<a href="https://netrouting.com/?utm_source=coolify.io"><img width="60px" alt="NetRouting" src="https://github.com/netroutingcom.png"/></a>
+<a href="https://github.com/parsecph?utm_source=coolify.io"><img width="60px" alt="ParsecPH" src="https://github.com/parsecph.png"/></a>
 
 
 ...and many more at [GitHub Sponsors](https://github.com/sponsors/coollabsio)

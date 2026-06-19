@@ -30,7 +30,7 @@
             @endif
         </div>
         @if (!isCloud())
-            <div class="w-96">
+            <div class="w-full sm:w-96">
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSave()" id="useInstanceEmailSettings"
                     label="Use system wide (transactional) email settings" />
             </div>

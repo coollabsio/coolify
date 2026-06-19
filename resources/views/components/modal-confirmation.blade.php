@@ -129,7 +129,11 @@
 }"
     @keydown.escape.window="if (modalOpen) { modalOpen = false; resetModal(); }" :class="{ 'z-40': modalOpen }"
     class="relative w-auto h-auto">
-    @if ($customButton)
+    @if (isset($trigger))
+        <div @click="modalOpen=true">
+            {{ $trigger }}
+        </div>
+    @elseif ($customButton)
         @if ($buttonFullWidth)
             <x-forms.button @click="modalOpen=true" class="w-full">
                 {{ $customButton }}
