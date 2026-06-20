@@ -116,6 +116,7 @@ class HetznerController extends Controller
         if (! $token) {
             return response()->json(['message' => 'Hetzner cloud provider token not found.'], 404);
         }
+        $this->authorize('view', $token);
 
         try {
             $hetznerService = new HetznerService($token->token);
@@ -237,6 +238,7 @@ class HetznerController extends Controller
         if (! $token) {
             return response()->json(['message' => 'Hetzner cloud provider token not found.'], 404);
         }
+        $this->authorize('view', $token);
 
         try {
             $hetznerService = new HetznerService($token->token);
@@ -336,6 +338,7 @@ class HetznerController extends Controller
         if (! $token) {
             return response()->json(['message' => 'Hetzner cloud provider token not found.'], 404);
         }
+        $this->authorize('view', $token);
 
         try {
             $hetznerService = new HetznerService($token->token);
@@ -445,6 +448,7 @@ class HetznerController extends Controller
         if (! $token) {
             return response()->json(['message' => 'Hetzner cloud provider token not found.'], 404);
         }
+        $this->authorize('view', $token);
 
         try {
             $hetznerService = new HetznerService($token->token);
@@ -550,6 +554,7 @@ class HetznerController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
+        $this->authorize('create', [Server::class]);
 
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {
@@ -620,6 +625,7 @@ class HetznerController extends Controller
         if (! $token) {
             return response()->json(['message' => 'Hetzner cloud provider token not found.'], 404);
         }
+        $this->authorize('view', $token);
 
         // Validate private key
         $privateKey = PrivateKey::whereTeamId($teamId)->whereUuid($request->private_key_uuid)->first();

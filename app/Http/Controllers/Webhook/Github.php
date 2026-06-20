@@ -17,7 +17,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Visus\Cuid2\Cuid2;
 
 class Github extends Controller
 {
@@ -144,7 +143,7 @@ class Github extends Controller
 
                                     continue;
                                 }
-                                $deployment_uuid = new Cuid2;
+                                $deployment_uuid = new_public_id();
                                 $result = queue_application_deployment(
                                     application: $application,
                                     deployment_uuid: $deployment_uuid,
@@ -362,7 +361,7 @@ class Github extends Controller
 
                                     continue;
                                 }
-                                $deployment_uuid = new Cuid2;
+                                $deployment_uuid = new_public_id();
                                 $result = queue_application_deployment(
                                     application: $application,
                                     deployment_uuid: $deployment_uuid,

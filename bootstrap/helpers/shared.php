@@ -64,7 +64,6 @@ use PurplePixie\PhpDns\DNSQuery;
 use PurplePixie\PhpDns\DNSTypes;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 function base_configuration_dir(): string
 {
@@ -113,6 +112,13 @@ function sanitize_string(?string $input = null): ?string
     $sanitized = trim($sanitized);
 
     return $sanitized;
+}
+
+function new_public_id(int $length = 24): string
+{
+    $length = max(1, $length);
+
+    return Str::lower(Str::random($length));
 }
 
 /**
@@ -455,7 +461,7 @@ function generate_random_name(?string $cuid = null): string
         ]
     );
     if (is_null($cuid)) {
-        $cuid = new Cuid2;
+        $cuid = new_public_id();
     }
 
     return Str::kebab("{$generator->getName()}-$cuid");
@@ -491,7 +497,7 @@ function formatPrivateKey(string $privateKey)
 function generate_application_name(string $git_repository, string $git_branch, ?string $cuid = null): string
 {
     if (is_null($cuid)) {
-        $cuid = new Cuid2;
+        $cuid = new_public_id();
     }
 
     $repo_name = str_contains($git_repository, '/') ? last(explode('/', $git_repository)) : $git_repository;
@@ -1057,7 +1063,6 @@ function sslip(Server $server)
 
 function get_service_templates(bool $force = false): Collection
 {
-
     if ($force) {
         try {
             $response = Http::retry(3, 1000)->get(config('constants.services.official'));
@@ -1068,15 +1073,16 @@ function get_service_templates(bool $force = false): Collection
 
             return collect($services);
         } catch (Throwable) {
-            $services = File::get(base_path('templates/'.config('constants.services.file_name')));
-
-            return collect(json_decode($services))->sortKeys();
+            return get_service_templates();
         }
-    } else {
-        $services = File::get(base_path('templates/'.config('constants.services.file_name')));
-
-        return collect(json_decode($services))->sortKeys();
     }
+
+    $path = base_path('templates/'.config('constants.services.file_name'));
+    $mtime = filemtime($path) ?: 0;
+
+    return Cache::remember("service-templates:{$mtime}", now()->addDay(), function () use ($path) {
+        return collect(json_decode(File::get($path)))->sortKeys();
+    });
 }
 
 function getResourceByUuid(string $uuid, ?int $teamId = null)
@@ -3259,7 +3265,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     $template = $resource->preview_url_template;
                                     $host = $url->getHost();
                                     $schema = $url->getScheme();
-                                    $random = new Cuid2;
+                                    $random = new_public_id();
                                     $preview_fqdn = str_replace('{{random}}', $random, $template);
                                     $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
                                     $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);

@@ -6,7 +6,6 @@ use App\Models\Project;
 use App\Models\Server;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
 
 class Select extends Component
@@ -107,7 +106,7 @@ class Select extends Component
     public function loadServices()
     {
         $services = get_service_templates();
-        $templateLastUpdatedMap = $this->serviceTemplateLastUpdatedMap($services->keys());
+        $templateLastUpdatedMap = $this->serviceTemplateLastUpdatedMap($services);
 
         $services = collect($services)->map(function ($service, $key) use ($templateLastUpdatedMap) {
             $default_logo = 'images/default.webp';
@@ -279,19 +278,31 @@ class Select extends Component
         return $this->formatLastModified($this->serviceTemplatesPath());
     }
 
-    private function serviceTemplateLastUpdatedMap(Collection $serviceNames): array
+    private function serviceTemplateLastUpdatedMap(Collection $services): array
     {
-        $bundleMtime = file_exists($this->serviceTemplatesPath()) ? filemtime($this->serviceTemplatesPath()) : 0;
+        return $services
+            ->mapWithKeys(fn ($service, $serviceName) => [
+                (string) $serviceName => $this->serviceTemplateLastUpdatedFromPayload($service)
+                    ?? $this->serviceTemplateLastUpdated((string) $serviceName),
+            ])
+            ->all();
+    }
 
-        return Cache::remember(
-            "service-template-last-updated-map:{$bundleMtime}",
-            now()->addDay(),
-            fn () => $serviceNames
-                ->mapWithKeys(fn ($serviceName) => [
-                    (string) $serviceName => $this->serviceTemplateLastUpdated((string) $serviceName),
-                ])
-                ->all()
-        );
+    private function serviceTemplateLastUpdatedFromPayload(mixed $service): ?string
+    {
+        $timestamp = data_get($service, 'template_last_updated_at');
+
+        if (! is_string($timestamp) || $timestamp === '') {
+            return null;
+        }
+
+        try {
+            return CarbonImmutable::parse($timestamp)
+                ->timezone(config('app.timezone'))
+                ->format('M j, Y H:i');
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function serviceTemplateLastUpdated(string $serviceName): ?string

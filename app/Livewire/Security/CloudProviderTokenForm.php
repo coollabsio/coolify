@@ -21,7 +21,11 @@ class CloudProviderTokenForm extends Component
 
     public function mount()
     {
-        $this->authorize('create', CloudProviderToken::class);
+        try {
+            $this->authorize('create', CloudProviderToken::class);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     protected function rules(): array
@@ -50,7 +54,6 @@ class CloudProviderTokenForm extends Component
                 $response = Http::withHeaders([
                     'Authorization' => 'Bearer '.$token,
                 ])->timeout(10)->get('https://api.hetzner.cloud/v1/servers');
-                ray($response);
 
                 return $response->successful();
             }
@@ -79,6 +82,13 @@ class CloudProviderTokenForm extends Component
                 'provider' => $this->provider,
                 'token' => $this->token,
                 'name' => $this->name,
+            ]);
+
+            auditLog('ui.cloud_token.created', [
+                'team_id' => currentTeam()->id,
+                'cloud_token_uuid' => $savedToken->uuid,
+                'cloud_token_name' => $savedToken->name,
+                'provider' => $savedToken->provider,
             ]);
 
             $this->reset(['token', 'name']);
