@@ -36,6 +36,44 @@
                     <script>
                         (function() {
                             checkTheme();
+                            const serverTimezone = @js(getServerTimezone($server));
+                            let serverTimezoneFormatter;
+                            try {
+                                serverTimezoneFormatter = new Intl.DateTimeFormat('en-US', {
+                                    timeZone: serverTimezone,
+                                    hourCycle: 'h23',
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                });
+                            } catch (e) {
+                                serverTimezoneFormatter = null;
+                            }
+                            const shiftSeriesToServerTimezone = (seriesData) => {
+                                if (!Array.isArray(seriesData) || !serverTimezoneFormatter) {
+                                    return seriesData;
+                                }
+                                return seriesData.map((point) => {
+                                    const timestamp = Array.isArray(point) ? point[0] : point.x;
+                                    const value = Array.isArray(point) ? point[1] : point.y;
+                                    const parts = {};
+                                    serverTimezoneFormatter.formatToParts(new Date(timestamp)).forEach((part) => {
+                                        parts[part.type] = part.value;
+                                    });
+                                    const shifted = Date.UTC(
+                                        Number(parts.year),
+                                        Number(parts.month) - 1,
+                                        Number(parts.day),
+                                        Number(parts.hour),
+                                        Number(parts.minute),
+                                        Number(parts.second)
+                                    );
+                                    return [shifted, value];
+                                });
+                            };
                             const optionsServerCpu = {
                                 stroke: {
                                     curve: 'straight',
@@ -124,7 +162,7 @@
                                 checkTheme();
                                  serverCpuChart.updateOptions({
                                          series: [{
-                                             data: chartData[0].seriesData,
+                                             data: shiftSeriesToServerTimezone(chartData[0].seriesData),
                                          }],
                                          colors: [cpuColor],
                                         xaxis: {
@@ -166,6 +204,44 @@
                         <script>
                             (function() {
                                 checkTheme();
+                                const serverTimezone = @js(getServerTimezone($server));
+                                let serverTimezoneFormatter;
+                                try {
+                                    serverTimezoneFormatter = new Intl.DateTimeFormat('en-US', {
+                                        timeZone: serverTimezone,
+                                        hourCycle: 'h23',
+                                        year: 'numeric',
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        second: '2-digit',
+                                    });
+                                } catch (e) {
+                                    serverTimezoneFormatter = null;
+                                }
+                                const shiftSeriesToServerTimezone = (seriesData) => {
+                                    if (!Array.isArray(seriesData) || !serverTimezoneFormatter) {
+                                        return seriesData;
+                                    }
+                                    return seriesData.map((point) => {
+                                        const timestamp = Array.isArray(point) ? point[0] : point.x;
+                                        const value = Array.isArray(point) ? point[1] : point.y;
+                                        const parts = {};
+                                        serverTimezoneFormatter.formatToParts(new Date(timestamp)).forEach((part) => {
+                                            parts[part.type] = part.value;
+                                        });
+                                        const shifted = Date.UTC(
+                                            Number(parts.year),
+                                            Number(parts.month) - 1,
+                                            Number(parts.day),
+                                            Number(parts.hour),
+                                            Number(parts.minute),
+                                            Number(parts.second)
+                                        );
+                                        return [shifted, value];
+                                    });
+                                };
                                 const optionsServerMemory = {
                                     stroke: {
                                         curve: 'straight',
@@ -260,7 +336,7 @@
                                     checkTheme();
                                      serverMemoryChart.updateOptions({
                                              series: [{
-                                                 data: chartData[0].seriesData,
+                                                 data: shiftSeriesToServerTimezone(chartData[0].seriesData),
                                              }],
                                              colors: [ramColor],
                                             xaxis: {
