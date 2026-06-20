@@ -1363,6 +1363,7 @@ CREATE TABLE IF NOT EXISTS "v5_servers" (
     "ssh_user" TEXT NOT NULL,
     "ssh_port" INTEGER DEFAULT '22' NOT NULL,
     "status" TEXT DEFAULT 'installed' NOT NULL,
+    "caddy_ingress_status" TEXT,
     "capabilities" TEXT,
     "builder_enabled" INTEGER DEFAULT false NOT NULL,
     "builder_capacity" INTEGER DEFAULT '0' NOT NULL,
@@ -1373,6 +1374,8 @@ CREATE TABLE IF NOT EXISTS "v5_servers" (
     "wireguard_management_ip" TEXT,
     "wireguard_public_key" TEXT,
     "container_subnets" JSON,
+    "canvas_x" INTEGER,
+    "canvas_y" INTEGER,
     "last_bootstrapped_at" TEXT,
     "last_bootstrap_action" TEXT,
     "last_bootstrap_status" TEXT,
@@ -1381,6 +1384,40 @@ CREATE TABLE IF NOT EXISTS "v5_servers" (
     "last_status_check" TEXT,
     "last_status_output" TEXT,
     "last_status_checked_at" TEXT,
+    "created_at" TEXT,
+    "updated_at" TEXT
+);
+
+CREATE TABLE IF NOT EXISTS "v5_container_statuses" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "team_id" INTEGER NOT NULL,
+    "server_id" INTEGER NOT NULL,
+    "container_id" TEXT NOT NULL,
+    "container_name" TEXT,
+    "image" TEXT,
+    "status" TEXT DEFAULT 'unknown' NOT NULL,
+    "status_message" TEXT,
+    "last_seen_at" TEXT,
+    "created_at" TEXT,
+    "updated_at" TEXT
+);
+
+CREATE TABLE IF NOT EXISTS "v5_applications" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "team_id" INTEGER NOT NULL,
+    "project_id" INTEGER NOT NULL,
+    "environment_id" INTEGER NOT NULL,
+    "server_id" INTEGER,
+    "created_by_user_id" INTEGER NOT NULL,
+    "name" TEXT NOT NULL,
+    "image" TEXT NOT NULL,
+    "container_name" TEXT NOT NULL,
+    "status" TEXT DEFAULT 'creating' NOT NULL,
+    "status_message" TEXT,
+    "runtime_container_id" TEXT,
+    "mesh_namespace" TEXT DEFAULT 'default' NOT NULL,
+    "canvas_x" INTEGER DEFAULT '0' NOT NULL,
+    "canvas_y" INTEGER DEFAULT '0' NOT NULL,
     "created_at" TEXT,
     "updated_at" TEXT
 );
@@ -1499,6 +1536,7 @@ CREATE INDEX IF NOT EXISTS "user_changelog_reads_release_tag_index" ON "user_cha
 CREATE INDEX IF NOT EXISTS "user_changelog_reads_user_id_index" ON "user_changelog_reads" (user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS "user_changelog_reads_user_id_release_tag_unique" ON "user_changelog_reads" (user_id, release_tag);
 CREATE UNIQUE INDEX IF NOT EXISTS "users_email_unique" ON "users" (email);
+CREATE UNIQUE INDEX IF NOT EXISTS "v5_applications_container_name_unique" ON "v5_applications" (container_name);
 CREATE UNIQUE INDEX IF NOT EXISTS "v5_servers_uuid_unique" ON "v5_servers" (uuid);
 CREATE UNIQUE INDEX IF NOT EXISTS "webhook_notification_settings_team_id_unique" ON "webhook_notification_settings" (team_id);
 
@@ -1819,3 +1857,7 @@ INSERT INTO "migrations" ("id", "migration", "batch") VALUES (313, '2025_12_17_0
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (314, '2025_12_17_000002_add_restart_tracking_to_standalone_databases', 314);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (316, '2026_06_16_130649_v5_create_clusters_table', 316);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (317, '2026_06_16_130650_v5_create_servers_table', 317);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (318, '2026_06_19_140000_v5_create_applications_table', 318);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (319, '2026_06_19_141231_add_canvas_position_to_v5_servers_table', 319);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (320, '2026_06_19_173933_add_caddy_ingress_status_to_v5_servers_table', 320);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (321, '2026_06_19_182231_create_container_statuses_table', 321);

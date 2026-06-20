@@ -128,6 +128,7 @@ update_env_var() {
 }
 
 log "Checking environment variables..."
+update_env_var "COOLIFY_FLUX_LARAVEL_API_TOKEN" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_ID" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_KEY" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_SECRET" "$(openssl rand -hex 32)"

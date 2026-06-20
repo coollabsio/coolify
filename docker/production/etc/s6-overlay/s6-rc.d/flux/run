@@ -20,7 +20,11 @@ export COOLIFY_FLUX_UNIX_SOCKET_PATH="${COOLIFY_FLUX_UNIX_SOCKET_PATH:-/run/cool
 export COOLIFY_FLUX_JWT_PRIVATE_KEY_PATH="${COOLIFY_FLUX_JWT_PRIVATE_KEY_PATH:-/var/www/html/storage/app/flux/jwt.priv}"
 export COOLIFY_FLUX_JWT_PUBLIC_KEY_PATH="${COOLIFY_FLUX_JWT_PUBLIC_KEY_PATH:-/var/www/html/storage/app/flux/jwt.pub}"
 export COOLIFY_FLUX_ALLOW_PUBLIC_BIND="${COOLIFY_FLUX_ALLOW_PUBLIC_BIND:-1}"
-
+export COOLIFY_FLUX_LARAVEL_API_URL="${COOLIFY_FLUX_LARAVEL_API_URL:-http://127.0.0.1:8080}"
+if [ -z "${COOLIFY_FLUX_LARAVEL_API_TOKEN:-}" ] && [ -f .env ]; then
+    COOLIFY_FLUX_LARAVEL_API_TOKEN="$(grep -E '^COOLIFY_FLUX_LARAVEL_API_TOKEN=' .env 2>/dev/null | tail -n1 | cut -d= -f2- | sed "s/^['\"]//; s/['\"]$//")"
+fi
+export COOLIFY_FLUX_LARAVEL_API_TOKEN="${COOLIFY_FLUX_LARAVEL_API_TOKEN:-}"
 if [ ! -r "$COOLIFY_FLUX_JWT_PUBLIC_KEY_PATH" ]; then
     echo "   INFO  Flux JWT public key not found at $COOLIFY_FLUX_JWT_PUBLIC_KEY_PATH, generating keypair..."
     mkdir -p "$(dirname "$COOLIFY_FLUX_JWT_PRIVATE_KEY_PATH")" "$(dirname "$COOLIFY_FLUX_JWT_PUBLIC_KEY_PATH")"

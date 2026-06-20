@@ -2,11 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\V5\Server\SyncDevLimaServers;
 use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
-use App\Models\V5\Cluster;
-use App\Models\V5\Server;
 use Illuminate\Console\Command;
 
 class V5SyncDevLimaServers extends Command
@@ -17,7 +16,7 @@ class V5SyncDevLimaServers extends Command
         {--private-key-id= : Optional private key used by the dev servers}
         {--cluster=Development-Lima : Cluster name for the dev Lima servers}
         {--builder-capacity=2 : Builder capacity to record for each dev server}
-        {--server=* : Server as name|host|ssh_user|ssh_port}
+        {--server=* : Server as name|host|ssh_user|ssh_port|wireguard_management_ip}
         {--force : Allow running outside local/development environments}';
 
     protected $description = 'Sync development Lima VMs into the v5 server/cluster tables.';
@@ -55,47 +54,40 @@ class V5SyncDevLimaServers extends Command
             return self::SUCCESS;
         }
 
-        $cluster = Cluster::query()->updateOrCreate([
-            'team_id' => $team->id,
-            'name' => (string) $this->option('cluster'),
-        ], [
-            'created_by_user_id' => $user->id,
-            'description' => 'Local Lima development cluster managed by scripts/dev.sh.',
-        ]);
-
-        $builderCapacity = max(0, (int) $this->option('builder-capacity'));
-        $builderEnabled = $builderCapacity > 0;
-        $capabilities = $builderEnabled ? ['coold', 'builder'] : ['coold'];
+        $parsedServers = [];
 
         foreach ($servers as $server) {
             $parts = explode('|', (string) $server);
 
-            if (count($parts) !== 4) {
-                $this->error("Invalid server '{$server}'. Expected name|host|ssh_user|ssh_port.");
+            if (! in_array(count($parts), [4, 5], true)) {
+                $this->error("Invalid server '{$server}'. Expected name|host|ssh_user|ssh_port|wireguard_management_ip.");
 
                 return self::FAILURE;
             }
 
-            [$name, $host, $sshUser, $sshPort] = $parts;
+            [$name, $host, $sshUser, $sshPort] = array_slice($parts, 0, 4);
+            $wireguardManagementIp = ($parts[4] ?? null) ?: null;
 
-            Server::query()->updateOrCreate([
-                'team_id' => $team->id,
-                'cluster_id' => $cluster->id,
+            $parsedServers[] = [
                 'name' => $name,
-            ], [
-                'created_by_user_id' => $user->id,
-                'private_key_id' => $privateKey?->id,
                 'host' => $host,
                 'ssh_user' => $sshUser,
                 'ssh_port' => (int) $sshPort,
-                'status' => 'installed',
-                'capabilities' => $capabilities,
-                'builder_enabled' => $builderEnabled,
-                'builder_capacity' => $builderCapacity,
-                'last_bootstrapped_at' => now(),
-            ]);
+                'wireguard_management_ip' => $wireguardManagementIp,
+            ];
+        }
 
-            $this->info("Synced {$name} ({$host}:{$sshPort}).");
+        SyncDevLimaServers::run(
+            team: $team,
+            user: $user,
+            privateKey: $privateKey,
+            clusterName: (string) $this->option('cluster'),
+            builderCapacity: (int) $this->option('builder-capacity'),
+            servers: $parsedServers,
+        );
+
+        foreach ($parsedServers as $server) {
+            $this->info("Synced {$server['name']} ({$server['host']}:{$server['ssh_port']}).");
         }
 
         return self::SUCCESS;

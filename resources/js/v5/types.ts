@@ -14,6 +14,7 @@ export type V5Server = {
     builderEnabled: boolean;
     builderCapacity: number;
     builderCpuQuota: string;
+    ingressEnabled: boolean;
     uuid: string | null;
     nodeAddress: string | null;
     wireguardListenPortOverride: number | null;
@@ -73,11 +74,55 @@ export type V5PrivateKey = {
     name: string;
 };
 
+export type V5NginxServer = {
+    id: string;
+    name: string;
+    host: string;
+    status: string;
+};
+
+export type V5Application = {
+    id: string;
+    name: string;
+    image: string;
+    containerName: string;
+    status: 'creating' | 'running' | 'failed' | string;
+    statusMessage: string | null;
+    runtimeContainerId: string | null;
+    serverName: string | null;
+    meshNamespace: string;
+    meshFqdn: string;
+    canvasX: number;
+    canvasY: number;
+};
+
+export type V5CaddyIngress = {
+    id: string;
+    name: string;
+    host: string;
+    status: string;
+    canvasX: number;
+    canvasY: number;
+};
+
+
+export type V5ResourceConnection = {
+    id: string;
+    applicationIds: [string, string];
+    fromApplicationId: string;
+    toApplicationId: string;
+    portsByDirection: Record<string, string[]>;
+};
+
 export type V5DashboardProps = {
     flux: FluxStatus | null;
     currentTeam?: {
         id: number;
     } | null;
+    applications?: V5Application[];
+    caddyIngresses?: V5CaddyIngress[];
+    resourceConnections?: V5ResourceConnection[];
+    nginxServers?: V5NginxServer[];
     clusters?: V5Cluster[];
     privateKeys?: V5PrivateKey[];
     projects?: V5Project[];

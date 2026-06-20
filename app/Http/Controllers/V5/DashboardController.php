@@ -2,6 +2,10 @@
 
 namespace App\Http\Controllers\V5;
 
+use App\Actions\V5\Application\DeployNginxApplication;
+use App\Actions\V5\Application\DestroyNginxApplication;
+use App\Actions\V5\Proxy\StartCaddyIngress;
+use App\Actions\V5\Proxy\StopCaddyIngress;
 use App\Events\V5ClusterUpdated;
 use App\Events\V5RealtimeTestEvent;
 use App\Http\Controllers\Controller;
@@ -10,20 +14,32 @@ use App\Models\Environment;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Team;
+use App\Models\V5\Application as V5Application;
 use App\Models\V5\Cluster as V5Cluster;
+use App\Models\V5\ResourceConnection;
 use App\Models\V5\Server as V5Server;
+use App\Services\Flux\FluxClient;
 use App\Services\Flux\FluxHealth;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DashboardController extends Controller
 {
+    private const CANVAS_CARD_WIDTH = 320;
+
+    private const CANVAS_CARD_HEIGHT = 144;
+
+    private const CANVAS_CARD_GAP = 32;
+
     private const SELECTED_PROJECT_SESSION_KEY = 'v5.selectedProjectUuid';
 
     private const SELECTED_ENVIRONMENT_SESSION_KEY = 'v5.selectedEnvironmentUuid';
@@ -35,7 +51,12 @@ class DashboardController extends Controller
         [$selectedProject, $selectedEnvironment] = $this->selectedProjectAndEnvironment($request, $projects);
 
         return Inertia::render('Dashboard', [
+            'currentTeam' => $this->serializeCurrentTeam($currentTeam),
             'flux' => $fluxHealth->check(),
+            'applications' => $this->applications($currentTeam, $selectedProject, $selectedEnvironment),
+            'caddyIngresses' => $this->caddyIngresses($currentTeam),
+            'resourceConnections' => $this->resourceConnections($currentTeam, $selectedProject, $selectedEnvironment),
+            'nginxServers' => $this->nginxServers($currentTeam),
             'projects' => $projects,
             'selectedProjectUuid' => $selectedProject['uuid'] ?? null,
             'selectedEnvironmentUuid' => $selectedEnvironment['uuid'] ?? null,
@@ -49,6 +70,7 @@ class DashboardController extends Controller
         [$selectedProject, $selectedEnvironment] = $this->selectedProjectAndEnvironment($request, $projects);
 
         return Inertia::render('Clusters', [
+            'currentTeam' => $this->serializeCurrentTeam($currentTeam),
             'flux' => $fluxHealth->check(),
             'clusters' => $this->clusters($currentTeam),
             'privateKeys' => $this->privateKeys($currentTeam),
@@ -135,6 +157,391 @@ class DashboardController extends Controller
             self::SELECTED_PROJECT_SESSION_KEY => $project->uuid,
             self::SELECTED_ENVIRONMENT_SESSION_KEY => $environment?->uuid,
         ]);
+
+        return response()->noContent();
+    }
+
+    public function storeNginxApplication(Request $request): JsonResponse
+    {
+        $currentTeam = $request->attributes->get('v5.currentTeam');
+
+        if (! $currentTeam instanceof Team) {
+            abort(403);
+        }
+
+        $projects = $this->projects($currentTeam);
+        [$selectedProject, $selectedEnvironment] = $this->selectedProjectAndEnvironment($request, $projects);
+
+        if ($selectedProject === null || $selectedEnvironment === null) {
+            return response()->json([
+                'message' => 'Select a project and environment before deploying nginx.',
+            ], 422);
+        }
+
+        $project = $this->projectQuery($currentTeam)
+            ->where('uuid', $selectedProject['uuid'])
+            ->first();
+
+        if (! $project instanceof Project) {
+            abort(403);
+        }
+
+        $environment = $this->selectedEnvironment($project, $selectedEnvironment['uuid']);
+
+        if (! $environment instanceof Environment) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'server_id' => ['nullable', 'integer'],
+        ]);
+
+        $server = V5Server::query()
+            ->where('team_id', $currentTeam->id)
+            ->when(
+                isset($validated['server_id']),
+                fn (Builder $query) => $query->whereKey($validated['server_id']),
+                fn (Builder $query) => $query
+                    ->orderByRaw('last_bootstrapped_at is null')
+                    ->orderBy('name')
+            )
+            ->first();
+
+        if (! $server instanceof V5Server) {
+            return response()->json([
+                'message' => 'Add a v5 server before deploying nginx.',
+            ], 422);
+        }
+
+        $canvasPosition = $this->nextApplicationCanvasPosition($currentTeam, $project, $environment);
+
+        $application = V5Application::query()->create([
+            'team_id' => $currentTeam->id,
+            'project_id' => $project->id,
+            'environment_id' => $environment->id,
+            'server_id' => $server->id,
+            'created_by_user_id' => $request->user()->id,
+            'name' => 'nginx-test',
+            'image' => 'docker.io/library/nginx:alpine',
+            'container_name' => 'coolify-v5-nginx-'.strtolower((string) Str::ulid()),
+            'status' => 'creating',
+            'status_message' => 'Starting nginx container.',
+            'mesh_namespace' => 'default',
+            'canvas_x' => $canvasPosition['canvas_x'],
+            'canvas_y' => $canvasPosition['canvas_y'],
+        ]);
+
+        $application = DeployNginxApplication::run($application);
+
+        return response()->json([
+            'application' => $this->serializeApplication($application),
+        ], $application->status === 'running' ? 201 : 422);
+    }
+
+    public function refreshApplications(Request $request, FluxClient $fluxClient): JsonResponse
+    {
+        $currentTeam = $request->attributes->get('v5.currentTeam');
+
+        if (! $currentTeam instanceof Team) {
+            abort(403);
+        }
+
+        $projects = $this->projects($currentTeam);
+        [$selectedProject, $selectedEnvironment] = $this->selectedProjectAndEnvironment($request, $projects);
+
+        if ($selectedProject === null || $selectedEnvironment === null) {
+            return response()->json([
+                'message' => 'Select a project and environment before refreshing applications.',
+            ], 422);
+        }
+
+        $applications = $this->applicationQuery($currentTeam, $selectedProject, $selectedEnvironment)
+            ->with('server')
+            ->get();
+        $errors = [];
+
+        $applications
+            ->groupBy('server_id')
+            ->each(function (Collection $serverApplications) use ($fluxClient, &$errors): void {
+                /** @var V5Application|null $firstApplication */
+                $firstApplication = $serverApplications->first();
+                $server = $firstApplication?->server;
+                $hostId = $server?->wireguard_management_ip ?: $server?->node_address;
+
+                if (! $server instanceof V5Server || ! is_string($hostId) || $hostId === '') {
+                    $errors[] = 'A server is missing its Flux host id.';
+
+                    return;
+                }
+
+                try {
+                    $containers = collect($fluxClient->listContainers($hostId));
+                } catch (\Throwable $e) {
+                    $errors[] = $e->getMessage();
+
+                    return;
+                }
+
+                $serverApplications->each(function (V5Application $application) use ($containers): void {
+                    $container = $containers->first(function (array $container) use ($application): bool {
+                        return ($application->runtime_container_id !== null && ($container['id'] ?? null) === $application->runtime_container_id)
+                            || ($container['name'] ?? null) === $application->container_name;
+                    });
+
+                    if (! is_array($container)) {
+                        $application->update([
+                            'status' => 'exited',
+                            'status_message' => 'Container not found on server.',
+                        ]);
+
+                        return;
+                    }
+
+                    $state = is_string($container['state'] ?? null) && $container['state'] !== '' ? $container['state'] : 'unknown';
+
+                    $application->update([
+                        'status' => strtolower($state),
+                        'status_message' => 'Container state refreshed from coold.',
+                        'runtime_container_id' => is_string($container['id'] ?? null) ? $container['id'] : $application->runtime_container_id,
+                    ]);
+                });
+            });
+
+        V5Server::query()
+            ->where('team_id', $currentTeam->id)
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (V5Server $server) => $server->isIngress())
+            ->each(function (V5Server $server) use ($fluxClient, &$errors): void {
+                $hostId = $server->wireguard_management_ip ?: $server->node_address;
+
+                if (! is_string($hostId) || $hostId === '') {
+                    $errors[] = "Caddy ingress server {$server->name} is missing its Flux host id.";
+
+                    return;
+                }
+
+                try {
+                    $containers = collect($fluxClient->listContainers($hostId));
+                } catch (\Throwable $e) {
+                    $errors[] = $e->getMessage();
+
+                    return;
+                }
+
+                $container = $containers->first(fn (array $container) => ($container['name'] ?? null) === 'coolify-v5-caddy');
+                $state = is_array($container) && is_string($container['state'] ?? null) && $container['state'] !== ''
+                    ? strtolower($container['state'])
+                    : 'exited';
+
+                $server->update([
+                    'caddy_ingress_status' => $state,
+                    'last_status_check' => 'flux',
+                    'last_status_output' => 'Caddy ingress state refreshed from coold.',
+                    'last_status_checked_at' => now(),
+                ]);
+            });
+
+        return response()->json([
+            'applications' => $this->applicationQuery($currentTeam, $selectedProject, $selectedEnvironment)
+                ->with('server')
+                ->orderBy('created_at')
+                ->get()
+                ->map(fn (V5Application $application) => $this->serializeApplication($application))
+                ->all(),
+            'caddyIngresses' => $this->caddyIngresses($currentTeam),
+            'errors' => $errors,
+        ]);
+    }
+
+    public function updateApplicationPosition(Request $request, V5Application $application): JsonResponse
+    {
+        $currentTeam = $request->attributes->get('v5.currentTeam');
+
+        if (! $currentTeam instanceof Team || $application->team_id !== $currentTeam->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'canvas_x' => ['required', 'integer', 'min:-100000', 'max:100000'],
+            'canvas_y' => ['required', 'integer', 'min:-100000', 'max:100000'],
+        ]);
+
+        $application->update([
+            'canvas_x' => $validated['canvas_x'],
+            'canvas_y' => $validated['canvas_y'],
+        ]);
+
+        return response()->json([
+            'application' => $this->serializeApplication($application->refresh()->load('server')),
+        ]);
+    }
+
+    public function updateCaddyIngressPosition(Request $request, V5Server $server): JsonResponse
+    {
+        $currentTeam = $request->attributes->get('v5.currentTeam');
+
+        if (! $currentTeam instanceof Team || $server->team_id !== $currentTeam->id || ! $server->isIngress()) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'canvas_x' => ['required', 'integer', 'min:-100000', 'max:100000'],
+            'canvas_y' => ['required', 'integer', 'min:-100000', 'max:100000'],
+        ]);
+
+        $server->update([
+            'canvas_x' => $validated['canvas_x'],
+            'canvas_y' => $validated['canvas_y'],
+        ]);
+
+        return response()->json([
+            'caddyIngress' => $this->serializeCaddyIngress($server->refresh()),
+        ]);
+    }
+
+    public function destroyApplication(Request $request, V5Application $application): \Illuminate\Http\Response|JsonResponse
+    {
+        $currentTeam = $request->attributes->get('v5.currentTeam');
+
+        if (! $currentTeam instanceof Team || $application->team_id !== $currentTeam->id) {
+            abort(404);
+        }
+
+        $error = DestroyNginxApplication::run($application);
+
+        if ($error !== null) {
+            return response()->json([
+                'message' => $error,
+            ], 422);
+        }
+
+        $application->delete();
+
+        return response()->noContent();
+    }
+
+    public function storeResourceConnection(Request $request): JsonResponse
+    {
+        $currentTeam = $request->attributes->get('v5.currentTeam');
+
+        if (! $currentTeam instanceof Team) {
+            abort(403);
+        }
+
+        $projects = $this->projects($currentTeam);
+        [$selectedProject, $selectedEnvironment] = $this->selectedProjectAndEnvironment($request, $projects);
+
+        if ($selectedProject === null || $selectedEnvironment === null) {
+            return response()->json([
+                'message' => 'Select a project and environment before connecting resources.',
+            ], 422);
+        }
+
+        $project = $this->projectQuery($currentTeam)
+            ->where('uuid', $selectedProject['uuid'])
+            ->first();
+
+        if (! $project instanceof Project) {
+            abort(403);
+        }
+
+        $environment = $this->selectedEnvironment($project, $selectedEnvironment['uuid']);
+
+        if (! $environment instanceof Environment) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'resource_one' => ['required', 'array'],
+            'resource_one.type' => ['required', 'string', Rule::in(['application'])],
+            'resource_one.id' => ['required', 'integer'],
+            'resource_two' => ['required', 'array'],
+            'resource_two.type' => ['required', 'string', Rule::in(['application'])],
+            'resource_two.id' => ['required', 'integer'],
+        ]);
+
+        $resourceOne = $this->resolveConnectableResource($currentTeam, $project, $environment, $validated['resource_one']);
+        $resourceTwo = $this->resolveConnectableResource($currentTeam, $project, $environment, $validated['resource_two']);
+
+        if ($this->resourceIdentity($resourceOne) === $this->resourceIdentity($resourceTwo)) {
+            return response()->json([
+                'message' => 'A resource cannot connect to itself.',
+            ], 422);
+        }
+
+        $connection = ResourceConnection::query()->firstOrCreate(
+            [
+                'team_id' => $currentTeam->id,
+                'resource_pair_key' => $this->resourcePairKey($resourceOne, $resourceTwo),
+            ],
+            [
+                'project_id' => $project->id,
+                'environment_id' => $environment->id,
+                'resource_one_type' => $resourceOne->getMorphClass(),
+                'resource_one_id' => $resourceOne->getKey(),
+                'resource_two_type' => $resourceTwo->getMorphClass(),
+                'resource_two_id' => $resourceTwo->getKey(),
+                'created_by_user_id' => $request->user()->id,
+            ],
+        );
+
+        return response()->json([
+            'connection' => $this->serializeResourceConnection($connection->load('rules')),
+        ], $connection->wasRecentlyCreated ? 201 : 200);
+    }
+
+    public function updateResourceConnection(Request $request, ResourceConnection $connection): JsonResponse
+    {
+        $currentTeam = $request->attributes->get('v5.currentTeam');
+
+        if (! $currentTeam instanceof Team || $connection->team_id !== $currentTeam->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'ports_by_direction' => ['present', 'array'],
+            'ports_by_direction.*' => ['array'],
+            'ports_by_direction.*.*' => ['integer', 'min:1', 'max:65535', 'distinct'],
+        ]);
+
+        DB::transaction(function () use ($connection, $validated): void {
+            $connection->rules()->delete();
+
+            foreach ($validated['ports_by_direction'] as $direction => $ports) {
+                [$sourceResourceId, $targetResourceId] = array_pad(explode('->', (string) $direction, 2), 2, null);
+
+                if (! $this->connectionHasResourceId($connection, $sourceResourceId) || ! $this->connectionHasResourceId($connection, $targetResourceId)) {
+                    continue;
+                }
+
+                foreach (array_unique($ports) as $port) {
+                    $connection->rules()->create([
+                        'source_resource_type' => $this->resourceTypeForConnectionId($connection, (int) $sourceResourceId),
+                        'source_resource_id' => (int) $sourceResourceId,
+                        'target_resource_type' => $this->resourceTypeForConnectionId($connection, (int) $targetResourceId),
+                        'target_resource_id' => (int) $targetResourceId,
+                        'protocol' => 'tcp',
+                        'port' => (int) $port,
+                    ]);
+                }
+            }
+        });
+
+        return response()->json([
+            'connection' => $this->serializeResourceConnection($connection->refresh()->load('rules')),
+        ]);
+    }
+
+    public function destroyResourceConnection(Request $request, ResourceConnection $connection): \Illuminate\Http\Response
+    {
+        $currentTeam = $request->attributes->get('v5.currentTeam');
+
+        if (! $currentTeam instanceof Team || $connection->team_id !== $currentTeam->id) {
+            abort(404);
+        }
+
+        $connection->delete();
 
         return response()->noContent();
     }
@@ -287,9 +694,11 @@ class DashboardController extends Controller
             'builder_cpu_quota' => ['sometimes', 'string', 'max:32'],
             'wireguard_listen_port_override' => ['nullable', 'integer', 'min:1', 'max:65535'],
             'wireguard_endpoint_override' => ['nullable', 'string', 'max:255'],
+            'ingress_enabled' => ['sometimes', 'boolean'],
         ]);
 
         $builderEnabled = (bool) ($validated['builder_enabled'] ?? $cluster->builder_enabled);
+        $ingressEnabled = (bool) ($validated['ingress_enabled'] ?? false);
         $builderCapacity = (int) ($validated['builder_capacity'] ?? $cluster->builder_capacity);
         $builderCpuQuota = $validated['builder_cpu_quota'] ?? $cluster->builder_cpu_quota;
         $devWireguardOverrides = $this->devLimaWireguardOverrides($validated['host'], (int) $validated['ssh_port']);
@@ -304,7 +713,7 @@ class DashboardController extends Controller
             'ssh_port' => $validated['ssh_port'],
             'private_key_id' => $validated['private_key_id'] ?? null,
             'status' => 'added',
-            'capabilities' => $builderEnabled ? ['coold', 'builder'] : ['coold'],
+            'capabilities' => $this->serverCapabilities($builderEnabled, $ingressEnabled),
             'builder_enabled' => $builderEnabled,
             'builder_capacity' => $builderCapacity,
             'builder_cpu_quota' => $builderCpuQuota,
@@ -343,16 +752,13 @@ class DashboardController extends Controller
                 required: true
             ),
             'builder_cpu_quota' => ['required', 'string', 'max:32'],
+            'ingress_enabled' => ['sometimes', 'boolean'],
         ]);
 
+        $wasIngress = $server->isIngress();
         $builderEnabled = (bool) $validated['builder_enabled'];
-        $capabilities = collect($server->capabilities ?? [])
-            ->push('coold')
-            ->when($builderEnabled, fn ($capabilities) => $capabilities->push('builder'))
-            ->when(! $builderEnabled, fn ($capabilities) => $capabilities->reject(fn (string $capability) => $capability === 'builder'))
-            ->unique()
-            ->values()
-            ->all();
+        $ingressEnabled = (bool) ($validated['ingress_enabled'] ?? $wasIngress);
+        $capabilities = $this->serverCapabilities($builderEnabled, $ingressEnabled);
 
         $server->update([
             'capabilities' => $capabilities,
@@ -360,6 +766,9 @@ class DashboardController extends Controller
             'builder_capacity' => (int) $validated['builder_capacity'],
             'builder_cpu_quota' => $validated['builder_cpu_quota'],
         ]);
+
+        $server->refresh();
+        $this->reconcileCaddyIngress($server, $wasIngress, $ingressEnabled);
 
         $cluster->load(['servers' => fn ($query) => $query
             ->with('privateKey')
@@ -713,6 +1122,269 @@ class DashboardController extends Controller
     }
 
     /**
+     * @return array<int, array{id: string, name: string, host: string, status: string}>
+     */
+    /**
+     * @return array{id: int}|null
+     */
+    private function serializeCurrentTeam(mixed $currentTeam): ?array
+    {
+        if (! $currentTeam instanceof Team) {
+            return null;
+        }
+
+        return [
+            'id' => $currentTeam->id,
+        ];
+    }
+
+    private function nginxServers(mixed $currentTeam): array
+    {
+        if (! $currentTeam instanceof Team) {
+            return [];
+        }
+
+        return V5Server::query()
+            ->where('team_id', $currentTeam->id)
+            ->orderByRaw('last_bootstrapped_at is null')
+            ->orderBy('name')
+            ->get(['id', 'name', 'host', 'status'])
+            ->map(fn (V5Server $server) => [
+                'id' => (string) $server->id,
+                'name' => $server->name,
+                'host' => $server->host,
+                'status' => $server->status,
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function applications(mixed $currentTeam, ?array $selectedProject, ?array $selectedEnvironment): array
+    {
+        if (! $currentTeam instanceof Team || $selectedProject === null || $selectedEnvironment === null) {
+            return [];
+        }
+
+        return $this->applicationQuery($currentTeam, $selectedProject, $selectedEnvironment)
+            ->with('server')
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn (V5Application $application) => $this->serializeApplication($application))
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function caddyIngresses(mixed $currentTeam): array
+    {
+        if (! $currentTeam instanceof Team) {
+            return [];
+        }
+
+        return V5Server::query()
+            ->where('team_id', $currentTeam->id)
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (V5Server $server) => $server->isIngress())
+            ->values()
+            ->map(fn (V5Server $server, int $index) => $this->serializeCaddyIngress($server, $index))
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function resourceConnections(mixed $currentTeam, ?array $selectedProject, ?array $selectedEnvironment): array
+    {
+        if (! $currentTeam instanceof Team || $selectedProject === null || $selectedEnvironment === null) {
+            return [];
+        }
+
+        return ResourceConnection::query()
+            ->where('team_id', $currentTeam->id)
+            ->whereHas('project', fn (Builder $query) => $query
+                ->where('team_id', $currentTeam->id)
+                ->where('uuid', $selectedProject['uuid']))
+            ->whereHas('environment', fn (Builder $query) => $query
+                ->where('uuid', $selectedEnvironment['uuid']))
+            ->with('rules')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (ResourceConnection $connection) => $this->serializeResourceConnection($connection))
+            ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeCaddyIngress(V5Server $server, int $index = 0): array
+    {
+        return [
+            'id' => (string) $server->id,
+            'name' => $server->name,
+            'host' => $server->host,
+            'status' => $server->caddyIngressStatus(),
+            'canvasX' => $server->canvas_x ?? -self::CANVAS_CARD_WIDTH - self::CANVAS_CARD_GAP,
+            'canvasY' => $server->canvas_y ?? $index * (self::CANVAS_CARD_HEIGHT + self::CANVAS_CARD_GAP),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeResourceConnection(ResourceConnection $connection): array
+    {
+        return [
+            'id' => (string) $connection->id,
+            'applicationIds' => [
+                (string) $connection->resource_one_id,
+                (string) $connection->resource_two_id,
+            ],
+            'fromApplicationId' => (string) $connection->resource_one_id,
+            'toApplicationId' => (string) $connection->resource_two_id,
+            'portsByDirection' => $connection->rules
+                ->groupBy(fn ($rule) => "{$rule->source_resource_id}->{$rule->target_resource_id}")
+                ->map(fn (Collection $rules) => $rules
+                    ->sortBy('port')
+                    ->pluck('port')
+                    ->map(fn ($port) => (string) $port)
+                    ->values()
+                    ->all())
+                ->all(),
+        ];
+    }
+
+    /**
+     * @param  array{type: string, id: int}  $resource
+     */
+    private function resolveConnectableResource(Team $team, Project $project, Environment $environment, array $resource): Model
+    {
+        return match ($resource['type']) {
+            'application' => V5Application::query()
+                ->where('team_id', $team->id)
+                ->where('project_id', $project->id)
+                ->where('environment_id', $environment->id)
+                ->whereKey($resource['id'])
+                ->firstOrFail(),
+        };
+    }
+
+    private function resourcePairKey(Model $resourceOne, Model $resourceTwo): string
+    {
+        return collect([
+            $this->resourceIdentity($resourceOne),
+            $this->resourceIdentity($resourceTwo),
+        ])->sort()->implode('|');
+    }
+
+    private function resourceIdentity(Model $resource): string
+    {
+        return $resource->getMorphClass().':'.$resource->getKey();
+    }
+
+    private function connectionHasResourceId(ResourceConnection $connection, mixed $resourceId): bool
+    {
+        return in_array((int) $resourceId, [
+            (int) $connection->resource_one_id,
+            (int) $connection->resource_two_id,
+        ], true);
+    }
+
+    private function resourceTypeForConnectionId(ResourceConnection $connection, int $resourceId): string
+    {
+        return (int) $connection->resource_one_id === $resourceId
+            ? $connection->resource_one_type
+            : $connection->resource_two_type;
+    }
+
+    /**
+     * @param  array{uuid: string}  $selectedProject
+     * @param  array{uuid: string}  $selectedEnvironment
+     * @return Builder<V5Application>
+     */
+    private function applicationQuery(Team $currentTeam, array $selectedProject, array $selectedEnvironment): Builder
+    {
+        return V5Application::query()
+            ->where('team_id', $currentTeam->id)
+            ->whereHas('project', fn (Builder $query) => $query
+                ->where('team_id', $currentTeam->id)
+                ->where('uuid', $selectedProject['uuid']))
+            ->whereHas('environment', fn (Builder $query) => $query
+                ->where('uuid', $selectedEnvironment['uuid']));
+    }
+
+    /**
+     * @return array{canvas_x: int, canvas_y: int}
+     */
+    private function nextApplicationCanvasPosition(Team $currentTeam, Project $project, Environment $environment): array
+    {
+        $existingApplications = V5Application::query()
+            ->where('team_id', $currentTeam->id)
+            ->where('project_id', $project->id)
+            ->where('environment_id', $environment->id)
+            ->get(['canvas_x', 'canvas_y']);
+
+        $horizontalStep = self::CANVAS_CARD_WIDTH + self::CANVAS_CARD_GAP;
+        $verticalStep = self::CANVAS_CARD_HEIGHT + self::CANVAS_CARD_GAP;
+
+        for ($row = 0; $row < 100; $row++) {
+            for ($column = 0; $column < 100; $column++) {
+                $candidate = [
+                    'canvas_x' => $column * $horizontalStep,
+                    'canvas_y' => $row * $verticalStep,
+                ];
+
+                if (! $this->canvasPositionCollides($candidate, $existingApplications)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return [
+            'canvas_x' => $existingApplications->max('canvas_x') + $horizontalStep,
+            'canvas_y' => 0,
+        ];
+    }
+
+    /**
+     * @param  array{canvas_x: int, canvas_y: int}  $candidate
+     * @param  Collection<int, V5Application>  $existingApplications
+     */
+    private function canvasPositionCollides(array $candidate, Collection $existingApplications): bool
+    {
+        return $existingApplications->contains(function (V5Application $application) use ($candidate) {
+            return abs($candidate['canvas_x'] - $application->canvas_x) < self::CANVAS_CARD_WIDTH + self::CANVAS_CARD_GAP
+                && abs($candidate['canvas_y'] - $application->canvas_y) < self::CANVAS_CARD_HEIGHT + self::CANVAS_CARD_GAP;
+        });
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeApplication(V5Application $application): array
+    {
+        $application->loadMissing('server');
+
+        return [
+            'id' => (string) $application->id,
+            'name' => $application->name,
+            'image' => $application->image,
+            'containerName' => $application->container_name,
+            'status' => $application->status,
+            'statusMessage' => $application->status_message,
+            'runtimeContainerId' => $application->runtime_container_id,
+            'serverName' => $application->server?->name,
+            'meshNamespace' => $application->mesh_namespace,
+            'meshFqdn' => $application->container_name.'.'.($application->mesh_namespace ?: 'default').'.coolify.internal',
+            'canvasX' => $application->canvas_x,
+            'canvasY' => $application->canvas_y,
+        ];
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     private function clusters(mixed $currentTeam): array
@@ -755,6 +1427,36 @@ class DashboardController extends Controller
     }
 
     /**
+     * @return array<int, string>
+     */
+    private function serverCapabilities(bool $builderEnabled, bool $ingressEnabled): array
+    {
+        return collect(['coold'])
+            ->when($builderEnabled, fn ($capabilities) => $capabilities->push('builder'))
+            ->when($ingressEnabled, fn ($capabilities) => $capabilities->push('ingress'))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function reconcileCaddyIngress(V5Server $server, bool $wasIngress, bool $isIngress): void
+    {
+        if ($server->status !== 'installed' || ! $server->privateKey instanceof PrivateKey) {
+            return;
+        }
+
+        if (! $wasIngress && $isIngress) {
+            StartCaddyIngress::run($server);
+
+            return;
+        }
+
+        if ($wasIngress && ! $isIngress) {
+            StopCaddyIngress::run($server);
+        }
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function serializeCluster(V5Cluster $cluster): array
@@ -793,6 +1495,7 @@ class DashboardController extends Controller
                 'builderEnabled' => $server->builder_enabled,
                 'builderCapacity' => $server->builder_capacity,
                 'builderCpuQuota' => $server->builder_cpu_quota,
+                'ingressEnabled' => $server->isIngress(),
                 'uuid' => $server->uuid,
                 'nodeAddress' => $server->node_address,
                 'wireguardListenPortOverride' => $server->wireguard_listen_port_override,

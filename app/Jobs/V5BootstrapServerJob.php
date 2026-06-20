@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\V5\Proxy\StartCaddyIngress;
 use App\Events\V5ClusterUpdated;
 use App\Models\PrivateKey;
 use App\Models\V5\Cluster as V5Cluster;
@@ -119,6 +120,7 @@ class V5BootstrapServerJob implements ShouldBeEncrypted, ShouldQueue
             $capabilities = collect($server->capabilities ?? [])
                 ->push('coold')
                 ->when($server->builder_enabled, fn ($capabilities) => $capabilities->push('builder'))
+                ->when($server->isIngress(), fn ($capabilities) => $capabilities->push('ingress'))
                 ->unique()
                 ->values()
                 ->all();
@@ -131,6 +133,10 @@ class V5BootstrapServerJob implements ShouldBeEncrypted, ShouldQueue
             $this->broadcastClusterUpdated($server);
 
             $this->writeBootstrapMarker($cluster, $server, $sshConfigLocation);
+
+            if ($server->isIngress()) {
+                StartCaddyIngress::run($server->fresh('privateKey'));
+            }
         } catch (\Throwable $e) {
             $this->markFailed($server, $action, $e->getMessage());
         } finally {
@@ -343,6 +349,10 @@ class V5BootstrapServerJob implements ShouldBeEncrypted, ShouldQueue
 
         $server->update($updates);
         $this->broadcastClusterUpdated($server);
+
+        if ($server->isIngress()) {
+            StartCaddyIngress::run($server->fresh('privateKey'));
+        }
     }
 
     private function writeBootstrapMarker(V5Cluster $cluster, V5Server $server, string $sshConfigLocation): void

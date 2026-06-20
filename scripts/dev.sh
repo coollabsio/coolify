@@ -529,7 +529,7 @@ sync_v5_dev_lima_servers() {
   for index in $(seq 1 "$count"); do
     instance="$(coold_vm_instance "$index")"
     ssh_port="$(lima_ssh_port "$index")"
-    server_args+=(--server="${instance}|host.docker.internal|${ssh_user}|${ssh_port}")
+    server_args+=(--server="${instance}|host.docker.internal|${ssh_user}|${ssh_port}|$(coold_vm_wg_ip "$index")")
   done
 
   echo "==> Running pending migrations before syncing v5 dev Lima state..."

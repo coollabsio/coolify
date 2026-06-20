@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\V5\Flux\ApplyFluxResourceStatusUpdate;
+use App\Events\V5CanvasResourceUpdated;
 use App\Events\V5ClusterUpdated;
 use App\Events\V5RealtimeTestEvent;
 use App\Http\Controllers\V5\DashboardController;
@@ -14,8 +16,11 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Team;
 use App\Models\User;
+use App\Models\V5\Application as V5Application;
 use App\Models\V5\Cluster;
+use App\Models\V5\ContainerStatus;
 use App\Models\V5\Server as V5Server;
+use App\Services\Flux\FluxClient;
 use App\Services\Flux\FluxHealth;
 use Database\Seeders\V5DevLimaSeeder;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -33,6 +38,10 @@ beforeEach(function () {
     Config::set('broadcasting.default', 'log');
     Config::set('cache.default', 'array');
 
+    Schema::dropIfExists('v5_resource_connection_rules');
+    Schema::dropIfExists('v5_resource_connections');
+    Schema::dropIfExists('v5_applications');
+    Schema::dropIfExists('v5_container_statuses');
     Schema::dropIfExists('v5_servers');
     Schema::dropIfExists('v5_clusters');
     Schema::dropIfExists('private_keys');
@@ -54,6 +63,14 @@ it('registers the v5 dashboard route', function () {
         ->and(Route::has('v5.clusters.servers.check'))->toBeTrue()
         ->and(Route::has('v5.clusters.servers.bootstrap'))->toBeTrue()
         ->and(Route::has('v5.clusters.servers.destroy'))->toBeTrue()
+        ->and(Route::has('v5.applications.nginx'))->toBeTrue()
+        ->and(Route::has('v5.applications.refresh'))->toBeTrue()
+        ->and(Route::has('v5.applications.position'))->toBeTrue()
+        ->and(Route::has('v5.caddy-ingresses.position'))->toBeTrue()
+        ->and(Route::has('v5.applications.destroy'))->toBeTrue()
+        ->and(Route::has('v5.resource-connections.store'))->toBeTrue()
+        ->and(Route::has('v5.resource-connections.update'))->toBeTrue()
+        ->and(Route::has('v5.resource-connections.destroy'))->toBeTrue()
         ->and(Route::has('v5.realtime-test'))->toBeTrue()
         ->and(Route::has('v5.realtime-test.broadcast'))->toBeTrue()
         ->and(Route::has('v5.coolify.version'))->toBeFalse()
@@ -80,6 +97,157 @@ it('uses separated v5 middleware groups', function () {
 it('reuses existing projects instead of creating v5 projects', function () {
     expect(file_exists(database_path('migrations/2026_06_04_050157_v5_create_projects_table.php')))->toBeFalse()
         ->and(file_exists(app_path('Models/V5/Project.php')))->toBeFalse();
+});
+
+it('keeps long v5 application metadata inside the canvas card', function () {
+    $dashboardSource = file_get_contents(resource_path('js/v5/Pages/Dashboard.tsx'));
+
+    expect($dashboardSource)
+        ->toContain('overflow-hidden')
+        ->and($dashboardSource)->toContain('grid grid-cols-[auto_minmax(0,1fr)]')
+        ->and($dashboardSource)->toContain('truncate text-right font-medium')
+        ->and($dashboardSource)->toContain('truncate text-right font-mono');
+});
+
+it('does not render v5 application status messages on dashboard cards', function () {
+    $dashboardSource = file_get_contents(resource_path('js/v5/Pages/Dashboard.tsx'));
+
+    expect($dashboardSource)
+        ->not->toContain('{application.statusMessage && (')
+        ->not->toContain('{application.statusMessage}</p>');
+});
+
+it('shows a dashboard refresh button next to the center button', function () {
+    $dashboardSource = file_get_contents(resource_path('js/v5/Pages/Dashboard.tsx'));
+
+    expect($dashboardSource)
+        ->toContain('onClick={() => centerOnCanvasNodes()}')
+        ->toContain('onClick={() => void refreshApplications()}')
+        ->toContain("isRefreshing ? 'Refreshing…' : 'Refresh state'");
+});
+
+it('subscribes the v5 dashboard canvas to automatic resource status updates', function () {
+    $dashboardSource = file_get_contents(resource_path('js/v5/Pages/Dashboard.tsx'));
+
+    expect($dashboardSource)
+        ->toContain('currentTeam = null')
+        ->toContain("channel.listen('.v5.canvas.resource.updated'")
+        ->toContain('setApplications((currentApplications) =>')
+        ->toContain('setIngresses((currentIngresses) =>')
+        ->toContain('Waiting for window.Echo before subscribing to canvas updates')
+        ->toContain("channel.listen('.v5.canvas.resource.updated'")
+        ->not->toContain("fetch('/v5/canvas-state'");
+});
+
+it('allows zooming the v5 dashboard canvas with buttons and pinch gestures', function () {
+    $dashboardSource = file_get_contents(resource_path('js/v5/Pages/Dashboard.tsx'));
+
+    expect($dashboardSource)
+        ->toContain('zoom: number;')
+        ->toContain('MIN_CANVAS_ZOOM')
+        ->toContain('MAX_CANVAS_ZOOM')
+        ->toContain('PINCH_CANVAS_ZOOM_STEP')
+        ->toContain('zoomCanvas(')
+        ->toContain('zoomCanvas(event.deltaY < 0 ? 1 : -1, PINCH_CANVAS_ZOOM_STEP')
+        ->toContain('onWheel={handleCanvasWheel}')
+        ->toContain('event.ctrlKey')
+        ->toContain('aria-label="Zoom out"')
+        ->toContain('aria-label="Zoom in"')
+        ->toContain('Math.round(viewport.zoom * 100)')
+        ->toContain('scale(${viewport.zoom})');
+});
+
+it('renders draggable connector dots on v5 application canvas cards', function () {
+    $dashboardSource = file_get_contents(resource_path('js/v5/Pages/Dashboard.tsx'));
+
+    expect($dashboardSource)
+        ->toContain("type ConnectorSide = 'top' | 'right' | 'bottom' | 'left';")
+        ->toContain('application-connector')
+        ->toContain('data-connector-side={side}')
+        ->toContain('startConnectionDrag(event, application.id, side)')
+        ->toContain('<svg className="pointer-events-none absolute inset-0 overflow-visible">')
+        ->toContain('draftConnection');
+});
+
+it('keeps v5 canvas connections selectable unique and shortest-path only', function () {
+    $dashboardSource = file_get_contents(resource_path('js/v5/Pages/Dashboard.tsx'));
+
+    expect($dashboardSource)
+        ->toContain('type CanvasConnection = V5ResourceConnection;')
+        ->toContain('resourceConnections: initialResourceConnections = []')
+        ->toContain('useState<CanvasConnection[]>(initialResourceConnections)')
+        ->toContain('selectedConnectionId')
+        ->toContain('clearCanvasSelection')
+        ->toContain('event.target !== event.currentTarget')
+        ->toContain('connectionExists')
+        ->toContain('shortestConnectionPoints')
+        ->toContain("!['Backspace', 'Delete'].includes(event.key)")
+        ->toContain('deletePersistedConnection(connectionId)')
+        ->toContain('onClick={(event) => selectConnection(event, connection.id)}')
+        ->toContain("selectedConnectionId === connection.id ? 'stroke-destructive' : 'stroke-warning'")
+        ->toContain('aria-label="Select connection"')
+        ->toContain('stroke="transparent"')
+        ->toContain('strokeWidth={12}')
+        ->toContain('data-application-card="application-card"')
+        ->toContain("closest<HTMLElement>('[data-application-card]')")
+        ->toContain('deleteConnection(connection.id)')
+        ->toContain('Delete connection')
+        ->toContain('left: (points.from.x + points.to.x) / 2')
+        ->toContain('top: (points.from.y + points.to.y) / 2')
+        ->toContain('id="dashboard-connection-arrow"')
+        ->toContain('markerEnd={selectedConnectionId === connection.id ? \'url(#dashboard-connection-arrow)\' : undefined}')
+        ->toContain('markerWidth="16"')
+        ->toContain('markerHeight="16"')
+        ->toContain('strokeDasharray="6 6"')
+        ->toContain('persistNewConnection(pointerState.from.applicationId, targetApplicationId)')
+        ->toContain('persistConnectionPorts(updatedConnection)')
+        ->toContain('/v5/resource-connections')
+        ->toContain('ports_by_direction: portsByDirection')
+        ->toContain('connectionDirectionKey(')
+        ->toContain('activeConnectionPorts(connection)')
+        ->toContain('addConnectionPort(connection.id)')
+        ->toContain('Number.isInteger(portNumber)')
+        ->toContain('setConnectionPortInput')
+        ->toContain('Allowed ports')
+        ->toContain('updateConnectionDirection(')
+        ->toContain('applicationDirectionLabel(')
+        ->toContain('application.id.slice(0, 8)')
+        ->toContain('connection.applicationIds[0]')
+        ->toContain('connection.applicationIds[1]')
+        ->toContain('group/application')
+        ->toContain('opacity-0')
+        ->toContain('group-hover/application:opacity-100');
+});
+
+it('shows v5 application connector dots after selecting a canvas card', function () {
+    $dashboardSource = file_get_contents(resource_path('js/v5/Pages/Dashboard.tsx'));
+
+    expect($dashboardSource)
+        ->toContain('selectedApplicationId')
+        ->toContain('setSelectedApplicationId(application.id)')
+        ->toContain('selectedApplicationId === application.id')
+        ->toContain('opacity-100');
+});
+
+it('uses a larger mobile touch target for v5 application connector dots', function () {
+    $dashboardSource = file_get_contents(resource_path('js/v5/Pages/Dashboard.tsx'));
+
+    expect($dashboardSource)
+        ->toContain('size-8')
+        ->toContain('md:size-3')
+        ->toContain('group/connector')
+        ->toContain('group-hover/connector:scale-125')
+        ->toContain('<span className="size-3 rounded-full border-2 border-card bg-warning shadow ring-2 ring-background transition group-hover/connector:scale-125 group-hover/connector:bg-warning/90" />');
+});
+
+it('detects the connection drop target from pointer coordinates for mobile drags', function () {
+    $dashboardSource = file_get_contents(resource_path('js/v5/Pages/Dashboard.tsx'));
+
+    expect($dashboardSource)
+        ->toContain('connectionTargetFromPointer(event)')
+        ->toContain('document.elementFromPoint(event.clientX, event.clientY)')
+        ->toContain('pointer-captured mobile drags')
+        ->toContain('targetApplicationId !== pointerState.from.applicationId');
 });
 
 it('creates v5 cluster tables and lets each server belong to one cluster', function () {
@@ -174,6 +342,147 @@ it('creates v5 server tables in the shared database', function () {
         ]))->toBeTrue();
 });
 
+it('adds v5 server canvas columns for movable caddy ingress nodes', function () {
+    createSharedUserAndTeamTables();
+
+    Schema::dropIfExists('v5_servers');
+    Schema::dropIfExists('v5_clusters');
+
+    $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
+    $clusterMigration->up();
+
+    $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
+    $serverMigration->up();
+
+    $canvasMigration = include database_path('migrations/2026_06_19_141231_add_canvas_position_to_v5_servers_table.php');
+    $canvasMigration->up();
+
+    expect(Schema::hasColumns('v5_servers', [
+        'canvas_x',
+        'canvas_y',
+    ]))->toBeTrue();
+});
+
+it('adds v5 server caddy ingress container status column', function () {
+    createSharedUserAndTeamTables();
+
+    Schema::dropIfExists('v5_servers');
+    Schema::dropIfExists('v5_clusters');
+
+    $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
+    $clusterMigration->up();
+
+    $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
+    $serverMigration->up();
+
+    [$user, $team] = createV5UserWithTeam();
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-ingress-01',
+        'host' => '203.0.113.20',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold', 'ingress'],
+    ]);
+
+    $statusMigration = include database_path('migrations/2026_06_19_173933_add_caddy_ingress_status_to_v5_servers_table.php');
+    $statusMigration->up();
+
+    expect(Schema::hasColumn('v5_servers', 'caddy_ingress_status'))->toBeTrue()
+        ->and($server->refresh()->caddy_ingress_status)->toBe('running');
+});
+
+it('creates v5 application tables for dashboard canvas nodes', function () {
+    createSharedUserAndTeamTables();
+
+    Schema::dropIfExists('v5_applications');
+    Schema::dropIfExists('v5_servers');
+    Schema::dropIfExists('v5_clusters');
+
+    $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
+    $clusterMigration->up();
+
+    $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
+    $serverMigration->up();
+
+    $applicationMigration = include database_path('migrations/2026_06_19_140000_v5_create_applications_table.php');
+    $applicationMigration->up();
+
+    expect(Schema::hasTable('v5_applications'))->toBeTrue()
+        ->and(Schema::hasColumns('v5_applications', [
+            'id',
+            'team_id',
+            'project_id',
+            'environment_id',
+            'server_id',
+            'created_by_user_id',
+            'name',
+            'image',
+            'container_name',
+            'status',
+            'status_message',
+            'runtime_container_id',
+            'mesh_namespace',
+            'canvas_x',
+            'canvas_y',
+            'created_at',
+            'updated_at',
+        ]))->toBeTrue();
+});
+
+it('creates generic v5 resource connection tables', function () {
+    createSharedUserAndTeamTables();
+
+    Schema::dropIfExists('v5_resource_connection_rules');
+    Schema::dropIfExists('v5_resource_connections');
+    Schema::dropIfExists('v5_applications');
+    Schema::dropIfExists('v5_servers');
+    Schema::dropIfExists('v5_clusters');
+
+    $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
+    $clusterMigration->up();
+
+    $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
+    $serverMigration->up();
+
+    $applicationMigration = include database_path('migrations/2026_06_19_140000_v5_create_applications_table.php');
+    $applicationMigration->up();
+
+    $connectionMigration = include database_path('migrations/2026_06_19_142000_v5_create_resource_connections_table.php');
+    $connectionMigration->up();
+
+    expect(Schema::hasTable('v5_resource_connections'))->toBeTrue()
+        ->and(Schema::hasColumns('v5_resource_connections', [
+            'id',
+            'team_id',
+            'project_id',
+            'environment_id',
+            'resource_one_type',
+            'resource_one_id',
+            'resource_two_type',
+            'resource_two_id',
+            'resource_pair_key',
+            'created_by_user_id',
+            'created_at',
+            'updated_at',
+        ]))->toBeTrue()
+        ->and(Schema::hasTable('v5_resource_connection_rules'))->toBeTrue()
+        ->and(Schema::hasColumns('v5_resource_connection_rules', [
+            'id',
+            'connection_id',
+            'source_resource_type',
+            'source_resource_id',
+            'target_resource_type',
+            'target_resource_id',
+            'protocol',
+            'port',
+            'created_at',
+            'updated_at',
+        ]))->toBeTrue();
+});
+
 it('keeps v5 server fields in the initial migration', function () {
     createSharedUserAndTeamTables();
 
@@ -205,6 +514,8 @@ it('includes v5 tables in the dev testing schema', function () {
         ->and($schema)->not->toContain('CREATE TABLE IF NOT EXISTS "v5_projects"')
         ->and($schema)->not->toContain('2026_06_04_050157_v5_create_projects_table')
         ->and($schema)->toContain('CREATE TABLE IF NOT EXISTS "v5_servers"')
+        ->and($schema)->toContain('CREATE TABLE IF NOT EXISTS "v5_container_statuses"')
+        ->and($schema)->toContain('CREATE TABLE IF NOT EXISTS "v5_applications"')
         ->and($schema)->toContain('"cluster_id" INTEGER')
         ->and($schema)->toContain('CREATE TABLE IF NOT EXISTS "v5_clusters"')
         ->and($schema)->toContain('"wireguard_interface" TEXT DEFAULT \'wg0\' NOT NULL')
@@ -212,13 +523,21 @@ it('includes v5 tables in the dev testing schema', function () {
         ->and($schema)->toContain('"container_network_pool" TEXT DEFAULT \'10.210.0.0/16\' NOT NULL')
         ->and($schema)->toContain('"builder_timeout_secs" INTEGER NOT NULL DEFAULT \'1800\'')
         ->and($schema)->toContain('"private_key_id" INTEGER')
+        ->and($schema)->toContain('"caddy_ingress_status" TEXT')
         ->and($schema)->toContain('"builder_cpu_quota" TEXT DEFAULT \'200%\' NOT NULL')
         ->and($schema)->toContain('"uuid" TEXT')
         ->and($schema)->toContain('"wireguard_management_ip" TEXT')
         ->and($schema)->toContain('"container_subnets" JSON')
+        ->and($schema)->toContain('"canvas_x" INTEGER')
+        ->and($schema)->toContain('"canvas_y" INTEGER')
         ->and($schema)->toContain('"last_bootstrap_output" TEXT')
         ->and($schema)->toContain('"last_status_output" TEXT')
         ->and($schema)->toContain('2026_06_16_130650_v5_create_servers_table')
+        ->and($schema)->toContain('2026_06_19_140000_v5_create_applications_table')
+        ->and($schema)->toContain('2026_06_19_141231_add_canvas_position_to_v5_servers_table')
+        ->and($schema)->toContain('2026_06_19_173933_add_caddy_ingress_status_to_v5_servers_table')
+        ->and($schema)->toContain('2026_06_19_182231_create_container_statuses_table')
+        ->and($schema)->not->toContain('2026_06_19_150000_add_mesh_namespace_to_v5_applications_table')
         ->and($schema)->toContain('2026_06_16_130649_v5_create_clusters_table')
         ->and($schema)->not->toContain('2026_06_16_204644_v5_add_wireguard_cli_configuration_to_clusters_and_servers')
         ->and($schema)->not->toContain('2026_06_17_165112_v5_add_builder_cpu_quota_to_servers_table')
@@ -239,6 +558,7 @@ it('serves the v5 inertia shell', function () {
     app()->detectEnvironment(fn () => 'local');
 
     $this->withoutVite();
+    $this->withoutExceptionHandling();
     fakeFluxHealth();
     createSharedUserAndTeamTables();
 
@@ -285,9 +605,1161 @@ it('serves the v5 inertia shell', function () {
         ->assertDontSee('Current team')
         ->assertDontSee('Your teams')
         ->assertSee('currentTeam', false)
+        ->assertSee('"currentTeam":{"id":'.$team->id, false)
         ->assertDontSee('teams', false)
         ->assertDontSee('V5 Shared Team')
         ->assertDontSee('Shared team details');
+});
+
+it('serves v5 dashboard applications as canvas nodes', function () {
+    app()->detectEnvironment(fn () => 'local');
+
+    $this->withoutVite();
+    fakeFluxHealth();
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    [$otherProject, $otherEnvironment] = createV5ProjectWithEnvironment($team, 'Staging Project', 'Staging');
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+    ]);
+
+    V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-1',
+        'status' => 'running',
+        'status_message' => 'Container started.',
+        'runtime_container_id' => 'abc123',
+        'mesh_namespace' => 'default',
+        'canvas_x' => 120,
+        'canvas_y' => -80,
+    ]);
+    V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $otherProject->id,
+        'environment_id' => $otherEnvironment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'other-nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-other',
+        'status' => 'running',
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession([
+            'currentTeam' => $team,
+            'v5.selectedProjectUuid' => $project->uuid,
+            'v5.selectedEnvironmentUuid' => $environment->uuid,
+        ])
+        ->get('/v5')
+        ->assertSuccessful()
+        ->assertSee('"applications":[', false)
+        ->assertSee('"name":"nginx-test"', false)
+        ->assertSee('"serverName":"edge-01"', false)
+        ->assertSee('"meshNamespace":"default"', false)
+        ->assertSee('"meshFqdn":"coolify-v5-nginx-1.default.coolify.internal"', false)
+        ->assertSee('"canvasX":120', false)
+        ->assertSee('"canvasY":-80', false)
+        ->assertDontSee('other-nginx-test', false);
+});
+
+it('persists generic v5 resource connections and direction-specific ports', function () {
+    app()->detectEnvironment(fn () => 'local');
+
+    $this->withoutVite();
+    fakeFluxHealth();
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+    ]);
+    $source = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-source',
+        'status' => 'running',
+    ]);
+    $target = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-target',
+        'status' => 'running',
+    ]);
+
+    $response = $this
+        ->actingAs($user)
+        ->withSession([
+            'currentTeam' => $team,
+            'v5.selectedProjectUuid' => $project->uuid,
+            'v5.selectedEnvironmentUuid' => $environment->uuid,
+            '_token' => 'test-csrf-token',
+        ])
+        ->withHeader('X-CSRF-TOKEN', 'test-csrf-token')
+        ->postJson('/v5/resource-connections', [
+            'resource_one' => ['type' => 'application', 'id' => $source->id],
+            'resource_two' => ['type' => 'application', 'id' => $target->id],
+        ])
+        ->assertCreated()
+        ->assertJsonPath('connection.applicationIds.0', (string) $source->id)
+        ->assertJsonPath('connection.applicationIds.1', (string) $target->id);
+
+    $connectionId = $response->json('connection.id');
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team, '_token' => 'test-csrf-token'])
+        ->withHeader('X-CSRF-TOKEN', 'test-csrf-token')
+        ->patchJson("/v5/resource-connections/{$connectionId}", [
+            'ports_by_direction' => [
+                "{$source->id}->{$target->id}" => [80],
+                "{$target->id}->{$source->id}" => [443],
+            ],
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath("connection.portsByDirection.{$source->id}->{$target->id}.0", '80')
+        ->assertJsonPath("connection.portsByDirection.{$target->id}->{$source->id}.0", '443');
+
+    $this
+        ->actingAs($user)
+        ->withSession([
+            'currentTeam' => $team,
+            'v5.selectedProjectUuid' => $project->uuid,
+            'v5.selectedEnvironmentUuid' => $environment->uuid,
+        ])
+        ->get('/v5')
+        ->assertSuccessful()
+        ->assertSee('"resourceConnections":[', false)
+        ->assertSee("\"id\":\"{$connectionId}\"", false)
+        ->assertSee("\"{$source->id}->{$target->id}\":[\"80\"]", false)
+        ->assertSee("\"{$target->id}->{$source->id}\":[\"443\"]", false);
+});
+
+it('serves enabled v5 caddy ingress servers as canvas nodes', function () {
+    app()->detectEnvironment(fn () => 'local');
+
+    $this->withoutVite();
+    fakeFluxHealth();
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+
+    V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-ingress-01',
+        'host' => '203.0.113.20',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'caddy_ingress_status' => 'running',
+        'capabilities' => ['coold', 'ingress'],
+        'canvas_x' => -160,
+        'canvas_y' => 240,
+    ]);
+    V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-ingress-02',
+        'host' => '203.0.113.22',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'caddy_ingress_status' => 'exited',
+        'capabilities' => ['coold', 'ingress'],
+    ]);
+    V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-worker-01',
+        'host' => '203.0.113.21',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->get('/v5')
+        ->assertSuccessful()
+        ->assertSee('"caddyIngresses":[', false)
+        ->assertSee('"name":"edge-ingress-01"', false)
+        ->assertSee('"host":"203.0.113.20"', false)
+        ->assertSee('"status":"running"', false)
+        ->assertSee('"name":"edge-ingress-02"', false)
+        ->assertSee('"status":"exited"', false)
+        ->assertSee('"canvasX":-160', false)
+        ->assertSee('"canvasY":240', false);
+});
+
+it('creates an nginx v5 application on the first installed team server', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+        'last_bootstrapped_at' => now(),
+    ]);
+
+    Process::fake([
+        '*' => Process::result(output: "nginx-container-id\n"),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession([
+            'currentTeam' => $team,
+            'v5.selectedProjectUuid' => $project->uuid,
+            'v5.selectedEnvironmentUuid' => $environment->uuid,
+        ])
+        ->postJson('/v5/applications/nginx')
+        ->assertCreated()
+        ->assertJsonPath('application.name', 'nginx-test')
+        ->assertJsonPath('application.image', 'docker.io/library/nginx:alpine')
+        ->assertJsonPath('application.status', 'running')
+        ->assertJsonPath('application.serverName', 'edge-01')
+        ->assertJsonPath('application.meshNamespace', 'default')
+        ->assertJsonPath('application.canvasX', 0)
+        ->assertJsonPath('application.canvasY', 0);
+
+    expect(V5Application::query()
+        ->where('team_id', $team->id)
+        ->where('project_id', $project->id)
+        ->where('environment_id', $environment->id)
+        ->where('name', 'nginx-test')
+        ->where('status', 'running')
+        ->where('runtime_container_id', 'nginx-container-id')
+        ->exists())->toBeTrue();
+});
+
+it('creates an nginx v5 application on the selected team server', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+        'last_bootstrapped_at' => now(),
+    ]);
+    $selectedServer = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'edge-02',
+        'host' => '203.0.113.11',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+        'last_bootstrapped_at' => now(),
+    ]);
+
+    Process::fake([
+        '*' => Process::result(output: "nginx-container-id\n"),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession([
+            'currentTeam' => $team,
+            'v5.selectedProjectUuid' => $project->uuid,
+            'v5.selectedEnvironmentUuid' => $environment->uuid,
+        ])
+        ->postJson('/v5/applications/nginx', [
+            'server_id' => $selectedServer->id,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('application.serverName', 'edge-02');
+
+    expect(V5Application::query()
+        ->where('server_id', $selectedServer->id)
+        ->where('runtime_container_id', 'nginx-container-id')
+        ->exists())->toBeTrue();
+});
+
+it('places a new nginx v5 application next to existing canvas nodes', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+        'last_bootstrapped_at' => now(),
+    ]);
+
+    V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-existing',
+        'status' => 'running',
+        'status_message' => 'Running.',
+        'mesh_namespace' => 'default',
+        'canvas_x' => 0,
+        'canvas_y' => 0,
+    ]);
+
+    Process::fake([
+        '*' => Process::result(output: "nginx-container-id\n"),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession([
+            'currentTeam' => $team,
+            'v5.selectedProjectUuid' => $project->uuid,
+            'v5.selectedEnvironmentUuid' => $environment->uuid,
+        ])
+        ->postJson('/v5/applications/nginx')
+        ->assertCreated()
+        ->assertJsonPath('application.canvasX', 352)
+        ->assertJsonPath('application.canvasY', 0);
+});
+
+it('marks an nginx v5 application failed when the launch command fails', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+        'last_bootstrapped_at' => now(),
+    ]);
+
+    Process::fake([
+        '*' => Process::result(errorOutput: 'podman failed', exitCode: 1),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession([
+            'currentTeam' => $team,
+            'v5.selectedProjectUuid' => $project->uuid,
+            'v5.selectedEnvironmentUuid' => $environment->uuid,
+        ])
+        ->postJson('/v5/applications/nginx')
+        ->assertUnprocessable()
+        ->assertJsonPath('application.status', 'failed')
+        ->assertJsonPath('application.statusMessage', 'podman failed');
+});
+
+it('does not create an nginx v5 application on another teams selected server', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$otherUser, $otherTeam] = createV5UserWithTeam('other@example.com');
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $privateKey = createV5PrivateKey($otherTeam, 'Other SSH Key');
+    $otherServer = V5Server::query()->create([
+        'team_id' => $otherTeam->id,
+        'created_by_user_id' => $otherUser->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'other-edge-01',
+        'host' => '203.0.113.20',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+        'last_bootstrapped_at' => now(),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession([
+            'currentTeam' => $team,
+            'v5.selectedProjectUuid' => $project->uuid,
+            'v5.selectedEnvironmentUuid' => $environment->uuid,
+        ])
+        ->postJson('/v5/applications/nginx', [
+            'server_id' => $otherServer->id,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Add a v5 server before deploying nginx.');
+
+    expect(V5Application::query()->count())->toBe(0);
+});
+
+it('does not create an nginx v5 application without a team server', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+
+    $this
+        ->actingAs($user)
+        ->withSession([
+            'currentTeam' => $team,
+            'v5.selectedProjectUuid' => $project->uuid,
+            'v5.selectedEnvironmentUuid' => $environment->uuid,
+        ])
+        ->postJson('/v5/applications/nginx')
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Add a v5 server before deploying nginx.');
+
+    expect(V5Application::query()->count())->toBe(0);
+});
+
+it('deletes a v5 application for the current team', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+    ]);
+    $application = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-1',
+        'status' => 'running',
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->deleteJson("/v5/applications/{$application->id}")
+        ->assertNoContent();
+
+    expect(V5Application::query()->whereKey($application->id)->exists())->toBeFalse();
+});
+
+it('stops and deletes the nginx container before deleting a v5 application', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+    ]);
+    $application = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-1',
+        'status' => 'running',
+        'runtime_container_id' => 'nginx-container-id',
+    ]);
+
+    Process::fake([
+        '*' => Process::result(),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->deleteJson("/v5/applications/{$application->id}")
+        ->assertNoContent();
+
+    Process::assertRan(function ($process): bool {
+        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+
+        return is_string($command)
+            && str_contains($command, '203.0.113.10')
+            && str_contains($command, 'podman rm -f')
+            && str_contains($command, 'coolify-v5-nginx-1');
+    });
+    expect(V5Application::query()->whereKey($application->id)->exists())->toBeFalse();
+});
+
+it('does not delete another teams v5 application', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$otherUser, $otherTeam] = createV5UserWithTeam();
+    [$otherProject, $otherEnvironment] = createV5ProjectWithEnvironment($otherTeam, 'Production Project', 'Production');
+    $server = V5Server::query()->create([
+        'team_id' => $otherTeam->id,
+        'created_by_user_id' => $otherUser->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+    ]);
+    $application = V5Application::query()->create([
+        'team_id' => $otherTeam->id,
+        'project_id' => $otherProject->id,
+        'environment_id' => $otherEnvironment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $otherUser->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-1',
+        'status' => 'running',
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->deleteJson("/v5/applications/{$application->id}")
+        ->assertNotFound();
+
+    expect(V5Application::query()->whereKey($application->id)->exists())->toBeTrue();
+});
+
+it('updates v5 application canvas position for the current team', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+    ]);
+    $application = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-1',
+        'status' => 'running',
+        'canvas_x' => 0,
+        'canvas_y' => 0,
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->patchJson("/v5/applications/{$application->id}/position", [
+            'canvas_x' => 320,
+            'canvas_y' => -160,
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('application.canvasX', 320)
+        ->assertJsonPath('application.canvasY', -160);
+
+    expect($application->refresh()->canvas_x)->toBe(320)
+        ->and($application->canvas_y)->toBe(-160);
+});
+
+it('updates v5 caddy ingress canvas position for the current team', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-ingress-01',
+        'host' => '203.0.113.20',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold', 'ingress'],
+        'canvas_x' => -352,
+        'canvas_y' => 0,
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->patchJson("/v5/caddy-ingresses/{$server->id}/position", [
+            'canvas_x' => -160,
+            'canvas_y' => 240,
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('caddyIngress.canvasX', -160)
+        ->assertJsonPath('caddyIngress.canvasY', 240);
+
+    expect($server->refresh()->canvas_x)->toBe(-160)
+        ->and($server->canvas_y)->toBe(240);
+});
+
+it('applies flux application status updates to the database and broadcasts to the team canvas', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+        'wireguard_management_ip' => '100.64.0.5',
+    ]);
+    $application = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-1',
+        'status' => 'running',
+        'status_message' => 'Container started.',
+        'runtime_container_id' => 'nginx-container-id',
+        'canvas_x' => 0,
+        'canvas_y' => 0,
+    ]);
+
+    Event::fake([V5CanvasResourceUpdated::class]);
+
+    $resource = ApplyFluxResourceStatusUpdate::run([
+        'resource_type' => 'application',
+        'host_id' => '100.64.0.5',
+        'container_name' => 'coolify-v5-nginx-1',
+        'container_id' => 'new-nginx-container-id',
+        'status' => 'exited',
+        'status_message' => 'Status received from coold through flux.',
+    ]);
+
+    expect($resource)->toBeInstanceOf(V5Application::class)
+        ->and($application->refresh()->status)->toBe('exited')
+        ->and($application->status_message)->toBe('Status received from coold through flux.')
+        ->and($application->runtime_container_id)->toBe('new-nginx-container-id');
+
+    Event::assertDispatched(V5CanvasResourceUpdated::class, fn (V5CanvasResourceUpdated $event) => $event->teamId === $team->id
+        && $event->applicationId === $application->id);
+});
+
+it('maps generic flux container status updates to v5 applications', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+        'wireguard_management_ip' => '100.64.0.5',
+    ]);
+    $application = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-1',
+        'status' => 'running',
+        'status_message' => 'Container started.',
+        'runtime_container_id' => 'nginx-container-id',
+    ]);
+
+    Event::fake([V5CanvasResourceUpdated::class]);
+
+    $resource = ApplyFluxResourceStatusUpdate::run([
+        'resource_type' => 'container',
+        'host_id' => '100.64.0.5',
+        'container_name' => 'coolify-v5-nginx-1',
+        'container_id' => 'nginx-container-id',
+        'status' => 'exited',
+        'status_message' => 'Container state received from coold.',
+    ]);
+
+    expect($resource)->toBeInstanceOf(V5Application::class)
+        ->and($application->refresh()->status)->toBe('exited')
+        ->and($application->status_message)->toBe('Container state received from coold.');
+
+    Event::assertDispatched(V5CanvasResourceUpdated::class, fn (V5CanvasResourceUpdated $event) => $event->teamId === $team->id
+        && $event->applicationId === $application->id);
+});
+
+it('applies flux ingress server status updates to the database and broadcasts cluster plus canvas updates', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Cluster',
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold', 'ingress'],
+        'wireguard_management_ip' => '100.64.0.5',
+    ]);
+
+    Event::fake([V5CanvasResourceUpdated::class, V5ClusterUpdated::class]);
+
+    $resource = ApplyFluxResourceStatusUpdate::run([
+        'resource_type' => 'server',
+        'host_id' => '100.64.0.5',
+        'status' => 'unreachable',
+        'message' => 'coold heartbeat timed out.',
+    ]);
+
+    expect($resource)->toBeInstanceOf(V5Server::class)
+        ->and($server->refresh()->status)->toBe('unreachable')
+        ->and($server->last_status_check)->toBe('flux')
+        ->and($server->last_status_output)->toBe('coold heartbeat timed out.')
+        ->and($server->last_status_checked_at)->not->toBeNull();
+
+    Event::assertDispatched(V5ClusterUpdated::class, fn (V5ClusterUpdated $event) => $event->teamId === $team->id
+        && $event->clusterId === $cluster->id);
+    Event::assertDispatched(V5CanvasResourceUpdated::class, fn (V5CanvasResourceUpdated $event) => $event->teamId === $team->id
+        && $event->caddyIngressServerId === $server->id);
+});
+
+it('applies flux caddy ingress container status updates without changing server install status', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'caddy_ingress_status' => 'running',
+        'capabilities' => ['coold', 'ingress'],
+        'wireguard_management_ip' => '100.64.0.5',
+    ]);
+
+    Event::fake([V5CanvasResourceUpdated::class]);
+
+    $resource = ApplyFluxResourceStatusUpdate::run([
+        'resource_type' => 'caddy_ingress',
+        'host_id' => '100.64.0.5',
+        'container_name' => 'coolify-v5-caddy',
+        'status' => 'exited',
+        'message' => 'Caddy container exited.',
+    ]);
+
+    expect($resource)->toBeInstanceOf(V5Server::class)
+        ->and($server->refresh()->status)->toBe('installed')
+        ->and($server->caddy_ingress_status)->toBe('exited')
+        ->and($server->last_status_check)->toBe('flux')
+        ->and($server->last_status_output)->toBe('Caddy container exited.')
+        ->and($server->last_status_checked_at)->not->toBeNull();
+
+    Event::assertDispatched(V5CanvasResourceUpdated::class, fn (V5CanvasResourceUpdated $event) => $event->teamId === $team->id
+        && $event->caddyIngressServerId === $server->id);
+});
+
+it('accepts flux status updates for non coolify managed containers', function () {
+    Config::set('flux.laravel_api_token', 'test-flux-token');
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'wireguard_management_ip' => '100.64.0.5',
+    ]);
+
+    $this
+        ->postJson('/api/v1/internal/flux/resource-status', [
+            'resource_type' => 'container',
+            'host_id' => '100.64.0.5',
+            'container_id' => 'external-container-id',
+            'container_name' => 'external-container',
+            'status' => 'running',
+        ], [
+            'Authorization' => 'Bearer test-flux-token',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('message', 'Resource status updated.');
+
+    expect(ContainerStatus::query()
+        ->where('container_id', 'external-container-id')
+        ->where('container_name', 'external-container')
+        ->where('status', 'running')
+        ->exists())->toBeTrue();
+});
+
+it('rejects flux resource status http updates without the shared token', function () {
+    Config::set('flux.laravel_api_token', 'test-flux-token');
+
+    $this
+        ->postJson('/api/v1/internal/flux/resource-status', [
+            'resource_type' => 'application',
+            'status' => 'running',
+        ])
+        ->assertUnauthorized();
+});
+
+it('accepts flux resource status http updates and stores them in the database', function () {
+    createSharedUserAndTeamTables();
+    Config::set('flux.laravel_api_token', 'test-flux-token');
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+        'wireguard_management_ip' => '100.64.0.5',
+    ]);
+    $application = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-1',
+        'status' => 'starting',
+        'status_message' => 'Container starting.',
+        'runtime_container_id' => 'old-container-id',
+    ]);
+
+    Event::fake([V5CanvasResourceUpdated::class]);
+
+    $this
+        ->withToken('test-flux-token')
+        ->postJson('/api/v1/internal/flux/resource-status', [
+            'resource_type' => 'application',
+            'host_id' => '100.64.0.5',
+            'container_name' => 'coolify-v5-nginx-1',
+            'container_id' => 'new-container-id',
+            'status' => 'running',
+            'status_message' => 'Status received from coold through flux.',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('message', 'Resource status updated.');
+
+    expect($application->refresh()->status)->toBe('running')
+        ->and($application->status_message)->toBe('Status received from coold through flux.')
+        ->and($application->runtime_container_id)->toBe('new-container-id');
+
+    Event::assertDispatched(V5CanvasResourceUpdated::class, fn (V5CanvasResourceUpdated $event) => $event->teamId === $team->id
+        && $event->applicationId === $application->id);
+});
+
+it('configures flux resource status updates for local http instead of redis', function () {
+    $configSource = file_get_contents(config_path('flux.php'));
+
+    expect($configSource)
+        ->toContain('COOLIFY_FLUX_LARAVEL_API_TOKEN')
+        ->not->toContain('APP_KEY')
+        ->not->toContain('COOLIFY_FLUX_RESOURCE_STATUS_CHANNEL')
+        ->not->toContain('resource_status_channel');
+});
+
+it('broadcasts v5 canvas resource updates when application state changes', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+    ]);
+    $application = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-1',
+        'status' => 'running',
+        'status_message' => 'Container started.',
+        'runtime_container_id' => 'nginx-container-id',
+        'canvas_x' => 0,
+        'canvas_y' => 0,
+    ]);
+
+    Event::fake([V5CanvasResourceUpdated::class]);
+
+    $application->update([
+        'status' => 'exited',
+        'status_message' => 'Container stopped.',
+    ]);
+
+    Event::assertDispatched(V5CanvasResourceUpdated::class, fn (V5CanvasResourceUpdated $event) => $event->teamId === $team->id
+        && $event->applicationId === $application->id);
+});
+
+it('broadcasts v5 cluster and canvas updates when ingress server state changes', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Cluster',
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold', 'ingress'],
+    ]);
+
+    Event::fake([V5CanvasResourceUpdated::class, V5ClusterUpdated::class]);
+
+    $server->update(['status' => 'unreachable']);
+
+    Event::assertDispatched(V5ClusterUpdated::class, fn (V5ClusterUpdated $event) => $event->teamId === $team->id
+        && $event->clusterId === $cluster->id);
+    Event::assertDispatched(V5CanvasResourceUpdated::class, fn (V5CanvasResourceUpdated $event) => $event->teamId === $team->id
+        && $event->caddyIngressServerId === $server->id);
+});
+
+it('refreshes v5 application state from flux container inventory', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+        'wireguard_management_ip' => '100.64.0.5',
+    ]);
+    $application = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-1',
+        'status' => 'running',
+        'status_message' => 'Container started.',
+        'runtime_container_id' => 'nginx-container-id',
+        'canvas_x' => 0,
+        'canvas_y' => 0,
+    ]);
+
+    $this->mock(FluxClient::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('listContainers')
+            ->once()
+            ->with('100.64.0.5')
+            ->andReturn([
+                [
+                    'id' => 'nginx-container-id',
+                    'name' => 'coolify-v5-nginx-1',
+                    'image' => 'docker.io/library/nginx:alpine',
+                    'state' => 'exited',
+                    'networks' => ['coolify-default-mesh'],
+                ],
+            ]);
+    });
+
+    $this
+        ->actingAs($user)
+        ->withSession([
+            'currentTeam' => $team,
+            'v5.selectedProjectUuid' => $project->uuid,
+            'v5.selectedEnvironmentUuid' => $environment->uuid,
+        ])
+        ->postJson('/v5/applications/refresh')
+        ->assertSuccessful()
+        ->assertJsonPath('applications.0.id', (string) $application->id)
+        ->assertJsonPath('applications.0.status', 'exited')
+        ->assertJsonPath('applications.0.statusMessage', 'Container state refreshed from coold.');
+
+    expect($application->refresh()->status)->toBe('exited')
+        ->and($application->status_message)->toBe('Container state refreshed from coold.');
+});
+
+it('refreshes v5 caddy ingress state from flux container inventory', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-ingress-01',
+        'host' => '203.0.113.20',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'caddy_ingress_status' => 'running',
+        'capabilities' => ['coold', 'ingress'],
+        'wireguard_management_ip' => '100.64.0.6',
+    ]);
+
+    Event::fake([V5CanvasResourceUpdated::class]);
+
+    $this->mock(FluxClient::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('listContainers')
+            ->once()
+            ->with('100.64.0.6')
+            ->andReturn([
+                [
+                    'id' => 'caddy-container-id',
+                    'name' => 'coolify-v5-caddy',
+                    'image' => 'docker.io/library/caddy:2-alpine',
+                    'state' => 'exited',
+                ],
+            ]);
+    });
+
+    $this
+        ->actingAs($user)
+        ->withSession([
+            'currentTeam' => $team,
+            'v5.selectedProjectUuid' => $project->uuid,
+            'v5.selectedEnvironmentUuid' => $environment->uuid,
+        ])
+        ->postJson('/v5/applications/refresh')
+        ->assertSuccessful()
+        ->assertJsonPath('caddyIngresses.0.id', (string) $server->id)
+        ->assertJsonPath('caddyIngresses.0.status', 'exited');
+
+    expect($server->refresh()->status)->toBe('installed')
+        ->and($server->caddy_ingress_status)->toBe('exited')
+        ->and($server->last_status_check)->toBe('flux')
+        ->and($server->last_status_output)->toBe('Caddy ingress state refreshed from coold.');
+
+    Event::assertDispatched(V5CanvasResourceUpdated::class, fn (V5CanvasResourceUpdated $event) => $event->teamId === $team->id
+        && $event->caddyIngressServerId === $server->id);
 });
 
 it('broadcasts v5 cluster updates when bootstrap state changes', function () {
@@ -690,6 +2162,7 @@ it('adds a v5 server to a cluster for the current team', function () {
         ->assertJsonPath('cluster.servers.0.builderEnabled', true)
         ->assertJsonPath('cluster.servers.0.builderCapacity', 3)
         ->assertJsonPath('cluster.servers.0.builderCpuQuota', '200%')
+        ->assertJsonPath('cluster.servers.0.ingressEnabled', false)
         ->assertJsonPath('cluster.servers.0.capabilities', ['coold', 'builder'])
         ->assertJsonPath('cluster.servers.0.wireguardListenPortOverride', 51821)
         ->assertJsonPath('cluster.servers.0.wireguardEndpointOverride', 'prod-01.example.com:51821')
@@ -710,6 +2183,41 @@ it('adds a v5 server to a cluster for the current team', function () {
 
     expect(V5Server::query()->where('name', 'prod-01')->first()->capabilities)
         ->toBe(['coold', 'builder']);
+});
+
+it('adds a v5 server with caddy ingress enabled', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson("/v5/clusters/{$cluster->id}/servers", [
+            'name' => 'edge-01',
+            'host' => '203.0.113.20',
+            'ssh_user' => 'root',
+            'ssh_port' => 22,
+            'private_key_id' => $privateKey->id,
+            'builder_enabled' => false,
+            'builder_capacity' => 0,
+            'ingress_enabled' => true,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('cluster.servers.0.ingressEnabled', true)
+        ->assertJsonPath('cluster.servers.0.capabilities', ['coold', 'ingress']);
+
+    $server = V5Server::query()->where('name', 'edge-01')->first();
+
+    expect($server->capabilities)->toBe(['coold', 'ingress'])
+        ->and($server->isIngress())->toBeTrue();
 });
 
 it('keeps added v5 server builder capacity when builder is disabled', function () {
@@ -1492,6 +3000,7 @@ it('updates editable v5 server builder details without changing networking', fun
         ->assertJsonPath('cluster.servers.0.builderEnabled', true)
         ->assertJsonPath('cluster.servers.0.builderCapacity', 5)
         ->assertJsonPath('cluster.servers.0.builderCpuQuota', '350%')
+        ->assertJsonPath('cluster.servers.0.ingressEnabled', false)
         ->assertJsonPath('cluster.servers.0.host', '203.0.113.10')
         ->assertJsonMissingPath('cluster.servers.0.sshUser')
         ->assertJsonMissingPath('cluster.servers.0.sshPort')
@@ -1509,6 +3018,52 @@ it('updates editable v5 server builder details without changing networking', fun
         ->and($server->ssh_port)->toBe(22)
         ->and($server->node_address)->toBe('10.0.0.10')
         ->and($server->wireguard_endpoint_override)->toBe('prod-01.example.com:51821');
+});
+
+it('updates editable v5 server caddy ingress capability independently from builder', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.20',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'added',
+        'capabilities' => ['coold', 'builder'],
+        'builder_enabled' => true,
+        'builder_capacity' => 2,
+        'builder_cpu_quota' => '200%',
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->patchJson("/v5/clusters/{$cluster->id}/servers/{$server->id}", [
+            'builder_enabled' => false,
+            'builder_capacity' => 2,
+            'builder_cpu_quota' => '200%',
+            'ingress_enabled' => true,
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('cluster.servers.0.builderEnabled', false)
+        ->assertJsonPath('cluster.servers.0.ingressEnabled', true)
+        ->assertJsonPath('cluster.servers.0.capabilities', ['coold', 'ingress']);
+
+    $server->refresh();
+
+    expect($server->capabilities)->toBe(['coold', 'ingress'])
+        ->and($server->builder_enabled)->toBeFalse()
+        ->and($server->isIngress())->toBeTrue();
 });
 
 it('keeps editable v5 server builder capacity when disabling builder', function () {
@@ -1914,22 +3469,40 @@ it('defines the v5 dashboard page as a shadcn styled canvas shell', function () 
         ->toContain('Dashboard')
         ->toContain("import { AppNavbar } from '@/components/app-navbar';")
         ->not->toContain('function csrfToken()')
-        ->not->toContain("import { csrfToken } from '@/lib/csrf';")
+        ->toContain("import { csrfToken } from '@/lib/csrf';")
         ->not->toContain("import { Button } from '@/components/ui/button';")
         ->not->toContain("fetch('/v5/clusters'")
         ->toContain('<AppNavbar')
         ->toContain('bg-background text-foreground')
         ->toContain('h-dvh overflow-hidden bg-background text-foreground')
-        ->toContain('flex h-full min-h-0 items-center justify-center overflow-hidden px-6 pt-16')
+        ->toContain('relative h-full min-h-0 overflow-hidden pt-16')
+        ->toContain('Add nginx')
+        ->toContain('Select nginx server')
+        ->toContain('selectedNginxServerId')
+        ->toContain('server_id: selectedNginxServerId || null')
+        ->toContain('Center')
+        ->toContain('Delete')
+        ->toContain("method: 'DELETE'")
+        ->toContain('removeApplication')
+        ->toContain('useEffect(() => {')
+        ->toContain('setApplications(settledResources.applications);')
+        ->toContain('centerOnCanvasNodes(settledResources.applications, settledResources.ingresses);')
+        ->toContain('Caddy ingress')
+        ->toContain('persistCaddyIngressPosition')
+        ->toContain('startIngressDrag')
+        ->toContain('fetch(`/v5/caddy-ingresses/${ingress.id}/position`')
+        ->toContain("fetch('/v5/applications/nginx'")
+        ->toContain('nginxServers = []')
+        ->toContain('fetch(`/v5/applications/${application.id}/position`')
         ->not->toContain('<header')
         ->not->toContain('h-[calc(100dvh-4rem)]')
         ->not->toContain('flex h-dvh flex-col overflow-hidden bg-background text-foreground')
-        ->toContain('This is where the magic happens.')
+        ->toContain('No applications on this canvas yet.')
         ->not->toContain("import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';")
         ->not->toContain("fetch('/v5/selection'");
 
     expect($navbar)
-        ->toContain("import { Link, usePage } from '@inertiajs/react';")
+        ->toContain("import { Link, router, usePage } from '@inertiajs/react';")
         ->toContain("import { cn } from '@/lib/utils';")
         ->toContain("import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';")
         ->toContain("import { csrfToken } from '@/lib/csrf';")
@@ -1939,7 +3512,7 @@ it('defines the v5 dashboard page as a shadcn styled canvas shell', function () 
         ->toContain('<Link')
         ->toContain('className="fixed inset-x-0 top-0 z-40 border-b border-border bg-background"')
         ->not->toContain('className="sticky top-0 z-40 shrink-0 border-b border-border bg-background"')
-        ->toContain('bg-muted/40')
+        ->toContain('hover:bg-muted')
         ->toContain('text-muted-foreground')
         ->toContain('SelectGroup')
         ->toContain('variant="ghost"')
@@ -1971,6 +3544,10 @@ it('defines the v5 dashboard page as a shadcn styled canvas shell', function () 
         ->toContain('Dashboard')
         ->not->toContain('Home')
         ->toContain("fetch('/v5/selection'")
+        ->toContain('router.reload({')
+        ->toContain("only: ['applications', 'selectedProjectUuid', 'selectedEnvironmentUuid']")
+        ->toContain('void persistSelection(nextProjectUuid, nextEnvironmentUuid).then(refreshCurrentPageSelection);')
+        ->toContain('void persistSelection(projectUuid, nextEnvironmentUuid).then(refreshCurrentPageSelection);')
         ->toContain("'X-CSRF-TOKEN': csrfToken()")
         ->not->toContain('isMobileMenuOpen')
         ->not->toContain('setIsMobileMenuOpen')
@@ -2176,11 +3753,14 @@ it('defines the v5 cluster management page and create cluster form', function ()
         ->toContain('flex min-h-dvh overflow-visible px-4 pt-16 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-6')
         ->toContain('flex w-full flex-col gap-4 py-4 lg:min-h-0 lg:py-6')
         ->toContain('rounded-lg border border-border bg-card p-4')
+        ->toContain('flex items-start justify-between gap-3')
+        ->toContain('min-w-0 flex-1')
+        ->toContain('flex shrink-0 items-center justify-end gap-2 sm:flex-wrap')
         ->toContain('aria-label="Select a cluster"')
         ->toContain('setSelectedClusterId(value)')
         ->not->toContain('flex max-h-80 flex-col rounded-lg border border-border bg-card lg:max-h-none lg:min-h-0')
         ->toContain('overflow-visible rounded-lg border border-border bg-card lg:min-h-0 lg:overflow-y-auto')
-        ->toContain('flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end')
+        ->not->toContain('flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end')
         ->toContain('mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2')
         ->not->toContain('lg:grid-cols-[20rem_minmax(0,1fr)]')
         ->not->toContain('lg:grid-cols-[20rem_minmax(0,1fr)_22rem]')
@@ -2313,6 +3893,14 @@ it('uses the requested shadcn preset configuration for v5', function () {
         ->and($css)->toContain('--foreground: oklch(0.141 0.005 285.823);')
         ->and($css)->toContain('--background: #101010;')
         ->and($css)->toContain('button:not(:disabled)');
+});
+
+it('sizes the v5 app root with the dynamic mobile viewport', function () {
+    $css = file_get_contents(resource_path('css/v5/app.css'));
+
+    expect($css)
+        ->toContain('min-height: 100dvh;')
+        ->not->toContain('min-height: 100vh;');
 });
 
 it('selects a shared team when the session has no current team', function () {
@@ -2449,15 +4037,15 @@ it('syncs dev Lima VMs into v5 clusters and servers', function () {
         '--cluster' => 'Development-Lima',
         '--builder-capacity' => 2,
         '--server' => [
-            'coold-dev|host.docker.internal|developer|61332',
-            'coold-dev-2|host.docker.internal|developer|61379',
+            'coold-dev|host.docker.internal|developer|61332|100.64.0.1',
+            'coold-dev-2|host.docker.internal|developer|61379|100.64.0.2',
         ],
     ]);
 
     expect($exitCode)->toBe(0)
         ->and(Cluster::query()->where('name', 'Development-Lima')->count())->toBe(1)
-        ->and(V5Server::query()->where('name', 'coold-dev')->where('host', 'host.docker.internal')->where('ssh_port', 61332)->where('private_key_id', $privateKey->id)->exists())->toBeTrue()
-        ->and(V5Server::query()->where('name', 'coold-dev-2')->where('host', 'host.docker.internal')->where('ssh_port', 61379)->where('private_key_id', $privateKey->id)->exists())->toBeTrue();
+        ->and(V5Server::query()->where('name', 'coold-dev')->where('host', 'host.docker.internal')->where('node_address', '100.64.0.1')->where('wireguard_management_ip', '100.64.0.1')->where('ssh_port', 61332)->where('private_key_id', $privateKey->id)->exists())->toBeTrue()
+        ->and(V5Server::query()->where('name', 'coold-dev-2')->where('host', 'host.docker.internal')->where('node_address', '100.64.0.2')->where('wireguard_management_ip', '100.64.0.2')->where('ssh_port', 61379)->where('private_key_id', $privateKey->id)->exists())->toBeTrue();
 });
 
 it('updates legacy dev Lima hostnames to Docker reachable SSH endpoints', function () {
@@ -2519,9 +4107,43 @@ it('seeds dev Lima VMs into v5 clusters and servers idempotently', function () {
         ->and(V5Server::query()->count())->toBe(2)
         ->and(V5Server::query()->where('name', 'coold-dev')->where('host', 'host.docker.internal')->where('ssh_user', get_current_user())->where('ssh_port', 60001)->exists())->toBeTrue()
         ->and(V5Server::query()->where('name', 'coold-dev-2')->where('host', 'host.docker.internal')->where('ssh_user', get_current_user())->where('ssh_port', 60002)->exists())->toBeTrue()
+        ->and(V5Server::query()->where('name', 'coold-dev')->where('node_address', '100.64.0.1')->where('wireguard_management_ip', '100.64.0.1')->exists())->toBeTrue()
+        ->and(V5Server::query()->where('name', 'coold-dev-2')->where('node_address', '100.64.0.2')->where('wireguard_management_ip', '100.64.0.2')->exists())->toBeTrue()
         ->and(V5Server::query()->where('status', 'installed')->count())->toBe(2)
         ->and(V5Server::query()->where('builder_enabled', true)->where('builder_capacity', 2)->count())->toBe(2)
         ->and(V5Server::query()->where('cluster_id', $cluster->id)->count())->toBe(2);
+});
+
+it('seeds dev Lima VMs by updating existing named servers', function () {
+    createSharedUserAndTeamTables();
+    [$user, $team] = createV5UserWithTeam();
+    createV5PrivateKey($team, 'Dev Lima Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Development-Lima',
+        'description' => 'Local Lima development cluster managed by scripts/dev.sh.',
+    ]);
+
+    V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'coold-dev',
+        'host' => 'old-host.local',
+        'ssh_user' => 'developer',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+        'last_bootstrapped_at' => now()->subDay(),
+    ]);
+
+    (new V5DevLimaSeeder)->run();
+
+    expect(V5Server::query()->where('name', 'coold-dev')->count())->toBe(1)
+        ->and(V5Server::query()->where('name', 'coold-dev')->where('host', 'host.docker.internal')->where('ssh_port', 60001)->exists())->toBeTrue()
+        ->and(V5Server::query()->count())->toBe(2);
 });
 
 function fakeFluxHealth(bool $available = true, string $message = 'Flux is running.'): void
@@ -2630,6 +4252,7 @@ function createSharedUserAndTeamTables(): void
         $table->string('ssh_user');
         $table->unsignedInteger('ssh_port');
         $table->string('status')->default('installed');
+        $table->string('caddy_ingress_status')->nullable();
         $table->json('capabilities')->nullable();
         $table->boolean('builder_enabled')->default(false);
         $table->unsignedInteger('builder_capacity')->default(0);
@@ -2640,6 +4263,8 @@ function createSharedUserAndTeamTables(): void
         $table->string('wireguard_management_ip')->nullable();
         $table->string('wireguard_public_key')->nullable();
         $table->json('container_subnets')->nullable();
+        $table->integer('canvas_x')->nullable();
+        $table->integer('canvas_y')->nullable();
         $table->timestamp('last_bootstrapped_at')->nullable();
         $table->string('last_bootstrap_action')->nullable();
         $table->string('last_bootstrap_status')->nullable();
@@ -2648,6 +4273,68 @@ function createSharedUserAndTeamTables(): void
         $table->string('last_status_check')->nullable();
         $table->text('last_status_output')->nullable();
         $table->timestamp('last_status_checked_at')->nullable();
+        $table->timestamps();
+    });
+
+    Schema::create('v5_container_statuses', function ($table) {
+        $table->id();
+        $table->foreignId('team_id');
+        $table->foreignId('server_id');
+        $table->string('container_id');
+        $table->string('container_name')->nullable();
+        $table->string('image')->nullable();
+        $table->string('status')->default('unknown');
+        $table->text('status_message')->nullable();
+        $table->timestamp('last_seen_at')->nullable();
+        $table->timestamps();
+
+        $table->unique(['server_id', 'container_id']);
+    });
+
+    Schema::create('v5_applications', function ($table) {
+        $table->id();
+        $table->foreignId('team_id');
+        $table->foreignId('project_id');
+        $table->foreignId('environment_id');
+        $table->foreignId('server_id')->nullable();
+        $table->foreignId('created_by_user_id');
+        $table->string('name');
+        $table->string('image');
+        $table->string('container_name')->unique();
+        $table->string('status')->default('creating');
+        $table->text('status_message')->nullable();
+        $table->string('runtime_container_id')->nullable();
+        $table->string('mesh_namespace')->default('default');
+        $table->integer('canvas_x')->default(0);
+        $table->integer('canvas_y')->default(0);
+        $table->timestamps();
+    });
+
+    Schema::create('v5_resource_connections', function ($table) {
+        $table->id();
+        $table->foreignId('team_id');
+        $table->foreignId('project_id');
+        $table->foreignId('environment_id');
+        $table->string('resource_one_type');
+        $table->unsignedBigInteger('resource_one_id');
+        $table->string('resource_two_type');
+        $table->unsignedBigInteger('resource_two_id');
+        $table->string('resource_pair_key');
+        $table->foreignId('created_by_user_id');
+        $table->timestamps();
+
+        $table->unique(['team_id', 'resource_pair_key']);
+    });
+
+    Schema::create('v5_resource_connection_rules', function ($table) {
+        $table->id();
+        $table->foreignId('connection_id');
+        $table->string('source_resource_type');
+        $table->unsignedBigInteger('source_resource_id');
+        $table->string('target_resource_type');
+        $table->unsignedBigInteger('target_resource_id');
+        $table->string('protocol')->default('tcp');
+        $table->unsignedSmallInteger('port');
         $table->timestamps();
     });
 
@@ -2714,11 +4401,11 @@ function createV5PrivateKey(Team $team, string $name): PrivateKey
 /**
  * @return array{0: User, 1: Team}
  */
-function createV5UserWithTeam(): array
+function createV5UserWithTeam(string $email = 'margaret@example.com'): array
 {
     $user = User::withoutEvents(fn () => User::query()->create([
         'name' => 'Margaret Hamilton',
-        'email' => 'margaret@example.com',
+        'email' => $email,
         'email_verified_at' => now(),
         'password' => 'password',
     ]));
@@ -2732,3 +4419,15 @@ function createV5UserWithTeam(): array
 
     return [$user, $team];
 }
+
+it('configures v5 dev lima host resolver for coolify internal dns', function () {
+    $script = file_get_contents(base_path('scripts/coold-vm.sh'));
+
+    expect($script)
+        ->toContain('configure_system_resolved')
+        ->toContain('ensure_mesh_dns_anchor')
+        ->toContain('coolify-v5-mesh-dns-anchor')
+        ->toContain('resolvectl dns podman1 "$CONTAINER_GATEWAY"')
+        ->toContain("resolvectl domain podman1 '~coolify.internal'")
+        ->toContain('resolvectl default-route podman1 false');
+});

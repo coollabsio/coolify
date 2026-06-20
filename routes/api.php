@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\DatabasesController;
 use App\Http\Controllers\Api\DeployController;
 use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\HetznerController;
+use App\Http\Controllers\Api\Internal\FluxResourceStatusController;
 use App\Http\Controllers\Api\OtherController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ResourcesController;
@@ -208,6 +209,7 @@ Route::group([
 Route::group([
     'prefix' => 'v1',
 ], function () {
+    Route::post('/internal/flux/resource-status', FluxResourceStatusController::class);
     Route::post('/sentinel/push', [SentinelController::class, 'push']);
 });
 

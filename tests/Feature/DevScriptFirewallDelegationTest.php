@@ -75,7 +75,7 @@ it('seeds bootstrapped Lima VMs into v5 development server state', function () {
         ->and($script)->toContain('lima_ssh_port "$index"')
         ->and($script)->toContain('host.docker.internal')
         ->and($script)->toContain('v5:sync-dev-lima-servers')
-        ->and($script)->toContain('--server="${instance}|host.docker.internal|${ssh_user}|${ssh_port}"')
+        ->and($script)->toContain('--server="${instance}|host.docker.internal|${ssh_user}|${ssh_port}|$(coold_vm_wg_ip "$index")"')
         ->and($compose)->toContain('COOLIFY_CLI_SSH_USER: "${COOLIFY_CLI_SSH_USER:-}"')
         ->and($script)->not->toContain('db:seed --class=V5DevLimaSeeder --force')
         ->and($script)->not->toContain('--server "${instance}|${node}|$(coolify_ssh_user)|22"');

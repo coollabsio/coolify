@@ -187,6 +187,7 @@ export default function Clusters({
     const [selectedPrivateKeyId, setSelectedPrivateKeyId] = useState('');
     const [serverNodeAddress, setServerNodeAddress] = useState('');
     const [serverBuilderEnabled, setServerBuilderEnabled] = useState(true);
+    const [serverIngressEnabled, setServerIngressEnabled] = useState(false);
     const [serverBuilderCapacity, setServerBuilderCapacity] = useState('2');
     const [serverBuilderCpuQuota, setServerBuilderCpuQuota] = useState(clusterDefaults.builderCpuQuota);
     const [wireguardListenPortOverride, setWireguardListenPortOverride] = useState('');
@@ -194,6 +195,7 @@ export default function Clusters({
     const [serverErrors, setServerErrors] = useState<ServerFormErrors>({});
     const [editingServer, setEditingServer] = useState<V5Server | null>(null);
     const [editServerBuilderEnabled, setEditServerBuilderEnabled] = useState(true);
+    const [editServerIngressEnabled, setEditServerIngressEnabled] = useState(false);
     const [editServerBuilderCapacity, setEditServerBuilderCapacity] = useState('2');
     const [editServerBuilderCpuQuota, setEditServerBuilderCpuQuota] = useState(clusterDefaults.builderCpuQuota);
     const [editServerErrors, setEditServerErrors] = useState<ServerFormErrors>({});
@@ -419,6 +421,7 @@ export default function Clusters({
                 private_key_id: selectedPrivateKeyId === '' ? null : Number(selectedPrivateKeyId),
                 node_address: serverNodeAddress.trim() === '' ? null : serverNodeAddress,
                 builder_enabled: serverBuilderEnabled,
+                ingress_enabled: serverIngressEnabled,
                 builder_capacity: Number(serverBuilderCapacity),
                 builder_cpu_quota: serverBuilderCpuQuota,
                 wireguard_listen_port_override:
@@ -476,6 +479,7 @@ export default function Clusters({
             },
             body: JSON.stringify({
                 builder_enabled: editServerBuilderEnabled,
+                ingress_enabled: editServerIngressEnabled,
                 builder_capacity: Number(editServerBuilderCapacity),
                 builder_cpu_quota: editServerBuilderCpuQuota,
             }),
@@ -624,6 +628,7 @@ export default function Clusters({
     function openEditServerDialog(server: V5Server): void {
         setEditingServer(server);
         setEditServerBuilderEnabled(server.builderEnabled);
+        setEditServerIngressEnabled(server.ingressEnabled);
         setEditServerBuilderCapacity(String(server.builderCapacity));
         setEditServerBuilderCpuQuota(server.builderCpuQuota);
         setEditServerErrors({});
@@ -727,6 +732,7 @@ export default function Clusters({
     function resetEditServerForm(): void {
         setEditingServer(null);
         setEditServerBuilderEnabled(true);
+        setEditServerIngressEnabled(false);
         setEditServerBuilderCapacity('2');
         setEditServerBuilderCpuQuota(clusterDefaults.builderCpuQuota);
         setEditServerErrors({});
@@ -747,12 +753,12 @@ export default function Clusters({
 
         return (
             <article key={server.id} className="rounded-lg border border-border bg-background p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
                         <h4 className="break-words text-sm font-semibold text-foreground">{server.name}</h4>
                         <p className="mt-1 break-all text-xs text-muted-foreground">{server.host}</p>
                     </div>
-                    <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                    <div className="flex shrink-0 items-center justify-end gap-2 sm:flex-wrap">
                         {!isServerInitialized ? (
                             <div role="group" aria-label="Server initialization" className="inline-flex">
                                 <span className="inline-flex h-7 items-center rounded-l-md border border-r-0 border-destructive/30 bg-destructive/10 px-2 text-xs font-medium text-destructive">
@@ -842,6 +848,12 @@ export default function Clusters({
                             <dd className="mt-1 break-words font-medium text-foreground">{server.builderCpuQuota}</dd>
                         </div>
                     ) : null}
+                    <div>
+                        <dt className="text-muted-foreground">Caddy ingress</dt>
+                        <dd className="mt-1 break-words font-medium text-foreground">
+                            {server.ingressEnabled ? 'Enabled' : 'Disabled'}
+                        </dd>
+                    </div>
                     <div>
                         <dt className="text-muted-foreground">WireGuard IP</dt>
                         <dd className="mt-1 break-words font-medium text-foreground">
@@ -1611,6 +1623,17 @@ export default function Clusters({
                                                     <FieldLabel>Enable builder on this server</FieldLabel>
                                                 </Field>
 
+                                                <Field className="flex-row items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={serverIngressEnabled}
+                                                        onChange={(event) =>
+                                                            setServerIngressEnabled(event.target.checked)
+                                                        }
+                                                    />
+                                                    <FieldLabel>Enable Caddy ingress on this server</FieldLabel>
+                                                </Field>
+
                                                 <Field>
                                                     <FieldLabel>WireGuard listen override</FieldLabel>
                                                     <Input
@@ -1678,20 +1701,31 @@ export default function Clusters({
                                 <DialogHeader>
                                     <DialogTitle>Edit server</DialogTitle>
                                     <DialogDescription>
-                                        Update builder scheduling limits for {editingServer?.name ?? 'this server'}.
+                                        Update builder scheduling limits and Caddy ingress for {editingServer?.name ?? 'this server'}.
                                         Networking and bootstrap settings stay locked after creation.
                                     </DialogDescription>
                                 </DialogHeader>
 
                                 <form className="mt-5 flex flex-col gap-4" onSubmit={updateServer}>
-                                    <Field className="flex-row items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            checked={editServerBuilderEnabled}
-                                            onChange={(event) => setEditServerBuilderEnabled(event.target.checked)}
-                                        />
-                                        <FieldLabel>Enable builder on this server</FieldLabel>
-                                    </Field>
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <Field className="flex-row items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={editServerBuilderEnabled}
+                                                onChange={(event) => setEditServerBuilderEnabled(event.target.checked)}
+                                            />
+                                            <FieldLabel>Enable builder on this server</FieldLabel>
+                                        </Field>
+
+                                        <Field className="flex-row items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={editServerIngressEnabled}
+                                                onChange={(event) => setEditServerIngressEnabled(event.target.checked)}
+                                            />
+                                            <FieldLabel>Enable Caddy ingress on this server</FieldLabel>
+                                        </Field>
+                                    </div>
 
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                         <Field>

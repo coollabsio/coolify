@@ -8,6 +8,14 @@ Route::middleware('v5.authenticated')->group(function () {
     Route::get('/realtime-test', [DashboardController::class, 'realtimeTest'])->name('realtime-test');
     Route::post('/realtime-test', [DashboardController::class, 'broadcastRealtimeTest'])->name('realtime-test.broadcast');
     Route::post('/selection', [DashboardController::class, 'updateSelection'])->name('selection.update');
+    Route::post('/applications/nginx', [DashboardController::class, 'storeNginxApplication'])->name('applications.nginx');
+    Route::post('/applications/refresh', [DashboardController::class, 'refreshApplications'])->name('applications.refresh');
+    Route::delete('/applications/{application}', [DashboardController::class, 'destroyApplication'])->name('applications.destroy');
+    Route::patch('/applications/{application}/position', [DashboardController::class, 'updateApplicationPosition'])->name('applications.position');
+    Route::patch('/caddy-ingresses/{server}/position', [DashboardController::class, 'updateCaddyIngressPosition'])->name('caddy-ingresses.position');
+    Route::post('/resource-connections', [DashboardController::class, 'storeResourceConnection'])->name('resource-connections.store');
+    Route::patch('/resource-connections/{connection}', [DashboardController::class, 'updateResourceConnection'])->name('resource-connections.update');
+    Route::delete('/resource-connections/{connection}', [DashboardController::class, 'destroyResourceConnection'])->name('resource-connections.destroy');
     Route::get('/clusters', [DashboardController::class, 'clustersIndex'])->name('clusters.index');
     Route::get('/clusters/{cluster}', [DashboardController::class, 'showCluster'])->name('clusters.show');
     Route::post('/clusters', [DashboardController::class, 'storeCluster'])->name('clusters.store');

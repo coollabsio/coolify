@@ -1,5 +1,5 @@
-import { Link, usePage } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { Link, router, usePage } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -7,8 +7,8 @@ import { csrfToken } from '@/lib/csrf';
 import { cn } from '@/lib/utils';
 import type { SelectItemOption, V5DashboardProps, V5Project } from '@/types';
 
-function persistSelection(projectUuid: string, environmentUuid: string): void {
-    void fetch('/v5/selection', {
+async function persistSelection(projectUuid: string, environmentUuid: string): Promise<void> {
+    await fetch('/v5/selection', {
         method: 'POST',
         credentials: 'same-origin',
         headers: {
@@ -20,6 +20,12 @@ function persistSelection(projectUuid: string, environmentUuid: string): void {
             project_uuid: projectUuid,
             environment_uuid: environmentUuid,
         }),
+    });
+}
+
+function refreshCurrentPageSelection(): void {
+    router.reload({
+        only: ['applications', 'selectedProjectUuid', 'selectedEnvironmentUuid'],
     });
 }
 
@@ -44,6 +50,14 @@ export function AppNavbar({
         [environmentUuid, firstEnvironment, selectedProject],
     );
 
+    useEffect(() => {
+        setProjectUuid(selectedProjectUuid ?? firstProject?.uuid ?? '');
+    }, [firstProject?.uuid, selectedProjectUuid]);
+
+    useEffect(() => {
+        setEnvironmentUuid(selectedEnvironmentUuid ?? firstEnvironment?.uuid ?? '');
+    }, [firstEnvironment?.uuid, selectedEnvironmentUuid]);
+
     function selectProject(nextProjectUuid: string | null): void {
         if (nextProjectUuid === null) {
             return;
@@ -54,7 +68,7 @@ export function AppNavbar({
 
         setProjectUuid(nextProjectUuid);
         setEnvironmentUuid(nextEnvironmentUuid);
-        persistSelection(nextProjectUuid, nextEnvironmentUuid);
+        void persistSelection(nextProjectUuid, nextEnvironmentUuid).then(refreshCurrentPageSelection);
     }
 
     function selectEnvironment(nextEnvironmentUuid: string | null): void {
@@ -63,7 +77,7 @@ export function AppNavbar({
         }
 
         setEnvironmentUuid(nextEnvironmentUuid);
-        persistSelection(projectUuid, nextEnvironmentUuid);
+        void persistSelection(projectUuid, nextEnvironmentUuid).then(refreshCurrentPageSelection);
     }
 
     const projectItems: SelectItemOption[] = projects.map((project) => ({

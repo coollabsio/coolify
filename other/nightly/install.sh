@@ -840,6 +840,7 @@ update_env_var() {
 
 update_env_var "APP_ID" "$(openssl rand -hex 16)"
 update_env_var "APP_KEY" "base64:$(openssl rand -base64 32)"
+update_env_var "COOLIFY_FLUX_LARAVEL_API_TOKEN" "$(openssl rand -hex 32)"
 # update_env_var "DB_USERNAME" "$(openssl rand -hex 16)" # Causes issues: database "random-user" does not exist
 update_env_var "DB_PASSWORD" "$(openssl rand -base64 32)"
 update_env_var "REDIS_PASSWORD" "$(openssl rand -base64 32)"

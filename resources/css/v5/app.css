@@ -151,7 +151,7 @@
     html,
     body,
     #v5-app {
-        min-height: 100%;
+        min-height: 100dvh;
     }
 
     html {
@@ -168,7 +168,7 @@
 
     body {
         @apply bg-background text-foreground;
-        min-height: 100vh;
+        min-height: 100dvh;
         font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
         text-rendering: optimizeLegibility;
         -webkit-font-smoothing: antialiased;

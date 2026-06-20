@@ -244,6 +244,23 @@ ensure_podman_networks() {
   fi
 }
 
+
+
+ensure_mesh_dns_anchor() {
+  lima_shell sudo podman run -d --replace \
+    --name coolify-v5-mesh-dns-anchor \
+    --network coolify-default-mesh \
+    docker.io/library/alpine:3.20 \
+    sleep infinity >/dev/null
+}
+
+configure_system_resolved() {
+  lima_shell sudo rm -f /etc/systemd/resolved.conf.d/coolify-internal.conf
+  lima_shell sudo systemctl restart systemd-resolved.service
+  lima_shell sudo resolvectl dns podman1 "$CONTAINER_GATEWAY"
+  lima_shell sudo resolvectl domain podman1 '~coolify.internal'
+  lima_shell sudo resolvectl default-route podman1 false
+}
 write_runtime_config() {
   local gossip_addr="127.0.0.1:8787"
   local bootstrap=""
@@ -294,6 +311,8 @@ run_foreground() {
   stop_agent_processes
   write_runtime_config
   ensure_podman_networks
+  configure_system_resolved
+  ensure_mesh_dns_anchor
   install_mesh_firewall
 
   (cd /tmp && limactl shell "$INSTANCE" -- sudo \
@@ -395,6 +414,8 @@ start_agent() {
   stop_agent_processes
   write_runtime_config
   ensure_podman_networks
+  configure_system_resolved
+  ensure_mesh_dns_anchor
   install_mesh_firewall
   lima_shell sudo sh -c 'if [ ! -s /etc/coolify/api-token ]; then openssl rand -hex 32 > /etc/coolify/api-token.tmp && chmod 600 /etc/coolify/api-token.tmp && mv /etc/coolify/api-token.tmp /etc/coolify/api-token; fi'
 

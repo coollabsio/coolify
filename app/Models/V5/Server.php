@@ -2,6 +2,8 @@
 
 namespace App\Models\V5;
 
+use App\Events\V5CanvasResourceUpdated;
+use App\Events\V5ClusterUpdated;
 use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
@@ -22,6 +24,7 @@ class Server extends V5Model
         'ssh_user',
         'ssh_port',
         'status',
+        'caddy_ingress_status',
         'capabilities',
         'builder_enabled',
         'builder_capacity',
@@ -32,6 +35,8 @@ class Server extends V5Model
         'wireguard_management_ip',
         'wireguard_public_key',
         'container_subnets',
+        'canvas_x',
+        'canvas_y',
         'last_bootstrapped_at',
         'last_bootstrap_action',
         'last_bootstrap_status',
@@ -42,16 +47,77 @@ class Server extends V5Model
         'last_status_checked_at',
     ];
 
+    protected static function booted(): void
+    {
+        static::updated(function (self $server): void {
+            if (! $server->wasChanged('status') && ! $server->wasChanged('caddy_ingress_status')) {
+                return;
+            }
+
+            if ($server->wasChanged('status') && $server->cluster_id !== null) {
+                V5ClusterUpdated::dispatch($server->team_id, $server->cluster_id);
+            }
+
+            if ($server->isIngress()) {
+                V5CanvasResourceUpdated::dispatch($server->team_id, null, $server->id);
+            }
+        });
+    }
+
     protected function casts(): array
     {
         return [
             'capabilities' => 'array',
             'builder_enabled' => 'boolean',
             'container_subnets' => 'array',
+            'canvas_x' => 'integer',
+            'canvas_y' => 'integer',
             'last_bootstrapped_at' => 'datetime',
             'last_bootstrap_ran_at' => 'datetime',
             'last_status_checked_at' => 'datetime',
         ];
+    }
+
+    public function hasCapability(string $capability): bool
+    {
+        return in_array($capability, $this->capabilities ?? [], true);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function withCapability(string $capability): array
+    {
+        return collect($this->capabilities ?? [])
+            ->push($capability)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function withoutCapability(string $capability): array
+    {
+        return collect($this->capabilities ?? [])
+            ->reject(fn (string $existingCapability) => $existingCapability === $capability)
+            ->values()
+            ->all();
+    }
+
+    public function isIngress(): bool
+    {
+        return $this->hasCapability('ingress');
+    }
+
+    public function caddyIngressStatus(): string
+    {
+        if ($this->caddy_ingress_status !== null) {
+            return $this->caddy_ingress_status;
+        }
+
+        return $this->status === 'installed' ? 'running' : 'unknown';
     }
 
     public function cluster(): BelongsTo

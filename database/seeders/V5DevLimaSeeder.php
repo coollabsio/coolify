@@ -2,11 +2,10 @@
 
 namespace Database\Seeders;
 
+use App\Actions\V5\Server\SyncDevLimaServers;
 use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
-use App\Models\V5\Cluster;
-use App\Models\V5\Server;
 use Illuminate\Database\Seeder;
 
 class V5DevLimaSeeder extends Seeder
@@ -25,14 +24,6 @@ class V5DevLimaSeeder extends Seeder
             return;
         }
 
-        $cluster = Cluster::query()->updateOrCreate([
-            'team_id' => $team->id,
-            'name' => self::CLUSTER_NAME,
-        ], [
-            'created_by_user_id' => $user->id,
-            'description' => 'Local Lima development cluster managed by scripts/dev.sh.',
-        ]);
-
         $privateKey = PrivateKey::query()
             ->where('team_id', $team->id)
             ->where('is_git_related', false)
@@ -40,34 +31,26 @@ class V5DevLimaSeeder extends Seeder
             ->first();
 
         $builderCapacity = max(0, (int) config('coold.dev_builder_capacity', 2));
-        $builderEnabled = $builderCapacity > 0;
-        $capabilities = $builderEnabled ? ['coold', 'builder'] : ['coold'];
         $sshUser = (string) config('coold.dev_ssh_user', get_current_user());
-
-        foreach ($this->servers() as $server) {
-            Server::query()->updateOrCreate([
-                'team_id' => $team->id,
-                'host' => $server['host'],
-                'ssh_port' => $server['ssh_port'],
-            ], [
-                'cluster_id' => $cluster->id,
-                'created_by_user_id' => $user->id,
-                'private_key_id' => $privateKey?->id,
-                'name' => $server['name'],
+        $servers = collect($this->servers())
+            ->map(fn (array $server): array => [
+                ...$server,
                 'ssh_user' => $sshUser,
-                'status' => 'installed',
-                'capabilities' => $capabilities,
-                'builder_enabled' => $builderEnabled,
-                'builder_capacity' => $builderCapacity,
-                'wireguard_listen_port_override' => $server['wireguard_listen_port_override'],
-                'wireguard_endpoint_override' => $server['wireguard_endpoint_override'],
-                'last_bootstrapped_at' => now(),
-            ]);
-        }
+            ])
+            ->all();
+
+        SyncDevLimaServers::run(
+            team: $team,
+            user: $user,
+            privateKey: $privateKey,
+            clusterName: self::CLUSTER_NAME,
+            builderCapacity: $builderCapacity,
+            servers: $servers,
+        );
     }
 
     /**
-     * @return array<int, array{name: string, host: string, ssh_port: int, wireguard_listen_port_override: int, wireguard_endpoint_override: string}>
+     * @return array<int, array{name: string, host: string, ssh_port: int, wireguard_management_ip: string, wireguard_listen_port_override: int, wireguard_endpoint_override: string}>
      */
     private function servers(): array
     {
@@ -76,6 +59,7 @@ class V5DevLimaSeeder extends Seeder
                 'name' => 'coold-dev',
                 'host' => 'host.docker.internal',
                 'ssh_port' => 60001,
+                'wireguard_management_ip' => '100.64.0.1',
                 'wireguard_listen_port_override' => 51821,
                 'wireguard_endpoint_override' => 'host.lima.internal:51821',
             ],
@@ -83,6 +67,7 @@ class V5DevLimaSeeder extends Seeder
                 'name' => 'coold-dev-2',
                 'host' => 'host.docker.internal',
                 'ssh_port' => 60002,
+                'wireguard_management_ip' => '100.64.0.2',
                 'wireguard_listen_port_override' => 51822,
                 'wireguard_endpoint_override' => 'host.lima.internal:51822',
             ],
