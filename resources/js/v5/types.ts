@@ -91,6 +91,9 @@ export type V5Application = {
     runtimeContainerId: string | null;
     serverName: string | null;
     meshNamespace: string;
+    ingressEnabled: boolean;
+    internalPort: number | null;
+    domains: string[];
     meshFqdn: string;
     canvasX: number;
     canvasY: number;

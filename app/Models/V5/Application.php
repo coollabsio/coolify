@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Application extends V5Model
 {
@@ -26,6 +27,8 @@ class Application extends V5Model
         'status_message',
         'runtime_container_id',
         'mesh_namespace',
+        'ingress_enabled',
+        'internal_port',
         'canvas_x',
         'canvas_y',
     ];
@@ -33,6 +36,7 @@ class Application extends V5Model
     protected $attributes = [
         'status' => 'creating',
         'mesh_namespace' => 'default',
+        'ingress_enabled' => false,
         'canvas_x' => 0,
         'canvas_y' => 0,
     ];
@@ -49,6 +53,8 @@ class Application extends V5Model
     protected function casts(): array
     {
         return [
+            'ingress_enabled' => 'boolean',
+            'internal_port' => 'integer',
             'canvas_x' => 'integer',
             'canvas_y' => 'integer',
         ];
@@ -77,5 +83,10 @@ class Application extends V5Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    public function domains(): HasMany
+    {
+        return $this->hasMany(ApplicationDomain::class);
     }
 }

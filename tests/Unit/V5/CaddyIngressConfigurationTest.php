@@ -3,103 +3,124 @@
 use App\Actions\V5\Proxy\GenerateCaddyIngressConfiguration;
 use App\Actions\V5\Proxy\StartCaddyIngress;
 use App\Actions\V5\Proxy\StopCaddyIngress;
-use App\Models\PrivateKey;
+use App\Models\V5\Application;
+use App\Models\V5\ApplicationDomain;
 use App\Models\V5\Server;
-use Illuminate\Support\Facades\Process;
+use App\Services\Flux\FluxClient;
+use Illuminate\Support\Collection;
 use Tests\TestCase;
 
 uses(TestCase::class);
 
-it('generates a caddy ingress compose file with health endpoint', function () {
-    $configuration = GenerateCaddyIngressConfiguration::run();
+it('generates a caddy ingress compose file with health endpoint and application routes', function () {
+    $application = new Application([
+        'name' => 'nginx-test',
+        'container_name' => 'coolify-v5-nginx-test',
+        'mesh_namespace' => 'default',
+        'ingress_enabled' => true,
+        'internal_port' => 8080,
+    ]);
+    $application->setRelation('domains', new Collection([
+        new ApplicationDomain([
+            'domain' => 'nginx.example.com',
+        ]),
+        new ApplicationDomain([
+            'domain' => 'www.nginx.example.com',
+        ]),
+    ]));
+
+    $configuration = GenerateCaddyIngressConfiguration::run(new Collection([$application]));
 
     expect($configuration['compose'])->toContain('container_name: coolify-v5-caddy')
         ->and($configuration['compose'])->toContain("image: 'docker.io/library/caddy:2-alpine'")
         ->and($configuration['compose'])->toContain('80:80')
         ->and($configuration['compose'])->toContain('443:443')
         ->and($configuration['compose'])->toContain('./Caddyfile:/etc/caddy/Caddyfile:ro')
+        ->and($configuration['compose'])->toContain('./apps:/etc/caddy/apps:ro')
         ->and($configuration['caddyfile'])->toContain('respond /coolify-health 200')
-        ->and($configuration['caddyfile'])->toContain('respond 404');
+        ->and($configuration['caddyfile'])->toContain('respond 404')
+        ->and($configuration['caddyfile'])->toContain('import apps/*.caddy')
+        ->and($configuration['apps'])->toHaveCount(1)
+        ->and($configuration['apps'][0]['caddyfile'])->toContain('nginx.example.com {')
+        ->and($configuration['apps'][0]['caddyfile'])->toContain('www.nginx.example.com {')
+        ->and($configuration['apps'][0]['caddyfile'])->toContain('reverse_proxy coolify-v5-nginx-test.default.coolify.internal:8080');
 });
 
-it('builds caddy ingress install commands with sudo fallback for non-root ssh users', function () {
-    $configuration = GenerateCaddyIngressConfiguration::run('/tmp/coolify-caddy');
-    $script = implode("\n", $configuration['commands']);
+it('does not generate app routes for applications without domains', function () {
+    $application = new Application([
+        'name' => 'private-app',
+        'container_name' => 'coolify-v5-private',
+        'mesh_namespace' => 'default',
+    ]);
+    $application->setRelation('domains', new Collection);
 
-    expect($configuration['commands'])->toHaveCount(6)
-        ->and($script)->toContain('sudo mkdir -p /tmp/coolify-caddy/data /tmp/coolify-caddy/config')
-        ->and($script)->toContain('sudo tee /tmp/coolify-caddy/docker-compose.yml')
-        ->and($script)->toContain('sudo tee /tmp/coolify-caddy/Caddyfile')
-        ->and($script)->toContain('command -v podman')
-        ->and($script)->toContain('command -v docker')
-        ->and(strpos($script, 'command -v podman'))->toBeLessThan(strpos($script, 'command -v docker'))
-        ->and($script)->toContain('coolify-v5-caddy')
-        ->and($script)->toContain('-v /tmp/coolify-caddy/Caddyfile:/etc/caddy/Caddyfile:ro');
+    $configuration = GenerateCaddyIngressConfiguration::run(new Collection([$application]));
+
+    expect($configuration['caddyfile'])
+        ->toContain('respond /coolify-health 200')
+        ->and($configuration['apps'])->toBe([]);
 });
 
-it('throws when the caddy ingress start command fails', function () {
-    $privateKey = new PrivateKey([
-        'private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest-key\n-----END OPENSSH PRIVATE KEY-----\n",
+it('does not generate app routes when ingress is disabled even with domains', function () {
+    $application = new Application([
+        'name' => 'private-app',
+        'container_name' => 'coolify-v5-private',
+        'mesh_namespace' => 'default',
+        'ingress_enabled' => false,
+        'internal_port' => 8080,
     ]);
+    $application->setRelation('domains', new Collection([
+        new ApplicationDomain([
+            'domain' => 'private.example.com',
+        ]),
+    ]));
 
+    $configuration = GenerateCaddyIngressConfiguration::run(new Collection([$application]));
+
+    expect($configuration['apps'])->toBe([]);
+});
+
+it('does not generate app routes when the internal port is missing', function () {
+    $application = new Application([
+        'name' => 'needs-port',
+        'container_name' => 'coolify-v5-needs-port',
+        'mesh_namespace' => 'default',
+        'ingress_enabled' => true,
+        'internal_port' => null,
+    ]);
+    $application->setRelation('domains', new Collection([
+        new ApplicationDomain([
+            'domain' => 'needs-port.example.com',
+        ]),
+    ]));
+
+    $configuration = GenerateCaddyIngressConfiguration::run(new Collection([$application]));
+
+    expect($configuration['apps'])->toBe([]);
+});
+
+it('applies caddy ingress configuration through flux instead of ssh', function () {
     $server = new Server([
-        'host' => '203.0.113.10',
-        'ssh_user' => 'root',
-        'ssh_port' => 22,
+        'wireguard_management_ip' => '100.64.0.10',
+        'node_address' => '10.0.0.10',
         'capabilities' => ['coold', 'ingress'],
     ]);
-    $server->setRelation('privateKey', $privateKey);
 
-    Process::fake([
-        '*' => Process::result(errorOutput: 'mkdir: Permission denied', exitCode: 1),
-    ]);
-
-    StartCaddyIngress::run($server);
-})->throws(RuntimeException::class, 'Failed to start Caddy ingress: mkdir: Permission denied');
-
-it('starts caddy ingress over ssh for ingress servers', function () {
-    $privateKey = new PrivateKey([
-        'private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest-key\n-----END OPENSSH PRIVATE KEY-----\n",
-    ]);
-
-    $server = new Server([
-        'host' => '203.0.113.10',
-        'ssh_user' => 'root',
-        'ssh_port' => 22,
-        'capabilities' => ['coold', 'ingress'],
-    ]);
-    $server->setRelation('privateKey', $privateKey);
-
-    Process::fake([
-        '*' => Process::result(output: ''),
-    ]);
+    $fluxClient = Mockery::mock(FluxClient::class);
+    $fluxClient
+        ->shouldReceive('applyCaddyIngress')
+        ->once()
+        ->with(
+            '100.64.0.10',
+            Mockery::on(fn (string $caddyfile): bool => str_contains($caddyfile, 'respond /coolify-health 200')),
+            []
+        )
+        ->andReturn('Caddy ingress applied.');
+    app()->instance(FluxClient::class, $fluxClient);
 
     $result = StartCaddyIngress::run($server);
 
-    expect($result)->toBe('Caddy ingress started.');
-
-    Process::assertRan(function ($process): bool {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
-
-        return is_string($command)
-            && str_contains($command, 'command -v podman')
-            && str_contains($command, 'command -v docker')
-            && strpos($command, 'command -v podman') < strpos($command, 'command -v docker')
-            && str_contains($command, 'coolify-v5-caddy');
-    });
-});
-
-it('prefers podman for every caddy ingress runtime command', function () {
-    $configuration = GenerateCaddyIngressConfiguration::run('/tmp/coolify-caddy');
-
-    $runtimeCommands = collect($configuration['commands'])
-        ->filter(fn (string $command) => str_contains($command, 'command -v podman') && str_contains($command, 'command -v docker'));
-
-    expect($runtimeCommands)->toHaveCount(3);
-
-    $runtimeCommands->each(function (string $command): void {
-        expect(strpos($command, 'command -v podman'))->toBeLessThan(strpos($command, 'command -v docker'));
-    });
+    expect($result)->toBe('Caddy ingress applied.');
 });
 
 it('does not start caddy ingress for non-ingress servers', function () {
@@ -107,43 +128,27 @@ it('does not start caddy ingress for non-ingress servers', function () {
         'capabilities' => ['coold'],
     ]);
 
-    Process::fake();
-
     $result = StartCaddyIngress::run($server);
 
     expect($result)->toBe('Server is not an ingress server.');
-
-    Process::assertNothingRan();
 });
 
-it('stops caddy ingress over ssh', function () {
-    $privateKey = new PrivateKey([
-        'private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest-key\n-----END OPENSSH PRIVATE KEY-----\n",
-    ]);
-
+it('stops caddy ingress through flux instead of ssh', function () {
     $server = new Server([
-        'host' => '203.0.113.10',
-        'ssh_user' => 'root',
-        'ssh_port' => 22,
+        'wireguard_management_ip' => '100.64.0.10',
+        'node_address' => '10.0.0.10',
         'capabilities' => ['coold'],
     ]);
-    $server->setRelation('privateKey', $privateKey);
 
-    Process::fake([
-        '*' => Process::result(output: ''),
-    ]);
+    $fluxClient = Mockery::mock(FluxClient::class);
+    $fluxClient
+        ->shouldReceive('stopCaddyIngress')
+        ->once()
+        ->with('100.64.0.10')
+        ->andReturn('Caddy ingress stopped.');
+    app()->instance(FluxClient::class, $fluxClient);
 
     $result = StopCaddyIngress::run($server);
 
     expect($result)->toBe('Caddy ingress stopped.');
-
-    Process::assertRan(function ($process): bool {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
-
-        return is_string($command)
-            && str_contains($command, 'command -v podman')
-            && str_contains($command, 'command -v docker')
-            && strpos($command, 'command -v podman') < strpos($command, 'command -v docker')
-            && str_contains($command, 'coolify-v5-caddy');
-    });
 });

@@ -1416,8 +1416,18 @@ CREATE TABLE IF NOT EXISTS "v5_applications" (
     "status_message" TEXT,
     "runtime_container_id" TEXT,
     "mesh_namespace" TEXT DEFAULT 'default' NOT NULL,
+    "ingress_enabled" INTEGER DEFAULT false NOT NULL,
+    "internal_port" INTEGER,
     "canvas_x" INTEGER DEFAULT '0' NOT NULL,
     "canvas_y" INTEGER DEFAULT '0' NOT NULL,
+    "created_at" TEXT,
+    "updated_at" TEXT
+);
+
+CREATE TABLE IF NOT EXISTS "v5_application_domains" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "application_id" INTEGER NOT NULL,
+    "domain" TEXT NOT NULL,
     "created_at" TEXT,
     "updated_at" TEXT
 );
@@ -1537,6 +1547,7 @@ CREATE INDEX IF NOT EXISTS "user_changelog_reads_user_id_index" ON "user_changel
 CREATE UNIQUE INDEX IF NOT EXISTS "user_changelog_reads_user_id_release_tag_unique" ON "user_changelog_reads" (user_id, release_tag);
 CREATE UNIQUE INDEX IF NOT EXISTS "users_email_unique" ON "users" (email);
 CREATE UNIQUE INDEX IF NOT EXISTS "v5_applications_container_name_unique" ON "v5_applications" (container_name);
+CREATE UNIQUE INDEX IF NOT EXISTS "v5_application_domains_application_id_domain_unique" ON "v5_application_domains" (application_id, domain);
 CREATE UNIQUE INDEX IF NOT EXISTS "v5_servers_uuid_unique" ON "v5_servers" (uuid);
 CREATE UNIQUE INDEX IF NOT EXISTS "webhook_notification_settings_team_id_unique" ON "webhook_notification_settings" (team_id);
 
@@ -1861,3 +1872,4 @@ INSERT INTO "migrations" ("id", "migration", "batch") VALUES (318, '2026_06_19_1
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (319, '2026_06_19_141231_add_canvas_position_to_v5_servers_table', 319);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (320, '2026_06_19_173933_add_caddy_ingress_status_to_v5_servers_table', 320);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (321, '2026_06_19_182231_create_container_statuses_table', 321);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (322, '2026_06_20_072818_v5_add_ingress_routing_to_applications_table', 322);

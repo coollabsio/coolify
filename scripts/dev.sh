@@ -122,10 +122,6 @@ ensure_coolify() {
   arch="$(host_arch)"
   os="$(host_os)"
 
-  if [ -x "$bin" ] && "$bin" --version >/dev/null 2>&1 && [ "${COOLIFY_CLI_FORCE_DOWNLOAD:-false}" != "true" ]; then
-    return
-  fi
-
   url="https://github.com/coollabsio/coold/releases/download/${version}/coolify-${os}-${arch}.tar.gz"
   echo "==> Installing coolify from ${url}"
 

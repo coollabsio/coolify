@@ -22,6 +22,15 @@ it('installs the coolify CLI in both application container images', function (st
     'production image' => 'docker/production/Dockerfile',
 ]);
 
+it('refreshes the host coolify CLI on every dev script run', function () {
+    $script = file_get_contents(base_path('scripts/dev.sh'));
+
+    expect($script)->toContain('url="https://github.com/coollabsio/coold/releases/download/${version}/coolify-${os}-${arch}.tar.gz"')
+        ->and($script)->toContain('==> Installing coolify from ${url}')
+        ->and($script)->not->toContain('COOLIFY_CLI_FORCE_DOWNLOAD')
+        ->and($script)->not->toContain('if [ -x "$bin" ] && "$bin" --version >/dev/null 2>&1');
+});
+
 it('does not require predefined UI node environment variables in the development app container', function () {
     $compose = file_get_contents(base_path('docker-compose.dev.yml'));
     $config = file_get_contents(base_path('config/coold.php'));

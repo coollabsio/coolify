@@ -335,6 +335,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
     async function persistNewConnection(fromApplicationId: string, toApplicationId: string): Promise<void> {
         setNotice(null);
 
+
         try {
             const response = await fetch('/v5/resource-connections', {
                 method: 'POST',
@@ -378,6 +379,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
             ]),
         );
 
+
         try {
             const response = await fetch(`/v5/resource-connections/${connection.id}`, {
                 method: 'PATCH',
@@ -409,6 +411,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
     }
 
     async function deletePersistedConnection(connectionId: string): Promise<void> {
+
         try {
             const response = await fetch(`/v5/resource-connections/${connectionId}`, {
                 method: 'DELETE',
@@ -615,6 +618,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
     async function removeApplication(application: V5Application): Promise<void> {
         setNotice(null);
 
+
         try {
             const response = await fetch(`/v5/applications/${application.id}`, {
                 method: 'DELETE',
@@ -645,9 +649,72 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
         }
     }
 
+    async function updateApplicationIngress(application: V5Application, enabled: boolean): Promise<void> {
+        setNotice(null);
+
+        const domains = enabled
+            ? window
+                  .prompt('Domains for this app, separated by commas', application.domains.join(', '))
+                  ?.split(',')
+                  .map((domain) => domain.trim())
+                  .filter(Boolean)
+            : application.domains;
+
+        if (enabled && (!domains || domains.length === 0)) {
+            setNotice('Add at least one domain before enabling app ingress.');
+
+            return;
+        }
+
+        const internalPort = enabled
+            ? Number(window.prompt('Internal container port', String(application.internalPort ?? '')))
+            : application.internalPort;
+
+        if (enabled && (!Number.isInteger(internalPort) || Number(internalPort) < 1 || Number(internalPort) > 65535)) {
+            setNotice('Choose a valid internal port before enabling app ingress.');
+
+            return;
+        }
+
+        const selectedInternalPort = enabled ? Number(internalPort) : application.internalPort;
+
+        try {
+            const response = await fetch(`/v5/applications/${application.id}/ingress`, {
+                method: 'PATCH',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken(),
+                },
+                body: JSON.stringify({
+                    ingress_enabled: enabled,
+                    internal_port: selectedInternalPort,
+                    domains,
+                }),
+            });
+
+            if (!response.ok) {
+                setNotice('Could not update application ingress.');
+
+                return;
+            }
+
+            const payload = (await response.json()) as { application: V5Application };
+            setApplications((currentApplications) =>
+                currentApplications.map((candidate) =>
+                    candidate.id === payload.application.id ? payload.application : candidate,
+                ),
+            );
+        } catch (error) {
+            setNotice(error instanceof Error ? error.message : 'Could not update application ingress.');
+        }
+    }
+
     async function addNginx(): Promise<void> {
         setIsCreating(true);
         setNotice(null);
+
 
         try {
             const response = await fetch('/v5/applications/nginx', {
@@ -696,6 +763,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
     async function refreshApplications(): Promise<void> {
         setIsRefreshing(true);
         setNotice(null);
+
 
         try {
             const response = await fetch('/v5/applications/refresh', {
@@ -1474,6 +1542,27 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                                             <dt className="shrink-0 text-muted-foreground">Container</dt>
                                             <dd className="truncate text-right font-mono text-[0.6875rem] text-foreground">
                                                 {application.containerName}
+                                            </dd>
+                                        </div>
+                                        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
+                                            <dt className="shrink-0 text-muted-foreground">Ingress</dt>
+                                            <dd className="flex items-center justify-end gap-2 text-right">
+                                                <span className="truncate text-muted-foreground">
+                                                    {application.ingressEnabled
+                                                        ? `${application.domains.length} domain${application.domains.length === 1 ? '' : 's'} → ${application.internalPort ?? 'no port'}`
+                                                        : 'Private'}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onPointerDown={(event) => event.stopPropagation()}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        void updateApplicationIngress(application, !application.ingressEnabled);
+                                                    }}
+                                                    className="rounded-sm border border-border px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-wide text-foreground transition hover:bg-muted"
+                                                >
+                                                    {application.ingressEnabled ? 'Disable' : 'Enable'}
+                                                </button>
                                             </dd>
                                         </div>
                                     </dl>

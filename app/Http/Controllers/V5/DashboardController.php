@@ -15,6 +15,7 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Team;
 use App\Models\V5\Application as V5Application;
+use App\Models\V5\ApplicationDomain as V5ApplicationDomain;
 use App\Models\V5\Cluster as V5Cluster;
 use App\Models\V5\ResourceConnection;
 use App\Models\V5\Server as V5Server;
@@ -374,6 +375,52 @@ class DashboardController extends Controller
 
         return response()->json([
             'application' => $this->serializeApplication($application->refresh()->load('server')),
+        ]);
+    }
+
+    public function updateApplicationIngress(Request $request, V5Application $application): JsonResponse
+    {
+        $currentTeam = $request->attributes->get('v5.currentTeam');
+
+        if (! $currentTeam instanceof Team || $application->team_id !== $currentTeam->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'ingress_enabled' => ['required', 'boolean'],
+            'internal_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'domains' => ['sometimes', 'array'],
+            'domains.*' => ['required', 'string', 'max:255', 'distinct'],
+        ]);
+
+        DB::transaction(function () use ($application, $validated): void {
+            $application->update([
+                'ingress_enabled' => $validated['ingress_enabled'],
+                'internal_port' => $validated['internal_port'] ?? null,
+            ]);
+
+            if (array_key_exists('domains', $validated)) {
+                $application->domains()->delete();
+
+                collect($validated['domains'])
+                    ->map(fn (string $domain) => trim($domain))
+                    ->filter()
+                    ->unique()
+                    ->each(fn (string $domain) => V5ApplicationDomain::query()->create([
+                        'application_id' => $application->id,
+                        'domain' => $domain,
+                    ]));
+            }
+        });
+
+        $application->refresh()->load(['server', 'domains']);
+
+        if ($application->server?->isIngress() && $application->server->status === 'installed') {
+            StartCaddyIngress::run($application->server);
+        }
+
+        return response()->json([
+            'application' => $this->serializeApplication($application),
         ]);
     }
 
@@ -1366,7 +1413,7 @@ class DashboardController extends Controller
      */
     private function serializeApplication(V5Application $application): array
     {
-        $application->loadMissing('server');
+        $application->loadMissing(['server', 'domains']);
 
         return [
             'id' => (string) $application->id,
@@ -1378,6 +1425,9 @@ class DashboardController extends Controller
             'runtimeContainerId' => $application->runtime_container_id,
             'serverName' => $application->server?->name,
             'meshNamespace' => $application->mesh_namespace,
+            'ingressEnabled' => $application->ingress_enabled,
+            'internalPort' => $application->internal_port,
+            'domains' => $application->domains->pluck('domain')->values()->all(),
             'meshFqdn' => $application->container_name.'.'.($application->mesh_namespace ?: 'default').'.coolify.internal',
             'canvasX' => $application->canvas_x,
             'canvasY' => $application->canvas_y,
@@ -1441,7 +1491,7 @@ class DashboardController extends Controller
 
     private function reconcileCaddyIngress(V5Server $server, bool $wasIngress, bool $isIngress): void
     {
-        if ($server->status !== 'installed' || ! $server->privateKey instanceof PrivateKey) {
+        if ($server->status !== 'installed') {
             return;
         }
 

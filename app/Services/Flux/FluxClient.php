@@ -22,6 +22,30 @@ class FluxClient
     }
 
     /**
+     * @param  array<int, array{name: string, caddyfile: string}>  $apps
+     */
+    public function applyCaddyIngress(string $hostId, string $caddyfile, array $apps = [], string $meshNetwork = 'coolify-default-mesh'): string
+    {
+        $payload = $this->dispatch($hostId, [
+            'type' => 'apply_caddy_ingress',
+            'caddyfile' => $caddyfile,
+            'apps' => $apps,
+            'mesh_network' => $meshNetwork,
+        ]);
+
+        return $this->output($payload, 'Caddy ingress applied.');
+    }
+
+    public function stopCaddyIngress(string $hostId): string
+    {
+        $payload = $this->dispatch($hostId, [
+            'type' => 'stop_caddy_ingress',
+        ]);
+
+        return $this->output($payload, 'Caddy ingress stopped.');
+    }
+
+    /**
      * @param  array<string, mixed>  $command
      * @return array<string, mixed>
      */
@@ -83,5 +107,16 @@ class FluxClient
         }
 
         return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function output(array $payload, string $fallback): string
+    {
+        $data = $payload['data'] ?? [];
+        $output = is_array($data) && is_string($data['output'] ?? null) ? $data['output'] : '';
+
+        return $output !== '' ? $output : $fallback;
     }
 }

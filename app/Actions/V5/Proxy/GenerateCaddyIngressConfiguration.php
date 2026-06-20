@@ -2,6 +2,9 @@
 
 namespace App\Actions\V5\Proxy;
 
+use App\Models\V5\Application;
+use App\Models\V5\ApplicationDomain;
+use Illuminate\Support\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -10,11 +13,21 @@ class GenerateCaddyIngressConfiguration
     use AsAction;
 
     /**
-     * @return array{compose: string, caddyfile: string, commands: array<int, string>}
+     * @param  Collection<int, Application>|null  $applications
+     * @return array{compose: string, caddyfile: string, apps: array<int, array{name: string, caddyfile: string}>}
      */
-    public function handle(string $basePath = '/data/coolify/v5/ingress/caddy'): array
+    public function handle(?Collection $applications = null): array
     {
-        $compose = Yaml::dump([
+        return [
+            'compose' => $this->compose(),
+            'caddyfile' => $this->rootCaddyfile(),
+            'apps' => $this->appCaddyfiles($applications ?? collect()),
+        ];
+    }
+
+    private function compose(): string
+    {
+        return Yaml::dump([
             'services' => [
                 'caddy' => [
                     'image' => 'docker.io/library/caddy:2-alpine',
@@ -27,31 +40,76 @@ class GenerateCaddyIngressConfiguration
                     ],
                     'volumes' => [
                         './Caddyfile:/etc/caddy/Caddyfile:ro',
+                        './apps:/etc/caddy/apps:ro',
                         './data:/data',
                         './config:/config',
                     ],
                 ],
             ],
         ], 8, 2);
+    }
 
-        $caddyfile = <<<'CADDY'
+    private function rootCaddyfile(): string
+    {
+        return <<<'CADDY'
 :80 {
     respond /coolify-health 200
     respond 404
 }
-CADDY;
 
-        return [
-            'compose' => $compose,
-            'caddyfile' => $caddyfile,
-            'commands' => [
-                sprintf('if [ "$(id -u)" = "0" ]; then mkdir -p %1$s/data %1$s/config; else sudo mkdir -p %1$s/data %1$s/config; fi', $basePath),
-                sprintf("printf '%%s' '%s' | base64 -d | if [ \"\$(id -u)\" = \"0\" ]; then tee %s/docker-compose.yml > /dev/null; else sudo tee %s/docker-compose.yml > /dev/null; fi", base64_encode($compose), $basePath, $basePath),
-                sprintf("printf '%%s' '%s' | base64 -d | if [ \"\$(id -u)\" = \"0\" ]; then tee %s/Caddyfile > /dev/null; else sudo tee %s/Caddyfile > /dev/null; fi", base64_encode($caddyfile), $basePath, $basePath),
-                'if command -v podman >/dev/null 2>&1; then runtime="sudo podman"; elif command -v docker >/dev/null 2>&1; then runtime=docker; else echo "Neither podman nor docker is installed" >&2; exit 1; fi; $runtime pull docker.io/library/caddy:2-alpine',
-                'if command -v podman >/dev/null 2>&1; then runtime="sudo podman"; elif command -v docker >/dev/null 2>&1; then runtime=docker; else echo "Neither podman nor docker is installed" >&2; exit 1; fi; $runtime rm -f coolify-v5-caddy 2>/dev/null || true',
-                "if command -v podman >/dev/null 2>&1; then runtime=\"sudo podman\"; elif command -v docker >/dev/null 2>&1; then runtime=docker; else echo \"Neither podman nor docker is installed\" >&2; exit 1; fi; \$runtime run -d --name coolify-v5-caddy --restart unless-stopped -p 80:80 -p 443:443 -p 443:443/udp -v {$basePath}/Caddyfile:/etc/caddy/Caddyfile:ro -v {$basePath}/data:/data -v {$basePath}/config:/config docker.io/library/caddy:2-alpine",
-            ],
-        ];
+import apps/*.caddy
+CADDY;
+    }
+
+    /**
+     * @param  Collection<int, Application>  $applications
+     * @return array<int, array{name: string, caddyfile: string}>
+     */
+    private function appCaddyfiles(Collection $applications): array
+    {
+        return $applications
+            ->each(fn (Application $application) => $application->loadMissing('domains'))
+            ->map(fn (Application $application) => [
+                'name' => $this->appFileName($application),
+                'caddyfile' => $this->applicationCaddyfile($application),
+            ])
+            ->filter(fn (array $file) => $file['caddyfile'] !== '')
+            ->sortBy('name')
+            ->values()
+            ->all();
+    }
+
+    private function applicationCaddyfile(Application $application): string
+    {
+        if (! $application->ingress_enabled || ! $application->internal_port) {
+            return '';
+        }
+
+        return $application->domains
+            ->map(fn (ApplicationDomain $domain) => $this->applicationRoute($application, $domain))
+            ->filter()
+            ->sort()
+            ->implode("\n\n");
+    }
+
+    private function applicationRoute(Application $application, ApplicationDomain $domain): ?string
+    {
+        if ($domain->domain === '') {
+            return null;
+        }
+
+        $namespace = $application->mesh_namespace ?: 'default';
+        $upstream = "{$application->container_name}.{$namespace}.coolify.internal:{$application->internal_port}";
+
+        return implode("\n", [
+            "{$domain->domain} {",
+            "    reverse_proxy {$upstream}",
+            '}',
+        ]);
+    }
+
+    private function appFileName(Application $application): string
+    {
+        return 'app_'.$application->getKey();
     }
 }

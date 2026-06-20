@@ -17,6 +17,7 @@ use App\Models\Project;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\V5\Application as V5Application;
+use App\Models\V5\ApplicationDomain as V5ApplicationDomain;
 use App\Models\V5\Cluster;
 use App\Models\V5\ContainerStatus;
 use App\Models\V5\Server as V5Server;
@@ -40,6 +41,7 @@ beforeEach(function () {
 
     Schema::dropIfExists('v5_resource_connection_rules');
     Schema::dropIfExists('v5_resource_connections');
+    Schema::dropIfExists('v5_application_domains');
     Schema::dropIfExists('v5_applications');
     Schema::dropIfExists('v5_container_statuses');
     Schema::dropIfExists('v5_servers');
@@ -66,6 +68,7 @@ it('registers the v5 dashboard route', function () {
         ->and(Route::has('v5.applications.nginx'))->toBeTrue()
         ->and(Route::has('v5.applications.refresh'))->toBeTrue()
         ->and(Route::has('v5.applications.position'))->toBeTrue()
+        ->and(Route::has('v5.applications.ingress'))->toBeTrue()
         ->and(Route::has('v5.caddy-ingresses.position'))->toBeTrue()
         ->and(Route::has('v5.applications.destroy'))->toBeTrue()
         ->and(Route::has('v5.resource-connections.store'))->toBeTrue()
@@ -432,6 +435,40 @@ it('creates v5 application tables for dashboard canvas nodes', function () {
         ]))->toBeTrue();
 });
 
+it('creates v5 application domain tables for zero or more inbound routes', function () {
+    createSharedUserAndTeamTables();
+
+    Schema::dropIfExists('v5_application_domains');
+    Schema::dropIfExists('v5_applications');
+    Schema::dropIfExists('v5_servers');
+    Schema::dropIfExists('v5_clusters');
+
+    $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
+    $clusterMigration->up();
+
+    $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
+    $serverMigration->up();
+
+    $applicationMigration = include database_path('migrations/2026_06_19_140000_v5_create_applications_table.php');
+    $applicationMigration->up();
+
+    $domainMigration = include database_path('migrations/2026_06_20_072818_v5_add_ingress_routing_to_applications_table.php');
+    $domainMigration->up();
+
+    expect(Schema::hasTable('v5_application_domains'))->toBeTrue()
+        ->and(Schema::hasColumns('v5_application_domains', [
+            'id',
+            'application_id',
+            'domain',
+            'created_at',
+            'updated_at',
+        ]))->toBeTrue()
+        ->and(Schema::hasColumns('v5_applications', [
+            'ingress_enabled',
+            'internal_port',
+        ]))->toBeTrue();
+});
+
 it('creates generic v5 resource connection tables', function () {
     createSharedUserAndTeamTables();
 
@@ -516,6 +553,10 @@ it('includes v5 tables in the dev testing schema', function () {
         ->and($schema)->toContain('CREATE TABLE IF NOT EXISTS "v5_servers"')
         ->and($schema)->toContain('CREATE TABLE IF NOT EXISTS "v5_container_statuses"')
         ->and($schema)->toContain('CREATE TABLE IF NOT EXISTS "v5_applications"')
+        ->and($schema)->toContain('CREATE TABLE IF NOT EXISTS "v5_application_domains"')
+        ->and($schema)->toContain('"domain" TEXT NOT NULL')
+        ->and($schema)->toContain('"ingress_enabled" INTEGER DEFAULT false NOT NULL')
+        ->and($schema)->toContain('"internal_port" INTEGER')
         ->and($schema)->toContain('"cluster_id" INTEGER')
         ->and($schema)->toContain('CREATE TABLE IF NOT EXISTS "v5_clusters"')
         ->and($schema)->toContain('"wireguard_interface" TEXT DEFAULT \'wg0\' NOT NULL')
@@ -537,6 +578,7 @@ it('includes v5 tables in the dev testing schema', function () {
         ->and($schema)->toContain('2026_06_19_141231_add_canvas_position_to_v5_servers_table')
         ->and($schema)->toContain('2026_06_19_173933_add_caddy_ingress_status_to_v5_servers_table')
         ->and($schema)->toContain('2026_06_19_182231_create_container_statuses_table')
+        ->and($schema)->toContain('2026_06_20_072818_v5_add_ingress_routing_to_applications_table')
         ->and($schema)->not->toContain('2026_06_19_150000_add_mesh_namespace_to_v5_applications_table')
         ->and($schema)->toContain('2026_06_16_130649_v5_create_clusters_table')
         ->and($schema)->not->toContain('2026_06_16_204644_v5_add_wireguard_cli_configuration_to_clusters_and_servers')
@@ -632,7 +674,7 @@ it('serves v5 dashboard applications as canvas nodes', function () {
         'capabilities' => ['coold'],
     ]);
 
-    V5Application::query()->create([
+    $application = V5Application::query()->create([
         'team_id' => $team->id,
         'project_id' => $project->id,
         'environment_id' => $environment->id,
@@ -648,7 +690,7 @@ it('serves v5 dashboard applications as canvas nodes', function () {
         'canvas_x' => 120,
         'canvas_y' => -80,
     ]);
-    V5Application::query()->create([
+    $application = V5Application::query()->create([
         'team_id' => $team->id,
         'project_id' => $otherProject->id,
         'environment_id' => $otherEnvironment->id,
@@ -952,7 +994,7 @@ it('places a new nginx v5 application next to existing canvas nodes', function (
         'last_bootstrapped_at' => now(),
     ]);
 
-    V5Application::query()->create([
+    $application = V5Application::query()->create([
         'team_id' => $team->id,
         'project_id' => $project->id,
         'environment_id' => $environment->id,
@@ -3066,6 +3108,229 @@ it('updates editable v5 server caddy ingress capability independently from build
         ->and($server->isIngress())->toBeTrue();
 });
 
+it('enables application ingress without publishing domains by default', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Project', 'production');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.20',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold', 'ingress'],
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+        'builder_cpu_quota' => '200%',
+        'wireguard_management_ip' => '100.64.0.10',
+        'last_bootstrapped_at' => now(),
+    ]);
+    $application = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-test',
+        'status' => 'running',
+        'mesh_namespace' => 'default',
+    ]);
+    V5ApplicationDomain::query()->create([
+        'application_id' => $application->id,
+        'domain' => 'kept.example.com',
+    ]);
+
+    $fluxClient = Mockery::mock(FluxClient::class);
+    $fluxClient
+        ->shouldReceive('applyCaddyIngress')
+        ->once()
+        ->with(
+            '100.64.0.10',
+            Mockery::on(fn (string $caddyfile): bool => str_contains($caddyfile, 'import apps/*.caddy')),
+            []
+        )
+        ->andReturn('Caddy ingress applied.');
+    app()->instance(FluxClient::class, $fluxClient);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->patchJson("/v5/applications/{$application->id}/ingress", [
+            'ingress_enabled' => false,
+            'internal_port' => 8080,
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('application.ingressEnabled', false)
+        ->assertJsonPath('application.internalPort', 8080)
+        ->assertJsonPath('application.domains.0', 'kept.example.com');
+
+    expect($application->refresh()->ingress_enabled)->toBeFalse();
+});
+
+it('enables application ingress with explicit domains and port', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Project', 'production');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.20',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold', 'ingress'],
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+        'builder_cpu_quota' => '200%',
+        'wireguard_management_ip' => '100.64.0.10',
+        'last_bootstrapped_at' => now(),
+    ]);
+    $application = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-test',
+        'status' => 'running',
+        'mesh_namespace' => 'default',
+    ]);
+
+    $fluxClient = Mockery::mock(FluxClient::class);
+    $fluxClient
+        ->shouldReceive('applyCaddyIngress')
+        ->once()
+        ->with(
+            '100.64.0.10',
+            Mockery::on(fn (string $caddyfile): bool => str_contains($caddyfile, 'import apps/*.caddy')),
+            Mockery::on(fn (array $apps): bool => count($apps) === 1
+                && str_contains($apps[0]['caddyfile'], 'app.example.com {')
+                && str_contains($apps[0]['caddyfile'], 'reverse_proxy coolify-v5-nginx-test.default.coolify.internal:3000'))
+        )
+        ->andReturn('Caddy ingress applied.');
+    app()->instance(FluxClient::class, $fluxClient);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->patchJson("/v5/applications/{$application->id}/ingress", [
+            'ingress_enabled' => true,
+            'internal_port' => 3000,
+            'domains' => ['app.example.com'],
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('application.ingressEnabled', true)
+        ->assertJsonPath('application.internalPort', 3000)
+        ->assertJsonPath('application.domains.0', 'app.example.com');
+
+    expect($application->refresh()->ingress_enabled)->toBeTrue()
+        ->and($application->internal_port)->toBe(3000)
+        ->and($application->domains()->pluck('domain')->all())->toBe(['app.example.com']);
+});
+
+it('syncs caddy ingress routes through flux when enabling ingress on an installed server', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Project', 'production');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.20',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['coold'],
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+        'builder_cpu_quota' => '200%',
+        'wireguard_management_ip' => '100.64.0.10',
+        'last_bootstrapped_at' => now(),
+    ]);
+    $application = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-test',
+        'status' => 'running',
+        'mesh_namespace' => 'default',
+        'ingress_enabled' => true,
+        'internal_port' => 8080,
+    ]);
+    V5ApplicationDomain::query()->create([
+        'application_id' => $application->id,
+        'domain' => 'nginx.example.com',
+    ]);
+    V5ApplicationDomain::query()->create([
+        'application_id' => $application->id,
+        'domain' => 'www.nginx.example.com',
+    ]);
+
+    $fluxClient = Mockery::mock(FluxClient::class);
+    $fluxClient
+        ->shouldReceive('applyCaddyIngress')
+        ->once()
+        ->with(
+            '100.64.0.10',
+            Mockery::on(fn (string $caddyfile): bool => str_contains($caddyfile, 'import apps/*.caddy')),
+            Mockery::on(fn (array $apps): bool => count($apps) === 1
+                && str_contains($apps[0]['caddyfile'], 'nginx.example.com {')
+                && str_contains($apps[0]['caddyfile'], 'www.nginx.example.com {')
+                && str_contains($apps[0]['caddyfile'], 'reverse_proxy coolify-v5-nginx-test.default.coolify.internal:8080'))
+        )
+        ->andReturn('Caddy ingress applied.');
+    app()->instance(FluxClient::class, $fluxClient);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->patchJson("/v5/clusters/{$cluster->id}/servers/{$server->id}", [
+            'builder_enabled' => false,
+            'builder_capacity' => 0,
+            'builder_cpu_quota' => '200%',
+            'ingress_enabled' => true,
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('cluster.servers.0.ingressEnabled', true);
+
+    expect($server->refresh()->caddy_ingress_status)->toBe('running');
+});
+
 it('keeps editable v5 server builder capacity when disabling builder', function () {
     createSharedUserAndTeamTables();
 
@@ -4305,9 +4570,20 @@ function createSharedUserAndTeamTables(): void
         $table->text('status_message')->nullable();
         $table->string('runtime_container_id')->nullable();
         $table->string('mesh_namespace')->default('default');
+        $table->boolean('ingress_enabled')->default(false);
+        $table->unsignedSmallInteger('internal_port')->nullable();
         $table->integer('canvas_x')->default(0);
         $table->integer('canvas_y')->default(0);
         $table->timestamps();
+    });
+
+    Schema::create('v5_application_domains', function ($table) {
+        $table->id();
+        $table->foreignId('application_id');
+        $table->string('domain');
+        $table->timestamps();
+
+        $table->unique(['application_id', 'domain']);
     });
 
     Schema::create('v5_resource_connections', function ($table) {
