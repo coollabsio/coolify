@@ -1,0 +1,88 @@
+# documentation: https://docs.paperclip.ing/
+# slogan: Manage AI agents for work.
+# category: ai
+# tags: ai, agents, orchestration, automation, self-hosted
+# logo: svgs/paperclip.svg
+# port: 3100
+
+services:
+  paperclip:
+    image: ghcr.io/lukasparke/paperclip-coolify:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - SERVICE_URL_PAPERCLIP_3100
+      - HOST=0.0.0.0
+      - PORT=3100
+      - PAPERCLIP_HOME=/paperclip
+      - HOME=/paperclip
+      - PAPERCLIP_DEPLOYMENT_MODE=${PAPERCLIP_DEPLOYMENT_MODE:-authenticated}
+      - PAPERCLIP_DEPLOYMENT_EXPOSURE=${PAPERCLIP_DEPLOYMENT_EXPOSURE:-public}
+      - PAPERCLIP_AUTH_BASE_URL_MODE=${PAPERCLIP_AUTH_BASE_URL_MODE:-explicit}
+      - PAPERCLIP_PUBLIC_URL=${SERVICE_URL_PAPERCLIP_3100}
+      - PAPERCLIP_AUTH_PUBLIC_BASE_URL=${SERVICE_URL_PAPERCLIP_3100}
+      - BETTER_AUTH_URL=${SERVICE_URL_PAPERCLIP_3100}
+      - BETTER_AUTH_TRUSTED_ORIGINS=${SERVICE_URL_PAPERCLIP_3100}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-paperclip}:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/${POSTGRES_DB:-paperclip}
+      - BETTER_AUTH_SECRET=${SERVICE_HEX_64_BETTERAUTH}
+      - PAPERCLIP_AGENT_JWT_SECRET=${SERVICE_HEX_64_AGENTJWT}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - KIMI_API_KEY=${KIMI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - XAI_API_KEY=${XAI_API_KEY:-}
+      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - FIREWORKS_API_KEY=${FIREWORKS_API_KEY:-}
+      - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
+      - ZAI_API_KEY=${ZAI_API_KEY:-}
+      - ZAI_CODING_CN_API_KEY=${ZAI_CODING_CN_API_KEY:-}
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
+      - MINIMAX_CN_API_KEY=${MINIMAX_CN_API_KEY:-}
+      - AI_GATEWAY_API_KEY=${AI_GATEWAY_API_KEY:-}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}
+      - AZURE_OPENAI_BASE_URL=${AZURE_OPENAI_BASE_URL:-}
+      - AZURE_OPENAI_RESOURCE_NAME=${AZURE_OPENAI_RESOURCE_NAME:-}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-}
+      - AZURE_OPENAI_DEPLOYMENT_NAME_MAP=${AZURE_OPENAI_DEPLOYMENT_NAME_MAP:-}
+      - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY:-}
+      - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:-}
+      - CLOUDFLARE_GATEWAY_ID=${CLOUDFLARE_GATEWAY_ID:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
+      - AWS_REGION=${AWS_REGION:-}
+      - AWS_ENDPOINT_URL_BEDROCK_RUNTIME=${AWS_ENDPOINT_URL_BEDROCK_RUNTIME:-}
+    volumes:
+      - paperclip-data:/paperclip
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3100/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-paperclip}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_64_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-paperclip}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  paperclip-data:
+  postgres-data:
