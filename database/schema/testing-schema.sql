@@ -1363,7 +1363,8 @@ CREATE TABLE IF NOT EXISTS "v5_servers" (
     "ssh_user" TEXT NOT NULL,
     "ssh_port" INTEGER DEFAULT '22' NOT NULL,
     "status" TEXT DEFAULT 'installed' NOT NULL,
-    "caddy_ingress_status" TEXT,
+    "ingress_type" TEXT,
+    "ingress_status" TEXT,
     "capabilities" TEXT,
     "builder_enabled" INTEGER DEFAULT false NOT NULL,
     "builder_capacity" INTEGER DEFAULT '0' NOT NULL,
@@ -1428,6 +1429,34 @@ CREATE TABLE IF NOT EXISTS "v5_application_domains" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     "application_id" INTEGER NOT NULL,
     "domain" TEXT NOT NULL,
+    "created_at" TEXT,
+    "updated_at" TEXT
+);
+
+CREATE TABLE IF NOT EXISTS "v5_resource_connections" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "team_id" INTEGER NOT NULL,
+    "project_id" INTEGER NOT NULL,
+    "environment_id" INTEGER NOT NULL,
+    "resource_one_type" TEXT NOT NULL,
+    "resource_one_id" INTEGER NOT NULL,
+    "resource_two_type" TEXT NOT NULL,
+    "resource_two_id" INTEGER NOT NULL,
+    "resource_pair_key" TEXT NOT NULL,
+    "created_by_user_id" INTEGER NOT NULL,
+    "created_at" TEXT,
+    "updated_at" TEXT
+);
+
+CREATE TABLE IF NOT EXISTS "v5_resource_connection_rules" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "connection_id" INTEGER NOT NULL,
+    "source_resource_type" TEXT NOT NULL,
+    "source_resource_id" INTEGER NOT NULL,
+    "target_resource_type" TEXT NOT NULL,
+    "target_resource_id" INTEGER NOT NULL,
+    "protocol" TEXT DEFAULT 'tcp' NOT NULL,
+    "port" INTEGER NOT NULL,
     "created_at" TEXT,
     "updated_at" TEXT
 );
@@ -1548,6 +1577,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS "user_changelog_reads_user_id_release_tag_uniq
 CREATE UNIQUE INDEX IF NOT EXISTS "users_email_unique" ON "users" (email);
 CREATE UNIQUE INDEX IF NOT EXISTS "v5_applications_container_name_unique" ON "v5_applications" (container_name);
 CREATE UNIQUE INDEX IF NOT EXISTS "v5_application_domains_application_id_domain_unique" ON "v5_application_domains" (application_id, domain);
+CREATE UNIQUE INDEX IF NOT EXISTS "v5_resource_connections_team_id_resource_pair_key_unique" ON "v5_resource_connections" (team_id, resource_pair_key);
+CREATE UNIQUE INDEX IF NOT EXISTS "v5_resource_connection_rules_unique_direction_port" ON "v5_resource_connection_rules" (connection_id, source_resource_type, source_resource_id, target_resource_type, target_resource_id, protocol, port);
 CREATE UNIQUE INDEX IF NOT EXISTS "v5_servers_uuid_unique" ON "v5_servers" (uuid);
 CREATE UNIQUE INDEX IF NOT EXISTS "webhook_notification_settings_team_id_unique" ON "webhook_notification_settings" (team_id);
 
@@ -1869,7 +1900,5 @@ INSERT INTO "migrations" ("id", "migration", "batch") VALUES (314, '2025_12_17_0
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (316, '2026_06_16_130649_v5_create_clusters_table', 316);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (317, '2026_06_16_130650_v5_create_servers_table', 317);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (318, '2026_06_19_140000_v5_create_applications_table', 318);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (319, '2026_06_19_141231_add_canvas_position_to_v5_servers_table', 319);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (320, '2026_06_19_173933_add_caddy_ingress_status_to_v5_servers_table', 320);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (321, '2026_06_19_182231_create_container_statuses_table', 321);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (322, '2026_06_20_072818_v5_add_ingress_routing_to_applications_table', 322);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (319, '2026_06_19_142000_v5_create_resource_connections_table', 319);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (320, '2026_06_19_182231_create_container_statuses_table', 320);

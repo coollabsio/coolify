@@ -66,14 +66,15 @@ class FluxClient
             'request_id' => (string) Str::uuid(),
             'command' => $command,
         ], JSON_THROW_ON_ERROR);
-        $timeout = (float) config('flux.health_timeout_seconds', 1.0);
-        $stream = @stream_socket_client("unix://{$socketPath}", $errorCode, $errorMessage, $timeout);
+        $connectionTimeout = (float) config('flux.connection_timeout_seconds', 1.0);
+        $dispatchTimeout = (float) config('flux.dispatch_timeout_seconds', 35.0);
+        $stream = @stream_socket_client("unix://{$socketPath}", $errorCode, $errorMessage, $connectionTimeout);
 
         if ($stream === false) {
             throw new RuntimeException($errorMessage ?: "Could not connect to Flux socket ({$errorCode}).");
         }
 
-        stream_set_timeout($stream, (int) ceil($timeout));
+        stream_set_timeout($stream, (int) ceil($dispatchTimeout));
 
         fwrite($stream, implode("\r\n", [
             'POST /v1/coold/dispatch HTTP/1.1',
@@ -89,12 +90,13 @@ class FluxClient
         $response = stream_get_contents($stream) ?: '';
         fclose($stream);
 
-        if (! str_starts_with($response, 'HTTP/1.1 200') && ! str_starts_with($response, 'HTTP/1.0 200')) {
-            throw new RuntimeException('Flux dispatch did not return HTTP 200.');
-        }
+        $statusCode = $this->statusCode($response);
+        $responseBody = $this->responseBody($response);
+        $payload = $responseBody === '' ? null : json_decode($responseBody, true);
 
-        $responseBody = str_contains($response, "\r\n\r\n") ? substr($response, strpos($response, "\r\n\r\n") + 4) : '';
-        $payload = json_decode($responseBody, true);
+        if ($statusCode < 200 || $statusCode >= 300) {
+            throw new RuntimeException($this->errorMessage($payload, $responseBody) ?? "Flux dispatch returned HTTP {$statusCode}.");
+        }
 
         if (! is_array($payload)) {
             throw new RuntimeException('Flux dispatch returned an invalid response.');
@@ -107,6 +109,37 @@ class FluxClient
         }
 
         return $payload;
+    }
+
+    private function statusCode(string $response): int
+    {
+        if ($response === '') {
+            throw new RuntimeException('Flux did not return a response before the timeout. Check that coold is connected to Flux and try again.');
+        }
+
+        if (preg_match('/^HTTP\/\d(?:\.\d)?\s+(\d{3})/', $response, $matches) !== 1) {
+            throw new RuntimeException('Could not talk to Flux. Check that Flux is running in the Coolify container.');
+        }
+
+        return (int) $matches[1];
+    }
+
+    private function responseBody(string $response): string
+    {
+        $position = strpos($response, "\r\n\r\n");
+
+        return $position === false ? '' : substr($response, $position + 4);
+    }
+
+    private function errorMessage(mixed $payload, string $responseBody): ?string
+    {
+        if (is_array($payload) && is_string($payload['message'] ?? null) && $payload['message'] !== '') {
+            return $payload['message'];
+        }
+
+        $message = trim($responseBody);
+
+        return $message === '' ? null : Str::limit($message, 1000);
     }
 
     /**

@@ -8,6 +8,7 @@ use App\Models\V5\ApplicationDomain;
 use App\Models\V5\Server;
 use App\Services\Flux\FluxClient;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -34,15 +35,16 @@ it('generates a caddy ingress compose file with health endpoint and application 
     expect($configuration['compose'])->toContain('container_name: coolify-v5-caddy')
         ->and($configuration['compose'])->toContain("image: 'docker.io/library/caddy:2-alpine'")
         ->and($configuration['compose'])->toContain('80:80')
-        ->and($configuration['compose'])->toContain('443:443')
+        ->and($configuration['compose'])->not->toContain('443:443')
         ->and($configuration['compose'])->toContain('./Caddyfile:/etc/caddy/Caddyfile:ro')
         ->and($configuration['compose'])->toContain('./apps:/etc/caddy/apps:ro')
         ->and($configuration['caddyfile'])->toContain('respond /coolify-health 200')
         ->and($configuration['caddyfile'])->toContain('respond 404')
         ->and($configuration['caddyfile'])->toContain('import apps/*.caddy')
         ->and($configuration['apps'])->toHaveCount(1)
-        ->and($configuration['apps'][0]['caddyfile'])->toContain('nginx.example.com {')
-        ->and($configuration['apps'][0]['caddyfile'])->toContain('www.nginx.example.com {')
+        ->and($configuration['apps'][0]['caddyfile'])->toContain('http://nginx.example.com {')
+        ->and($configuration['apps'][0]['caddyfile'])->toContain('http://www.nginx.example.com {')
+        ->and($configuration['apps'][0]['caddyfile'])->not->toContain('https://')
         ->and($configuration['apps'][0]['caddyfile'])->toContain('reverse_proxy coolify-v5-nginx-test.default.coolify.internal:8080');
 });
 
@@ -152,3 +154,89 @@ it('stops caddy ingress through flux instead of ssh', function () {
 
     expect($result)->toBe('Caddy ingress stopped.');
 });
+
+it('includes flux error response details when dispatch returns a non success status', function () {
+    if (! function_exists('pcntl_fork')) {
+        $this->markTestSkipped('pcntl is required to fake a Flux Unix socket.');
+    }
+
+    $body = json_encode([
+        'request_id' => 'test-request',
+        'status' => 'error',
+        'code' => 500,
+        'message' => 'start Caddy ingress: podman exited with status 125',
+    ], JSON_THROW_ON_ERROR);
+
+    withFakeFluxSocket(
+        "HTTP/1.1 500 Internal Server Error\r\n".
+        "Content-Type: application/json\r\n".
+        'Content-Length: '.strlen($body)."\r\n".
+        "\r\n".
+        $body,
+        fn () => (new FluxClient)->applyCaddyIngress('100.64.0.10', 'example.com { respond "ok" }')
+    );
+})->throws(RuntimeException::class, 'start Caddy ingress: podman exited with status 125');
+
+it('uses a friendly message when flux returns an invalid http response', function () {
+    if (! function_exists('pcntl_fork')) {
+        $this->markTestSkipped('pcntl is required to fake a Flux Unix socket.');
+    }
+
+    withFakeFluxSocket(
+        '',
+        fn () => (new FluxClient)->applyCaddyIngress('100.64.0.10', 'example.com { respond "ok" }')
+    );
+})->throws(RuntimeException::class, 'Flux did not return a response before the timeout.');
+
+it('uses separate flux timeouts for health checks and command dispatches', function () {
+    expect(config('flux.health_timeout_seconds'))->toBe(1.0)
+        ->and(config('flux.connection_timeout_seconds'))->toBe(1.0)
+        ->and(config('flux.dispatch_timeout_seconds'))->toBe(35.0);
+});
+
+function withFakeFluxSocket(string $response, Closure $callback): void
+{
+    $directory = storage_path('framework/testing');
+
+    if (! is_dir($directory)) {
+        mkdir($directory, 0777, true);
+    }
+
+    $socketPath = $directory.'/flux-'.bin2hex(random_bytes(8)).'.sock';
+    $server = stream_socket_server("unix://{$socketPath}", $errorCode, $errorMessage);
+
+    expect($server)->not->toBeFalse("Could not create fake Flux socket: {$errorMessage} ({$errorCode})");
+
+    $pid = pcntl_fork();
+
+    if ($pid === 0) {
+        $connection = stream_socket_accept($server, 5);
+
+        if ($connection !== false) {
+            $request = '';
+
+            while (! str_contains($request, "\r\n\r\n") && ! feof($connection)) {
+                $request .= fread($connection, 8192);
+            }
+
+            fwrite($connection, $response);
+            fclose($connection);
+        }
+
+        fclose($server);
+        exit(0);
+    }
+
+    fclose($server);
+    Config::set('flux.unix_socket_path', $socketPath);
+    Config::set('flux.health_timeout_seconds', 1.0);
+    Config::set('flux.connection_timeout_seconds', 1.0);
+    Config::set('flux.dispatch_timeout_seconds', 1.0);
+
+    try {
+        $callback();
+    } finally {
+        pcntl_waitpid($pid, $status);
+        @unlink($socketPath);
+    }
+}

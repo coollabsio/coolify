@@ -82,7 +82,8 @@ class V5CanvasResourceUpdated implements ShouldBroadcastNow
             'id' => (string) $server->id,
             'name' => $server->name,
             'host' => $server->host,
-            'status' => $server->caddyIngressStatus(),
+            'type' => $server->ingressType(),
+            'status' => $server->ingressStatus(),
             'canvasX' => $server->canvas_x ?? -352,
             'canvasY' => $server->canvas_y ?? 0,
         ];

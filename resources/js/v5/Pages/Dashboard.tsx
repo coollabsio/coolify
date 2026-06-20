@@ -2,6 +2,11 @@ import { Head } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent, type WheelEvent } from 'react';
 
 import { AppNavbar } from '@/components/app-navbar';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Field, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { resolveCanvasNodeLayout, resolveCanvasNodePosition, type CanvasNodeBounds } from '@/lib/canvas-collision';
 import { csrfToken } from '@/lib/csrf';
 import { cn } from '@/lib/utils';
@@ -23,6 +28,13 @@ type ConnectionEndpoint = {
 type V5CanvasResourceUpdatedEvent = {
     application: V5Application | null;
     caddyIngress: V5CaddyIngress | null;
+};
+
+type IngressModalState = {
+    application: V5Application;
+    domains: string;
+    internalPort: string;
+    error: string | null;
 };
 
 type EchoChannel = {
@@ -148,6 +160,9 @@ export default function Dashboard({
     const [selectedNginxServerId, setSelectedNginxServerId] = useState<string>(nginxServers[0]?.id ?? '');
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [notice, setNotice] = useState<string | null>(null);
+    const [ingressModal, setIngressModal] = useState<IngressModalState | null>(null);
+    const [isSavingIngress, setIsSavingIngress] = useState(false);
+    const [savingIngressApplicationId, setSavingIngressApplicationId] = useState<string | null>(null);
     const canvasRef = useRef<HTMLDivElement | null>(null);
     const hasCanvasNodes = applications.length > 0 || ingresses.length > 0;
 
@@ -649,34 +664,69 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
         }
     }
 
-    async function updateApplicationIngress(application: V5Application, enabled: boolean): Promise<void> {
+    function openApplicationIngressModal(application: V5Application): void {
         setNotice(null);
 
-        const domains = enabled
-            ? window
-                  .prompt('Domains for this app, separated by commas', application.domains.join(', '))
-                  ?.split(',')
-                  .map((domain) => domain.trim())
-                  .filter(Boolean)
-            : application.domains;
-
-        if (enabled && (!domains || domains.length === 0)) {
-            setNotice('Add at least one domain before enabling app ingress.');
+        if (!application.serverIngressEnabled) {
+            setNotice('Enable ingress on the server before enabling app ingress.');
 
             return;
         }
 
-        const internalPort = enabled
-            ? Number(window.prompt('Internal container port', String(application.internalPort ?? '')))
-            : application.internalPort;
+        setIngressModal({
+            application,
+            domains: application.domains.join(', '),
+            internalPort: application.internalPort ? String(application.internalPort) : '',
+            error: null,
+        });
+    }
 
-        if (enabled && (!Number.isInteger(internalPort) || Number(internalPort) < 1 || Number(internalPort) > 65535)) {
-            setNotice('Choose a valid internal port before enabling app ingress.');
+    async function disableApplicationIngress(application: V5Application): Promise<void> {
+        await saveApplicationIngress(application, false, application.domains, application.internalPort);
+    }
+
+    async function submitApplicationIngress(): Promise<void> {
+        if (!ingressModal) {
+            return;
+        }
+
+        const domains = ingressModal.domains
+            .split(',')
+            .map((domain) => domain.trim().toLowerCase())
+            .filter(Boolean);
+        const internalPort = Number(ingressModal.internalPort);
+        const invalidDomain = domains.find((domain) => !isValidDomain(domain));
+
+        if (domains.length === 0) {
+            setIngressModal({ ...ingressModal, error: 'Add at least one valid domain.' });
 
             return;
         }
 
-        const selectedInternalPort = enabled ? Number(internalPort) : application.internalPort;
+        if (invalidDomain) {
+            setIngressModal({ ...ingressModal, error: `${invalidDomain} is not a valid domain.` });
+
+            return;
+        }
+
+        if (!Number.isInteger(internalPort) || internalPort < 1 || internalPort > 65535) {
+            setIngressModal({ ...ingressModal, error: 'Choose a valid internal port between 1 and 65535.' });
+
+            return;
+        }
+
+        await saveApplicationIngress(ingressModal.application, true, [...new Set(domains)], internalPort);
+    }
+
+    async function saveApplicationIngress(
+        application: V5Application,
+        enabled: boolean,
+        domains: string[],
+        internalPort: number | null,
+    ): Promise<void> {
+        setNotice(null);
+        setIsSavingIngress(true);
+        setSavingIngressApplicationId(application.id);
 
         try {
             const response = await fetch(`/v5/applications/${application.id}/ingress`, {
@@ -689,13 +739,20 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                 },
                 body: JSON.stringify({
                     ingress_enabled: enabled,
-                    internal_port: selectedInternalPort,
+                    internal_port: internalPort,
                     domains,
                 }),
             });
 
             if (!response.ok) {
-                setNotice('Could not update application ingress.');
+                const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+                const message = payload?.message ?? 'Could not update application ingress.';
+
+                if (ingressModal) {
+                    setIngressModal({ ...ingressModal, error: message });
+                } else {
+                    setNotice(message);
+                }
 
                 return;
             }
@@ -706,9 +763,61 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                     candidate.id === payload.application.id ? payload.application : candidate,
                 ),
             );
+            setIngressModal(null);
         } catch (error) {
-            setNotice(error instanceof Error ? error.message : 'Could not update application ingress.');
+            const message = error instanceof Error ? error.message : 'Could not update application ingress.';
+
+            if (ingressModal) {
+                setIngressModal({ ...ingressModal, error: message });
+            } else {
+                setNotice(message);
+            }
+        } finally {
+            setIsSavingIngress(false);
+            setSavingIngressApplicationId(null);
         }
+    }
+
+    function isValidDomain(domain: string): boolean {
+        if (domain.length < 1 || domain.length > 253 || domain.startsWith('.') || domain.endsWith('.')) {
+            return false;
+        }
+
+        return domain.split('.').every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label));
+    }
+
+    function renderIngressButton(application: V5Application) {
+        const isDisabled = !application.ingressEnabled && !application.serverIngressEnabled;
+        const isApplicationIngressSaving = savingIngressApplicationId === application.id;
+        const button = (
+            <button
+                type="button"
+                onPointerDown={(event) => event.stopPropagation()}
+                disabled={isDisabled || isApplicationIngressSaving}
+                onClick={(event) => {
+                    event.stopPropagation();
+                    application.ingressEnabled
+                        ? void disableApplicationIngress(application)
+                        : openApplicationIngressModal(application);
+                }}
+                className="rounded-sm border border-border px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-wide text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+            >
+                {isApplicationIngressSaving ? 'Saving...' : application.ingressEnabled ? 'Disable' : 'Enable'}
+            </button>
+        );
+
+        if (!isDisabled) {
+            return button;
+        }
+
+        return (
+            <Tooltip>
+                <TooltipTrigger render={<span className="inline-flex" />}>{button}</TooltipTrigger>
+                <TooltipContent side="top">
+                    <p>You need to enable ingress in server settings first.</p>
+                </TooltipContent>
+            </Tooltip>
+        );
     }
 
     async function addNginx(): Promise<void> {
@@ -1091,7 +1200,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
     }
 
     return (
-        <>
+        <TooltipProvider>
             <Head title="Dashboard" />
 
             <div className="h-dvh overflow-hidden bg-background text-foreground">
@@ -1552,17 +1661,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                                                         ? `${application.domains.length} domain${application.domains.length === 1 ? '' : 's'} → ${application.internalPort ?? 'no port'}`
                                                         : 'Private'}
                                                 </span>
-                                                <button
-                                                    type="button"
-                                                    onPointerDown={(event) => event.stopPropagation()}
-                                                    onClick={(event) => {
-                                                        event.stopPropagation();
-                                                        void updateApplicationIngress(application, !application.ingressEnabled);
-                                                    }}
-                                                    className="rounded-sm border border-border px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-wide text-foreground transition hover:bg-muted"
-                                                >
-                                                    {application.ingressEnabled ? 'Disable' : 'Enable'}
-                                                </button>
+                                                {renderIngressButton(application)}
                                             </dd>
                                         </div>
                                     </dl>
@@ -1572,6 +1671,76 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                     </div>
                 </main>
             </div>
-        </>
+
+            {ingressModal && (
+                <Dialog
+                    open
+                    onOpenChange={(open) => {
+                        if (!open && !isSavingIngress) {
+                            setIngressModal(null);
+                        }
+                    }}
+                >
+                    <DialogContent className="max-w-lg" showCloseButton>
+                        <DialogHeader>
+                            <DialogTitle>Enable app ingress</DialogTitle>
+                            <DialogDescription>
+                                Route public domains to {ingressModal.application.name} through the server ingress.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <form
+                            className="mt-6 flex flex-col gap-4"
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                void submitApplicationIngress();
+                            }}
+                        >
+                            <Field>
+                                <FieldLabel>Domains</FieldLabel>
+                                <Input
+                                    type="text"
+                                    value={ingressModal.domains}
+                                    onChange={(event) =>
+                                        setIngressModal({ ...ingressModal, domains: event.target.value, error: null })
+                                    }
+                                    placeholder="example.com, www.example.com"
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                    Use hostnames only, separated by commas. No scheme, path, wildcard, or port.
+                                </span>
+                            </Field>
+
+                            <Field>
+                                <FieldLabel>Internal port</FieldLabel>
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    max="65535"
+                                    value={ingressModal.internalPort}
+                                    onChange={(event) =>
+                                        setIngressModal({ ...ingressModal, internalPort: event.target.value, error: null })
+                                    }
+                                    placeholder="3000"
+                                />
+                            </Field>
+
+                            {ingressModal.error && (
+                                <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                                    <p className="font-medium">Ingress update failed</p>
+                                    <p className="mt-1 text-destructive/90">{ingressModal.error}</p>
+                                </div>
+                            )}
+
+                            <div className="flex justify-end">
+                                <Button type="submit" variant="coolify" disabled={isSavingIngress}>
+                                    {isSavingIngress ? 'Saving...' : 'Enable ingress'}
+                                </Button>
+                            </div>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+            )}
+        </TooltipProvider>
     );
 }

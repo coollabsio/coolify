@@ -9,12 +9,14 @@ export type V5Server = {
     id: string;
     name: string;
     host: string;
+    type: string;
     status: string;
     capabilities: string[];
     builderEnabled: boolean;
     builderCapacity: number;
     builderCpuQuota: string;
     ingressEnabled: boolean;
+    ingressType: string | null;
     uuid: string | null;
     nodeAddress: string | null;
     wireguardListenPortOverride: number | null;
@@ -90,6 +92,7 @@ export type V5Application = {
     statusMessage: string | null;
     runtimeContainerId: string | null;
     serverName: string | null;
+    serverIngressEnabled: boolean;
     meshNamespace: string;
     ingressEnabled: boolean;
     internalPort: number | null;

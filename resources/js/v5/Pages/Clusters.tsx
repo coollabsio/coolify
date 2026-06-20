@@ -64,6 +64,7 @@ type ServerFormErrors = {
     builder_enabled?: string[];
     builder_capacity?: string[];
     builder_cpu_quota?: string[];
+    ingress_type?: string[];
     wireguard_listen_port_override?: string[];
     wireguard_endpoint_override?: string[];
 };
@@ -139,6 +140,13 @@ const clusterDefaults = {
     builderTimeoutSecs: '1800',
 };
 
+const ingressTypes = [
+    {
+        label: 'Caddy',
+        value: 'caddy',
+    },
+];
+
 function formatDate(value: string | null): string {
     if (value === null) {
         return 'Never';
@@ -188,6 +196,7 @@ export default function Clusters({
     const [serverNodeAddress, setServerNodeAddress] = useState('');
     const [serverBuilderEnabled, setServerBuilderEnabled] = useState(true);
     const [serverIngressEnabled, setServerIngressEnabled] = useState(false);
+    const [serverIngressType, setServerIngressType] = useState('caddy');
     const [serverBuilderCapacity, setServerBuilderCapacity] = useState('2');
     const [serverBuilderCpuQuota, setServerBuilderCpuQuota] = useState(clusterDefaults.builderCpuQuota);
     const [wireguardListenPortOverride, setWireguardListenPortOverride] = useState('');
@@ -196,6 +205,7 @@ export default function Clusters({
     const [editingServer, setEditingServer] = useState<V5Server | null>(null);
     const [editServerBuilderEnabled, setEditServerBuilderEnabled] = useState(true);
     const [editServerIngressEnabled, setEditServerIngressEnabled] = useState(false);
+    const [editServerIngressType, setEditServerIngressType] = useState('caddy');
     const [editServerBuilderCapacity, setEditServerBuilderCapacity] = useState('2');
     const [editServerBuilderCpuQuota, setEditServerBuilderCpuQuota] = useState(clusterDefaults.builderCpuQuota);
     const [editServerErrors, setEditServerErrors] = useState<ServerFormErrors>({});
@@ -422,6 +432,7 @@ export default function Clusters({
                 node_address: serverNodeAddress.trim() === '' ? null : serverNodeAddress,
                 builder_enabled: serverBuilderEnabled,
                 ingress_enabled: serverIngressEnabled,
+                ingress_type: serverIngressEnabled ? serverIngressType : null,
                 builder_capacity: Number(serverBuilderCapacity),
                 builder_cpu_quota: serverBuilderCpuQuota,
                 wireguard_listen_port_override:
@@ -480,6 +491,7 @@ export default function Clusters({
             body: JSON.stringify({
                 builder_enabled: editServerBuilderEnabled,
                 ingress_enabled: editServerIngressEnabled,
+                ingress_type: editServerIngressEnabled ? editServerIngressType : null,
                 builder_capacity: Number(editServerBuilderCapacity),
                 builder_cpu_quota: editServerBuilderCpuQuota,
             }),
@@ -496,8 +508,10 @@ export default function Clusters({
         }
 
         if (!response.ok) {
+            const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+
             setEditServerErrors({
-                builder_capacity: ['Unable to update this server. Please try again.'],
+                builder_capacity: [payload?.message ?? 'Unable to update this server. Please try again.'],
             });
             setIsServerUpdateSubmitting(false);
 
@@ -629,6 +643,7 @@ export default function Clusters({
         setEditingServer(server);
         setEditServerBuilderEnabled(server.builderEnabled);
         setEditServerIngressEnabled(server.ingressEnabled);
+        setEditServerIngressType(server.ingressType ?? 'caddy');
         setEditServerBuilderCapacity(String(server.builderCapacity));
         setEditServerBuilderCpuQuota(server.builderCpuQuota);
         setEditServerErrors({});
@@ -721,6 +736,8 @@ export default function Clusters({
         setSelectedPrivateKeyId('');
         setServerNodeAddress('');
         setServerBuilderEnabled(selectedCluster?.builderEnabled ?? true);
+        setServerIngressEnabled(false);
+        setServerIngressType('caddy');
         setServerBuilderCapacity(String(selectedCluster?.builderCapacity ?? 2));
         setServerBuilderCpuQuota(selectedCluster?.builderCpuQuota ?? clusterDefaults.builderCpuQuota);
         setWireguardListenPortOverride('');
@@ -733,6 +750,7 @@ export default function Clusters({
         setEditingServer(null);
         setEditServerBuilderEnabled(true);
         setEditServerIngressEnabled(false);
+        setEditServerIngressType('caddy');
         setEditServerBuilderCapacity('2');
         setEditServerBuilderCpuQuota(clusterDefaults.builderCpuQuota);
         setEditServerErrors({});
@@ -1586,53 +1604,104 @@ export default function Clusters({
                                                     <FieldError message={serverErrors.node_address?.[0]} />
                                                 </Field>
 
-                                                <Field>
-                                                    <FieldLabel>Builder capacity</FieldLabel>
-                                                    <Input
-                                                        value={serverBuilderCapacity}
-                                                        onChange={(event) =>
-                                                            setServerBuilderCapacity(event.target.value)
-                                                        }
-                                                        inputMode="numeric"
-                                                        aria-invalid={serverErrors.builder_capacity ? true : undefined}
-                                                    />
-                                                    <FieldError message={serverErrors.builder_capacity?.[0]} />
-                                                </Field>
+                                                <section className="rounded-lg border border-border bg-background/60 p-4 sm:col-span-2">
+                                                    <Field className="flex-row items-center gap-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={serverBuilderEnabled}
+                                                            onChange={(event) =>
+                                                                setServerBuilderEnabled(event.target.checked)
+                                                            }
+                                                        />
+                                                        <FieldLabel>Enable builder on this server</FieldLabel>
+                                                    </Field>
 
-                                                <Field>
-                                                    <FieldLabel>Builder CPU quota</FieldLabel>
-                                                    <Input
-                                                        value={serverBuilderCpuQuota}
-                                                        onChange={(event) =>
-                                                            setServerBuilderCpuQuota(event.target.value)
-                                                        }
-                                                        placeholder="200%"
-                                                        aria-invalid={serverErrors.builder_cpu_quota ? true : undefined}
-                                                    />
-                                                    <FieldError message={serverErrors.builder_cpu_quota?.[0]} />
-                                                </Field>
+                                                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                                        <Field>
+                                                            <FieldLabel>Builder capacity</FieldLabel>
+                                                            <Input
+                                                                value={serverBuilderCapacity}
+                                                                onChange={(event) =>
+                                                                    setServerBuilderCapacity(event.target.value)
+                                                                }
+                                                                inputMode="numeric"
+                                                                aria-invalid={
+                                                                    serverErrors.builder_capacity ? true : undefined
+                                                                }
+                                                            />
+                                                            <FieldError message={serverErrors.builder_capacity?.[0]} />
+                                                        </Field>
 
-                                                <Field className="flex-row items-center gap-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={serverBuilderEnabled}
-                                                        onChange={(event) =>
-                                                            setServerBuilderEnabled(event.target.checked)
-                                                        }
-                                                    />
-                                                    <FieldLabel>Enable builder on this server</FieldLabel>
-                                                </Field>
+                                                        <Field>
+                                                            <FieldLabel>Builder CPU quota</FieldLabel>
+                                                            <Input
+                                                                value={serverBuilderCpuQuota}
+                                                                onChange={(event) =>
+                                                                    setServerBuilderCpuQuota(event.target.value)
+                                                                }
+                                                                placeholder="200%"
+                                                                aria-invalid={
+                                                                    serverErrors.builder_cpu_quota ? true : undefined
+                                                                }
+                                                            />
+                                                            <FieldError message={serverErrors.builder_cpu_quota?.[0]} />
+                                                        </Field>
+                                                    </div>
+                                                </section>
 
-                                                <Field className="flex-row items-center gap-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={serverIngressEnabled}
-                                                        onChange={(event) =>
-                                                            setServerIngressEnabled(event.target.checked)
-                                                        }
-                                                    />
-                                                    <FieldLabel>Enable Caddy ingress on this server</FieldLabel>
-                                                </Field>
+                                                <section className="rounded-lg border border-border bg-background/60 p-4 sm:col-span-2">
+                                                    <Field className="flex-row items-center gap-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={serverIngressEnabled}
+                                                            onChange={(event) =>
+                                                                setServerIngressEnabled(event.target.checked)
+                                                            }
+                                                        />
+                                                        <FieldLabel>Enable ingress on this server</FieldLabel>
+                                                    </Field>
+
+                                                    <Field className="mt-4">
+                                                        <FieldLabel>Ingress type</FieldLabel>
+                                                        <Select
+                                                            items={ingressTypes}
+                                                            value={serverIngressType}
+                                                            onValueChange={(value) => {
+                                                                if (value !== null) {
+                                                                    setServerIngressType(value);
+                                                                }
+                                                            }}
+                                                            disabled={!serverIngressEnabled}
+                                                        >
+                                                            <SelectTrigger
+                                                                aria-label="Select ingress type"
+                                                                className="h-10 w-full rounded-md px-3 text-sm"
+                                                                aria-invalid={
+                                                                    serverErrors.ingress_type ? true : undefined
+                                                                }
+                                                            >
+                                                                <SelectValue placeholder="Select ingress type" />
+                                                            </SelectTrigger>
+                                                            <SelectContent
+                                                                position="popper"
+                                                                align="start"
+                                                                sideOffset={4}
+                                                            >
+                                                                <SelectGroup>
+                                                                    {ingressTypes.map((ingressType) => (
+                                                                        <SelectItem
+                                                                            key={ingressType.value}
+                                                                            value={ingressType.value}
+                                                                        >
+                                                                            {ingressType.label}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectGroup>
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <FieldError message={serverErrors.ingress_type?.[0]} />
+                                                    </Field>
+                                                </section>
 
                                                 <Field>
                                                     <FieldLabel>WireGuard listen override</FieldLabel>
@@ -1701,13 +1770,13 @@ export default function Clusters({
                                 <DialogHeader>
                                     <DialogTitle>Edit server</DialogTitle>
                                     <DialogDescription>
-                                        Update builder scheduling limits and Caddy ingress for {editingServer?.name ?? 'this server'}.
+                                        Update builder scheduling limits and ingress for {editingServer?.name ?? 'this server'}.
                                         Networking and bootstrap settings stay locked after creation.
                                     </DialogDescription>
                                 </DialogHeader>
 
                                 <form className="mt-5 flex flex-col gap-4" onSubmit={updateServer}>
-                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <section className="rounded-lg border border-border bg-muted/20 p-4">
                                         <Field className="flex-row items-center gap-2">
                                             <input
                                                 type="checkbox"
@@ -1717,39 +1786,76 @@ export default function Clusters({
                                             <FieldLabel>Enable builder on this server</FieldLabel>
                                         </Field>
 
+                                        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                            <Field>
+                                                <FieldLabel>Builder capacity</FieldLabel>
+                                                <Input
+                                                    value={editServerBuilderCapacity}
+                                                    onChange={(event) => setEditServerBuilderCapacity(event.target.value)}
+                                                    inputMode="numeric"
+                                                    aria-invalid={editServerErrors.builder_capacity ? true : undefined}
+                                                />
+                                                <FieldError message={editServerErrors.builder_capacity?.[0]} />
+                                            </Field>
+
+                                            <Field>
+                                                <FieldLabel>Builder CPU quota</FieldLabel>
+                                                <Input
+                                                    value={editServerBuilderCpuQuota}
+                                                    onChange={(event) => setEditServerBuilderCpuQuota(event.target.value)}
+                                                    placeholder="200%"
+                                                    aria-invalid={editServerErrors.builder_cpu_quota ? true : undefined}
+                                                />
+                                                <FieldError message={editServerErrors.builder_cpu_quota?.[0]} />
+                                            </Field>
+                                        </div>
+                                    </section>
+
+                                    <section className="rounded-lg border border-border bg-muted/20 p-4">
                                         <Field className="flex-row items-center gap-2">
                                             <input
                                                 type="checkbox"
                                                 checked={editServerIngressEnabled}
                                                 onChange={(event) => setEditServerIngressEnabled(event.target.checked)}
                                             />
-                                            <FieldLabel>Enable Caddy ingress on this server</FieldLabel>
-                                        </Field>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                        <Field>
-                                            <FieldLabel>Builder capacity</FieldLabel>
-                                            <Input
-                                                value={editServerBuilderCapacity}
-                                                onChange={(event) => setEditServerBuilderCapacity(event.target.value)}
-                                                inputMode="numeric"
-                                                aria-invalid={editServerErrors.builder_capacity ? true : undefined}
-                                            />
-                                            <FieldError message={editServerErrors.builder_capacity?.[0]} />
+                                            <FieldLabel>Enable ingress on this server</FieldLabel>
                                         </Field>
 
-                                        <Field>
-                                            <FieldLabel>Builder CPU quota</FieldLabel>
-                                            <Input
-                                                value={editServerBuilderCpuQuota}
-                                                onChange={(event) => setEditServerBuilderCpuQuota(event.target.value)}
-                                                placeholder="200%"
-                                                aria-invalid={editServerErrors.builder_cpu_quota ? true : undefined}
-                                            />
-                                            <FieldError message={editServerErrors.builder_cpu_quota?.[0]} />
+                                        <Field className="mt-4">
+                                            <FieldLabel>Ingress type</FieldLabel>
+                                            <Select
+                                                items={ingressTypes}
+                                                value={editServerIngressType}
+                                                onValueChange={(value) => {
+                                                    if (value !== null) {
+                                                        setEditServerIngressType(value);
+                                                    }
+                                                }}
+                                                disabled={!editServerIngressEnabled}
+                                            >
+                                                <SelectTrigger
+                                                    aria-label="Select ingress type"
+                                                    className="h-10 w-full rounded-md px-3 text-sm"
+                                                    aria-invalid={editServerErrors.ingress_type ? true : undefined}
+                                                >
+                                                    <SelectValue placeholder="Select ingress type" />
+                                                </SelectTrigger>
+                                                <SelectContent position="popper" align="start" sideOffset={4}>
+                                                    <SelectGroup>
+                                                        {ingressTypes.map((ingressType) => (
+                                                            <SelectItem
+                                                                key={ingressType.value}
+                                                                value={ingressType.value}
+                                                            >
+                                                                {ingressType.label}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectGroup>
+                                                </SelectContent>
+                                            </Select>
+                                            <FieldError message={editServerErrors.ingress_type?.[0]} />
                                         </Field>
-                                    </div>
+                                    </section>
 
                                     <p className="text-xs text-muted-foreground">
                                         Host, bootstrap credentials, node address, and WireGuard overrides are not

@@ -136,7 +136,8 @@ class ApplyFluxResourceStatusUpdate
         }
 
         $server->update([
-            'caddy_ingress_status' => $status,
+            'ingress_type' => 'caddy',
+            'ingress_status' => $status,
             'last_status_check' => 'flux',
             'last_status_output' => $this->statusMessage($payload, 'Status updated by flux.'),
             'last_status_checked_at' => now(),

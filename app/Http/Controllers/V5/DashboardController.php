@@ -19,6 +19,7 @@ use App\Models\V5\ApplicationDomain as V5ApplicationDomain;
 use App\Models\V5\Cluster as V5Cluster;
 use App\Models\V5\ResourceConnection;
 use App\Models\V5\Server as V5Server;
+use App\Rules\ValidHostname;
 use App\Services\Flux\FluxClient;
 use App\Services\Flux\FluxHealth;
 use Illuminate\Database\Eloquent\Builder;
@@ -336,7 +337,8 @@ class DashboardController extends Controller
                     : 'exited';
 
                 $server->update([
-                    'caddy_ingress_status' => $state,
+                    'ingress_type' => 'caddy',
+                    'ingress_status' => $state,
                     'last_status_check' => 'flux',
                     'last_status_output' => 'Caddy ingress state refreshed from coold.',
                     'last_status_checked_at' => now(),
@@ -389,9 +391,17 @@ class DashboardController extends Controller
         $validated = $request->validate([
             'ingress_enabled' => ['required', 'boolean'],
             'internal_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
-            'domains' => ['sometimes', 'array'],
-            'domains.*' => ['required', 'string', 'max:255', 'distinct'],
+            'domains' => [Rule::requiredIf(fn () => $request->boolean('ingress_enabled')), 'array', 'min:1'],
+            'domains.*' => ['required', 'string', 'max:255', 'distinct:ignore_case', new ValidHostname],
         ]);
+
+        $application->loadMissing('server');
+
+        if ($validated['ingress_enabled'] && ! $application->server?->isIngress()) {
+            return response()->json([
+                'message' => 'Enable ingress on the server before enabling app ingress.',
+            ], 422);
+        }
 
         DB::transaction(function () use ($application, $validated): void {
             $application->update([
@@ -416,7 +426,11 @@ class DashboardController extends Controller
         $application->refresh()->load(['server', 'domains']);
 
         if ($application->server?->isIngress() && $application->server->status === 'installed') {
-            StartCaddyIngress::run($application->server);
+            try {
+                StartCaddyIngress::run($application->server);
+            } catch (\RuntimeException $exception) {
+                return $this->ingressSyncErrorResponse($exception);
+            }
         }
 
         return response()->json([
@@ -742,10 +756,17 @@ class DashboardController extends Controller
             'wireguard_listen_port_override' => ['nullable', 'integer', 'min:1', 'max:65535'],
             'wireguard_endpoint_override' => ['nullable', 'string', 'max:255'],
             'ingress_enabled' => ['sometimes', 'boolean'],
+            'ingress_type' => [
+                Rule::requiredIf(fn () => $request->boolean('ingress_enabled')),
+                'nullable',
+                'string',
+                Rule::in(['caddy']),
+            ],
         ]);
 
         $builderEnabled = (bool) ($validated['builder_enabled'] ?? $cluster->builder_enabled);
         $ingressEnabled = (bool) ($validated['ingress_enabled'] ?? false);
+        $ingressType = $ingressEnabled ? $validated['ingress_type'] : null;
         $builderCapacity = (int) ($validated['builder_capacity'] ?? $cluster->builder_capacity);
         $builderCpuQuota = $validated['builder_cpu_quota'] ?? $cluster->builder_cpu_quota;
         $devWireguardOverrides = $this->devLimaWireguardOverrides($validated['host'], (int) $validated['ssh_port']);
@@ -760,6 +781,7 @@ class DashboardController extends Controller
             'ssh_port' => $validated['ssh_port'],
             'private_key_id' => $validated['private_key_id'] ?? null,
             'status' => 'added',
+            'ingress_type' => $ingressType,
             'capabilities' => $this->serverCapabilities($builderEnabled, $ingressEnabled),
             'builder_enabled' => $builderEnabled,
             'builder_capacity' => $builderCapacity,
@@ -800,22 +822,35 @@ class DashboardController extends Controller
             ),
             'builder_cpu_quota' => ['required', 'string', 'max:32'],
             'ingress_enabled' => ['sometimes', 'boolean'],
+            'ingress_type' => [
+                Rule::requiredIf(fn () => $request->boolean('ingress_enabled')),
+                'nullable',
+                'string',
+                Rule::in(['caddy']),
+            ],
         ]);
 
         $wasIngress = $server->isIngress();
         $builderEnabled = (bool) $validated['builder_enabled'];
         $ingressEnabled = (bool) ($validated['ingress_enabled'] ?? $wasIngress);
+        $ingressType = $ingressEnabled ? ($validated['ingress_type'] ?? $server->ingress_type ?? 'caddy') : null;
         $capabilities = $this->serverCapabilities($builderEnabled, $ingressEnabled);
 
         $server->update([
             'capabilities' => $capabilities,
+            'ingress_type' => $ingressType,
             'builder_enabled' => $builderEnabled,
             'builder_capacity' => (int) $validated['builder_capacity'],
             'builder_cpu_quota' => $validated['builder_cpu_quota'],
         ]);
 
         $server->refresh();
-        $this->reconcileCaddyIngress($server, $wasIngress, $ingressEnabled);
+
+        try {
+            $this->reconcileCaddyIngress($server, $wasIngress, $ingressEnabled);
+        } catch (\RuntimeException $exception) {
+            return $this->ingressSyncErrorResponse($exception);
+        }
 
         $cluster->load(['servers' => fn ($query) => $query
             ->with('privateKey')
@@ -1273,7 +1308,8 @@ class DashboardController extends Controller
             'id' => (string) $server->id,
             'name' => $server->name,
             'host' => $server->host,
-            'status' => $server->caddyIngressStatus(),
+            'type' => $server->ingressType(),
+            'status' => $server->ingressStatus(),
             'canvasX' => $server->canvas_x ?? -self::CANVAS_CARD_WIDTH - self::CANVAS_CARD_GAP,
             'canvasY' => $server->canvas_y ?? $index * (self::CANVAS_CARD_HEIGHT + self::CANVAS_CARD_GAP),
         ];
@@ -1424,6 +1460,7 @@ class DashboardController extends Controller
             'statusMessage' => $application->status_message,
             'runtimeContainerId' => $application->runtime_container_id,
             'serverName' => $application->server?->name,
+            'serverIngressEnabled' => (bool) $application->server?->isIngress(),
             'meshNamespace' => $application->mesh_namespace,
             'ingressEnabled' => $application->ingress_enabled,
             'internalPort' => $application->internal_port,
@@ -1506,6 +1543,37 @@ class DashboardController extends Controller
         }
     }
 
+    private function ingressSyncErrorResponse(\RuntimeException $exception): JsonResponse
+    {
+        return response()->json([
+            'message' => $this->friendlyIngressSyncError($exception->getMessage()),
+            'detail' => $exception->getMessage(),
+        ], 502);
+    }
+
+    private function friendlyIngressSyncError(string $message): string
+    {
+        $normalized = Str::lower($message);
+
+        if (str_contains($normalized, 'invalid http response') || str_contains($normalized, 'could not talk to flux')) {
+            return 'Could not reach Flux. Check that Flux is running in the Coolify container and try again.';
+        }
+
+        if (str_contains($normalized, 'dispatch timeout') || str_contains($normalized, 'timed out')) {
+            return 'coold did not respond in time. Check that the server agent is running and connected to Flux.';
+        }
+
+        if (str_contains($normalized, 'validate caddyfile')) {
+            return 'Caddy rejected the generated ingress configuration. Check the domains and internal port, then try again.';
+        }
+
+        if (str_contains($normalized, 'start caddy ingress') || str_contains($normalized, 'reload caddy ingress')) {
+            return 'Could not start Caddy ingress on the server. Check that Podman is running and port 80 is available.';
+        }
+
+        return 'Could not update ingress. Check Flux and coold logs, then try again.';
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -1546,6 +1614,7 @@ class DashboardController extends Controller
                 'builderCapacity' => $server->builder_capacity,
                 'builderCpuQuota' => $server->builder_cpu_quota,
                 'ingressEnabled' => $server->isIngress(),
+                'ingressType' => $server->ingress_type,
                 'uuid' => $server->uuid,
                 'nodeAddress' => $server->node_address,
                 'wireguardListenPortOverride' => $server->wireguard_listen_port_override,

@@ -35,8 +35,6 @@ class GenerateCaddyIngressConfiguration
                     'restart' => 'unless-stopped',
                     'ports' => [
                         '80:80',
-                        '443:443',
-                        '443:443/udp',
                     ],
                     'volumes' => [
                         './Caddyfile:/etc/caddy/Caddyfile:ro',
@@ -102,7 +100,7 @@ CADDY;
         $upstream = "{$application->container_name}.{$namespace}.coolify.internal:{$application->internal_port}";
 
         return implode("\n", [
-            "{$domain->domain} {",
+            "http://{$domain->domain} {",
             "    reverse_proxy {$upstream}",
             '}',
         ]);

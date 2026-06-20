@@ -24,7 +24,8 @@ class Server extends V5Model
         'ssh_user',
         'ssh_port',
         'status',
-        'caddy_ingress_status',
+        'ingress_type',
+        'ingress_status',
         'capabilities',
         'builder_enabled',
         'builder_capacity',
@@ -50,7 +51,11 @@ class Server extends V5Model
     protected static function booted(): void
     {
         static::updated(function (self $server): void {
-            if (! $server->wasChanged('status') && ! $server->wasChanged('caddy_ingress_status')) {
+            if (
+                ! $server->wasChanged('status')
+                && ! $server->wasChanged('ingress_type')
+                && ! $server->wasChanged('ingress_status')
+            ) {
                 return;
             }
 
@@ -111,13 +116,18 @@ class Server extends V5Model
         return $this->hasCapability('ingress');
     }
 
-    public function caddyIngressStatus(): string
+    public function ingressStatus(): string
     {
-        if ($this->caddy_ingress_status !== null) {
-            return $this->caddy_ingress_status;
+        if ($this->ingress_status !== null) {
+            return $this->ingress_status;
         }
 
         return $this->status === 'installed' ? 'running' : 'unknown';
+    }
+
+    public function ingressType(): string
+    {
+        return $this->ingress_type ?? 'caddy';
     }
 
     public function cluster(): BelongsTo

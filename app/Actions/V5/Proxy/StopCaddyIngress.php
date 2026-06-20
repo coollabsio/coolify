@@ -23,7 +23,7 @@ class StopCaddyIngress
         $output = $this->fluxClient->stopCaddyIngress($hostId);
 
         if ($server->exists) {
-            $server->update(['caddy_ingress_status' => 'exited']);
+            $server->update(['ingress_status' => 'exited']);
         }
 
         return $output;

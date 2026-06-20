@@ -25,6 +25,8 @@ return new class extends Migration
             $table->text('status_message')->nullable();
             $table->string('runtime_container_id')->nullable();
             $table->string('mesh_namespace')->default('default');
+            $table->boolean('ingress_enabled')->default(false);
+            $table->unsignedSmallInteger('internal_port')->nullable();
             $table->integer('canvas_x')->default(0);
             $table->integer('canvas_y')->default(0);
             $table->timestamps();
@@ -33,6 +35,15 @@ return new class extends Migration
             $table->index(['team_id', 'project_id', 'environment_id']);
             $table->index(['team_id', 'server_id']);
         });
+
+        Schema::create('v5_application_domains', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('application_id')->constrained('v5_applications')->cascadeOnDelete();
+            $table->string('domain');
+            $table->timestamps();
+
+            $table->unique(['application_id', 'domain']);
+        });
     }
 
     /**
@@ -40,6 +51,7 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::dropIfExists('v5_application_domains');
         Schema::dropIfExists('v5_applications');
     }
 };

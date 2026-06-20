@@ -23,6 +23,8 @@ return new class extends Migration
             $table->string('ssh_user');
             $table->unsignedInteger('ssh_port')->default(22);
             $table->string('status')->default('installed');
+            $table->string('ingress_type')->nullable();
+            $table->string('ingress_status')->nullable();
             $table->json('capabilities')->nullable();
             $table->boolean('builder_enabled')->default(false);
             $table->unsignedInteger('builder_capacity')->default(0);
@@ -33,6 +35,8 @@ return new class extends Migration
             $table->string('wireguard_management_ip')->nullable();
             $table->string('wireguard_public_key')->nullable();
             $table->json('container_subnets')->nullable();
+            $table->integer('canvas_x')->nullable();
+            $table->integer('canvas_y')->nullable();
             $table->timestamp('last_bootstrapped_at')->nullable();
             $table->string('last_bootstrap_action')->nullable();
             $table->string('last_bootstrap_status')->nullable();

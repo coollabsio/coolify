@@ -30,7 +30,10 @@ class StartCaddyIngress
         $output = $this->fluxClient->applyCaddyIngress($hostId, $configuration['caddyfile'], $configuration['apps']);
 
         if ($server->exists) {
-            $server->update(['caddy_ingress_status' => 'running']);
+            $server->update([
+                'ingress_type' => 'caddy',
+                'ingress_status' => 'running',
+            ]);
         }
 
         return $output;
