@@ -412,12 +412,9 @@ mint_host_jwt_for_host() {
   local host_id="$1"
   local attempts=60
   local output
-  local caps
-
-  caps="coold"
 
   for attempt in $(seq 1 "$attempts"); do
-    if output="$(spin exec -T coolify php artisan flux:dev "$host_id" --caps="$caps" 2>&1)"; then
+    if output="$(spin exec -T coolify php artisan flux:dev "$host_id" 2>&1)"; then
       printf '%s\n' "$output" | tail -n 1
       return 0
     fi

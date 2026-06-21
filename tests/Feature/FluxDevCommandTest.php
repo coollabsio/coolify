@@ -27,6 +27,24 @@ it('mints a host jwt signed by the configured flux private key', function () {
         ->and($claims->exp)->toBeGreaterThan(time());
 });
 
+it('mints a host jwt with only the coarse coold capability by default', function () {
+    [$privateKeyPath, $publicKeyPath] = createFluxJwtKeypair();
+
+    Config::set('flux.jwt_private_key_path', $privateKeyPath);
+
+    $exitCode = Artisan::call('flux:dev', [
+        'host_id' => 'coold-dev',
+        '--ttl' => '600',
+    ]);
+
+    expect($exitCode)->toBe(0);
+
+    $token = trim(Artisan::output());
+    $claims = JWT::decode($token, new Key(file_get_contents($publicKeyPath), 'ES256'));
+
+    expect($claims->caps)->toBe(['coold']);
+});
+
 it('writes the host jwt to an output path with owner-only permissions', function () {
     [$privateKeyPath] = createFluxJwtKeypair();
     $outputPath = storage_path('framework/testing/host-jwt');
