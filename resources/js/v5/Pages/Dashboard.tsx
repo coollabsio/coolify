@@ -1704,7 +1704,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                     }
                 }}
             >
-                <SheetContent side="right" className="w-full overflow-y-auto bg-background sm:rounded-l-xl sm:border data-[side=right]:sm:!inset-y-4 data-[side=right]:sm:!h-auto data-[side=right]:sm:!w-[45vw] data-[side=right]:sm:!max-w-[45vw]" showCloseButton blurOverlay={false}>
+                <SheetContent side="right" className="w-full overflow-hidden bg-background sm:rounded-l-xl sm:border data-[side=right]:sm:!inset-y-4 data-[side=right]:sm:!h-auto data-[side=right]:sm:!w-[45vw] data-[side=right]:sm:!max-w-[45vw]" showCloseButton blurOverlay={false}>
                     {selectedInspectorApplication && (
                         <>
                             <SheetHeader className="p-6 pb-4">
@@ -1717,7 +1717,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
 
                             <div className="flex flex-1 flex-col gap-6 px-6 pb-6">
                                 <Tabs defaultValue="overview" className="gap-4">
-                                    <TabsList className="w-full justify-start overflow-x-auto" variant="line">
+                                    <TabsList className="w-full justify-start" variant="line">
                                         <TabsTrigger value="overview">Overview</TabsTrigger>
                                         <TabsTrigger value="networking">Networking</TabsTrigger>
                                         <TabsTrigger value="advanced">Advanced</TabsTrigger>

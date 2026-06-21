@@ -105,7 +105,7 @@ it('applies caddy ingress configuration through flux instead of ssh', function (
     $server = new Server([
         'wireguard_management_ip' => '100.64.0.10',
         'node_address' => '10.0.0.10',
-        'capabilities' => ['coold', 'ingress'],
+        'capabilities' => ['ingress'],
     ]);
 
     $fluxClient = Mockery::mock(FluxClient::class);
@@ -128,7 +128,7 @@ it('applies caddy ingress configuration through flux instead of ssh', function (
 
 it('does not start caddy ingress for non-ingress servers', function () {
     $server = new Server([
-        'capabilities' => ['coold'],
+        'capabilities' => [],
     ]);
 
     $result = StartCaddyIngress::run($server);
@@ -140,7 +140,7 @@ it('stops caddy ingress through flux instead of ssh', function () {
     $server = new Server([
         'wireguard_management_ip' => '100.64.0.10',
         'node_address' => '10.0.0.10',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
     ]);
 
     $fluxClient = Mockery::mock(FluxClient::class);
@@ -269,6 +269,74 @@ it('dispatches container inventory through the containers list primitive', funct
 
     expect($request)->toContain('"type":"containers.list"')
         ->not->toContain('list_containers');
+});
+
+it('dispatches firewall allow through the firewall allow primitive', function () {
+    if (! function_exists('pcntl_fork')) {
+        $this->markTestSkipped('pcntl is required to fake a Flux Unix socket.');
+    }
+
+    $body = json_encode([
+        'request_id' => 'test-request',
+        'status' => 'ok',
+        'data' => ['id' => 'rule-123', 'output' => 'Firewall rule applied.'],
+    ], JSON_THROW_ON_ERROR);
+    $requestPath = storage_path('framework/testing/flux-request-'.bin2hex(random_bytes(8)).'.txt');
+
+    withFakeFluxSocketCapturingRequest(
+        "HTTP/1.1 200 OK\r\n".
+        "Content-Type: application/json\r\n".
+        'Content-Length: '.strlen($body)."\r\n".
+        "\r\n".
+        $body,
+        $requestPath,
+        fn () => (new FluxClient)->applyFirewallRule('100.64.0.10', [
+            'id' => 'rule-123',
+            'namespace' => 'default',
+            'src' => 'coolify-v5-api',
+            'dst' => 'coolify-v5-postgres',
+            'proto' => 'tcp',
+            'port' => 5432,
+        ])
+    );
+
+    $request = file_get_contents($requestPath) ?: '';
+    @unlink($requestPath);
+
+    expect($request)->toContain('"type":"firewall.allow"')
+        ->toContain('"id":"rule-123"')
+        ->toContain('"src":"coolify-v5-api"')
+        ->toContain('"dst":"coolify-v5-postgres"')
+        ->toContain('"port":5432');
+});
+
+it('dispatches firewall revoke through the firewall revoke primitive', function () {
+    if (! function_exists('pcntl_fork')) {
+        $this->markTestSkipped('pcntl is required to fake a Flux Unix socket.');
+    }
+
+    $body = json_encode([
+        'request_id' => 'test-request',
+        'status' => 'ok',
+        'data' => ['output' => 'Firewall rule removed.'],
+    ], JSON_THROW_ON_ERROR);
+    $requestPath = storage_path('framework/testing/flux-request-'.bin2hex(random_bytes(8)).'.txt');
+
+    withFakeFluxSocketCapturingRequest(
+        "HTTP/1.1 200 OK\r\n".
+        "Content-Type: application/json\r\n".
+        'Content-Length: '.strlen($body)."\r\n".
+        "\r\n".
+        $body,
+        $requestPath,
+        fn () => (new FluxClient)->revokeFirewallRule('100.64.0.10', 'rule-123')
+    );
+
+    $request = file_get_contents($requestPath) ?: '';
+    @unlink($requestPath);
+
+    expect($request)->toContain('"type":"firewall.revoke"')
+        ->toContain('"id":"rule-123"');
 });
 
 function withFakeFluxSocketCapturingRequest(string $response, string $requestPath, Closure $callback): void

@@ -39,7 +39,7 @@ class SyncDevLimaServers
             'description' => 'Local Lima development cluster managed by scripts/dev.sh.',
         ]);
 
-        $capabilities = ['coold'];
+        $capabilities = [];
 
         foreach ($servers as $server) {
             $wireguardManagementIp = $server['wireguard_management_ip'] ?? null;

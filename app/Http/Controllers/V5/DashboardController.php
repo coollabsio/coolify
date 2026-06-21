@@ -552,7 +552,7 @@ class DashboardController extends Controller
         ], $connection->wasRecentlyCreated ? 201 : 200);
     }
 
-    public function updateResourceConnection(Request $request, ResourceConnection $connection): JsonResponse
+    public function updateResourceConnection(Request $request, ResourceConnection $connection, FluxClient $fluxClient): JsonResponse
     {
         $currentTeam = $request->attributes->get('v5.currentTeam');
 
@@ -565,6 +565,8 @@ class DashboardController extends Controller
             'ports_by_direction.*' => ['array'],
             'ports_by_direction.*.*' => ['integer', 'min:1', 'max:65535', 'distinct'],
         ]);
+
+        $oldFirewallRules = $this->connectionFirewallRules($connection->load('rules'));
 
         DB::transaction(function () use ($connection, $validated): void {
             $connection->rules()->delete();
@@ -589,17 +591,40 @@ class DashboardController extends Controller
             }
         });
 
+        $connection->refresh()->load('rules');
+        $newFirewallRules = $this->connectionFirewallRules($connection);
+
+        try {
+            $this->syncConnectionFirewallRules($fluxClient, $oldFirewallRules, $newFirewallRules);
+        } catch (\RuntimeException $exception) {
+            return response()->json([
+                'message' => 'Could not sync firewall rules through Flux.',
+                'detail' => $exception->getMessage(),
+            ], 502);
+        }
+
         return response()->json([
-            'connection' => $this->serializeResourceConnection($connection->refresh()->load('rules')),
+            'connection' => $this->serializeResourceConnection($connection),
         ]);
     }
 
-    public function destroyResourceConnection(Request $request, ResourceConnection $connection): \Illuminate\Http\Response
+    public function destroyResourceConnection(Request $request, ResourceConnection $connection, FluxClient $fluxClient): \Illuminate\Http\Response|JsonResponse
     {
         $currentTeam = $request->attributes->get('v5.currentTeam');
 
         if (! $currentTeam instanceof Team || $connection->team_id !== $currentTeam->id) {
             abort(404);
+        }
+
+        $oldFirewallRules = $this->connectionFirewallRules($connection->load('rules'));
+
+        try {
+            $this->syncConnectionFirewallRules($fluxClient, $oldFirewallRules, collect());
+        } catch (\RuntimeException $exception) {
+            return response()->json([
+                'message' => 'Could not sync firewall rules through Flux.',
+                'detail' => $exception->getMessage(),
+            ], 502);
         }
 
         $connection->delete();
@@ -1364,6 +1389,86 @@ class DashboardController extends Controller
     }
 
     /**
+     * @return Collection<int, array{id: string, hostId: string, rule: array{id: string, namespace: string, src: string, dst: string, proto: string, port: int}}>
+     */
+    private function connectionFirewallRules(ResourceConnection $connection): Collection
+    {
+        $applicationIds = $connection->rules
+            ->flatMap(fn ($rule) => [$rule->source_resource_id, $rule->target_resource_id])
+            ->unique()
+            ->values();
+
+        $applications = V5Application::query()
+            ->whereIn('id', $applicationIds)
+            ->with('server')
+            ->get()
+            ->keyBy('id');
+
+        return $connection->rules
+            ->map(function ($rule) use ($applications, $connection): ?array {
+                $source = $applications->get($rule->source_resource_id);
+                $target = $applications->get($rule->target_resource_id);
+
+                if (! $source instanceof V5Application || ! $target instanceof V5Application || ! $target->server instanceof V5Server) {
+                    return null;
+                }
+
+                $hostId = $target->server->wireguard_management_ip ?: $target->server->node_address;
+
+                if (! is_string($hostId) || $hostId === '') {
+                    return null;
+                }
+
+                $firewallRule = [
+                    'id' => $this->connectionFirewallRuleId($connection, $rule),
+                    'namespace' => $target->mesh_namespace ?: 'default',
+                    'src' => $source->container_name,
+                    'dst' => $target->container_name,
+                    'proto' => $rule->protocol ?: 'tcp',
+                    'port' => (int) $rule->port,
+                ];
+
+                return [
+                    'id' => $firewallRule['id'],
+                    'hostId' => $hostId,
+                    'rule' => $firewallRule,
+                ];
+            })
+            ->filter()
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, array{id: string, hostId: string, rule: array{id: string, namespace: string, src: string, dst: string, proto: string, port: int}}>  $oldRules
+     * @param  Collection<int, array{id: string, hostId: string, rule: array{id: string, namespace: string, src: string, dst: string, proto: string, port: int}}>  $newRules
+     */
+    private function syncConnectionFirewallRules(FluxClient $fluxClient, Collection $oldRules, Collection $newRules): void
+    {
+        $newRuleIds = $newRules->pluck('id')->all();
+        $oldRuleIds = $oldRules->pluck('id')->all();
+
+        $oldRules
+            ->reject(fn (array $oldRule): bool => in_array($oldRule['id'], $newRuleIds, true))
+            ->each(fn (array $oldRule): string => $fluxClient->revokeFirewallRule($oldRule['hostId'], $oldRule['id']));
+
+        $newRules
+            ->reject(fn (array $newRule): bool => in_array($newRule['id'], $oldRuleIds, true))
+            ->each(fn (array $newRule): string => $fluxClient->applyFirewallRule($newRule['hostId'], $newRule['rule']));
+    }
+
+    private function connectionFirewallRuleId(ResourceConnection $connection, mixed $rule): string
+    {
+        return implode(':', [
+            'v5-resource-connection',
+            $connection->id,
+            $rule->source_resource_id,
+            $rule->target_resource_id,
+            $rule->protocol ?: 'tcp',
+            (int) $rule->port,
+        ]);
+    }
+
+    /**
      * @param  array{uuid: string}  $selectedProject
      * @param  array{uuid: string}  $selectedEnvironment
      * @return Builder<V5Application>
@@ -1498,7 +1603,7 @@ class DashboardController extends Controller
      */
     private function serverCapabilities(bool $builderEnabled, bool $ingressEnabled): array
     {
-        return collect(['coold'])
+        return collect()
             ->when($ingressEnabled, fn ($capabilities) => $capabilities->push('ingress'))
             ->unique()
             ->values()

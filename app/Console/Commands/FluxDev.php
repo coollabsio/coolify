@@ -11,12 +11,36 @@ class FluxDev extends Command
 {
     protected $signature = 'flux:dev
         {host_id=coold-dev : Stable coold host id}
-        {--caps=coold : Comma-separated host capabilities}
+        {--caps= : Comma-separated host capabilities}
         {--ttl=3600 : Token lifetime in seconds}
         {--output= : Optional path to write the token with 0600 permissions}
         {--force : Allow running outside local/development environments}';
 
     protected $description = 'Run Flux development helpers.';
+
+    /**
+     * @return array<int, string>
+     */
+    private function defaultCapabilities(): array
+    {
+        return [
+            'images.pull',
+            'images.list',
+            'images.delete',
+            'containers.create',
+            'containers.start',
+            'containers.stop',
+            'containers.restart',
+            'containers.delete',
+            'containers.inspect',
+            'containers.list',
+            'containers.logs',
+            'containers.exec',
+            'containers.healthcheck.run',
+            'ingress.apply',
+            'ingress.stop',
+        ];
+    }
 
     public function handle(): int
     {
@@ -45,7 +69,7 @@ class FluxDev extends Command
             ->all();
 
         if ($caps === []) {
-            $caps = ['coold'];
+            $caps = $this->defaultCapabilities();
         }
 
         $token = JWT::encode([

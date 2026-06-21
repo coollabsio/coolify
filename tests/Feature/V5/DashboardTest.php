@@ -20,6 +20,7 @@ use App\Models\V5\Application as V5Application;
 use App\Models\V5\ApplicationDomain as V5ApplicationDomain;
 use App\Models\V5\Cluster;
 use App\Models\V5\ContainerStatus;
+use App\Models\V5\ResourceConnection;
 use App\Models\V5\Server as V5Server;
 use App\Services\Flux\FluxClient;
 use App\Services\Flux\FluxHealth;
@@ -162,7 +163,7 @@ it('generates http-only caddy routes for application ingress', function () {
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold', 'ingress'],
+        'capabilities' => ['ingress'],
         'builder_enabled' => false,
         'builder_capacity' => 0,
         'builder_cpu_quota' => '200%',
@@ -753,7 +754,7 @@ it('serves v5 dashboard applications as canvas nodes', function () {
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
     ]);
 
     $application = V5Application::query()->create([
@@ -820,7 +821,7 @@ it('persists generic v5 resource connections and direction-specific ports', func
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
     ]);
     $source = V5Application::query()->create([
         'team_id' => $team->id,
@@ -893,6 +894,110 @@ it('persists generic v5 resource connections and direction-specific ports', func
         ->assertSee("\"{$target->id}->{$source->id}\":[\"443\"]", false);
 });
 
+it('syncs v5 resource connection ports through flux firewall primitives', function () {
+    app()->detectEnvironment(fn () => 'local');
+
+    $this->withoutVite();
+    $this->withoutExceptionHandling();
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'wireguard_management_ip' => '100.64.0.10',
+        'capabilities' => [],
+    ]);
+    $source = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'api',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-api',
+        'mesh_namespace' => 'default',
+        'status' => 'running',
+    ]);
+    $target = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'postgres',
+        'image' => 'docker.io/library/postgres:16',
+        'container_name' => 'coolify-v5-postgres',
+        'mesh_namespace' => 'default',
+        'status' => 'running',
+    ]);
+
+    $connection = ResourceConnection::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'resource_one_type' => $source->getMorphClass(),
+        'resource_one_id' => $source->id,
+        'resource_two_type' => $target->getMorphClass(),
+        'resource_two_id' => $target->id,
+        'resource_pair_key' => "application:{$source->id}|application:{$target->id}",
+        'created_by_user_id' => $user->id,
+    ]);
+
+    $firewallRuleId = "v5-resource-connection:{$connection->id}:{$source->id}:{$target->id}:tcp:5432";
+
+    $fluxClient = Mockery::mock(FluxClient::class);
+    $fluxClient
+        ->shouldReceive('applyFirewallRule')
+        ->once()
+        ->with('100.64.0.10', [
+            'id' => $firewallRuleId,
+            'namespace' => 'default',
+            'src' => 'coolify-v5-api',
+            'dst' => 'coolify-v5-postgres',
+            'proto' => 'tcp',
+            'port' => 5432,
+        ])
+        ->andReturn('rule-api-postgres');
+    $fluxClient
+        ->shouldReceive('revokeFirewallRule')
+        ->once()
+        ->with('100.64.0.10', $firewallRuleId)
+        ->andReturn('Firewall rule removed.');
+    app()->instance(FluxClient::class, $fluxClient);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team, '_token' => 'test-csrf-token'])
+        ->withHeader('X-CSRF-TOKEN', 'test-csrf-token')
+        ->patchJson("/v5/resource-connections/{$connection->id}", [
+            'ports_by_direction' => [
+                "{$source->id}->{$target->id}" => [5432],
+            ],
+        ])
+        ->assertSuccessful();
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team, '_token' => 'test-csrf-token'])
+        ->withHeader('X-CSRF-TOKEN', 'test-csrf-token')
+        ->deleteJson("/v5/resource-connections/{$connection->id}")
+        ->assertNoContent();
+});
+
 it('serves enabled v5 caddy ingress servers as canvas nodes', function () {
     app()->detectEnvironment(fn () => 'local');
 
@@ -912,7 +1017,7 @@ it('serves enabled v5 caddy ingress servers as canvas nodes', function () {
         'ssh_port' => 22,
         'status' => 'installed',
         'ingress_status' => 'running',
-        'capabilities' => ['coold', 'ingress'],
+        'capabilities' => ['ingress'],
         'canvas_x' => -160,
         'canvas_y' => 240,
     ]);
@@ -925,7 +1030,7 @@ it('serves enabled v5 caddy ingress servers as canvas nodes', function () {
         'ssh_port' => 22,
         'status' => 'installed',
         'ingress_status' => 'exited',
-        'capabilities' => ['coold', 'ingress'],
+        'capabilities' => ['ingress'],
     ]);
     V5Server::query()->create([
         'team_id' => $team->id,
@@ -935,7 +1040,7 @@ it('serves enabled v5 caddy ingress servers as canvas nodes', function () {
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
     ]);
 
     $this
@@ -969,7 +1074,7 @@ it('creates an nginx v5 application on the first installed team server', functio
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
         'last_bootstrapped_at' => now(),
     ]);
 
@@ -1019,7 +1124,7 @@ it('creates an nginx v5 application on the selected team server', function () {
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
         'last_bootstrapped_at' => now(),
     ]);
     $selectedServer = V5Server::query()->create([
@@ -1031,7 +1136,7 @@ it('creates an nginx v5 application on the selected team server', function () {
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
         'last_bootstrapped_at' => now(),
     ]);
 
@@ -1073,7 +1178,7 @@ it('places a new nginx v5 application next to existing canvas nodes', function (
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
         'last_bootstrapped_at' => now(),
     ]);
 
@@ -1125,7 +1230,7 @@ it('marks an nginx v5 application failed when the launch command fails', functio
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
         'last_bootstrapped_at' => now(),
     ]);
 
@@ -1162,7 +1267,7 @@ it('does not create an nginx v5 application on another teams selected server', f
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
         'last_bootstrapped_at' => now(),
     ]);
 
@@ -1215,7 +1320,7 @@ it('deletes a v5 application for the current team', function () {
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
     ]);
     $application = V5Application::query()->create([
         'team_id' => $team->id,
@@ -1253,7 +1358,7 @@ it('stops and deletes the nginx container before deleting a v5 application', fun
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
     ]);
     $application = V5Application::query()->create([
         'team_id' => $team->id,
@@ -1303,7 +1408,7 @@ it('does not delete another teams v5 application', function () {
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
     ]);
     $application = V5Application::query()->create([
         'team_id' => $otherTeam->id,
@@ -1339,7 +1444,7 @@ it('updates v5 application canvas position for the current team', function () {
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
     ]);
     $application = V5Application::query()->create([
         'team_id' => $team->id,
@@ -1382,7 +1487,7 @@ it('updates v5 caddy ingress canvas position for the current team', function () 
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold', 'ingress'],
+        'capabilities' => ['ingress'],
         'canvas_x' => -352,
         'canvas_y' => 0,
     ]);
@@ -1415,7 +1520,7 @@ it('applies flux application status updates to the database and broadcasts to th
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
         'wireguard_management_ip' => '100.64.0.5',
     ]);
     $application = V5Application::query()->create([
@@ -1467,7 +1572,7 @@ it('maps generic flux container status updates to v5 applications', function () 
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
         'wireguard_management_ip' => '100.64.0.5',
     ]);
     $application = V5Application::query()->create([
@@ -1521,7 +1626,7 @@ it('applies flux ingress server status updates to the database and broadcasts cl
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold', 'ingress'],
+        'capabilities' => ['ingress'],
         'wireguard_management_ip' => '100.64.0.5',
     ]);
 
@@ -1559,7 +1664,7 @@ it('applies flux caddy ingress container status updates without changing server 
         'ssh_port' => 22,
         'status' => 'installed',
         'ingress_status' => 'running',
-        'capabilities' => ['coold', 'ingress'],
+        'capabilities' => ['ingress'],
         'wireguard_management_ip' => '100.64.0.5',
     ]);
 
@@ -1646,7 +1751,7 @@ it('accepts flux resource status http updates and stores them in the database', 
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
         'wireguard_management_ip' => '100.64.0.5',
     ]);
     $application = V5Application::query()->create([
@@ -1709,7 +1814,7 @@ it('broadcasts v5 canvas resource updates when application state changes', funct
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
     ]);
     $application = V5Application::query()->create([
         'team_id' => $team->id,
@@ -1756,7 +1861,7 @@ it('broadcasts v5 cluster and canvas updates when ingress server state changes',
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold', 'ingress'],
+        'capabilities' => ['ingress'],
     ]);
 
     Event::fake([V5CanvasResourceUpdated::class, V5ClusterUpdated::class]);
@@ -1782,7 +1887,7 @@ it('refreshes v5 application state from flux container inventory', function () {
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
         'wireguard_management_ip' => '100.64.0.5',
     ]);
     $application = V5Application::query()->create([
@@ -1847,7 +1952,7 @@ it('refreshes v5 caddy ingress state from flux container inventory', function ()
         'ssh_port' => 22,
         'status' => 'installed',
         'ingress_status' => 'running',
-        'capabilities' => ['coold', 'ingress'],
+        'capabilities' => ['ingress'],
         'wireguard_management_ip' => '100.64.0.6',
     ]);
 
@@ -2070,7 +2175,7 @@ it('shows v5 clusters with their servers on the cluster page', function () {
         'ssh_user' => 'developer',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold', 'builder'],
+        'capabilities' => ['builder'],
         'builder_enabled' => true,
         'builder_capacity' => 2,
         'last_bootstrapped_at' => now(),
@@ -2292,7 +2397,7 @@ it('adds a v5 server to a cluster for the current team', function () {
         ->assertJsonPath('cluster.servers.0.builderCpuQuota', '200%')
         ->assertJsonPath('cluster.servers.0.ingressEnabled', false)
         ->assertJsonPath('cluster.servers.0.ingressType', null)
-        ->assertJsonPath('cluster.servers.0.capabilities', ['coold'])
+        ->assertJsonPath('cluster.servers.0.capabilities', [])
         ->assertJsonPath('cluster.servers.0.wireguardListenPortOverride', 51821)
         ->assertJsonPath('cluster.servers.0.wireguardEndpointOverride', 'prod-01.example.com:51821')
         ->assertJsonPath('cluster.servers.0.wireguardManagementIp', null)
@@ -2311,7 +2416,7 @@ it('adds a v5 server to a cluster for the current team', function () {
         ->exists())->toBeTrue();
 
     expect(V5Server::query()->where('name', 'prod-01')->first()->capabilities)
-        ->toBe(['coold']);
+        ->toBe([]);
 });
 
 it('adds a v5 server with caddy ingress enabled', function () {
@@ -2343,11 +2448,11 @@ it('adds a v5 server with caddy ingress enabled', function () {
         ->assertCreated()
         ->assertJsonPath('cluster.servers.0.ingressEnabled', true)
         ->assertJsonPath('cluster.servers.0.ingressType', 'caddy')
-        ->assertJsonPath('cluster.servers.0.capabilities', ['coold', 'ingress']);
+        ->assertJsonPath('cluster.servers.0.capabilities', ['ingress']);
 
     $server = V5Server::query()->where('name', 'edge-01')->first();
 
-    expect($server->capabilities)->toBe(['coold', 'ingress'])
+    expect($server->capabilities)->toBe(['ingress'])
         ->and($server->ingress_type)->toBe('caddy')
         ->and($server->isIngress())->toBeTrue();
 });
@@ -2381,13 +2486,13 @@ it('keeps added v5 server builder capacity when builder is disabled', function (
         ->assertCreated()
         ->assertJsonPath('cluster.servers.0.builderEnabled', false)
         ->assertJsonPath('cluster.servers.0.builderCapacity', 3)
-        ->assertJsonPath('cluster.servers.0.capabilities', ['coold']);
+        ->assertJsonPath('cluster.servers.0.capabilities', []);
 
     $server = V5Server::query()->where('name', 'prod-01')->first();
 
     expect($server->builder_enabled)->toBeFalse()
         ->and($server->builder_capacity)->toBe(3)
-        ->and($server->capabilities)->toBe(['coold']);
+        ->and($server->capabilities)->toBe([]);
 });
 
 it('requires positive v5 server builder capacity when builder is enabled', function () {
@@ -3106,7 +3211,7 @@ it('updates editable v5 server builder details without changing networking', fun
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
         'builder_enabled' => false,
         'builder_capacity' => 0,
         'builder_cpu_quota' => '100%',
@@ -3144,7 +3249,7 @@ it('updates editable v5 server builder details without changing networking', fun
     expect($server->builder_enabled)->toBeTrue()
         ->and($server->builder_capacity)->toBe(5)
         ->and($server->builder_cpu_quota)->toBe('350%')
-        ->and($server->capabilities)->toBe(['coold'])
+        ->and($server->capabilities)->toBe([])
         ->and($server->host)->toBe('203.0.113.10')
         ->and($server->ssh_user)->toBe('root')
         ->and($server->ssh_port)->toBe(22)
@@ -3171,7 +3276,7 @@ it('updates editable v5 server caddy ingress capability independently from build
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'added',
-        'capabilities' => ['coold', 'builder'],
+        'capabilities' => ['builder'],
         'builder_enabled' => true,
         'builder_capacity' => 2,
         'builder_cpu_quota' => '200%',
@@ -3191,11 +3296,11 @@ it('updates editable v5 server caddy ingress capability independently from build
         ->assertJsonPath('cluster.servers.0.builderEnabled', false)
         ->assertJsonPath('cluster.servers.0.ingressEnabled', true)
         ->assertJsonPath('cluster.servers.0.ingressType', 'caddy')
-        ->assertJsonPath('cluster.servers.0.capabilities', ['coold', 'ingress']);
+        ->assertJsonPath('cluster.servers.0.capabilities', ['ingress']);
 
     $server->refresh();
 
-    expect($server->capabilities)->toBe(['coold', 'ingress'])
+    expect($server->capabilities)->toBe(['ingress'])
         ->and($server->ingress_type)->toBe('caddy')
         ->and($server->builder_enabled)->toBeFalse()
         ->and($server->isIngress())->toBeTrue();
@@ -3221,7 +3326,7 @@ it('rejects application ingress when server ingress is disabled', function () {
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
         'builder_enabled' => false,
         'builder_capacity' => 0,
         'builder_cpu_quota' => '200%',
@@ -3280,7 +3385,7 @@ it('enables application ingress without publishing domains by default', function
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold', 'ingress'],
+        'capabilities' => ['ingress'],
         'builder_enabled' => false,
         'builder_capacity' => 0,
         'builder_cpu_quota' => '200%',
@@ -3352,7 +3457,7 @@ it('validates application ingress domains', function () {
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold', 'ingress'],
+        'capabilities' => ['ingress'],
         'builder_enabled' => false,
         'builder_capacity' => 0,
         'builder_cpu_quota' => '200%',
@@ -3410,7 +3515,7 @@ it('enables application ingress with explicit domains and port', function () {
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold', 'ingress'],
+        'capabilities' => ['ingress'],
         'builder_enabled' => false,
         'builder_capacity' => 0,
         'builder_cpu_quota' => '200%',
@@ -3483,7 +3588,7 @@ it('returns flux error details when application ingress sync fails', function ()
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold', 'ingress'],
+        'capabilities' => ['ingress'],
         'builder_enabled' => false,
         'builder_capacity' => 0,
         'builder_cpu_quota' => '200%',
@@ -3543,7 +3648,7 @@ it('syncs caddy ingress routes through flux when enabling ingress on an installe
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
         'builder_enabled' => false,
         'builder_capacity' => 0,
         'builder_cpu_quota' => '200%',
@@ -3627,7 +3732,7 @@ it('returns flux error details when server ingress activation fails', function (
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
         'builder_enabled' => false,
         'builder_capacity' => 0,
         'builder_cpu_quota' => '200%',
@@ -3694,7 +3799,7 @@ it('keeps editable v5 server builder capacity when disabling builder', function 
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold', 'builder'],
+        'capabilities' => ['builder'],
         'builder_enabled' => true,
         'builder_capacity' => 5,
         'builder_cpu_quota' => '350%',
@@ -3717,7 +3822,7 @@ it('keeps editable v5 server builder capacity when disabling builder', function 
     expect($server->builder_enabled)->toBeFalse()
         ->and($server->builder_capacity)->toBe(5)
         ->and($server->builder_cpu_quota)->toBe('350%')
-        ->and($server->capabilities)->toBe(['coold']);
+        ->and($server->capabilities)->toBe([]);
 });
 
 it('validates editable v5 server builder details', function () {
@@ -3776,7 +3881,7 @@ it('requires positive editable v5 server builder capacity when builder is enable
         'ssh_user' => 'root',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold'],
+        'capabilities' => [],
         'builder_enabled' => false,
         'builder_capacity' => 0,
         'builder_cpu_quota' => '200%',
@@ -3873,7 +3978,7 @@ it('does not delete a v5 cluster that has servers', function () {
         'ssh_user' => 'developer',
         'ssh_port' => 22,
         'status' => 'installed',
-        'capabilities' => ['coold', 'builder'],
+        'capabilities' => ['builder'],
         'builder_enabled' => true,
         'builder_capacity' => 2,
         'last_bootstrapped_at' => now(),
@@ -4098,11 +4203,12 @@ it('defines the v5 dashboard page as a shadcn styled canvas shell', function () 
         ->toContain('selectedInspectorApplication')
         ->toContain('onDoubleClick={(event) => openApplicationInspector(event, application)}')
         ->toContain('open={selectedInspectorApplication !== null}')
-        ->toContain('<SheetContent side="right" className="w-full overflow-y-auto bg-background sm:rounded-l-xl sm:border data-[side=right]:sm:!inset-y-4 data-[side=right]:sm:!h-auto data-[side=right]:sm:!w-[45vw] data-[side=right]:sm:!max-w-[45vw]"')
+        ->toContain('<SheetContent side="right" className="w-full overflow-hidden bg-background sm:rounded-l-xl sm:border data-[side=right]:sm:!inset-y-4 data-[side=right]:sm:!h-auto data-[side=right]:sm:!w-[45vw] data-[side=right]:sm:!max-w-[45vw]"')
         ->toContain('showCloseButton blurOverlay={false}')
         ->toContain('<SheetHeader className="p-6 pb-4">')
         ->toContain('<div className="flex flex-1 flex-col gap-6 px-6 pb-6">')
         ->toContain('<Tabs defaultValue="overview"')
+        ->toContain('<TabsList className="w-full justify-start" variant="line">')
         ->toContain('<TabsTrigger value="overview">Overview</TabsTrigger>')
         ->toContain('<TabsTrigger value="networking">Networking</TabsTrigger>')
         ->toContain('<TabsTrigger value="advanced">Advanced</TabsTrigger>')

@@ -48,6 +48,32 @@ class FluxClient
     }
 
     /**
+     * @param  array{id: string, namespace: string, src: string, dst: string, proto: string, port: int}  $rule
+     */
+    public function applyFirewallRule(string $hostId, array $rule): string
+    {
+        $payload = $this->dispatch($hostId, [
+            'type' => 'firewall.allow',
+            ...$rule,
+        ]);
+
+        $data = $payload['data'] ?? [];
+        $id = is_array($data) && is_string($data['id'] ?? null) ? $data['id'] : '';
+
+        return $id !== '' ? $id : $this->output($payload, 'Firewall rule applied.');
+    }
+
+    public function revokeFirewallRule(string $hostId, string $id): string
+    {
+        $payload = $this->dispatch($hostId, [
+            'type' => 'firewall.revoke',
+            'id' => $id,
+        ]);
+
+        return $this->output($payload, 'Firewall rule removed.');
+    }
+
+    /**
      * @param  array<string, mixed>  $command
      * @return array<string, mixed>
      */

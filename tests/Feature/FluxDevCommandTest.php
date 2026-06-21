@@ -12,7 +12,7 @@ it('mints a host jwt signed by the configured flux private key', function () {
 
     $exitCode = Artisan::call('flux:dev', [
         'host_id' => 'coold-dev',
-        '--caps' => 'coold',
+        '--caps' => 'containers.list,ingress.apply',
         '--ttl' => '600',
     ]);
 
@@ -23,11 +23,11 @@ it('mints a host jwt signed by the configured flux private key', function () {
 
     expect($claims->sub)->toBe('coold-dev')
         ->and($claims->aud)->toBe('coold')
-        ->and($claims->caps)->toBe(['coold'])
+        ->and($claims->caps)->toBe(['containers.list', 'ingress.apply'])
         ->and($claims->exp)->toBeGreaterThan(time());
 });
 
-it('mints a host jwt with only the coarse coold capability by default', function () {
+it('mints a host jwt with primitive capabilities by default', function () {
     [$privateKeyPath, $publicKeyPath] = createFluxJwtKeypair();
 
     Config::set('flux.jwt_private_key_path', $privateKeyPath);
@@ -42,7 +42,9 @@ it('mints a host jwt with only the coarse coold capability by default', function
     $token = trim(Artisan::output());
     $claims = JWT::decode($token, new Key(file_get_contents($publicKeyPath), 'ES256'));
 
-    expect($claims->caps)->toBe(['coold']);
+    expect($claims->caps)->toContain('containers.list')
+        ->and($claims->caps)->toContain('ingress.apply')
+        ->and($claims->caps)->not->toContain('coold');
 });
 
 it('writes the host jwt to an output path with owner-only permissions', function () {
