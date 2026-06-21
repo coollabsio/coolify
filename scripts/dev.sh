@@ -413,13 +413,8 @@ mint_host_jwt_for_host() {
   local attempts=60
   local output
   local caps
-  local builder_capacity
 
-  builder_capacity="$(read_coolify_env COOLIFY_COOLD_VM_BUILDER_CAPACITY 2)"
   caps="coold"
-  if [ "$builder_capacity" != "0" ]; then
-    caps="coold,builder"
-  fi
 
   for attempt in $(seq 1 "$attempts"); do
     if output="$(spin exec -T coolify php artisan flux:dev "$host_id" --caps="$caps" 2>&1)"; then
@@ -496,7 +491,6 @@ sync_v5_dev_lima_servers() {
   spin exec -T \
     -e COOLIFY_CLI_SSH_USER="$ssh_user" \
     coolify php artisan v5:sync-dev-lima-servers \
-      --builder-capacity="$(read_coolify_env COOLIFY_COOLD_VM_BUILDER_CAPACITY 2)" \
       "${server_args[@]}"
 }
 

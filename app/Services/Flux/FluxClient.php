@@ -13,7 +13,7 @@ class FluxClient
     public function listContainers(string $hostId): array
     {
         $payload = $this->dispatch($hostId, [
-            'type' => 'list_containers',
+            'type' => 'containers.list',
         ]);
 
         $data = $payload['data'] ?? [];

@@ -15,7 +15,6 @@ class V5SyncDevLimaServers extends Command
         {--user-id=0 : User recorded as creator}
         {--private-key-id= : Optional private key used by the dev servers}
         {--cluster=Development-Lima : Cluster name for the dev Lima servers}
-        {--builder-capacity=2 : Builder capacity to record for each dev server}
         {--server=* : Server as name|host|ssh_user|ssh_port|wireguard_management_ip}
         {--force : Allow running outside local/development environments}';
 
@@ -82,7 +81,6 @@ class V5SyncDevLimaServers extends Command
             user: $user,
             privateKey: $privateKey,
             clusterName: (string) $this->option('cluster'),
-            builderCapacity: (int) $this->option('builder-capacity'),
             servers: $parsedServers,
         );
 

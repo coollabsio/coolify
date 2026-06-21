@@ -25,6 +25,7 @@ Podman / networks / firewall / DNS / Corrosion / builder
 | [Responsibility split](responsibility-split.md) | What belongs in Coolify, Flux, and coold. |
 | [Primitives](primitives.md) | Canonical host primitive surface Coolify may dispatch. |
 | [Deploy flows](deploy-flows.md) | User-functionality flows, starting with `nginx:alpine`. |
+| [ADRs](adr/README.md) | Architecture decision records for Coolify, Flux, coold, and their contracts. |
 | [ADR 0001](adr/0001-control-plane-flux-coold-split.md) | Decision record for the v5 split. |
 
 ## Core rule

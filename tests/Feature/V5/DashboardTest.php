@@ -2291,7 +2291,7 @@ it('adds a v5 server to a cluster for the current team', function () {
         ->assertJsonPath('cluster.servers.0.builderCpuQuota', '200%')
         ->assertJsonPath('cluster.servers.0.ingressEnabled', false)
         ->assertJsonPath('cluster.servers.0.ingressType', null)
-        ->assertJsonPath('cluster.servers.0.capabilities', ['coold', 'builder'])
+        ->assertJsonPath('cluster.servers.0.capabilities', ['coold'])
         ->assertJsonPath('cluster.servers.0.wireguardListenPortOverride', 51821)
         ->assertJsonPath('cluster.servers.0.wireguardEndpointOverride', 'prod-01.example.com:51821')
         ->assertJsonPath('cluster.servers.0.wireguardManagementIp', null)
@@ -2310,7 +2310,7 @@ it('adds a v5 server to a cluster for the current team', function () {
         ->exists())->toBeTrue();
 
     expect(V5Server::query()->where('name', 'prod-01')->first()->capabilities)
-        ->toBe(['coold', 'builder']);
+        ->toBe(['coold']);
 });
 
 it('adds a v5 server with caddy ingress enabled', function () {
@@ -2720,7 +2720,7 @@ it('bootstraps a single v5 server with the Coolify CLI', function () {
             && cliFlagValue($command, '--corrosion-version') === 'v1.1.0'
             && cliFlagValue($command, '--wg-listen-port-overrides') === $node.'=51831'
             && cliFlagValue($command, '--wg-endpoint-overrides') === $node.'=prod-01.example.com:51831'
-            && in_array('--enable-builder', $command, true)
+            && ! in_array('--enable-builder', $command, true)
             && in_array('--yes', $command, true)
             && ! in_array('--new-nodes', $command, true);
     });
@@ -3143,7 +3143,7 @@ it('updates editable v5 server builder details without changing networking', fun
     expect($server->builder_enabled)->toBeTrue()
         ->and($server->builder_capacity)->toBe(5)
         ->and($server->builder_cpu_quota)->toBe('350%')
-        ->and($server->capabilities)->toBe(['coold', 'builder'])
+        ->and($server->capabilities)->toBe(['coold'])
         ->and($server->host)->toBe('203.0.113.10')
         ->and($server->ssh_user)->toBe('root')
         ->and($server->ssh_port)->toBe(22)
@@ -4640,7 +4640,6 @@ it('syncs dev Lima VMs into v5 clusters and servers', function () {
         '--team-id' => $team->id,
         '--user-id' => $user->id,
         '--cluster' => 'Development-Lima',
-        '--builder-capacity' => 2,
         '--server' => [
             'coold-dev|host.docker.internal|developer|61332|100.64.0.1',
             'coold-dev-2|host.docker.internal|developer|61379|100.64.0.2',
@@ -4683,7 +4682,6 @@ it('updates legacy dev Lima hostnames to Docker reachable SSH endpoints', functi
         '--team-id' => $team->id,
         '--user-id' => $user->id,
         '--cluster' => 'Development-Lima',
-        '--builder-capacity' => 2,
         '--server' => [
             'coold-dev|host.docker.internal|developer|61332',
         ],
@@ -4699,7 +4697,6 @@ it('seeds dev Lima VMs into v5 clusters and servers idempotently', function () {
     createSharedUserAndTeamTables();
     [$user, $team] = createV5UserWithTeam();
     createV5PrivateKey($team, 'Dev Lima Key');
-    config()->set('coold.dev_builder_capacity', 2);
 
     (new V5DevLimaSeeder)->run();
     (new V5DevLimaSeeder)->run();
@@ -4715,7 +4712,7 @@ it('seeds dev Lima VMs into v5 clusters and servers idempotently', function () {
         ->and(V5Server::query()->where('name', 'coold-dev')->where('node_address', '100.64.0.1')->where('wireguard_management_ip', '100.64.0.1')->exists())->toBeTrue()
         ->and(V5Server::query()->where('name', 'coold-dev-2')->where('node_address', '100.64.0.2')->where('wireguard_management_ip', '100.64.0.2')->exists())->toBeTrue()
         ->and(V5Server::query()->where('status', 'installed')->count())->toBe(2)
-        ->and(V5Server::query()->where('builder_enabled', true)->where('builder_capacity', 2)->count())->toBe(2)
+        ->and(V5Server::query()->where('builder_enabled', false)->where('builder_capacity', 0)->count())->toBe(2)
         ->and(V5Server::query()->where('cluster_id', $cluster->id)->count())->toBe(2);
 });
 

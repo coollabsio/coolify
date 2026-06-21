@@ -82,16 +82,11 @@ traffic and nft bridge rules for same-bridge traffic.
 | `host.stats` | Return CPU, memory, disk, and container stats snapshot. |
 | `host.containers` | Return host container summaries. |
 
-## Builder
+## Builder (deferred)
 
-Builds are routed through Flux to a host with builder capability. coold should
-supervise the builder process but should not implement build logic inline.
-
-| Primitive | Purpose |
-| --- | --- |
-| `build.dispatch` | Start a builder request on a capable host. |
-| `build.cancel` | Cancel a running build request. |
-| `build.result` | Return or long-poll build result. |
+Builder is intentionally not part of the active v5 Flux/coold primitive
+surface. Before reintroducing it, add an ADR/API covering scheduling, capacity,
+logs, artifacts, cancellation, restart adoption, and registry flow.
 
 ## Not primitives
 

@@ -12,8 +12,10 @@ must own product behavior and durable state, but it should not hold thousands of
 long-lived agent streams or directly expose host runtime sockets.
 
 Host operations also need a narrow privileged boundary. Podman, firewall, DNS,
-Corrosion, and build supervision require local host privileges that should not
-be spread across the Laravel app or arbitrary scripts.
+and Corrosion require local host privileges that should not be spread across the
+Laravel app or arbitrary scripts. Future builder supervision belongs behind the
+same boundary, but its active primitive/API shape is deferred to a separate
+decision.
 
 ## Decision
 
@@ -27,7 +29,7 @@ Coolify v5 uses three distinct building blocks:
    primitive requests to connected hosts and resolves pending responses.
 3. **coold** runs once per host. It exposes a closed set of host primitives and
    owns privileged local execution through Podman, firewall, DNS, Corrosion,
-   host facts, and builder supervision.
+   and host facts.
 
 coold must not expose raw Podman passthrough. Every supported operation must be
 an explicit primitive with validation and a stable protocol shape.

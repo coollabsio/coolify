@@ -29,7 +29,6 @@ class SyncDevLimaServers
         User $user,
         ?PrivateKey $privateKey,
         string $clusterName,
-        int $builderCapacity,
         array $servers,
     ): Cluster {
         $cluster = Cluster::query()->updateOrCreate([
@@ -40,9 +39,7 @@ class SyncDevLimaServers
             'description' => 'Local Lima development cluster managed by scripts/dev.sh.',
         ]);
 
-        $builderCapacity = max(0, $builderCapacity);
-        $builderEnabled = $builderCapacity > 0;
-        $capabilities = $builderEnabled ? ['coold', 'builder'] : ['coold'];
+        $capabilities = ['coold'];
 
         foreach ($servers as $server) {
             $wireguardManagementIp = $server['wireguard_management_ip'] ?? null;
@@ -54,8 +51,8 @@ class SyncDevLimaServers
                 'ssh_port' => $server['ssh_port'],
                 'status' => 'installed',
                 'capabilities' => $capabilities,
-                'builder_enabled' => $builderEnabled,
-                'builder_capacity' => $builderCapacity,
+                'builder_enabled' => false,
+                'builder_capacity' => 0,
                 'node_address' => $wireguardManagementIp ?: $server['host'],
                 'wireguard_management_ip' => $wireguardManagementIp,
                 'last_bootstrapped_at' => now(),

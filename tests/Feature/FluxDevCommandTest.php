@@ -12,7 +12,7 @@ it('mints a host jwt signed by the configured flux private key', function () {
 
     $exitCode = Artisan::call('flux:dev', [
         'host_id' => 'coold-dev',
-        '--caps' => 'coold,builder',
+        '--caps' => 'coold',
         '--ttl' => '600',
     ]);
 
@@ -23,7 +23,7 @@ it('mints a host jwt signed by the configured flux private key', function () {
 
     expect($claims->sub)->toBe('coold-dev')
         ->and($claims->aud)->toBe('coold')
-        ->and($claims->caps)->toBe(['coold', 'builder'])
+        ->and($claims->caps)->toBe(['coold'])
         ->and($claims->exp)->toBeGreaterThan(time());
 });
 

@@ -28,7 +28,6 @@ INSTANCE="$(read_coolify_env COOLIFY_COOLD_LIMA_INSTANCE coold-dev)"
 VERSION="$(read_coolify_env COOLIFY_COOLD_VERSION nightly)"
 CORROSION_VERSION="$(read_coolify_env COOLIFY_CORROSION_VERSION v1.0.0)"
 FLUX_URL="$(read_coolify_env COOLIFY_COOLD_VM_FLUX_URL http://host.lima.internal:6443)"
-BUILDER_CAPACITY="$(read_coolify_env COOLIFY_COOLD_VM_BUILDER_CAPACITY 2)"
 START_TIMEOUT="$(read_coolify_env COOLIFY_COOLD_VM_START_TIMEOUT 300)"
 WG_IP="$(read_coolify_env COOLIFY_COOLD_VM_WG_IP "")"
 WG_PEER_IP="$(read_coolify_env COOLIFY_COOLD_VM_WG_PEER_IP "")"
@@ -36,10 +35,6 @@ WG_PEER_ENDPOINT="$(read_coolify_env COOLIFY_COOLD_VM_WG_PEER_ENDPOINT "")"
 WG_PEER_PUBLIC_KEY="$(read_coolify_env COOLIFY_COOLD_VM_WG_PEER_PUBLIC_KEY "")"
 CONTAINER_SUBNET="$(read_coolify_env COOLIFY_COOLD_VM_CONTAINER_SUBNET 10.210.0.0/24)"
 CONTAINER_GATEWAY="$(read_coolify_env COOLIFY_COOLD_VM_CONTAINER_GATEWAY 10.210.0.1)"
-BUILDER_ENABLED="true"
-if [ "$BUILDER_CAPACITY" = "0" ]; then
-  BUILDER_ENABLED="false"
-fi
 TEMPLATE="$ROOT/dev/lima/coold.yaml"
 GUEST_COOLIFY_ROOT="/workspace/coolify"
 
@@ -68,7 +63,6 @@ Environment:
   COOLIFY_COOLD_VERSION        coold release tag to install (default: nightly)
   COOLIFY_CORROSION_VERSION    corrosion release tag to install (default: v1.0.0)
   COOLIFY_COOLD_VM_FLUX_URL    Flux gRPC URL visible from the VM (default: http://host.lima.internal:6443)
-  COOLIFY_COOLD_VM_BUILDER_CAPACITY VM builder capacity to advertise (default: 2; set 0 to disable)
   COOLIFY_COOLD_VM_START_TIMEOUT Seconds to wait for Lima SSH/provisioning (default: 300)
   COOLIFY_COOLD_VM_WG_IP       Optional WireGuard mgmt IP for this host
   COOLIFY_COOLD_VM_CONTAINER_SUBNET Podman mesh subnet for this host
@@ -270,7 +264,7 @@ write_runtime_config() {
     bootstrap="\"$WG_PEER_IP:8787\""
   fi
 
-  lima_shell sudo install -d -m 0755 /etc/corrosion/schemas /etc/coolify /run/coolify /var/lib/corrosion /var/run/corrosion /var/lib/coolify-dev /var/lib/coolify-builder/work
+  lima_shell sudo install -d -m 0755 /etc/corrosion/schemas /etc/coolify /run/coolify /var/lib/corrosion /var/run/corrosion /var/lib/coolify-dev
 
   lima_shell sudo tee /etc/corrosion/schemas/coolify.sql >/dev/null <<'SQL'
 CREATE TABLE service_endpoints (
@@ -315,14 +309,11 @@ run_foreground() {
   (cd /tmp && limactl shell "$INSTANCE" -- sudo \
     env COOLIFY_COOLD_HOST_MGMT_IP="${WG_IP:-127.0.0.1}" \
     COOLIFY_COOLD_FLUX_URL="$FLUX_URL" \
-    COOLIFY_COOLD_BUILDER_ENABLED="$BUILDER_ENABLED" \
-    COOLIFY_COOLD_BUILDER_CAPACITY="$BUILDER_CAPACITY" \
     CONTAINER_GATEWAY="$CONTAINER_GATEWAY" \
     bash -s) <<'RUNNER'
 set -euo pipefail
 
 echo "coold: $(/usr/local/bin/coold --version)"
-echo "builder: $(/usr/local/bin/builder --version)"
 echo "corrosion: $(/usr/local/bin/corrosion --version 2>/dev/null || cat /usr/local/bin/corrosion.version)"
 echo "starting packaged coold endpoint with corrosion in local mode"
 
@@ -340,10 +331,6 @@ COOLIFY_COOLD_NAMESPACES="${COOLIFY_COOLD_NAMESPACES:-default:coolify-default-me
 COOLIFY_COOLD_DNS_ZONE="${COOLIFY_COOLD_DNS_ZONE:-coolify.internal}" \
 COOLIFY_COOLD_FLUX_URL="${COOLIFY_COOLD_FLUX_URL:-http://host.lima.internal:6443}" \
 COOLIFY_COOLD_HOST_JWT_PATH="${COOLIFY_COOLD_HOST_JWT_PATH:-/etc/coolify/host-jwt}" \
-COOLIFY_COOLD_BUILDER_ENABLED="${COOLIFY_COOLD_BUILDER_ENABLED:-true}" \
-COOLIFY_COOLD_BUILDER_CAPACITY="${COOLIFY_COOLD_BUILDER_CAPACITY:-2}" \
-COOLIFY_COOLD_BUILDER_BIN="${COOLIFY_COOLD_BUILDER_BIN:-/usr/local/bin/builder}" \
-COOLIFY_COOLD_BUILDER_WORK_DIR="${COOLIFY_COOLD_BUILDER_WORK_DIR:-/var/lib/coolify-builder/work}" \
 /usr/local/bin/coold &
 
 wait
@@ -442,10 +429,6 @@ Environment=COOLIFY_COOLD_NAMESPACES=default:coolify-default-mesh:$CONTAINER_GAT
 Environment=COOLIFY_COOLD_DNS_ZONE=coolify.internal
 Environment=COOLIFY_COOLD_FLUX_URL=$FLUX_URL
 Environment=COOLIFY_COOLD_HOST_JWT_PATH=/etc/coolify/host-jwt
-Environment=COOLIFY_COOLD_BUILDER_ENABLED=$BUILDER_ENABLED
-Environment=COOLIFY_COOLD_BUILDER_CAPACITY=$BUILDER_CAPACITY
-Environment=COOLIFY_COOLD_BUILDER_BIN=/usr/local/bin/builder
-Environment=COOLIFY_COOLD_BUILDER_WORK_DIR=/var/lib/coolify-builder/work
 ExecStart=/usr/local/bin/coold
 AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_NET_RAW
 Restart=on-failure

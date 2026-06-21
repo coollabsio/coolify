@@ -1057,26 +1057,6 @@ class DashboardController extends Controller
             $command[] = '--skip-default-deny';
         }
 
-        $builderServers = $servers->filter(fn (V5Server $server) => $server->builder_enabled);
-        if ($cluster->builder_enabled && $builderServers->isNotEmpty()) {
-            array_push(
-                $command,
-                '--enable-builder',
-                '--builder-hosts',
-                $builderServers
-                    ->map(fn (V5Server $server) => $this->bootstrapNode($server))
-                    ->implode(','),
-                '--builder-capacity',
-                (string) $cluster->builder_capacity,
-                '--builder-cpu-quota',
-                $cluster->builder_cpu_quota,
-                '--builder-memory-max',
-                $cluster->builder_memory_max,
-                '--builder-timeout-secs',
-                (string) $cluster->builder_timeout_secs,
-            );
-        }
-
         $command[] = '--yes';
 
         return $command;
@@ -1519,7 +1499,6 @@ class DashboardController extends Controller
     private function serverCapabilities(bool $builderEnabled, bool $ingressEnabled): array
     {
         return collect(['coold'])
-            ->when($builderEnabled, fn ($capabilities) => $capabilities->push('builder'))
             ->when($ingressEnabled, fn ($capabilities) => $capabilities->push('ingress'))
             ->unique()
             ->values()

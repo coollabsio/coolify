@@ -100,7 +100,7 @@ class V5BootstrapServerJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
-            $result = Process::timeout(max(60, (int) $cluster->builder_timeout_secs + 120))
+            $result = Process::timeout(300)
                 ->run($this->bootstrapCommand($cluster, $servers, $server, $sshConfigLocation, $action));
             $output = trim($result->output()."\n".$result->errorOutput());
             $successful = $result->successful();
@@ -119,7 +119,6 @@ class V5BootstrapServerJob implements ShouldBeEncrypted, ShouldQueue
 
             $capabilities = collect($server->capabilities ?? [])
                 ->push('coold')
-                ->when($server->builder_enabled, fn ($capabilities) => $capabilities->push('builder'))
                 ->when($server->isIngress(), fn ($capabilities) => $capabilities->push('ingress'))
                 ->unique()
                 ->values()
@@ -227,26 +226,6 @@ class V5BootstrapServerJob implements ShouldBeEncrypted, ShouldQueue
 
         if (! $cluster->default_deny_containers) {
             $command[] = '--skip-default-deny';
-        }
-
-        $builderServers = $servers->filter(fn (V5Server $server) => $server->builder_enabled);
-        if ($cluster->builder_enabled && $builderServers->isNotEmpty()) {
-            array_push(
-                $command,
-                '--enable-builder',
-                '--builder-hosts',
-                $builderServers
-                    ->map(fn (V5Server $server) => $this->bootstrapNode($server))
-                    ->implode(','),
-                '--builder-capacity',
-                (string) $cluster->builder_capacity,
-                '--builder-cpu-quota',
-                $cluster->builder_cpu_quota,
-                '--builder-memory-max',
-                $cluster->builder_memory_max,
-                '--builder-timeout-secs',
-                (string) $cluster->builder_timeout_secs,
-            );
         }
 
         $command[] = '--yes';

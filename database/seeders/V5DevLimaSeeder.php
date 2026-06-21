@@ -30,7 +30,6 @@ class V5DevLimaSeeder extends Seeder
             ->orderBy('id')
             ->first();
 
-        $builderCapacity = max(0, (int) config('coold.dev_builder_capacity', 2));
         $sshUser = (string) config('coold.dev_ssh_user', 'coolify');
         $servers = collect($this->servers())
             ->map(fn (array $server): array => [
@@ -44,7 +43,6 @@ class V5DevLimaSeeder extends Seeder
             user: $user,
             privateKey: $privateKey,
             clusterName: self::CLUSTER_NAME,
-            builderCapacity: $builderCapacity,
             servers: $servers,
         );
     }

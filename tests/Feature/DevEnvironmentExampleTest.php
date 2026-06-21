@@ -14,7 +14,6 @@ it('does not include coold dev tooling defaults in the development env example',
     'coold VM WireGuard IP 2 default' => 'COOLIFY_COOLD_VM_WG_IP_2',
     'coold VM WireGuard port 1 default' => 'COOLIFY_COOLD_VM_WG_PORT_1',
     'coold VM WireGuard port 2 default' => 'COOLIFY_COOLD_VM_WG_PORT_2',
-    'coold VM builder capacity default' => 'COOLIFY_COOLD_VM_BUILDER_CAPACITY',
     'coold VM enabled default' => 'COOLIFY_COOLD_VM_ENABLED',
     'coold VM stop on down default' => 'COOLIFY_COOLD_VM_STOP_ON_DOWN',
     'dev follow logs default' => 'COOLIFY_DEV_FOLLOW_LOGS',
@@ -25,8 +24,7 @@ it('defaults coold dev VM settings in Laravel config', function () {
         ->and(config('coold.coold_version'))->toBe('nightly')
         ->and(config('coold.corrosion_version'))->toBe('v1.0.0')
         ->and(config('coold.dev_ssh_user'))->toBe('coolify')
-        ->and(config('coold.dev_builder_capacity'))->toBe(2)
-        ->and(config('coold.dev_builder_enabled'))->toBeTrue();
+        ->and(config('coold.dev_ssh_user'))->toBe('coolify');
 });
 
 it('runs the v5 dev Lima seeder with the normal development database seeder', function () {

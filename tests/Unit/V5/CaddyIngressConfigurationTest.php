@@ -240,3 +240,87 @@ function withFakeFluxSocket(string $response, Closure $callback): void
         @unlink($socketPath);
     }
 }
+
+it('dispatches container inventory through the containers list primitive', function () {
+    if (! function_exists('pcntl_fork')) {
+        $this->markTestSkipped('pcntl is required to fake a Flux Unix socket.');
+    }
+
+    $body = json_encode([
+        'request_id' => 'test-request',
+        'status' => 'ok',
+        'data' => [],
+    ], JSON_THROW_ON_ERROR);
+    $requestPath = storage_path('framework/testing/flux-request-'.bin2hex(random_bytes(8)).'.txt');
+
+    withFakeFluxSocketCapturingRequest(
+        "HTTP/1.1 200 OK\r\n".
+        "Content-Type: application/json\r\n".
+        'Content-Length: '.strlen($body)."\r\n".
+        "\r\n".
+        $body,
+        $requestPath,
+        fn () => (new FluxClient)->listContainers('100.64.0.10')
+    );
+
+    $request = file_get_contents($requestPath) ?: '';
+    @unlink($requestPath);
+
+    expect($request)->toContain('"type":"containers.list"')
+        ->not->toContain('list_containers');
+});
+
+function withFakeFluxSocketCapturingRequest(string $response, string $requestPath, Closure $callback): void
+{
+    $directory = storage_path('framework/testing');
+
+    if (! is_dir($directory)) {
+        mkdir($directory, 0777, true);
+    }
+
+    $socketPath = $directory.'/flux-'.bin2hex(random_bytes(8)).'.sock';
+    $server = stream_socket_server("unix://{$socketPath}", $errorCode, $errorMessage);
+
+    expect($server)->not->toBeFalse("Could not create fake Flux socket: {$errorMessage} ({$errorCode})");
+
+    $pid = pcntl_fork();
+
+    if ($pid === 0) {
+        $connection = stream_socket_accept($server, 5);
+
+        if ($connection !== false) {
+            $request = '';
+
+            while (! str_contains($request, "\r\n\r\n") && ! feof($connection)) {
+                $request .= fread($connection, 8192);
+            }
+
+            if (preg_match('/Content-Length: (\d+)/i', $request, $matches) === 1) {
+                $remaining = (int) $matches[1] - strlen(substr($request, strpos($request, "\r\n\r\n") + 4));
+
+                while ($remaining > 0 && ! feof($connection)) {
+                    $chunk = fread($connection, $remaining);
+                    $request .= $chunk;
+                    $remaining -= strlen($chunk);
+                }
+            }
+
+            file_put_contents($requestPath, $request);
+            fwrite($connection, $response);
+            fclose($connection);
+        }
+
+        fclose($server);
+        exit(0);
+    }
+
+    fclose($server);
+
+    try {
+        config(['flux.unix_socket_path' => $socketPath]);
+        $callback();
+        pcntl_waitpid($pid, $status);
+    } finally {
+        @unlink($socketPath);
+    }
+}
