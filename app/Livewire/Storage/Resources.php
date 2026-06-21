@@ -4,21 +4,16 @@ namespace App\Livewire\Storage;
 
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Resources extends Component
 {
-    use AuthorizesRequests;
-
     public S3Storage $storage;
 
     public array $selectedStorages = [];
 
     public function mount(): void
     {
-        $this->authorize('view', $this->storage);
-
         $backups = ScheduledDatabaseBackup::where('s3_storage_id', $this->storage->id)
             ->where('save_s3', true)
             ->get();
@@ -30,8 +25,6 @@ class Resources extends Component
 
     public function disableS3(int $backupId): void
     {
-        $this->authorize('update', $this->storage);
-
         $backup = ScheduledDatabaseBackup::where('id', $backupId)
             ->where('s3_storage_id', $this->storage->id)
             ->firstOrFail();
@@ -48,8 +41,6 @@ class Resources extends Component
 
     public function moveBackup(int $backupId): void
     {
-        $this->authorize('update', $this->storage);
-
         $backup = ScheduledDatabaseBackup::where('id', $backupId)
             ->where('s3_storage_id', $this->storage->id)
             ->firstOrFail();
@@ -70,8 +61,6 @@ class Resources extends Component
 
             return;
         }
-
-        $this->authorize('update', $newStorage);
 
         $backup->update(['s3_storage_id' => $newStorage->id]);
 

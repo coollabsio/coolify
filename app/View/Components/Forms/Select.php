@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\Component;
+use Visus\Cuid2\Cuid2;
 
 class Select extends Component
 {
@@ -47,7 +48,7 @@ class Select extends Component
         $this->modelBinding = $this->id;
 
         if (is_null($this->id)) {
-            $this->id = new_public_id();
+            $this->id = new Cuid2;
             // Don't create wire:model binding for auto-generated IDs
             $this->modelBinding = 'null';
         }
@@ -56,7 +57,7 @@ class Select extends Component
         // This prevents duplicate IDs when multiple forms are on the same page
         if ($this->modelBinding && $this->modelBinding !== 'null') {
             // Use original ID with random suffix for uniqueness
-            $uniqueSuffix = new_public_id();
+            $uniqueSuffix = new Cuid2;
             $this->htmlId = $this->modelBinding.'-'.$uniqueSuffix;
         } else {
             $this->htmlId = (string) $this->id;

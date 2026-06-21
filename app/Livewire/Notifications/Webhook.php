@@ -105,9 +105,7 @@ class Webhook extends Component
             refreshSession();
         } else {
             $this->webhookEnabled = $this->settings->webhook_enabled;
-            $this->webhookUrl = auth()->user()->can('update', $this->settings)
-                ? $this->settings->webhook_url
-                : null;
+            $this->webhookUrl = $this->settings->webhook_url;
 
             $this->deploymentSuccessWebhookNotifications = $this->settings->deployment_success_webhook_notifications;
             $this->deploymentFailureWebhookNotifications = $this->settings->deployment_failure_webhook_notifications;

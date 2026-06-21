@@ -10,6 +10,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Exception;
 use Illuminate\Http\Request;
+use Visus\Cuid2\Cuid2;
 
 class Bitbucket extends Controller
 {
@@ -140,7 +141,7 @@ class Bitbucket extends Controller
 
                             continue;
                         }
-                        $deployment_uuid = new_public_id();
+                        $deployment_uuid = new Cuid2;
                         $result = queue_application_deployment(
                             application: $application,
                             deployment_uuid: $deployment_uuid,
@@ -191,7 +192,7 @@ class Bitbucket extends Controller
 
                             continue;
                         }
-                        $deployment_uuid = new_public_id();
+                        $deployment_uuid = new Cuid2;
                         $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                         if (! $found) {
                             if ($application->build_pack === 'dockercompose') {

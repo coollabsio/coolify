@@ -7,7 +7,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::create(['id' => 0, 'is_sponsorship_popup_enabled' => false]);
+    InstanceSettings::create(['id' => 0]);
 });
 
 it('shows registration page when no users exist', function () {

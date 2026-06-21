@@ -20,9 +20,8 @@ class EnvironmentPolicy
      */
     public function view(User $user, Environment $environment): bool
     {
-        $teamId = $this->getTeamId($environment);
-
-        return $teamId !== null && $user->teams->contains('id', $teamId);
+        // return $user->teams->contains('id', $environment->project->team_id);
+        return true;
     }
 
     /**
@@ -30,7 +29,8 @@ class EnvironmentPolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        // return $user->isAdmin();
+        return true;
     }
 
     /**
@@ -38,9 +38,8 @@ class EnvironmentPolicy
      */
     public function update(User $user, Environment $environment): bool
     {
-        $teamId = $this->getTeamId($environment);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        // return $user->isAdmin() && $user->teams->contains('id', $environment->project->team_id);
+        return true;
     }
 
     /**
@@ -48,9 +47,8 @@ class EnvironmentPolicy
      */
     public function delete(User $user, Environment $environment): bool
     {
-        $teamId = $this->getTeamId($environment);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        // return $user->isAdmin() && $user->teams->contains('id', $environment->project->team_id);
+        return true;
     }
 
     /**
@@ -58,7 +56,8 @@ class EnvironmentPolicy
      */
     public function restore(User $user, Environment $environment): bool
     {
-        return false;
+        // return $user->isAdmin() && $user->teams->contains('id', $environment->project->team_id);
+        return true;
     }
 
     /**
@@ -66,11 +65,7 @@ class EnvironmentPolicy
      */
     public function forceDelete(User $user, Environment $environment): bool
     {
-        return false;
-    }
-
-    private function getTeamId(Environment $environment): ?int
-    {
-        return $environment->project?->team_id;
+        // return $user->isAdmin() && $user->teams->contains('id', $environment->project->team_id);
+        return true;
     }
 }

@@ -15,6 +15,7 @@ use App\Models\Tag;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
+use Visus\Cuid2\Cuid2;
 
 class DeployController extends Controller
 {
@@ -510,7 +511,7 @@ class DeployController extends Controller
                 if ($dockerTag !== null && $resource->build_pack !== 'dockerimage') {
                     return ['message' => 'docker_tag can only be used with Docker Image applications.', 'deployment_uuid' => null];
                 }
-                $deployment_uuid = new_public_id();
+                $deployment_uuid = new Cuid2;
                 $result = queue_application_deployment(
                     application: $resource,
                     deployment_uuid: $deployment_uuid,

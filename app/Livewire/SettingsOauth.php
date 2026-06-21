@@ -3,13 +3,10 @@
 namespace App\Livewire;
 
 use App\Models\OauthSetting;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class SettingsOauth extends Component
 {
-    use AuthorizesRequests;
-
     public $oauth_settings_map;
 
     protected function rules()
@@ -134,7 +131,6 @@ class SettingsOauth extends Component
     public function instantSave(string $provider)
     {
         try {
-            $this->authorize('update', instanceSettings());
             $this->updateOauthSettings($provider);
         } catch (\Exception $e) {
             return handleError($e, $this);
@@ -143,12 +139,7 @@ class SettingsOauth extends Component
 
     public function submit()
     {
-        try {
-            $this->authorize('update', instanceSettings());
-            $this->updateOauthSettings();
-            $this->dispatch('success', 'Instance settings updated successfully!');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
+        $this->updateOauthSettings();
+        $this->dispatch('success', 'Instance settings updated successfully!');
     }
 }

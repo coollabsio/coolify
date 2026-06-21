@@ -34,22 +34,17 @@ class Webhooks extends Component
     {
         $this->deploywebhook = generateDeployWebhook($this->resource);
 
-        if ($this->canViewSecrets()) {
-            $this->githubManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_github');
-            $this->gitlabManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_gitlab');
-            $this->bitbucketManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_bitbucket');
-            $this->giteaManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_gitea');
-        }
-
+        $this->githubManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_github');
         $this->githubManualWebhook = generateGitManualWebhook($this->resource, 'github');
-        $this->gitlabManualWebhook = generateGitManualWebhook($this->resource, 'gitlab');
-        $this->bitbucketManualWebhook = generateGitManualWebhook($this->resource, 'bitbucket');
-        $this->giteaManualWebhook = generateGitManualWebhook($this->resource, 'gitea');
-    }
 
-    public function canViewSecrets(): bool
-    {
-        return auth()->user()->can('update', $this->resource);
+        $this->gitlabManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_gitlab');
+        $this->gitlabManualWebhook = generateGitManualWebhook($this->resource, 'gitlab');
+
+        $this->bitbucketManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_bitbucket');
+        $this->bitbucketManualWebhook = generateGitManualWebhook($this->resource, 'bitbucket');
+
+        $this->giteaManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_gitea');
+        $this->giteaManualWebhook = generateGitManualWebhook($this->resource, 'gitea');
     }
 
     public function submit()

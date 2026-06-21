@@ -14,7 +14,6 @@ class Button extends Component
      */
     public function __construct(
         public bool $disabled = false,
-        public bool $authDisabled = false,
         public bool $noStyle = false,
         public ?string $modalId = null,
         public string $defaultClass = 'button',
@@ -29,7 +28,6 @@ class Button extends Component
 
             if (! $hasPermission) {
                 $this->disabled = true;
-                $this->authDisabled = true;
             }
         }
 

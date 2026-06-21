@@ -230,37 +230,15 @@
                         ]" confirmationText="{{ currentTeam()->name }}"
                         confirmationLabel="Enter your team name to confirm"
                         shortConfirmationLabel="Team Name" step2ButtonText="Confirm Cancellation" />
-                    @if ($isRefundEligible)
-                        <div wire:key="cancel-immediately-refundable">
-                            <x-modal-confirmation title="Cancel Immediately?" buttonTitle="Cancel Immediately"
-                                isErrorButton submitAction="cancelImmediately"
-                                :checkboxes="[
-                                    [
-                                        'id' => 'refundLatestPayment',
-                                        'label' => 'Refund my latest payment (eligible for '.$refundDaysRemaining.' more days).',
-                                        'default_warning' => 'No refund will be issued for the remaining period.',
-                                    ],
-                                ]"
-                                :actions="[
-                                    'Your subscription will be cancelled immediately.',
-                                    'All servers will be deactivated.',
-                                ]" confirmationText="{{ currentTeam()->name }}"
-                                confirmationLabel="Enter your team name to confirm"
-                                shortConfirmationLabel="Team Name" step2ButtonText="Permanently Cancel" />
-                        </div>
-                    @else
-                        <div wire:key="cancel-immediately-standard">
-                            <x-modal-confirmation title="Cancel Immediately?" buttonTitle="Cancel Immediately"
-                                isErrorButton submitAction="cancelImmediately"
-                                :actions="[
-                                    'Your subscription will be cancelled immediately.',
-                                    'All servers will be deactivated.',
-                                    'No refund will be issued for the remaining period.',
-                                ]" confirmationText="{{ currentTeam()->name }}"
-                                confirmationLabel="Enter your team name to confirm"
-                                shortConfirmationLabel="Team Name" step2ButtonText="Permanently Cancel" />
-                        </div>
-                    @endif
+                    <x-modal-confirmation title="Cancel Immediately?" buttonTitle="Cancel Immediately"
+                        isErrorButton submitAction="cancelImmediately"
+                        :actions="[
+                            'Your subscription will be cancelled immediately.',
+                            'All servers will be deactivated.',
+                            'No refund will be issued for the remaining period.',
+                        ]" confirmationText="{{ currentTeam()->name }}"
+                        confirmationLabel="Enter your team name to confirm"
+                        shortConfirmationLabel="Team Name" step2ButtonText="Permanently Cancel" />
                 @endif
             </div>
             @if (currentTeam()->subscription->stripe_cancel_at_period_end)
@@ -271,7 +249,7 @@
         {{-- Refund --}}
         <section>
             <h3 class="pb-2">Refund</h3>
-            @if ($refundCheckLoading || $isRefundEligible)
+            @if ($refundCheckLoading || ($isRefundEligible && !currentTeam()->subscription->stripe_cancel_at_period_end))
                 <div class="flex flex-wrap items-center gap-2">
                     @if ($refundCheckLoading)
                         <x-forms.button disabled>Request Full Refund</x-forms.button>
@@ -291,7 +269,7 @@
             <p class="mt-2 text-sm text-neutral-500">
                 @if ($refundCheckLoading)
                     Checking refund eligibility...
-                @elseif ($isRefundEligible)
+                @elseif ($isRefundEligible && !currentTeam()->subscription->stripe_cancel_at_period_end)
                     Eligible for a full refund &mdash; <strong class="dark:text-warning">{{ $refundDaysRemaining }}</strong> days remaining.
                 @elseif ($refundAlreadyUsed)
                     Refund already processed. Each team is eligible for one refund only.

@@ -30,53 +30,38 @@ class Resources extends Component
 
     public function startUnmanaged($id)
     {
-        try {
-            $this->authorize('update', $this->server);
-            if (! ValidationPatterns::isValidContainerName($id)) {
-                $this->dispatch('error', 'Invalid container identifier.');
+        if (! ValidationPatterns::isValidContainerName($id)) {
+            $this->dispatch('error', 'Invalid container identifier.');
 
-                return;
-            }
-            $this->server->startUnmanaged($id);
-            $this->dispatch('success', 'Container started.');
-            $this->loadUnmanagedContainers();
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
+            return;
         }
+        $this->server->startUnmanaged($id);
+        $this->dispatch('success', 'Container started.');
+        $this->loadUnmanagedContainers();
     }
 
     public function restartUnmanaged($id)
     {
-        try {
-            $this->authorize('update', $this->server);
-            if (! ValidationPatterns::isValidContainerName($id)) {
-                $this->dispatch('error', 'Invalid container identifier.');
+        if (! ValidationPatterns::isValidContainerName($id)) {
+            $this->dispatch('error', 'Invalid container identifier.');
 
-                return;
-            }
-            $this->server->restartUnmanaged($id);
-            $this->dispatch('success', 'Container restarted.');
-            $this->loadUnmanagedContainers();
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
+            return;
         }
+        $this->server->restartUnmanaged($id);
+        $this->dispatch('success', 'Container restarted.');
+        $this->loadUnmanagedContainers();
     }
 
     public function stopUnmanaged($id)
     {
-        try {
-            $this->authorize('update', $this->server);
-            if (! ValidationPatterns::isValidContainerName($id)) {
-                $this->dispatch('error', 'Invalid container identifier.');
+        if (! ValidationPatterns::isValidContainerName($id)) {
+            $this->dispatch('error', 'Invalid container identifier.');
 
-                return;
-            }
-            $this->server->stopUnmanaged($id);
-            $this->dispatch('success', 'Container stopped.');
-            $this->loadUnmanagedContainers();
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
+            return;
         }
+        $this->server->stopUnmanaged($id);
+        $this->dispatch('success', 'Container stopped.');
+        $this->loadUnmanagedContainers();
     }
 
     public function refreshStatus()

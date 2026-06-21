@@ -20,7 +20,8 @@ class ProjectPolicy
      */
     public function view(User $user, Project $project): bool
     {
-        return $user->teams->contains('id', $project->team_id);
+        // return $user->teams->contains('id', $project->team_id);
+        return true;
     }
 
     /**
@@ -28,7 +29,8 @@ class ProjectPolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        // return $user->isAdmin();
+        return true;
     }
 
     /**
@@ -36,7 +38,8 @@ class ProjectPolicy
      */
     public function update(User $user, Project $project): bool
     {
-        return $user->isAdminOfTeam($project->team_id);
+        // return $user->isAdmin() && $user->teams->contains('id', $project->team_id);
+        return true;
     }
 
     /**
@@ -44,7 +47,8 @@ class ProjectPolicy
      */
     public function delete(User $user, Project $project): bool
     {
-        return $user->isAdminOfTeam($project->team_id);
+        // return $user->isAdmin() && $user->teams->contains('id', $project->team_id);
+        return true;
     }
 
     /**
@@ -52,7 +56,8 @@ class ProjectPolicy
      */
     public function restore(User $user, Project $project): bool
     {
-        return false;
+        // return $user->isAdmin() && $user->teams->contains('id', $project->team_id);
+        return true;
     }
 
     /**
@@ -60,6 +65,7 @@ class ProjectPolicy
      */
     public function forceDelete(User $user, Project $project): bool
     {
-        return false;
+        // return $user->isAdmin() && $user->teams->contains('id', $project->team_id);
+        return true;
     }
 }

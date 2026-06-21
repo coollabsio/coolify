@@ -110,9 +110,7 @@ class Discord extends Component
             refreshSession();
         } else {
             $this->discordEnabled = $this->settings->discord_enabled;
-            $this->discordWebhookUrl = auth()->user()->can('update', $this->settings)
-                ? $this->settings->discord_webhook_url
-                : null;
+            $this->discordWebhookUrl = $this->settings->discord_webhook_url;
 
             $this->deploymentSuccessDiscordNotifications = $this->settings->deployment_success_discord_notifications;
             $this->deploymentFailureDiscordNotifications = $this->settings->deployment_failure_discord_notifications;

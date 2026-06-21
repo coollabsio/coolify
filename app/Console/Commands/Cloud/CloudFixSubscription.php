@@ -4,8 +4,6 @@ namespace App\Console\Commands\Cloud;
 
 use App\Models\Team;
 use Illuminate\Console\Command;
-use Stripe\Exception\InvalidRequestException;
-use Stripe\StripeClient;
 
 class CloudFixSubscription extends Command
 {
@@ -33,7 +31,7 @@ class CloudFixSubscription extends Command
      */
     public function handle()
     {
-        $stripe = app(StripeClient::class);
+        $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
 
         if ($this->option('verify-all')) {
             return $this->verifyAllActiveSubscriptions($stripe);
@@ -113,7 +111,7 @@ class CloudFixSubscription extends Command
     /**
      * Fix canceled subscriptions in the database
      */
-    private function fixCanceledSubscriptions(StripeClient $stripe)
+    private function fixCanceledSubscriptions(\Stripe\StripeClient $stripe)
     {
         $isDryRun = $this->option('dry-run');
         $checkOne = $this->option('one');
@@ -222,7 +220,7 @@ class CloudFixSubscription extends Command
                         break;
                     }
                 }
-            } catch (InvalidRequestException $e) {
+            } catch (\Stripe\Exception\InvalidRequestException $e) {
                 if ($e->getStripeCode() === 'resource_missing') {
                     $toFixCount++;
 
@@ -328,7 +326,7 @@ class CloudFixSubscription extends Command
     /**
      * Verify all active subscriptions against Stripe API
      */
-    private function verifyAllActiveSubscriptions(StripeClient $stripe)
+    private function verifyAllActiveSubscriptions(\Stripe\StripeClient $stripe)
     {
         $isDryRun = $this->option('dry-run');
         $shouldFix = $this->option('fix-verified');
@@ -572,7 +570,7 @@ class CloudFixSubscription extends Command
                             break;
                     }
 
-                } catch (InvalidRequestException $e) {
+                } catch (\Stripe\Exception\InvalidRequestException $e) {
                     $this->error('  → Error: '.$e->getMessage());
 
                     if ($e->getStripeCode() === 'resource_missing' || $e->getHttpStatus() === 404) {
@@ -732,7 +730,7 @@ class CloudFixSubscription extends Command
     /**
      * Search for subscriptions by customer ID
      */
-    private function searchSubscriptionsByCustomer(StripeClient $stripe, $customerId, $requireActive = false)
+    private function searchSubscriptionsByCustomer(\Stripe\StripeClient $stripe, $customerId, $requireActive = false)
     {
         try {
             $subscriptions = $stripe->subscriptions->all([
@@ -772,7 +770,7 @@ class CloudFixSubscription extends Command
     /**
      * Search for subscriptions by team member emails
      */
-    private function searchSubscriptionsByEmails(StripeClient $stripe, $emails)
+    private function searchSubscriptionsByEmails(\Stripe\StripeClient $stripe, $emails)
     {
         $this->line('  → Searching by team member emails...');
 

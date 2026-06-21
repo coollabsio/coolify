@@ -20,11 +20,8 @@ class GithubAppPolicy
      */
     public function view(User $user, GithubApp $githubApp): bool
     {
-        if ($githubApp->is_system_wide) {
-            return true;
-        }
-
-        return $user->teams->contains('id', $githubApp->team_id);
+        // return $user->teams->contains('id', $githubApp->team_id) || $githubApp->is_system_wide;
+        return true;
     }
 
     /**
@@ -32,7 +29,8 @@ class GithubAppPolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        // return $user->isAdmin();
+        return true;
     }
 
     /**
@@ -41,10 +39,12 @@ class GithubAppPolicy
     public function update(User $user, GithubApp $githubApp): bool
     {
         if ($githubApp->is_system_wide) {
-            return $user->canAccessSystemResources();
+            // return $user->isAdmin();
+            return true;
         }
 
-        return $user->isAdminOfTeam($githubApp->team_id);
+        // return $user->isAdmin() && $user->teams->contains('id', $githubApp->team_id);
+        return true;
     }
 
     /**
@@ -53,10 +53,12 @@ class GithubAppPolicy
     public function delete(User $user, GithubApp $githubApp): bool
     {
         if ($githubApp->is_system_wide) {
-            return $user->canAccessSystemResources();
+            // return $user->isAdmin();
+            return true;
         }
 
-        return $user->isAdminOfTeam($githubApp->team_id);
+        // return $user->isAdmin() && $user->teams->contains('id', $githubApp->team_id);
+        return true;
     }
 
     /**

@@ -14,7 +14,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Throwable;
+use Visus\Cuid2\Cuid2;
 
 class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
 {
@@ -71,23 +71,14 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
             ->first();
 
         if ($found) {
-            try {
-                $this->dispatchPullRequestClosedUpdate($application, $found);
-            } catch (Throwable $e) {
-                report($e);
-            } finally {
-                CleanupPreviewDeployment::run($application, $this->pullRequestId, $found);
-            }
-        }
-    }
+            ApplicationPullRequestUpdateJob::dispatchSync(
+                application: $application,
+                preview: $found,
+                status: ProcessStatus::CLOSED
+            );
 
-    protected function dispatchPullRequestClosedUpdate(Application $application, ApplicationPreview $preview): void
-    {
-        ApplicationPullRequestUpdateJob::dispatchSync(
-            application: $application,
-            preview: $preview,
-            status: ProcessStatus::CLOSED
-        );
+            CleanupPreviewDeployment::run($application, $this->pullRequestId, $found);
+        }
     }
 
     private function handleOpenAction(Application $application, ?GithubApp $githubApp): void
@@ -165,7 +156,7 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
         }
 
         // Queue the deployment
-        $deployment_uuid = new_public_id();
+        $deployment_uuid = new Cuid2;
         queue_application_deployment(
             application: $application,
             pull_request_id: $this->pullRequestId,

@@ -6,6 +6,7 @@ use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use OpenApi\Attributes as OA;
+use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Project model',
@@ -58,7 +59,7 @@ class Project extends BaseModel
             Environment::create([
                 'name' => 'production',
                 'project_id' => $project->id,
-                'uuid' => new_public_id(),
+                'uuid' => (string) new Cuid2,
             ]);
         });
         static::deleting(function ($project) {

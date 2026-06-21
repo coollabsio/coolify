@@ -5,7 +5,6 @@ namespace App\Livewire;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Notifications\TransactionalEmails\Test;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -13,8 +12,6 @@ use Livewire\Component;
 
 class SettingsEmail extends Component
 {
-    use AuthorizesRequests;
-
     public InstanceSettings $settings;
 
     #[Locked]
@@ -106,7 +103,6 @@ class SettingsEmail extends Component
     public function submit()
     {
         try {
-            $this->authorize('update', $this->settings);
             $this->resetErrorBag();
             $this->syncData(true);
             $this->dispatch('success', 'Transactional email settings updated.');
@@ -118,7 +114,6 @@ class SettingsEmail extends Component
     public function instantSave(string $type)
     {
         try {
-            $this->authorize('update', $this->settings);
             $currentSmtpEnabled = $this->settings->smtp_enabled;
             $currentResendEnabled = $this->settings->resend_enabled;
             $this->resetErrorBag();
@@ -146,7 +141,6 @@ class SettingsEmail extends Component
     public function submitSmtp()
     {
         try {
-            $this->authorize('update', $this->settings);
             $this->validate([
                 'smtpEnabled' => 'boolean',
                 'smtpFromAddress' => 'required|email',
@@ -190,7 +184,6 @@ class SettingsEmail extends Component
     public function submitResend()
     {
         try {
-            $this->authorize('update', $this->settings);
             $this->validate([
                 'resendEnabled' => 'boolean',
                 'resendApiKey' => 'required|string',
@@ -221,7 +214,6 @@ class SettingsEmail extends Component
     public function sendTestEmail()
     {
         try {
-            $this->authorize('update', $this->settings);
             $this->validate([
                 'testEmailAddress' => 'required|email',
             ], [

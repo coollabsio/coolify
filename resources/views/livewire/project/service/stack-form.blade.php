@@ -45,14 +45,10 @@
                         <x-helper helper="Variable name: {{ $serviceName }}" />
                     @endif
                 </div>
-                @if ($isPasswordHiddenForMember && data_get($field, 'isPassword'))
-                    <x-forms.input disabled value="Hidden (only admins can view)" />
-                @else
-                    <x-forms.input canGate="update" :canResource="$service"
-                        type="{{ data_get($field, 'isPassword') ? 'password' : 'text' }}"
-                        required="{{ str(data_get($field, 'rules'))?->contains('required') }}"
-                        id="fields.{{ $serviceName }}.value"></x-forms.input>
-                @endif
+                <x-forms.input canGate="update" :canResource="$service"
+                    type="{{ data_get($field, 'isPassword') ? 'password' : 'text' }}"
+                    required="{{ str(data_get($field, 'rules'))?->contains('required') }}"
+                    id="fields.{{ $serviceName }}.value"></x-forms.input>
             @endforeach
         </div>
     @endif

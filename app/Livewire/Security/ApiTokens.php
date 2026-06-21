@@ -36,12 +36,6 @@ class ApiTokens extends Component
     #[Locked]
     public bool $canUseWritePermissions = false;
 
-    #[Locked]
-    public bool $canUseDeployPermissions = false;
-
-    #[Locked]
-    public bool $canUseSensitivePermissions = false;
-
     public function render()
     {
         return view('livewire.security.api-tokens');
@@ -52,8 +46,6 @@ class ApiTokens extends Component
         $this->isApiEnabled = InstanceSettings::get()->is_api_enabled;
         $this->canUseRootPermissions = auth()->user()->can('useRootPermissions', PersonalAccessToken::class);
         $this->canUseWritePermissions = auth()->user()->can('useWritePermissions', PersonalAccessToken::class);
-        $this->canUseDeployPermissions = auth()->user()->can('useDeployPermissions', PersonalAccessToken::class);
-        $this->canUseSensitivePermissions = auth()->user()->can('useSensitivePermissions', PersonalAccessToken::class);
         $this->getTokens();
     }
 
@@ -64,9 +56,10 @@ class ApiTokens extends Component
 
     public function updatedPermissions($permissionToUpdate)
     {
-        // Re-evaluate policies fresh — never trust stored snapshot booleans.
+        // Check if user is trying to use restricted permissions
         if ($permissionToUpdate == 'root' && ! auth()->user()->can('useRootPermissions', PersonalAccessToken::class)) {
             $this->dispatch('error', 'You do not have permission to use root permissions.');
+            // Remove root from permissions if it was somehow added
             $this->permissions = array_diff($this->permissions, ['root']);
 
             return;
@@ -74,21 +67,8 @@ class ApiTokens extends Component
 
         if (in_array($permissionToUpdate, ['write', 'write:sensitive'], true) && ! auth()->user()->can('useWritePermissions', PersonalAccessToken::class)) {
             $this->dispatch('error', 'You do not have permission to use write permissions.');
+            // Remove write permissions if they were somehow added
             $this->permissions = array_diff($this->permissions, ['write', 'write:sensitive']);
-
-            return;
-        }
-
-        if ($permissionToUpdate == 'deploy' && ! auth()->user()->can('useDeployPermissions', PersonalAccessToken::class)) {
-            $this->dispatch('error', 'You do not have permission to use deploy permissions.');
-            $this->permissions = array_diff($this->permissions, ['deploy']);
-
-            return;
-        }
-
-        if ($permissionToUpdate == 'read:sensitive' && ! auth()->user()->can('useSensitivePermissions', PersonalAccessToken::class)) {
-            $this->dispatch('error', 'You do not have permission to use read:sensitive permissions.');
-            $this->permissions = array_diff($this->permissions, ['read:sensitive']);
 
             return;
         }
@@ -112,23 +92,13 @@ class ApiTokens extends Component
         try {
             $this->authorize('create', PersonalAccessToken::class);
 
-            // Re-evaluate policies fresh against the current authenticated user.
-            // Never trust $this->canUse* booleans — they come from the Livewire
-            // snapshot which can be replayed from another user's session.
+            // Validate permissions based on user role
             if (in_array('root', $this->permissions, true) && ! auth()->user()->can('useRootPermissions', PersonalAccessToken::class)) {
                 throw new \Exception('You do not have permission to create tokens with root permissions.');
             }
 
             if (array_intersect(['write', 'write:sensitive'], $this->permissions) && ! auth()->user()->can('useWritePermissions', PersonalAccessToken::class)) {
                 throw new \Exception('You do not have permission to create tokens with write permissions.');
-            }
-
-            if (in_array('deploy', $this->permissions, true) && ! auth()->user()->can('useDeployPermissions', PersonalAccessToken::class)) {
-                throw new \Exception('You do not have permission to create tokens with deploy permissions.');
-            }
-
-            if (in_array('read:sensitive', $this->permissions, true) && ! auth()->user()->can('useSensitivePermissions', PersonalAccessToken::class)) {
-                throw new \Exception('You do not have permission to create tokens with read:sensitive permissions.');
             }
 
             $this->validate([
@@ -138,7 +108,6 @@ class ApiTokens extends Component
             $expiresAt = $this->expiresInDays ? now()->addDays($this->expiresInDays) : null;
             $token = auth()->user()->createToken($this->description, array_values($this->permissions), $expiresAt);
             $this->getTokens();
-            // Do NOT strip the numeric prefix (e.g. "69|...") — Sanctum uses it to index and look up tokens.
             session()->flash('token', $token->plainTextToken);
         } catch (\Exception $e) {
             return handleError($e, $this);

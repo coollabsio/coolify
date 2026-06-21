@@ -69,11 +69,6 @@ class Destinations extends Component
 
     public function scan()
     {
-        try {
-            $this->authorize('update', $this->server);
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
         if ($this->server->isSwarm()) {
             $alreadyAddedNetworks = $this->server->swarmDockers;
         } else {

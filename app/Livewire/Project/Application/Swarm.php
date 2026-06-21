@@ -3,14 +3,11 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Swarm extends Component
 {
-    use AuthorizesRequests;
-
     public Application $application;
 
     #[Validate('required')]
@@ -54,7 +51,6 @@ class Swarm extends Component
     public function instantSave()
     {
         try {
-            $this->authorize('update', $this->application);
             $this->syncData(true);
             $this->dispatch('success', 'Swarm settings updated.');
         } catch (\Throwable $e) {
@@ -65,7 +61,6 @@ class Swarm extends Component
     public function submit()
     {
         try {
-            $this->authorize('update', $this->application);
             $this->syncData(true);
             $this->dispatch('success', 'Swarm settings updated.');
         } catch (\Throwable $e) {

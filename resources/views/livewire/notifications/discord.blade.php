@@ -26,15 +26,9 @@
                 helper="If enabled, a ping (@here) will be sent to the notification when a critical event happens."
                 label="Ping Enabled" />
         </div>
-        @can('update', $settings)
-            <x-forms.input type="password"
-                helper="Create a Discord Server and generate a Webhook URL. <br><a class='inline-block underline dark:text-white' href='https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks' target='_blank'>Webhook Documentation</a>"
-                required id="discordWebhookUrl" label="Webhook" />
-        @else
-            <x-forms.input disabled
-                helper="Create a Discord Server and generate a Webhook URL. <br><a class='inline-block underline dark:text-white' href='https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks' target='_blank'>Webhook Documentation</a>"
-                required label="Webhook" value="Hidden (only admins can view)" />
-        @endcan
+        <x-forms.input canGate="update" :canResource="$settings" type="password"
+            helper="Create a Discord Server and generate a Webhook URL. <br><a class='inline-block underline dark:text-white' href='https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks' target='_blank'>Webhook Documentation</a>"
+            required id="discordWebhookUrl" label="Webhook" />
     </form>
     <h2 class="mt-4">Notification Settings</h2>
     <p class="mb-4">

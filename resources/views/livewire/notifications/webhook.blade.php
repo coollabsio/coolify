@@ -28,15 +28,9 @@
         </div>
         <div class="flex items-end gap-2">
 
-            @can('update', $settings)
-                <x-forms.input type="password"
-                    helper="Enter a valid HTTP or HTTPS URL. Coolify will send POST requests to this endpoint when events occur."
-                    required id="webhookUrl" label="Webhook URL (POST)" />
-            @else
-                <x-forms.input disabled
-                    helper="Enter a valid HTTP or HTTPS URL. Coolify will send POST requests to this endpoint when events occur."
-                    required label="Webhook URL (POST)" value="Hidden (only admins can view)" />
-            @endcan
+            <x-forms.input canGate="update" :canResource="$settings" type="password"
+                helper="Enter a valid HTTP or HTTPS URL. Coolify will send POST requests to this endpoint when events occur."
+                required id="webhookUrl" label="Webhook URL (POST)" />
         </div>
     </form>
     <h2 class="mt-4">Notification Settings</h2>

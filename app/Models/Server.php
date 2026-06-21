@@ -37,6 +37,7 @@ use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Spatie\Url\Url;
 use Stevebauman\Purify\Facades\Purify;
 use Symfony\Component\Yaml\Yaml;
+use Visus\Cuid2\Cuid2;
 
 /**
  * @property array{
@@ -1040,7 +1041,7 @@ $schema://$host {
     {
         $attributes = [
             'name' => 'coolify',
-            'uuid' => new_public_id(),
+            'uuid' => (string) new Cuid2,
             'network' => 'coolify',
             'server_id' => $this->id,
         ];

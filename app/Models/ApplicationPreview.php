@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Url\Url;
+use Visus\Cuid2\Cuid2;
 
 class ApplicationPreview extends BaseModel
 {
@@ -110,7 +111,7 @@ class ApplicationPreview extends BaseModel
             $port = $portInt !== null ? ':'.$portInt : '';
             $urlPath = $url->getPath();
             $path = ($urlPath !== '' && $urlPath !== '/') ? $urlPath : '';
-            $random = new_public_id();
+            $random = new Cuid2;
             $preview_fqdn = str_replace('{{random}}', $random, $template);
             $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
             $preview_fqdn = str_replace('{{pr_id}}', $this->pull_request_id, $preview_fqdn);
@@ -172,7 +173,7 @@ class ApplicationPreview extends BaseModel
                 $port = $portInt !== null ? ':'.$portInt : '';
                 $urlPath = $url->getPath();
                 $path = ($urlPath !== '' && $urlPath !== '/') ? $urlPath : '';
-                $random = new_public_id();
+                $random = new Cuid2;
                 $preview_fqdn = str_replace('{{random}}', $random, $template);
                 $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
                 $preview_fqdn = str_replace('{{pr_id}}', $this->pull_request_id, $preview_fqdn);

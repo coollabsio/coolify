@@ -41,11 +41,7 @@ class Patches extends Component
     {
         $this->parameters = get_route_parameters();
         $this->server = Server::ownedByCurrentTeam()->whereUuid($this->parameters['server_uuid'])->firstOrFail();
-        try {
-            $this->authorize('viewSecurity', $this->server);
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
+        $this->authorize('viewSecurity', $this->server);
     }
 
     public function checkForUpdatesDispatch()
@@ -73,14 +69,14 @@ class Patches extends Component
 
     public function updateAllPackages()
     {
+        $this->authorize('update', $this->server);
+        if (! $this->packageManager || ! $this->osId) {
+            $this->dispatch('error', message: 'Run "Check for updates" first.');
+
+            return;
+        }
+
         try {
-            $this->authorize('update', $this->server);
-            if (! $this->packageManager || ! $this->osId) {
-                $this->dispatch('error', message: 'Run "Check for updates" first.');
-
-                return;
-            }
-
             $activity = UpdatePackage::run(
                 server: $this->server,
                 packageManager: $this->packageManager,
@@ -88,8 +84,8 @@ class Patches extends Component
                 all: true
             );
             $this->dispatch('activityMonitor', $activity->id, ServerPackageUpdated::class);
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
+        } catch (\Exception $e) {
+            $this->dispatch('error', message: $e->getMessage());
         }
     }
 

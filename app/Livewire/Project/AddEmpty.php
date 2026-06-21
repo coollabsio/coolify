@@ -4,13 +4,11 @@ namespace App\Livewire\Project;
 
 use App\Models\Project;
 use App\Support\ValidationPatterns;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
+use Visus\Cuid2\Cuid2;
 
 class AddEmpty extends Component
 {
-    use AuthorizesRequests;
-
     public string $name;
 
     public string $description = '';
@@ -31,13 +29,12 @@ class AddEmpty extends Component
     public function submit()
     {
         try {
-            $this->authorize('create', Project::class);
             $this->validate();
             $project = Project::create([
                 'name' => $this->name,
                 'description' => $this->description,
                 'team_id' => currentTeam()->id,
-                'uuid' => new_public_id(),
+                'uuid' => (string) new Cuid2,
             ]);
 
             $productionEnvironment = $project->environments()->where('name', 'production')->first();

@@ -111,7 +111,7 @@ class All extends Component
             $query->orderBy('order');
         }
 
-        return $this->nullLockedValues($query->get());
+        return $query->get();
     }
 
     private function searchTerm(): string
@@ -125,20 +125,6 @@ class All extends Component
             $this->environmentVariablesPreview->isNotEmpty() ||
             $this->hardcodedEnvironmentVariables->isNotEmpty() ||
             $this->hardcodedEnvironmentVariablesPreview->isNotEmpty();
-    }
-
-    private function nullLockedValues($envs)
-    {
-        $isMember = auth()->user()?->isMember();
-
-        $envs->each(function ($env) use ($isMember) {
-            if ($env->is_shown_once || $isMember) {
-                $env->value = null;
-                $env->real_value = null;
-            }
-        });
-
-        return $envs;
     }
 
     public function getIsSearchActiveProperty(): bool
@@ -218,12 +204,7 @@ class All extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        $isMember = auth()->user()?->isMember();
-
-        return $variables->map(function ($item) use ($isMember) {
-            if ($isMember) {
-                return "$item->key=(Hidden, only admins can view)";
-            }
+        return $variables->map(function ($item) {
             if ($item->is_shown_once) {
                 return "$item->key=(Locked Secret, delete and add again to change)";
             }

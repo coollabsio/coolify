@@ -33,8 +33,6 @@ class Form extends Component
 
     public ?bool $isUsable = null;
 
-    public bool $isPasswordHiddenForMember = false;
-
     protected function rules(): array
     {
         return [
@@ -112,12 +110,6 @@ class Form extends Component
     public function mount()
     {
         $this->syncData(false);
-
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->key = '';
-            $this->secret = '';
-        }
     }
 
     public function testConnection()

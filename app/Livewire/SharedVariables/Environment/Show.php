@@ -76,12 +76,7 @@ class Show extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        $isMember = auth()->user()?->isMember();
-
-        return $variables->map(function ($item) use ($isMember) {
-            if ($isMember) {
-                return "$item->key=(Hidden, only admins can view)";
-            }
+        return $variables->map(function ($item) {
             if ($item->is_shown_once) {
                 return "$item->key=(Locked Secret, delete and add again to change)";
             }

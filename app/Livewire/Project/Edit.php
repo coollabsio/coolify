@@ -4,13 +4,10 @@ namespace App\Livewire\Project;
 
 use App\Models\Project;
 use App\Support\ValidationPatterns;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Edit extends Component
 {
-    use AuthorizesRequests;
-
     public Project $project;
 
     public string $name;
@@ -57,7 +54,6 @@ class Edit extends Component
     public function submit()
     {
         try {
-            $this->authorize('update', $this->project);
             $this->syncData(true);
             $this->dispatch('success', 'Project updated.');
         } catch (\Throwable $e) {

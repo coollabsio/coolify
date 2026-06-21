@@ -23,6 +23,7 @@ use RuntimeException;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
+use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Application model',
@@ -1924,7 +1925,7 @@ class Application extends BaseModel
         if ($isInit && $this->docker_compose_raw) {
             return;
         }
-        $uuid = new_public_id();
+        $uuid = new Cuid2;
         ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: 'checkout');
         $cloneCommand = str_replace(' clone ', ' clone --quiet ', $cloneCommand);
         $workdir = rtrim($this->base_directory, '/');

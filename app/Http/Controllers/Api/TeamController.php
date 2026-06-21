@@ -110,7 +110,6 @@ class TeamController extends Controller
         if (is_null($team)) {
             return response()->json(['message' => 'Team not found.'], 404);
         }
-        $this->authorize('view', $team);
         $team = $this->removeSensitiveData($team);
 
         return response()->json(
@@ -169,7 +168,6 @@ class TeamController extends Controller
         if (is_null($team)) {
             return response()->json(['message' => 'Team not found.'], 404);
         }
-        $this->authorize('view', $team);
         $members = $team->members;
         $members->makeHidden([
             'pivot',

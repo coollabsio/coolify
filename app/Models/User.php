@@ -349,11 +349,6 @@ class User extends Authenticatable implements SendsEmail
     {
         $sessionTeamId = data_get(session('currentTeam'), 'id');
 
-        // Fallback for stateless API requests: resolve team from Sanctum token
-        if (is_null($sessionTeamId) && $this->currentAccessToken()) {
-            $sessionTeamId = data_get($this->currentAccessToken(), 'team_id');
-        }
-
         if (is_null($sessionTeamId)) {
             return null;
         }

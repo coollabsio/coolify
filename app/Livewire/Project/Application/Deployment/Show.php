@@ -59,9 +59,7 @@ class Show extends Component
         $this->application_deployment_queue = $application_deployment_queue;
         $this->horizon_job_status = $this->application_deployment_queue->getHorizonJobStatus();
         $this->deployment_uuid = $deploymentUuid;
-        $this->is_debug_enabled = auth()->user()->isMember()
-            ? false
-            : $this->application->settings->is_debug_enabled;
+        $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
         $this->isKeepAliveOn();
     }
 
@@ -112,8 +110,6 @@ class Show extends Component
 
     public function downloadAllLogs(): string
     {
-        $this->authorize('update', $this->application);
-
         $logs = decode_remote_command_output($this->application_deployment_queue, includeAll: true)
             ->map(function ($line) {
                 $prefix = '';

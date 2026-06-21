@@ -37,6 +37,7 @@ use JsonException;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
+use Visus\Cuid2\Cuid2;
 
 class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -2206,7 +2207,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 continue;
             }
-            $deployment_uuid = new_public_id();
+            $deployment_uuid = new Cuid2;
             queue_application_deployment(
                 deployment_uuid: $deployment_uuid,
                 application: $this->application,

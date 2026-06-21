@@ -9,6 +9,7 @@ use App\Models\ApplicationPreview;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
+use Visus\Cuid2\Cuid2;
 
 class Previews extends Component
 {
@@ -233,38 +234,31 @@ class Previews extends Component
 
     public function force_deploy_without_cache(int $pull_request_id, ?string $pull_request_html_url = null)
     {
-        try {
-            $this->authorize('deploy', $this->application);
+        $this->authorize('deploy', $this->application);
 
-            $dockerRegistryImageTag = null;
-            if ($this->application->build_pack === 'dockerimage') {
-                $dockerRegistryImageTag = $this->application->previews()
-                    ->where('pull_request_id', $pull_request_id)
-                    ->value('docker_registry_image_tag');
-            }
-
-            $this->deploy($pull_request_id, $pull_request_html_url, force_rebuild: true, docker_registry_image_tag: $dockerRegistryImageTag);
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
+        $dockerRegistryImageTag = null;
+        if ($this->application->build_pack === 'dockerimage') {
+            $dockerRegistryImageTag = $this->application->previews()
+                ->where('pull_request_id', $pull_request_id)
+                ->value('docker_registry_image_tag');
         }
+
+        $this->deploy($pull_request_id, $pull_request_html_url, force_rebuild: true, docker_registry_image_tag: $dockerRegistryImageTag);
     }
 
     public function add_and_deploy(int $pull_request_id, ?string $pull_request_html_url = null, ?string $docker_registry_image_tag = null)
     {
-        try {
-            $this->authorize('deploy', $this->application);
+        $this->authorize('deploy', $this->application);
 
-            $this->add($pull_request_id, $pull_request_html_url, $docker_registry_image_tag);
-            $this->deploy($pull_request_id, $pull_request_html_url, force_rebuild: false, docker_registry_image_tag: $docker_registry_image_tag);
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
+        $this->add($pull_request_id, $pull_request_html_url, $docker_registry_image_tag);
+        $this->deploy($pull_request_id, $pull_request_html_url, force_rebuild: false, docker_registry_image_tag: $docker_registry_image_tag);
     }
 
     public function deploy(int $pull_request_id, ?string $pull_request_html_url = null, bool $force_rebuild = false, ?string $docker_registry_image_tag = null)
     {
+        $this->authorize('deploy', $this->application);
+
         try {
-            $this->authorize('deploy', $this->application);
             $this->setDeploymentUuid();
             $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
             if (! $found && (! is_null($pull_request_html_url) || ($this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()))) {
@@ -311,7 +305,7 @@ class Previews extends Component
 
     protected function setDeploymentUuid()
     {
-        $this->deployment_uuid = new_public_id();
+        $this->deployment_uuid = new Cuid2;
         $this->parameters['deployment_uuid'] = $this->deployment_uuid;
     }
 
@@ -356,8 +350,9 @@ class Previews extends Component
 
     public function stop(int $pull_request_id)
     {
+        $this->authorize('deploy', $this->application);
+
         try {
-            $this->authorize('deploy', $this->application);
             $server = $this->application->destination->server;
 
             if ($this->application->destination->server->isSwarm()) {

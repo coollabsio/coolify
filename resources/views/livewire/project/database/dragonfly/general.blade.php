@@ -21,24 +21,16 @@
 
         @if ($database->started_at)
             <div class="flex gap-2">
-                @if ($isPasswordHiddenForMember)
-                    <x-forms.input label="Initial Password" disabled value="Hidden (only admins can view)" />
-                @else
-                    <x-forms.input label="Initial Password" id="dragonflyPassword" type="password" required readonly
-                        helper="You can only change this in the database." canGate="update" :canResource="$database" />
-                @endif
+                <x-forms.input label="Initial Password" id="dragonflyPassword" type="password" required readonly
+                    helper="You can only change this in the database." canGate="update" :canResource="$database" />
             </div>
         @else
             <div class=" dark:text-warning">Please verify these values. You can only modify them before the initial
                 start. After that, you need to modify it in the database.
             </div>
             <div class="flex gap-2">
-                @if ($isPasswordHiddenForMember)
-                    <x-forms.input label="Password" disabled value="Hidden (only admins can view)" />
-                @else
-                    <x-forms.input label="Password" id="dragonflyPassword" type="password" required canGate="update"
-                        :canResource="$database" />
-                @endif
+                <x-forms.input label="Password" id="dragonflyPassword" type="password" required canGate="update"
+                    :canResource="$database" />
             </div>
         @endif
         <div class="flex flex-col gap-2">

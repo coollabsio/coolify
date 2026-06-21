@@ -20,9 +20,7 @@ class EnvironmentVariablePolicy
      */
     public function view(User $user, EnvironmentVariable $environmentVariable): bool
     {
-        $teamId = $this->getTeamId($environmentVariable);
-
-        return $teamId !== null && $user->teams->contains('id', $teamId);
+        return true;
     }
 
     /**
@@ -30,7 +28,7 @@ class EnvironmentVariablePolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return true;
     }
 
     /**
@@ -38,9 +36,7 @@ class EnvironmentVariablePolicy
      */
     public function update(User $user, EnvironmentVariable $environmentVariable): bool
     {
-        $teamId = $this->getTeamId($environmentVariable);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return true;
     }
 
     /**
@@ -48,9 +44,7 @@ class EnvironmentVariablePolicy
      */
     public function delete(User $user, EnvironmentVariable $environmentVariable): bool
     {
-        $teamId = $this->getTeamId($environmentVariable);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return true;
     }
 
     /**
@@ -58,7 +52,7 @@ class EnvironmentVariablePolicy
      */
     public function restore(User $user, EnvironmentVariable $environmentVariable): bool
     {
-        return false;
+        return true;
     }
 
     /**
@@ -66,7 +60,7 @@ class EnvironmentVariablePolicy
      */
     public function forceDelete(User $user, EnvironmentVariable $environmentVariable): bool
     {
-        return false;
+        return true;
     }
 
     /**
@@ -74,19 +68,6 @@ class EnvironmentVariablePolicy
      */
     public function manageEnvironment(User $user, EnvironmentVariable $environmentVariable): bool
     {
-        $teamId = $this->getTeamId($environmentVariable);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
-    }
-
-    private function getTeamId(EnvironmentVariable $environmentVariable): ?int
-    {
-        $resource = $environmentVariable->resourceable;
-
-        if (! $resource || ! method_exists($resource, 'team')) {
-            return null;
-        }
-
-        return $resource->team()?->id;
+        return true;
     }
 }

@@ -184,7 +184,6 @@
                             @endif
                         </div>
                         <x-forms.input instantSave id="comment" label="Comment"
-                            placeholder="{{ $isMagicVariable ? 'This env cannot be edited manually, it is handled by Coolify.' : '' }}"
                             helper="Add a note to document what this environment variable is used for." maxlength="256" />
                     </div>
                 @endif
@@ -192,23 +191,16 @@
                 <div class="flex flex-col w-full gap-2">
                     <div class="flex flex-col w-full gap-2 lg:flex-row">
                         <x-forms.input disabled id="key" />
-                        @if ($isValueHidden)
-                            <div class="w-full">
-                                <input disabled type="text" value="Hidden (only admins can view)"
-                                    class="input italic !text-neutral-500 dark:!text-neutral-500" />
-                            </div>
-                        @else
-                            <x-forms.env-var-input
-                                disabled
-                                type="password"
-                                id="value"
-                                :availableVars="$isSharedVariable ? [] : $this->availableSharedVariables"
-                                :projectUuid="data_get($parameters, 'project_uuid')"
-                                :environmentUuid="data_get($parameters, 'environment_uuid')"
-                                :serverUuid="data_get($parameters, 'server_uuid')" />
-                            @if ($is_shared)
-                                <x-forms.input disabled type="password" id="real_value" />
-                            @endif
+                        <x-forms.env-var-input
+                            disabled
+                            type="password"
+                            id="value"
+                            :availableVars="$isSharedVariable ? [] : $this->availableSharedVariables"
+                            :projectUuid="data_get($parameters, 'project_uuid')"
+                            :environmentUuid="data_get($parameters, 'environment_uuid')"
+                            :serverUuid="data_get($parameters, 'server_uuid')" />
+                        @if ($is_shared)
+                            <x-forms.input disabled type="password" id="real_value" />
                         @endif
                     </div>
                     <x-forms.input disabled id="comment" label="Comment"

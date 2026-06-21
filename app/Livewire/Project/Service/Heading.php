@@ -110,20 +110,17 @@ class Heading extends Component
 
     public function start()
     {
-        try {
-            $this->authorizeService('deploy');
-            $activity = StartService::run($this->service, pullLatestImages: true);
-            $this->js("window.dispatchEvent(new CustomEvent('startservice'))");
-            $this->dispatch('activityMonitor', $activity->id);
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
+        $this->authorizeService('deploy');
+
+        $activity = StartService::run($this->service, pullLatestImages: true);
+        $this->dispatch('activityMonitor', $activity->id);
     }
 
     public function forceDeploy()
     {
+        $this->authorizeService('deploy');
+
         try {
-            $this->authorizeService('deploy');
             $activities = Activity::where('properties->type_uuid', $this->service->uuid)
                 ->where(function ($q) {
                     $q->where('properties->status', ProcessStatus::IN_PROGRESS->value)
@@ -134,57 +131,49 @@ class Heading extends Component
                 $activity->save();
             }
             $activity = StartService::run($this->service, pullLatestImages: true, stopBeforeStart: true);
-            $this->js("window.dispatchEvent(new CustomEvent('startservice'))");
             $this->dispatch('activityMonitor', $activity->id);
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
         }
     }
 
     public function stop()
     {
+        $this->authorizeService('stop');
+
         try {
-            $this->authorizeService('stop');
             StopService::dispatch($this->service, false, $this->docker_cleanup);
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
         }
     }
 
     public function restart()
     {
-        try {
-            $this->authorizeService('deploy');
-            $this->checkDeployments();
-            if ($this->isDeploymentProgress) {
-                $this->dispatch('error', 'There is a deployment in progress.');
+        $this->authorizeService('deploy');
 
-                return;
-            }
-            $activity = StartService::run($this->service, stopBeforeStart: true);
-            $this->js("window.dispatchEvent(new CustomEvent('startservice'))");
-            $this->dispatch('activityMonitor', $activity->id);
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
+        $this->checkDeployments();
+        if ($this->isDeploymentProgress) {
+            $this->dispatch('error', 'There is a deployment in progress.');
+
+            return;
         }
+        $activity = StartService::run($this->service, stopBeforeStart: true);
+        $this->dispatch('activityMonitor', $activity->id);
     }
 
     public function pullAndRestartEvent()
     {
-        try {
-            $this->authorizeService('deploy');
-            $this->checkDeployments();
-            if ($this->isDeploymentProgress) {
-                $this->dispatch('error', 'There is a deployment in progress.');
+        $this->authorizeService('deploy');
 
-                return;
-            }
-            $activity = StartService::run($this->service, pullLatestImages: true, stopBeforeStart: true);
-            $this->js("window.dispatchEvent(new CustomEvent('startservice'))");
-            $this->dispatch('activityMonitor', $activity->id);
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
+        $this->checkDeployments();
+        if ($this->isDeploymentProgress) {
+            $this->dispatch('error', 'There is a deployment in progress.');
+
+            return;
         }
+        $activity = StartService::run($this->service, pullLatestImages: true, stopBeforeStart: true);
+        $this->dispatch('activityMonitor', $activity->id);
     }
 
     private function authorizeService(string $ability): void

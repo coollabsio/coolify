@@ -6,6 +6,7 @@ use App\Models\ApplicationPreview;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Spatie\Url\Url;
+use Visus\Cuid2\Cuid2;
 
 class PreviewsCompose extends Component
 {
@@ -63,7 +64,7 @@ class PreviewsCompose extends Component
             if (empty($domain_string)) {
                 $server = $this->preview->application->destination->server;
                 $template = $this->preview->application->preview_url_template;
-                $random = new_public_id();
+                $random = new Cuid2;
 
                 // Generate a unique domain like main app services do
                 $generated_fqdn = generateUrl(server: $server, random: $random);
@@ -78,7 +79,7 @@ class PreviewsCompose extends Component
                 $domain_list = explode(',', $domain_string);
                 $preview_fqdns = [];
                 $template = $this->preview->application->preview_url_template;
-                $random = new_public_id();
+                $random = new Cuid2;
 
                 foreach ($domain_list as $single_domain) {
                     $single_domain = trim($single_domain);

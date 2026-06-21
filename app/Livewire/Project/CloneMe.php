@@ -11,13 +11,11 @@ use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use App\Support\ValidationPatterns;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
+use Visus\Cuid2\Cuid2;
 
 class CloneMe extends Component
 {
-    use AuthorizesRequests;
-
     public string $project_uuid;
 
     public string $environment_uuid;
@@ -63,7 +61,7 @@ class CloneMe extends Component
             ->servers()
             ->get()
             ->reject(fn ($server) => $server->isBuildServer());
-        $this->newName = str($this->project->name.'-clone-'.new_public_id())->slug();
+        $this->newName = str($this->project->name.'-clone-'.(string) new Cuid2)->slug();
     }
 
     public function toggleVolumeCloning(bool $value)
@@ -93,7 +91,6 @@ class CloneMe extends Component
     public function clone(string $type)
     {
         try {
-            $this->authorize('create', Project::class);
             $this->validate([
                 'selectedDestination' => 'required',
                 'newName' => ValidationPatterns::nameRules(),
@@ -111,7 +108,7 @@ class CloneMe extends Component
                 if ($this->environment->name !== 'production') {
                     $project->environments()->create([
                         'name' => $this->environment->name,
-                        'uuid' => new_public_id(),
+                        'uuid' => (string) new Cuid2,
                     ]);
                 }
                 $environment = $project->environments->where('name', $this->environment->name)->first();
@@ -123,7 +120,7 @@ class CloneMe extends Component
                 $project = $this->project;
                 $environment = $this->project->environments()->create([
                     'name' => $this->newName,
-                    'uuid' => new_public_id(),
+                    'uuid' => (string) new Cuid2,
                 ]);
             }
             $applications = $this->environment->applications;
@@ -137,7 +134,7 @@ class CloneMe extends Component
             }
 
             foreach ($databases as $database) {
-                $uuid = new_public_id();
+                $uuid = (string) new Cuid2;
                 $newDatabase = $database->replicate([
                     'id',
                     'created_at',
@@ -228,7 +225,7 @@ class CloneMe extends Component
 
                 $scheduledBackups = $database->scheduledBackups()->get();
                 foreach ($scheduledBackups as $backup) {
-                    $uuid = new_public_id();
+                    $uuid = (string) new Cuid2;
                     $newBackup = $backup->replicate([
                         'id',
                         'created_at',
@@ -257,7 +254,7 @@ class CloneMe extends Component
             }
 
             foreach ($services as $service) {
-                $uuid = new_public_id();
+                $uuid = (string) new Cuid2;
                 $newService = $service->replicate([
                     'id',
                     'created_at',
@@ -281,7 +278,7 @@ class CloneMe extends Component
                         'created_at',
                         'updated_at',
                     ])->fill([
-                        'uuid' => new_public_id(),
+                        'uuid' => (string) new Cuid2,
                         'service_id' => $newService->id,
                         'team_id' => currentTeam()->id,
                     ]);
@@ -412,7 +409,7 @@ class CloneMe extends Component
 
                     $scheduledBackups = $database->scheduledBackups()->get();
                     foreach ($scheduledBackups as $backup) {
-                        $uuid = new_public_id();
+                        $uuid = (string) new Cuid2;
                         $newBackup = $backup->replicate([
                             'id',
                             'created_at',

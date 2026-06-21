@@ -66,7 +66,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $team->webhookNotificationSettings()->create();
         });
 
-        static::updating(function ($team) {
+        static::saving(function ($team) {
             if (auth()->user()?->isMember()) {
                 throw new \Exception('You are not allowed to update this team.');
             }

@@ -106,22 +106,24 @@ When using time-based retry limits, set `$tries = 0` to avoid premature failure.
 ```php
 public $tries = 0;
 
-public function retryUntil(): \DateTimeInterface
+public function retryUntil(): DateTime
 {
     return now()->addHours(4);
 }
 ```
 
-## Use `ShouldBeUniqueUntilProcessing` for Early Lock Release
+## Use `WithoutOverlapping::untilProcessing()`
 
-`ShouldBeUnique` holds the lock until the job completes. `ShouldBeUniqueUntilProcessing` releases it when processing starts, allowing new instances to queue.
+Prevents concurrent execution while allowing new instances to queue.
 
 ```php
-class UpdateSearchIndex implements ShouldQueue, ShouldBeUniqueUntilProcessing
+public function middleware(): array
 {
-    // Lock releases when processing begins, not when it finishes
+    return [new WithoutOverlapping($this->product->id)->untilProcessing()];
 }
 ```
+
+Without `untilProcessing()`, the lock extends through queue wait time. With it, the lock releases when processing starts.
 
 ## Use Horizon for Complex Queue Scenarios
 

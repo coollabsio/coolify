@@ -4,15 +4,12 @@ namespace App\Livewire\Settings;
 
 use App\Models\InstanceSettings;
 use App\Models\Server;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Index extends Component
 {
-    use AuthorizesRequests;
-
     public InstanceSettings $settings;
 
     public ?Server $server = null;
@@ -90,7 +87,6 @@ class Index extends Component
 
     public function instantSave($isSave = true)
     {
-        $this->authorize('update', $this->settings);
         $this->validate();
         $this->settings->fqdn = $this->fqdn ? trim($this->fqdn) : $this->fqdn;
         $this->settings->public_port_min = $this->public_port_min;
@@ -108,7 +104,6 @@ class Index extends Component
 
     public function confirmDomainUsage()
     {
-        $this->authorize('update', $this->settings);
         $this->forceSaveDomains = true;
         $this->showDomainConflictModal = false;
         $this->submit();
@@ -117,7 +112,6 @@ class Index extends Component
     public function submit()
     {
         try {
-            $this->authorize('update', $this->settings);
             $error_show = false;
             $this->resetErrorBag();
 
@@ -179,7 +173,6 @@ class Index extends Component
     public function buildHelperImage()
     {
         try {
-            $this->authorize('update', $this->settings);
             if (! isDev()) {
                 $this->dispatch('error', 'Building helper image is only available in development mode.');
 

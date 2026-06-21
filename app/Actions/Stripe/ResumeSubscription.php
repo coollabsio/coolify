@@ -3,7 +3,6 @@
 namespace App\Actions\Stripe;
 
 use App\Models\Team;
-use Stripe\Exception\InvalidRequestException;
 use Stripe\StripeClient;
 
 class ResumeSubscription
@@ -12,7 +11,7 @@ class ResumeSubscription
 
     public function __construct(?StripeClient $stripe = null)
     {
-        $this->stripe = $stripe ?? app(StripeClient::class);
+        $this->stripe = $stripe ?? new StripeClient(config('subscription.stripe_api_key'));
     }
 
     /**
@@ -44,7 +43,7 @@ class ResumeSubscription
             \Log::info("Subscription {$subscription->stripe_subscription_id} resumed for team {$team->name}");
 
             return ['success' => true, 'error' => null];
-        } catch (InvalidRequestException $e) {
+        } catch (\Stripe\Exception\InvalidRequestException $e) {
             \Log::error("Stripe resume subscription error for team {$team->id}: ".$e->getMessage());
 
             return ['success' => false, 'error' => 'Stripe error: '.$e->getMessage()];

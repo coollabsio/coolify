@@ -4,7 +4,7 @@
     'isImportSupported' => false,
 ])
 
-<div class="sub-menu-wrapper hidden md:flex">
+<div class="sub-menu-wrapper">
     <a class="sub-menu-item"
         class="{{ request()->routeIs('project.service.configuration') ? 'menu-item-active' : '' }}"
         {{ wireNavigate() }}

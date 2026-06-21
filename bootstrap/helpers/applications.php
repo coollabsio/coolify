@@ -10,6 +10,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use Spatie\Url\Url;
+use Visus\Cuid2\Cuid2;
 
 function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null)
 {
@@ -191,7 +192,7 @@ function next_after_cancel(?Server $server = null)
 
 function clone_application(Application $source, $destination, array $overrides = [], bool $cloneVolumeData = false): Application
 {
-    $uuid = $overrides['uuid'] ?? new_public_id();
+    $uuid = $overrides['uuid'] ?? (string) new Cuid2;
     $server = $destination->server;
 
     if ($server->team_id !== currentTeam()->id) {
@@ -258,7 +259,7 @@ function clone_application(Application $source, $destination, array $overrides =
             'created_at',
             'updated_at',
         ])->fill([
-            'uuid' => new_public_id(),
+            'uuid' => (string) new Cuid2,
             'application_id' => $newApplication->id,
             'team_id' => currentTeam()->id,
         ]);
@@ -273,7 +274,7 @@ function clone_application(Application $source, $destination, array $overrides =
             'created_at',
             'updated_at',
         ])->fill([
-            'uuid' => new_public_id(),
+            'uuid' => (string) new Cuid2,
             'application_id' => $newApplication->id,
             'status' => 'exited',
             'fqdn' => null,
@@ -321,7 +322,7 @@ function clone_application(Application $source, $destination, array $overrides =
                 VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                 queue_application_deployment(
-                    deployment_uuid: new_public_id(),
+                    deployment_uuid: (string) new Cuid2,
                     application: $source,
                     server: $sourceServer,
                     destination: $source->destination,

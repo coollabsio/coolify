@@ -13,6 +13,10 @@ class ApplicationPolicy
      */
     public function viewAny(User $user): bool
     {
+        // Authorization temporarily disabled
+        /*
+        return true;
+        */
         return true;
     }
 
@@ -21,9 +25,11 @@ class ApplicationPolicy
      */
     public function view(User $user, Application $application): bool
     {
-        $teamId = $this->getTeamId($application);
-
-        return $teamId !== null && $user->teams->contains('id', $teamId);
+        // Authorization temporarily disabled
+        /*
+        return true;
+        */
+        return true;
     }
 
     /**
@@ -31,7 +37,15 @@ class ApplicationPolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        // Authorization temporarily disabled
+        /*
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        return false;
+        */
+        return true;
     }
 
     /**
@@ -39,17 +53,15 @@ class ApplicationPolicy
      */
     public function update(User $user, Application $application): Response
     {
-        $teamId = $this->getTeamId($application);
-
-        if ($teamId === null) {
-            return Response::deny('Application team not found.');
-        }
-
-        if ($user->isAdminOfTeam($teamId)) {
+        // Authorization temporarily disabled
+        /*
+        if ($user->isAdmin()) {
             return Response::allow();
         }
 
-        return Response::deny('You need at least admin or owner permissions to update this application.');
+        return Response::deny('As a member, you cannot update this application.<br/><br/>You need at least admin or owner permissions.');
+        */
+        return Response::allow();
     }
 
     /**
@@ -57,9 +69,15 @@ class ApplicationPolicy
      */
     public function delete(User $user, Application $application): bool
     {
-        $teamId = $this->getTeamId($application);
+        // Authorization temporarily disabled
+        /*
+        if ($user->isAdmin()) {
+            return true;
+        }
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return false;
+        */
+        return true;
     }
 
     /**
@@ -67,7 +85,11 @@ class ApplicationPolicy
      */
     public function restore(User $user, Application $application): bool
     {
-        return false;
+        // Authorization temporarily disabled
+        /*
+        return true;
+        */
+        return true;
     }
 
     /**
@@ -75,25 +97,11 @@ class ApplicationPolicy
      */
     public function forceDelete(User $user, Application $application): bool
     {
-        return false;
-    }
-
-    /**
-     * Determine whether the user can upload a backup archive for this application.
-     */
-    public function uploadBackup(User $user, Application $application): Response
-    {
-        $teamId = $this->getTeamId($application);
-
-        if ($teamId === null) {
-            return Response::deny('Application team not found.');
-        }
-
-        if ($user->isAdminOfTeam($teamId)) {
-            return Response::allow();
-        }
-
-        return Response::deny('You need at least admin or owner permissions to upload backups for this application.');
+        // Authorization temporarily disabled
+        /*
+        return $user->isAdmin() && $user->teams->contains('id', $application->team()->first()->id);
+        */
+        return true;
     }
 
     /**
@@ -101,9 +109,11 @@ class ApplicationPolicy
      */
     public function deploy(User $user, Application $application): bool
     {
-        $teamId = $this->getTeamId($application);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        // Authorization temporarily disabled
+        /*
+        return $user->teams->contains('id', $application->team()->first()->id);
+        */
+        return true;
     }
 
     /**
@@ -111,9 +121,11 @@ class ApplicationPolicy
      */
     public function manageDeployments(User $user, Application $application): bool
     {
-        $teamId = $this->getTeamId($application);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        // Authorization temporarily disabled
+        /*
+        return $user->isAdmin() && $user->teams->contains('id', $application->team()->first()->id);
+        */
+        return true;
     }
 
     /**
@@ -121,9 +133,11 @@ class ApplicationPolicy
      */
     public function manageEnvironment(User $user, Application $application): bool
     {
-        $teamId = $this->getTeamId($application);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        // Authorization temporarily disabled
+        /*
+        return $user->isAdmin() && $user->teams->contains('id', $application->team()->first()->id);
+        */
+        return true;
     }
 
     /**
@@ -131,11 +145,10 @@ class ApplicationPolicy
      */
     public function cleanupDeploymentQueue(User $user): bool
     {
+        // Authorization temporarily disabled
+        /*
         return $user->isAdmin();
-    }
-
-    private function getTeamId(Application $application): ?int
-    {
-        return $application->team()?->id;
+        */
+        return true;
     }
 }

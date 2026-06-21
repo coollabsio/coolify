@@ -148,7 +148,6 @@ class ServersController extends Controller
         if (is_null($server)) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
-        $this->authorize('view', $server);
         if ($with_resources) {
             $server['resources'] = $server->definedResources()->map(function ($resource) {
                 $payload = [
@@ -478,7 +477,6 @@ class ServersController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $this->authorize('create', [ModelsServer::class]);
 
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {
@@ -703,7 +701,6 @@ class ServersController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
-        $this->authorize('update', $server);
         if ($request->proxy_type) {
             $validProxyTypes = collect(ProxyTypes::cases())->map(function ($proxyType) {
                 return str($proxyType->value)->lower();
@@ -828,7 +825,6 @@ class ServersController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
-        $this->authorize('delete', $server);
 
         $force = filter_var($request->query('force', false), FILTER_VALIDATE_BOOLEAN);
 
@@ -928,7 +924,6 @@ class ServersController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
-        $this->authorize('update', $server);
         ValidateServer::dispatch($server);
 
         auditLog('api.server.validated', [

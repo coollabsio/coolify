@@ -3,7 +3,6 @@
 namespace App\Actions\Stripe;
 
 use App\Models\Team;
-use Stripe\Exception\InvalidRequestException;
 use Stripe\StripeClient;
 
 class CancelSubscriptionAtPeriodEnd
@@ -12,7 +11,7 @@ class CancelSubscriptionAtPeriodEnd
 
     public function __construct(?StripeClient $stripe = null)
     {
-        $this->stripe = $stripe ?? app(StripeClient::class);
+        $this->stripe = $stripe ?? new StripeClient(config('subscription.stripe_api_key'));
     }
 
     /**
@@ -48,7 +47,7 @@ class CancelSubscriptionAtPeriodEnd
             \Log::info("Subscription {$subscription->stripe_subscription_id} set to cancel at period end for team {$team->name}");
 
             return ['success' => true, 'error' => null];
-        } catch (InvalidRequestException $e) {
+        } catch (\Stripe\Exception\InvalidRequestException $e) {
             \Log::error("Stripe cancel at period end error for team {$team->id}: ".$e->getMessage());
 
             return ['success' => false, 'error' => 'Stripe error: '.$e->getMessage()];

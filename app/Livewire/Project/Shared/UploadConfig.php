@@ -3,13 +3,10 @@
 namespace App\Livewire\Project\Shared;
 
 use App\Models\Application;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class UploadConfig extends Component
 {
-    use AuthorizesRequests;
-
     public $config;
 
     public $applicationId;
@@ -32,12 +29,13 @@ class UploadConfig extends Component
     public function uploadConfig()
     {
         try {
-            $application = Application::ownedByCurrentTeam()->findOrFail($this->applicationId);
-            $this->authorize('update', $application);
+            $application = Application::findOrFail($this->applicationId);
             $application->setConfig($this->config);
             $this->dispatch('success', 'Application settings updated');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
+
+            return;
         }
     }
 

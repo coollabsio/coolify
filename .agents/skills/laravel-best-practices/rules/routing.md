@@ -36,8 +36,7 @@ Use `Route::resource()` or `apiResource()` for RESTful endpoints.
 
 ```php
 Route::resource('posts', PostController::class);
-// In routes/api.php — the /api prefix is applied automatically
-Route::apiResource('posts', Api\PostController::class);
+Route::apiResource('api/posts', Api\PostController::class);
 ```
 
 ## Keep Controllers Thin

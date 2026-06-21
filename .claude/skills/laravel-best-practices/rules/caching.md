@@ -2,7 +2,7 @@
 
 ## Use `Cache::remember()` Instead of Manual Get/Put
 
-Cleaner cache-aside pattern that removes boilerplate. use `Cache::lock()` for race conditions.
+Atomic pattern prevents race conditions and removes boilerplate.
 
 Incorrect:
 ```php

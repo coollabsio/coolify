@@ -42,8 +42,6 @@ class General extends Component
 
     public bool $isLogDrainEnabled = false;
 
-    public bool $isPasswordHiddenForMember = false;
-
     public function getListeners(): array
     {
         $user = Auth::user();
@@ -73,11 +71,6 @@ class General extends Component
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
-        }
-
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->clickhouseAdminPassword = '';
         }
     }
 

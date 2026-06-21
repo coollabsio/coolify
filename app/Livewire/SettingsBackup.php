@@ -8,15 +8,12 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class SettingsBackup extends Component
 {
-    use AuthorizesRequests;
-
     public InstanceSettings $settings;
 
     public Server $server;
@@ -80,7 +77,6 @@ class SettingsBackup extends Component
     public function addCoolifyDatabase()
     {
         try {
-            $this->authorize('update', $this->settings);
             $server = Server::findOrFail(0);
             $out = instant_remote_process(['docker inspect coolify-db'], $server);
             $envs = format_docker_envs_to_json($out);
@@ -127,19 +123,14 @@ class SettingsBackup extends Component
 
     public function submit()
     {
-        try {
-            $this->authorize('update', $this->settings);
-            $this->validate();
+        $this->validate();
 
-            $this->database->update([
-                'name' => $this->name,
-                'description' => $this->description,
-                'postgres_user' => $this->postgres_user,
-                'postgres_password' => $this->postgres_password,
-            ]);
-            $this->dispatch('success', 'Backup updated.');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
+        $this->database->update([
+            'name' => $this->name,
+            'description' => $this->description,
+            'postgres_user' => $this->postgres_user,
+            'postgres_password' => $this->postgres_password,
+        ]);
+        $this->dispatch('success', 'Backup updated.');
     }
 }

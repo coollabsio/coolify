@@ -1,4 +1,6 @@
-<div class="w-full max-h-[70vh] overflow-y-auto pr-1 pt-1">
+<div class="w-full max-h-[70vh] overflow-y-auto pr-1 -mt-4">
+    <div class="pb-4 text-sm dark:text-neutral-400">Identifiers for this resource. Read-only</div>
+
     <div class="flex flex-col gap-6">
         <div>
             <h3>Resource</h3>
