@@ -20,7 +20,7 @@ class StopCaddyIngress
             return 'Server is missing its Flux host id.';
         }
 
-        $output = $this->fluxClient->stopCaddyIngress($hostId);
+        $output = $this->fluxClient->stopIngress($hostId, 'caddy');
 
         if ($server->exists) {
             $server->update(['ingress_status' => 'exited']);

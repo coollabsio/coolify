@@ -184,15 +184,16 @@ it('generates http-only caddy routes for application ingress', function () {
 
     $fluxClient = Mockery::mock(FluxClient::class);
     $fluxClient
-        ->shouldReceive('applyCaddyIngress')
+        ->shouldReceive('applyIngress')
         ->once()
         ->with(
             '100.64.0.10',
+            'caddy',
             Mockery::on(fn (string $caddyfile): bool => str_contains($caddyfile, 'import apps/*.caddy')),
             Mockery::on(fn (array $apps): bool => count($apps) === 1
-                && str_contains($apps[0]['caddyfile'], 'http://app.example.com {')
-                && ! str_contains($apps[0]['caddyfile'], 'https://')
-                && str_contains($apps[0]['caddyfile'], 'reverse_proxy coolify-v5-nginx-test.default.coolify.internal:3000'))
+                && str_contains($apps[0]['config'], 'http://app.example.com {')
+                && ! str_contains($apps[0]['config'], 'https://')
+                && str_contains($apps[0]['config'], 'reverse_proxy coolify-v5-nginx-test.default.coolify.internal:3000'))
         )
         ->andReturn('Caddy ingress applied.');
     app()->instance(FluxClient::class, $fluxClient);
@@ -3241,7 +3242,7 @@ it('rejects application ingress when server ingress is disabled', function () {
     ]);
 
     $fluxClient = Mockery::mock(FluxClient::class);
-    $fluxClient->shouldNotReceive('applyCaddyIngress');
+    $fluxClient->shouldNotReceive('applyIngress');
     app()->instance(FluxClient::class, $fluxClient);
 
     $this
@@ -3305,10 +3306,11 @@ it('enables application ingress without publishing domains by default', function
 
     $fluxClient = Mockery::mock(FluxClient::class);
     $fluxClient
-        ->shouldReceive('applyCaddyIngress')
+        ->shouldReceive('applyIngress')
         ->once()
         ->with(
             '100.64.0.10',
+            'caddy',
             Mockery::on(fn (string $caddyfile): bool => str_contains($caddyfile, 'import apps/*.caddy')),
             []
         )
@@ -3371,7 +3373,7 @@ it('validates application ingress domains', function () {
     ]);
 
     $fluxClient = Mockery::mock(FluxClient::class);
-    $fluxClient->shouldNotReceive('applyCaddyIngress');
+    $fluxClient->shouldNotReceive('applyIngress');
     app()->instance(FluxClient::class, $fluxClient);
 
     $this
@@ -3430,14 +3432,15 @@ it('enables application ingress with explicit domains and port', function () {
 
     $fluxClient = Mockery::mock(FluxClient::class);
     $fluxClient
-        ->shouldReceive('applyCaddyIngress')
+        ->shouldReceive('applyIngress')
         ->once()
         ->with(
             '100.64.0.10',
+            'caddy',
             Mockery::on(fn (string $caddyfile): bool => str_contains($caddyfile, 'import apps/*.caddy')),
             Mockery::on(fn (array $apps): bool => count($apps) === 1
-                && str_contains($apps[0]['caddyfile'], 'http://app.example.com {')
-                && str_contains($apps[0]['caddyfile'], 'reverse_proxy coolify-v5-nginx-test.default.coolify.internal:3000'))
+                && str_contains($apps[0]['config'], 'http://app.example.com {')
+                && str_contains($apps[0]['config'], 'reverse_proxy coolify-v5-nginx-test.default.coolify.internal:3000'))
         )
         ->andReturn('Caddy ingress applied.');
     app()->instance(FluxClient::class, $fluxClient);
@@ -3502,7 +3505,7 @@ it('returns flux error details when application ingress sync fails', function ()
 
     $fluxClient = Mockery::mock(FluxClient::class);
     $fluxClient
-        ->shouldReceive('applyCaddyIngress')
+        ->shouldReceive('applyIngress')
         ->once()
         ->andThrow(new RuntimeException('start Caddy ingress: podman exited with status 125'));
     app()->instance(FluxClient::class, $fluxClient);
@@ -3572,15 +3575,16 @@ it('syncs caddy ingress routes through flux when enabling ingress on an installe
 
     $fluxClient = Mockery::mock(FluxClient::class);
     $fluxClient
-        ->shouldReceive('applyCaddyIngress')
+        ->shouldReceive('applyIngress')
         ->once()
         ->with(
             '100.64.0.10',
+            'caddy',
             Mockery::on(fn (string $caddyfile): bool => str_contains($caddyfile, 'import apps/*.caddy')),
             Mockery::on(fn (array $apps): bool => count($apps) === 1
-                && str_contains($apps[0]['caddyfile'], 'http://nginx.example.com {')
-                && str_contains($apps[0]['caddyfile'], 'http://www.nginx.example.com {')
-                && str_contains($apps[0]['caddyfile'], 'reverse_proxy coolify-v5-nginx-test.default.coolify.internal:8080'))
+                && str_contains($apps[0]['config'], 'http://nginx.example.com {')
+                && str_contains($apps[0]['config'], 'http://www.nginx.example.com {')
+                && str_contains($apps[0]['config'], 'reverse_proxy coolify-v5-nginx-test.default.coolify.internal:8080'))
         )
         ->andReturn('Caddy ingress applied.');
     app()->instance(FluxClient::class, $fluxClient);
@@ -3651,7 +3655,7 @@ it('returns flux error details when server ingress activation fails', function (
 
     $fluxClient = Mockery::mock(FluxClient::class);
     $fluxClient
-        ->shouldReceive('applyCaddyIngress')
+        ->shouldReceive('applyIngress')
         ->once()
         ->andThrow(new RuntimeException('validate Caddyfile: unrecognized directive'));
     app()->instance(FluxClient::class, $fluxClient);
@@ -4076,6 +4080,8 @@ it('defines the v5 dashboard page as a shadcn styled canvas shell', function () 
         ->not->toContain('function csrfToken()')
         ->toContain("import { csrfToken } from '@/lib/csrf';")
         ->toContain("import { Button } from '@/components/ui/button';")
+        ->toContain("import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';")
+        ->toContain("import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';")
         ->not->toContain("fetch('/v5/clusters'")
         ->toContain('<AppNavbar')
         ->toContain('bg-background text-foreground')
@@ -4087,6 +4093,20 @@ it('defines the v5 dashboard page as a shadcn styled canvas shell', function () 
         ->toContain('server_id: selectedNginxServerId || null')
         ->toContain('Center')
         ->toContain('Delete')
+        ->toContain('App configuration')
+        ->toContain('openApplicationInspector')
+        ->toContain('selectedInspectorApplication')
+        ->toContain('onDoubleClick={(event) => openApplicationInspector(event, application)}')
+        ->toContain('open={selectedInspectorApplication !== null}')
+        ->toContain('<SheetContent side="right" className="w-full overflow-y-auto bg-background sm:rounded-l-xl sm:border data-[side=right]:sm:!inset-y-4 data-[side=right]:sm:!h-auto data-[side=right]:sm:!w-[45vw] data-[side=right]:sm:!max-w-[45vw]"')
+        ->toContain('showCloseButton blurOverlay={false}')
+        ->toContain('<SheetHeader className="p-6 pb-4">')
+        ->toContain('<div className="flex flex-1 flex-col gap-6 px-6 pb-6">')
+        ->toContain('<Tabs defaultValue="overview"')
+        ->toContain('<TabsTrigger value="overview">Overview</TabsTrigger>')
+        ->toContain('<TabsTrigger value="networking">Networking</TabsTrigger>')
+        ->toContain('<TabsTrigger value="advanced">Advanced</TabsTrigger>')
+        ->toContain('Double-click an application card to open configuration.')
         ->toContain("method: 'DELETE'")
         ->toContain('removeApplication')
         ->toContain('useEffect(() => {')
@@ -4105,6 +4125,10 @@ it('defines the v5 dashboard page as a shadcn styled canvas shell', function () 
         ->toContain('No applications on this canvas yet.')
         ->not->toContain("import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';")
         ->not->toContain("fetch('/v5/selection'");
+
+    expect(file_get_contents($sheetPath))
+        ->toContain('blurOverlay = true')
+        ->toContain('<SheetOverlay blur={blurOverlay} />');
 
     expect($navbar)
         ->toContain("import { Link, router, usePage } from '@inertiajs/react';")

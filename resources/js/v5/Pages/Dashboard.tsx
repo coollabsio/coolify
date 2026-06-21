@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { resolveCanvasNodeLayout, resolveCanvasNodePosition, type CanvasNodeBounds } from '@/lib/canvas-collision';
 import { csrfToken } from '@/lib/csrf';
@@ -152,6 +155,7 @@ export default function Dashboard({
     const [connections, setConnections] = useState<CanvasConnection[]>(initialResourceConnections);
     const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
     const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
+    const [selectedInspectorApplicationId, setSelectedInspectorApplicationId] = useState<string | null>(null);
     const [connectionPortInput, setConnectionPortInput] = useState<Record<string, string>>({});
     const [draftConnection, setDraftConnection] = useState<DraftConnection | null>(null);
     const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
@@ -173,6 +177,10 @@ export default function Dashboard({
         }),
         [applications],
     );
+    const selectedInspectorApplication = useMemo(
+        () => applications.find((application) => application.id === selectedInspectorApplicationId) ?? null,
+        [applications, selectedInspectorApplicationId],
+    );
 
     useEffect(() => {
         const settledResources = settleCanvasResources(initialApplications, caddyIngresses);
@@ -183,6 +191,7 @@ export default function Dashboard({
         setSelectedNginxServerId((currentServerId) => currentServerId || nginxServers[0]?.id || '');
         setSelectedConnectionId(null);
         setSelectedApplicationId(null);
+        setSelectedInspectorApplicationId(null);
         centerOnCanvasNodes(settledResources.applications, settledResources.ingresses);
     }, [initialApplications, caddyIngresses, initialResourceConnections, selectedProjectUuid, selectedEnvironmentUuid]);
 
@@ -1029,6 +1038,12 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
         setSelectedApplicationId(null);
     }
 
+    function openApplicationInspector(event: MouseEvent<HTMLElement>, application: V5Application): void {
+        event.stopPropagation();
+        setSelectedApplicationId(application.id);
+        setSelectedInspectorApplicationId(application.id);
+    }
+
     function connectionTargetFromPointer(event: PointerEvent<HTMLDivElement>): HTMLElement | null {
         const pointerTarget = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
 
@@ -1586,6 +1601,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                                         transform: `translate3d(${application.canvasX}px, ${application.canvasY}px, 0)`,
                                     }}
                                     onPointerDown={(event) => startApplicationDrag(event, application)}
+                                    onDoubleClick={(event) => openApplicationInspector(event, application)}
                                 >
                                     {CONNECTOR_SIDES.map((side) => (
                                         <button
@@ -1626,6 +1642,14 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                                             >
                                                 {application.status}
                                             </span>
+                                            <button
+                                                type="button"
+                                                onPointerDown={(event) => event.stopPropagation()}
+                                                onClick={(event) => openApplicationInspector(event, application)}
+                                                className="rounded-md border border-border px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-wide text-foreground transition hover:bg-muted"
+                                            >
+                                                Configure
+                                            </button>
                                             <button
                                                 type="button"
                                                 onPointerDown={(event) => event.stopPropagation()}
@@ -1671,6 +1695,151 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                     </div>
                 </main>
             </div>
+
+            <Sheet
+                open={selectedInspectorApplication !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setSelectedInspectorApplicationId(null);
+                    }
+                }}
+            >
+                <SheetContent side="right" className="w-full overflow-y-auto bg-background sm:rounded-l-xl sm:border data-[side=right]:sm:!inset-y-4 data-[side=right]:sm:!h-auto data-[side=right]:sm:!w-[45vw] data-[side=right]:sm:!max-w-[45vw]" showCloseButton blurOverlay={false}>
+                    {selectedInspectorApplication && (
+                        <>
+                            <SheetHeader className="p-6 pb-4">
+                                <SheetTitle>App configuration</SheetTitle>
+                                <SheetDescription>
+                                    Double-click an application card to open configuration. Review runtime, networking, and advanced settings for{' '}
+                                    {selectedInspectorApplication.name}.
+                                </SheetDescription>
+                            </SheetHeader>
+
+                            <div className="flex flex-1 flex-col gap-6 px-6 pb-6">
+                                <Tabs defaultValue="overview" className="gap-4">
+                                    <TabsList className="w-full justify-start overflow-x-auto" variant="line">
+                                        <TabsTrigger value="overview">Overview</TabsTrigger>
+                                        <TabsTrigger value="networking">Networking</TabsTrigger>
+                                        <TabsTrigger value="advanced">Advanced</TabsTrigger>
+                                    </TabsList>
+
+                                    <TabsContent value="overview" className="flex flex-col gap-4">
+                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                            <Field>
+                                                <FieldLabel>Name</FieldLabel>
+                                                <Input value={selectedInspectorApplication.name} readOnly />
+                                            </Field>
+
+                                            <Field>
+                                                <FieldLabel>Status</FieldLabel>
+                                                <Input value={selectedInspectorApplication.status} readOnly />
+                                            </Field>
+
+                                            <Field>
+                                                <FieldLabel>Image</FieldLabel>
+                                                <Input value={selectedInspectorApplication.image} readOnly />
+                                            </Field>
+
+                                            <Field>
+                                                <FieldLabel>Server</FieldLabel>
+                                                <Input value={selectedInspectorApplication.serverName ?? 'Unknown'} readOnly />
+                                            </Field>
+
+                                            <Field>
+                                                <FieldLabel>Container</FieldLabel>
+                                                <Input value={selectedInspectorApplication.containerName} readOnly />
+                                            </Field>
+
+                                            <Field>
+                                                <FieldLabel>Runtime container ID</FieldLabel>
+                                                <Input value={selectedInspectorApplication.runtimeContainerId ?? 'Not available'} readOnly />
+                                            </Field>
+                                        </div>
+
+                                        <Field>
+                                            <FieldLabel>Status message</FieldLabel>
+                                            <Textarea
+                                                value={selectedInspectorApplication.statusMessage ?? 'No status message yet.'}
+                                                readOnly
+                                                className="min-h-20"
+                                            />
+                                        </Field>
+                                    </TabsContent>
+
+                                    <TabsContent value="networking" className="flex flex-col gap-4">
+                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                            <Field>
+                                                <FieldLabel>Mesh namespace</FieldLabel>
+                                                <Input value={selectedInspectorApplication.meshNamespace} readOnly />
+                                            </Field>
+
+                                            <Field>
+                                                <FieldLabel>Mesh FQDN</FieldLabel>
+                                                <Input value={selectedInspectorApplication.meshFqdn} readOnly />
+                                            </Field>
+
+                                            <Field>
+                                                <FieldLabel>Internal port</FieldLabel>
+                                                <Input value={selectedInspectorApplication.internalPort?.toString() ?? 'Not configured'} readOnly />
+                                            </Field>
+
+                                            <Field>
+                                                <FieldLabel>Public ingress</FieldLabel>
+                                                <Input value={selectedInspectorApplication.ingressEnabled ? 'Enabled' : 'Private'} readOnly />
+                                            </Field>
+                                        </div>
+
+                                        <Field>
+                                            <FieldLabel>Domains</FieldLabel>
+                                            <Textarea
+                                                value={
+                                                    selectedInspectorApplication.domains.length > 0
+                                                        ? selectedInspectorApplication.domains.join('\n')
+                                                        : 'No public domains configured.'
+                                                }
+                                                readOnly
+                                            />
+                                        </Field>
+
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {renderIngressButton(selectedInspectorApplication)}
+                                            <span className="text-xs text-muted-foreground">
+                                                Use this action to publish or private-route the app through the server ingress.
+                                            </span>
+                                        </div>
+                                    </TabsContent>
+
+                                    <TabsContent value="advanced" className="flex flex-col gap-4">
+                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                            <Field>
+                                                <FieldLabel>Application ID</FieldLabel>
+                                                <Input value={selectedInspectorApplication.id} readOnly />
+                                            </Field>
+
+                                            <Field>
+                                                <FieldLabel>Canvas position</FieldLabel>
+                                                <Input
+                                                    value={`${selectedInspectorApplication.canvasX}, ${selectedInspectorApplication.canvasY}`}
+                                                    readOnly
+                                                />
+                                            </Field>
+                                        </div>
+
+                                        <Field>
+                                            <FieldLabel>Raw app config</FieldLabel>
+                                            <Textarea
+                                                value={JSON.stringify(selectedInspectorApplication, null, 2)}
+                                                readOnly
+                                                className="min-h-80 font-mono text-xs"
+                                            />
+                                        </Field>
+                                    </TabsContent>
+                                </Tabs>
+                            </div>
+                        </>
+                    )}
+                </SheetContent>
+            </Sheet>
 
             {ingressModal && (
                 <Dialog

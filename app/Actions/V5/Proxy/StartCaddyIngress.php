@@ -27,7 +27,7 @@ class StartCaddyIngress
         }
 
         $configuration = GenerateCaddyIngressConfiguration::run($this->applications($server));
-        $output = $this->fluxClient->applyCaddyIngress($hostId, $configuration['caddyfile'], $configuration['apps']);
+        $output = $this->fluxClient->applyIngress($hostId, 'caddy', $configuration['caddyfile'], $this->ingressApps($configuration['apps']));
 
         if ($server->exists) {
             $server->update([
@@ -37,6 +37,21 @@ class StartCaddyIngress
         }
 
         return $output;
+    }
+
+    /**
+     * @param  array<int, array{name: string, caddyfile: string}>  $apps
+     * @return array<int, array{name: string, config: string}>
+     */
+    private function ingressApps(array $apps): array
+    {
+        return array_map(
+            fn (array $app): array => [
+                'name' => $app['name'],
+                'config' => $app['caddyfile'],
+            ],
+            $apps
+        );
     }
 
     /**

@@ -110,10 +110,11 @@ it('applies caddy ingress configuration through flux instead of ssh', function (
 
     $fluxClient = Mockery::mock(FluxClient::class);
     $fluxClient
-        ->shouldReceive('applyCaddyIngress')
+        ->shouldReceive('applyIngress')
         ->once()
         ->with(
             '100.64.0.10',
+            'caddy',
             Mockery::on(fn (string $caddyfile): bool => str_contains($caddyfile, 'respond /coolify-health 200')),
             []
         )
@@ -144,9 +145,9 @@ it('stops caddy ingress through flux instead of ssh', function () {
 
     $fluxClient = Mockery::mock(FluxClient::class);
     $fluxClient
-        ->shouldReceive('stopCaddyIngress')
+        ->shouldReceive('stopIngress')
         ->once()
-        ->with('100.64.0.10')
+        ->with('100.64.0.10', 'caddy')
         ->andReturn('Caddy ingress stopped.');
     app()->instance(FluxClient::class, $fluxClient);
 
@@ -173,7 +174,7 @@ it('includes flux error response details when dispatch returns a non success sta
         'Content-Length: '.strlen($body)."\r\n".
         "\r\n".
         $body,
-        fn () => (new FluxClient)->applyCaddyIngress('100.64.0.10', 'example.com { respond "ok" }')
+        fn () => (new FluxClient)->applyIngress('100.64.0.10', 'caddy', 'example.com { respond "ok" }')
     );
 })->throws(RuntimeException::class, 'start Caddy ingress: podman exited with status 125');
 
@@ -184,7 +185,7 @@ it('uses a friendly message when flux returns an invalid http response', functio
 
     withFakeFluxSocket(
         '',
-        fn () => (new FluxClient)->applyCaddyIngress('100.64.0.10', 'example.com { respond "ok" }')
+        fn () => (new FluxClient)->applyIngress('100.64.0.10', 'caddy', 'example.com { respond "ok" }')
     );
 })->throws(RuntimeException::class, 'Flux did not return a response before the timeout.');
 
