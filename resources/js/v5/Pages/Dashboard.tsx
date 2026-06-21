@@ -1262,7 +1262,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                             disabled={isCreating || nginxServers.length === 0}
                             className="rounded-lg bg-warning px-3 py-2 text-sm font-semibold text-black transition hover:bg-warning/90 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            {isCreating ? 'Adding nginx…' : 'Add nginx'}
+                            {isCreating ? 'Deploying…' : 'Deploy'}
                         </button>
                         <button
                             type="button"
@@ -1335,7 +1335,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                             <section className="pointer-events-none absolute left-1/2 top-1/2 flex w-[min(32rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-card/90 px-8 py-16 text-center shadow-sm">
                                 <p className="text-sm font-medium text-foreground">No applications on this canvas yet.</p>
                                 <p className="max-w-md text-sm text-muted-foreground">
-                                    Click Add nginx to deploy a test container on one of your v5 servers.
+                                    Click Deploy to deploy a test container on one of your v5 servers.
                                 </p>
                             </section>
                         )}
