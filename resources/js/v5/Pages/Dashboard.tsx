@@ -106,6 +106,7 @@ const MIN_CANVAS_ZOOM = 0.5;
 const MAX_CANVAS_ZOOM = 2;
 const CANVAS_ZOOM_STEP = 0.1;
 const PINCH_CANVAS_ZOOM_STEP = 0.03;
+const DEFAULT_NGINX_IMAGE = 'docker.io/library/nginx:alpine';
 
 async function persistApplicationPosition(application: V5Application): Promise<void> {
     await fetch(`/v5/applications/${application.id}/position`, {
@@ -162,6 +163,7 @@ export default function Dashboard({
     const [pointerState, setPointerState] = useState<PointerState | null>(null);
     const [isCreating, setIsCreating] = useState(false);
     const [selectedNginxServerId, setSelectedNginxServerId] = useState<string>(nginxServers[0]?.id ?? '');
+    const [nginxImage, setNginxImage] = useState<string>(DEFAULT_NGINX_IMAGE);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [notice, setNotice] = useState<string | null>(null);
     const [ingressModal, setIngressModal] = useState<IngressModalState | null>(null);
@@ -845,6 +847,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                 },
                 body: JSON.stringify({
                     server_id: selectedNginxServerId || null,
+                    image: nginxImage.trim() || DEFAULT_NGINX_IMAGE,
                 }),
             });
             const payload = (await response.json()) as { application?: V5Application; message?: string };
@@ -1245,6 +1248,14 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                                 ))
                             )}
                         </select>
+                        <input
+                            type="text"
+                            aria-label="Nginx image"
+                            value={nginxImage}
+                            onChange={(event) => setNginxImage(event.target.value)}
+                            disabled={isCreating}
+                            className="w-72 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition disabled:cursor-not-allowed disabled:opacity-60"
+                        />
                         <button
                             type="button"
                             onClick={() => void addNginx()}

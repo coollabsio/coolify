@@ -271,6 +271,47 @@ it('dispatches container inventory through the containers list primitive', funct
         ->not->toContain('list_containers');
 });
 
+it('dispatches image pull and container lifecycle primitives for v5 apps', function () {
+    if (! function_exists('pcntl_fork')) {
+        $this->markTestSkipped('pcntl is required to fake a Flux Unix socket.');
+    }
+
+    $responses = [
+        ['request_id' => 'test-request', 'status' => 'ok', 'data' => ['output' => 'Image pulled.']],
+        ['request_id' => 'test-request', 'status' => 'ok', 'data' => ['id' => 'container-123']],
+        ['request_id' => 'test-request', 'status' => 'ok', 'data' => ['output' => 'Container started.']],
+        ['request_id' => 'test-request', 'status' => 'ok', 'data' => ['State' => ['Running' => true]]],
+    ];
+    $requestPath = storage_path('framework/testing/flux-request-'.bin2hex(random_bytes(8)).'.txt');
+
+    withFakeFluxSocketCapturingRequests($responses, $requestPath, function (): void {
+        $fluxClient = new FluxClient;
+
+        expect($fluxClient->pullImage('100.64.0.10', 'docker.io/library/nginx:alpine'))->toBe('Image pulled.')
+            ->and($fluxClient->createContainer('100.64.0.10', [
+                'name' => 'coolify-v5-nginx-test',
+                'image' => 'docker.io/library/nginx:alpine',
+                'networks' => ['coolify-default-mesh'],
+                'network_aliases' => ['coolify-v5-nginx-test'],
+                'dns' => ['10.210.0.1'],
+                'dns_search' => ['default.coolify.internal'],
+                'restart_policy' => 'unless-stopped',
+            ]))->toBe('container-123')
+            ->and($fluxClient->startContainer('100.64.0.10', 'container-123'))->toBe('Container started.')
+            ->and($fluxClient->inspectContainer('100.64.0.10', 'container-123'))->toBe(['State' => ['Running' => true]]);
+    });
+
+    $request = file_get_contents($requestPath) ?: '';
+    @unlink($requestPath);
+
+    expect($request)->toContain('"type":"images.pull"')
+        ->toContain('"type":"containers.create"')
+        ->toContain('"network_aliases":["coolify-v5-nginx-test"]')
+        ->toContain('"dns_search":["default.coolify.internal"]')
+        ->toContain('"type":"containers.start"')
+        ->toContain('"type":"containers.inspect"');
+});
+
 it('dispatches firewall allow through the firewall allow primitive', function () {
     if (! function_exists('pcntl_fork')) {
         $this->markTestSkipped('pcntl is required to fake a Flux Unix socket.');
@@ -338,6 +379,72 @@ it('dispatches firewall revoke through the firewall revoke primitive', function 
     expect($request)->toContain('"type":"firewall.revoke"')
         ->toContain('"id":"rule-123"');
 });
+
+function withFakeFluxSocketCapturingRequests(array $responsePayloads, string $requestPath, Closure $callback): void
+{
+    $directory = storage_path('framework/testing');
+
+    if (! is_dir($directory)) {
+        mkdir($directory, 0777, true);
+    }
+
+    $socketPath = $directory.'/flux-'.bin2hex(random_bytes(8)).'.sock';
+    $server = stream_socket_server("unix://{$socketPath}", $errorCode, $errorMessage);
+
+    expect($server)->not->toBeFalse("Could not create fake Flux socket: {$errorMessage} ({$errorCode})");
+
+    $pid = pcntl_fork();
+
+    if ($pid === 0) {
+        $capturedRequests = '';
+
+        foreach ($responsePayloads as $payload) {
+            $connection = stream_socket_accept($server, 5);
+
+            if ($connection === false) {
+                continue;
+            }
+
+            $request = '';
+
+            while (! str_contains($request, "\r\n\r\n") && ! feof($connection)) {
+                $request .= fread($connection, 8192);
+            }
+
+            if (preg_match('/Content-Length: (\d+)/i', $request, $matches) === 1) {
+                $remaining = (int) $matches[1] - strlen(substr($request, strpos($request, "\r\n\r\n") + 4));
+
+                while ($remaining > 0 && ! feof($connection)) {
+                    $chunk = fread($connection, $remaining);
+                    $request .= $chunk;
+                    $remaining -= strlen($chunk);
+                }
+            }
+
+            $capturedRequests .= $request."\n---REQUEST---\n";
+            $body = json_encode($payload, JSON_THROW_ON_ERROR);
+            fwrite($connection, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ".strlen($body)."\r\n\r\n{$body}");
+            fclose($connection);
+        }
+
+        file_put_contents($requestPath, $capturedRequests);
+        fclose($server);
+        exit(0);
+    }
+
+    fclose($server);
+    Config::set('flux.unix_socket_path', $socketPath);
+    Config::set('flux.health_timeout_seconds', 1.0);
+    Config::set('flux.connection_timeout_seconds', 1.0);
+    Config::set('flux.dispatch_timeout_seconds', 1.0);
+
+    try {
+        $callback();
+    } finally {
+        pcntl_waitpid($pid, $status);
+        @unlink($socketPath);
+    }
+}
 
 function withFakeFluxSocketCapturingRequest(string $response, string $requestPath, Closure $callback): void
 {

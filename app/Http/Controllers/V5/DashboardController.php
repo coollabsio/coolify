@@ -36,6 +36,8 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
+    private const DEFAULT_NGINX_IMAGE = 'docker.io/library/nginx:alpine';
+
     private const CANVAS_CARD_WIDTH = 320;
 
     private const CANVAS_CARD_HEIGHT = 144;
@@ -196,7 +198,9 @@ class DashboardController extends Controller
 
         $validated = $request->validate([
             'server_id' => ['nullable', 'integer'],
+            'image' => ['nullable', 'string', 'max:255', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\/:@-]*$/'],
         ]);
+        $image = trim($validated['image'] ?? '') ?: self::DEFAULT_NGINX_IMAGE;
 
         $server = V5Server::query()
             ->where('team_id', $currentTeam->id)
@@ -224,7 +228,7 @@ class DashboardController extends Controller
             'server_id' => $server->id,
             'created_by_user_id' => $request->user()->id,
             'name' => 'nginx-test',
-            'image' => 'docker.io/library/nginx:alpine',
+            'image' => $image,
             'container_name' => 'coolify-v5-nginx-'.strtolower((string) Str::ulid()),
             'status' => 'creating',
             'status_message' => 'Starting nginx container.',

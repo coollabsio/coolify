@@ -21,6 +21,59 @@ class FluxClient
         return is_array($data) ? $data : [];
     }
 
+    public function pullImage(string $hostId, string $image): string
+    {
+        $payload = $this->dispatch($hostId, [
+            'type' => 'images.pull',
+            'reference' => $image,
+        ]);
+
+        return $this->output($payload, 'Image pulled.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $spec
+     */
+    public function createContainer(string $hostId, array $spec): string
+    {
+        $payload = $this->dispatch($hostId, [
+            'type' => 'containers.create',
+            ...$spec,
+        ]);
+        $data = $payload['data'] ?? [];
+        $id = is_array($data) && is_string($data['id'] ?? null) ? $data['id'] : '';
+
+        if ($id === '') {
+            throw new RuntimeException('Flux did not return a container id.');
+        }
+
+        return $id;
+    }
+
+    public function startContainer(string $hostId, string $id): string
+    {
+        $payload = $this->dispatch($hostId, [
+            'type' => 'containers.start',
+            'id' => $id,
+        ]);
+
+        return $this->output($payload, 'Container started.');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function inspectContainer(string $hostId, string $id): array
+    {
+        $payload = $this->dispatch($hostId, [
+            'type' => 'containers.inspect',
+            'id' => $id,
+        ]);
+        $data = $payload['data'] ?? [];
+
+        return is_array($data) ? $data : [];
+    }
+
     /**
      * @param  array<int, array{name: string, config: string}>  $apps
      */

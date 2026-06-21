@@ -1078,9 +1078,7 @@ it('creates an nginx v5 application on the first installed team server', functio
         'last_bootstrapped_at' => now(),
     ]);
 
-    Process::fake([
-        '*' => Process::result(output: "nginx-container-id\n"),
-    ]);
+    fakeSuccessfulNginxFluxDeployment();
 
     $this
         ->actingAs($user)
@@ -1105,6 +1103,46 @@ it('creates an nginx v5 application on the first installed team server', functio
         ->where('environment_id', $environment->id)
         ->where('name', 'nginx-test')
         ->where('status', 'running')
+        ->where('runtime_container_id', 'nginx-container-id')
+        ->exists())->toBeTrue();
+});
+
+it('creates an nginx v5 application with a custom image', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => [],
+        'last_bootstrapped_at' => now(),
+    ]);
+
+    fakeSuccessfulNginxFluxDeployment(image: 'docker.io/library/httpd:alpine');
+
+    $this
+        ->actingAs($user)
+        ->withSession([
+            'currentTeam' => $team,
+            'v5.selectedProjectUuid' => $project->uuid,
+            'v5.selectedEnvironmentUuid' => $environment->uuid,
+        ])
+        ->postJson('/v5/applications/nginx', [
+            'image' => 'docker.io/library/httpd:alpine',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('application.image', 'docker.io/library/httpd:alpine');
+
+    expect(V5Application::query()
+        ->where('image', 'docker.io/library/httpd:alpine')
         ->where('runtime_container_id', 'nginx-container-id')
         ->exists())->toBeTrue();
 });
@@ -1140,9 +1178,7 @@ it('creates an nginx v5 application on the selected team server', function () {
         'last_bootstrapped_at' => now(),
     ]);
 
-    Process::fake([
-        '*' => Process::result(output: "nginx-container-id\n"),
-    ]);
+    fakeSuccessfulNginxFluxDeployment();
 
     $this
         ->actingAs($user)
@@ -1198,9 +1234,7 @@ it('places a new nginx v5 application next to existing canvas nodes', function (
         'canvas_y' => 0,
     ]);
 
-    Process::fake([
-        '*' => Process::result(output: "nginx-container-id\n"),
-    ]);
+    fakeSuccessfulNginxFluxDeployment();
 
     $this
         ->actingAs($user)
@@ -1234,9 +1268,9 @@ it('marks an nginx v5 application failed when the launch command fails', functio
         'last_bootstrapped_at' => now(),
     ]);
 
-    Process::fake([
-        '*' => Process::result(errorOutput: 'podman failed', exitCode: 1),
-    ]);
+    $this->mock(FluxClient::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('pullImage')->once()->andThrow(new RuntimeException('podman failed'));
+    });
 
     $this
         ->actingAs($user)
@@ -4195,7 +4229,10 @@ it('defines the v5 dashboard page as a shadcn styled canvas shell', function () 
         ->toContain('Add nginx')
         ->toContain('Select nginx server')
         ->toContain('selectedNginxServerId')
+        ->toContain('nginxImage')
+        ->toContain('docker.io/library/nginx:alpine')
         ->toContain('server_id: selectedNginxServerId || null')
+        ->toContain('image: nginxImage.trim() || DEFAULT_NGINX_IMAGE')
         ->toContain('Center')
         ->toContain('Delete')
         ->toContain('App configuration')
@@ -4890,6 +4927,33 @@ function fakeFluxHealth(bool $available = true, string $message = 'Flux is runni
                 'socket' => '/run/coolify/flux.sock',
             ]);
     }));
+}
+
+function fakeSuccessfulNginxFluxDeployment(string $image = 'docker.io/library/nginx:alpine'): void
+{
+    $mock = Mockery::mock(FluxClient::class, function (MockInterface $mock) use ($image): void {
+        $mock->shouldReceive('pullImage')
+            ->once()
+            ->with(Mockery::type('string'), $image)
+            ->andReturn('Image pulled.');
+        $mock->shouldReceive('createContainer')
+            ->once()
+            ->with(Mockery::type('string'), Mockery::on(fn (array $spec): bool => ($spec['image'] ?? null) === $image
+                && ($spec['networks'] ?? []) === ['coolify-default-mesh']
+                && ($spec['dns_search'] ?? []) === ['default.coolify.internal']
+                && in_array($spec['name'] ?? '', $spec['network_aliases'] ?? [], true)))
+            ->andReturn('nginx-container-id');
+        $mock->shouldReceive('startContainer')
+            ->once()
+            ->with(Mockery::type('string'), 'nginx-container-id')
+            ->andReturn('Container started.');
+        $mock->shouldReceive('inspectContainer')
+            ->once()
+            ->with(Mockery::type('string'), 'nginx-container-id')
+            ->andReturn(['State' => ['Running' => true]]);
+    });
+
+    app()->instance(FluxClient::class, $mock);
 }
 
 function createSharedUserAndTeamTables(): void
