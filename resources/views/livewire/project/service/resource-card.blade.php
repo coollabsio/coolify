@@ -43,7 +43,15 @@
                     @endcan
                 </span>
             @endif
-            <div @class(['pt-2' => $isApplication, 'text-xs'])>{{ formatContainerStatus($resource->status) }}</div>
+            <div @class(['pt-2' => $isApplication])>
+                @if (str($resource->status)->contains('running'))
+                    <x-status-badge status="{{ formatContainerStatus($resource->status) }}" type="success" />
+                @elseif (str($resource->status)->contains(['starting', 'restarting', 'degraded']))
+                    <x-status-badge status="{{ formatContainerStatus($resource->status) }}" type="warning" />
+                @else
+                    <x-status-badge status="{{ formatContainerStatus($resource->status) }}" type="error" />
+                @endif
+            </div>
         </div>
         <div class="flex items-center px-4">
             @if ($isDatabase && ($resource->isBackupSolutionAvailable() || $resource->is_migrated))

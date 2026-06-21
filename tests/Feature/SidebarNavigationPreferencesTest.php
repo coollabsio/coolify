@@ -2,18 +2,16 @@
 
 use App\Livewire\SettingsDropdown;
 
-it('keeps changelog and the theme switcher in the sidebar without the old preferences trigger', function () {
+it('keeps changelog in the sidebar without a dedicated theme switcher', function () {
     $navbarView = file_get_contents(resource_path('views/components/navbar.blade.php'));
 
     expect($navbarView)
         ->toContain('<livewire:settings-dropdown trigger="changelog-sidebar" />')
         ->not->toContain('<livewire:settings-dropdown />')
-        ->toContain('aria-label="Theme switcher"')
-        ->toContain('aria-label="Use light theme"')
-        ->toContain('aria-label="Use system theme"')
-        ->toContain('aria-label="Use dark theme"')
-        ->toContain('cycleTheme()')
-        ->toContain("const themes = ['light', 'system', 'dark'];")
+        ->not->toContain('<span class="text-left menu-item-label">Theme</span>')
+        ->not->toContain('Click to change theme.')
+        ->not->toContain('cycleTheme()')
+        ->toContain('this.queryTheme();')
         ->toContain('pl-2 pr-3 items-start gap-3')
         ->toContain('class="flex min-w-0 flex-1 flex-col"')
         ->toContain('class="min-w-0 flex-1"')

@@ -100,7 +100,7 @@
             @else
                 {{-- Read-only view --}}
                 @if (!$fileStorage->is_directory)
-                    @can('view', $resource)
+                    @can('update', $resource)
                         <div class="flex gap-2">
                             <x-forms.button type="button" wire:click="loadStorageOnServer">Load from
                                 server</x-forms.button>

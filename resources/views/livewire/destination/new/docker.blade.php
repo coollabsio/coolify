@@ -18,7 +18,7 @@
         </form>
     </div>
 @else
-    <x-callout type="warning" title="Permission Required">
+    <x-callout type="danger" title="Insufficient Permissions">
         You don't have permission to create new destinations. Please contact your team administrator for access.
     </x-callout>
 @endcan
