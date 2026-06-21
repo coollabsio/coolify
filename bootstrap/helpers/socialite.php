@@ -22,26 +22,15 @@ function get_socialite_provider(string $provider)
         return Socialite::driver('azure')->setConfig($azure_config);
     }
 
-    if ($provider == 'authentik' || $provider == 'clerk') {
-        $authentik_clerk_config = new \SocialiteProviders\Manager\Config(
+   if (in_array($provider, ['authentik', 'clerk', 'zitadel', 'oidc'])) {
+        $config = new \SocialiteProviders\Manager\Config(
             $oauth_setting->client_id,
             $oauth_setting->client_secret,
             $oauth_setting->redirect_uri,
             ['base_url' => $oauth_setting->base_url],
         );
 
-        return Socialite::driver($provider)->setConfig($authentik_clerk_config);
-    }
-
-    if ($provider == 'zitadel') {
-        $zitadel_config = new \SocialiteProviders\Manager\Config(
-            $oauth_setting->client_id,
-            $oauth_setting->client_secret,
-            $oauth_setting->redirect_uri,
-            ['base_url' => $oauth_setting->base_url],
-        );
-
-        return Socialite::driver('zitadel')->setConfig($zitadel_config);
+        return Socialite::driver($provider)->setConfig($config);
     }
 
     if ($provider == 'google') {
