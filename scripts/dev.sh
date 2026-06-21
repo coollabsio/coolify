@@ -65,6 +65,80 @@ coold_vm_dns_name() {
   printf '%s.local\n' "$(coold_vm_instance "$index")"
 }
 
+coold_asset_arch() {
+  case "$(uname -m)" in
+    arm64|aarch64)
+      printf 'arm64\n'
+      ;;
+    x86_64|amd64)
+      printf 'amd64\n'
+      ;;
+    *)
+      echo "ERROR: Unsupported coold asset architecture: $(uname -m)" >&2
+      return 1
+      ;;
+  esac
+}
+
+resolve_coold_asset_checksum() {
+  local version="$1"
+  local asset="$2"
+  local arch
+  local url
+
+  arch="$(coold_asset_arch)"
+  url="https://github.com/coollabsio/coold/releases/download/${version}/${asset}-linux-musl-${arch}.tar.gz.sha256"
+
+  curl -fsSL --retry 3 --max-time 30 "$url" | awk '{ print $1; exit }'
+}
+
+prepare_coold_asset_cache_bust() {
+  local flux_version
+  local cli_version
+  local cache_dir="$ROOT/.dev/coold-assets"
+  local cache_file="$cache_dir/docker-cache-key"
+  local previous_key=""
+  local current_key
+  local resolved_checksum
+
+  flux_version="$(read_coolify_env COOLIFY_FLUX_VERSION nightly)"
+  cli_version="$(read_coolify_env COOLIFY_CLI_VERSION nightly)"
+
+  if [ -z "${COOLIFY_FLUX_CHECKSUM:-}" ]; then
+    if resolved_checksum="$(resolve_coold_asset_checksum "$flux_version" flux 2>/dev/null)"; then
+      export COOLIFY_FLUX_CHECKSUM="$resolved_checksum"
+    else
+      echo "WARN: Could not resolve Flux checksum for ${flux_version}; Docker may reuse a cached Flux layer." >&2
+      export COOLIFY_FLUX_CHECKSUM=unknown
+    fi
+  fi
+
+  if [ -z "${COOLIFY_CLI_CHECKSUM:-}" ]; then
+    if resolved_checksum="$(resolve_coold_asset_checksum "$cli_version" coolify 2>/dev/null)"; then
+      export COOLIFY_CLI_CHECKSUM="$resolved_checksum"
+    else
+      echo "WARN: Could not resolve Coolify CLI checksum for ${cli_version}; Docker may reuse a cached CLI layer." >&2
+      export COOLIFY_CLI_CHECKSUM=unknown
+    fi
+  fi
+
+  current_key="flux=${flux_version}:${COOLIFY_FLUX_CHECKSUM};cli=${cli_version}:${COOLIFY_CLI_CHECKSUM}"
+
+  if [ -f "$cache_file" ]; then
+    previous_key="$(cat "$cache_file")"
+  fi
+
+  mkdir -p "$cache_dir"
+  printf '%s\n' "$current_key" > "$cache_file"
+
+  if [ "$previous_key" != "$current_key" ]; then
+    COOLD_ASSETS_CHANGED=changed
+    return
+  fi
+
+  COOLD_ASSETS_CHANGED=unchanged
+}
+
 resolve_lima_dns_name() {
   local name="$1"
   local ip=""
@@ -551,6 +625,12 @@ up() {
   fi
 
   echo "==> Starting Coolify Docker stack with Spin..."
+  prepare_coold_asset_cache_bust
+  if [ "$COOLD_ASSETS_CHANGED" = "changed" ]; then
+    echo "==> Coold nightly assets changed; rebuilding the Coolify dev image..."
+    COOLIFY_CLI_SSH_USER="$(coolify_ssh_user)" spin build coolify
+  fi
+
   if [ "${#spin_args[@]}" -gt 0 ]; then
     COOLIFY_CLI_SSH_USER="$(coolify_ssh_user)" spin up -d "${spin_args[@]}"
   else

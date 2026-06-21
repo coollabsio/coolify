@@ -34,3 +34,19 @@ it('runs the v5 dev Lima seeder with the normal development database seeder', fu
     expect($developmentSeederBlock)->toContain('DevelopmentRailpackExamplesSeeder::class')
         ->and($developmentSeederBlock)->toContain('V5DevLimaSeeder::class');
 });
+
+it('cache busts mutable nightly coold assets with resolved checksums', function () {
+    $compose = file_get_contents(base_path('docker-compose.dev.yml'));
+    $dockerfile = file_get_contents(base_path('docker/development/Dockerfile'));
+    $devScript = file_get_contents(base_path('scripts/dev.sh'));
+
+    expect($compose)->toContain('COOLIFY_FLUX_CHECKSUM=${COOLIFY_FLUX_CHECKSUM:-unknown}')
+        ->and($compose)->toContain('COOLIFY_CLI_CHECKSUM=${COOLIFY_CLI_CHECKSUM:-unknown}')
+        ->and($dockerfile)->toContain('ARG COOLIFY_FLUX_CHECKSUM')
+        ->and($dockerfile)->toContain('ARG COOLIFY_CLI_CHECKSUM')
+        ->and($dockerfile)->toContain('Flux checksum: ${COOLIFY_FLUX_CHECKSUM}')
+        ->and($dockerfile)->toContain('Coolify CLI checksum: ${COOLIFY_CLI_CHECKSUM}')
+        ->and($devScript)->toContain('resolve_coold_asset_checksum')
+        ->and($devScript)->toContain('export COOLIFY_FLUX_CHECKSUM=')
+        ->and($devScript)->toContain('export COOLIFY_CLI_CHECKSUM=');
+});

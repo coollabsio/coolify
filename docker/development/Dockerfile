@@ -31,7 +31,9 @@ ARG TARGETARCH
 ARG POSTGRES_VERSION
 ARG CLOUDFLARED_VERSION
 ARG COOLIFY_FLUX_VERSION
+ARG COOLIFY_FLUX_CHECKSUM
 ARG COOLIFY_CLI_VERSION
+ARG COOLIFY_CLI_CHECKSUM
 ARG NGINX_VERSION
 
 WORKDIR /var/www/html
@@ -90,6 +92,7 @@ RUN mkdir -p /usr/local/bin && \
 
 # Install Flux from coold nightly release based on architecture
 RUN set -eux; \
+    echo "Flux checksum: ${COOLIFY_FLUX_CHECKSUM}"; \
     mkdir -p /usr/local/bin /run/coolify /etc/coolify; \
     chown -R www-data:www-data /run/coolify /etc/coolify; \
     case "${TARGETARCH:-}" in \
@@ -112,6 +115,7 @@ RUN set -eux; \
 
 # Install coolify from coold nightly release based on architecture
 RUN set -eux; \
+    echo "Coolify CLI checksum: ${COOLIFY_CLI_CHECKSUM}"; \
     mkdir -p /usr/local/bin; \
     case "${TARGETARCH:-}" in \
         amd64|arm64) COOLIFY_CLI_ARCH="${TARGETARCH}" ;; \
