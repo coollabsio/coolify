@@ -44,6 +44,10 @@ it('mints a host jwt with primitive capabilities by default', function () {
 
     expect($claims->caps)->toContain('containers.list')
         ->and($claims->caps)->toContain('ingress.apply')
+        ->and($claims->caps)->toContain('firewall.allow')
+        ->and($claims->caps)->toContain('firewall.revoke')
+        ->and($claims->caps)->toContain('firewall.list')
+        ->and($claims->caps)->toContain('firewall.reconcile')
         ->and($claims->caps)->not->toContain('coold');
 });
 

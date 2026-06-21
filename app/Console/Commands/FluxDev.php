@@ -39,6 +39,10 @@ class FluxDev extends Command
             'containers.healthcheck.run',
             'ingress.apply',
             'ingress.stop',
+            'firewall.allow',
+            'firewall.revoke',
+            'firewall.list',
+            'firewall.reconcile',
         ];
     }
 
