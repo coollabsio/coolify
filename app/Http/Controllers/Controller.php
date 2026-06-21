@@ -126,7 +126,6 @@ class Controller extends BaseController
             $invitation = TeamInvitation::query()
                 ->where('email', $email)
                 ->when($invitationUuid, fn ($query) => $query->where('uuid', $invitationUuid))
-                ->where('link', request()->fullUrl())
                 ->first();
             if (! $invitation || ! $invitation->isValid()) {
                 return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');

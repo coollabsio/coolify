@@ -77,6 +77,24 @@ it('accepts a valid magic link invitation only once and rotates the temporary pa
     $this->assertGuest();
 });
 
+it('accepts a valid magic link even when the stored link does not match the request url', function () {
+    // Reproduces #10633: in real deployments the stored link is generated from
+    // APP_URL via route(), but request()->fullUrl() reflects the live request
+    // (e.g. http vs https behind a reverse proxy, or a different host/port).
+    // Binding on the encrypted invitation uuid must be enough to accept it.
+    [$team, $user, , $token] = createInvitationLinkFixture();
+
+    TeamInvitation::where('email', $user->email)->update([
+        'link' => 'https://behind-a-proxy.example.com/auth/link?token=stored-under-a-different-url',
+    ]);
+
+    $this->get(route('auth.link', ['token' => $token]))
+        ->assertRedirect(route('dashboard'));
+
+    $this->assertAuthenticatedAs($user);
+    expect($user->teams()->where('team_id', $team->id)->exists())->toBeTrue();
+});
+
 it('rejects a magic link when the invitation was revoked', function () {
     [, $user, , $token, $invitation] = createInvitationLinkFixture();
     $invitation->delete();
