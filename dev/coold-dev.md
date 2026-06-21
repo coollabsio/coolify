@@ -49,20 +49,24 @@ scripts/dev.sh coolify bootstrap-command
 scripts/dev.sh coolify run <args>
 ```
 
-On macOS, the helper builds `coolify` from the local coold repo because the
-nightly release currently publishes Linux binaries. On Linux, it downloads the
-nightly release artifact.
+The helper runs the `coolify` CLI from the Coolify development container. Lima
+VMs are addressed by their bridged mDNS names (`<vm>.local`), so the same
+addresses are used by bootstrap and by the v5 dev server seeder.
 
-The generated bootstrap command uses Lima's forwarded SSH ports and dev
-WireGuard endpoint overrides, for example:
+Because Docker Desktop does not reliably pass mDNS multicast into containers,
+`scripts/dev.sh up` resolves each `<vm>.local` name on the host and writes the
+resolved records into the Coolify container `/etc/hosts` before bootstrapping.
+
+The generated bootstrap command uses the container CLI, the repo-local copy of
+the Lima SSH key, and dev WireGuard endpoint overrides, for example:
 
 ```bash
-.dev/bin/coolify init bootstrap \
-  --nodes "127.0.0.1:<ssh1>,127.0.0.1:<ssh2>" \
-  --ssh-key "$HOME/.lima/_config/user" \
-  --ssh-user "$USER" \
-  --wg-listen-port-overrides "127.0.0.1:<ssh1>=51821,127.0.0.1:<ssh2>=51822" \
-  --wg-endpoint-overrides "127.0.0.1:<ssh1>=host.lima.internal:51821,127.0.0.1:<ssh2>=host.lima.internal:51822" \
+spin exec -T coolify /usr/local/bin/coolify init bootstrap \
+  --nodes "coold-dev.local,coold-dev-2.local" \
+  --ssh-key "/var/www/html/.dev/lima/ssh_key" \
+  --ssh-user "coolify" \
+  --wg-listen-port-overrides "coold-dev.local=51821,coold-dev-2.local=51822" \
+  --wg-endpoint-overrides "coold-dev.local=coold-dev.local:51821,coold-dev-2.local=coold-dev-2.local:51822" \
   --coold-version "nightly" \
   --corrosion-version "v1.0.0" \
   --yes
@@ -78,8 +82,8 @@ After `coolify init bootstrap`, defaults are:
 
 | VM | WireGuard IP | WireGuard endpoint | Podman subnet | Gateway |
 | --- | --- | --- | --- | --- |
-| `coold-dev` | `100.64.0.1` | `host.lima.internal:51821` | `10.210.0.0/24` | `10.210.0.1` |
-| `coold-dev-2` | `100.64.0.2` | `host.lima.internal:51822` | `10.210.1.0/24` | `10.210.1.1` |
+| `coold-dev` | `100.64.0.1` | `coold-dev.local:51821` | `10.210.0.0/24` | `10.210.0.1` |
+| `coold-dev-2` | `100.64.0.2` | `coold-dev-2.local:51822` | `10.210.1.0/24` | `10.210.1.1` |
 
 ## Checking state
 

@@ -30,7 +30,6 @@ CORROSION_VERSION="$(read_coolify_env COOLIFY_CORROSION_VERSION v1.0.0)"
 FLUX_URL="$(read_coolify_env COOLIFY_COOLD_VM_FLUX_URL http://host.lima.internal:6443)"
 BUILDER_CAPACITY="$(read_coolify_env COOLIFY_COOLD_VM_BUILDER_CAPACITY 2)"
 START_TIMEOUT="$(read_coolify_env COOLIFY_COOLD_VM_START_TIMEOUT 300)"
-SSH_PORT="$(read_coolify_env COOLIFY_COOLD_VM_SSH_PORT 60002)"
 WG_IP="$(read_coolify_env COOLIFY_COOLD_VM_WG_IP "")"
 WG_PEER_IP="$(read_coolify_env COOLIFY_COOLD_VM_WG_PEER_IP "")"
 WG_PEER_ENDPOINT="$(read_coolify_env COOLIFY_COOLD_VM_WG_PEER_ENDPOINT "")"
@@ -42,7 +41,6 @@ if [ "$BUILDER_CAPACITY" = "0" ]; then
   BUILDER_ENABLED="false"
 fi
 TEMPLATE="$ROOT/dev/lima/coold.yaml"
-GENERATED="$ROOT/.dev/lima/${INSTANCE}.generated.yaml"
 GUEST_COOLIFY_ROOT="/workspace/coolify"
 
 usage() {
@@ -72,7 +70,6 @@ Environment:
   COOLIFY_COOLD_VM_FLUX_URL    Flux gRPC URL visible from the VM (default: http://host.lima.internal:6443)
   COOLIFY_COOLD_VM_BUILDER_CAPACITY VM builder capacity to advertise (default: 2; set 0 to disable)
   COOLIFY_COOLD_VM_START_TIMEOUT Seconds to wait for Lima SSH/provisioning (default: 300)
-  COOLIFY_COOLD_VM_SSH_PORT    Host SSH port forwarded to this VM (default: 60002)
   COOLIFY_COOLD_VM_WG_IP       Optional WireGuard mgmt IP for this host
   COOLIFY_COOLD_VM_CONTAINER_SUBNET Podman mesh subnet for this host
   COOLIFY_COOLD_VM_CONTAINER_GATEWAY Podman mesh gateway for this host
@@ -341,8 +338,6 @@ COOLIFY_COOLD_PODMAN_SOCKET="${COOLIFY_COOLD_PODMAN_SOCKET:-/run/podman/podman.s
 COOLIFY_COOLD_CORROSION_URL="${COOLIFY_COOLD_CORROSION_URL:-http://127.0.0.1:8080}" \
 COOLIFY_COOLD_NAMESPACES="${COOLIFY_COOLD_NAMESPACES:-default:coolify-default-mesh:$CONTAINER_GATEWAY}" \
 COOLIFY_COOLD_DNS_ZONE="${COOLIFY_COOLD_DNS_ZONE:-coolify.internal}" \
-COOLIFY_COOLD_API_BIND="${COOLIFY_COOLD_API_BIND:-${WG_IP:-127.0.0.1}:8443}" \
-COOLIFY_COOLD_API_TOKEN_FILE="${COOLIFY_COOLD_API_TOKEN_FILE:-/etc/coolify/api-token}" \
 COOLIFY_COOLD_FLUX_URL="${COOLIFY_COOLD_FLUX_URL:-http://host.lima.internal:6443}" \
 COOLIFY_COOLD_HOST_JWT_PATH="${COOLIFY_COOLD_HOST_JWT_PATH:-/etc/coolify/host-jwt}" \
 COOLIFY_COOLD_BUILDER_ENABLED="${COOLIFY_COOLD_BUILDER_ENABLED:-true}" \
@@ -417,7 +412,6 @@ start_agent() {
   configure_system_resolved
   ensure_mesh_dns_anchor
   install_mesh_firewall
-  lima_shell sudo sh -c 'if [ ! -s /etc/coolify/api-token ]; then openssl rand -hex 32 > /etc/coolify/api-token.tmp && chmod 600 /etc/coolify/api-token.tmp && mv /etc/coolify/api-token.tmp /etc/coolify/api-token; fi'
 
   lima_shell sudo tee /etc/systemd/system/corrosion.service >/dev/null <<'UNIT'
 [Unit]
@@ -446,8 +440,6 @@ Environment=COOLIFY_COOLD_PODMAN_SOCKET=/run/podman/podman.sock
 Environment=COOLIFY_COOLD_CORROSION_URL=http://127.0.0.1:8080
 Environment=COOLIFY_COOLD_NAMESPACES=default:coolify-default-mesh:$CONTAINER_GATEWAY
 Environment=COOLIFY_COOLD_DNS_ZONE=coolify.internal
-Environment=COOLIFY_COOLD_API_BIND=${WG_IP:-127.0.0.1}:8443
-Environment=COOLIFY_COOLD_API_TOKEN_FILE=/etc/coolify/api-token
 Environment=COOLIFY_COOLD_FLUX_URL=$FLUX_URL
 Environment=COOLIFY_COOLD_HOST_JWT_PATH=/etc/coolify/host-jwt
 Environment=COOLIFY_COOLD_BUILDER_ENABLED=$BUILDER_ENABLED
@@ -468,19 +460,7 @@ UNIT
   lima_shell sudo systemctl restart corrosion.service coold.service
 }
 
-generate_yaml() {
-  mkdir -p "$(dirname "$GENERATED")"
-  sed \
-    -e "s#{{COOLIFY_REPO}}#$ROOT#g" \
-    -e "s#{{COOLIFY_COOLD_VERSION}}#$VERSION#g" \
-    -e "s#{{COOLIFY_CORROSION_VERSION}}#$CORROSION_VERSION#g" \
-    -e "s#{{COOLIFY_COOLD_VM_SSH_PORT}}#$SSH_PORT#g" \
-    "$TEMPLATE" > "$GENERATED"
-}
-
 start_vm() {
-  generate_yaml
-
   if instance_running; then
     return
   fi
@@ -491,7 +471,7 @@ start_vm() {
   if instance_exists; then
     limactl start --tty=false "$INSTANCE"
   else
-    limactl start --tty=false --name="$INSTANCE" "$GENERATED"
+    limactl start --tty=false --name="$INSTANCE" "$TEMPLATE"
   fi
 }
 
@@ -604,14 +584,27 @@ wait_for_guest_provisioning() {
     | awk '{ print "[guest] " $0; fflush(); }' || true
 }
 
+ensure_mdns_hostname() {
+  local current_hostname
+  current_hostname="$(lima_shell hostname 2>/dev/null || true)"
+
+  if [ "$current_hostname" != "$INSTANCE" ]; then
+    echo "==> Setting guest hostname to ${INSTANCE} for ${INSTANCE}.local mDNS..."
+    lima_shell sudo hostnamectl set-hostname "$INSTANCE"
+  fi
+
+  lima_shell sudo systemctl restart avahi-daemon.service
+}
+
 up_with_logs() {
   echo "==> Coolify coold VM: $INSTANCE"
   echo "==> coold package tag: $VERSION"
   echo "==> corrosion package tag: $CORROSION_VERSION"
-  echo "==> Lima config: $GENERATED"
+  echo "==> Lima config: $TEMPLATE"
 
   wait_for_lima_start
   wait_for_guest_provisioning
+  ensure_mdns_hostname
 
   echo "==> VM is ready. Run coolify bootstrap via: scripts/dev.sh up"
 }

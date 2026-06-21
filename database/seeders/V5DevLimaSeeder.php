@@ -31,7 +31,7 @@ class V5DevLimaSeeder extends Seeder
             ->first();
 
         $builderCapacity = max(0, (int) config('coold.dev_builder_capacity', 2));
-        $sshUser = (string) config('coold.dev_ssh_user', get_current_user());
+        $sshUser = (string) config('coold.dev_ssh_user', 'coolify');
         $servers = collect($this->servers())
             ->map(fn (array $server): array => [
                 ...$server,
@@ -57,19 +57,19 @@ class V5DevLimaSeeder extends Seeder
         return [
             [
                 'name' => 'coold-dev',
-                'host' => 'host.docker.internal',
-                'ssh_port' => 60001,
+                'host' => 'coold-dev.local',
+                'ssh_port' => 22,
                 'wireguard_management_ip' => '100.64.0.1',
                 'wireguard_listen_port_override' => 51821,
-                'wireguard_endpoint_override' => 'host.lima.internal:51821',
+                'wireguard_endpoint_override' => 'coold-dev.local:51821',
             ],
             [
                 'name' => 'coold-dev-2',
-                'host' => 'host.docker.internal',
-                'ssh_port' => 60002,
+                'host' => 'coold-dev-2.local',
+                'ssh_port' => 22,
                 'wireguard_management_ip' => '100.64.0.2',
                 'wireguard_listen_port_override' => 51822,
-                'wireguard_endpoint_override' => 'host.lima.internal:51822',
+                'wireguard_endpoint_override' => 'coold-dev-2.local:51822',
             ],
         ];
     }

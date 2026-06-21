@@ -4710,8 +4710,8 @@ it('seeds dev Lima VMs into v5 clusters and servers idempotently', function () {
         ->and($cluster->created_by_user_id)->toBe($user->id)
         ->and($cluster->description)->toBe('Local Lima development cluster managed by scripts/dev.sh.')
         ->and(V5Server::query()->count())->toBe(2)
-        ->and(V5Server::query()->where('name', 'coold-dev')->where('host', 'host.docker.internal')->where('ssh_user', get_current_user())->where('ssh_port', 60001)->exists())->toBeTrue()
-        ->and(V5Server::query()->where('name', 'coold-dev-2')->where('host', 'host.docker.internal')->where('ssh_user', get_current_user())->where('ssh_port', 60002)->exists())->toBeTrue()
+        ->and(V5Server::query()->where('name', 'coold-dev')->where('host', 'coold-dev.local')->where('ssh_user', 'coolify')->where('ssh_port', 22)->exists())->toBeTrue()
+        ->and(V5Server::query()->where('name', 'coold-dev-2')->where('host', 'coold-dev-2.local')->where('ssh_user', 'coolify')->where('ssh_port', 22)->exists())->toBeTrue()
         ->and(V5Server::query()->where('name', 'coold-dev')->where('node_address', '100.64.0.1')->where('wireguard_management_ip', '100.64.0.1')->exists())->toBeTrue()
         ->and(V5Server::query()->where('name', 'coold-dev-2')->where('node_address', '100.64.0.2')->where('wireguard_management_ip', '100.64.0.2')->exists())->toBeTrue()
         ->and(V5Server::query()->where('status', 'installed')->count())->toBe(2)
@@ -4747,7 +4747,7 @@ it('seeds dev Lima VMs by updating existing named servers', function () {
     (new V5DevLimaSeeder)->run();
 
     expect(V5Server::query()->where('name', 'coold-dev')->count())->toBe(1)
-        ->and(V5Server::query()->where('name', 'coold-dev')->where('host', 'host.docker.internal')->where('ssh_port', 60001)->exists())->toBeTrue()
+        ->and(V5Server::query()->where('name', 'coold-dev')->where('host', 'coold-dev.local')->where('ssh_port', 22)->exists())->toBeTrue()
         ->and(V5Server::query()->count())->toBe(2);
 });
 

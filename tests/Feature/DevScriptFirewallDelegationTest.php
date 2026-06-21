@@ -1,12 +1,11 @@
 <?php
 
-it('delegates dev firewall commands to the coolify CLI instead of calling coold APIs directly', function () {
+it('does not expose removed dev firewall commands', function () {
     $script = file_get_contents(base_path('scripts/dev.sh'));
 
-    expect($script)->toContain('coolify_firewall()')
-        ->and($script)->toContain('"$(coolify_cli_bin)" firewall "$command"')
-        ->and($script)->toContain('--nodes "$nodes"')
-        ->and($script)->toContain('--ssh-config "$ssh_config"')
+    expect($script)->not->toContain('coolify_firewall()')
+        ->and($script)->not->toContain('scripts/dev.sh firewall')
+        ->and($script)->not->toContain('firewall <command>')
         ->and($script)->not->toContain('/api/v1/firewall/allow')
         ->and($script)->not->toContain('firewall_api_for_each_vm');
 });
@@ -22,13 +21,28 @@ it('installs the coolify CLI in both application container images', function (st
     'production image' => 'docker/production/Dockerfile',
 ]);
 
-it('refreshes the host coolify CLI on every dev script run', function () {
+it('runs the coolify CLI from the development application container', function () {
     $script = file_get_contents(base_path('scripts/dev.sh'));
 
-    expect($script)->toContain('url="https://github.com/coollabsio/coold/releases/download/${version}/coolify-${os}-${arch}.tar.gz"')
-        ->and($script)->toContain('==> Installing coolify from ${url}')
-        ->and($script)->not->toContain('COOLIFY_CLI_FORCE_DOWNLOAD')
-        ->and($script)->not->toContain('if [ -x "$bin" ] && "$bin" --version >/dev/null 2>&1');
+    expect($script)->toContain("printf '%s\\n' '/usr/local/bin/coolify'")
+        ->and($script)->toContain('spin exec -T coolify "$(coolify_cli_bin)" init bootstrap')
+        ->and($script)->toContain('spin exec -T coolify "$(coolify_cli_bin)" "$@"')
+        ->and($script)->toContain('ensure_coolify_container_ssh_key')
+        ->and($script)->not->toContain('.dev/bin/coolify')
+        ->and($script)->not->toContain('coolify-${os}-${arch}.tar.gz');
+});
+
+it('syncs host-resolved Lima local names into the Coolify container hosts file', function () {
+    $script = file_get_contents(base_path('scripts/dev.sh'));
+
+    expect($script)->toContain('resolve_lima_dns_name()')
+        ->and($script)->toContain('dscacheutil -q host -a name "$name"')
+        ->and($script)->toContain('getent ahostsv4 "$name"')
+        ->and($script)->toContain('sync_lima_hosts_into_coolify_container()')
+        ->and($script)->toContain('spin exec -T -u root coolify sh -lc')
+        ->and($script)->toContain('cat "$next" > /etc/hosts')
+        ->and($script)->toContain('sync_lima_hosts_into_coolify_container')
+        ->and($script)->toContain('if [ "$naked" = "true" ]; then');
 });
 
 it('does not require predefined UI node environment variables in the development app container', function () {
@@ -81,28 +95,38 @@ it('seeds bootstrapped Lima VMs into v5 development server state', function () {
     expect($script)->toContain('sync_v5_dev_lima_servers()')
         ->and($script)->toContain('COOLIFY_CLI_SSH_USER="$ssh_user"')
         ->and($script)->toContain('COOLIFY_CLI_SSH_USER="$(coolify_ssh_user)" spin up -d')
-        ->and($script)->toContain('lima_ssh_port "$index"')
-        ->and($script)->toContain('host.docker.internal')
+        ->and($script)->toContain('coold_vm_dns_name()')
+        ->and($script)->toContain('$(coold_vm_dns_name "$index")')
         ->and($script)->toContain('v5:sync-dev-lima-servers')
-        ->and($script)->toContain('--server="${instance}|host.docker.internal|${ssh_user}|${ssh_port}|$(coold_vm_wg_ip "$index")"')
+        ->and($script)->toContain('--server="${instance}|$(coold_vm_dns_name "$index")|${ssh_user}|22|$(coold_vm_wg_ip "$index")"')
         ->and($compose)->toContain('COOLIFY_CLI_SSH_USER: "${COOLIFY_CLI_SSH_USER:-}"')
         ->and($script)->not->toContain('db:seed --class=V5DevLimaSeeder --force')
-        ->and($script)->not->toContain('--server "${instance}|${node}|$(coolify_ssh_user)|22"');
+        ->and($script)->not->toContain('host.docker.internal|${ssh_user}');
 });
 
-it('configures predictable Lima SSH local ports for dev VMs', function () {
+it('uses the shared Lima template directly instead of generated per-VM YAML', function () {
     $script = file_get_contents(base_path('scripts/dev.sh'));
     $vmScript = file_get_contents(base_path('scripts/coold-vm.sh'));
     $template = file_get_contents(base_path('dev/lima/coold.yaml'));
 
-    expect($script)->toContain('coold_vm_ssh_port()')
-        ->and($script)->toContain('COOLIFY_COOLD_VM_SSH_PORT_')
-        ->and($script)->toContain('6000${index}')
-        ->and($script)->toContain('COOLIFY_COOLD_VM_SSH_PORT="$(coold_vm_ssh_port "$index")"')
-        ->and($vmScript)->toContain('SSH_PORT="$(read_coolify_env COOLIFY_COOLD_VM_SSH_PORT 60002)"')
-        ->and($vmScript)->toContain('{{COOLIFY_COOLD_VM_SSH_PORT}}')
-        ->and($template)->toContain('ssh:')
-        ->and($template)->toContain('localPort: {{COOLIFY_COOLD_VM_SSH_PORT}}');
+    expect($script)->toContain('coold_vm_dns_name()')
+        ->and($script)->not->toContain('COOLIFY_COOLD_VM_SSH_PORT="$(coold_vm_ssh_port "$index")"')
+        ->and($vmScript)->toContain('limactl start --tty=false --name="$INSTANCE" "$TEMPLATE"')
+        ->and($vmScript)->not->toContain('GENERATED=')
+        ->and($vmScript)->not->toContain('generate_yaml()')
+        ->and($template)->not->toContain('{{COOLIFY_COOLD_VM_SSH_PORT}}');
+});
+
+it('sets the Lima guest hostname to the instance name for predictable mDNS', function () {
+    $vmScript = file_get_contents(base_path('scripts/coold-vm.sh'));
+    $template = file_get_contents(base_path('dev/lima/coold.yaml'));
+
+    expect($vmScript)->toContain('ensure_mdns_hostname()')
+        ->and($vmScript)->toContain('hostnamectl set-hostname "$INSTANCE"')
+        ->and($vmScript)->toContain('systemctl restart avahi-daemon.service')
+        ->and($vmScript)->toContain('ensure_mdns_hostname')
+        ->and($template)->toContain('hostnamectl set-hostname "{{.Name}}"')
+        ->and($template)->not->toContain('hostnamectl set-hostname myvm');
 });
 
 it('authorizes the seeded testing host key in dev Lima VMs', function () {
@@ -112,10 +136,11 @@ it('authorizes the seeded testing host key in dev Lima VMs', function () {
         ->and($template)->toContain('ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFuGmoeGq/pojrsyP1pszcNVuZx9iFkCELtxrh31QJ68')
         ->and($template)->toContain('authorized_keys')
         ->and($template)->toContain('grep -qxF "$coolify_test_public_key"')
-        ->and($template)->toContain('install -d -m 700 /root/.ssh')
-        ->and($template)->toContain('/root/.ssh/authorized_keys')
-        ->and($template)->toContain('target_home="$(getent passwd 501 | cut -d: -f6 || true)"')
-        ->and($template)->toContain('owner="$(stat -c \'%u:%g\' "$target_home")"')
+        ->and($template)->toContain('install_public_key root')
+        ->and($template)->toContain('install_public_key coolify')
+        ->and($template)->toContain('owner="$(stat -c \'%u:%g\' "$home")"')
+        ->and($template)->toContain('hostnamectl set-hostname "{{.Name}}"')
+        ->and($template)->not->toContain('hostnamectl set-hostname myvm')
         ->and($template)->not->toContain('mode: user')
         ->and($template)->not->toContain('user="$(basename "$home")"');
 });

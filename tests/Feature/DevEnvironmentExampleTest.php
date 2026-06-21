@@ -21,11 +21,10 @@ it('does not include coold dev tooling defaults in the development env example',
 ]);
 
 it('defaults coold dev VM settings in Laravel config', function () {
-    expect(config('coold.dev_host_count'))->toBe(2)
-        ->and(config('coold.dev_host_id'))->toBe('coolify-coold-dev')
-        ->and(config('coold.dev_host_id_2'))->toBe('coolify-coold-dev-2')
-        ->and(config('coold.dev_wireguard_ip_1'))->toBe('100.64.0.10')
-        ->and(config('coold.dev_wireguard_ip_2'))->toBe('100.64.0.11')
+    expect(config('coold.coolify_cli_bin'))->toBe('/usr/local/bin/coolify')
+        ->and(config('coold.coold_version'))->toBe('nightly')
+        ->and(config('coold.corrosion_version'))->toBe('v1.0.0')
+        ->and(config('coold.dev_ssh_user'))->toBe('coolify')
         ->and(config('coold.dev_builder_capacity'))->toBe(2)
         ->and(config('coold.dev_builder_enabled'))->toBeTrue();
 });

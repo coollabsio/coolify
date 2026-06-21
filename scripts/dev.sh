@@ -60,9 +60,71 @@ coold_vm_wg_port() {
   read_coolify_env "COOLIFY_COOLD_VM_WG_PORT_${index}" "$((51820 + index))"
 }
 
-coold_vm_ssh_port() {
+coold_vm_dns_name() {
   local index="$1"
-  read_coolify_env "COOLIFY_COOLD_VM_SSH_PORT_${index}" "6000${index}"
+  printf '%s.local\n' "$(coold_vm_instance "$index")"
+}
+
+resolve_lima_dns_name() {
+  local name="$1"
+  local ip=""
+
+  if command -v dscacheutil >/dev/null 2>&1; then
+    ip="$(dscacheutil -q host -a name "$name" 2>/dev/null | awk '/ip_address:/ && $2 ~ /^[0-9.]+$/ { print $2; exit }')"
+  fi
+
+  if [ -z "$ip" ] && command -v getent >/dev/null 2>&1; then
+    ip="$(getent ahostsv4 "$name" 2>/dev/null | awk '{ print $1; exit }')"
+  fi
+
+  if [ -z "$ip" ]; then
+    ip="$(ping -c 1 -W 1 "$name" 2>/dev/null | sed -n 's/^PING .* (\([0-9.]*\)).*$/\1/p' | head -n 1)"
+  fi
+
+  if [ -z "$ip" ]; then
+    echo "ERROR: Could not resolve ${name} from the host." >&2
+    echo "Check that the Lima VM is running, bridged networking is enabled, and Avahi/mDNS finished provisioning." >&2
+    return 1
+  fi
+
+  printf '%s\n' "$ip"
+}
+
+sync_lima_hosts_into_coolify_container() {
+  local count
+  local hosts_file="$ROOT/.dev/lima/hosts"
+  local name
+  local ip
+
+  count="$(coold_vm_count)"
+  mkdir -p "$(dirname "$hosts_file")"
+  : > "$hosts_file"
+
+  for index in $(seq 1 "$count"); do
+    name="$(coold_vm_dns_name "$index")"
+    ip="$(resolve_lima_dns_name "$name")" || return 1
+    printf '%s %s\n' "$ip" "$name" >> "$hosts_file"
+  done
+
+  echo "==> Syncing Lima .local host records into the Coolify container..."
+  spin exec -T -u root coolify sh -lc '
+set -e
+records=/tmp/coolify-lima-hosts
+next=/tmp/coolify-hosts-next
+cat > "$records"
+cp /etc/hosts "$next"
+while read -r ip name; do
+  if [ -z "$ip" ] || [ -z "$name" ]; then
+    continue
+  fi
+
+  awk -v name="$name" '\''$0 !~ ("(^|[[:space:]])" name "([[:space:]]|$)") { print }'\'' "$next" > "${next}.filtered"
+  printf "%s %s\n" "$ip" "$name" >> "${next}.filtered"
+  mv "${next}.filtered" "$next"
+done < "$records"
+cat "$next" > /etc/hosts
+rm -f "$records" "$next" "${next}.filtered"
+' < "$hosts_file"
 }
 
 coold_vm_container_subnet() {
@@ -75,124 +137,13 @@ coold_vm_container_gateway() {
   read_coolify_env "COOLIFY_COOLD_VM_CONTAINER_GATEWAY_${index}" "10.210.$((index - 1)).1"
 }
 
-host_arch() {
-  case "$(uname -m)" in
-    x86_64|amd64)
-      printf '%s\n' amd64
-      ;;
-    arm64|aarch64)
-      printf '%s\n' arm64
-      ;;
-    *)
-      echo "ERROR: unsupported host architecture: $(uname -m)" >&2
-      exit 1
-      ;;
-  esac
-}
-
-host_os() {
-  case "$(uname -s)" in
-    Darwin)
-      printf '%s\n' darwin
-      ;;
-    Linux)
-      printf '%s\n' linux
-      ;;
-    *)
-      echo "ERROR: unsupported host OS: $(uname -s)" >&2
-      exit 1
-      ;;
-  esac
-}
-
 coolify_cli_bin() {
-  printf '%s\n' "$ROOT/.dev/bin/coolify"
-}
-
-ensure_coolify() {
-  local bin
-  local version
-  local arch
-  local os
-  local url
-  local tmpdir
-
-  bin="$(coolify_cli_bin)"
-  version="$(read_coolify_env COOLIFY_CLI_VERSION "$(read_coolify_env COOLIFY_COOLD_VERSION nightly)")"
-  arch="$(host_arch)"
-  os="$(host_os)"
-
-  url="https://github.com/coollabsio/coold/releases/download/${version}/coolify-${os}-${arch}.tar.gz"
-  echo "==> Installing coolify from ${url}"
-
-  mkdir -p "$(dirname "$bin")"
-  tmpdir="$(mktemp -d)"
-  if ! curl -fsSL --retry 3 --max-time 120 -o "$tmpdir/coolify.tar.gz" "$url"; then
-    rm -rf "$tmpdir"
-    return 1
-  fi
-  tar -xzf "$tmpdir/coolify.tar.gz" -C "$tmpdir"
-  install -m 0755 "$tmpdir/coolify" "$bin"
-  rm -rf "$tmpdir"
+  printf '%s\n' '/usr/local/bin/coolify'
 }
 
 lima_ssh_target() {
   local index="$1"
-  local instance
-
-  instance="$(coold_vm_instance "$index")"
-
-  if [ ! -f "$HOME/.lima/${instance}/ssh.config" ]; then
-    echo "ERROR: Lima SSH config for ${instance} was not found. Start it first with scripts/dev.sh up." >&2
-    exit 1
-  fi
-
-  printf 'lima-%s\n' "$instance"
-}
-
-lima_ssh_config() {
-  local count
-  local config="$ROOT/.dev/lima/ssh.config"
-  local instance
-  count="$(coold_vm_count)"
-
-  mkdir -p "$(dirname "$config")"
-  : > "$config"
-
-  for index in $(seq 1 "$count"); do
-    instance="$(coold_vm_instance "$index")"
-    if [ ! -f "$HOME/.lima/${instance}/ssh.config" ]; then
-      echo "ERROR: Lima SSH config for ${instance} was not found. Start it first with scripts/dev.sh up." >&2
-      exit 1
-    fi
-
-    cat "$HOME/.lima/${instance}/ssh.config" >> "$config"
-    printf '\n' >> "$config"
-  done
-
-  printf '%s\n' "$config"
-}
-
-lima_ssh_port() {
-  local index="$1"
-  local instance
-  local port
-
-  instance="$(coold_vm_instance "$index")"
-
-  if [ ! -f "$HOME/.lima/${instance}/ssh.config" ]; then
-    echo "ERROR: Lima SSH config for ${instance} was not found. Start it first with scripts/dev.sh up." >&2
-    exit 1
-  fi
-
-  port="$(awk 'tolower($1) == "port" { print $2; exit }' "$HOME/.lima/${instance}/ssh.config")"
-
-  if [ -z "$port" ]; then
-    echo "ERROR: Lima SSH port for ${instance} was not found in $HOME/.lima/${instance}/ssh.config." >&2
-    exit 1
-  fi
-
-  printf '%s\n' "$port"
+  coold_vm_dns_name "$index"
 }
 
 coolify_nodes_arg() {
@@ -240,18 +191,37 @@ coolify_wg_endpoint_overrides_arg() {
     if [ -n "$overrides" ]; then
       overrides="${overrides},"
     fi
-    overrides="${overrides}${node}=host.lima.internal:$(coold_vm_wg_port "$index")"
+    overrides="${overrides}${node}=$(coold_vm_dns_name "$index"):$(coold_vm_wg_port "$index")"
   done
 
   printf '%s\n' "$overrides"
 }
 
 coolify_ssh_key() {
-  read_coolify_env COOLIFY_CLI_SSH_KEY "$HOME/.lima/_config/user"
+  read_coolify_env COOLIFY_CLI_SSH_KEY "/var/www/html/.dev/lima/ssh_key"
+}
+
+coolify_host_ssh_key_source() {
+  read_coolify_env COOLIFY_CLI_HOST_SSH_KEY "$HOME/.lima/_config/user"
+}
+
+ensure_coolify_container_ssh_key() {
+  local source_key
+  local target_key="$ROOT/.dev/lima/ssh_key"
+
+  source_key="$(coolify_host_ssh_key_source)"
+  if [ ! -f "$source_key" ]; then
+    echo "ERROR: SSH key for dev Lima VMs was not found at ${source_key}." >&2
+    echo "Set COOLIFY_CLI_HOST_SSH_KEY to the host-side private key that Lima authorized." >&2
+    exit 1
+  fi
+
+  mkdir -p "$(dirname "$target_key")"
+  install -m 0600 "$source_key" "$target_key"
 }
 
 coolify_ssh_user() {
-  read_coolify_env COOLIFY_CLI_SSH_USER "$USER"
+  read_coolify_env COOLIFY_CLI_SSH_USER coolify
 }
 
 coolify_bootstrap_concurrency() {
@@ -264,20 +234,17 @@ coolify_bootstrap_ssh_timeout() {
 
 coolify_bootstrap_command() {
   local nodes
-  local ssh_config
   local listen_overrides
   local endpoint_overrides
-  ensure_coolify
 
   nodes="$(coolify_nodes_arg)" || return 1
-  ssh_config="$(lima_ssh_config)" || return 1
   listen_overrides="$(coolify_wg_listen_overrides_arg)" || return 1
   endpoint_overrides="$(coolify_wg_endpoint_overrides_arg)" || return 1
 
   cat <<CMD
-$(coolify_cli_bin) init bootstrap \\
+spin exec -T coolify $(coolify_cli_bin) init bootstrap \\
   --nodes "${nodes}" \\
-  --ssh-config "${ssh_config}" \\
+  --ssh-key "$(coolify_ssh_key)" \\
   --ssh-user "$(coolify_ssh_user)" \\
   --concurrency "$(coolify_bootstrap_concurrency)" \\
   --ssh-timeout "$(coolify_bootstrap_ssh_timeout)" \\
@@ -292,19 +259,17 @@ CMD
 
 coolify_bootstrap() {
   local nodes
-  local ssh_config
   local listen_overrides
   local endpoint_overrides
-  ensure_coolify
+  ensure_coolify_container_ssh_key
 
   nodes="$(coolify_nodes_arg)" || return 1
-  ssh_config="$(lima_ssh_config)" || return 1
   listen_overrides="$(coolify_wg_listen_overrides_arg)" || return 1
   endpoint_overrides="$(coolify_wg_endpoint_overrides_arg)" || return 1
 
-  "$(coolify_cli_bin)" init bootstrap \
+  spin exec -T coolify "$(coolify_cli_bin)" init bootstrap \
     --nodes "$nodes" \
-    --ssh-config "$ssh_config" \
+    --ssh-key "$(coolify_ssh_key)" \
     --ssh-user "$(coolify_ssh_user)" \
     --concurrency "$(coolify_bootstrap_concurrency)" \
     --ssh-timeout "$(coolify_bootstrap_ssh_timeout)" \
@@ -373,27 +338,25 @@ coolify_dev() {
 
   case "$command" in
     install)
-      ensure_coolify
-      "$(coolify_cli_bin)" --version
+      echo "==> coolify CLI is provided by the Coolify dev container."
+      spin exec -T coolify "$(coolify_cli_bin)" --version
       ;;
     path)
-      ensure_coolify
       coolify_cli_bin
       ;;
     bootstrap-command)
       coolify_bootstrap_command
       ;;
     run)
-      ensure_coolify
-      exec "$(coolify_cli_bin)" "$@"
+      exec spin exec -T coolify "$(coolify_cli_bin)" "$@"
       ;;
     -h|--help|help)
       cat <<'USAGE'
 Usage: scripts/dev.sh coolify <command>
 
 Commands:
-  install             Download/install the nightly coolify dev binary
-  path                Print the local coolify path
+  install             Print the coolify CLI version from the dev container
+  path                Print the coolify CLI path inside the dev container
   bootstrap-command   Print the dev Lima bootstrap command without running it
   run <args>          Run coolify with arbitrary args
 
@@ -414,7 +377,6 @@ coold_vm() {
   shift
   COOLIFY_COOLD_LIMA_INSTANCE="$(coold_vm_instance "$index")" \
   COOLIFY_COOLD_VM_WG_IP="$(coold_vm_wg_ip "$index")" \
-  COOLIFY_COOLD_VM_SSH_PORT="$(coold_vm_ssh_port "$index")" \
   COOLIFY_COOLD_VM_CONTAINER_SUBNET="$(coold_vm_container_subnet "$index")" \
   COOLIFY_COOLD_VM_CONTAINER_GATEWAY="$(coold_vm_container_gateway "$index")" \
     scripts/coold-vm.sh "$@"
@@ -524,8 +486,7 @@ sync_v5_dev_lima_servers() {
 
   for index in $(seq 1 "$count"); do
     instance="$(coold_vm_instance "$index")"
-    ssh_port="$(lima_ssh_port "$index")"
-    server_args+=(--server="${instance}|host.docker.internal|${ssh_user}|${ssh_port}|$(coold_vm_wg_ip "$index")")
+    server_args+=(--server="${instance}|$(coold_vm_dns_name "$index")|${ssh_user}|22|$(coold_vm_wg_ip "$index")")
   done
 
   echo "==> Running pending migrations before syncing v5 dev Lima state..."
@@ -603,6 +564,10 @@ up() {
     COOLIFY_CLI_SSH_USER="$(coolify_ssh_user)" spin up -d "${spin_args[@]}"
   else
     COOLIFY_CLI_SSH_USER="$(coolify_ssh_user)" spin up -d
+  fi
+
+  if [ "$coold_vm_enabled" != "false" ]; then
+    sync_lima_hosts_into_coolify_container
   fi
 
   if [ "$naked" = "true" ]; then
@@ -940,7 +905,7 @@ SH
 
 example_nginx_require_pair() {
   if [ "$(coold_vm_count)" = "1" ]; then
-    echo "ERROR: example-nginx ping/firewall commands require COOLIFY_COOLD_VM_COUNT=2." >&2
+    echo "ERROR: example-nginx ping command requires COOLIFY_COOLD_VM_COUNT=2." >&2
     exit 1
   fi
 }
@@ -966,28 +931,6 @@ echo 'ok: coolify-example-nginx can reach coolify-example-nginx-2 on tcp/80'
 SH
 }
 
-example_nginx_firewall_up() {
-  local src
-  local dst
-  example_nginx_require_pair
-
-  src="$(example_nginx_container_ip 1)"
-  dst="$(example_nginx_container_ip 2)"
-
-  scripts/dev.sh firewall allow "$src" "$dst" tcp 80
-}
-
-example_nginx_firewall_down() {
-  local src
-  local dst
-  example_nginx_require_pair
-
-  src="$(example_nginx_container_ip 1)"
-  dst="$(example_nginx_container_ip 2)"
-
-  scripts/dev.sh firewall revoke "$src" "$dst" tcp 80
-}
-
 example_nginx_help() {
   cat <<'USAGE'
 Usage: scripts/dev.sh example-nginx <command>
@@ -997,8 +940,6 @@ Commands:
   down           Remove the example nginx containers
   check-dns      Verify host 1 nginx can resolve host 2 nginx through coold DNS
   ping           Verify host 1 nginx can reach host 2 nginx on tcp/80
-  firewall up    Allow host 1 nginx to reach host 2 nginx through the coolify CLI
-  firewall down  Revoke the example nginx tcp/80 allow rule through the coolify CLI
 USAGE
 }
 
@@ -1021,160 +962,12 @@ example_nginx() {
     ping)
       example_nginx_ping
       ;;
-    firewall)
-      case "${1:-help}" in
-        up)
-          example_nginx_firewall_up
-          ;;
-        down)
-          example_nginx_firewall_down
-          ;;
-        *)
-          echo "unknown example-nginx firewall command: ${1:-help}" >&2
-          echo "Run: scripts/dev.sh example-nginx help" >&2
-          exit 1
-          ;;
-      esac
-      ;;
     -h|--help|help)
       example_nginx_help
       ;;
     *)
       echo "unknown example-nginx command: $command" >&2
       echo "Run: scripts/dev.sh example-nginx help" >&2
-      exit 1
-      ;;
-  esac
-}
-
-firewall_help() {
-  cat <<'USAGE'
-Usage: scripts/dev.sh firewall <command>
-
-Commands:
-  allow <src> <dst> [proto] [port]  Allow traffic through the coolify CLI (proto/port optional)
-  revoke [id|src] [dst] [proto] [port]
-                                    Remove an allow rule through the coolify CLI
-  list                              List allow rules through the coolify CLI
-  containers                        List registered containers through the coolify CLI
-
-Examples:
-  scripts/dev.sh firewall allow 10.210.0.2 10.210.1.2 tcp 80
-  scripts/dev.sh firewall revoke
-  scripts/dev.sh firewall revoke 10.210.0.2 10.210.1.2 tcp 80
-  scripts/dev.sh firewall revoke 3ba6e0c235a6
-  scripts/dev.sh firewall list
-USAGE
-}
-
-coolify_firewall() {
-  local command="$1"
-  shift
-  local nodes
-  local ssh_config
-
-  ensure_coolify
-  nodes="$(coolify_nodes_arg)" || return 1
-  ssh_config="$(lima_ssh_config)" || return 1
-
-  "$(coolify_cli_bin)" firewall "$command" \
-    --nodes "$nodes" \
-    --ssh-config "$ssh_config" \
-    --ssh-user "$(coolify_ssh_user)" \
-    "$@"
-}
-
-firewall_allow() {
-  local src="${1:-}"
-  local dst="${2:-}"
-  local proto="${3:-}"
-  local port="${4:-}"
-  local args=()
-
-  if [ -z "$src" ] || [ -z "$dst" ]; then
-    firewall_help >&2
-    exit 1
-  fi
-
-  if [ -n "$port" ] && [ -z "$proto" ]; then
-    echo "ERROR: port requires proto (tcp or udp)." >&2
-    exit 1
-  fi
-
-  args+=(--from "$src" --to "$dst")
-  if [ -n "$proto" ]; then
-    args+=(--proto "$proto")
-  fi
-  if [ -n "$port" ]; then
-    args+=(--port "$port")
-  fi
-
-  coolify_firewall allow "${args[@]}"
-}
-
-firewall_revoke() {
-  local id_or_src="${1:-}"
-  local dst="${2:-}"
-  local proto="${3:-}"
-  local port="${4:-}"
-  local args=()
-
-  if [ -z "$id_or_src" ]; then
-    echo "Current firewall allow rule IDs:"
-    firewall_list
-    echo
-    echo "Revoke one with: scripts/dev.sh firewall revoke <id>"
-    return
-  fi
-
-  if [ -z "$dst" ]; then
-    args+=(--id "$id_or_src")
-  else
-    args+=(--from "$id_or_src" --to "$dst")
-    if [ -n "$proto" ]; then
-      args+=(--proto "$proto")
-    fi
-    if [ -n "$port" ]; then
-      args+=(--port "$port")
-    fi
-  fi
-
-  coolify_firewall revoke "${args[@]}"
-}
-
-firewall_list() {
-  coolify_firewall list "$@"
-}
-
-firewall_containers() {
-  coolify_firewall containers "$@"
-}
-
-firewall() {
-  local command="${1:-help}"
-  if [ $# -gt 0 ]; then
-    shift
-  fi
-
-  case "$command" in
-    allow)
-      firewall_allow "$@"
-      ;;
-    revoke|remove|delete|deny)
-      firewall_revoke "$@"
-      ;;
-    list)
-      firewall_list "$@"
-      ;;
-    containers)
-      firewall_containers "$@"
-      ;;
-    -h|--help|help)
-      firewall_help
-      ;;
-    *)
-      echo "unknown firewall command: $command" >&2
-      echo "Run: scripts/dev.sh firewall help" >&2
       exit 1
       ;;
   esac
@@ -1258,7 +1051,6 @@ Commands:
   clean-vms Delete the coold Lima VMs and all VM-local runtime state (alias for down --cleanup)
   naked-vm Recreate the naked Lima VM used for bootstrap testing
   corrosion <command> Inspect Corrosion state, config, logs, and registered containers
-  firewall <command>  Manage dev coold firewall allow rules
   example-nginx <command> Start/check example nginx containers with coold DNS
   coolify <command> Install/run the released coolify dev helper
 USAGE
@@ -1293,9 +1085,6 @@ case "$cmd" in
     ;;
   corrosion)
     corrosion "$@"
-    ;;
-  firewall)
-    firewall "$@"
     ;;
   example-nginx)
     example_nginx "$@"
