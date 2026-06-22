@@ -7,7 +7,12 @@
 
 services:
   garage:
-    image: dxflrs/garage:v2.1.0
+    image: dxflrs/garage:v2.3.0
+    command:
+      - /garage
+      - server
+      - '--single-node'
+      - '--default-bucket'
     environment:
       - GARAGE_S3_API_URL=$GARAGE_S3_API_URL
       - GARAGE_WEB_URL=$GARAGE_WEB_URL
@@ -16,6 +21,9 @@ services:
       - GARAGE_ADMIN_TOKEN=$SERVICE_PASSWORD_GARAGE
       - GARAGE_METRICS_TOKEN=$SERVICE_PASSWORD_GARAGEMETRICS
       - GARAGE_ALLOW_WORLD_READABLE_SECRETS=true
+      - GARAGE_DEFAULT_ACCESS_KEY=${SERVICE_USER_GARAGE}
+      - GARAGE_DEFAULT_SECRET_KEY=${SERVICE_PASSWORD_64_GARAGE}
+      - GARAGE_DEFAULT_BUCKET=${GARAGE_DEFAULT_BUCKET}
       - RUST_LOG=${RUST_LOG:-garage=info}
     volumes:
       - garage-meta:/var/lib/garage/meta
