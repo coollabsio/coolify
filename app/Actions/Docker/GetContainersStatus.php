@@ -359,7 +359,11 @@ class GetContainersStatus
             } else {
                 $url = null;
             }
-            // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+            // Throttle: Only notify once per 60 minutes to prevent spam when containers keep crashing
+            if (! $exitedService->last_stop_notification_at || $exitedService->last_stop_notification_at->lessThan(now()->subMinutes(60))) {
+                $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+                $exitedService->update(['last_stop_notification_at' => now()]);
+            }
             $exitedService->update(['status' => 'exited']);
         }
 
@@ -447,7 +451,11 @@ class GetContainersStatus
             } else {
                 $url = null;
             }
-            // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+            // Throttle: Only notify once per 60 minutes to prevent spam when containers keep crashing
+            if (! $database->last_stop_notification_at || $database->last_stop_notification_at->lessThan(now()->subMinutes(60))) {
+                $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+                $database->update(['last_stop_notification_at' => now()]);
+            }
         }
 
         // Aggregate multi-container application statuses
