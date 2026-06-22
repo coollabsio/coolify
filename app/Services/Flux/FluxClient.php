@@ -126,6 +126,21 @@ class FluxClient
         return $this->output($payload, 'Firewall rule removed.');
     }
 
+    /**
+     * @return array<int, array{id?: string, namespace?: string, src?: string, dst?: string, proto?: string, port?: int}>
+     */
+    public function listFirewallRules(string $hostId, string $namespace = ''): array
+    {
+        $payload = $this->dispatch($hostId, [
+            'type' => 'firewall.list',
+            'namespace' => $namespace,
+        ]);
+
+        $data = $payload['data'] ?? [];
+
+        return is_array($data) ? $data : [];
+    }
+
     public function cooldLogs(string $hostId, int $tail = 200): string
     {
         $payload = $this->dispatch($hostId, [
@@ -134,6 +149,16 @@ class FluxClient
         ]);
 
         return $this->output($payload, 'No coold logs returned.');
+    }
+
+    public function corrosionTables(string $hostId, int $limit = 200): string
+    {
+        $payload = $this->dispatch($hostId, [
+            'type' => 'corrosion.tables',
+            'limit' => max(1, min($limit, 1000)),
+        ]);
+
+        return $this->output($payload, '{"limit":200,"tables":[]}');
     }
 
     /**

@@ -29,6 +29,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
@@ -65,6 +66,7 @@ it('registers the v5 dashboard route', function () {
         ->and(Route::has('v5.clusters.servers.update'))->toBeTrue()
         ->and(Route::has('v5.clusters.servers.check'))->toBeTrue()
         ->and(Route::has('v5.clusters.servers.coold-logs'))->toBeTrue()
+        ->and(Route::has('v5.clusters.servers.corrosion-tables'))->toBeTrue()
         ->and(Route::has('v5.clusters.servers.bootstrap'))->toBeTrue()
         ->and(Route::has('v5.clusters.servers.destroy'))->toBeTrue()
         ->and(Route::has('v5.applications.nginx'))->toBeTrue()
@@ -120,6 +122,15 @@ it('does not render v5 application status messages on dashboard cards', function
     expect($dashboardSource)
         ->not->toContain('{application.statusMessage && (')
         ->not->toContain('{application.statusMessage}</p>');
+});
+
+it('lets users dismiss v5 dashboard notices', function () {
+    $dashboardSource = file_get_contents(resource_path('js/v5/Pages/Dashboard.tsx'));
+
+    expect($dashboardSource)
+        ->toContain('aria-label="Dismiss notice"')
+        ->toContain('onClick={() => setNotice(null)}')
+        ->toContain('<span className="sr-only">Dismiss notice</span>');
 });
 
 it('uses the shared dialog and button components for the application ingress modal', function () {
@@ -322,6 +333,14 @@ it('shows v5 application connector dots after selecting a canvas card', function
         ->toContain('setSelectedApplicationId(application.id)')
         ->toContain('selectedApplicationId === application.id')
         ->toContain('opacity-100');
+});
+
+it('keeps side connector geometry aligned with the rendered v5 application card height', function () {
+    $dashboardSource = file_get_contents(resource_path('js/v5/Pages/Dashboard.tsx'));
+
+    expect($dashboardSource)
+        ->toContain('const APPLICATION_CARD_HEIGHT = 160;')
+        ->toContain('h-40 w-80');
 });
 
 it('shows a loading state on v5 application delete buttons', function () {
@@ -989,6 +1008,200 @@ it('persists generic v5 resource connections and direction-specific ports', func
         ->assertSee("\"id\":\"{$connectionId}\"", false)
         ->assertSee("\"{$source->id}->{$target->id}\":[\"80\"]", false)
         ->assertSee("\"{$target->id}->{$source->id}\":[\"443\"]", false);
+});
+
+it('reports flux failures when syncing v5 resource connection firewall rules', function () {
+    app()->detectEnvironment(fn () => 'local');
+
+    $this->withoutVite();
+    createSharedUserAndTeamTables();
+    Exceptions::fake();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'wireguard_management_ip' => '100.64.0.10',
+        'capabilities' => [],
+    ]);
+    $source = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'api',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-api',
+        'mesh_namespace' => 'default',
+        'status' => 'running',
+    ]);
+    $target = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'postgres',
+        'image' => 'docker.io/library/postgres:16',
+        'container_name' => 'coolify-v5-postgres',
+        'mesh_namespace' => 'default',
+        'status' => 'running',
+    ]);
+
+    $connection = ResourceConnection::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'resource_one_type' => $source->getMorphClass(),
+        'resource_one_id' => $source->id,
+        'resource_two_type' => $target->getMorphClass(),
+        'resource_two_id' => $target->id,
+        'resource_pair_key' => "application:{$source->id}|application:{$target->id}",
+        'created_by_user_id' => $user->id,
+    ]);
+
+    $fluxClient = Mockery::mock(FluxClient::class);
+    $fluxClient
+        ->shouldReceive('applyFirewallRule')
+        ->once()
+        ->andThrow(new RuntimeException('resolve firewall endpoint coolify-v5-api on coolify-default-mesh'));
+    app()->instance(FluxClient::class, $fluxClient);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team, '_token' => 'test-csrf-token'])
+        ->withHeader('X-CSRF-TOKEN', 'test-csrf-token')
+        ->patchJson("/v5/resource-connections/{$connection->id}", [
+            'ports_by_direction' => [
+                "{$source->id}->{$target->id}" => [5432],
+            ],
+        ])
+        ->assertStatus(502)
+        ->assertJsonPath('detail', 'resolve firewall endpoint coolify-v5-api on coolify-default-mesh');
+
+    Exceptions::assertReported(fn (RuntimeException $exception): bool => $exception->getMessage() === 'resolve firewall endpoint coolify-v5-api on coolify-default-mesh');
+});
+
+it('syncs cross-server v5 resource connection ports on both endpoint hosts', function () {
+    app()->detectEnvironment(fn () => 'local');
+
+    $this->withoutVite();
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+    ]);
+    $sourceServer = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'wireguard_management_ip' => '100.64.0.10',
+        'capabilities' => [],
+    ]);
+    $targetServer = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-02',
+        'host' => '203.0.113.11',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'wireguard_management_ip' => '100.64.0.11',
+        'capabilities' => [],
+    ]);
+    $source = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $sourceServer->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'api',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-api',
+        'mesh_namespace' => 'default',
+        'status' => 'running',
+    ]);
+    $target = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $targetServer->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'postgres',
+        'image' => 'docker.io/library/postgres:16',
+        'container_name' => 'coolify-v5-postgres',
+        'mesh_namespace' => 'default',
+        'status' => 'running',
+    ]);
+
+    $connection = ResourceConnection::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'resource_one_type' => $source->getMorphClass(),
+        'resource_one_id' => $source->id,
+        'resource_two_type' => $target->getMorphClass(),
+        'resource_two_id' => $target->id,
+        'resource_pair_key' => "application:{$source->id}|application:{$target->id}",
+        'created_by_user_id' => $user->id,
+    ]);
+
+    $firewallRuleId = "v5-resource-connection:{$connection->id}:{$source->id}:{$target->id}:tcp:5432";
+    $expectedRule = [
+        'id' => $firewallRuleId,
+        'namespace' => 'default',
+        'src' => 'coolify-v5-api',
+        'dst' => 'coolify-v5-postgres',
+        'proto' => 'tcp',
+        'port' => 5432,
+    ];
+
+    $fluxClient = Mockery::mock(FluxClient::class);
+    $fluxClient
+        ->shouldReceive('applyFirewallRule')
+        ->once()
+        ->with('100.64.0.10', $expectedRule)
+        ->andReturn('Firewall rule applied on source host.');
+    $fluxClient
+        ->shouldReceive('applyFirewallRule')
+        ->once()
+        ->with('100.64.0.11', $expectedRule)
+        ->andReturn('Firewall rule applied on target host.');
+    app()->instance(FluxClient::class, $fluxClient);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team, '_token' => 'test-csrf-token'])
+        ->withHeader('X-CSRF-TOKEN', 'test-csrf-token')
+        ->patchJson("/v5/resource-connections/{$connection->id}", [
+            'ports_by_direction' => [
+                "{$source->id}->{$target->id}" => [5432],
+            ],
+        ])
+        ->assertSuccessful();
 });
 
 it('syncs v5 resource connection ports through flux firewall primitives', function () {
@@ -2382,13 +2595,111 @@ it('fetches v5 server coold logs through flux', function () {
         ->assertJsonStructure(['output', 'fetchedAt']);
 });
 
-it('renders a coold logs action in the v5 server menu', function () {
+it('fetches v5 server corrosion tables through flux', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+        'wireguard_management_ip' => '100.64.0.10',
+        'node_address' => '203.0.113.10',
+    ]);
+
+    $this->mock(FluxClient::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('corrosionTables')
+            ->once()
+            ->with('100.64.0.10', 200)
+            ->andReturn('{"limit":200,"tables":[{"name":"service_endpoints","columns":["container_name"],"rows":[["coolify-v5-nginx"]]}]}');
+    });
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->getJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/corrosion-tables?limit=200")
+        ->assertSuccessful()
+        ->assertJsonPath('output', '{"limit":200,"tables":[{"name":"service_endpoints","columns":["container_name"],"rows":[["coolify-v5-nginx"]]}]}')
+        ->assertJsonStructure(['output', 'fetchedAt']);
+});
+
+it('fetches v5 server firewall rules through flux', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+        'wireguard_management_ip' => '100.64.0.10',
+        'node_address' => '203.0.113.10',
+    ]);
+
+    $this->mock(FluxClient::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('listFirewallRules')
+            ->once()
+            ->with('100.64.0.10', '')
+            ->andReturn([[
+                'id' => 'v5-resource-connection:1:1:2:tcp:5432',
+                'namespace' => 'default',
+                'src' => 'coolify-v5-api',
+                'dst' => 'coolify-v5-postgres',
+                'proto' => 'tcp',
+                'port' => 5432,
+            ]]);
+    });
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->getJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/firewall-rules")
+        ->assertSuccessful()
+        ->assertJsonPath('rules.0.id', 'v5-resource-connection:1:1:2:tcp:5432')
+        ->assertJsonPath('rules.0.port', 5432)
+        ->assertJsonStructure(['rules', 'fetchedAt']);
+});
+
+it('renders coold diagnostics actions in the v5 server menu', function () {
     $clustersPage = file_get_contents(resource_path('js/v5/Pages/Clusters.tsx'));
 
     expect($clustersPage)
         ->toContain('Coold logs')
+        ->toContain('Corrosion tables')
+        ->toContain('Firewall rules')
         ->toContain('/coold-logs?tail=200')
-        ->toContain('Latest journalctl entries');
+        ->toContain('/corrosion-tables?limit=200')
+        ->toContain('/firewall-rules')
+        ->toContain('Latest journalctl entries')
+        ->toContain('Corrosion table snapshots')
+        ->toContain('Defined coold allow rules')
+        ->toContain('overflow-y-auto overflow-x-hidden')
+        ->toContain('whitespace-pre-wrap wrap-anywhere');
 });
 
 it('renders v5 server status on cluster server cards', function () {
@@ -5295,6 +5606,18 @@ function expectCaddyIngressFirewallRule(mixed $fluxClient): void
             'dst' => 'coolify-v5-caddy',
             'proto' => 'tcp',
             'port' => 80,
+        ])
+        ->andReturn('Firewall rule applied.');
+    $fluxClient
+        ->shouldReceive('applyFirewallRule')
+        ->once()
+        ->with('100.64.0.10', [
+            'id' => 'v5-caddy-ingress:443',
+            'namespace' => 'default',
+            'src' => '0.0.0.0/0',
+            'dst' => 'coolify-v5-caddy',
+            'proto' => 'tcp',
+            'port' => 443,
         ])
         ->andReturn('Firewall rule applied.');
 }

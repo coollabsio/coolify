@@ -601,6 +601,8 @@ class DashboardController extends Controller
         try {
             $this->syncConnectionFirewallRules($fluxClient, $oldFirewallRules, $newFirewallRules);
         } catch (\RuntimeException $exception) {
+            report($exception);
+
             return response()->json([
                 'message' => 'Could not sync firewall rules through Flux.',
                 'detail' => $exception->getMessage(),
@@ -625,6 +627,8 @@ class DashboardController extends Controller
         try {
             $this->syncConnectionFirewallRules($fluxClient, $oldFirewallRules, collect());
         } catch (\RuntimeException $exception) {
+            report($exception);
+
             return response()->json([
                 'message' => 'Could not sync firewall rules through Flux.',
                 'detail' => $exception->getMessage(),
@@ -1005,6 +1009,86 @@ class DashboardController extends Controller
 
         return response()->json([
             'output' => $output,
+            'source' => 'flux',
+            'fetchedAt' => now()->toJSON(),
+        ]);
+    }
+
+    public function serverCorrosionTables(Request $request, V5Cluster $cluster, V5Server $server, FluxClient $fluxClient): JsonResponse
+    {
+        $currentTeam = $request->attributes->get('v5.currentTeam');
+
+        if (
+            ! $currentTeam instanceof Team
+            || $cluster->team_id !== $currentTeam->id
+            || $server->team_id !== $currentTeam->id
+            || $server->cluster_id !== $cluster->id
+        ) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'limit' => ['sometimes', 'integer', 'min:1', 'max:1000'],
+        ]);
+
+        $hostId = $server->wireguard_management_ip ?: $server->node_address;
+
+        if (! is_string($hostId) || $hostId === '') {
+            return response()->json([
+                'message' => 'This server is missing its Flux host id.',
+            ], 422);
+        }
+
+        try {
+            $output = $fluxClient->corrosionTables($hostId, (int) ($validated['limit'] ?? 200));
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json([
+            'output' => $output,
+            'source' => 'flux',
+            'fetchedAt' => now()->toJSON(),
+        ]);
+    }
+
+    public function serverFirewallRules(Request $request, V5Cluster $cluster, V5Server $server, FluxClient $fluxClient): JsonResponse
+    {
+        $currentTeam = $request->attributes->get('v5.currentTeam');
+
+        if (
+            ! $currentTeam instanceof Team
+            || $cluster->team_id !== $currentTeam->id
+            || $server->team_id !== $currentTeam->id
+            || $server->cluster_id !== $cluster->id
+        ) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'namespace' => ['sometimes', 'string', 'max:63'],
+        ]);
+
+        $hostId = $server->wireguard_management_ip ?: $server->node_address;
+
+        if (! is_string($hostId) || $hostId === '') {
+            return response()->json([
+                'message' => 'This server is missing its Flux host id.',
+            ], 422);
+        }
+
+        try {
+            $rules = $fluxClient->listFirewallRules($hostId, (string) ($validated['namespace'] ?? ''));
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json([
+            'rules' => $rules,
             'source' => 'flux',
             'fetchedAt' => now()->toJSON(),
         ]);
@@ -1452,18 +1536,27 @@ class DashboardController extends Controller
             ->keyBy('id');
 
         return $connection->rules
-            ->map(function ($rule) use ($applications, $connection): ?array {
+            ->flatMap(function ($rule) use ($applications, $connection): Collection {
                 $source = $applications->get($rule->source_resource_id);
                 $target = $applications->get($rule->target_resource_id);
 
-                if (! $source instanceof V5Application || ! $target instanceof V5Application || ! $target->server instanceof V5Server) {
-                    return null;
+                if (
+                    ! $source instanceof V5Application
+                    || ! $target instanceof V5Application
+                    || ! $source->server instanceof V5Server
+                    || ! $target->server instanceof V5Server
+                ) {
+                    return collect();
                 }
 
-                $hostId = $target->server->wireguard_management_ip ?: $target->server->node_address;
+                $hostIds = collect([$source->server, $target->server])
+                    ->map(fn (V5Server $server) => $server->wireguard_management_ip ?: $server->node_address)
+                    ->filter(fn (mixed $hostId): bool => is_string($hostId) && $hostId !== '')
+                    ->unique()
+                    ->values();
 
-                if (! is_string($hostId) || $hostId === '') {
-                    return null;
+                if ($hostIds->isEmpty()) {
+                    return collect();
                 }
 
                 $firewallRule = [
@@ -1475,13 +1568,12 @@ class DashboardController extends Controller
                     'port' => (int) $rule->port,
                 ];
 
-                return [
+                return $hostIds->map(fn (string $hostId): array => [
                     'id' => $firewallRule['id'],
                     'hostId' => $hostId,
                     'rule' => $firewallRule,
-                ];
+                ]);
             })
-            ->filter()
             ->values();
     }
 
@@ -1491,16 +1583,24 @@ class DashboardController extends Controller
      */
     private function syncConnectionFirewallRules(FluxClient $fluxClient, Collection $oldRules, Collection $newRules): void
     {
-        $newRuleIds = $newRules->pluck('id')->all();
-        $oldRuleIds = $oldRules->pluck('id')->all();
+        $newRuleKeys = $newRules->map(fn (array $rule): string => $this->firewallRuleSyncKey($rule))->all();
+        $oldRuleKeys = $oldRules->map(fn (array $rule): string => $this->firewallRuleSyncKey($rule))->all();
 
         $oldRules
-            ->reject(fn (array $oldRule): bool => in_array($oldRule['id'], $newRuleIds, true))
+            ->reject(fn (array $oldRule): bool => in_array($this->firewallRuleSyncKey($oldRule), $newRuleKeys, true))
             ->each(fn (array $oldRule): string => $fluxClient->revokeFirewallRule($oldRule['hostId'], $oldRule['id']));
 
         $newRules
-            ->reject(fn (array $newRule): bool => in_array($newRule['id'], $oldRuleIds, true))
+            ->reject(fn (array $newRule): bool => in_array($this->firewallRuleSyncKey($newRule), $oldRuleKeys, true))
             ->each(fn (array $newRule): string => $fluxClient->applyFirewallRule($newRule['hostId'], $newRule['rule']));
+    }
+
+    /**
+     * @param  array{id: string, hostId: string, rule: array{id: string, namespace: string, src: string, dst: string, proto: string, port: int}}  $rule
+     */
+    private function firewallRuleSyncKey(array $rule): string
+    {
+        return $rule['hostId'].'|'.$rule['id'];
     }
 
     private function connectionFirewallRuleId(ResourceConnection $connection, mixed $rule): string

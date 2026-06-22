@@ -12,7 +12,7 @@ class StartCaddyIngress
 {
     use AsAction;
 
-    private const FIREWALL_RULE_ID = 'v5-caddy-ingress:80';
+    private const FIREWALL_PORTS = [80, 443];
 
     public function __construct(private readonly FluxClient $fluxClient) {}
 
@@ -30,14 +30,17 @@ class StartCaddyIngress
 
         $configuration = GenerateCaddyIngressConfiguration::run($this->applications($server));
         $output = $this->fluxClient->applyIngress($hostId, 'caddy', $configuration['caddyfile'], $this->ingressApps($configuration['apps']));
-        $this->fluxClient->applyFirewallRule($hostId, [
-            'id' => self::FIREWALL_RULE_ID,
-            'namespace' => 'default',
-            'src' => '0.0.0.0/0',
-            'dst' => 'coolify-v5-caddy',
-            'proto' => 'tcp',
-            'port' => 80,
-        ]);
+
+        foreach (self::FIREWALL_PORTS as $port) {
+            $this->fluxClient->applyFirewallRule($hostId, [
+                'id' => "v5-caddy-ingress:{$port}",
+                'namespace' => 'default',
+                'src' => '0.0.0.0/0',
+                'dst' => 'coolify-v5-caddy',
+                'proto' => 'tcp',
+                'port' => $port,
+            ]);
+        }
 
         if ($server->exists) {
             $server->update([

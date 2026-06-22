@@ -92,6 +92,36 @@ type CooldLogsResponse = {
     fetchedAt: string;
 };
 
+type CorrosionTablesResponse = {
+    output: string;
+    fetchedAt: string;
+};
+
+type FirewallRule = {
+    id?: string;
+    namespace?: string;
+    src?: string;
+    dst?: string;
+    proto?: string;
+    port?: number;
+};
+
+type FirewallRulesResponse = {
+    rules: FirewallRule[];
+    fetchedAt: string;
+};
+
+type CorrosionTableDump = {
+    limit?: number;
+    tables?: CorrosionTable[];
+};
+
+type CorrosionTable = {
+    name: string;
+    columns: string[];
+    rows: unknown[][];
+};
+
 type BootstrapServerResponse = {
     cluster?: V5Cluster;
     message?: string;
@@ -106,6 +136,32 @@ type ServerSshCheck = {
 type V5ClusterUpdatedEvent = {
     cluster: V5Cluster | null;
 };
+
+function formatCorrosionCell(value: unknown): string {
+    if (value === null || value === undefined) {
+        return 'null';
+    }
+
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        return String(value);
+    }
+
+    return JSON.stringify(value);
+}
+
+function parseCorrosionTables(output: string): CorrosionTableDump | null {
+    if (!output.trim()) {
+        return null;
+    }
+
+    try {
+        const parsed = JSON.parse(output) as CorrosionTableDump;
+
+        return Array.isArray(parsed.tables) ? parsed : null;
+    } catch {
+        return null;
+    }
+}
 
 function statusLabel(status: string): string {
     return status
@@ -260,6 +316,18 @@ export default function Clusters({
     const [cooldLogsFetchedAt, setCooldLogsFetchedAt] = useState<string | null>(null);
     const [cooldLogsError, setCooldLogsError] = useState<string | null>(null);
     const [isLoadingCooldLogs, setIsLoadingCooldLogs] = useState(false);
+    const [isCorrosionTablesDialogOpen, setIsCorrosionTablesDialogOpen] = useState(false);
+    const [corrosionTablesServer, setCorrosionTablesServer] = useState<V5Server | null>(null);
+    const [corrosionTablesOutput, setCorrosionTablesOutput] = useState('');
+    const [corrosionTablesFetchedAt, setCorrosionTablesFetchedAt] = useState<string | null>(null);
+    const [corrosionTablesError, setCorrosionTablesError] = useState<string | null>(null);
+    const [isLoadingCorrosionTables, setIsLoadingCorrosionTables] = useState(false);
+    const [isFirewallRulesDialogOpen, setIsFirewallRulesDialogOpen] = useState(false);
+    const [firewallRulesServer, setFirewallRulesServer] = useState<V5Server | null>(null);
+    const [firewallRules, setFirewallRules] = useState<FirewallRule[]>([]);
+    const [firewallRulesFetchedAt, setFirewallRulesFetchedAt] = useState<string | null>(null);
+    const [firewallRulesError, setFirewallRulesError] = useState<string | null>(null);
+    const [isLoadingFirewallRules, setIsLoadingFirewallRules] = useState(false);
     const [showAdvancedConfiguration, setShowAdvancedConfiguration] = useState(false);
     const [showAdvancedServerConfiguration, setShowAdvancedServerConfiguration] = useState(false);
 
@@ -657,6 +725,75 @@ export default function Clusters({
         setIsLoadingCooldLogs(false);
     }
 
+    async function loadCorrosionTables(server: V5Server): Promise<void> {
+        if (!selectedCluster) {
+            return;
+        }
+
+        setCorrosionTablesServer(server);
+        setIsCorrosionTablesDialogOpen(true);
+        setIsLoadingCorrosionTables(true);
+        setCorrosionTablesError(null);
+        setCorrosionTablesOutput('');
+        setCorrosionTablesFetchedAt(null);
+
+        const response = await fetch(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/corrosion-tables?limit=200`, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+            },
+        });
+
+        const payload = (await response.json().catch(() => null)) as CorrosionTablesResponse & { message?: string } | null;
+
+        if (!response.ok) {
+            setCorrosionTablesError(payload?.message ?? 'Unable to load Corrosion tables.');
+            setIsLoadingCorrosionTables(false);
+
+            return;
+        }
+
+        setCorrosionTablesOutput(payload?.output ?? '');
+        setCorrosionTablesFetchedAt(payload?.fetchedAt ?? null);
+        setIsLoadingCorrosionTables(false);
+    }
+
+
+    async function loadFirewallRules(server: V5Server): Promise<void> {
+        if (!selectedCluster) {
+            return;
+        }
+
+        setFirewallRulesServer(server);
+        setIsFirewallRulesDialogOpen(true);
+        setIsLoadingFirewallRules(true);
+        setFirewallRulesError(null);
+        setFirewallRules([]);
+        setFirewallRulesFetchedAt(null);
+
+        const response = await fetch(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/firewall-rules`, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+            },
+        });
+
+        const payload = (await response.json().catch(() => null)) as FirewallRulesResponse & { message?: string } | null;
+
+        if (!response.ok) {
+            setFirewallRulesError(payload?.message ?? 'Unable to load firewall rules.');
+            setIsLoadingFirewallRules(false);
+
+            return;
+        }
+
+        setFirewallRules(Array.isArray(payload?.rules) ? payload.rules : []);
+        setFirewallRulesFetchedAt(payload?.fetchedAt ?? null);
+        setIsLoadingFirewallRules(false);
+    }
+
     function openDeleteClusterDialog(): void {
         if (!selectedCluster || selectedCluster.serversCount !== 0) {
             setDeleteClusterError('Only empty clusters can be deleted.');
@@ -916,6 +1053,12 @@ export default function Clusters({
                                     ) : null}
                                     <DropdownMenuItem onClick={() => void loadCooldLogs(server)}>
                                         Coold logs
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => void loadCorrosionTables(server)}>
+                                        Corrosion tables
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => void loadFirewallRules(server)}>
+                                        Firewall rules
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => openEditServerDialog(server)}>
                                         Edit server
@@ -1192,6 +1335,53 @@ export default function Clusters({
                                                 </dl>
                                             </div>
                                         </div>
+
+                                        <section className="mb-5 rounded-lg border border-border bg-background p-4">
+                                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                                <div>
+                                                    <h3 className="text-base font-semibold text-foreground">
+                                                        Firewall rules
+                                                    </h3>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Inspect defined coold allow rules persisted on each initialized server.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {initializedServers.length === 0 ? (
+                                                <div className="mt-4 rounded-lg border border-dashed border-border p-6 text-center">
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Initialize a server to inspect its firewall rules.
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2">
+                                                    {initializedServers.map((server) => (
+                                                        <div
+                                                            key={`firewall-rules-${server.id}`}
+                                                            className="flex items-center justify-between gap-3 rounded-md border border-border bg-card p-3"
+                                                        >
+                                                            <div className="min-w-0">
+                                                                <p className="truncate text-sm font-medium text-foreground">
+                                                                    {server.name}
+                                                                </p>
+                                                                <p className="truncate text-xs text-muted-foreground">
+                                                                    Host ID: {server.wireguardManagementIp ?? server.nodeAddress ?? 'Not assigned'}
+                                                                </p>
+                                                            </div>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => void loadFirewallRules(server)}
+                                                            >
+                                                                View rules
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </section>
 
                                         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                             <div>
@@ -1883,9 +2073,232 @@ export default function Clusters({
                                         </div>
                                     ) : null}
 
-                                    <pre className="max-h-[32rem] overflow-auto rounded-lg border border-border bg-black p-4 font-mono text-xs leading-relaxed text-white">
+                                    <pre className="max-h-[32rem] max-w-full overflow-y-auto overflow-x-hidden whitespace-pre-wrap wrap-anywhere rounded-lg border border-border bg-black p-4 font-mono text-xs leading-relaxed text-white">
                                         {isLoadingCooldLogs ? 'Loading coold logs...' : cooldLogsOutput || 'No coold logs returned.'}
                                     </pre>
+                                </div>
+                            </DialogContent>
+                        </Dialog>
+
+                        <Dialog
+                            open={isCorrosionTablesDialogOpen}
+                            onOpenChange={(open) => {
+                                setIsCorrosionTablesDialogOpen(open);
+
+                                if (!open) {
+                                    setCorrosionTablesServer(null);
+                                    setCorrosionTablesOutput('');
+                                    setCorrosionTablesFetchedAt(null);
+                                    setCorrosionTablesError(null);
+                                }
+                            }}
+                        >
+                            <DialogContent className="max-w-6xl">
+                                <DialogHeader>
+                                    <DialogTitle>Corrosion tables</DialogTitle>
+                                    <DialogDescription>
+                                        Corrosion table snapshots for {corrosionTablesServer?.name ?? 'this server'}.
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                <div className="mt-5 flex flex-col gap-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <p className="text-xs text-muted-foreground">
+                                            {corrosionTablesFetchedAt
+                                                ? `Fetched ${formatDate(corrosionTablesFetchedAt)}`
+                                                : 'First 200 rows per table'}
+                                        </p>
+                                        {corrosionTablesServer ? (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={isLoadingCorrosionTables}
+                                                onClick={() => void loadCorrosionTables(corrosionTablesServer)}
+                                            >
+                                                {isLoadingCorrosionTables ? 'Loading...' : 'Refresh'}
+                                            </Button>
+                                        ) : null}
+                                    </div>
+
+                                    {corrosionTablesError ? (
+                                        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                                            {corrosionTablesError}
+                                        </div>
+                                    ) : null}
+
+                                    <div className="max-h-[32rem] overflow-auto rounded-lg border border-border bg-card p-4">
+                                        {isLoadingCorrosionTables ? (
+                                            <p className="text-sm text-muted-foreground">Loading Corrosion tables...</p>
+                                        ) : (() => {
+                                            const dump = parseCorrosionTables(corrosionTablesOutput);
+
+                                            if (!dump || !dump.tables?.length) {
+                                                return (
+                                                    <pre className="font-mono text-xs leading-relaxed text-muted-foreground">
+                                                        {corrosionTablesOutput || 'No Corrosion tables returned.'}
+                                                    </pre>
+                                                );
+                                            }
+
+                                            return (
+                                                <div className="flex flex-col gap-6">
+                                                    {dump.tables.map((table) => (
+                                                        <section key={table.name} className="flex flex-col gap-2">
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <h3 className="text-sm font-semibold text-foreground">{table.name}</h3>
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    {table.rows.length} row{table.rows.length === 1 ? '' : 's'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="overflow-auto rounded-md border border-border">
+                                                                <table className="min-w-full divide-y divide-border text-left text-xs">
+                                                                    <thead className="bg-muted/50 text-muted-foreground">
+                                                                        <tr>
+                                                                            {table.columns.map((column) => (
+                                                                                <th key={column} className="whitespace-nowrap px-3 py-2 font-medium">
+                                                                                    {column}
+                                                                                </th>
+                                                                            ))}
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody className="divide-y divide-border">
+                                                                        {table.rows.length > 0 ? (
+                                                                            table.rows.map((row, rowIndex) => (
+                                                                                <tr key={`${table.name}-${rowIndex}`}>
+                                                                                    {table.columns.map((column, columnIndex) => (
+                                                                                        <td
+                                                                                            key={`${table.name}-${rowIndex}-${column}`}
+                                                                                            className="max-w-80 truncate px-3 py-2 font-mono text-muted-foreground"
+                                                                                            title={formatCorrosionCell(row[columnIndex])}
+                                                                                        >
+                                                                                            {formatCorrosionCell(row[columnIndex])}
+                                                                                        </td>
+                                                                                    ))}
+                                                                                </tr>
+                                                                            ))
+                                                                        ) : (
+                                                                            <tr>
+                                                                                <td
+                                                                                    colSpan={Math.max(table.columns.length, 1)}
+                                                                                    className="px-3 py-4 text-center text-muted-foreground"
+                                                                                >
+                                                                                    No rows
+                                                                                </td>
+                                                                            </tr>
+                                                                        )}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </section>
+                                                    ))}
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                            </DialogContent>
+                        </Dialog>
+
+                        <Dialog
+                            open={isFirewallRulesDialogOpen}
+                            onOpenChange={(open) => {
+                                setIsFirewallRulesDialogOpen(open);
+
+                                if (!open) {
+                                    setFirewallRulesServer(null);
+                                    setFirewallRules([]);
+                                    setFirewallRulesFetchedAt(null);
+                                    setFirewallRulesError(null);
+                                }
+                            }}
+                        >
+                            <DialogContent className="max-w-5xl">
+                                <DialogHeader>
+                                    <DialogTitle>Firewall rules</DialogTitle>
+                                    <DialogDescription>
+                                        Defined coold allow rules for {firewallRulesServer?.name ?? 'this server'}.
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                <div className="mt-5 flex flex-col gap-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <p className="text-xs text-muted-foreground">
+                                            {firewallRulesFetchedAt
+                                                ? `Fetched ${formatDate(firewallRulesFetchedAt)}`
+                                                : 'Rules currently persisted by coold'}
+                                        </p>
+                                        {firewallRulesServer ? (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={isLoadingFirewallRules}
+                                                onClick={() => void loadFirewallRules(firewallRulesServer)}
+                                            >
+                                                {isLoadingFirewallRules ? 'Loading...' : 'Refresh'}
+                                            </Button>
+                                        ) : null}
+                                    </div>
+
+                                    {firewallRulesError ? (
+                                        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                                            {firewallRulesError}
+                                        </div>
+                                    ) : null}
+
+                                    <div className="max-h-[32rem] overflow-auto rounded-lg border border-border">
+                                        <table className="min-w-full divide-y divide-border text-left text-xs">
+                                            <thead className="bg-muted/50 text-muted-foreground">
+                                                <tr>
+                                                    <th className="whitespace-nowrap px-3 py-2 font-medium">Rule ID</th>
+                                                    <th className="whitespace-nowrap px-3 py-2 font-medium">Namespace</th>
+                                                    <th className="whitespace-nowrap px-3 py-2 font-medium">Source</th>
+                                                    <th className="whitespace-nowrap px-3 py-2 font-medium">Destination</th>
+                                                    <th className="whitespace-nowrap px-3 py-2 font-medium">Protocol</th>
+                                                    <th className="whitespace-nowrap px-3 py-2 font-medium">Port</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-border">
+                                                {isLoadingFirewallRules ? (
+                                                    <tr>
+                                                        <td colSpan={6} className="px-3 py-4 text-center text-muted-foreground">
+                                                            Loading firewall rules...
+                                                        </td>
+                                                    </tr>
+                                                ) : firewallRules.length > 0 ? (
+                                                    firewallRules.map((rule, index) => (
+                                                        <tr key={rule.id ?? `firewall-rule-${index}`}>
+                                                            <td className="max-w-80 truncate px-3 py-2 font-mono text-muted-foreground" title={rule.id}>
+                                                                {rule.id ?? '—'}
+                                                            </td>
+                                                            <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
+                                                                {rule.namespace ?? '—'}
+                                                            </td>
+                                                            <td className="whitespace-nowrap px-3 py-2 font-mono text-muted-foreground">
+                                                                {rule.src ?? '—'}
+                                                            </td>
+                                                            <td className="whitespace-nowrap px-3 py-2 font-mono text-muted-foreground">
+                                                                {rule.dst ?? '—'}
+                                                            </td>
+                                                            <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
+                                                                {rule.proto ?? '—'}
+                                                            </td>
+                                                            <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
+                                                                {rule.port ?? '—'}
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                ) : (
+                                                    <tr>
+                                                        <td colSpan={6} className="px-3 py-4 text-center text-muted-foreground">
+                                                            No firewall rules defined.
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </DialogContent>
                         </Dialog>

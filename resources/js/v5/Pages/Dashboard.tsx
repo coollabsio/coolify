@@ -100,7 +100,7 @@ type PointerState =
       };
 
 const APPLICATION_CARD_WIDTH = 320;
-const APPLICATION_CARD_HEIGHT = 136;
+const APPLICATION_CARD_HEIGHT = 160;
 const CANVAS_CARD_GAP = 16;
 const CONNECTOR_SIDES: ConnectorSide[] = ['top', 'right', 'bottom', 'left'];
 const MIN_CANVAS_ZOOM = 0.5;
@@ -391,6 +391,14 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
         };
     }
 
+    function responseErrorMessage(payload: { message?: string; detail?: string }, fallback: string): string {
+        if (payload.message && payload.detail) {
+            return `${payload.message} ${payload.detail}`;
+        }
+
+        return payload.message ?? fallback;
+    }
+
     async function persistNewConnection(fromApplicationId: string, toApplicationId: string): Promise<void> {
         setNotice(null);
 
@@ -409,10 +417,10 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                     resource_two: { type: 'application', id: Number(toApplicationId) },
                 }),
             });
-            const payload = (await response.json()) as { connection?: V5ResourceConnection; message?: string };
+            const payload = (await response.json()) as { connection?: V5ResourceConnection; message?: string; detail?: string };
 
             if (!response.ok || !payload.connection) {
-                setNotice(payload.message ?? 'Could not save resource connection.');
+                setNotice(responseErrorMessage(payload, 'Could not save resource connection.'));
 
                 return;
             }
@@ -450,10 +458,10 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                 },
                 body: JSON.stringify({ ports_by_direction: portsByDirection }),
             });
-            const payload = (await response.json()) as { connection?: V5ResourceConnection; message?: string };
+            const payload = (await response.json()) as { connection?: V5ResourceConnection; message?: string; detail?: string };
 
             if (!response.ok || !payload.connection) {
-                setNotice(payload.message ?? 'Could not save allowed ports.');
+                setNotice(responseErrorMessage(payload, 'Could not save allowed ports.'));
 
                 return;
             }
@@ -1364,8 +1372,17 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                     </div>
 
                     {notice && (
-                        <div className="absolute right-4 top-20 z-30 max-w-sm rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive shadow-lg">
-                            {notice}
+                        <div className="absolute right-4 top-20 z-30 flex max-w-sm items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive shadow-lg">
+                            <span>{notice}</span>
+                            <button
+                                type="button"
+                                aria-label="Dismiss notice"
+                                onClick={() => setNotice(null)}
+                                className="-m-1 rounded p-1 text-destructive/80 transition hover:bg-destructive/10 hover:text-destructive"
+                            >
+                                <span aria-hidden="true">×</span>
+                                <span className="sr-only">Dismiss notice</span>
+                            </button>
                         </div>
                     )}
 
@@ -1656,7 +1673,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                                         key={application.id}
                                         data-application-card="application-card"
                                         data-application-id={application.id}
-                                        className="group/application absolute min-h-[8.5rem] w-80 select-none overflow-visible rounded-xl border border-border bg-card p-4 shadow-xl transition-shadow hover:shadow-2xl"
+                                        className="group/application absolute h-40 w-80 select-none overflow-visible rounded-xl border border-border bg-card p-4 shadow-xl transition-shadow hover:shadow-2xl"
                                         style={{
                                             transform: `translate3d(${application.canvasX}px, ${application.canvasY}px, 0)`,
                                         }}

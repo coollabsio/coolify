@@ -131,6 +131,18 @@ it('applies caddy ingress configuration through flux instead of ssh', function (
             'port' => 80,
         ])
         ->andReturn('Firewall rule applied.');
+    $fluxClient
+        ->shouldReceive('applyFirewallRule')
+        ->once()
+        ->with('100.64.0.10', [
+            'id' => 'v5-caddy-ingress:443',
+            'namespace' => 'default',
+            'src' => '0.0.0.0/0',
+            'dst' => 'coolify-v5-caddy',
+            'proto' => 'tcp',
+            'port' => 443,
+        ])
+        ->andReturn('Firewall rule applied.');
     app()->instance(FluxClient::class, $fluxClient);
 
     $result = StartCaddyIngress::run($server);
@@ -165,6 +177,11 @@ it('stops caddy ingress through flux instead of ssh', function () {
         ->shouldReceive('revokeFirewallRule')
         ->once()
         ->with('100.64.0.10', 'v5-caddy-ingress:80')
+        ->andReturn('Firewall rule removed.');
+    $fluxClient
+        ->shouldReceive('revokeFirewallRule')
+        ->once()
+        ->with('100.64.0.10', 'v5-caddy-ingress:443')
         ->andReturn('Firewall rule removed.');
     app()->instance(FluxClient::class, $fluxClient);
 

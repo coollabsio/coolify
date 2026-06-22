@@ -25,6 +25,8 @@ Route::middleware('v5.authenticated')->group(function () {
     Route::patch('/clusters/{cluster}/servers/{server}', [DashboardController::class, 'updateServer'])->name('clusters.servers.update');
     Route::post('/clusters/{cluster}/servers/{server}/check', [DashboardController::class, 'checkServer'])->name('clusters.servers.check');
     Route::get('/clusters/{cluster}/servers/{server}/coold-logs', [DashboardController::class, 'serverCooldLogs'])->name('clusters.servers.coold-logs');
+    Route::get('/clusters/{cluster}/servers/{server}/corrosion-tables', [DashboardController::class, 'serverCorrosionTables'])->name('clusters.servers.corrosion-tables');
+    Route::get('/clusters/{cluster}/servers/{server}/firewall-rules', [DashboardController::class, 'serverFirewallRules'])->name('clusters.servers.firewall-rules');
     Route::post('/clusters/{cluster}/servers/{server}/bootstrap', [DashboardController::class, 'bootstrapServer'])->name('clusters.servers.bootstrap');
     Route::delete('/clusters/{cluster}/servers/{server}', [DashboardController::class, 'destroyServer'])->name('clusters.servers.destroy');
 });
