@@ -456,6 +456,22 @@ coold_vm() {
     scripts/coold-vm.sh "$@"
 }
 
+coold_vm_shell() {
+  local instance="${1:-}"
+
+  if [ -z "$instance" ]; then
+    instance="$(coold_vm_instance 1)"
+  fi
+
+  if [[ "$instance" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: Use the Lima hostname, not a numeric VM index." >&2
+    echo "Example: scripts/dev.sh shell $(coold_vm_instance 1)" >&2
+    exit 1
+  fi
+
+  COOLIFY_COOLD_LIMA_INSTANCE="$instance" scripts/coold-vm.sh shell
+}
+
 coold_vm_up_with_retry() {
   local index="$1"
   local attempt
@@ -1117,7 +1133,8 @@ Commands:
   down    Stop the dev coold agent and Spin stack
   down --cleanup
           Stop the dev stack, then delete the coold Lima VM(s) and VM-local state
-  shell [n] Open a shell inside coold VM n (default: 1)
+  shell [hostname]
+          Open a shell inside a coold VM by Lima hostname (default: coold-dev)
   list      Show Lima instances
   clean-vms Delete the coold Lima VMs and all VM-local runtime state (alias for down --cleanup)
   naked-vm Recreate the naked Lima VM used for bootstrap testing
@@ -1143,7 +1160,7 @@ case "$cmd" in
     fresh
     ;;
   shell)
-    coold_vm "${1:-1}" shell
+    coold_vm_shell "${1:-}"
     ;;
   list)
     limactl list

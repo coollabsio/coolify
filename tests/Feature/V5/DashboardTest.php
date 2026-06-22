@@ -198,6 +198,7 @@ it('generates http-only caddy routes for application ingress', function () {
                 && str_contains($apps[0]['config'], 'reverse_proxy coolify-v5-nginx-test.default.coolify.internal:3000'))
         )
         ->andReturn('Caddy ingress applied.');
+    expectCaddyIngressFirewallRule($fluxClient);
     app()->instance(FluxClient::class, $fluxClient);
 
     $this
@@ -321,6 +322,20 @@ it('shows v5 application connector dots after selecting a canvas card', function
         ->toContain('setSelectedApplicationId(application.id)')
         ->toContain('selectedApplicationId === application.id')
         ->toContain('opacity-100');
+});
+
+it('shows a loading state on v5 application delete buttons', function () {
+    $dashboardSource = file_get_contents(resource_path('js/v5/Pages/Dashboard.tsx'));
+
+    foreach ([
+        'deletingApplicationIds',
+        'const isDeletingApplication = deletingApplicationIds.has(application.id)',
+        'setDeletingApplicationIds',
+        'disabled={isDeletingApplication}',
+        "{isDeletingApplication ? 'Deleting…' : 'Delete'}",
+    ] as $expectedSource) {
+        $this->assertTrue(str_contains($dashboardSource, $expectedSource), "Missing source: {$expectedSource}");
+    }
 });
 
 it('uses a larger mobile touch target for v5 application connector dots', function () {
@@ -805,7 +820,7 @@ it('serves v5 dashboard applications as canvas nodes', function () {
         ->assertDontSee('other-nginx-test', false);
 });
 
-it('marks v5 application status as stale when its server is unreachable', function () {
+it('marks v5 application status as unknown when its server is unreachable', function () {
     app()->detectEnvironment(fn () => 'local');
 
     $this->withoutVite();
@@ -849,7 +864,7 @@ it('marks v5 application status as stale when its server is unreachable', functi
         ->get('/v5')
         ->assertSuccessful()
         ->assertSee('"status":"running"', false)
-        ->assertSee('"effectiveStatus":"unreachable"', false)
+        ->assertSee('"effectiveStatus":"unknown"', false)
         ->assertSee('"effectiveStatusMessage":"coold heartbeat timed out."', false)
         ->assertSee('"serverStatus":"unreachable"', false)
         ->assertSee('"isServerReachable":false', false);
@@ -1767,6 +1782,70 @@ it('applies flux ingress server status updates to the database and broadcasts cl
         && $event->caddyIngressServerId === $server->id);
 });
 
+it('broadcasts v5 canvas application updates when a non-ingress server goes unreachable', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Cluster',
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'worker-01',
+        'host' => '203.0.113.11',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => [],
+        'wireguard_management_ip' => '100.64.0.6',
+    ]);
+    $application = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-1',
+        'status' => 'running',
+        'status_message' => 'Container started.',
+    ]);
+
+    Event::fake([V5CanvasResourceUpdated::class, V5ClusterUpdated::class]);
+
+    $resource = ApplyFluxResourceStatusUpdate::run([
+        'resource_type' => 'server',
+        'host_id' => '100.64.0.6',
+        'status' => 'unreachable',
+        'message' => 'coold heartbeat timed out.',
+    ]);
+
+    expect($resource)->toBeInstanceOf(V5Server::class)
+        ->and($server->refresh()->status)->toBe('unreachable');
+
+    Event::assertDispatched(V5CanvasResourceUpdated::class, fn (V5CanvasResourceUpdated $event) => $event->teamId === $team->id
+        && $event->serverId === $server->id);
+
+    $payload = (new V5CanvasResourceUpdated($team->id, serverId: $server->id))->broadcastWith();
+    expect($payload['applications'])
+        ->toHaveCount(1)
+        ->and($payload['applications'][0])
+        ->toMatchArray([
+            'id' => (string) $application->id,
+            'status' => 'running',
+            'effectiveStatus' => 'unknown',
+            'effectiveStatusMessage' => 'coold heartbeat timed out.',
+            'serverStatus' => 'unreachable',
+            'isServerReachable' => false,
+        ]);
+});
+
 it('applies flux caddy ingress container status updates without changing server install status', function () {
     createSharedUserAndTeamTables();
 
@@ -1957,6 +2036,108 @@ it('broadcasts v5 canvas resource updates when application state changes', funct
 
     Event::assertDispatched(V5CanvasResourceUpdated::class, fn (V5CanvasResourceUpdated $event) => $event->teamId === $team->id
         && $event->applicationId === $application->id);
+});
+
+it('broadcasts the full v5 application canvas shape after application state changes', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => ['ingress'],
+    ]);
+    $application = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-1',
+        'status' => 'running',
+        'status_message' => 'Container started.',
+        'runtime_container_id' => 'nginx-container-id',
+        'ingress_enabled' => true,
+        'internal_port' => 80,
+        'canvas_x' => 0,
+        'canvas_y' => 0,
+    ]);
+    V5ApplicationDomain::query()->create([
+        'application_id' => $application->id,
+        'domain' => 'nginx.example.com',
+    ]);
+
+    $application->update([
+        'status' => 'exited',
+        'status_message' => 'Container stopped.',
+    ]);
+
+    $payload = (new V5CanvasResourceUpdated($team->id, $application->id))->broadcastWith();
+
+    expect($payload['application'])
+        ->toMatchArray([
+            'id' => (string) $application->id,
+            'status' => 'exited',
+            'statusMessage' => 'Container stopped.',
+            'effectiveStatus' => 'exited',
+            'effectiveStatusMessage' => 'Container stopped.',
+            'serverName' => 'edge-01',
+            'serverStatus' => 'installed',
+            'isServerReachable' => true,
+            'serverIngressEnabled' => true,
+            'ingressEnabled' => true,
+            'internalPort' => 80,
+            'domains' => ['nginx.example.com'],
+        ]);
+});
+
+it('broadcasts v5 application status as unknown when its server is unreachable', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'unreachable',
+        'last_status_output' => 'coold heartbeat timed out.',
+        'capabilities' => ['ingress'],
+    ]);
+    $application = V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-1',
+        'status' => 'running',
+        'status_message' => 'Container started.',
+    ]);
+
+    $payload = (new V5CanvasResourceUpdated($team->id, $application->id))->broadcastWith();
+
+    expect($payload['application'])
+        ->toMatchArray([
+            'status' => 'running',
+            'effectiveStatus' => 'unknown',
+            'effectiveStatusMessage' => 'coold heartbeat timed out.',
+            'serverStatus' => 'unreachable',
+            'isServerReachable' => false,
+        ]);
 });
 
 it('broadcasts v5 cluster and canvas updates when ingress server state changes', function () {
@@ -3596,6 +3777,7 @@ it('enables application ingress without publishing domains by default', function
             []
         )
         ->andReturn('Caddy ingress applied.');
+    expectCaddyIngressFirewallRule($fluxClient);
     app()->instance(FluxClient::class, $fluxClient);
 
     $this
@@ -3724,6 +3906,7 @@ it('enables application ingress with explicit domains and port', function () {
                 && str_contains($apps[0]['config'], 'reverse_proxy coolify-v5-nginx-test.default.coolify.internal:3000'))
         )
         ->andReturn('Caddy ingress applied.');
+    expectCaddyIngressFirewallRule($fluxClient);
     app()->instance(FluxClient::class, $fluxClient);
 
     $this
@@ -3868,6 +4051,7 @@ it('syncs caddy ingress routes through flux when enabling ingress on an installe
                 && str_contains($apps[0]['config'], 'reverse_proxy coolify-v5-nginx-test.default.coolify.internal:8080'))
         )
         ->andReturn('Caddy ingress applied.');
+    expectCaddyIngressFirewallRule($fluxClient);
     app()->instance(FluxClient::class, $fluxClient);
 
     $this
@@ -5097,6 +5281,22 @@ function fakeSuccessfulNginxFluxDeployment(string $image = 'docker.io/library/ng
     });
 
     app()->instance(FluxClient::class, $mock);
+}
+
+function expectCaddyIngressFirewallRule(mixed $fluxClient): void
+{
+    $fluxClient
+        ->shouldReceive('applyFirewallRule')
+        ->once()
+        ->with('100.64.0.10', [
+            'id' => 'v5-caddy-ingress:80',
+            'namespace' => 'default',
+            'src' => '0.0.0.0/0',
+            'dst' => 'coolify-v5-caddy',
+            'proto' => 'tcp',
+            'port' => 80,
+        ])
+        ->andReturn('Firewall rule applied.');
 }
 
 function createSharedUserAndTeamTables(): void

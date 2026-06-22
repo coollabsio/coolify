@@ -1,9 +1,49 @@
 <?php
 
+use App\Models\V5\Server as V5Server;
+use App\Services\Flux\AgentTokenIssuer;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
+
+it('issues production host tokens with the default capability profile', function () {
+    [$privateKeyPath, $publicKeyPath] = createFluxJwtKeypair();
+
+    Config::set('flux.jwt_private_key_path', $privateKeyPath);
+
+    $token = app(AgentTokenIssuer::class)->issue('100.64.0.10');
+    $claims = JWT::decode($token, new Key(file_get_contents($publicKeyPath), 'ES256'));
+
+    expect($claims->sub)->toBe('100.64.0.10')
+        ->and($claims->aud)->toBe('coold')
+        ->and($claims->caps)->toBe(['host-agent:default'])
+        ->and($claims->exp)->toBeGreaterThan(time());
+});
+
+it('issues production server tokens with server identity claims', function () {
+    [$privateKeyPath, $publicKeyPath] = createFluxJwtKeypair();
+
+    Config::set('flux.jwt_private_key_path', $privateKeyPath);
+
+    $server = new V5Server;
+    $server->forceFill([
+        'id' => 123,
+        'team_id' => 7,
+        'cluster_id' => 'cluster-456',
+        'wireguard_management_ip' => '100.64.0.10',
+        'node_address' => '203.0.113.10',
+    ]);
+
+    $token = app(AgentTokenIssuer::class)->issueForServer($server);
+    $claims = JWT::decode($token, new Key(file_get_contents($publicKeyPath), 'ES256'));
+
+    expect($claims->sub)->toBe('100.64.0.10')
+        ->and($claims->caps)->toBe(['host-agent:default'])
+        ->and($claims->team_id)->toBe(7)
+        ->and($claims->cluster_id)->toBe('cluster-456')
+        ->and($claims->server_id)->toBe(123);
+});
 
 it('mints a host jwt signed by the configured flux private key', function () {
     [$privateKeyPath, $publicKeyPath] = createFluxJwtKeypair();

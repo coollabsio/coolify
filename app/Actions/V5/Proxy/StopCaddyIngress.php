@@ -10,6 +10,8 @@ class StopCaddyIngress
 {
     use AsAction;
 
+    private const FIREWALL_RULE_ID = 'v5-caddy-ingress:80';
+
     public function __construct(private readonly FluxClient $fluxClient) {}
 
     public function handle(Server $server): string
@@ -21,6 +23,7 @@ class StopCaddyIngress
         }
 
         $output = $this->fluxClient->stopIngress($hostId, 'caddy');
+        $this->fluxClient->revokeFirewallRule($hostId, self::FIREWALL_RULE_ID);
 
         if ($server->exists) {
             $server->update(['ingress_status' => 'exited']);

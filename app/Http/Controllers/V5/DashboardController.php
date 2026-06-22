@@ -1592,7 +1592,7 @@ class DashboardController extends Controller
             'containerName' => $application->container_name,
             'status' => $application->status,
             'statusMessage' => $application->status_message,
-            'effectiveStatus' => $isServerReachable ? $application->status : 'unreachable',
+            'effectiveStatus' => $isServerReachable ? $application->status : 'unknown',
             'effectiveStatusMessage' => $isServerReachable
                 ? $application->status_message
                 : $this->serverStatusMessage($server),

@@ -30,6 +30,7 @@ type ConnectionEndpoint = {
 
 type V5CanvasResourceUpdatedEvent = {
     application: V5Application | null;
+    applications?: V5Application[];
     caddyIngress: V5CaddyIngress | null;
 };
 
@@ -117,6 +118,10 @@ function statusBadgeClass(status: string): string | false {
         return 'bg-warning/15 text-warning';
     }
 
+        if (status === 'unknown') {
+        return 'bg-muted text-muted-foreground';
+    }
+
     if (['failed', 'exited', 'unreachable'].includes(status)) {
         return 'bg-destructive/15 text-destructive';
     }
@@ -185,6 +190,7 @@ export default function Dashboard({
     const [ingressModal, setIngressModal] = useState<IngressModalState | null>(null);
     const [isSavingIngress, setIsSavingIngress] = useState(false);
     const [savingIngressApplicationId, setSavingIngressApplicationId] = useState<string | null>(null);
+    const [deletingApplicationIds, setDeletingApplicationIds] = useState<Set<string>>(() => new Set());
     const canvasRef = useRef<HTMLDivElement | null>(null);
     const hasCanvasNodes = applications.length > 0 || ingresses.length > 0;
 
@@ -192,7 +198,7 @@ export default function Dashboard({
         () => ({
             running: applications.filter((application) => application.effectiveStatus === 'running').length,
             failed: applications.filter((application) => application.effectiveStatus === 'failed').length,
-            unreachable: applications.filter((application) => application.effectiveStatus === 'unreachable').length,
+            unknown: applications.filter((application) => application.effectiveStatus === 'unknown').length,
         }),
         [applications],
     );
@@ -256,6 +262,16 @@ export default function Dashboard({
                         currentApplications.map((application) =>
                             application.id === event.application?.id ? event.application : application,
                         ),
+                    );
+                }
+
+                if (event.applications && event.applications.length > 0) {
+                    setApplications((currentApplications) =>
+                        currentApplications.map((application) => {
+                            const updatedApplication = event.applications?.find((candidate) => candidate.id === application.id);
+
+                            return updatedApplication ?? application;
+                        }),
                     );
                 }
 
@@ -660,6 +676,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
 
     async function removeApplication(application: V5Application): Promise<void> {
         setNotice(null);
+        setDeletingApplicationIds((currentIds) => new Set(currentIds).add(application.id));
 
 
         try {
@@ -689,6 +706,14 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
             );
         } catch (error) {
             setNotice(error instanceof Error ? error.message : 'Could not delete application.');
+        } finally {
+            setDeletingApplicationIds((currentIds) => {
+                const nextIds = new Set(currentIds);
+
+                nextIds.delete(application.id);
+
+                return nextIds;
+            });
         }
     }
 
@@ -1329,10 +1354,10 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                                     <span className="text-destructive">{statusCounts.failed} failed</span>
                                 </>
                             )}
-                            {statusCounts.unreachable > 0 && (
+                            {statusCounts.unknown > 0 && (
                                 <>
                                     <span>•</span>
-                                    <span className="text-destructive">{statusCounts.unreachable} unreachable</span>
+                                    <span>{statusCounts.unknown} unknown</span>
                                 </>
                             )}
                         </div>
@@ -1623,18 +1648,21 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                                 );
                             })}
 
-                            {applications.map((application) => (
-                                <div
-                                    key={application.id}
-                                    data-application-card="application-card"
-                                    data-application-id={application.id}
-                                    className="group/application absolute min-h-[8.5rem] w-80 select-none overflow-visible rounded-xl border border-border bg-card p-4 shadow-xl transition-shadow hover:shadow-2xl"
-                                    style={{
-                                        transform: `translate3d(${application.canvasX}px, ${application.canvasY}px, 0)`,
-                                    }}
-                                    onPointerDown={(event) => startApplicationDrag(event, application)}
-                                    onDoubleClick={(event) => openApplicationInspector(event, application)}
-                                >
+                            {applications.map((application) => {
+                                const isDeletingApplication = deletingApplicationIds.has(application.id);
+
+                                return (
+                                    <div
+                                        key={application.id}
+                                        data-application-card="application-card"
+                                        data-application-id={application.id}
+                                        className="group/application absolute min-h-[8.5rem] w-80 select-none overflow-visible rounded-xl border border-border bg-card p-4 shadow-xl transition-shadow hover:shadow-2xl"
+                                        style={{
+                                            transform: `translate3d(${application.canvasX}px, ${application.canvasY}px, 0)`,
+                                        }}
+                                        onPointerDown={(event) => startApplicationDrag(event, application)}
+                                        onDoubleClick={(event) => openApplicationInspector(event, application)}
+                                    >
                                     {CONNECTOR_SIDES.map((side) => (
                                         <button
                                             key={side}
@@ -1687,9 +1715,10 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                                                     event.stopPropagation();
                                                     void removeApplication(application);
                                                 }}
-                                                className="rounded-md border border-destructive/40 px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-wide text-destructive transition hover:bg-destructive/10"
+                                                disabled={isDeletingApplication}
+                                                className="rounded-md border border-destructive/40 px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-wide text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-60"
                                             >
-                                                Delete
+                                                {isDeletingApplication ? 'Deleting…' : 'Delete'}
                                             </button>
                                         </div>
                                     </div>
@@ -1722,8 +1751,9 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                                             </dd>
                                         </div>
                                     </dl>
-                                </div>
-                            ))}
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 </main>

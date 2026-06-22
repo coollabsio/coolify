@@ -63,6 +63,17 @@ class Server extends V5Model
                 V5ClusterUpdated::dispatch($server->team_id, $server->cluster_id);
             }
 
+            if ($server->wasChanged('status')) {
+                V5CanvasResourceUpdated::dispatch(
+                    $server->team_id,
+                    null,
+                    $server->isIngress() ? $server->id : null,
+                    $server->id,
+                );
+
+                return;
+            }
+
             if ($server->isIngress()) {
                 V5CanvasResourceUpdated::dispatch($server->team_id, null, $server->id);
             }

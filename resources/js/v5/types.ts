@@ -92,7 +92,7 @@ export type V5Application = {
     containerName: string;
     status: 'creating' | 'running' | 'failed' | string;
     statusMessage: string | null;
-    effectiveStatus: 'creating' | 'running' | 'failed' | 'unreachable' | string;
+    effectiveStatus: 'creating' | 'running' | 'failed' | 'unknown' | string;
     effectiveStatusMessage: string | null;
     runtimeContainerId: string | null;
     serverName: string | null;

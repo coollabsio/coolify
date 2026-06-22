@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use Firebase\JWT\JWT;
+use App\Services\Flux\AgentTokenIssuer;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -28,7 +28,7 @@ class FluxDev extends Command
         ];
     }
 
-    public function handle(): int
+    public function handle(AgentTokenIssuer $agentTokenIssuer): int
     {
         if (! app()->environment(['local', 'development', 'testing']) && ! $this->option('force')) {
             $this->error('This command is intended for development only. Use --force to override.');
@@ -36,17 +36,8 @@ class FluxDev extends Command
             return self::FAILURE;
         }
 
-        $privateKeyPath = config('flux.jwt_private_key_path');
-
-        if (! is_string($privateKeyPath) || $privateKeyPath === '' || ! File::isReadable($privateKeyPath)) {
-            $this->error("Flux JWT private key not found at {$privateKeyPath}.");
-
-            return self::FAILURE;
-        }
-
         $hostId = (string) $this->argument('host_id');
         $ttl = max(60, (int) $this->option('ttl'));
-        $now = time();
         $caps = collect(explode(',', (string) $this->option('caps')))
             ->map(fn (string $cap) => trim($cap))
             ->filter()
@@ -58,13 +49,13 @@ class FluxDev extends Command
             $caps = $this->defaultCapabilities();
         }
 
-        $token = JWT::encode([
-            'sub' => $hostId,
-            'aud' => 'coold',
-            'caps' => $caps,
-            'iat' => $now,
-            'exp' => $now + $ttl,
-        ], File::get($privateKeyPath), 'ES256');
+        try {
+            $token = $agentTokenIssuer->issue($hostId, $caps, $ttl);
+        } catch (\RuntimeException $exception) {
+            $this->error($exception->getMessage());
+
+            return self::FAILURE;
+        }
 
         $output = $this->option('output');
 
