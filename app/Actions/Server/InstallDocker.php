@@ -73,6 +73,8 @@ class InstallDocker
 
             if ($supported_os_type->contains('debian')) {
                 $command = $command->merge([$this->getDebianDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('amzn')) {
+                $command = $command->merge([$this->getAmazonLinuxDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('rhel')) {
                 $command = $command->merge([$this->getRhelDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('sles')) {
@@ -124,6 +126,15 @@ class InstallDocker
             'apt-get update && '.
             'apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin'.
             ')';
+    }
+
+    private function getAmazonLinuxDockerInstallCommand(): string
+    {
+        return 'dnf install -y docker && '.
+            'DOCKER_CONFIG=${DOCKER_CONFIG:-/usr/local/lib/docker} && '.
+            'mkdir -p $DOCKER_CONFIG/cli-plugins && '.
+            'curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o $DOCKER_CONFIG/cli-plugins/docker-compose && '.
+            'chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose';
     }
 
     private function getRhelDockerInstallCommand(): string
