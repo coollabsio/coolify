@@ -970,6 +970,46 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function serverCooldLogs(Request $request, V5Cluster $cluster, V5Server $server, FluxClient $fluxClient): JsonResponse
+    {
+        $currentTeam = $request->attributes->get('v5.currentTeam');
+
+        if (
+            ! $currentTeam instanceof Team
+            || $cluster->team_id !== $currentTeam->id
+            || $server->team_id !== $currentTeam->id
+            || $server->cluster_id !== $cluster->id
+        ) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'tail' => ['sometimes', 'integer', 'min:1', 'max:1000'],
+        ]);
+
+        $hostId = $server->wireguard_management_ip ?: $server->node_address;
+
+        if (! is_string($hostId) || $hostId === '') {
+            return response()->json([
+                'message' => 'This server is missing its Flux host id.',
+            ], 422);
+        }
+
+        try {
+            $output = $fluxClient->cooldLogs($hostId, (int) ($validated['tail'] ?? 200));
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json([
+            'output' => $output,
+            'source' => 'flux',
+            'fetchedAt' => now()->toJSON(),
+        ]);
+    }
+
     public function destroyServer(Request $request, V5Cluster $cluster, V5Server $server): \Illuminate\Http\Response|JsonResponse
     {
         $currentTeam = $request->attributes->get('v5.currentTeam');
@@ -1313,12 +1353,15 @@ class DashboardController extends Controller
      */
     private function serializeCaddyIngress(V5Server $server, int $index = 0): array
     {
+        $isServerReachable = $this->isServerReachable($server);
+
         return [
             'id' => (string) $server->id,
             'name' => $server->name,
             'host' => $server->host,
             'type' => $server->ingressType(),
-            'status' => $server->ingressStatus(),
+            'status' => $isServerReachable ? $server->ingressStatus() : 'unreachable',
+            'statusMessage' => $isServerReachable ? null : $this->serverStatusMessage($server),
             'canvasX' => $server->canvas_x ?? -self::CANVAS_CARD_WIDTH - self::CANVAS_CARD_GAP,
             'canvasY' => $server->canvas_y ?? $index * (self::CANVAS_CARD_HEIGHT + self::CANVAS_CARD_GAP),
         ];
@@ -1539,6 +1582,8 @@ class DashboardController extends Controller
     private function serializeApplication(V5Application $application): array
     {
         $application->loadMissing(['server', 'domains']);
+        $server = $application->server;
+        $isServerReachable = ! $server instanceof V5Server || $this->isServerReachable($server);
 
         return [
             'id' => (string) $application->id,
@@ -1547,9 +1592,16 @@ class DashboardController extends Controller
             'containerName' => $application->container_name,
             'status' => $application->status,
             'statusMessage' => $application->status_message,
+            'effectiveStatus' => $isServerReachable ? $application->status : 'unreachable',
+            'effectiveStatusMessage' => $isServerReachable
+                ? $application->status_message
+                : $this->serverStatusMessage($server),
             'runtimeContainerId' => $application->runtime_container_id,
-            'serverName' => $application->server?->name,
-            'serverIngressEnabled' => (bool) $application->server?->isIngress(),
+            'serverName' => $server?->name,
+            'serverStatus' => $server?->status,
+            'serverStatusMessage' => $server instanceof V5Server ? $this->serverStatusMessage($server) : null,
+            'isServerReachable' => $isServerReachable,
+            'serverIngressEnabled' => (bool) $server?->isIngress(),
             'meshNamespace' => $application->mesh_namespace,
             'ingressEnabled' => $application->ingress_enabled,
             'internalPort' => $application->internal_port,
@@ -1558,6 +1610,16 @@ class DashboardController extends Controller
             'canvasX' => $application->canvas_x,
             'canvasY' => $application->canvas_y,
         ];
+    }
+
+    private function isServerReachable(V5Server $server): bool
+    {
+        return $server->status !== 'unreachable';
+    }
+
+    private function serverStatusMessage(V5Server $server): ?string
+    {
+        return $server->last_status_output ?: null;
     }
 
     /**
@@ -1716,6 +1778,8 @@ class DashboardController extends Controller
                 'lastBootstrapStatus' => $server->last_bootstrap_status,
                 'lastBootstrapOutput' => $server->last_bootstrap_output,
                 'lastBootstrapRanAt' => $server->last_bootstrap_ran_at?->toJSON(),
+                'lastStatusOutput' => $server->last_status_output,
+                'lastStatusCheckedAt' => $server->last_status_checked_at?->toJSON(),
             ])->all(),
         ];
     }

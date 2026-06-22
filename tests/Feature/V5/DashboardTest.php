@@ -64,6 +64,7 @@ it('registers the v5 dashboard route', function () {
         ->and(Route::has('v5.clusters.servers.store'))->toBeTrue()
         ->and(Route::has('v5.clusters.servers.update'))->toBeTrue()
         ->and(Route::has('v5.clusters.servers.check'))->toBeTrue()
+        ->and(Route::has('v5.clusters.servers.coold-logs'))->toBeTrue()
         ->and(Route::has('v5.clusters.servers.bootstrap'))->toBeTrue()
         ->and(Route::has('v5.clusters.servers.destroy'))->toBeTrue()
         ->and(Route::has('v5.applications.nginx'))->toBeTrue()
@@ -802,6 +803,87 @@ it('serves v5 dashboard applications as canvas nodes', function () {
         ->assertSee('"canvasX":120', false)
         ->assertSee('"canvasY":-80', false)
         ->assertDontSee('other-nginx-test', false);
+});
+
+it('marks v5 application status as stale when its server is unreachable', function () {
+    app()->detectEnvironment(fn () => 'local');
+
+    $this->withoutVite();
+    fakeFluxHealth();
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'unreachable',
+        'last_status_output' => 'coold heartbeat timed out.',
+        'capabilities' => [],
+    ]);
+
+    V5Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-1',
+        'status' => 'running',
+        'status_message' => 'Container started.',
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession([
+            'currentTeam' => $team,
+            'v5.selectedProjectUuid' => $project->uuid,
+            'v5.selectedEnvironmentUuid' => $environment->uuid,
+        ])
+        ->get('/v5')
+        ->assertSuccessful()
+        ->assertSee('"status":"running"', false)
+        ->assertSee('"effectiveStatus":"unreachable"', false)
+        ->assertSee('"effectiveStatusMessage":"coold heartbeat timed out."', false)
+        ->assertSee('"serverStatus":"unreachable"', false)
+        ->assertSee('"isServerReachable":false', false);
+});
+
+it('shows v5 caddy ingress as unreachable when its server is unreachable', function () {
+    app()->detectEnvironment(fn () => 'local');
+
+    $this->withoutVite();
+    fakeFluxHealth();
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-ingress-01',
+        'host' => '203.0.113.20',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'unreachable',
+        'ingress_status' => 'running',
+        'last_status_output' => 'coold heartbeat timed out.',
+        'capabilities' => ['ingress'],
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->get('/v5')
+        ->assertSuccessful()
+        ->assertSee('"caddyIngresses":[', false)
+        ->assertSee('"status":"unreachable"', false)
+        ->assertSee('"statusMessage":"coold heartbeat timed out."', false);
 });
 
 it('persists generic v5 resource connections and direction-specific ports', function () {
@@ -2076,6 +2158,66 @@ it('broadcasts v5 cluster updates when bootstrap state changes', function () {
     (new V5BootstrapServerJob($cluster->id, $server->id))->handle();
 
     expect(Event::dispatched(V5ClusterUpdated::class)->count())->toBeGreaterThanOrEqual(2);
+});
+
+it('fetches v5 server coold logs through flux', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+        'wireguard_management_ip' => '100.64.0.10',
+        'node_address' => '203.0.113.10',
+    ]);
+
+    $this->mock(FluxClient::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('cooldLogs')
+            ->once()
+            ->with('100.64.0.10', 200)
+            ->andReturn('Jun 22 coold[123]: started');
+    });
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->getJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/coold-logs?tail=200")
+        ->assertSuccessful()
+        ->assertJsonPath('output', 'Jun 22 coold[123]: started')
+        ->assertJsonStructure(['output', 'fetchedAt']);
+});
+
+it('renders a coold logs action in the v5 server menu', function () {
+    $clustersPage = file_get_contents(resource_path('js/v5/Pages/Clusters.tsx'));
+
+    expect($clustersPage)
+        ->toContain('Coold logs')
+        ->toContain('/coold-logs?tail=200')
+        ->toContain('Latest journalctl entries');
+});
+
+it('renders v5 server status on cluster server cards', function () {
+    $clustersPage = file_get_contents(resource_path('js/v5/Pages/Clusters.tsx'));
+
+    expect($clustersPage)
+        ->toContain('server.status')
+        ->toContain('server.lastStatusOutput')
+        ->toContain('statusLabel(server.status)')
+        ->toContain('statusBadgeClass(server.status)');
 });
 
 it('returns fresh v5 cluster bootstrap state for realtime fallback refreshes', function () {
@@ -4583,7 +4725,7 @@ it('defines the v5 cluster management page and create cluster form', function ()
         ->toContain('privateKeyName: string | null;')
         ->toContain('lastBootstrappedAt: string | null;')
         ->toContain('lastBootstrapStatus: string | null;')
-        ->not->toContain('lastStatusOutput: string | null;');
+        ->toContain('lastStatusOutput: string | null;');
 });
 
 it('uses the standard button size for the v5 delete cluster action', function () {

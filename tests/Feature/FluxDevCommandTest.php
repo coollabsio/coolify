@@ -27,7 +27,7 @@ it('mints a host jwt signed by the configured flux private key', function () {
         ->and($claims->exp)->toBeGreaterThan(time());
 });
 
-it('mints a host jwt with primitive capabilities by default', function () {
+it('mints a host jwt with the dev capability profile by default', function () {
     [$privateKeyPath, $publicKeyPath] = createFluxJwtKeypair();
 
     Config::set('flux.jwt_private_key_path', $privateKeyPath);
@@ -42,13 +42,7 @@ it('mints a host jwt with primitive capabilities by default', function () {
     $token = trim(Artisan::output());
     $claims = JWT::decode($token, new Key(file_get_contents($publicKeyPath), 'ES256'));
 
-    expect($claims->caps)->toContain('containers.list')
-        ->and($claims->caps)->toContain('ingress.apply')
-        ->and($claims->caps)->toContain('firewall.allow')
-        ->and($claims->caps)->toContain('firewall.revoke')
-        ->and($claims->caps)->toContain('firewall.list')
-        ->and($claims->caps)->toContain('firewall.reconcile')
-        ->and($claims->caps)->not->toContain('coold');
+    expect($claims->caps)->toBe(['host-agent:dev']);
 });
 
 it('writes the host jwt to an output path with owner-only permissions', function () {

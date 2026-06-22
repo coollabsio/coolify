@@ -87,6 +87,10 @@ type DeleteServerResponse = {
     cluster: V5Cluster;
 };
 
+type CooldLogsResponse = {
+    output: string;
+    fetchedAt: string;
+};
 
 type BootstrapServerResponse = {
     cluster?: V5Cluster;
@@ -102,6 +106,30 @@ type ServerSshCheck = {
 type V5ClusterUpdatedEvent = {
     cluster: V5Cluster | null;
 };
+
+function statusLabel(status: string): string {
+    return status
+        .split(/[-_\s]+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+}
+
+function statusBadgeClass(status: string): string {
+    if (status === 'installed' || status === 'running') {
+        return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400';
+    }
+
+    if (['queued', 'starting', 'bootstrapping'].includes(status)) {
+        return 'border-warning/30 bg-warning/10 text-warning';
+    }
+
+    if (['unreachable', 'failed', 'error'].includes(status)) {
+        return 'border-destructive/30 bg-destructive/10 text-destructive';
+    }
+
+    return 'border-border bg-muted/40 text-muted-foreground';
+}
 
 type EchoChannel = {
     listen: (event: string, callback: (payload: unknown) => void) => EchoChannel;
@@ -226,6 +254,12 @@ export default function Clusters({
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isAddServerDialogOpen, setIsAddServerDialogOpen] = useState(false);
     const [isEditServerDialogOpen, setIsEditServerDialogOpen] = useState(false);
+    const [isCooldLogsDialogOpen, setIsCooldLogsDialogOpen] = useState(false);
+    const [cooldLogsServer, setCooldLogsServer] = useState<V5Server | null>(null);
+    const [cooldLogsOutput, setCooldLogsOutput] = useState('');
+    const [cooldLogsFetchedAt, setCooldLogsFetchedAt] = useState<string | null>(null);
+    const [cooldLogsError, setCooldLogsError] = useState<string | null>(null);
+    const [isLoadingCooldLogs, setIsLoadingCooldLogs] = useState(false);
     const [showAdvancedConfiguration, setShowAdvancedConfiguration] = useState(false);
     const [showAdvancedServerConfiguration, setShowAdvancedServerConfiguration] = useState(false);
 
@@ -588,6 +622,41 @@ export default function Clusters({
         bootstrappingServers.finish(server.id);
     }
 
+
+    async function loadCooldLogs(server: V5Server): Promise<void> {
+        if (!selectedCluster) {
+            return;
+        }
+
+        setCooldLogsServer(server);
+        setIsCooldLogsDialogOpen(true);
+        setIsLoadingCooldLogs(true);
+        setCooldLogsError(null);
+        setCooldLogsOutput('');
+        setCooldLogsFetchedAt(null);
+
+        const response = await fetch(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/coold-logs?tail=200`, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+            },
+        });
+
+        const payload = (await response.json().catch(() => null)) as CooldLogsResponse & { message?: string } | null;
+
+        if (!response.ok) {
+            setCooldLogsError(payload?.message ?? 'Unable to load coold logs.');
+            setIsLoadingCooldLogs(false);
+
+            return;
+        }
+
+        setCooldLogsOutput(payload?.output ?? '');
+        setCooldLogsFetchedAt(payload?.fetchedAt ?? null);
+        setIsLoadingCooldLogs(false);
+    }
+
     function openDeleteClusterDialog(): void {
         if (!selectedCluster || selectedCluster.serversCount !== 0) {
             setDeleteClusterError('Only empty clusters can be deleted.');
@@ -775,8 +844,17 @@ export default function Clusters({
                     <div className="min-w-0 flex-1">
                         <h4 className="break-words text-sm font-semibold text-foreground">{server.name}</h4>
                         <p className="mt-1 break-all text-xs text-muted-foreground">{server.host}</p>
+                        {server.status === 'unreachable' && server.lastStatusOutput ? (
+                            <p className="mt-2 break-words text-xs text-destructive">{server.lastStatusOutput}</p>
+                        ) : null}
                     </div>
                     <div className="flex shrink-0 items-center justify-end gap-2 sm:flex-wrap">
+                        <span
+                            className={`inline-flex h-7 items-center rounded-md border px-2 text-xs font-medium ${statusBadgeClass(server.status)}`}
+                            title={server.lastStatusOutput ?? undefined}
+                        >
+                            {statusLabel(server.status)}
+                        </span>
                         {!isServerInitialized ? (
                             <div role="group" aria-label="Server initialization" className="inline-flex">
                                 <span className="inline-flex h-7 items-center rounded-l-md border border-r-0 border-destructive/30 bg-destructive/10 px-2 text-xs font-medium text-destructive">
@@ -836,6 +914,9 @@ export default function Clusters({
                                                   : 'Show install logs'}
                                         </DropdownMenuItem>
                                     ) : null}
+                                    <DropdownMenuItem onClick={() => void loadCooldLogs(server)}>
+                                        Coold logs
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => openEditServerDialog(server)}>
                                         Edit server
                                     </DropdownMenuItem>
@@ -1753,6 +1834,59 @@ export default function Clusters({
                                         </Button>
                                     </DialogFooter>
                                 </form>
+                            </DialogContent>
+                        </Dialog>
+
+
+                        <Dialog
+                            open={isCooldLogsDialogOpen}
+                            onOpenChange={(open) => {
+                                setIsCooldLogsDialogOpen(open);
+
+                                if (!open) {
+                                    setCooldLogsServer(null);
+                                    setCooldLogsOutput('');
+                                    setCooldLogsFetchedAt(null);
+                                    setCooldLogsError(null);
+                                }
+                            }}
+                        >
+                            <DialogContent className="max-w-4xl">
+                                <DialogHeader>
+                                    <DialogTitle>coold logs</DialogTitle>
+                                    <DialogDescription>
+                                        Latest journalctl entries for {cooldLogsServer?.name ?? 'this server'}.
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                <div className="mt-5 flex flex-col gap-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <p className="text-xs text-muted-foreground">
+                                            {cooldLogsFetchedAt ? `Fetched ${formatDate(cooldLogsFetchedAt)}` : 'Last 200 lines'}
+                                        </p>
+                                        {cooldLogsServer ? (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={isLoadingCooldLogs}
+                                                onClick={() => void loadCooldLogs(cooldLogsServer)}
+                                            >
+                                                {isLoadingCooldLogs ? 'Loading...' : 'Refresh'}
+                                            </Button>
+                                        ) : null}
+                                    </div>
+
+                                    {cooldLogsError ? (
+                                        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                                            {cooldLogsError}
+                                        </div>
+                                    ) : null}
+
+                                    <pre className="max-h-[32rem] overflow-auto rounded-lg border border-border bg-black p-4 font-mono text-xs leading-relaxed text-white">
+                                        {isLoadingCooldLogs ? 'Loading coold logs...' : cooldLogsOutput || 'No coold logs returned.'}
+                                    </pre>
+                                </div>
                             </DialogContent>
                         </Dialog>
 

@@ -126,6 +126,16 @@ class FluxClient
         return $this->output($payload, 'Firewall rule removed.');
     }
 
+    public function cooldLogs(string $hostId, int $tail = 200): string
+    {
+        $payload = $this->dispatch($hostId, [
+            'type' => 'coold.logs',
+            'tail' => max(1, min($tail, 1000)),
+        ]);
+
+        return $this->output($payload, 'No coold logs returned.');
+    }
+
     /**
      * @param  array<string, mixed>  $command
      * @return array<string, mixed>

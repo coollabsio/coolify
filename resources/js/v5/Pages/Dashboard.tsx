@@ -108,6 +108,22 @@ const CANVAS_ZOOM_STEP = 0.1;
 const PINCH_CANVAS_ZOOM_STEP = 0.03;
 const DEFAULT_NGINX_IMAGE = 'docker.io/library/nginx:alpine';
 
+function statusBadgeClass(status: string): string | false {
+    if (status === 'running') {
+        return 'bg-emerald-500/15 text-emerald-400';
+    }
+
+    if (status === 'creating') {
+        return 'bg-warning/15 text-warning';
+    }
+
+    if (['failed', 'exited', 'unreachable'].includes(status)) {
+        return 'bg-destructive/15 text-destructive';
+    }
+
+    return false;
+}
+
 async function persistApplicationPosition(application: V5Application): Promise<void> {
     await fetch(`/v5/applications/${application.id}/position`, {
         method: 'PATCH',
@@ -174,8 +190,9 @@ export default function Dashboard({
 
     const statusCounts = useMemo(
         () => ({
-            running: applications.filter((application) => application.status === 'running').length,
-            failed: applications.filter((application) => application.status === 'failed').length,
+            running: applications.filter((application) => application.effectiveStatus === 'running').length,
+            failed: applications.filter((application) => application.effectiveStatus === 'failed').length,
+            unreachable: applications.filter((application) => application.effectiveStatus === 'unreachable').length,
         }),
         [applications],
     );
@@ -1312,6 +1329,12 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                                     <span className="text-destructive">{statusCounts.failed} failed</span>
                                 </>
                             )}
+                            {statusCounts.unreachable > 0 && (
+                                <>
+                                    <span>•</span>
+                                    <span className="text-destructive">{statusCounts.unreachable} unreachable</span>
+                                </>
+                            )}
                         </div>
                     </div>
 
@@ -1364,11 +1387,9 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                                         <span
                                             className={cn(
                                                 'shrink-0 rounded-full px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-wide',
-                                                ingress.status === 'running' && 'bg-emerald-500/15 text-emerald-400',
-                                                ingress.status === 'creating' && 'bg-warning/15 text-warning',
-                                                ingress.status === 'failed' && 'bg-destructive/15 text-destructive',
-                                                ingress.status === 'exited' && 'bg-destructive/15 text-destructive',
+                                                statusBadgeClass(ingress.status),
                                             )}
+                                            title={ingress.statusMessage ?? undefined}
                                         >
                                             {ingress.status}
                                         </span>
@@ -1645,13 +1666,11 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                                             <span
                                                 className={cn(
                                                     'rounded-full px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-wide',
-                                                    application.status === 'running' && 'bg-emerald-500/15 text-emerald-400',
-                                                    application.status === 'creating' && 'bg-warning/15 text-warning',
-                                                    application.status === 'failed' && 'bg-destructive/15 text-destructive',
-                                                    application.status === 'exited' && 'bg-destructive/15 text-destructive',
+                                                    statusBadgeClass(application.effectiveStatus),
                                                 )}
+                                                title={application.effectiveStatusMessage ?? undefined}
                                             >
-                                                {application.status}
+                                                {application.effectiveStatus}
                                             </span>
                                             <button
                                                 type="button"
@@ -1680,6 +1699,9 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                                             <dt className="shrink-0 text-muted-foreground">Server</dt>
                                             <dd className="truncate text-right font-medium text-foreground">
                                                 {application.serverName ?? 'Unknown'}
+                                                {!application.isServerReachable && (
+                                                    <span className="ml-2 text-destructive">(unreachable)</span>
+                                                )}
                                             </dd>
                                         </div>
                                         <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3">
@@ -1743,8 +1765,15 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
 
                                             <Field>
                                                 <FieldLabel>Status</FieldLabel>
-                                                <Input value={selectedInspectorApplication.status} readOnly />
+                                                <Input value={selectedInspectorApplication.effectiveStatus} readOnly />
                                             </Field>
+
+                                            {selectedInspectorApplication.effectiveStatus !== selectedInspectorApplication.status && (
+                                                <Field>
+                                                    <FieldLabel>Last known container status</FieldLabel>
+                                                    <Input value={selectedInspectorApplication.status} readOnly />
+                                                </Field>
+                                            )}
 
                                             <Field>
                                                 <FieldLabel>Image</FieldLabel>
@@ -1753,7 +1782,14 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
 
                                             <Field>
                                                 <FieldLabel>Server</FieldLabel>
-                                                <Input value={selectedInspectorApplication.serverName ?? 'Unknown'} readOnly />
+                                                <Input
+                                                    value={
+                                                        selectedInspectorApplication.isServerReachable
+                                                            ? (selectedInspectorApplication.serverName ?? 'Unknown')
+                                                            : `${selectedInspectorApplication.serverName ?? 'Unknown'} (unreachable)`
+                                                    }
+                                                    readOnly
+                                                />
                                             </Field>
 
                                             <Field>
@@ -1770,7 +1806,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                                         <Field>
                                             <FieldLabel>Status message</FieldLabel>
                                             <Textarea
-                                                value={selectedInspectorApplication.statusMessage ?? 'No status message yet.'}
+                                                value={selectedInspectorApplication.effectiveStatusMessage ?? 'No status message yet.'}
                                                 readOnly
                                                 className="min-h-20"
                                             />

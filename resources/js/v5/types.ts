@@ -30,6 +30,8 @@ export type V5Server = {
     lastBootstrapStatus: string | null;
     lastBootstrapOutput: string | null;
     lastBootstrapRanAt: string | null;
+    lastStatusOutput: string | null;
+    lastStatusCheckedAt: string | null;
 };
 
 export type V5Cluster = {
@@ -90,8 +92,13 @@ export type V5Application = {
     containerName: string;
     status: 'creating' | 'running' | 'failed' | string;
     statusMessage: string | null;
+    effectiveStatus: 'creating' | 'running' | 'failed' | 'unreachable' | string;
+    effectiveStatusMessage: string | null;
     runtimeContainerId: string | null;
     serverName: string | null;
+    serverStatus: string | null;
+    serverStatusMessage: string | null;
+    isServerReachable: boolean;
     serverIngressEnabled: boolean;
     meshNamespace: string;
     ingressEnabled: boolean;
@@ -107,6 +114,7 @@ export type V5CaddyIngress = {
     name: string;
     host: string;
     status: string;
+    statusMessage: string | null;
     canvasX: number;
     canvasY: number;
 };

@@ -24,25 +24,7 @@ class FluxDev extends Command
     private function defaultCapabilities(): array
     {
         return [
-            'images.pull',
-            'images.list',
-            'images.delete',
-            'containers.create',
-            'containers.start',
-            'containers.stop',
-            'containers.restart',
-            'containers.delete',
-            'containers.inspect',
-            'containers.list',
-            'containers.logs',
-            'containers.exec',
-            'containers.healthcheck.run',
-            'ingress.apply',
-            'ingress.stop',
-            'firewall.allow',
-            'firewall.revoke',
-            'firewall.list',
-            'firewall.reconcile',
+            'host-agent:dev',
         ];
     }
 
