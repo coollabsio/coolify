@@ -31,12 +31,55 @@
             </x-forms.select>
             <div @if ($poll) wire:poll.5000ms='pollData' @endif x-init="$wire.loadData()"
                 class="pt-5">
+                @once
+                    <script>
+                        window.shiftSeriesToServerTimezone = function(seriesData, serverTimezone) {
+                            let serverTimezoneFormatter;
+                            try {
+                                serverTimezoneFormatter = new Intl.DateTimeFormat('en-US', {
+                                    timeZone: serverTimezone,
+                                    hourCycle: 'h23',
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                });
+                            } catch (e) {
+                                serverTimezoneFormatter = null;
+                            }
+                            if (!Array.isArray(seriesData) || !serverTimezoneFormatter) {
+                                return seriesData;
+                            }
+                            return seriesData.map((point) => {
+                                const timestamp = Array.isArray(point) ? point[0] : point.x;
+                                const value = Array.isArray(point) ? point[1] : point.y;
+                                const parts = {};
+                                serverTimezoneFormatter.formatToParts(new Date(timestamp)).forEach((part) => {
+                                    parts[part.type] = part.value;
+                                });
+                                const shifted = Date.UTC(
+                                    Number(parts.year),
+                                    Number(parts.month) - 1,
+                                    Number(parts.day),
+                                    Number(parts.hour),
+                                    Number(parts.minute),
+                                    Number(parts.second)
+                                );
+                                return [shifted, value];
+                            });
+                        };
+                    </script>
+                @endonce
+
                 <h4>CPU Usage</h4>
                 <div wire:ignore id="{!! $chartId !!}-cpu"></div>
 
                 <script>
                     (function() {
                         checkTheme();
+                        const serverTimezone = @js(getServerTimezone(data_get($resource, 'destination.server')));
                         const optionsServerCpu = {
                             stroke: {
                                 curve: 'straight',
@@ -124,7 +167,7 @@
                              checkTheme();
                               serverCpuChart.updateOptions({
                                   series: [{
-                                      data: chartData[0].seriesData,
+                                      data: window.shiftSeriesToServerTimezone(chartData[0].seriesData, serverTimezone),
                                   }],
                                   colors: [cpuColor],
                                  xaxis: {
@@ -165,6 +208,7 @@
                 <script>
                     (function() {
                         checkTheme();
+                        const serverTimezone = @js(getServerTimezone(data_get($resource, 'destination.server')));
                         const optionsServerMemory = {
                             stroke: {
                                 curve: 'straight',
@@ -259,7 +303,7 @@
                              checkTheme();
                               serverMemoryChart.updateOptions({
                                   series: [{
-                                      data: chartData[0].seriesData,
+                                      data: window.shiftSeriesToServerTimezone(chartData[0].seriesData, serverTimezone),
                                   }],
                                   colors: [ramColor],
                                  xaxis: {
