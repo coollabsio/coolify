@@ -8,7 +8,6 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Danger extends Component
 {
@@ -39,7 +38,7 @@ class Danger extends Component
     public function mount()
     {
         $parameters = get_route_parameters();
-        $this->modalId = new Cuid2;
+        $this->modalId = new_public_id();
         $this->projectUuid = data_get($parameters, 'project_uuid');
         $this->environmentUuid = data_get($parameters, 'environment_uuid');
 

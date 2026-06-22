@@ -31,8 +31,12 @@ class Show extends Component
             if (! $destination) {
                 return redirect()->route('destination.index');
             }
+            $this->authorize('view', $destination);
+
             $this->destination = $destination;
             $this->syncData();
+        } catch (\Illuminate\Auth\Access\AuthorizationException) {
+            abort(403);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

@@ -45,6 +45,8 @@ class General extends Component
 
     public ?string $customDockerRunOptions = null;
 
+    public bool $isPasswordHiddenForMember = false;
+
     protected function rules(): array
     {
         return [
@@ -118,6 +120,11 @@ class General extends Component
             }
         } catch (Exception $e) {
             return handleError($e, $this);
+        }
+
+        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
+        if ($this->isPasswordHiddenForMember) {
+            $this->mongoInitdbRootPassword = '';
         }
     }
 

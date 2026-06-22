@@ -36,7 +36,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
             $data = data_get($this->event, 'data.object');
             switch ($type) {
                 case 'radar.early_fraud_warning.created':
-                    $stripe = new StripeClient(config('subscription.stripe_api_key'));
+                    $stripe = app(StripeClient::class);
                     $id = data_get($data, 'id');
                     $charge = data_get($data, 'charge');
                     if ($charge) {
@@ -100,7 +100,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
 
                     if ($subscription->stripe_subscription_id) {
                         try {
-                            $stripe = new StripeClient(config('subscription.stripe_api_key'));
+                            $stripe = app(StripeClient::class);
                             $stripeSubscription = $stripe->subscriptions->retrieve(
                                 $subscription->stripe_subscription_id
                             );
@@ -166,7 +166,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                     // Verify payment status with Stripe API before sending failure notification
                     if ($paymentIntentId) {
                         try {
-                            $stripe = new StripeClient(config('subscription.stripe_api_key'));
+                            $stripe = app(StripeClient::class);
                             $paymentIntent = $stripe->paymentIntents->retrieve($paymentIntentId);
 
                             if (in_array($paymentIntent->status, ['processing', 'succeeded', 'requires_action', 'requires_confirmation'])) {

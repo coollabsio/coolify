@@ -31,6 +31,15 @@ beforeEach(function () {
     Server::flushIdentityMap();
 });
 
+function loginAndSkipBoarding(string $email = 'test@example.com', string $password = 'password'): mixed
+{
+    return visit('/login')
+        ->fill('email', $email)
+        ->fill('password', $password)
+        ->click('Login')
+        ->click('Skip Setup');
+}
+
 /*
 |--------------------------------------------------------------------------
 | Expectations

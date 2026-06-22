@@ -37,9 +37,13 @@
                 <x-forms.input label="Username" id="postgresUser" placeholder="If empty: postgres" canGate="update"
                     :canResource="$database"
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
-                <x-forms.input label="Password" id="postgresPassword" type="password" required canGate="update"
-                    :canResource="$database"
-                    helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
+                @if ($isPasswordHiddenForMember)
+                    <x-forms.input label="Password" disabled value="Hidden (only admins can view)" />
+                @else
+                    <x-forms.input label="Password" id="postgresPassword" type="password" required canGate="update"
+                        :canResource="$database"
+                        helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
+                @endif
                 <x-forms.input label="Initial Database" id="postgresDb"
                     placeholder="If empty, it will be the same as Username." readonly
                     helper="You can only change this in the database." />
@@ -48,8 +52,12 @@
             <div class="flex xl:flex-row flex-col gap-2 pb-2">
                 <x-forms.input label="Username" id="postgresUser" placeholder="If empty: postgres" canGate="update"
                     :canResource="$database" />
-                <x-forms.input label="Password" id="postgresPassword" type="password" required canGate="update"
-                    :canResource="$database" />
+                @if ($isPasswordHiddenForMember)
+                    <x-forms.input label="Password" disabled value="Hidden (only admins can view)" />
+                @else
+                    <x-forms.input label="Password" id="postgresPassword" type="password" required canGate="update"
+                        :canResource="$database" />
+                @endif
                 <x-forms.input label="Initial Database" id="postgresDb"
                     placeholder="If empty, it will be the same as Username." canGate="update" :canResource="$database" />
             </div>
@@ -134,7 +142,8 @@
             </div>
             <div class="flex flex-col gap-2">
                 @forelse($initScripts ?? [] as $script)
-                    <livewire:project.database.init-script :script="$script" :wire:key="$script['index']" />
+                    <livewire:project.database.init-script :database="$database" :script="$script"
+                        :wire:key="$script['index']" />
                 @empty
                     <div>No initialization scripts found.</div>
                 @endforelse

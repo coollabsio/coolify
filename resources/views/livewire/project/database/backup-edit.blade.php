@@ -5,7 +5,7 @@
             Save
         </x-forms.button>
         @if (str($status)->startsWith('running'))
-            <livewire:project.database.backup-now :backup="$backup" />
+            <x-forms.button wire:click='backupNow'>Backup Now</x-forms.button>
         @endif
         @if ($backup->database_id !== 0)
             <x-modal-confirmation title="Confirm Backup Schedule Deletion?" buttonTitle="Delete Backups and Schedule"
