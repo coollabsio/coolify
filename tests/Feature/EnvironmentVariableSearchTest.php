@@ -220,6 +220,26 @@ it('does not delete non-matching variables when saving developer view after sear
         ->toContain('DATABASE_URL');
 });
 
+it('shows the empty message instead of 500 when a service search matches nothing', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+    ]);
+
+    EnvironmentVariable::create([
+        'key' => 'API_KEY',
+        'value' => 'secret',
+        'resourceable_type' => Service::class,
+        'resourceable_id' => $service->id,
+    ]);
+
+    $component = Livewire::test(All::class, ['resource' => $service])
+        ->set('search', 'no-such-variable')
+        ->assertOk()
+        ->assertSee('No environment variables found.');
+
+    expect($component->instance()->hasEnvironmentVariables)->toBeFalse();
+});
+
 it('hides the preview section when search filters out all preview variables', function () {
     $application = Application::factory()->create([
         'environment_id' => $this->environment->id,
