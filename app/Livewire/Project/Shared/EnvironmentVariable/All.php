@@ -88,6 +88,10 @@ class All extends Component
 
     public function getEnvironmentVariablesPreviewProperty()
     {
+        if (! $this->showPreview) {
+            return collect();
+        }
+
         return $this->getEnvironmentVariables(true);
     }
 
@@ -139,6 +143,10 @@ class All extends Component
 
     public function getHardcodedEnvironmentVariablesPreviewProperty()
     {
+        if (! $this->showPreview) {
+            return collect();
+        }
+
         return $this->getHardcodedVariables(true);
     }
 
