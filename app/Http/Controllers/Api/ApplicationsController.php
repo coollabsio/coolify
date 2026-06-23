@@ -1087,7 +1087,7 @@ class ApplicationsController extends Controller
 
                 $errors = [];
                 $urls = $urls->map(function ($url) use (&$errors) {
-                    if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                    if (! isValidDomainUrl($url)) {
                         $errors[] = "Invalid URL: {$url}";
 
                         return $url;
@@ -1328,7 +1328,7 @@ class ApplicationsController extends Controller
 
                 $errors = [];
                 $urls = $urls->map(function ($url) use (&$errors) {
-                    if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                    if (! isValidDomainUrl($url)) {
                         $errors[] = "Invalid URL: {$url}";
 
                         return $url;
@@ -1541,7 +1541,7 @@ class ApplicationsController extends Controller
 
                 $errors = [];
                 $urls = $urls->map(function ($url) use (&$errors) {
-                    if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                    if (! isValidDomainUrl($url)) {
                         $errors[] = "Invalid URL: {$url}";
 
                         return $url;
@@ -2493,7 +2493,7 @@ class ApplicationsController extends Controller
                     return null;
                 }
 
-                if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                if (! isValidDomainUrl($url)) {
                     $errors[] = 'Invalid URL: '.$url;
 
                     return $url;
@@ -2556,7 +2556,7 @@ class ApplicationsController extends Controller
 
             $errors = [];
             $urls = $urls->map(function ($url) use (&$errors) {
-                if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                if (! isValidDomainUrl($url)) {
                     $errors[] = "Invalid URL: {$url}";
 
                     return $url;
@@ -3869,7 +3869,7 @@ class ApplicationsController extends Controller
                     return null;
                 }
 
-                if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                if (! isValidDomainUrl($url)) {
                     $errors[] = 'Invalid URL: '.$url;
 
                     return str($url)->lower();

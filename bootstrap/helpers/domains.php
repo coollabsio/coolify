@@ -4,6 +4,30 @@ use App\Models\Application;
 use App\Models\ServiceApplication;
 use Illuminate\Support\Collection;
 
+/**
+ * Validate that a string is a well-formed domain URL, tolerating underscores
+ * in the host. FILTER_VALIDATE_URL follows RFC 3986 and rejects underscores,
+ * but they are common in Docker service domains and accepted by browsers and
+ * Let's Encrypt, so we re-validate with host underscores swapped for hyphens.
+ */
+function isValidDomainUrl(string $url): bool
+{
+    if (filter_var($url, FILTER_VALIDATE_URL) !== false) {
+        return true;
+    }
+
+    $host = parse_url($url, PHP_URL_HOST);
+    if (blank($host) || ! str_contains($host, '_')) {
+        return false;
+    }
+
+    // Replace only the first occurrence (the authority), not a path/query match.
+    $position = strpos($url, $host);
+    $sanitized = substr_replace($url, str_replace('_', '-', $host), $position, strlen($host));
+
+    return filter_var($sanitized, FILTER_VALIDATE_URL) !== false;
+}
+
 function checkDomainUsage(ServiceApplication|Application|null $resource = null, ?string $domain = null)
 {
     $conflicts = [];
