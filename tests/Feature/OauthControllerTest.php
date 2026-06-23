@@ -77,3 +77,27 @@ it('rejects oauth logins when the provider does not return an email address', fu
     'null email' => [null],
     'blank email' => ['   '],
 ]);
+
+it('rejects callback when oauth provider is configured but not enabled', function () {
+    config()->set('app.maintenance.driver', 'file');
+
+    $user = User::factory()->create([
+        'email' => 'user@example.com',
+    ]);
+
+    OauthSetting::where('provider', 'google')->update(['enabled' => false]);
+
+    $response = $this->from('/login')->get(route('auth.callback', 'google'));
+
+    $response->assertStatus(403);
+    $this->assertGuest();
+    expect(User::count())->toBe(1);
+});
+
+it('rejects redirect when oauth provider is configured but not enabled', function () {
+    config()->set('app.maintenance.driver', 'file');
+
+    $response = $this->get(route('auth.redirect', 'google'));
+
+    $response->assertStatus(403);
+});
