@@ -106,6 +106,7 @@ return [
         'login' => 'login',
         'two-factor' => 'two-factor',
         'forgot-password' => 'forgot-password',
+        'passkeys' => 'passkeys',
     ],
 
     /*
@@ -143,6 +144,28 @@ return [
             'confirmPassword' => true,
             // 'window' => 0,
         ]),
+        Features::passkeys([
+            'confirmPassword' => true,
+        ]),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Passkeys
+    |--------------------------------------------------------------------------
+    |
+    | WebAuthn passkey configuration. Relying party values are overridden at
+    | runtime in FortifyServiceProvider to use the instance FQDN when available.
+    |
+    */
+
+    'passkeys' => [
+        'relying_party_id' => parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST),
+        'allowed_origins' => array_values(array_filter([
+            env('APP_URL', 'http://localhost'),
+        ])),
+        'user_handle_secret' => env('APP_KEY'),
+        'timeout' => 60000,
     ],
 
 ];

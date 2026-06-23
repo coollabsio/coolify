@@ -15,6 +15,7 @@
         "vite": "7.3.2"
     },
     "dependencies": {
+        "@laravel/passkeys": "^0.2.0",
         "@tailwindcss/forms": "0.5.10",
         "@tailwindcss/typography": "0.5.16",
         "@xterm/addon-fit": "0.10.0",

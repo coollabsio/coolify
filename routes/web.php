@@ -128,6 +128,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/profile', ProfileIndex::class)->name('profile');
     Route::get('/profile/appearance', ProfileAppearance::class)->name('profile.appearance');
+    Route::get('/profile/add-passkey', function () {
+        session()->put('url.intended', route('profile').'?addPasskey=1');
+
+        return redirect()->route('password.confirm');
+    })->name('profile.add-passkey');
 
     Route::prefix('tags')->group(function () {
         Route::get('/{tagName?}', TagsShow::class)->name('tags.show');

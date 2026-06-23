@@ -6,6 +6,7 @@ use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
+use App\Http\Responses\PasskeyConfirmationResponse;
 use App\Models\OauthSetting;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Fortify\Contracts\RegisterResponse;
 use Laravel\Fortify\Fortify;
+use Laravel\Passkeys\Contracts\PasskeyConfirmationResponse as PasskeyConfirmationResponseContract;
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -23,6 +25,8 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(PasskeyConfirmationResponseContract::class, PasskeyConfirmationResponse::class);
+
         $this->app->instance(RegisterResponse::class, new class implements RegisterResponse
         {
             public function toResponse($request)
@@ -42,6 +46,18 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        configurePasskeyRelyingParty(
+            passkeyRelyingPartyId(),
+            passkeyAllowedOrigins(),
+        );
+
+        config([
+            'fortify.passkeys.user_handle_secret' => config('app.key'),
+            'fortify.passkeys.timeout' => 60000,
+            'passkeys.user_handle_secret' => config('app.key'),
+            'passkeys.timeout' => 60000,
+        ]);
+
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::registerView(function () {
             $isFirstUser = User::count() === 0;
@@ -81,25 +97,6 @@ class FortifyServiceProvider extends ServiceProvider
                 $user->updated_at = now();
                 $user->save();
 
-                // Check if user has a pending invitation they haven't accepted yet
-                $invitation = \App\Models\TeamInvitation::whereEmail($email)->first();
-                if ($invitation && $invitation->isValid()) {
-                    // User is logging in for the first time after being invited
-                    // Attach them to the invited team if not already attached
-                    if (! $user->teams()->where('team_id', $invitation->team->id)->exists()) {
-                        $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
-                    }
-                    $user->currentTeam = $invitation->team;
-                    $invitation->delete();
-                } else {
-                    // Normal login - use personal team
-                    $user->currentTeam = $user->teams->firstWhere('personal_team', true);
-                    if (! $user->currentTeam) {
-                        $user->currentTeam = $user->recreate_personal_team();
-                    }
-                }
-                session(['currentTeam' => $user->currentTeam]);
-
                 return $user;
             }
         });
@@ -115,7 +112,9 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
 
         Fortify::confirmPasswordView(function () {
-            return view('auth.confirm-password');
+            return view('auth.confirm-password', [
+                'hasPasskeys' => auth()->user()?->passkeys()->exists() ?? false,
+            ]);
         });
 
         Fortify::twoFactorChallengeView(function () {
@@ -144,6 +143,12 @@ class FortifyServiceProvider extends ServiceProvider
 
         RateLimiter::for('two-factor', function (Request $request) {
             return Limit::perMinute(5)->by($request->session()->get('login.id'));
+        });
+
+        RateLimiter::for('passkeys', function (Request $request) {
+            $realIp = $request->server('REMOTE_ADDR') ?? $request->ip();
+
+            return Limit::perMinute(5)->by($realIp);
         });
     }
 }
