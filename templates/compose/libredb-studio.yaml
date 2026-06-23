@@ -1,0 +1,26 @@
+# documentation: https://github.com/libredb/libredb-studio
+# slogan: Modern, AI-powered open-source SQL IDE for PostgreSQL, MySQL, Oracle, SQL Server, SQLite, MongoDB and Redis.
+# category: database
+# tags: database,sql,ide,developer-tools,ai,self-hosted
+# logo: svgs/libredb-studio.svg
+# port: 3000
+
+services:
+  libredb-studio:
+    image: ghcr.io/libredb/libredb-studio:v0.9.27
+    environment:
+      - SERVICE_URL_LIBREDBSTUDIO_3000
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@libredb.org}
+      - ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - USER_EMAIL=${USER_EMAIL:-user@libredb.org}
+      - USER_PASSWORD=${SERVICE_PASSWORD_USER}
+      - JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
+      - STORAGE_PROVIDER=sqlite
+      - STORAGE_SQLITE_PATH=/app/data/libredb-storage.db
+    volumes:
+      - libredb-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
