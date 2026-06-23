@@ -7,7 +7,7 @@
 
 services:
   libredb-studio:
-    image: ghcr.io/libredb/libredb-studio:v0.9.27
+    image: ghcr.io/libredb/libredb-studio:0.9.27
     environment:
       - SERVICE_URL_LIBREDBSTUDIO_3000
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@libredb.org}
