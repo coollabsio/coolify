@@ -1,0 +1,22 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="100%" stop-color="#9333EA" />
+    </linearGradient>
+    <linearGradient id="code-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+  </defs>
+  <path d="M100 20L169.282 60V140L100 180L30.718 140V60L100 20Z" fill="url(#logo-gradient)" fill-opacity="0.05" stroke="url(#logo-gradient)" stroke-width="1.5"/>
+  <g opacity="0.3">
+    <rect x="70" y="80" width="60" height="10" rx="2" fill="url(#logo-gradient)" />
+    <rect x="70" y="95" width="60" height="10" rx="2" fill="url(#logo-gradient)" />
+    <rect x="70" y="110" width="60" height="10" rx="2" fill="url(#logo-gradient)" />
+  </g>
+  <g>
+    <path d="M55 70L35 100L55 130" stroke="url(#code-gradient)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M145 70L165 100L145 130" stroke="url(#code-gradient)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+</svg>
