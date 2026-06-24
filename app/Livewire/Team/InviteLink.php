@@ -59,20 +59,26 @@ class InviteLink extends Component
 
             $member_emails = currentTeam()->members()->get()->pluck('email');
             if ($member_emails->contains($this->email)) {
-                return handleError(livewire: $this, customErrorMessage: "$this->email is already a member of ".currentTeam()->name.'.');
+                return handleError(livewire: $this, customErrorMessage: "$this->email is already a member of " . currentTeam()->name . '.');
             }
             $uuid = (string) new Cuid2(32);
-            $link = url('/').config('constants.invitation.link.base_url').$uuid;
+            $link = url('/') . config('constants.invitation.link.base_url') . $uuid;
             $user = User::whereEmail($this->email)->first();
 
-            if (is_null($user)) {
+            if (is_null($user) || $user->force_password_reset) {
                 $password = Str::password();
-                $user = User::create([
-                    'name' => str($this->email)->before('@'),
-                    'email' => $this->email,
-                    'password' => Hash::make($password),
-                    'force_password_reset' => true,
-                ]);
+                if (is_null($user)) {
+                    $user = User::create([
+                        'name' => str($this->email)->before('@'),
+                        'email' => $this->email,
+                        'password' => Hash::make($password),
+                        'force_password_reset' => true,
+                    ]);
+                } else {
+                    $user->update([
+                        'password' => Hash::make($password),
+                    ]);
+                }
                 $token = Crypt::encryptString("{$user->email}@@@{$uuid}@@@{$password}");
                 $link = route('auth.link', ['token' => $token]);
             }
@@ -100,7 +106,7 @@ class InviteLink extends Component
                     'team' => currentTeam()->name,
                     'invitation_link' => $link,
                 ]);
-                $mail->subject('You have been invited to '.currentTeam()->name.' on '.config('app.name').'.');
+                $mail->subject('You have been invited to ' . currentTeam()->name . ' on ' . config('app.name') . '.');
                 send_user_an_email($mail, $this->email);
                 $this->dispatch('success', 'Invitation sent via email.');
                 $this->dispatch('refreshInvitations');
