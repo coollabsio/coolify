@@ -6,6 +6,7 @@ use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
+use App\Livewire\Deployments\Index as DeploymentsIndex;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Resources as DestinationResources;
 use App\Livewire\Destination\Show as DestinationShow;
@@ -204,6 +205,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/projects', ProjectIndex::class)->name('project.index');
+    Route::get('/deployments', DeploymentsIndex::class)->name('deployments.index');
     Route::prefix('project/{project_uuid}')->group(function () {
         Route::get('/', ProjectShow::class)->name('project.show');
         Route::get('/edit', ProjectEdit::class)->name('project.edit')->middleware('can.update.resource');
