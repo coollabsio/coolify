@@ -67,11 +67,11 @@ class Index extends Component
     {
         $teamId = currentTeam()?->id;
         $applicationIds = Application::query()
+            ->withoutGlobalScope('withRelations')
+            ->selectRaw('CAST(id AS TEXT)')
             ->whereHas('environment.project', function ($query) use ($teamId) {
                 $query->where('team_id', $teamId);
-            })
-            ->pluck('id')
-            ->map(fn ($id) => (string) $id);
+            });
 
         return ApplicationDeploymentQueue::query()
             ->select([
