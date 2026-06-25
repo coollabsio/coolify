@@ -1,9 +1,30 @@
 <div>
     <x-slot:title>Deployments | Coolify</x-slot:title>
 
-    <h1>Deployments</h1>
-
     <div class="flex flex-col gap-4 pb-10" @if ($deployments->currentPage() === 1) wire:poll.5000ms @endif>
+        <div class="flex flex-wrap items-center gap-4">
+            <h1>Deployments <span class="text-xs">({{ $deployments->total() }})</span></h1>
+            @if ($deployments->total() > 0)
+                <div class="flex items-center gap-2">
+                    <x-forms.button type="button" disabled="{{ $deployments->onFirstPage() }}" wire:click="previousPage">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24">
+                            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="2" d="m14 6l-6 6l6 6z" />
+                        </svg>
+                    </x-forms.button>
+                    <span class="px-2 text-sm text-gray-600 dark:text-gray-400">
+                        Page {{ $deployments->currentPage() }} of {{ $deployments->lastPage() }}
+                    </span>
+                    <x-forms.button type="button" disabled="{{ ! $deployments->hasMorePages() }}" wire:click="nextPage">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24">
+                            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="2" d="m10 18l6-6l-6-6z" />
+                        </svg>
+                    </x-forms.button>
+                </div>
+            @endif
+        </div>
+
         <div class="flex flex-col gap-3 md:flex-row md:items-end">
             <div class="w-full md:w-48">
                 <x-forms.select id="deployment_type" label="Type" wire:model.live="deployment_type">
@@ -137,10 +158,5 @@
             @endforelse
         </div>
 
-        @if ($deployments->hasPages())
-            <div>
-                {{ $deployments->links() }}
-            </div>
-        @endif
     </div>
 </div>
