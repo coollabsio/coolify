@@ -117,6 +117,17 @@ it('shows paginated deployment history for the current team only', function () {
         $newDeployment->deployment_uuid,
         $oldDeployment->deployment_uuid,
     ]);
+
+    $dom = new DOMDocument;
+    $previousLibxmlState = libxml_use_internal_errors(true);
+    $dom->loadHTML($response->getContent());
+    libxml_clear_errors();
+    libxml_use_internal_errors($previousLibxmlState);
+
+    $xpath = new DOMXPath($dom);
+
+    expect($xpath->query('//button[@aria-label="Previous page"]')->length)->toBe(1);
+    expect($xpath->query('//button[@aria-label="Next page"]')->length)->toBe(1);
 });
 
 it('paginates global deployments', function () {
@@ -240,9 +251,11 @@ it('keeps deployment row navigation separate from commit links', function () {
     $xpath = new DOMXPath($dom);
     $deploymentUrlAnchors = $xpath->query('//*[@data-deployment-uuid="deployment-with-url"]//a[@href="'.$deploymentUrl.'"]');
     $commitAnchors = $xpath->query('//*[@data-deployment-uuid="deployment-with-url"]//a[@target="_blank" and contains(@rel, "noopener")]');
+    $deploymentRows = $xpath->query('//*[@data-deployment-uuid="deployment-with-url" and @role="link" and @tabindex="0"]');
 
     expect($deploymentUrlAnchors->length)->toBe(0);
     expect($commitAnchors->length)->toBe(1);
+    expect($deploymentRows->length)->toBe(1);
 });
 
 it('renders deployments without log urls as non-clickable rows', function () {

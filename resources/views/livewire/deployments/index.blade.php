@@ -6,7 +6,8 @@
             <h1>Deployments <span class="text-xs">({{ $deployments->total() }})</span></h1>
             @if ($deployments->total() > 0)
                 <div class="flex items-center gap-2">
-                    <x-forms.button type="button" :disabled="$deployments->onFirstPage()" wire:click="previousPage">
+                    <x-forms.button type="button" aria-label="Previous page" :disabled="$deployments->onFirstPage()"
+                        wire:click="previousPage">
                         <svg class="w-4 h-4" viewBox="0 0 24 24">
                             <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                                 stroke-width="2" d="m14 6l-6 6l6 6z" />
@@ -15,7 +16,8 @@
                     <span class="px-2 text-sm text-gray-600 dark:text-gray-400">
                         Page {{ $deployments->currentPage() }} of {{ $deployments->lastPage() }}
                     </span>
-                    <x-forms.button type="button" :disabled="! $deployments->hasMorePages()" wire:click="nextPage">
+                    <x-forms.button type="button" aria-label="Next page" :disabled="! $deployments->hasMorePages()"
+                        wire:click="nextPage">
                         <svg class="w-4 h-4" viewBox="0 0 24 24">
                             <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                                 stroke-width="2" d="m10 18l6-6l-6-6z" />
@@ -70,10 +72,19 @@
                 @endphp
 
                 <div data-deployment-uuid="{{ data_get($deployment, 'deployment_uuid') }}"
-                    @if ($deploymentUrl) x-on:click="if (!$event.target.closest('a')) {
+                    @if ($deploymentUrl) tabindex="0" role="link" aria-label="View deployment logs for {{ data_get($deployment, 'application_name') ?? data_get($application, 'name') ?? 'application' }}"
+                        x-on:click="if (!$event.target.closest('a')) {
                             const url = @js($deploymentUrl);
                             window.Livewire?.navigate ? window.Livewire.navigate(url) : window.location.href = url;
-                        }" @endif
+                        }"
+                        x-on:keydown.enter.prevent="
+                            const url = @js($deploymentUrl);
+                            window.Livewire?.navigate ? window.Livewire.navigate(url) : window.location.href = url;
+                        "
+                        x-on:keydown.space.prevent="
+                            const url = @js($deploymentUrl);
+                            window.Livewire?.navigate ? window.Livewire.navigate(url) : window.location.href = url;
+                        " @endif
                     @class([
                     'p-3 border-l-2 bg-white dark:bg-coolgray-100',
                     'cursor-pointer' => $deploymentUrl,
