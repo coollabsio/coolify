@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Livewire\Deployments\Index as DeploymentsIndex;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
@@ -11,6 +12,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -109,7 +111,7 @@ it('shows paginated deployment history for the current team only', function () {
     $response->assertSee('Production Server');
     $response->assertSee('Newest same team deployment');
     $response->assertSee('Old same team deployment');
-    $response->assertSee('/project/storefront/environment/production/application/checkout/deployment/new-deployment', false);
+    $response->assertSee('\/project\/storefront\/environment\/production\/application\/checkout\/deployment\/new-deployment', false);
     $response->assertDontSee('Hidden other team deployment');
     $response->assertSeeInOrder([
         $newDeployment->deployment_uuid,
@@ -141,6 +143,38 @@ it('paginates global deployments', function () {
     $this->get('/deployments?page=2')
         ->assertSuccessful()
         ->assertSee('Last page unique deployment');
+});
+
+it('paginates global deployments through Livewire controls', function () {
+    createGlobalHistoryDeployment([
+        'deployment_uuid' => 'failed-deployment',
+        'commit_message' => 'Filtered failed deployment',
+        'status' => ApplicationDeploymentStatus::FAILED->value,
+        'created_at' => now(),
+        'finished_at' => now()->addMinute(),
+    ]);
+
+    for ($deploymentNumber = 1; $deploymentNumber <= 21; $deploymentNumber++) {
+        createGlobalHistoryDeployment([
+            'deployment_uuid' => "livewire-deployment-{$deploymentNumber}",
+            'commit_message' => "Livewire deployment {$deploymentNumber}",
+            'created_at' => now()->subMinutes($deploymentNumber),
+            'finished_at' => now()->subMinutes($deploymentNumber)->addMinute(),
+        ]);
+    }
+
+    Livewire::test(DeploymentsIndex::class)
+        ->assertSee('Livewire deployment 1')
+        ->assertDontSee('Livewire deployment 21')
+        ->call('nextPage')
+        ->assertSee('Livewire deployment 21')
+        ->assertDontSee('Livewire deployment 1')
+        ->call('previousPage')
+        ->assertSee('Livewire deployment 1')
+        ->call('nextPage')
+        ->set('status', ApplicationDeploymentStatus::FAILED->value)
+        ->assertSee('Filtered failed deployment')
+        ->assertDontSee('Livewire deployment 21');
 });
 
 it('filters deployments by deployment type and status', function () {
@@ -180,6 +214,35 @@ it('filters deployments by deployment type and status', function () {
         ->assertDontSee('Production finished deployment')
         ->assertSee('Preview failed deployment')
         ->assertDontSee('Preview queued deployment');
+});
+
+it('keeps deployment row navigation separate from commit links', function () {
+    $deploymentUrl = '/project/storefront/environment/production/application/checkout/deployment/deployment-with-url';
+
+    createGlobalHistoryDeployment([
+        'deployment_uuid' => 'deployment-with-url',
+        'deployment_url' => $deploymentUrl,
+        'commit_message' => 'Deployment with URL',
+    ]);
+
+    $response = $this->get('/deployments')
+        ->assertSuccessful()
+        ->assertSee('Deployment with URL')
+        ->assertSee(str_replace('/', '\/', $deploymentUrl), false)
+        ->assertSee('window.Livewire?.navigate', false);
+
+    $dom = new DOMDocument;
+    $previousLibxmlState = libxml_use_internal_errors(true);
+    $dom->loadHTML($response->getContent());
+    libxml_clear_errors();
+    libxml_use_internal_errors($previousLibxmlState);
+
+    $xpath = new DOMXPath($dom);
+    $deploymentUrlAnchors = $xpath->query('//*[@data-deployment-uuid="deployment-with-url"]//a[@href="'.$deploymentUrl.'"]');
+    $commitAnchors = $xpath->query('//*[@data-deployment-uuid="deployment-with-url"]//a[@target="_blank" and contains(@rel, "noopener")]');
+
+    expect($deploymentUrlAnchors->length)->toBe(0);
+    expect($commitAnchors->length)->toBe(1);
 });
 
 it('renders deployments without log urls as non-clickable rows', function () {
