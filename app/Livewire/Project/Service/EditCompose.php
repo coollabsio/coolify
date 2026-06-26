@@ -3,10 +3,13 @@
 namespace App\Livewire\Project\Service;
 
 use App\Models\Service;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class EditCompose extends Component
 {
+    use AuthorizesRequests;
+
     public Service $service;
 
     public $serviceId;
@@ -72,19 +75,29 @@ class EditCompose extends Component
 
     public function saveEditedCompose()
     {
-        $this->dispatch('info', 'Saving new docker compose...');
-        $this->dispatch('saveCompose', $this->dockerComposeRaw);
-        $this->dispatch('refreshStorages');
+        try {
+            $this->authorize('update', $this->service);
+            $this->dispatch('info', 'Saving new docker compose...');
+            $this->dispatch('saveCompose', $this->dockerComposeRaw);
+            $this->dispatch('refreshStorages');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function instantSave()
     {
-        $this->validate([
-            'isContainerLabelEscapeEnabled' => 'required',
-        ]);
-        $this->syncData(true);
-        $this->service->save(['is_container_label_escape_enabled' => $this->isContainerLabelEscapeEnabled]);
-        $this->dispatch('success', 'Service updated successfully');
+        try {
+            $this->authorize('update', $this->service);
+            $this->validate([
+                'isContainerLabelEscapeEnabled' => 'required',
+            ]);
+            $this->syncData(true);
+            $this->service->save(['is_container_label_escape_enabled' => $this->isContainerLabelEscapeEnabled]);
+            $this->dispatch('success', 'Service updated successfully');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function render()

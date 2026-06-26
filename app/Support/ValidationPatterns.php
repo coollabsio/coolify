@@ -95,9 +95,9 @@ class ValidationPatterns
 
     /**
      * Pattern for Docker-compatible environment variable keys.
-     * Docker environment entries are KEY=value strings, so keys must be non-empty and cannot contain '=' or NUL.
+     * Environment variable keys are later interpolated into shell commands as Docker build args, so only shell-safe identifier characters are allowed.
      */
-    public const ENVIRONMENT_VARIABLE_KEY_PATTERN = '/\A[^=\x00]+\z/u';
+    public const ENVIRONMENT_VARIABLE_KEY_PATTERN = '/\A[A-Za-z_][A-Za-z0-9_.]*\z/u';
 
     /**
      * Pattern for SQL-safe unquoted database identifiers (usernames, database names).
@@ -164,7 +164,7 @@ class ValidationPatterns
     public static function environmentVariableKeyMessages(string $field = 'key', string $label = 'key'): array
     {
         return [
-            "{$field}.regex" => "The {$label} must be a non-empty Docker-compatible environment variable key and cannot contain '=' or NUL characters.",
+            "{$field}.regex" => "The {$label} must start with a letter or underscore and may only contain letters, numbers, underscores, and dots.",
             "{$field}.max" => "The {$label} may not be greater than :max characters.",
         ];
     }

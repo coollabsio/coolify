@@ -13,7 +13,6 @@ use Illuminate\Support\Collection;
 use Livewire\Component;
 use Livewire\Features\SupportEvents\Event;
 use Spatie\Url\Url;
-use Visus\Cuid2\Cuid2;
 
 class General extends Component
 {
@@ -549,7 +548,7 @@ class General extends Component
         try {
             $this->authorize('update', $this->application);
 
-            $uuid = new Cuid2;
+            $uuid = new_public_id();
             $domain = generateUrl(server: $this->application->destination->server, random: $uuid);
             $sanitizedKey = str($serviceName)->replace('-', '_')->replace('.', '_')->toString();
             $this->parsedServiceDomains[$sanitizedKey]['domain'] = $domain;
