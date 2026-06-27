@@ -162,6 +162,26 @@ it('adds mux options to ssh commands only after the explicit master is ready', f
     Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
 });
 
+it('can generate short ssh commands for stdin scripts', function () {
+    config(['constants.ssh.mux_enabled' => true]);
+    $server = makeMuxServer();
+
+    Process::fake([
+        '*-O check*' => Process::result(exitCode: 1),
+        '*-fN *' => Process::result(exitCode: 0),
+    ]);
+
+    $command = SshMultiplexingHelper::generateSshCommandForStdin($server);
+
+    expect($command)
+        ->toContain('-o ControlMaster=auto')
+        ->toContain("'bash -se'")
+        ->not->toContain('<< \\')
+        ->not->toContain('echo ok');
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
+});
+
 it('can generate terminal ssh commands without a hard command timeout', function () {
     config(['constants.ssh.mux_enabled' => false]);
     $server = makeMuxServer();
