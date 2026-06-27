@@ -79,7 +79,9 @@ class RunRemoteProcess
 
         $status = ProcessStatus::IN_PROGRESS;
         $timeout = config('constants.ssh.command_timeout');
-        $process = Process::timeout($timeout)->start($this->getCommand(), $this->handleOutput(...));
+        $process = Process::timeout($timeout)
+            ->input($this->getRemoteCommand())
+            ->start($this->getSshCommand(), $this->handleOutput(...));
         $this->activity->properties = $this->activity->properties->merge([
             'process_id' => $process->id(),
         ]);
@@ -121,13 +123,17 @@ class RunRemoteProcess
         return $processResult;
     }
 
-    protected function getCommand(): string
+    protected function getSshCommand(): string
     {
         $server_uuid = $this->activity->getExtraProperty('server_uuid');
-        $command = $this->activity->getExtraProperty('command');
         $server = Server::whereUuid($server_uuid)->firstOrFail();
 
-        return SshMultiplexingHelper::generateSshCommand($server, $command);
+        return SshMultiplexingHelper::generateSshCommandForStdin($server);
+    }
+
+    protected function getRemoteCommand(): string
+    {
+        return $this->activity->getExtraProperty('command');
     }
 
     protected function handleOutput(string $type, string $output)

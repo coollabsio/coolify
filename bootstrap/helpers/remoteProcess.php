@@ -112,8 +112,8 @@ function instant_remote_process_with_timeout(Collection|array $command, Server $
 
     return SshRetryHandler::retry(
         function () use ($server, $command_string) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
-            $process = Process::timeout(30)->run($sshCommand);
+            $sshCommand = SshMultiplexingHelper::generateSshCommandForStdin($server);
+            $process = Process::timeout(30)->input($command_string)->run($sshCommand);
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -148,8 +148,8 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
 
     return SshRetryHandler::retry(
         function () use ($server, $command_string, $effectiveTimeout, $disableMultiplexing) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing);
-            $process = Process::timeout($effectiveTimeout)->run($sshCommand);
+            $sshCommand = SshMultiplexingHelper::generateSshCommandForStdin($server, $disableMultiplexing);
+            $process = Process::timeout($effectiveTimeout)->input($command_string)->run($sshCommand);
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();

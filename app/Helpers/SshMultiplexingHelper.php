@@ -136,6 +136,18 @@ class SshMultiplexingHelper
 
     public static function generateSshCommand(Server $server, string $command, bool $disableMultiplexing = false, ?int $commandTimeout = null): string
     {
+        $sshCommand = self::generateSshCommandForStdin($server, $disableMultiplexing, $commandTimeout);
+
+        $delimiter = base64_encode(Hash::make($command));
+        $command = str_replace($delimiter, '', $command);
+
+        return $sshCommand." << \\$delimiter".PHP_EOL
+            .$command.PHP_EOL
+            .$delimiter;
+    }
+
+    public static function generateSshCommandForStdin(Server $server, bool $disableMultiplexing = false, ?int $commandTimeout = null): string
+    {
         if ($server->settings->force_disabled) {
             throw new \RuntimeException('Server is disabled.');
         }
@@ -167,12 +179,7 @@ class SshMultiplexingHelper
 
         $sshCommand .= self::getCommonSshOptions($server, $sshKeyLocation, self::getConnectionTimeout($server), config('constants.ssh.server_interval'));
 
-        $delimiter = base64_encode(Hash::make($command));
-        $command = str_replace($delimiter, '', $command);
-
-        return $sshCommand.self::escapedUserAtHost($server)." 'bash -se' << \\$delimiter".PHP_EOL
-            .$command.PHP_EOL
-            .$delimiter;
+        return $sshCommand.self::escapedUserAtHost($server)." 'bash -se'";
     }
 
     public static function getConnectionTimeout(Server $server): int
