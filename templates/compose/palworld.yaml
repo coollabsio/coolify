@@ -1,3 +1,4 @@
+# category: games
 services:
   palworld:
     image: thijsvanloef/palworld-server-docker:v1.4.6

@@ -2,18 +2,26 @@
 
 namespace App\Rules;
 
+use App\Support\ValidationPatterns;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Translation\PotentiallyTranslatedString;
 
 class DockerImageFormat implements ValidationRule
 {
     /**
      * Run the validation rule.
      *
-     * @param  \Closure(string, ?string=): \Illuminate\Translation\PotentiallyTranslatedString  $fail
+     * @param  Closure(string, ?string=): PotentiallyTranslatedString  $fail
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
+        if (! is_string($value)) {
+            $fail('The :attribute format is invalid. Use image:tag or image@sha256:hash format.');
+
+            return;
+        }
+
         // Check if the value contains ":sha256:" or ":sha" which is incorrect format
         if (preg_match('/:sha256?:/i', $value)) {
             $fail('The :attribute must use @ before sha256 digest (e.g., image@sha256:hash, not image:sha256:hash).');
@@ -21,20 +29,21 @@ class DockerImageFormat implements ValidationRule
             return;
         }
 
-        // Valid formats:
-        // 1. image:tag (e.g., nginx:latest)
-        // 2. registry/image:tag (e.g., ghcr.io/user/app:v1.2.3)
-        // 3. image@sha256:hash (e.g., nginx@sha256:abc123...)
-        // 4. registry/image@sha256:hash
-        // 5. registry:port/image:tag (e.g., localhost:5000/app:latest)
+        $imageName = $value;
+        $tag = null;
 
-        $pattern = '/^
-            (?:[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[0-9]+)?\/)?  # Optional registry with optional port
-            [a-z0-9]+(?:[._\/-][a-z0-9]+)*                    # Image name (required)
-            (?::[a-z0-9][a-z0-9._-]*|@sha256:[a-f0-9]{64})?   # Optional :tag or @sha256:hash
-        $/ix';
+        if (preg_match('/\A(.+)@sha256:([a-f0-9]{64})\z/i', $value, $matches) === 1) {
+            $imageName = $matches[1];
+        } else {
+            $lastColon = strrpos($value, ':');
+            $lastSlash = strrpos($value, '/');
+            if ($lastColon !== false && ($lastSlash === false || $lastColon > $lastSlash)) {
+                $imageName = substr($value, 0, $lastColon);
+                $tag = substr($value, $lastColon + 1);
+            }
+        }
 
-        if (! preg_match($pattern, $value)) {
+        if (! ValidationPatterns::isValidDockerImageName($imageName) || ! ValidationPatterns::isValidDockerImageTag($tag)) {
             $fail('The :attribute format is invalid. Use image:tag or image@sha256:hash format.');
         }
     }

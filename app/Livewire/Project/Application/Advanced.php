@@ -4,6 +4,8 @@ namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -61,6 +63,9 @@ class Advanced extends Component
     #[Validate(['string', 'nullable'])]
     public ?string $gpuOptions = null;
 
+    #[Validate(['string', 'nullable'])]
+    public ?string $stopGracePeriod = null;
+
     #[Validate(['boolean'])]
     public bool $isBuildServerEnabled = false;
 
@@ -81,6 +86,9 @@ class Advanced extends Component
 
     #[Validate(['boolean'])]
     public bool $isConnectToDockerNetworkEnabled = false;
+
+    #[Validate(['integer', 'min:0'])]
+    public int $maxRestartCount = 10;
 
     public function mount()
     {
@@ -144,7 +152,12 @@ class Advanced extends Component
             $this->disableBuildCache = $this->application->settings->disable_build_cache;
             $this->injectBuildArgsToDockerfile = $this->application->settings->inject_build_args_to_dockerfile ?? true;
             $this->includeSourceCommitInBuild = $this->application->settings->include_source_commit_in_build ?? false;
+            $this->maxRestartCount = $this->application->max_restart_count ?? 10;
         }
+
+        // Load stop_grace_period separately since it has its own save handler
+        // Convert null to empty string to prevent dirty detection issues
+        $this->stopGracePeriod = $this->application->settings->stop_grace_period ?? '';
     }
 
     private function resetDefaultLabels()
@@ -210,6 +223,7 @@ class Advanced extends Component
             }
             $this->syncData(true);
             $this->dispatch('success', 'Settings saved.');
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -228,6 +242,7 @@ class Advanced extends Component
             if (is_null($this->customInternalName)) {
                 $this->syncData(true);
                 $this->dispatch('success', 'Custom name saved.');
+                $this->dispatch('configurationChanged');
 
                 return;
             }
@@ -247,6 +262,47 @@ class Advanced extends Component
             }
             $this->syncData(true);
             $this->dispatch('success', 'Custom name saved.');
+            $this->dispatch('configurationChanged');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function saveStopGracePeriod()
+    {
+        try {
+            $this->authorize('update', $this->application);
+
+            $validated = Validator::make(
+                ['stopGracePeriod' => $this->stopGracePeriod === '' ? null : $this->stopGracePeriod],
+                ['stopGracePeriod' => ['nullable', 'integer', 'min:'.MIN_STOP_GRACE_PERIOD_SECONDS, 'max:'.MAX_STOP_GRACE_PERIOD_SECONDS]],
+                [],
+                ['stopGracePeriod' => 'stop grace period']
+            )->validate();
+
+            $this->application->settings->stop_grace_period = $validated['stopGracePeriod'] === null
+                ? null
+                : (int) $validated['stopGracePeriod'];
+            $this->application->settings->save();
+
+            $this->dispatch('success', 'Stop grace period updated.');
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function saveMaxRestartCount()
+    {
+        try {
+            $this->authorize('update', $this->application);
+            $this->validate([
+                'maxRestartCount' => 'integer|min:0',
+            ]);
+            $this->application->max_restart_count = $this->maxRestartCount;
+            $this->application->save();
+            $this->dispatch('success', 'Max restart count saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

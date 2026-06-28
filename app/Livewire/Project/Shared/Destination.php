@@ -110,15 +110,27 @@ class Destination extends Component
 
     public function promote(int $network_id, int $server_id)
     {
-        $main_destination = $this->resource->destination;
-        $this->resource->update([
-            'destination_id' => $network_id,
-            'destination_type' => StandaloneDocker::class,
-        ]);
-        $this->resource->additional_networks()->detach($network_id, ['server_id' => $server_id]);
-        $this->resource->additional_networks()->attach($main_destination->id, ['server_id' => $main_destination->server->id]);
-        $this->refreshServers();
-        $this->resource->refresh();
+        try {
+            $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
+            $network = StandaloneDocker::ownedByCurrentTeam()->where('server_id', $server->id)->findOrFail($network_id);
+            $this->authorize('update', $this->resource);
+
+            $this->resource->getConnection()->transaction(function () use ($network, $server) {
+                $main_destination = $this->resource->destination;
+                $this->resource->update([
+                    'destination_id' => $network->id,
+                    'destination_type' => StandaloneDocker::class,
+                ]);
+                $this->resource->additional_networks()
+                    ->wherePivot('server_id', $server->id)
+                    ->detach($network->id);
+                $this->resource->additional_networks()->attach($main_destination->id, ['server_id' => $main_destination->server->id]);
+            });
+            $this->resource->refresh();
+            $this->refreshServers();
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function refreshServers()
@@ -130,15 +142,23 @@ class Destination extends Component
 
     public function addServer(int $network_id, int $server_id)
     {
-        $this->resource->additional_networks()->attach($network_id, ['server_id' => $server_id]);
-        $this->dispatch('refresh');
+        try {
+            $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
+            $network = StandaloneDocker::ownedByCurrentTeam()->where('server_id', $server->id)->findOrFail($network_id);
+            $this->authorize('update', $this->resource);
+
+            $this->resource->additional_networks()->attach($network->id, ['server_id' => $server->id]);
+            $this->dispatch('refresh');
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
     }
 
-    public function removeServer(int $network_id, int $server_id, $password)
+    public function removeServer(int $network_id, int $server_id, $password, $selectedActions = [])
     {
         try {
             if (! verifyPasswordConfirmation($password, $this)) {
-                return;
+                return 'The provided password is incorrect.';
             }
 
             if ($this->resource->destination->server->id == $server_id && $this->resource->destination->id == $network_id) {
@@ -148,10 +168,14 @@ class Destination extends Component
             }
             $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
             StopApplicationOneServer::run($this->resource, $server);
-            $this->resource->additional_networks()->detach($network_id, ['server_id' => $server_id]);
+            $this->resource->additional_networks()
+                ->wherePivot('server_id', $server_id)
+                ->detach($network_id);
             $this->loadData();
             $this->dispatch('refresh');
             ApplicationStatusChanged::dispatch(data_get($this->resource, 'environment.project.team.id'));
+
+            return true;
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

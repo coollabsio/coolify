@@ -68,6 +68,20 @@
             @endif
         </div>
     </div>
+    @if ($application->build_pack === 'dockerimage')
+        <div class="flex flex-col gap-2 pt-4">
+            <h3>Manual Preview Deployment</h3>
+            <form wire:submit.prevent="addDockerImagePreview" class="flex flex-col gap-2 xl:flex-row xl:items-end">
+                <x-forms.input id="manualPullRequestId" label="Pull Request Id"
+                    helper="Used as the preview identifier for naming, domains, logs, and cleanup." />
+                <x-forms.input id="manualDockerTag" label="Docker Tag"
+                    helper="The image tag to deploy for this preview, for example pr_1234." />
+                @can('deploy', $application)
+                    <x-forms.button type="submit">Deploy Preview</x-forms.button>
+                @endcan
+            </form>
+        </div>
+    @endif
     @if ($application->previews->count() > 0)
         <h3 class="py-4">Deployments</h3>
         <div class="flex flex-wrap w-full gap-4">
@@ -87,11 +101,13 @@
                                 <x-external-link />
                             </a>
                         @endif
-                        |
-                        <a target="_blank" href="{{ data_get($preview, 'pull_request_html_url') }}">Open
-                            PR on Git
-                            <x-external-link />
-                        </a>
+                        @if (filled(data_get($preview, 'pull_request_html_url')))
+                            |
+                            <a target="_blank" href="{{ data_get($preview, 'pull_request_html_url') }}">Open
+                                PR on Git
+                                <x-external-link />
+                            </a>
+                        @endif
                         @if (count($parameters) > 0)
                             |
                             <a {{ wireNavigate() }}
@@ -131,6 +147,10 @@
                         <form wire:submit="save_preview('{{ $preview->id }}')" class="flex items-end gap-2 pt-4">
                             <x-forms.input label="Domain" helper="One domain per preview."
                                 id="previewFqdns.{{ $previewName }}" canGate="update" :canResource="$application"></x-forms.input>
+                            @if ($application->build_pack === 'dockerimage')
+                                <x-forms.input label="Docker Tag" helper="The image tag used for this preview deployment."
+                                    id="previewDockerTags.{{ $previewName }}" canGate="update" :canResource="$application"></x-forms.input>
+                            @endif
                             @can('update', $application)
                                 <x-forms.button type="submit">Save</x-forms.button>
                                 <x-forms.button wire:click="generate_preview('{{ $preview->id }}')">Generate
@@ -157,7 +177,8 @@
                                 Force deploy (without
                                 cache)
                             </x-forms.button>
-                            <x-forms.button wire:click="deploy({{ data_get($preview, 'pull_request_id') }})">
+                            <x-forms.button
+                                wire:click="deploy({{ data_get($preview, 'pull_request_id') }}, null, false, '{{ data_get($preview, 'docker_registry_image_tag') }}')">
                                 @if (data_get($preview, 'status') === 'exited')
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning"
                                         viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"

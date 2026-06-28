@@ -14,14 +14,6 @@ class TeamController extends Controller
             'custom_server_limit',
             'pivot',
         ]);
-        if (request()->attributes->get('can_read_sensitive', false) === false) {
-            $team->makeHidden([
-                'smtp_username',
-                'smtp_password',
-                'resend_api_key',
-                'telegram_token',
-            ]);
-        }
 
         return serializeApiResponse($team);
     }

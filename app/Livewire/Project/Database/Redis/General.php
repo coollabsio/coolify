@@ -4,14 +4,11 @@ namespace App\Livewire\Project\Database\Redis;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
-use App\Helpers\SslHelper;
 use App\Models\Server;
 use App\Models\StandaloneRedis;
 use App\Support\ValidationPatterns;
-use Carbon\Carbon;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class General extends Component
@@ -34,7 +31,9 @@ class General extends Component
 
     public ?bool $isPublic = null;
 
-    public ?int $publicPort = null;
+    public mixed $publicPort = null;
+
+    public mixed $publicPortTimeout = 3600;
 
     public bool $isLogDrainEnabled = false;
 
@@ -46,23 +45,9 @@ class General extends Component
 
     public string $redisVersion;
 
-    public ?string $dbUrl = null;
-
-    public ?string $dbUrlPublic = null;
-
-    public bool $enableSsl = false;
-
-    public ?Carbon $certificateValidUntil = null;
-
-    public function getListeners()
-    {
-        $userId = Auth::id();
-
-        return [
-            "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
-            'envsUpdated' => 'refresh',
-        ];
-    }
+    protected $listeners = [
+        'envsUpdated' => 'refresh',
+    ];
 
     protected function rules(): array
     {
@@ -71,14 +56,18 @@ class General extends Component
             'description' => ValidationPatterns::descriptionRules(),
             'redisConf' => 'nullable',
             'image' => 'required',
-            'portsMappings' => 'nullable',
+            'portsMappings' => ValidationPatterns::portMappingRules(),
             'isPublic' => 'nullable|boolean',
-            'publicPort' => 'nullable|integer',
+            'publicPort' => 'nullable|integer|min:1|max:65535',
+            'publicPortTimeout' => 'nullable|integer|min:1',
             'isLogDrainEnabled' => 'nullable|boolean',
             'customDockerRunOptions' => 'nullable',
-            'redisUsername' => 'required',
-            'redisPassword' => 'required',
-            'enableSsl' => 'boolean',
+            'redisUsername' => ValidationPatterns::databaseIdentifierRules(
+                enforcePattern: $this->redisUsername !== $this->database->redis_username,
+            ),
+            'redisPassword' => ValidationPatterns::databasePasswordRules(
+                enforcePattern: $this->redisPassword !== $this->database->redis_password,
+            ),
         ];
     }
 
@@ -86,12 +75,17 @@ class General extends Component
     {
         return array_merge(
             ValidationPatterns::combinedMessages(),
+            ValidationPatterns::portMappingMessages(),
             [
                 'name.required' => 'The Name field is required.',
                 'image.required' => 'The Docker Image field is required.',
                 'publicPort.integer' => 'The Public Port must be an integer.',
-                'redisUsername.required' => 'The Redis Username field is required.',
-                'redisPassword.required' => 'The Redis Password field is required.',
+                'publicPort.min' => 'The Public Port must be at least 1.',
+                'publicPort.max' => 'The Public Port must not exceed 65535.',
+                'publicPortTimeout.integer' => 'The Public Port Timeout must be an integer.',
+                'publicPortTimeout.min' => 'The Public Port Timeout must be at least 1.',
+                ...ValidationPatterns::databaseIdentifierMessages('redisUsername', 'Redis Username'),
+                ...ValidationPatterns::databasePasswordMessages('redisPassword', 'Redis Password'),
             ]
         );
     }
@@ -104,10 +98,10 @@ class General extends Component
         'portsMappings' => 'Port Mapping',
         'isPublic' => 'Is Public',
         'publicPort' => 'Public Port',
+        'publicPortTimeout' => 'Public Port Timeout',
         'customDockerRunOptions' => 'Custom Docker Options',
         'redisUsername' => 'Redis Username',
         'redisPassword' => 'Redis Password',
-        'enableSsl' => 'Enable SSL',
     ];
 
     public function mount()
@@ -120,12 +114,6 @@ class General extends Component
                 $this->dispatch('error', 'Database destination server is not configured.');
 
                 return;
-            }
-
-            $existingCert = $this->database->sslCertificates()->first();
-
-            if ($existingCert) {
-                $this->certificateValidUntil = $existingCert->valid_until;
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -142,14 +130,11 @@ class General extends Component
             $this->database->image = $this->image;
             $this->database->ports_mappings = $this->portsMappings;
             $this->database->is_public = $this->isPublic;
-            $this->database->public_port = $this->publicPort;
+            $this->database->public_port = $this->publicPort ?: null;
+            $this->database->public_port_timeout = $this->publicPortTimeout ?: null;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
-            $this->database->enable_ssl = $this->enableSsl;
             $this->database->save();
-
-            $this->dbUrl = $this->database->internal_db_url;
-            $this->dbUrlPublic = $this->database->external_db_url;
         } else {
             $this->name = $this->database->name;
             $this->description = $this->database->description;
@@ -158,11 +143,9 @@ class General extends Component
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
             $this->publicPort = $this->database->public_port;
+            $this->publicPortTimeout = $this->database->public_port_timeout;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
             $this->customDockerRunOptions = $this->database->custom_docker_run_options;
-            $this->enableSsl = $this->database->enable_ssl;
-            $this->dbUrl = $this->database->internal_db_url;
-            $this->dbUrlPublic = $this->database->external_db_url;
             $this->redisVersion = $this->database->getRedisVersion();
             $this->redisUsername = $this->database->redis_username;
             $this->redisPassword = $this->database->redis_password;
@@ -193,6 +176,9 @@ class General extends Component
         try {
             $this->authorize('manageEnvironment', $this->database);
 
+            if ($this->portsMappings) {
+                $this->portsMappings = str($this->portsMappings)->replace(' ', '')->trim()->toString();
+            }
             $this->syncData(true);
 
             if (version_compare($this->redisVersion, '6.0', '>=')) {
@@ -207,6 +193,7 @@ class General extends Component
             );
 
             $this->dispatch('success', 'Database updated.');
+            $this->dispatch('databaseUpdated');
         } catch (Exception $e) {
             return handleError($e, $this);
         } finally {
@@ -239,57 +226,12 @@ class General extends Component
                 StopDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is no longer publicly accessible.');
             }
+            $this->dispatch('databaseUpdated');
         } catch (\Throwable $e) {
             $this->isPublic = ! $this->isPublic;
             $this->syncData(true);
 
             return handleError($e, $this);
-        }
-    }
-
-    public function instantSaveSSL()
-    {
-        try {
-            $this->authorize('update', $this->database);
-
-            $this->syncData(true);
-            $this->dispatch('success', 'SSL configuration updated.');
-        } catch (Exception $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function regenerateSslCertificate()
-    {
-        try {
-            $this->authorize('update', $this->database);
-
-            $existingCert = $this->database->sslCertificates()->first();
-
-            if (! $existingCert) {
-                $this->dispatch('error', 'No existing SSL certificate found for this database.');
-
-                return;
-            }
-
-            $caCert = $this->server->sslCertificates()->where('is_ca_certificate', true)->first();
-
-            SslHelper::generateSslCertificate(
-                commonName: $existingCert->commonName,
-                subjectAlternativeNames: $existingCert->subjectAlternativeNames ?? [],
-                resourceType: $existingCert->resource_type,
-                resourceId: $existingCert->resource_id,
-                serverId: $existingCert->server_id,
-                caCert: $caCert->ssl_certificate,
-                caKey: $caCert->ssl_private_key,
-                configurationDir: $existingCert->configuration_dir,
-                mountPath: $existingCert->mount_path,
-                isPemKeyFileRequired: true,
-            );
-
-            $this->dispatch('success', 'SSL certificates regenerated. Restart database to apply changes.');
-        } catch (Exception $e) {
-            handleError($e, $this);
         }
     }
 

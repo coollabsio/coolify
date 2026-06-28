@@ -89,7 +89,8 @@ class ValidateAndInstall extends Component
         $this->authorize('update', $this->server);
         ['uptime' => $this->uptime, 'error' => $error] = $this->server->validateConnection();
         if (! $this->uptime) {
-            $this->error = 'Server is not reachable. Please validate your configuration and connection.<br>Check this <a target="_blank" class="text-black underline dark:text-white" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br><div class="text-error">Error: '.$error.'</div>';
+            $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');
+            $this->error = 'Server is not reachable. Please validate your configuration and connection.<br>Check this <a target="_blank" class="text-black underline dark:text-white" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br><div class="text-error">Error: '.$sanitizedError.'</div>';
             $this->server->update([
                 'validation_logs' => $this->error,
             ]);
@@ -197,6 +198,9 @@ class ValidateAndInstall extends Component
             if ($this->docker_version) {
                 // Mark validation as complete
                 $this->server->update(['is_validating' => false]);
+
+                // Auto-fetch server details now that validation passed
+                $this->server->gatherServerMetadata();
 
                 $this->dispatch('refreshServerShow');
                 $this->dispatch('refreshBoardingIndex');

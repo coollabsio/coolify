@@ -63,6 +63,9 @@
     }">
         <h3 class="pt-4">Clone Resource</h3>
         <div class="pb-2">Duplicate this resource to another server or network destination.</div>
+        <x-callout type="info" title="Important" class="mb-4">
+            Cloning only duplicates resource configuration (such as environment variables, build settings etc..). It does not include any resource data, such as databases or stored files.
+        </x-callout>
 
         @can('update', $resource)
             <div class="space-y-4 pb-8">

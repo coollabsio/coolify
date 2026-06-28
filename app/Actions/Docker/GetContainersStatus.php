@@ -2,12 +2,15 @@
 
 namespace App\Actions\Docker;
 
+use App\Actions\Application\StopApplication;
 use App\Actions\Database\StartDatabaseProxy;
+use App\Actions\Database\StopDatabaseProxy;
 use App\Actions\Shared\ComplexStatusCheck;
 use App\Events\ServiceChecked;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
+use App\Notifications\Application\RestartLimitReached as ApplicationRestartLimitReached;
 use App\Services\ContainerStatusAggregator;
 use App\Traits\CalculatesExcludedStatus;
 use Illuminate\Support\Arr;
@@ -180,21 +183,30 @@ class GetContainersStatus
                         if ($database_id) {
                             $service_db = ServiceDatabase::where('id', $database_id)->first();
                             if ($service_db) {
-                                $uuid = data_get($service_db, 'service.uuid');
-                                if ($uuid) {
-                                    $isPublic = data_get($service_db, 'is_public');
-                                    if ($isPublic) {
-                                        $foundTcpProxy = $this->containers->filter(function ($value, $key) use ($uuid) {
-                                            if ($this->server->isSwarm()) {
-                                                return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
-                                            } else {
-                                                return data_get($value, 'Name') === "/$uuid-proxy";
-                                            }
-                                        })->first();
-                                        if (! $foundTcpProxy) {
-                                            StartDatabaseProxy::run($service_db);
-                                            // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$service_db->service->name}", $this->server));
+                                $proxyUuid = $service_db->uuid;
+                                $isPublic = data_get($service_db, 'is_public');
+                                if ($isPublic) {
+                                    $foundTcpProxy = $this->containers->filter(function ($value, $key) use ($proxyUuid) {
+                                        if ($this->server->isSwarm()) {
+                                            return data_get($value, 'Spec.Name') === "coolify-proxy_$proxyUuid";
+                                        } else {
+                                            return data_get($value, 'Name') === "/$proxyUuid-proxy";
                                         }
+                                    })->first();
+                                    if (! $foundTcpProxy) {
+                                        StartDatabaseProxy::run($service_db);
+                                    }
+                                } else {
+                                    // Clean up orphaned proxy when is_public=false
+                                    $orphanedProxy = $this->containers->filter(function ($value, $key) use ($proxyUuid) {
+                                        if ($this->server->isSwarm()) {
+                                            return data_get($value, 'Spec.Name') === "coolify-proxy_$proxyUuid";
+                                        } else {
+                                            return data_get($value, 'Name') === "/$proxyUuid-proxy";
+                                        }
+                                    })->first();
+                                    if ($orphanedProxy) {
+                                        StopDatabaseProxy::run($service_db);
                                     }
                                 }
                             }
@@ -235,7 +247,18 @@ class GetContainersStatus
                                 })->first();
                                 if (! $foundTcpProxy) {
                                     StartDatabaseProxy::run($database);
-                                    // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for database", $this->server));
+                                }
+                            } else {
+                                // Clean up orphaned proxy when is_public=false
+                                $orphanedProxy = $this->containers->filter(function ($value, $key) use ($uuid) {
+                                    if ($this->server->isSwarm()) {
+                                        return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
+                                    } else {
+                                        return data_get($value, 'Name') === "/$uuid-proxy";
+                                    }
+                                })->first();
+                                if ($orphanedProxy) {
+                                    StopDatabaseProxy::run($database);
                                 }
                             }
                         } else {
@@ -306,6 +329,12 @@ class GetContainersStatus
             if (str($exitedService->status)->startsWith('exited')) {
                 continue;
             }
+
+            // Only protection: If no containers at all, Docker query might have failed
+            if ($this->containers->isEmpty()) {
+                continue;
+            }
+
             $name = data_get($exitedService, 'name');
             $fqdn = data_get($exitedService, 'fqdn');
             if ($name) {
@@ -385,6 +414,12 @@ class GetContainersStatus
             if (str($database->status)->startsWith('exited')) {
                 continue;
             }
+
+            // Only protection: If no containers at all, Docker query might have failed
+            if ($this->containers->isEmpty()) {
+                continue;
+            }
+
             // Reset restart tracking when database exits completely
             $database->update([
                 'status' => 'exited',
@@ -392,6 +427,11 @@ class GetContainersStatus
                 'last_restart_at' => null,
                 'last_restart_type' => null,
             ]);
+
+            // Stop proxy if database was public
+            if ($database->is_public) {
+                StopDatabaseProxy::run($database);
+            }
 
             $name = data_get($database, 'name');
             $fqdn = data_get($database, 'fqdn');
@@ -426,7 +466,9 @@ class GetContainersStatus
                 }
 
                 // Wrap all database updates in a transaction to ensure consistency
-                DB::transaction(function () use ($application, $maxRestartCount, $containerStatuses) {
+                $restartLimitReached = false;
+
+                DB::transaction(function () use ($application, $maxRestartCount, $containerStatuses, &$restartLimitReached) {
                     $previousRestartCount = $application->restart_count ?? 0;
 
                     if ($maxRestartCount > $previousRestartCount) {
@@ -437,16 +479,10 @@ class GetContainersStatus
                             'last_restart_type' => 'crash',
                         ]);
 
-                        // Send notification
-                        $containerName = $application->name;
-                        $projectUuid = data_get($application, 'environment.project.uuid');
-                        $environmentName = data_get($application, 'environment.name');
-                        $applicationUuid = data_get($application, 'uuid');
-
-                        if ($projectUuid && $applicationUuid && $environmentName) {
-                            $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/application/'.$applicationUuid;
-                        } else {
-                            $url = null;
+                        // Check if restart limit has been reached
+                        $maxAllowedRestarts = $application->max_restart_count ?? 0;
+                        if ($maxAllowedRestarts > 0 && $maxRestartCount >= $maxAllowedRestarts && $previousRestartCount < $maxAllowedRestarts) {
+                            $restartLimitReached = true;
                         }
                     }
 
@@ -461,6 +497,12 @@ class GetContainersStatus
                         }
                     }
                 });
+
+                if ($restartLimitReached) {
+                    $application->refresh();
+                    StopApplication::dispatch($application, false, true, false);
+                    $application->environment->project->team?->notify(new ApplicationRestartLimitReached($application));
+                }
             }
         }
 

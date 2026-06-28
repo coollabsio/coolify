@@ -1,0 +1,34 @@
+# documentation: https://docs.pydio.com/
+# slogan: High-performance large file sharing, native no-code automation, and a collaboration-centric architecture that simplifies access control without compromising security or compliance.
+# category: storage
+# tags: storage
+# logo: svgs/cells.svg
+# port: 8080
+
+services:
+  cells:
+    image: pydio/cells:4.4
+    environment:
+      - SERVICE_URL_CELLS_8080
+      - CELLS_SITE_EXTERNAL=${SERVICE_URL_CELLS}
+      - CELLS_SITE_NO_TLS=1
+    volumes:
+      - cells_data:/var/cells
+  mariadb:
+    image: 'mariadb:11'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-cells}
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - '--connect'
+        - '--innodb_initialized'
+      interval: 10s
+      timeout: 20s
+      retries: 5

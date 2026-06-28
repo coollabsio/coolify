@@ -5,13 +5,19 @@
     <div class="pb-4">Basic metrics for your application container.</div>
     <div>
         @if ($resource->getMorphClass() === 'App\Models\Application' && $resource->build_pack === 'dockercompose')
-            <div class="alert alert-warning">Metrics are not available for Docker Compose applications yet!</div>
+            <x-callout type="warning" title="Not Available">
+                Metrics are not available for Docker Compose applications yet!
+            </x-callout>
         @elseif(!$resource->destination->server->isMetricsEnabled())
-            <div class="alert alert-warning pb-1">Metrics are only available for servers with Sentinel & Metrics enabled!</div>
-            <div>Go to <a class="underline dark:text-white" href="{{ route('server.show', $resource->destination->server->uuid) }}/sentinel" {{ wireNavigate() }}>Server settings</a> to enable it.</div>
+            <x-callout type="info" title="Metrics Not Enabled">
+                Metrics are only available for servers with Sentinel & Metrics enabled.
+                Go to <a class="underline font-semibold" href="{{ route('server.metrics', ['server_uuid' => $resource->destination->server->uuid]) }}" {{ wireNavigate() }}>Server Metrics</a> to enable it.
+            </x-callout>
         @else
             @if (!str($resource->status)->contains('running'))
-                <div class="alert alert-warning">Metrics are only available when the application container is running!</div>
+                <x-callout type="warning" title="Container Not Running">
+                    Metrics are only available when the application container is running!
+                </x-callout>
             @else
                 <div>
                 <x-forms.select label="Interval" wire:change="setInterval" id="interval">

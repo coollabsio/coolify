@@ -45,10 +45,10 @@ class Danger extends Component
 
         if ($this->resource === null) {
             if (isset($parameters['service_uuid'])) {
-                $this->resource = Service::where('uuid', $parameters['service_uuid'])->first();
+                $this->resource = Service::ownedByCurrentTeam()->where('uuid', $parameters['service_uuid'])->first();
             } elseif (isset($parameters['stack_service_uuid'])) {
-                $this->resource = ServiceApplication::where('uuid', $parameters['stack_service_uuid'])->first()
-                    ?? ServiceDatabase::where('uuid', $parameters['stack_service_uuid'])->first();
+                $this->resource = ServiceApplication::ownedByCurrentTeam()->where('uuid', $parameters['stack_service_uuid'])->first()
+                    ?? ServiceDatabase::ownedByCurrentTeam()->where('uuid', $parameters['stack_service_uuid'])->first();
             }
         }
 
@@ -88,16 +88,21 @@ class Danger extends Component
         }
     }
 
-    public function delete($password)
+    public function delete($password, $selectedActions = [])
     {
         if (! verifyPasswordConfirmation($password, $this)) {
-            return;
+            return 'The provided password is incorrect.';
         }
 
         if (! $this->resource) {
-            $this->addError('resource', 'Resource not found.');
+            return 'Resource not found.';
+        }
 
-            return;
+        if (! empty($selectedActions)) {
+            $this->delete_volumes = in_array('delete_volumes', $selectedActions);
+            $this->delete_connected_networks = in_array('delete_connected_networks', $selectedActions);
+            $this->delete_configurations = in_array('delete_configurations', $selectedActions);
+            $this->docker_cleanup = in_array('docker_cleanup', $selectedActions);
         }
 
         try {

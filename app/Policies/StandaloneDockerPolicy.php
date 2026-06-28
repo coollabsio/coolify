@@ -37,8 +37,7 @@ class StandaloneDockerPolicy
      */
     public function update(User $user, StandaloneDocker $standaloneDocker): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $standaloneDocker->server->team_id);
-        return true;
+        return $user->teams->contains('id', $standaloneDocker->server->team_id);
     }
 
     /**
@@ -46,8 +45,7 @@ class StandaloneDockerPolicy
      */
     public function delete(User $user, StandaloneDocker $standaloneDocker): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $standaloneDocker->server->team_id);
-        return true;
+        return $user->teams->contains('id', $standaloneDocker->server->team_id);
     }
 
     /**
@@ -55,8 +53,7 @@ class StandaloneDockerPolicy
      */
     public function restore(User $user, StandaloneDocker $standaloneDocker): bool
     {
-        // return false;
-        return true;
+        return false;
     }
 
     /**
@@ -64,7 +61,6 @@ class StandaloneDockerPolicy
      */
     public function forceDelete(User $user, StandaloneDocker $standaloneDocker): bool
     {
-        // return false;
-        return true;
+        return false;
     }
 }
