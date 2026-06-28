@@ -223,8 +223,13 @@ class BackupEdit extends Component
         // S3 backup cannot be enabled without a valid S3 storage owned by the team
         $availableS3Ids = collect($this->s3s)->pluck('id');
         if ($this->backup->save_s3 && ! $availableS3Ids->contains($this->backup->s3_storage_id)) {
-            $this->backup->save_s3 = $this->saveS3 = false;
-            $this->backup->s3_storage_id = $this->s3StorageId = null;
+            if ($availableS3Ids->isNotEmpty()) {
+                // Select the first available S3 storage instead of silently disabling the toggle
+                $this->backup->s3_storage_id = $this->s3StorageId = $availableS3Ids->first();
+            } else {
+                $this->backup->save_s3 = $this->saveS3 = false;
+                $this->backup->s3_storage_id = $this->s3StorageId = null;
+            }
         }
 
         // Validate that disable_local_backup can only be true when S3 backup is enabled
