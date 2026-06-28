@@ -14,7 +14,7 @@
                     back!
                 </div>
                 @if ($server->definedResources()->count() > 0)
-                    <div class="pb-2 text-red-500">You need to delete all resources before deleting this server.</div>
+                    <div class="pb-2 text-red-500">This server has resources. You can force delete all resources by checking the option below.</div>
                 @endif
 
                 <x-modal-confirmation title="Confirm Server Deletion?" isErrorButton buttonTitle="Delete"

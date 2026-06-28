@@ -28,12 +28,11 @@ class DynamicConfigurationNavbar extends Component
 
         // Decode filename: pipes are used to encode dots for Livewire property binding
         // (e.g., 'my|service.yaml' -> 'my.service.yaml')
-        // This must happen BEFORE validation because validateShellSafePath() correctly
-        // rejects pipe characters as dangerous shell metacharacters
+        // This must happen BEFORE validation because validateFilenameSafe()
+        // rejects pipe characters through validateShellSafePath().
         $file = str_replace('|', '.', $fileName);
 
-        // Validate filename to prevent command injection
-        validateShellSafePath($file, 'proxy configuration filename');
+        validateFilenameSafe($file, 'proxy configuration filename');
 
         if ($proxy_type === 'CADDY' && $file === 'Caddyfile') {
             $this->dispatch('error', 'Cannot delete Caddyfile.');

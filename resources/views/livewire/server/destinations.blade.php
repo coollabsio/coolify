@@ -29,6 +29,9 @@
                             <x-forms.button>{{ data_get($docker, 'network') }} </x-forms.button>
                         </a>
                     @endforeach
+                    @if ($server->standaloneDockers->isEmpty() && $server->swarmDockers->isEmpty())
+                        <div class="text-sm text-neutral-500">No destinations configured for this server yet.</div>
+                    @endif
                 </div>
                 @if ($networks->count() > 0)
                     <div class="pt-2">

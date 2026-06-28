@@ -17,7 +17,7 @@
                 <div class="flex items-center justify-center size-8 rounded-full border-2 transition-all duration-300"
                     :class="{
                         'bg-success border-success': currentStep > 1,
-                        'bg-warning/20 border-warning': currentStep === 1,
+                        'bg-black/20 border-black dark:bg-warning/20 dark:border-warning': currentStep === 1,
                         'border-neutral-400 dark:border-coolgray-300': currentStep < 1
                     }">
                     <template x-if="currentStep > 1">
@@ -26,7 +26,7 @@
                         </svg>
                     </template>
                     <template x-if="currentStep === 1">
-                        <svg class="size-4 text-warning animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg class="size-4 text-black dark:text-warning animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
@@ -38,7 +38,7 @@
                 <span class="mt-1.5 text-xs font-medium transition-colors duration-300"
                     :class="{
                         'text-success': currentStep > 1,
-                        'text-warning': currentStep === 1,
+                        'text-black dark:text-warning': currentStep === 1,
                         'text-neutral-500 dark:text-neutral-400': currentStep < 1
                     }">Preparing</span>
             </div>
@@ -52,7 +52,7 @@
                 <div class="flex items-center justify-center size-8 rounded-full border-2 transition-all duration-300"
                     :class="{
                         'bg-success border-success': currentStep > 2,
-                        'bg-warning/20 border-warning': currentStep === 2,
+                        'bg-black/20 border-black dark:bg-warning/20 dark:border-warning': currentStep === 2,
                         'border-neutral-400 dark:border-coolgray-300': currentStep < 2
                     }">
                     <template x-if="currentStep > 2">
@@ -61,7 +61,7 @@
                         </svg>
                     </template>
                     <template x-if="currentStep === 2">
-                        <svg class="size-4 text-warning animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg class="size-4 text-black dark:text-warning animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
@@ -73,7 +73,7 @@
                 <span class="mt-1.5 text-xs font-medium transition-colors duration-300"
                     :class="{
                         'text-success': currentStep > 2,
-                        'text-warning': currentStep === 2,
+                        'text-black dark:text-warning': currentStep === 2,
                         'text-neutral-500 dark:text-neutral-400': currentStep < 2
                     }">Helper</span>
             </div>
@@ -87,7 +87,7 @@
                 <div class="flex items-center justify-center size-8 rounded-full border-2 transition-all duration-300"
                     :class="{
                         'bg-success border-success': currentStep > 3,
-                        'bg-warning/20 border-warning': currentStep === 3,
+                        'bg-black/20 border-black dark:bg-warning/20 dark:border-warning': currentStep === 3,
                         'border-neutral-400 dark:border-coolgray-300': currentStep < 3
                     }">
                     <template x-if="currentStep > 3">
@@ -96,7 +96,7 @@
                         </svg>
                     </template>
                     <template x-if="currentStep === 3">
-                        <svg class="size-4 text-warning animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg class="size-4 text-black dark:text-warning animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
@@ -108,7 +108,7 @@
                 <span class="mt-1.5 text-xs font-medium transition-colors duration-300"
                     :class="{
                         'text-success': currentStep > 3,
-                        'text-warning': currentStep === 3,
+                        'text-black dark:text-warning': currentStep === 3,
                         'text-neutral-500 dark:text-neutral-400': currentStep < 3
                     }">Image</span>
             </div>
@@ -122,7 +122,7 @@
                 <div class="flex items-center justify-center size-8 rounded-full border-2 transition-all duration-300"
                     :class="{
                         'bg-success border-success': currentStep > 4,
-                        'bg-warning/20 border-warning': currentStep === 4,
+                        'bg-black/20 border-black dark:bg-warning/20 dark:border-warning': currentStep === 4,
                         'border-neutral-400 dark:border-coolgray-300': currentStep < 4
                     }">
                     <template x-if="currentStep > 4">
@@ -131,7 +131,7 @@
                         </svg>
                     </template>
                     <template x-if="currentStep === 4">
-                        <svg class="size-4 text-warning animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg class="size-4 text-black dark:text-warning animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
@@ -143,7 +143,7 @@
                 <span class="mt-1.5 text-xs font-medium transition-colors duration-300"
                     :class="{
                         'text-success': currentStep > 4,
-                        'text-warning': currentStep === 4,
+                        'text-black dark:text-warning': currentStep === 4,
                         'text-neutral-500 dark:text-neutral-400': currentStep < 4
                     }">Restart</span>
             </div>

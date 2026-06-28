@@ -4,12 +4,14 @@ namespace App\Livewire\Project;
 
 use App\Models\Environment;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class DeleteEnvironment extends Component
 {
     use AuthorizesRequests;
 
+    #[Locked]
     public int $environment_id;
 
     public bool $disabled = false;
@@ -20,12 +22,8 @@ class DeleteEnvironment extends Component
 
     public function mount()
     {
-        try {
-            $this->environmentName = Environment::findOrFail($this->environment_id)->name;
-            $this->parameters = get_route_parameters();
-        } catch (\Exception $e) {
-            return handleError($e, $this);
-        }
+        $this->parameters = get_route_parameters();
+        $this->environmentName = Environment::ownedByCurrentTeam()->findOrFail($this->environment_id)->name;
     }
 
     public function delete()
@@ -33,13 +31,13 @@ class DeleteEnvironment extends Component
         $this->validate([
             'environment_id' => 'required|int',
         ]);
-        $environment = Environment::findOrFail($this->environment_id);
+        $environment = Environment::ownedByCurrentTeam()->findOrFail($this->environment_id);
         $this->authorize('delete', $environment);
 
         if ($environment->isEmpty()) {
             $environment->delete();
 
-            return redirect()->route('project.show', parameters: ['project_uuid' => $this->parameters['project_uuid']]);
+            return redirectRoute($this, 'project.show', ['project_uuid' => $this->parameters['project_uuid']]);
         }
 
         return $this->dispatch('error', "<strong>Environment {$environment->name}</strong> has defined resources, please delete them first.");

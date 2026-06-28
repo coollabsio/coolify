@@ -2,6 +2,7 @@
 
 namespace App\Actions\Fortify;
 
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -37,13 +38,17 @@ class CreateNewUser implements CreatesNewUsers
         if (User::count() == 0) {
             // If this is the first user, make them the root user
             // Team is already created in the database/seeders/ProductionSeeder.php
-            $user = User::create([
+            $user = (new User)->forceFill([
                 'id' => 0,
                 'name' => $input['name'],
                 'email' => $input['email'],
                 'password' => Hash::make($input['password']),
             ]);
-            $team = $user->teams()->first();
+            $user->save();
+            $team = $user->teams()->first() ?? Team::find(0);
+            if ($team !== null && ! $user->teams()->where('team_id', $team->id)->exists()) {
+                $user->teams()->attach($team, ['role' => 'owner']);
+            }
 
             // Disable registration after first user is created
             $settings = instanceSettings();

@@ -21,7 +21,7 @@ class DeleteProject extends Component
     public function mount()
     {
         $this->parameters = get_route_parameters();
-        $this->projectName = Project::findOrFail($this->project_id)->name;
+        $this->projectName = Project::ownedByCurrentTeam()->findOrFail($this->project_id)->name;
     }
 
     public function delete()
@@ -29,13 +29,13 @@ class DeleteProject extends Component
         $this->validate([
             'project_id' => 'required|int',
         ]);
-        $project = Project::findOrFail($this->project_id);
+        $project = Project::ownedByCurrentTeam()->findOrFail($this->project_id);
         $this->authorize('delete', $project);
 
         if ($project->isEmpty()) {
             $project->delete();
 
-            return redirect()->route('project.index');
+            return redirectRoute($this, 'project.index');
         }
 
         return $this->dispatch('error', "<strong>Project {$project->name}</strong> has resources defined, please delete them first.");

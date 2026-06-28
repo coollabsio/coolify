@@ -54,13 +54,6 @@ class ContainerStatusAggregator
             $maxRestartCount = 0;
         }
 
-        if ($maxRestartCount > 1000) {
-            Log::warning('High maxRestartCount detected', [
-                'maxRestartCount' => $maxRestartCount,
-                'containers' => $containerStatuses->count(),
-            ]);
-        }
-
         if ($containerStatuses->isEmpty()) {
             return 'exited';
         }
@@ -136,13 +129,6 @@ class ContainerStatusAggregator
                 'original_value' => $maxRestartCount,
             ]);
             $maxRestartCount = 0;
-        }
-
-        if ($maxRestartCount > 1000) {
-            Log::warning('High maxRestartCount detected', [
-                'maxRestartCount' => $maxRestartCount,
-                'containers' => $containers->count(),
-            ]);
         }
 
         if ($containers->isEmpty()) {

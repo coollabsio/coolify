@@ -287,7 +287,7 @@ class ChangelogService
         $html = preg_replace('/<a([^>]*)>/', '<a$1 class="text-blue-500 hover:text-blue-600 underline" target="_blank" rel="noopener">', $html);
 
         // Convert plain URLs to clickable links (that aren't already in <a> tags)
-        $html = preg_replace('/(?<!href="|href=\')(?<!>)(?<!\/)(https?:\/\/[^\s<>"]+)(?![^<]*<\/a>)/', '<a href="$1" class="text-blue-500 hover:text-blue-600 underline" target="_blank" rel="noopener">$1</a>', $html);
+        $html = preg_replace('/(?<!href="|href=\')(?<!src="|src=\')(?<!>)(?<!\/)(https?:\/\/[^\s<>"]+)(?![^<]*<\/a>)/', '<a href="$1" class="text-blue-500 hover:text-blue-600 underline" target="_blank" rel="noopener">$1</a>', $html);
 
         // Strong/bold text
         $html = preg_replace('/<strong[^>]*>/', '<strong class="font-semibold dark:text-white">', $html);

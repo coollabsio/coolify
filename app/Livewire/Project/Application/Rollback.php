@@ -50,6 +50,8 @@ class Rollback extends Component
     {
         $this->authorize('deploy', $this->application);
 
+        $commit = validateGitRef($commit, 'rollback commit');
+
         $deployment_uuid = new Cuid2;
 
         $result = queue_application_deployment(
@@ -66,7 +68,7 @@ class Rollback extends Component
             return;
         }
 
-        return redirect()->route('project.application.deployment.show', [
+        return redirectRoute($this, 'project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $deployment_uuid,

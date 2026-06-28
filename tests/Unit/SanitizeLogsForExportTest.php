@@ -153,6 +153,22 @@ it('removes AWS secret access key', function () {
     expect($result)->toContain('aws_secret_access_key='.REDACTED);
 });
 
+it('removes HTTPS basic auth passwords from git URLs', function () {
+    $testCases = [
+        'https://oauth2:glpat-xxxxxxxxxxxx@gitlab.com/user/repo.git' => 'https://oauth2:'.REDACTED.'@'.REDACTED,
+        'https://user:my-secret-token@gitlab.example.com/group/repo.git' => 'https://user:'.REDACTED.'@'.REDACTED,
+        'http://deploy:token123@git.internal.com/repo.git' => 'http://deploy:'.REDACTED.'@'.REDACTED,
+    ];
+
+    foreach ($testCases as $input => $notExpected) {
+        $result = sanitizeLogsForExport($input);
+        // The password should be redacted
+        expect($result)->not->toContain('glpat-xxxxxxxxxxxx');
+        expect($result)->not->toContain('my-secret-token');
+        expect($result)->not->toContain('token123');
+    }
+});
+
 it('removes generic URL passwords', function () {
     $testCases = [
         'ftp://user:ftppass@ftp.example.com/path' => 'ftp://user:'.REDACTED.'@ftp.example.com/path',

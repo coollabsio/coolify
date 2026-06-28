@@ -28,6 +28,13 @@ class StopDatabase
 
             $this->stopContainer($database, $database->uuid, 30);
 
+            // Reset restart tracking when database is manually stopped
+            $database->update([
+                'restart_count' => 0,
+                'last_restart_at' => null,
+                'last_restart_type' => null,
+            ]);
+
             if ($dockerCleanup) {
                 CleanupDocker::dispatch($server, false, false);
             }

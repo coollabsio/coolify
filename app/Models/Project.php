@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use OpenApi\Attributes as OA;
 use Visus\Cuid2\Cuid2;
 
@@ -15,20 +16,20 @@ use Visus\Cuid2\Cuid2;
         'uuid' => ['type' => 'string'],
         'name' => ['type' => 'string'],
         'description' => ['type' => 'string'],
-        'environments' => new OA\Property(
-            property: 'environments',
-            type: 'array',
-            items: new OA\Items(ref: '#/components/schemas/Environment'),
-            description: 'The environments of the project.'
-        ),
     ]
 )]
 class Project extends BaseModel
 {
     use ClearsGlobalSearchCache;
+    use HasFactory;
     use HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+        'team_id',
+        'uuid',
+    ];
 
     /**
      * Get query builder for projects owned by current team.
@@ -73,7 +74,7 @@ class Project extends BaseModel
 
     public function environment_variables()
     {
-        return $this->hasMany(SharedEnvironmentVariable::class);
+        return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'project');
     }
 
     public function environments()

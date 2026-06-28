@@ -5,7 +5,6 @@ namespace App\Actions\Database;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandaloneRedis;
-use Illuminate\Support\Facades\Storage;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -106,17 +105,11 @@ class StartRedis
                         $this->database->destination->network,
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
-                    'healthcheck' => [
-                        'test' => [
-                            'CMD-SHELL',
-                            'redis-cli',
-                            'ping',
-                        ],
-                        'interval' => '5s',
-                        'timeout' => '5s',
-                        'retries' => 10,
-                        'start_period' => '5s',
-                    ],
+                    'healthcheck' => $this->database->healthCheckConfiguration([
+                        'CMD-SHELL',
+                        'redis-cli',
+                        'ping',
+                    ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
                     'mem_swappiness' => $this->database->limits_memory_swappiness,
@@ -182,7 +175,7 @@ class StartRedis
             );
         }
 
-        if (! is_null($this->database->redis_conf) || ! empty($this->database->redis_conf)) {
+        if (! is_null($this->database->redis_conf) && ! empty($this->database->redis_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
                 'source' => $this->configuration_dir.'/redis.conf',
@@ -195,6 +188,9 @@ class StartRedis
         $docker_run_options = convertDockerRunToCompose($this->database->custom_docker_run_options);
         $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
 
+        if (! $this->database->isHealthcheckEnabled()) {
+            unset($docker_compose['services'][$container_name]['healthcheck']);
+        }
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
@@ -204,6 +200,9 @@ class StartRedis
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         if ($this->database->enable_ssl) {
             $this->commands[] = "chown -R 999:999 $this->configuration_dir/ssl/server.key $this->configuration_dir/ssl/server.crt";
+        }
+        if (! is_null($this->database->redis_conf) && ! empty($this->database->redis_conf)) {
+            $this->commands[] = "chown 999:999 $this->configuration_dir/redis.conf";
         }
         $this->commands[] = "docker stop -t 10 $container_name 2>/dev/null || true";
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
@@ -316,9 +315,8 @@ class StartRedis
             return;
         }
         $filename = 'redis.conf';
-        Storage::disk('local')->put("tmp/redis.conf_{$this->database->uuid}", $this->database->redis_conf);
-        $path = Storage::path("tmp/redis.conf_{$this->database->uuid}");
-        instant_scp($path, "{$this->configuration_dir}/{$filename}", $this->database->destination->server);
-        Storage::disk('local')->delete("tmp/redis.conf_{$this->database->uuid}");
+        $content = $this->database->redis_conf;
+        $content_base64 = base64_encode($content);
+        $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
     }
 }

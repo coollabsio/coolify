@@ -1,8 +1,8 @@
-<div class="flex flex-col items-start gap-2 min-w-fit">
-    <a class="menu-item {{ $activeMenu === 'general' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
-        href="{{ route('settings.index') }}">General</a>
-    <a class="menu-item {{ $activeMenu === 'advanced' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
-        href="{{ route('settings.advanced') }}">Advanced</a>
-    <a class="menu-item {{ $activeMenu === 'updates' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
-        href="{{ route('settings.updates') }}">Updates</a>
+<div class="sub-menu-wrapper">
+    <a class="sub-menu-item {{ $activeMenu === 'general' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
+        href="{{ route('settings.index') }}"><span class="menu-item-label">General</span></a>
+    <a class="sub-menu-item {{ $activeMenu === 'advanced' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
+        href="{{ route('settings.advanced') }}"><span class="menu-item-label">Advanced</span></a>
+    <a class="sub-menu-item {{ $activeMenu === 'updates' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
+        href="{{ route('settings.updates') }}"><span class="menu-item-label">Updates</span></a>
 </div>

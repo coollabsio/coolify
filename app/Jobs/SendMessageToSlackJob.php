@@ -4,15 +4,26 @@ namespace App\Jobs;
 
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 
-class SendMessageToSlackJob implements ShouldQueue
+class SendMessageToSlackJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    /**
+     * The number of times the job may be attempted.
+     */
+    public $tries = 5;
+
+    /**
+     * The number of seconds to wait before retrying the job.
+     */
+    public $backoff = 10;
 
     public function __construct(
         private SlackMessage $message,
@@ -22,6 +33,36 @@ class SendMessageToSlackJob implements ShouldQueue
     }
 
     public function handle(): void
+    {
+        if ($this->isSlackWebhook()) {
+            $this->sendToSlack();
+
+            return;
+        }
+
+        /**
+         * This works with Mattermost and as a fallback also with Slack, the notifications just look slightly different and advanced formatting for slack is not supported with Mattermost.
+         *
+         * @see https://github.com/coollabsio/coolify/pull/6139#issuecomment-3756777708
+         */
+        $this->sendToMattermost();
+    }
+
+    private function isSlackWebhook(): bool
+    {
+        $parsedUrl = parse_url($this->webhookUrl);
+
+        if ($parsedUrl === false) {
+            return false;
+        }
+
+        $scheme = $parsedUrl['scheme'] ?? '';
+        $host = $parsedUrl['host'] ?? '';
+
+        return $scheme === 'https' && $host === 'hooks.slack.com';
+    }
+
+    private function sendToSlack(): void
     {
         Http::post($this->webhookUrl, [
             'text' => $this->message->title,
@@ -53,6 +94,26 @@ class SendMessageToSlackJob implements ShouldQueue
                             ],
                         ],
                     ],
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * @todo v5 refactor: Extract this into a separate SendMessageToMattermostJob.php triggered via the "mattermost" notification channel type.
+     */
+    private function sendToMattermost(): void
+    {
+        $username = config('app.name');
+
+        Http::post($this->webhookUrl, [
+            'username' => $username,
+            'attachments' => [
+                [
+                    'title' => $this->message->title,
+                    'color' => $this->message->color,
+                    'text' => $this->message->description,
+                    'footer' => $username,
                 ],
             ],
         ]);

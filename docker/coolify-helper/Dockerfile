@@ -11,6 +11,10 @@ ARG DOCKER_BUILDX_VERSION=0.25.0
 ARG PACK_VERSION=0.38.2
 # https://github.com/railwayapp/nixpacks/releases
 ARG NIXPACKS_VERSION=1.41.0
+# https://github.com/railwayapp/railpack/releases
+ARG RAILPACK_VERSION=0.23.0
+# https://github.com/jdx/mise/releases — must match railpack's pinned version (https://raw.githubusercontent.com/railwayapp/railpack/refs/heads/main/core/mise/version.txt)
+ARG MISE_VERSION=2026.3.17
 # https://github.com/minio/mc/releases
 ARG MINIO_VERSION=RELEASE.2025-08-13T08-35-41Z
 
@@ -25,17 +29,34 @@ ARG DOCKER_COMPOSE_VERSION
 ARG DOCKER_BUILDX_VERSION
 ARG PACK_VERSION
 ARG NIXPACKS_VERSION
+ARG RAILPACK_VERSION
+ARG MISE_VERSION
 
 USER root
 WORKDIR /artifacts
-RUN apk add --no-cache bash curl git git-lfs openssh-client tar tini
+ENV RAILPACK_VERSION=${RAILPACK_VERSION}
+RUN apk upgrade --no-cache && \
+    apk add --no-cache bash curl git git-lfs openssh-client tar tini
 RUN mkdir -p ~/.docker/cli-plugins
+
+# Install mise (musl build) at the path railpack expects (/tmp/railpack/mise/mise-VERSION).
+# Railpack hardcodes a glibc mise download that fails on Alpine, so we pre-place a musl binary.
+RUN mkdir -p /tmp/railpack/mise && \
+    if [[ ${TARGETPLATFORM} == 'linux/amd64' ]]; then \
+        curl -sSL "https://github.com/jdx/mise/releases/download/v${MISE_VERSION}/mise-v${MISE_VERSION}-linux-x64-musl.tar.gz" | tar xz && \
+        mv mise/bin/mise "/tmp/railpack/mise/mise-${MISE_VERSION}" && rm -rf mise; \
+    elif [[ ${TARGETPLATFORM} == 'linux/arm64' ]]; then \
+        curl -sSL "https://github.com/jdx/mise/releases/download/v${MISE_VERSION}/mise-v${MISE_VERSION}-linux-arm64-musl.tar.gz" | tar xz && \
+        mv mise/bin/mise "/tmp/railpack/mise/mise-${MISE_VERSION}" && rm -rf mise; \
+    fi
+
 RUN if [[ ${TARGETPLATFORM} == 'linux/amd64' ]]; then \
     curl -sSL https://github.com/docker/buildx/releases/download/v${DOCKER_BUILDX_VERSION}/buildx-v${DOCKER_BUILDX_VERSION}.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx && \
     curl -sSL https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose && \
     (curl -sSL https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz | tar -C /usr/bin/ --no-same-owner -xzv --strip-components=1 docker/docker) && \
     (curl -sSL https://github.com/buildpacks/pack/releases/download/v${PACK_VERSION}/pack-v${PACK_VERSION}-linux.tgz | tar -C /usr/local/bin/ --no-same-owner -xzv pack) && \
     curl -sSL https://nixpacks.com/install.sh | bash && \
+    curl -sSL https://railpack.com/install.sh | RAILPACK_VERSION=${RAILPACK_VERSION} sh && \
     chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker /usr/local/bin/pack /root/.docker/cli-plugins/docker-buildx \
     ;fi
 
@@ -45,6 +66,7 @@ RUN if [[ ${TARGETPLATFORM} == 'linux/arm64' ]]; then \
     (curl -sSL https://download.docker.com/linux/static/stable/aarch64/docker-${DOCKER_VERSION}.tgz | tar -C /usr/bin/ --no-same-owner -xzv --strip-components=1 docker/docker) && \
     (curl -sSL https://github.com/buildpacks/pack/releases/download/v${PACK_VERSION}/pack-v${PACK_VERSION}-linux-arm64.tgz | tar -C /usr/local/bin/ --no-same-owner -xzv pack) && \
     curl -sSL https://nixpacks.com/install.sh | bash && \
+    curl -sSL https://railpack.com/install.sh | RAILPACK_VERSION=${RAILPACK_VERSION} sh && \
     chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker /usr/local/bin/pack /root/.docker/cli-plugins/docker-buildx \
     ;fi
 

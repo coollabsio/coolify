@@ -1,6 +1,10 @@
 <div>
     <div class="flex flex-col gap-4 p-4 bg-white border dark:bg-base dark:border-coolgray-300 border-neutral-200">
-        @if ($isReadOnly)
+        @if ($fileStorage->is_too_large)
+            <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
+                File on server exceeds 5 MB and cannot be edited from the UI. Edit it directly on the server.
+            </div>
+        @elseif ($isReadOnly)
             <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
                 @if ($fileStorage->is_directory)
                     This directory is mounted as read-only and cannot be modified from the UI.
@@ -15,6 +19,15 @@
                 <x-forms.input label="Destination Path" :value="$fileStorage->mount_path" readonly />
             </div>
         </div>
+        @if ($resource instanceof \App\Models\Application)
+            @can('update', $resource)
+                <div class="w-full sm:w-96">
+                    <x-forms.checkbox instantSave canGate="update" :canResource="$resource" label="Add suffix for PR deployments"
+                        id="isPreviewSuffixEnabled"
+                        helper="When enabled, a -pr-N suffix is added to this volume's path for preview deployments (e.g. ./scripts becomes ./scripts-pr-1). Disable this for volumes that contain shared config or scripts from your repository."></x-forms.checkbox>
+                </div>
+            @endcan
+        @endif
         <form wire:submit='submit' class="flex flex-col gap-2">
             @if (!$isReadOnly)
                 @can('update', $resource)
@@ -35,7 +48,7 @@
                                 confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
                                 shortConfirmationLabel="Filepath" />
                         @else
-                            @if (!$fileStorage->is_binary)
+                            @if (!$fileStorage->is_binary && !$fileStorage->is_too_large)
                                 <x-modal-confirmation :ignoreWire="false" title="Confirm File Conversion to Directory?"
                                     buttonTitle="Convert to directory" submitAction="convertToDirectory" :actions="[
                                         'The selected file will be permanently deleted and an empty directory will be created in its place.',
@@ -58,7 +71,7 @@
                 @if (!$fileStorage->is_directory)
                     @can('update', $resource)
                         @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
-                            <div class="w-96">
+                            <div class="w-full sm:w-96">
                                 <x-forms.checkbox instantSave label="Is this based on the Git repository?"
                                     id="isBasedOnGit"></x-forms.checkbox>
                             </div>
@@ -67,13 +80,13 @@
                             label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
                             helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
                             rows="20" id="content"
-                            readonly="{{ $fileStorage->is_based_on_git || $fileStorage->is_binary }}"></x-forms.textarea>
-                        @if (!$fileStorage->is_based_on_git && !$fileStorage->is_binary)
+                            readonly="{{ $fileStorage->is_based_on_git || $fileStorage->is_binary || $fileStorage->is_too_large }}"></x-forms.textarea>
+                        @if (!$fileStorage->is_based_on_git && !$fileStorage->is_binary && !$fileStorage->is_too_large)
                             <x-forms.button class="w-full" type="submit">Save</x-forms.button>
                         @endif
                     @else
                         @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
-                            <div class="w-96">
+                            <div class="w-full sm:w-96">
                                 <x-forms.checkbox disabled label="Is this based on the Git repository?"
                                     id="isBasedOnGit"></x-forms.checkbox>
                             </div>
@@ -94,7 +107,7 @@
                         </div>
                     @endcan
                     @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
-                        <div class="w-96">
+                        <div class="w-full sm:w-96">
                             <x-forms.checkbox disabled label="Is this based on the Git repository?"
                                 id="isBasedOnGit"></x-forms.checkbox>
                         </div>

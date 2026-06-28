@@ -1,11 +1,11 @@
-#!/command/execlineb -P
+#!/bin/sh
 
-# Use with-contenv to ensure environment variables are available
-with-contenv
 cd /var/www/html
-foreground {
-    php
-    artisan
-    start:horizon
-}
 
+if grep -qE '^HORIZON_ENABLED=false' .env 2>/dev/null; then
+    echo "   INFO  Horizon is disabled, sleeping."
+    exec sleep infinity
+fi
+
+echo "   INFO  Horizon is enabled, starting..."
+exec php artisan horizon

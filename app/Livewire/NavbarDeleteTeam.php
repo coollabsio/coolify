@@ -15,10 +15,10 @@ class NavbarDeleteTeam extends Component
         $this->team = currentTeam()->name;
     }
 
-    public function delete($password)
+    public function delete($password, $selectedActions = [])
     {
         if (! verifyPasswordConfirmation($password, $this)) {
-            return;
+            return 'The provided password is incorrect.';
         }
 
         $currentTeam = currentTeam();
@@ -37,7 +37,7 @@ class NavbarDeleteTeam extends Component
 
         refreshSession();
 
-        return redirect()->route('team.index');
+        return redirectRoute($this, 'team.index');
     }
 
     public function render()

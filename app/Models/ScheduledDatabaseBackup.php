@@ -8,7 +8,35 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ScheduledDatabaseBackup extends BaseModel
 {
-    protected $guarded = [];
+    protected function casts(): array
+    {
+        return [
+            'database_backup_retention_max_storage_locally' => 'float',
+            'database_backup_retention_max_storage_s3' => 'float',
+        ];
+    }
+
+    protected $fillable = [
+        'uuid',
+        'team_id',
+        'description',
+        'enabled',
+        'save_s3',
+        'frequency',
+        'database_backup_retention_amount_locally',
+        'database_type',
+        'database_id',
+        's3_storage_id',
+        'databases_to_backup',
+        'dump_all',
+        'database_backup_retention_days_locally',
+        'database_backup_retention_max_storage_locally',
+        'database_backup_retention_amount_s3',
+        'database_backup_retention_days_s3',
+        'database_backup_retention_max_storage_s3',
+        'timeout',
+        'disable_local_backup',
+    ];
 
     public static function ownedByCurrentTeam()
     {

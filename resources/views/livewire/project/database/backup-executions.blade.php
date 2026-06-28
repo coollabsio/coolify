@@ -186,10 +186,13 @@
                 <div class="p-4 bg-gray-100 dark:bg-coolgray-100 rounded-sm">No executions found.</div>
             @endforelse
         </div>
-        <script>
-            function download_file(executionId) {
-                window.open('/download/backup/' + executionId, '_blank');
-            }
-        </script>
     @endisset
 </div>
+
+@script
+<script>
+    window.download_file = function(executionId) {
+        window.open('/download/backup/' + executionId, '_blank');
+    }
+</script>
+@endscript

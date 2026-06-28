@@ -158,8 +158,7 @@ function checkIfDomainIsAlreadyUsedViaAPI(Collection|array $domains, ?string $te
         return str($domain);
     });
 
-    // Check applications within the same team
-    $applications = Application::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid', 'name', 'id']);
+    $applications = Application::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid', 'name', 'id', 'docker_compose_domains', 'build_pack']);
     $serviceApplications = ServiceApplication::ownedByCurrentTeamAPI($teamId)->with('service:id,name')->get(['fqdn', 'uuid', 'id', 'service_id']);
 
     if ($uuid) {
@@ -168,23 +167,51 @@ function checkIfDomainIsAlreadyUsedViaAPI(Collection|array $domains, ?string $te
     }
 
     foreach ($applications as $app) {
-        if (is_null($app->fqdn)) {
-            continue;
-        }
-        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
-        foreach ($list_of_domains as $domain) {
-            if (str($domain)->endsWith('/')) {
-                $domain = str($domain)->beforeLast('/');
+        if (! is_null($app->fqdn)) {
+            $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+            foreach ($list_of_domains as $domain) {
+                if (str($domain)->endsWith('/')) {
+                    $domain = str($domain)->beforeLast('/');
+                }
+                $naked_domain = str($domain)->value();
+                if ($domains->contains($naked_domain)) {
+                    $conflicts[] = [
+                        'domain' => $naked_domain,
+                        'resource_name' => $app->name,
+                        'resource_uuid' => $app->uuid,
+                        'resource_type' => 'application',
+                        'message' => "Domain $naked_domain is already in use by application '{$app->name}'",
+                    ];
+                }
             }
-            $naked_domain = str($domain)->value();
-            if ($domains->contains($naked_domain)) {
-                $conflicts[] = [
-                    'domain' => $naked_domain,
-                    'resource_name' => $app->name,
-                    'resource_uuid' => $app->uuid,
-                    'resource_type' => 'application',
-                    'message' => "Domain $naked_domain is already in use by application '{$app->name}'",
-                ];
+        }
+
+        if ($app->build_pack === 'dockercompose' && ! empty($app->docker_compose_domains)) {
+            $dockerComposeDomains = json_decode($app->docker_compose_domains, true);
+            if (is_array($dockerComposeDomains)) {
+                foreach ($dockerComposeDomains as $serviceName => $domainConfig) {
+                    $domainValue = data_get($domainConfig, 'domain');
+                    if (empty($domainValue)) {
+                        continue;
+                    }
+                    $list_of_domains = collect(explode(',', $domainValue))->filter(fn ($fqdn) => $fqdn !== '');
+                    foreach ($list_of_domains as $domain) {
+                        if (str($domain)->endsWith('/')) {
+                            $domain = str($domain)->beforeLast('/');
+                        }
+                        $naked_domain = str($domain)->value();
+                        if ($domains->contains($naked_domain)) {
+                            $conflicts[] = [
+                                'domain' => $naked_domain,
+                                'resource_name' => $app->name,
+                                'resource_uuid' => $app->uuid,
+                                'resource_type' => 'application',
+                                'service_name' => $serviceName,
+                                'message' => "Domain $naked_domain is already in use by application '{$app->name}' (service: {$serviceName})",
+                            ];
+                        }
+                    }
+                }
             }
         }
     }

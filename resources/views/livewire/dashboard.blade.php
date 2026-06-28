@@ -7,12 +7,6 @@
     @endif
     <h1>Dashboard</h1>
     <div class="subtitle">Your self-hosted infrastructure.</div>
-    @if (request()->query->get('success'))
-        <div class=" mb-10 font-bold alert alert-success">
-            Your subscription has been activated! Welcome onboard! It could take a few seconds before your
-            subscription is activated.<br> Please be patient.
-        </div>
-    @endif
 
     <section class="-mt-2">
         <div class="flex items-center gap-2 pb-2">
@@ -21,7 +15,7 @@
                 <x-modal-input buttonTitle="Add" title="New Project">
                     <x-slot:content>
                         <button
-                            class="flex items-center justify-center size-4 text-white rounded hover:bg-coolgray-400 dark:hover:bg-coolgray-300 cursor-pointer">
+                            class="flex items-center justify-center size-4 text-black dark:text-white rounded hover:bg-coolgray-400 dark:hover:bg-coolgray-300 cursor-pointer">
                             <svg class="size-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                 stroke-width="2" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -87,7 +81,7 @@
                 <x-modal-input buttonTitle="Add" title="New Server" :closeOutside="false">
                     <x-slot:content>
                         <button
-                            class="flex items-center justify-center size-4 text-white rounded hover:bg-coolgray-400 dark:hover:bg-coolgray-300 cursor-pointer">
+                            class="flex items-center justify-center size-4 text-black dark:text-white rounded hover:bg-coolgray-400 dark:hover:bg-coolgray-300 cursor-pointer">
                             <svg class="size-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                 stroke-width="2" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />

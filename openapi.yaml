@@ -14,6 +14,14 @@ paths:
       summary: List
       description: 'List all applications.'
       operationId: list-applications
+      parameters:
+        -
+          name: tag
+          in: query
+          description: 'Filter applications by tag name.'
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: 'Get all applications.'
@@ -51,7 +59,6 @@ paths:
                 - git_repository
                 - git_branch
                 - build_pack
-                - ports_exposes
               properties:
                 project_uuid:
                   type: string
@@ -73,7 +80,7 @@ paths:
                   description: 'The git branch.'
                 build_pack:
                   type: string
-                  enum: [nixpacks, static, dockerfile, dockercompose]
+                  enum: [nixpacks, railpack, static, dockerfile, dockercompose]
                   description: 'The build pack type.'
                 ports_exposes:
                   type: string
@@ -89,7 +96,7 @@ paths:
                   description: 'The application description.'
                 domains:
                   type: string
-                  description: 'The application domains.'
+                  description: 'The application URLs in a comma-separated list.'
                 git_commit_sha:
                   type: string
                   description: 'The git commit SHA.'
@@ -102,6 +109,15 @@ paths:
                 is_static:
                   type: boolean
                   description: 'The flag to indicate if the application is static.'
+                is_spa:
+                  type: boolean
+                  description: 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'
+                is_auto_deploy_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'
+                is_force_https_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
                 static_image:
                   type: string
                   enum: ['nginx:alpine']
@@ -226,12 +242,12 @@ paths:
                 dockerfile:
                   type: string
                   description: 'The Dockerfile content.'
+                dockerfile_location:
+                  type: string
+                  description: 'The Dockerfile location in the repository.'
                 docker_compose_location:
                   type: string
                   description: 'The Docker Compose location.'
-                docker_compose_raw:
-                  type: string
-                  description: 'The Docker Compose raw content.'
                 docker_compose_custom_start_command:
                   type: string
                   description: 'The Docker Compose custom start command.'
@@ -240,7 +256,8 @@ paths:
                   description: 'The Docker Compose custom build command.'
                 docker_compose_domains:
                   type: array
-                  description: 'The Docker Compose domains.'
+                  description: 'Array of URLs to be applied to containers of a dockercompose application.'
+                  items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' } }, type: object }
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
@@ -269,6 +286,14 @@ paths:
                   type: boolean
                   default: true
                   description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
+                is_preserve_repository_enabled:
+                  type: boolean
+                  default: false
+                  description: 'Preserve repository during deployment.'
               type: object
       responses:
         '201':
@@ -318,7 +343,6 @@ paths:
                 - git_repository
                 - git_branch
                 - build_pack
-                - ports_exposes
               properties:
                 project_uuid:
                   type: string
@@ -349,7 +373,7 @@ paths:
                   description: 'The destination UUID.'
                 build_pack:
                   type: string
-                  enum: [nixpacks, static, dockerfile, dockercompose]
+                  enum: [nixpacks, railpack, static, dockerfile, dockercompose]
                   description: 'The build pack type.'
                 name:
                   type: string
@@ -359,7 +383,7 @@ paths:
                   description: 'The application description.'
                 domains:
                   type: string
-                  description: 'The application domains.'
+                  description: 'The application URLs in a comma-separated list.'
                 git_commit_sha:
                   type: string
                   description: 'The git commit SHA.'
@@ -372,6 +396,15 @@ paths:
                 is_static:
                   type: boolean
                   description: 'The flag to indicate if the application is static.'
+                is_spa:
+                  type: boolean
+                  description: 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'
+                is_auto_deploy_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'
+                is_force_https_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
                 static_image:
                   type: string
                   enum: ['nginx:alpine']
@@ -496,12 +529,12 @@ paths:
                 dockerfile:
                   type: string
                   description: 'The Dockerfile content.'
+                dockerfile_location:
+                  type: string
+                  description: 'The Dockerfile location in the repository'
                 docker_compose_location:
                   type: string
                   description: 'The Docker Compose location.'
-                docker_compose_raw:
-                  type: string
-                  description: 'The Docker Compose raw content.'
                 docker_compose_custom_start_command:
                   type: string
                   description: 'The Docker Compose custom start command.'
@@ -510,7 +543,8 @@ paths:
                   description: 'The Docker Compose custom build command.'
                 docker_compose_domains:
                   type: array
-                  description: 'The Docker Compose domains.'
+                  description: 'Array of URLs to be applied to containers of a dockercompose application.'
+                  items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' } }, type: object }
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
@@ -539,6 +573,14 @@ paths:
                   type: boolean
                   default: true
                   description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
+                is_preserve_repository_enabled:
+                  type: boolean
+                  default: false
+                  description: 'Preserve repository during deployment.'
               type: object
       responses:
         '201':
@@ -588,7 +630,6 @@ paths:
                 - git_repository
                 - git_branch
                 - build_pack
-                - ports_exposes
               properties:
                 project_uuid:
                   type: string
@@ -619,7 +660,7 @@ paths:
                   description: 'The destination UUID.'
                 build_pack:
                   type: string
-                  enum: [nixpacks, static, dockerfile, dockercompose]
+                  enum: [nixpacks, railpack, static, dockerfile, dockercompose]
                   description: 'The build pack type.'
                 name:
                   type: string
@@ -629,7 +670,7 @@ paths:
                   description: 'The application description.'
                 domains:
                   type: string
-                  description: 'The application domains.'
+                  description: 'The application URLs in a comma-separated list.'
                 git_commit_sha:
                   type: string
                   description: 'The git commit SHA.'
@@ -642,6 +683,15 @@ paths:
                 is_static:
                   type: boolean
                   description: 'The flag to indicate if the application is static.'
+                is_spa:
+                  type: boolean
+                  description: 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'
+                is_auto_deploy_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'
+                is_force_https_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
                 static_image:
                   type: string
                   enum: ['nginx:alpine']
@@ -766,12 +816,12 @@ paths:
                 dockerfile:
                   type: string
                   description: 'The Dockerfile content.'
+                dockerfile_location:
+                  type: string
+                  description: 'The Dockerfile location in the repository.'
                 docker_compose_location:
                   type: string
                   description: 'The Docker Compose location.'
-                docker_compose_raw:
-                  type: string
-                  description: 'The Docker Compose raw content.'
                 docker_compose_custom_start_command:
                   type: string
                   description: 'The Docker Compose custom start command.'
@@ -780,7 +830,8 @@ paths:
                   description: 'The Docker Compose custom build command.'
                 docker_compose_domains:
                   type: array
-                  description: 'The Docker Compose domains.'
+                  description: 'Array of URLs to be applied to containers of a dockercompose application.'
+                  items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' } }, type: object }
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
@@ -809,6 +860,14 @@ paths:
                   type: boolean
                   default: true
                   description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
+                is_preserve_repository_enabled:
+                  type: boolean
+                  default: false
+                  description: 'Preserve repository during deployment.'
               type: object
       responses:
         '201':
@@ -840,8 +899,8 @@ paths:
     post:
       tags:
         - Applications
-      summary: 'Create (Dockerfile)'
-      description: 'Create new application based on a simple Dockerfile.'
+      summary: 'Create (Dockerfile without git)'
+      description: 'Create new application based on a simple Dockerfile (without git).'
       operationId: create-dockerfile-application
       requestBody:
         description: 'Application object that needs to be created.'
@@ -873,7 +932,7 @@ paths:
                   description: 'The Dockerfile content.'
                 build_pack:
                   type: string
-                  enum: [nixpacks, static, dockerfile, dockercompose]
+                  enum: [dockerfile]
                   description: 'The build pack type.'
                 ports_exposes:
                   type: string
@@ -889,7 +948,7 @@ paths:
                   description: 'The application description.'
                 domains:
                   type: string
-                  description: 'The application domains.'
+                  description: 'The application URLs in a comma-separated list.'
                 docker_registry_image_name:
                   type: string
                   description: 'The docker registry image name.'
@@ -1001,6 +1060,9 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'The flag to indicate if the application should be deployed instantly.'
+                is_force_https_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -1026,6 +1088,10 @@ paths:
                   type: boolean
                   default: true
                   description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
               type: object
       responses:
         '201':
@@ -1057,8 +1123,8 @@ paths:
     post:
       tags:
         - Applications
-      summary: 'Create (Docker Image)'
-      description: 'Create new application based on a prebuilt docker image'
+      summary: 'Create (Docker Image without git)'
+      description: 'Create new application based on a prebuilt docker image (without git).'
       operationId: create-dockerimage-application
       requestBody:
         description: 'Application object that needs to be created.'
@@ -1072,7 +1138,6 @@ paths:
                 - environment_name
                 - environment_uuid
                 - docker_registry_image_name
-                - ports_exposes
               properties:
                 project_uuid:
                   type: string
@@ -1106,7 +1171,7 @@ paths:
                   description: 'The application description.'
                 domains:
                   type: string
-                  description: 'The application domains.'
+                  description: 'The application URLs in a comma-separated list.'
                 ports_mappings:
                   type: string
                   description: 'The ports mappings.'
@@ -1209,6 +1274,9 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'The flag to indicate if the application should be deployed instantly.'
+                is_force_https_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -1234,90 +1302,10 @@ paths:
                   type: boolean
                   default: true
                   description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
-              type: object
-      responses:
-        '201':
-          description: 'Application created successfully.'
-          content:
-            application/json:
-              schema:
-                properties:
-                  uuid: { type: string }
-                type: object
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-        '409':
-          description: 'Domain conflicts detected.'
-          content:
-            application/json:
-              schema:
-                properties:
-                  message: { type: string, example: 'Domain conflicts detected. Use force_domain_override=true to proceed.' }
-                  warning: { type: string, example: 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.' }
-                  conflicts: { type: array, items: { properties: { domain: { type: string, example: example.com }, resource_name: { type: string, example: 'My Application' }, resource_uuid: { type: string, nullable: true, example: abc123-def456 }, resource_type: { type: string, enum: [application, service, instance], example: application }, message: { type: string, example: "Domain example.com is already in use by application 'My Application'" } }, type: object } }
-                type: object
-      security:
-        -
-          bearerAuth: []
-  /applications/dockercompose:
-    post:
-      tags:
-        - Applications
-      summary: 'Create (Docker Compose)'
-      description: 'Create new application based on a docker-compose file.'
-      operationId: create-dockercompose-application
-      requestBody:
-        description: 'Application object that needs to be created.'
-        required: true
-        content:
-          application/json:
-            schema:
-              required:
-                - project_uuid
-                - server_uuid
-                - environment_name
-                - environment_uuid
-                - docker_compose_raw
-              properties:
-                project_uuid:
-                  type: string
-                  description: 'The project UUID.'
-                server_uuid:
-                  type: string
-                  description: 'The server UUID.'
-                environment_name:
-                  type: string
-                  description: 'The environment name. You need to provide at least one of environment_name or environment_uuid.'
-                environment_uuid:
-                  type: string
-                  description: 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'
-                docker_compose_raw:
-                  type: string
-                  description: 'The Docker Compose raw content.'
-                destination_uuid:
-                  type: string
-                  description: 'The destination UUID if the server has more than one destinations.'
-                name:
-                  type: string
-                  description: 'The application name.'
-                description:
-                  type: string
-                  description: 'The application description.'
-                instant_deploy:
+                is_container_label_escape_enabled:
                   type: boolean
-                  description: 'The flag to indicate if the application should be deployed instantly.'
-                use_build_server:
-                  type: boolean
-                  nullable: true
-                  description: 'Use build server.'
-                connect_to_docker_network:
-                  type: boolean
-                  description: 'The flag to connect the service to the predefined Docker network.'
-                force_domain_override:
-                  type: boolean
-                  description: 'Force domain usage even if conflicts are detected. Default is false.'
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
               type: object
       responses:
         '201':
@@ -1360,7 +1348,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Get application by UUID.'
@@ -1391,7 +1378,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: delete_configurations
           in: query
@@ -1456,7 +1442,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Application updated.'
         required: true
@@ -1490,7 +1475,7 @@ paths:
                   description: 'The destination UUID.'
                 build_pack:
                   type: string
-                  enum: [nixpacks, static, dockerfile, dockercompose]
+                  enum: [nixpacks, railpack, static, dockerfile, dockercompose]
                   description: 'The build pack type.'
                 name:
                   type: string
@@ -1500,7 +1485,7 @@ paths:
                   description: 'The application description.'
                 domains:
                   type: string
-                  description: 'The application domains.'
+                  description: 'The application URLs in a comma-separated list.'
                 git_commit_sha:
                   type: string
                   description: 'The git commit SHA.'
@@ -1513,6 +1498,15 @@ paths:
                 is_static:
                   type: boolean
                   description: 'The flag to indicate if the application is static.'
+                is_spa:
+                  type: boolean
+                  description: 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'
+                is_auto_deploy_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'
+                is_force_https_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
                 install_command:
                   type: string
                   description: 'The install command.'
@@ -1633,12 +1627,12 @@ paths:
                 dockerfile:
                   type: string
                   description: 'The Dockerfile content.'
+                dockerfile_location:
+                  type: string
+                  description: 'The Dockerfile location in the repository.'
                 docker_compose_location:
                   type: string
                   description: 'The Docker Compose location.'
-                docker_compose_raw:
-                  type: string
-                  description: 'The Docker Compose raw content.'
                 docker_compose_custom_start_command:
                   type: string
                   description: 'The Docker Compose custom start command.'
@@ -1647,7 +1641,8 @@ paths:
                   description: 'The Docker Compose custom build command.'
                 docker_compose_domains:
                   type: array
-                  description: 'The Docker Compose domains.'
+                  description: 'Array of URLs to be applied to containers of a dockercompose application.'
+                  items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")' } }, type: object }
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
@@ -1661,6 +1656,13 @@ paths:
                 force_domain_override:
                   type: boolean
                   description: 'Force domain usage even if conflicts are detected. Default is false.'
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
+                is_preserve_repository_enabled:
+                  type: boolean
+                  description: 'Preserve git repository during application update. If false, the existing repository will be removed and replaced with the new one. If true, the existing repository will be kept and the new one will be ignored. Default is false.'
               type: object
       responses:
         '200':
@@ -1705,7 +1707,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: lines
           in: query
@@ -1748,7 +1749,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'All environment variables by application UUID.'
@@ -1781,7 +1781,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Env created.'
         required: true
@@ -1840,7 +1839,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Env updated.'
         required: true
@@ -1876,9 +1874,7 @@ paths:
           content:
             application/json:
               schema:
-                properties:
-                  message: { type: string, example: 'Environment variable updated.' }
-                type: object
+                $ref: '#/components/schemas/EnvironmentVariable'
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -1903,7 +1899,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Bulk envs updated.'
         required: true
@@ -1923,9 +1918,9 @@ paths:
           content:
             application/json:
               schema:
-                properties:
-                  message: { type: string, example: 'Environment variables updated.' }
-                type: object
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnvironmentVariable'
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -1950,7 +1945,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: env_uuid
           in: path
@@ -1958,7 +1952,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Environment variable deleted.'
@@ -1992,7 +1985,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: force
           in: query
@@ -2041,7 +2033,13 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Perform docker cleanup (prune networks, volumes, etc.).'
+          schema:
+            type: boolean
+            default: true
       responses:
         '200':
           description: 'Stop application.'
@@ -2075,7 +2073,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Restart application.'
@@ -2092,6 +2089,261 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/storages':
+    get:
+      tags:
+        - Applications
+      summary: 'List Storages'
+      description: 'List all persistent storages and file storages by application UUID.'
+      operationId: list-storages-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'All storages by application UUID.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  persistent_storages: { type: array, items: { type: object } }
+                  file_storages: { type: array, items: { type: object } }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Applications
+      summary: 'Create Storage'
+      description: 'Create a persistent storage or file storage for an application.'
+      operationId: create-storage-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - type
+                - mount_path
+              properties:
+                type:
+                  type: string
+                  enum: [persistent, file]
+                  description: 'The type of storage.'
+                name:
+                  type: string
+                  description: 'Volume name (persistent only, required for persistent).'
+                mount_path:
+                  type: string
+                  description: 'The container mount path.'
+                host_path:
+                  type: string
+                  nullable: true
+                  description: 'The host path (persistent only, optional).'
+                content:
+                  type: string
+                  nullable: true
+                  description: 'File content (file only, optional).'
+                is_directory:
+                  type: boolean
+                  description: 'Whether this is a directory mount (file only, default false).'
+                fs_path:
+                  type: string
+                  description: 'Host directory path (required when is_directory is true).'
+              type: object
+              additionalProperties: false
+      responses:
+        '201':
+          description: 'Storage created.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Applications
+      summary: 'Update Storage'
+      description: 'Update a persistent storage or file storage by application UUID.'
+      operationId: update-storage-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Storage updated. For read-only storages (from docker-compose or services), only is_preview_suffix_enabled can be updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - type
+              properties:
+                uuid:
+                  type: string
+                  description: 'The UUID of the storage (preferred).'
+                id:
+                  type: integer
+                  description: 'The ID of the storage (deprecated, use uuid instead).'
+                type:
+                  type: string
+                  enum: [persistent, file]
+                  description: 'The type of storage: persistent or file.'
+                is_preview_suffix_enabled:
+                  type: boolean
+                  description: 'Whether to add -pr-N suffix for preview deployments.'
+                name:
+                  type: string
+                  description: 'The volume name (persistent only, not allowed for read-only storages).'
+                mount_path:
+                  type: string
+                  description: 'The container mount path (not allowed for read-only storages).'
+                host_path:
+                  type: string
+                  nullable: true
+                  description: 'The host path (persistent only, not allowed for read-only storages).'
+                content:
+                  type: string
+                  nullable: true
+                  description: 'The file content (file only, not allowed for read-only storages).'
+              type: object
+              additionalProperties: false
+      responses:
+        '200':
+          description: 'Storage updated.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/storages/{storage_uuid}':
+    delete:
+      tags:
+        - Applications
+      summary: 'Delete Storage'
+      description: 'Delete a persistent storage or file storage by application UUID.'
+      operationId: delete-storage-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: storage_uuid
+          in: path
+          description: 'UUID of the storage.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Storage deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/previews/{pull_request_id}':
+    delete:
+      tags:
+        - Applications
+      summary: 'Delete Preview Deployment'
+      description: 'Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes/networks, and deletes the preview record.'
+      operationId: delete-preview-deployment-by-pull-request-id
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: pull_request_id
+          in: path
+          description: 'Pull request ID of the preview to delete.'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Preview deletion queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -2219,7 +2471,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Cloud provider token deleted.'
@@ -2350,7 +2601,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Get all backups for a database'
@@ -2382,7 +2632,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Backup configuration data'
         required: true
@@ -2423,8 +2672,8 @@ paths:
                   type: integer
                   description: 'Number of days to retain backups locally'
                 database_backup_retention_max_storage_locally:
-                  type: integer
-                  description: 'Max storage (MB) for local backups'
+                  type: number
+                  description: 'Max storage (GB) for local backups'
                 database_backup_retention_amount_s3:
                   type: integer
                   description: 'Number of backups to retain in S3'
@@ -2432,8 +2681,12 @@ paths:
                   type: integer
                   description: 'Number of days to retain backups in S3'
                 database_backup_retention_max_storage_s3:
+                  type: number
+                  description: 'Max storage (GB) for S3 backups'
+                timeout:
                   type: integer
-                  description: 'Max storage (MB) for S3 backups'
+                  description: 'Backup job timeout in seconds (min: 60, max: 36000)'
+                  default: 3600
               type: object
       responses:
         '201':
@@ -2471,7 +2724,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Get all databases'
@@ -2503,7 +2755,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: delete_configurations
           in: query
@@ -2568,7 +2819,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Database data'
         required: true
@@ -2591,6 +2841,9 @@ paths:
                 public_port:
                   type: integer
                   description: 'Public port of the database'
+                public_port_timeout:
+                  type: integer
+                  description: 'Public port timeout in seconds (default: 3600)'
                 limits_memory:
                   type: string
                   description: 'Memory limit of the database'
@@ -2693,6 +2946,30 @@ paths:
                 mysql_conf:
                   type: string
                   description: 'MySQL conf'
+                health_check_enabled:
+                  type: boolean
+                  description: 'Enable the database healthcheck probe.'
+                  default: true
+                health_check_interval:
+                  type: integer
+                  description: 'Healthcheck interval in seconds.'
+                  minimum: 1
+                  default: 15
+                health_check_timeout:
+                  type: integer
+                  description: 'Healthcheck timeout in seconds.'
+                  minimum: 1
+                  default: 5
+                health_check_retries:
+                  type: integer
+                  description: 'Healthcheck retries count.'
+                  minimum: 1
+                  default: 5
+                health_check_start_period:
+                  type: integer
+                  description: 'Healthcheck start period in seconds.'
+                  minimum: 0
+                  default: 5
               type: object
       responses:
         '200':
@@ -2730,7 +3007,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: delete_s3
           in: query
@@ -2773,7 +3049,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: scheduled_backup_uuid
           in: path
@@ -2781,7 +3056,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Database backup configuration data'
         required: true
@@ -2817,7 +3091,7 @@ paths:
                   type: integer
                   description: 'Retention days of the backup locally'
                 database_backup_retention_max_storage_locally:
-                  type: integer
+                  type: number
                   description: 'Max storage of the backup locally'
                 database_backup_retention_amount_s3:
                   type: integer
@@ -2826,8 +3100,12 @@ paths:
                   type: integer
                   description: 'Retention days of the backup in s3'
                 database_backup_retention_max_storage_s3:
-                  type: integer
+                  type: number
                   description: 'Max storage of the backup in S3'
+                timeout:
+                  type: integer
+                  description: 'Backup job timeout in seconds (min: 60, max: 36000)'
+                  default: 3600
               type: object
       responses:
         '200':
@@ -2910,6 +3188,9 @@ paths:
                 public_port:
                   type: integer
                   description: 'Public port of the database'
+                public_port_timeout:
+                  type: integer
+                  description: 'Public port timeout in seconds (default: 3600)'
                 limits_memory:
                   type: string
                   description: 'Memory limit of the database'
@@ -3002,6 +3283,9 @@ paths:
                 public_port:
                   type: integer
                   description: 'Public port of the database'
+                public_port_timeout:
+                  type: integer
+                  description: 'Public port timeout in seconds (default: 3600)'
                 limits_memory:
                   type: string
                   description: 'Memory limit of the database'
@@ -3091,6 +3375,9 @@ paths:
                 public_port:
                   type: integer
                   description: 'Public port of the database'
+                public_port_timeout:
+                  type: integer
+                  description: 'Public port timeout in seconds (default: 3600)'
                 limits_memory:
                   type: string
                   description: 'Memory limit of the database'
@@ -3183,6 +3470,9 @@ paths:
                 public_port:
                   type: integer
                   description: 'Public port of the database'
+                public_port_timeout:
+                  type: integer
+                  description: 'Public port timeout in seconds (default: 3600)'
                 limits_memory:
                   type: string
                   description: 'Memory limit of the database'
@@ -3275,6 +3565,9 @@ paths:
                 public_port:
                   type: integer
                   description: 'Public port of the database'
+                public_port_timeout:
+                  type: integer
+                  description: 'Public port timeout in seconds (default: 3600)'
                 limits_memory:
                   type: string
                   description: 'Memory limit of the database'
@@ -3376,6 +3669,9 @@ paths:
                 public_port:
                   type: integer
                   description: 'Public port of the database'
+                public_port_timeout:
+                  type: integer
+                  description: 'Public port timeout in seconds (default: 3600)'
                 limits_memory:
                   type: string
                   description: 'Memory limit of the database'
@@ -3477,6 +3773,9 @@ paths:
                 public_port:
                   type: integer
                   description: 'Public port of the database'
+                public_port_timeout:
+                  type: integer
+                  description: 'Public port timeout in seconds (default: 3600)'
                 limits_memory:
                   type: string
                   description: 'Memory limit of the database'
@@ -3569,6 +3868,9 @@ paths:
                 public_port:
                   type: integer
                   description: 'Public port of the database'
+                public_port_timeout:
+                  type: integer
+                  description: 'Public port timeout in seconds (default: 3600)'
                 limits_memory:
                   type: string
                   description: 'Memory limit of the database'
@@ -3628,7 +3930,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: execution_uuid
           in: path
@@ -3636,7 +3937,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: delete_s3
           in: query
@@ -3687,7 +3987,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'List of backup executions'
@@ -3717,7 +4016,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Start database.'
@@ -3751,7 +4049,13 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Perform docker cleanup (prune networks, volumes, etc.).'
+          schema:
+            type: boolean
+            default: true
       responses:
         '200':
           description: 'Stop database.'
@@ -3785,7 +4089,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Restart database.'
@@ -3801,6 +4104,455 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/envs':
+    get:
+      tags:
+        - Databases
+      summary: 'List Envs'
+      description: 'List all envs by database UUID.'
+      operationId: list-envs-by-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Environment variables.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnvironmentVariable'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Databases
+      summary: 'Create Env'
+      description: 'Create env by database UUID.'
+      operationId: create-env-by-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Env created.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                key:
+                  type: string
+                  description: 'The key of the environment variable.'
+                value:
+                  type: string
+                  description: 'The value of the environment variable.'
+                is_literal:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is a literal, nothing espaced.'
+                is_multiline:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is multiline.'
+                is_shown_once:
+                  type: boolean
+                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+              type: object
+      responses:
+        '201':
+          description: 'Environment variable created.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string, example: nc0k04gk8g0cgsk440g0koko }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Databases
+      summary: 'Update Env'
+      description: 'Update env by database UUID.'
+      operationId: update-env-by-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Env updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - key
+                - value
+              properties:
+                key:
+                  type: string
+                  description: 'The key of the environment variable.'
+                value:
+                  type: string
+                  description: 'The value of the environment variable.'
+                is_literal:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is a literal, nothing espaced.'
+                is_multiline:
+                  type: boolean
+                  description: 'The flag to indicate if the environment variable is multiline.'
+                is_shown_once:
+                  type: boolean
+                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+              type: object
+      responses:
+        '201':
+          description: 'Environment variable updated.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvironmentVariable'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/envs/bulk':
+    patch:
+      tags:
+        - Databases
+      summary: 'Update Envs (Bulk)'
+      description: 'Update multiple envs by database UUID.'
+      operationId: update-envs-by-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Bulk envs updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - data
+              properties:
+                data:
+                  type: array
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "The flag to indicate if the environment variable's value is shown on the UI." } }, type: object }
+              type: object
+      responses:
+        '201':
+          description: 'Environment variables updated.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnvironmentVariable'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/envs/{env_uuid}':
+    delete:
+      tags:
+        - Databases
+      summary: 'Delete Env'
+      description: 'Delete env by UUID.'
+      operationId: delete-env-by-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+        -
+          name: env_uuid
+          in: path
+          description: 'UUID of the environment variable.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Environment variable deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Environment variable deleted.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/storages':
+    get:
+      tags:
+        - Databases
+      summary: 'List Storages'
+      description: 'List all persistent storages and file storages by database UUID.'
+      operationId: list-storages-by-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'All storages by database UUID.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  persistent_storages: { type: array, items: { type: object } }
+                  file_storages: { type: array, items: { type: object } }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Databases
+      summary: 'Create Storage'
+      description: 'Create a persistent storage or file storage for a database.'
+      operationId: create-storage-by-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - type
+                - mount_path
+              properties:
+                type:
+                  type: string
+                  enum: [persistent, file]
+                  description: 'The type of storage.'
+                name:
+                  type: string
+                  description: 'Volume name (persistent only, required for persistent).'
+                mount_path:
+                  type: string
+                  description: 'The container mount path.'
+                host_path:
+                  type: string
+                  nullable: true
+                  description: 'The host path (persistent only, optional).'
+                content:
+                  type: string
+                  nullable: true
+                  description: 'File content (file only, optional).'
+                is_directory:
+                  type: boolean
+                  description: 'Whether this is a directory mount (file only, default false).'
+                fs_path:
+                  type: string
+                  description: 'Host directory path (required when is_directory is true).'
+              type: object
+              additionalProperties: false
+      responses:
+        '201':
+          description: 'Storage created.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Databases
+      summary: 'Update Storage'
+      description: 'Update a persistent storage or file storage by database UUID.'
+      operationId: update-storage-by-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Storage updated. For read-only storages (from docker-compose or services), only is_preview_suffix_enabled can be updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - type
+              properties:
+                uuid:
+                  type: string
+                  description: 'The UUID of the storage (preferred).'
+                id:
+                  type: integer
+                  description: 'The ID of the storage (deprecated, use uuid instead).'
+                type:
+                  type: string
+                  enum: [persistent, file]
+                  description: 'The type of storage: persistent or file.'
+                is_preview_suffix_enabled:
+                  type: boolean
+                  description: 'Whether to add -pr-N suffix for preview deployments.'
+                name:
+                  type: string
+                  description: 'The volume name (persistent only, not allowed for read-only storages).'
+                mount_path:
+                  type: string
+                  description: 'The container mount path (not allowed for read-only storages).'
+                host_path:
+                  type: string
+                  nullable: true
+                  description: 'The host path (persistent only, not allowed for read-only storages).'
+                content:
+                  type: string
+                  nullable: true
+                  description: 'The file content (file only, not allowed for read-only storages).'
+              type: object
+              additionalProperties: false
+      responses:
+        '200':
+          description: 'Storage updated.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/storages/{storage_uuid}':
+    delete:
+      tags:
+        - Databases
+      summary: 'Delete Storage'
+      description: 'Delete a persistent storage or file storage by database UUID.'
+      operationId: delete-storage-by-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+        -
+          name: storage_uuid
+          in: path
+          description: 'UUID of the storage.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Storage deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -3939,6 +4691,18 @@ paths:
           description: 'Pull Request Id for deploying specific PR builds. Cannot be used with tag parameter.'
           schema:
             type: integer
+        -
+          name: pull_request_id
+          in: query
+          description: 'Preview deployment identifier. Alias of pr.'
+          schema:
+            type: integer
+        -
+          name: docker_tag
+          in: query
+          description: 'Docker image tag for Docker Image preview deployments. Requires pull_request_id.'
+          schema:
+            type: string
       responses:
         '200':
           description: "Get deployment(s) UUID's"
@@ -3970,7 +4734,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: skip
           in: query
@@ -4652,6 +5415,64 @@ paths:
       security:
         -
           bearerAuth: []
+  /mcp/enable:
+    post:
+      summary: 'Enable MCP Server'
+      description: 'Enable the MCP server endpoint at /mcp (only with root permissions).'
+      operationId: enable-mcp
+      responses:
+        '200':
+          description: 'MCP server enabled.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'MCP server enabled.' }
+                type: object
+        '403':
+          description: 'You are not allowed to enable the MCP server.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'You are not allowed to enable the MCP server.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /mcp/disable:
+    post:
+      summary: 'Disable MCP Server'
+      description: 'Disable the MCP server endpoint at /mcp (only with root permissions).'
+      operationId: disable-mcp
+      responses:
+        '200':
+          description: 'MCP server disabled.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'MCP server disabled.' }
+                type: object
+        '403':
+          description: 'You are not allowed to disable the MCP server.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'You are not allowed to disable the MCP server.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
   /health:
     get:
       summary: Healthcheck
@@ -4777,7 +5598,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Project deleted.'
@@ -4812,7 +5632,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Project updated.'
         required: true
@@ -5032,6 +5851,478 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/scheduled-tasks':
+    get:
+      tags:
+        - 'Scheduled Tasks'
+      summary: 'List Tasks'
+      description: 'List all scheduled tasks for an application.'
+      operationId: list-scheduled-tasks-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Get all scheduled tasks for an application.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScheduledTask'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - 'Scheduled Tasks'
+      summary: 'Create Task'
+      description: 'Create a new scheduled task for an application.'
+      operationId: create-scheduled-task-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Scheduled task data'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - name
+                - command
+                - frequency
+              properties:
+                name:
+                  type: string
+                  description: 'The name of the scheduled task.'
+                command:
+                  type: string
+                  description: 'The command to execute.'
+                frequency:
+                  type: string
+                  description: 'The frequency of the scheduled task.'
+                container:
+                  type: string
+                  nullable: true
+                  description: 'The container where the command should be executed.'
+                timeout:
+                  type: integer
+                  description: 'The timeout of the scheduled task in seconds.'
+                  default: 300
+                enabled:
+                  type: boolean
+                  description: 'The flag to indicate if the scheduled task is enabled.'
+                  default: true
+              type: object
+      responses:
+        '201':
+          description: 'Scheduled task created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledTask'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/scheduled-tasks/{task_uuid}':
+    delete:
+      tags:
+        - 'Scheduled Tasks'
+      summary: 'Delete Task'
+      description: 'Delete a scheduled task for an application.'
+      operationId: delete-scheduled-task-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: task_uuid
+          in: path
+          description: 'UUID of the scheduled task.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Scheduled task deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Scheduled task deleted.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - 'Scheduled Tasks'
+      summary: 'Update Task'
+      description: 'Update a scheduled task for an application.'
+      operationId: update-scheduled-task-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: task_uuid
+          in: path
+          description: 'UUID of the scheduled task.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Scheduled task data'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+                  description: 'The name of the scheduled task.'
+                command:
+                  type: string
+                  description: 'The command to execute.'
+                frequency:
+                  type: string
+                  description: 'The frequency of the scheduled task.'
+                container:
+                  type: string
+                  nullable: true
+                  description: 'The container where the command should be executed.'
+                timeout:
+                  type: integer
+                  description: 'The timeout of the scheduled task in seconds.'
+                  default: 300
+                enabled:
+                  type: boolean
+                  description: 'The flag to indicate if the scheduled task is enabled.'
+                  default: true
+              type: object
+      responses:
+        '200':
+          description: 'Scheduled task updated.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledTask'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/scheduled-tasks/{task_uuid}/executions':
+    get:
+      tags:
+        - 'Scheduled Tasks'
+      summary: 'List Executions'
+      description: 'List all executions for a scheduled task on an application.'
+      operationId: list-scheduled-task-executions-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: task_uuid
+          in: path
+          description: 'UUID of the scheduled task.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Get all executions for a scheduled task.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScheduledTaskExecution'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/scheduled-tasks':
+    get:
+      tags:
+        - 'Scheduled Tasks'
+      summary: 'List Tasks'
+      description: 'List all scheduled tasks for a service.'
+      operationId: list-scheduled-tasks-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Get all scheduled tasks for a service.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScheduledTask'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - 'Scheduled Tasks'
+      summary: 'Create Task'
+      description: 'Create a new scheduled task for a service.'
+      operationId: create-scheduled-task-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Scheduled task data'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - name
+                - command
+                - frequency
+              properties:
+                name:
+                  type: string
+                  description: 'The name of the scheduled task.'
+                command:
+                  type: string
+                  description: 'The command to execute.'
+                frequency:
+                  type: string
+                  description: 'The frequency of the scheduled task.'
+                container:
+                  type: string
+                  nullable: true
+                  description: 'The container where the command should be executed.'
+                timeout:
+                  type: integer
+                  description: 'The timeout of the scheduled task in seconds.'
+                  default: 300
+                enabled:
+                  type: boolean
+                  description: 'The flag to indicate if the scheduled task is enabled.'
+                  default: true
+              type: object
+      responses:
+        '201':
+          description: 'Scheduled task created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledTask'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/scheduled-tasks/{task_uuid}':
+    delete:
+      tags:
+        - 'Scheduled Tasks'
+      summary: 'Delete Task'
+      description: 'Delete a scheduled task for a service.'
+      operationId: delete-scheduled-task-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+        -
+          name: task_uuid
+          in: path
+          description: 'UUID of the scheduled task.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Scheduled task deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Scheduled task deleted.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - 'Scheduled Tasks'
+      summary: 'Update Task'
+      description: 'Update a scheduled task for a service.'
+      operationId: update-scheduled-task-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+        -
+          name: task_uuid
+          in: path
+          description: 'UUID of the scheduled task.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Scheduled task data'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+                  description: 'The name of the scheduled task.'
+                command:
+                  type: string
+                  description: 'The command to execute.'
+                frequency:
+                  type: string
+                  description: 'The frequency of the scheduled task.'
+                container:
+                  type: string
+                  nullable: true
+                  description: 'The container where the command should be executed.'
+                timeout:
+                  type: integer
+                  description: 'The timeout of the scheduled task in seconds.'
+                  default: 300
+                enabled:
+                  type: boolean
+                  description: 'The flag to indicate if the scheduled task is enabled.'
+                  default: true
+              type: object
+      responses:
+        '200':
+          description: 'Scheduled task updated.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledTask'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/scheduled-tasks/{task_uuid}/executions':
+    get:
+      tags:
+        - 'Scheduled Tasks'
+      summary: 'List Executions'
+      description: 'List all executions for a scheduled task on a service.'
+      operationId: list-scheduled-task-executions-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+        -
+          name: task_uuid
+          in: path
+          description: 'UUID of the scheduled task.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Get all executions for a scheduled task.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScheduledTaskExecution'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -5348,7 +6639,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Server deleted.'
@@ -5418,6 +6708,24 @@ paths:
                   type: string
                   enum: [traefik, caddy, none]
                   description: 'The proxy type.'
+                concurrent_builds:
+                  type: integer
+                  description: 'Number of concurrent builds.'
+                dynamic_timeout:
+                  type: integer
+                  description: 'Deployment timeout in seconds.'
+                deployment_queue_limit:
+                  type: integer
+                  description: 'Maximum number of queued deployments.'
+                server_disk_usage_notification_threshold:
+                  type: integer
+                  description: 'Server disk usage notification threshold (%).'
+                server_disk_usage_check_frequency:
+                  type: string
+                  description: 'Cron expression for disk usage check frequency.'
+                connection_timeout:
+                  type: integer
+                  description: 'SSH connection timeout in seconds (1-300). Default: 10.'
               type: object
       responses:
         '201':
@@ -5577,9 +6885,8 @@ paths:
                 - environment_uuid
               properties:
                 type:
-                  description: 'The one-click service type'
+                  description: 'The one-click service type (e.g. "actualbudget", "calibre-web", "gitea-with-mysql" ...)'
                   type: string
-                  enum: [activepieces, appsmith, appwrite, authentik, babybuddy, budge, changedetection, chatwoot, classicpress-with-mariadb, classicpress-with-mysql, classicpress-without-database, cloudflared, code-server, dashboard, directus, directus-with-postgresql, docker-registry, docuseal, docuseal-with-postgres, dokuwiki, duplicati, emby, embystat, fider, filebrowser, firefly, formbricks, ghost, gitea, gitea-with-mariadb, gitea-with-mysql, gitea-with-postgresql, glance, glances, glitchtip, grafana, grafana-with-postgresql, grocy, heimdall, homepage, jellyfin, kuzzle, listmonk, logto, mediawiki, meilisearch, metabase, metube, minio, moodle, n8n, n8n-with-postgresql, next-image-transformation, nextcloud, nocodb, odoo, openblocks, pairdrop, penpot, phpmyadmin, pocketbase, posthog, reactive-resume, rocketchat, shlink, slash, snapdrop, statusnook, stirling-pdf, supabase, syncthing, tolgee, trigger, trigger-with-external-database, twenty, umami, unleash-with-postgresql, unleash-without-database, uptime-kuma, vaultwarden, vikunja, weblate, whoogle, wordpress-with-mariadb, wordpress-with-mysql, wordpress-without-database]
                 name:
                   type: string
                   maxLength: 255
@@ -5609,7 +6916,19 @@ paths:
                   description: 'Start the service immediately after creation.'
                 docker_compose_raw:
                   type: string
-                  description: 'The Docker Compose raw content.'
+                  description: 'The base64 encoded Docker Compose content.'
+                urls:
+                  type: array
+                  description: 'Array of URLs to be applied to containers of a service.'
+                  items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, url: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io").' } }, type: object }
+                force_domain_override:
+                  type: boolean
+                  default: false
+                  description: 'Force domain override even if conflicts are detected.'
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'
               type: object
       responses:
         '201':
@@ -5625,6 +6944,16 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '409':
+          description: 'Domain conflicts detected.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Domain conflicts detected. Use force_domain_override=true to proceed.' }
+                  warning: { type: string, example: 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.' }
+                  conflicts: { type: array, items: { properties: { domain: { type: string, example: example.com }, resource_name: { type: string, example: 'My Application' }, resource_uuid: { type: string, nullable: true, example: abc123-def456 }, resource_type: { type: string, enum: [application, service, instance], example: application }, message: { type: string, example: "Domain example.com is already in use by application 'My Application'" } }, type: object } }
+                type: object
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -5739,7 +7068,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Service updated.'
         required: true
@@ -5777,7 +7105,19 @@ paths:
                   description: 'Connect the service to the predefined docker network.'
                 docker_compose_raw:
                   type: string
-                  description: 'The Docker Compose raw content.'
+                  description: 'The base64 encoded Docker Compose content.'
+                urls:
+                  type: array
+                  description: 'Array of URLs to be applied to containers of a service.'
+                  items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, url: { type: string, description: 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io").' } }, type: object }
+                force_domain_override:
+                  type: boolean
+                  default: false
+                  description: 'Force domain override even if conflicts are detected.'
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'
               type: object
       responses:
         '200':
@@ -5795,6 +7135,16 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '409':
+          description: 'Domain conflicts detected.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Domain conflicts detected. Use force_domain_override=true to proceed.' }
+                  warning: { type: string, example: 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.' }
+                  conflicts: { type: array, items: { properties: { domain: { type: string, example: example.com }, resource_name: { type: string, example: 'My Application' }, resource_uuid: { type: string, nullable: true, example: abc123-def456 }, resource_type: { type: string, enum: [application, service, instance], example: application }, message: { type: string, example: "Domain example.com is already in use by application 'My Application'" } }, type: object } }
+                type: object
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -5815,7 +7165,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'All environment variables by service UUID.'
@@ -5848,7 +7197,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Env created.'
         required: true
@@ -5909,7 +7257,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Env updated.'
         required: true
@@ -5945,9 +7292,7 @@ paths:
           content:
             application/json:
               schema:
-                properties:
-                  message: { type: string, example: 'Environment variable updated.' }
-                type: object
+                $ref: '#/components/schemas/EnvironmentVariable'
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -5974,7 +7319,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Bulk envs updated.'
         required: true
@@ -5994,9 +7338,9 @@ paths:
           content:
             application/json:
               schema:
-                properties:
-                  message: { type: string, example: 'Environment variables updated.' }
-                type: object
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnvironmentVariable'
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -6023,7 +7367,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: env_uuid
           in: path
@@ -6031,7 +7374,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Environment variable deleted.'
@@ -6065,7 +7407,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Start service.'
@@ -6099,7 +7440,13 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Perform docker cleanup (prune networks, volumes, etc.).'
+          schema:
+            type: boolean
+            default: true
       responses:
         '200':
           description: 'Stop service.'
@@ -6133,7 +7480,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: latest
           in: query
@@ -6156,6 +7502,223 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/storages':
+    get:
+      tags:
+        - Services
+      summary: 'List Storages'
+      description: 'List all persistent storages and file storages by service UUID.'
+      operationId: list-storages-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'All storages by service UUID.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  persistent_storages: { type: array, items: { type: object } }
+                  file_storages: { type: array, items: { type: object } }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Services
+      summary: 'Create Storage'
+      description: 'Create a persistent storage or file storage for a service sub-resource.'
+      operationId: create-storage-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - type
+                - mount_path
+                - resource_uuid
+              properties:
+                type:
+                  type: string
+                  enum: [persistent, file]
+                  description: 'The type of storage.'
+                resource_uuid:
+                  type: string
+                  description: 'UUID of the service application or database sub-resource.'
+                name:
+                  type: string
+                  description: 'Volume name (persistent only, required for persistent).'
+                mount_path:
+                  type: string
+                  description: 'The container mount path.'
+                host_path:
+                  type: string
+                  nullable: true
+                  description: 'The host path (persistent only, optional).'
+                content:
+                  type: string
+                  nullable: true
+                  description: 'File content (file only, optional).'
+                is_directory:
+                  type: boolean
+                  description: 'Whether this is a directory mount (file only, default false).'
+                fs_path:
+                  type: string
+                  description: 'Host directory path (required when is_directory is true).'
+              type: object
+              additionalProperties: false
+      responses:
+        '201':
+          description: 'Storage created.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Services
+      summary: 'Update Storage'
+      description: 'Update a persistent storage or file storage by service UUID.'
+      operationId: update-storage-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Storage updated. For read-only storages (from docker-compose or services), only is_preview_suffix_enabled can be updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - type
+              properties:
+                uuid:
+                  type: string
+                  description: 'The UUID of the storage (preferred).'
+                id:
+                  type: integer
+                  description: 'The ID of the storage (deprecated, use uuid instead).'
+                type:
+                  type: string
+                  enum: [persistent, file]
+                  description: 'The type of storage: persistent or file.'
+                is_preview_suffix_enabled:
+                  type: boolean
+                  description: 'Whether to add -pr-N suffix for preview deployments.'
+                name:
+                  type: string
+                  description: 'The volume name (persistent only, not allowed for read-only storages).'
+                mount_path:
+                  type: string
+                  description: 'The container mount path (not allowed for read-only storages).'
+                host_path:
+                  type: string
+                  nullable: true
+                  description: 'The host path (persistent only, not allowed for read-only storages).'
+                content:
+                  type: string
+                  nullable: true
+                  description: 'The file content (file only, not allowed for read-only storages).'
+              type: object
+              additionalProperties: false
+      responses:
+        '200':
+          description: 'Storage updated.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/storages/{storage_uuid}':
+    delete:
+      tags:
+        - Services
+      summary: 'Delete Storage'
+      description: 'Delete a persistent storage or file storage by service UUID.'
+      operationId: delete-storage-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+        -
+          name: storage_uuid
+          in: path
+          description: 'UUID of the storage.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Storage deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -6345,6 +7908,7 @@ components:
           description: 'Build pack.'
           enum:
             - nixpacks
+            - railpack
             - static
             - dockerfile
             - dockercompose
@@ -6416,6 +7980,16 @@ components:
         health_check_start_period:
           type: integer
           description: 'Health check start period in seconds.'
+        health_check_type:
+          type: string
+          description: 'Health check type: http or cmd.'
+          enum:
+            - http
+            - cmd
+        health_check_command:
+          type: string
+          nullable: true
+          description: 'Health check command for CMD type.'
         limits_memory:
           type: string
           description: 'Memory limit.'
@@ -6601,6 +8175,18 @@ components:
           type: string
         pull_request_id:
           type: integer
+        docker_registry_image_tag:
+          type: string
+          nullable: true
+        configuration_hash:
+          type: string
+          nullable: true
+        configuration_snapshot:
+          type: object
+          nullable: true
+        configuration_diff:
+          type: object
+          nullable: true
         force_rebuild:
           type: boolean
         commit:
@@ -6687,6 +8273,9 @@ components:
           type: string
         real_value:
           type: string
+        comment:
+          type: string
+          nullable: true
         version:
           type: string
         created_at:
@@ -6734,11 +8323,86 @@ components:
           type: string
         description:
           type: string
-        environments:
-          description: 'The environments of the project.'
-          type: array
-          items:
-            $ref: '#/components/schemas/Environment'
+      type: object
+    ScheduledTask:
+      description: 'Scheduled Task model'
+      properties:
+        id:
+          type: integer
+          description: 'The unique identifier of the scheduled task in the database.'
+        uuid:
+          type: string
+          description: 'The unique identifier of the scheduled task.'
+        enabled:
+          type: boolean
+          description: 'The flag to indicate if the scheduled task is enabled.'
+        name:
+          type: string
+          description: 'The name of the scheduled task.'
+        command:
+          type: string
+          description: 'The command to execute.'
+        frequency:
+          type: string
+          description: 'The frequency of the scheduled task.'
+        container:
+          type: string
+          nullable: true
+          description: 'The container where the command should be executed.'
+        timeout:
+          type: integer
+          description: 'The timeout of the scheduled task in seconds.'
+        created_at:
+          type: string
+          format: date-time
+          description: 'The date and time when the scheduled task was created.'
+        updated_at:
+          type: string
+          format: date-time
+          description: 'The date and time when the scheduled task was last updated.'
+      type: object
+    ScheduledTaskExecution:
+      description: 'Scheduled Task Execution model'
+      properties:
+        uuid:
+          type: string
+          description: 'The unique identifier of the execution.'
+        status:
+          type: string
+          enum:
+            - success
+            - failed
+            - running
+          description: 'The status of the execution.'
+        message:
+          type: string
+          nullable: true
+          description: 'The output message of the execution.'
+        retry_count:
+          type: integer
+          description: 'The number of retries.'
+        duration:
+          type: number
+          nullable: true
+          description: 'Duration in seconds.'
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 'When the execution started.'
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 'When the execution finished.'
+        created_at:
+          type: string
+          format: date-time
+          description: 'When the record was created.'
+        updated_at:
+          type: string
+          format: date-time
+          description: 'When the record was last updated.'
       type: object
     Server:
       description: 'Server model'
@@ -6876,6 +8540,9 @@ components:
         delete_unused_networks:
           type: boolean
           description: 'The flag to indicate if the unused networks should be deleted.'
+        connection_timeout:
+          type: integer
+          description: 'SSH connection timeout in seconds.'
       type: object
     Service:
       description: 'Service model'
@@ -7094,6 +8761,9 @@ tags:
   -
     name: Resources
     description: Resources
+  -
+    name: 'Scheduled Tasks'
+    description: 'Scheduled Tasks'
   -
     name: 'Private Keys'
     description: 'Private Keys'
