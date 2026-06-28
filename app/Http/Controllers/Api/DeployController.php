@@ -303,7 +303,7 @@ class DeployController extends Controller
 
     #[OA\Get(
         summary: 'Deploy',
-        description: 'Deploy by tag or uuid. `Post` request also accepted with `uuid` and `tag` json body.',
+        description: 'Deploy by tag or uuid. `Post` request also accepted with `uuid` in the query parameters and `tag` in the json body.',
         path: '/deploy',
         operationId: 'deploy-by-tag-or-uuid',
         security: [
