@@ -5,6 +5,7 @@ namespace App\Livewire\Destination;
 use App\Models\DockerNetwork;
 use App\Models\StandaloneDocker;
 use App\Services\Docker\DockerNetworkManager;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -37,7 +38,7 @@ class Show extends Component
 
             $this->destination = $destination;
             $this->syncData();
-        } catch (\Illuminate\Auth\Access\AuthorizationException) {
+        } catch (AuthorizationException) {
             abort(403);
         } catch (\Throwable $e) {
             return handleError($e, $this);

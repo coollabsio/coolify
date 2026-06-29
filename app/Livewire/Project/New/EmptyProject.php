@@ -3,12 +3,17 @@
 namespace App\Livewire\Project\New;
 
 use App\Models\Project;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class EmptyProject extends Component
 {
+    use AuthorizesRequests;
+
     public function createEmptyProject()
     {
+        $this->authorize('create', Project::class);
+
         $project = Project::create([
             'name' => generate_random_name(),
             'team_id' => currentTeam()->id,

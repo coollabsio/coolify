@@ -5,11 +5,14 @@ namespace App\Livewire\Project\New;
 use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use App\Models\Service;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Symfony\Component\Yaml\Yaml;
 
 class DockerCompose extends Component
 {
+    use AuthorizesRequests;
+
     public string $dockerComposeRaw = '';
 
     public string $envFile = '';
@@ -30,6 +33,8 @@ class DockerCompose extends Component
     public function submit()
     {
         try {
+            $this->authorize('create', Service::class);
+
             $this->validate([
                 'dockerComposeRaw' => 'required',
             ]);

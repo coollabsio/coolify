@@ -1,5 +1,7 @@
 <?php
 
+use App\Rules\ValidIpOrCidr;
+
 test('IP allowlist with single IPs', function () {
     $testCases = [
         ['ip' => '192.168.1.100', 'allowlist' => ['192.168.1.100'], 'expected' => true],
@@ -200,7 +202,7 @@ test('IP allowlist comma-separated string input', function () {
 });
 
 test('ValidIpOrCidr validation rule', function () {
-    $rule = new \App\Rules\ValidIpOrCidr;
+    $rule = new ValidIpOrCidr;
 
     // Helper function to test validation
     $validate = function ($value) use ($rule) {
@@ -248,7 +250,7 @@ test('ValidIpOrCidr validation rule', function () {
 });
 
 test('ValidIpOrCidr validation rule error messages', function () {
-    $rule = new \App\Rules\ValidIpOrCidr;
+    $rule = new ValidIpOrCidr;
 
     // Helper function to get error message
     $getError = function ($value) use ($rule) {
