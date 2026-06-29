@@ -38,6 +38,9 @@ class Show extends Component
     public string $frequency;
 
     #[Validate(['string', 'nullable'])]
+    public ?string $dayCondition = null;
+
+    #[Validate(['string', 'nullable'])]
     public ?string $container = null;
 
     #[Validate(['integer', 'required', 'min:60', 'max:36000'])]
@@ -94,10 +97,15 @@ class Show extends Component
                 $this->frequency = $this->task->frequency;
                 throw new \Exception('Invalid Cron / Human expression.');
             }
+            if (! validate_day_condition($this->dayCondition)) {
+                $this->dayCondition = $this->task->day_condition;
+                throw new \Exception('Invalid day condition.');
+            }
             $this->task->enabled = $this->isEnabled;
             $this->task->name = str($this->name)->trim()->value();
             $this->task->command = str($this->command)->trim()->value();
             $this->task->frequency = str($this->frequency)->trim()->value();
+            $this->task->day_condition = blank($this->dayCondition) ? null : str($this->dayCondition)->trim()->value();
             $this->task->container = str($this->container)->trim()->value();
             $this->task->timeout = (int) $this->timeout;
             $this->task->save();
@@ -106,6 +114,7 @@ class Show extends Component
             $this->name = $this->task->name;
             $this->command = $this->task->command;
             $this->frequency = $this->task->frequency;
+            $this->dayCondition = $this->task->day_condition ?? '';
             $this->container = $this->task->container;
             $this->timeout = $this->task->timeout ?? 300;
         }
