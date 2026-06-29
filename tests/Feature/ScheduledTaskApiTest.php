@@ -115,6 +115,47 @@ describe('POST /api/v1/applications/{uuid}/scheduled-tasks', function () {
         ]);
     });
 
+    test('creates a task with day condition', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/applications/{$application->uuid}/scheduled-tasks", [
+                'name' => 'Weekly Range',
+                'command' => 'php artisan report',
+                'frequency' => '0 0 1-7 * *',
+                'day_condition' => '4',
+            ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonFragment([
+            'frequency' => '0 0 1-7 * *',
+            'day_condition' => '4',
+        ]);
+    });
+
+    test('returns 422 for invalid day condition', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $response = $this->withHeaders(scheduledTaskAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/applications/{$application->uuid}/scheduled-tasks", [
+                'name' => 'Weekly Range',
+                'command' => 'php artisan report',
+                'frequency' => '0 0 1-7 * *',
+                'day_condition' => 'not-a-day',
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('errors.day_condition.0', 'Invalid day condition.');
+    });
+
     test('returns 422 when name is missing', function () {
         $application = Application::factory()->create([
             'environment_id' => $this->environment->id,

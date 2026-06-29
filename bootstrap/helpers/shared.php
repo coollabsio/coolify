@@ -695,6 +695,89 @@ function shouldRunCronNow(string $frequency, string $timezone, ?string $dedupKey
     return $shouldFire;
 }
 
+function validate_day_condition(?string $dayCondition): bool
+{
+    if (blank($dayCondition)) {
+        return true;
+    }
+
+    try {
+        return (new CronExpression("* * * * {$dayCondition}"))->isValid();
+    } catch (Throwable) {
+        return false;
+    }
+}
+
+function scheduled_task_is_due_now(string $frequency, ?string $dayCondition, Carbon $executionTime): bool
+{
+    $frequency = translate_cron_expression($frequency);
+
+    if (blank($dayCondition)) {
+        return (new Cron\CronExpression($frequency))->isDue($executionTime);
+    }
+
+    $parts = preg_split('/\s+/', trim($frequency));
+    if (count($parts) !== 5) {
+        return false;
+    }
+
+    $parts[4] = '*';
+    $timeMatches = (new Cron\CronExpression(implode(' ', $parts)))->isDue($executionTime);
+    $dayMatches = (new Cron\CronExpression("* * * * {$dayCondition}"))->isDue($executionTime);
+
+    return $timeMatches && $dayMatches;
+}
+
+function get_previous_scheduled_task_run_date(string $frequency, ?string $dayCondition, Carbon $executionTime): Carbon
+{
+    $frequency = translate_cron_expression($frequency);
+
+    if (blank($dayCondition)) {
+        return Carbon::instance(
+            (new Cron\CronExpression($frequency))->getPreviousRunDate($executionTime, allowCurrentDate: true)
+        );
+    }
+
+    $parts = preg_split('/\s+/', trim($frequency));
+    $parts[4] = '*';
+    $timeCron = new Cron\CronExpression(implode(' ', $parts));
+    $dayCron = new Cron\CronExpression("* * * * {$dayCondition}");
+
+    $candidate = $executionTime->copy();
+
+    for ($attempts = 0; $attempts < 366 * 48; $attempts++) {
+        $previous = Carbon::instance($timeCron->getPreviousRunDate($candidate, allowCurrentDate: true));
+
+        if ($dayCron->isDue($previous)) {
+            return $previous;
+        }
+
+        $candidate = $previous->copy()->subMinute();
+    }
+
+    return Carbon::instance($timeCron->getPreviousRunDate($executionTime, allowCurrentDate: true));
+}
+
+function shouldRunScheduledTaskNow(string $frequency, ?string $dayCondition, string $timezone, ?string $dedupKey = null, ?Carbon $executionTime = null): bool
+{
+    $executionTime = ($executionTime ?? Carbon::now())->copy()->setTimezone($timezone);
+
+    if ($dedupKey === null) {
+        return scheduled_task_is_due_now($frequency, $dayCondition, $executionTime);
+    }
+
+    $previousDue = get_previous_scheduled_task_run_date($frequency, $dayCondition, $executionTime);
+    $lastDispatched = Cache::get($dedupKey);
+
+    $shouldFire = $lastDispatched === null
+        ? scheduled_task_is_due_now($frequency, $dayCondition, $executionTime)
+        : $previousDue->gt(Carbon::parse($lastDispatched));
+
+    Cache::put($dedupKey, ($shouldFire ? $executionTime : $previousDue)->toIso8601String(), 2592000);
+
+    return $shouldFire;
+}
+
 function validate_timezone(string $timezone): bool
 {
     return in_array($timezone, timezone_identifiers_list());

@@ -54,12 +54,13 @@ class ScheduledTasksController extends Controller
             return $return;
         }
 
-        $allowedFields = ['name', 'command', 'frequency', 'container', 'timeout', 'enabled'];
+        $allowedFields = ['name', 'command', 'frequency', 'day_condition', 'container', 'timeout', 'enabled'];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'required|string|max:255',
             'command' => 'required|string',
             'frequency' => 'required|string',
+            'day_condition' => 'string|nullable',
             'container' => 'string|nullable',
             'timeout' => 'integer|min:1',
             'enabled' => 'boolean',
@@ -87,12 +88,20 @@ class ScheduledTasksController extends Controller
             ], 422);
         }
 
+        if ($request->has('day_condition') && ! validate_day_condition($request->day_condition)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['day_condition' => ['Invalid day condition.']],
+            ], 422);
+        }
+
         $teamId = getTeamIdFromToken();
 
         $task = new ScheduledTask;
         $task->name = $request->name;
         $task->command = $request->command;
         $task->frequency = $request->frequency;
+        $task->day_condition = $request->input('day_condition');
         $task->container = $request->container;
         $task->timeout = $request->has('timeout') ? $request->timeout : 300;
         $task->enabled = $request->has('enabled') ? $request->enabled : true;
@@ -130,12 +139,13 @@ class ScheduledTasksController extends Controller
             return response()->json(['message' => 'At least one field must be provided.'], 422);
         }
 
-        $allowedFields = ['name', 'command', 'frequency', 'container', 'timeout', 'enabled'];
+        $allowedFields = ['name', 'command', 'frequency', 'day_condition', 'container', 'timeout', 'enabled'];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
             'command' => 'string',
             'frequency' => 'string',
+            'day_condition' => 'string|nullable',
             'container' => 'string|nullable',
             'timeout' => 'integer|min:1',
             'enabled' => 'boolean',
@@ -160,6 +170,13 @@ class ScheduledTasksController extends Controller
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => ['frequency' => ['Invalid cron expression or frequency format.']],
+            ], 422);
+        }
+
+        if ($request->has('day_condition') && ! validate_day_condition($request->day_condition)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['day_condition' => ['Invalid day condition.']],
             ], 422);
         }
 

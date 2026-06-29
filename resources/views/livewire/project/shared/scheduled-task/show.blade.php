@@ -28,6 +28,7 @@
                 <x-forms.input placeholder="Name" id="name" label="Name" required />
                 <x-forms.input placeholder="0 0 * * * or daily" id="frequency" label="Frequency"
                     helper="You can use every_minute, hourly, daily, weekly, monthly, yearly or a cron expression." required />
+                <x-scheduled-task.day-condition-select />
                 <x-forms.input type="number" placeholder="300" id="timeout"
                     helper="Maximum execution time in seconds (60-36000)." label="Timeout (seconds)" required />
                 @if ($type === 'application')
