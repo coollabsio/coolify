@@ -1,11 +1,15 @@
 <?php
 
+use App\Jobs\CheckTraefikVersionForServerJob;
 use App\Models\Server;
 use App\Models\Team;
 use App\Notifications\Server\TraefikVersionOutdated;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
 
@@ -14,7 +18,7 @@ beforeEach(function () {
 });
 
 it('detects servers table has detected_traefik_version column', function () {
-    expect(\Illuminate\Support\Facades\Schema::hasColumn('servers', 'detected_traefik_version'))->toBeTrue();
+    expect(Schema::hasColumn('servers', 'detected_traefik_version'))->toBeTrue();
 });
 
 it('server model casts detected_traefik_version as string', function () {
@@ -137,7 +141,7 @@ it('notification channels can be retrieved', function () {
 });
 
 it('traefik version check command exists', function () {
-    $commands = \Illuminate\Support\Facades\Artisan::all();
+    $commands = Artisan::all();
 
     expect($commands)->toHaveKey('traefik:check-version');
 });
@@ -181,16 +185,16 @@ it('groups servers by team correctly', function () {
 });
 
 it('server check job exists and has correct structure', function () {
-    expect(class_exists(\App\Jobs\CheckTraefikVersionForServerJob::class))->toBeTrue();
+    expect(class_exists(CheckTraefikVersionForServerJob::class))->toBeTrue();
 
     // Verify CheckTraefikVersionForServerJob has required properties
-    $reflection = new \ReflectionClass(\App\Jobs\CheckTraefikVersionForServerJob::class);
+    $reflection = new ReflectionClass(CheckTraefikVersionForServerJob::class);
     expect($reflection->hasProperty('tries'))->toBeTrue();
     expect($reflection->hasProperty('timeout'))->toBeTrue();
 
     // Verify it implements ShouldQueue
-    $interfaces = class_implements(\App\Jobs\CheckTraefikVersionForServerJob::class);
-    expect($interfaces)->toContain(\Illuminate\Contracts\Queue\ShouldQueue::class);
+    $interfaces = class_implements(CheckTraefikVersionForServerJob::class);
+    expect($interfaces)->toContain(ShouldQueue::class);
 });
 
 it('sends immediate notifications when outdated traefik is detected', function () {

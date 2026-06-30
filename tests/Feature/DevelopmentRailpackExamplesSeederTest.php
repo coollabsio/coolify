@@ -2,6 +2,7 @@
 
 use App\Models\Application;
 use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -42,6 +43,7 @@ it('can seed the railpack examples directly on a clean development database', fu
     expect(Server::query()->find(0))->not->toBeNull();
     expect(StandaloneDocker::query()->find(0))->not->toBeNull();
     expect(GithubApp::query()->find(0))->not->toBeNull();
+    expect(GitlabApp::query()->find(1))->not->toBeNull();
     expect(Project::query()->where('uuid', DevelopmentRailpackExamplesSeeder::PROJECT_UUID)->exists())->toBeTrue();
     expect(Application::query()->count())->toBe(count(DevelopmentRailpackExamplesSeeder::examples()));
 });
@@ -66,9 +68,10 @@ it('seeds the railpack examples in development mode', function () {
 
     expect($applications)->toHaveCount(count(DevelopmentRailpackExamplesSeeder::examples()));
     expect($applications->every(fn (Application $application) => $application->build_pack === 'railpack'))->toBeTrue();
-    expect($applications->every(fn (Application $application) => $application->git_repository === DevelopmentRailpackExamplesSeeder::GIT_REPOSITORY))->toBeTrue();
-
     $examples = collect(DevelopmentRailpackExamplesSeeder::examples())->keyBy('uuid');
+    expect($applications->every(
+        fn (Application $application) => $application->git_repository === ($examples->get($application->uuid)['git_repository'] ?? DevelopmentRailpackExamplesSeeder::GIT_REPOSITORY)
+    ))->toBeTrue();
     expect($applications->every(
         fn (Application $application) => $application->git_branch === ($examples->get($application->uuid)['git_branch'] ?? DevelopmentRailpackExamplesSeeder::GIT_BRANCH)
     ))->toBeTrue();
@@ -79,6 +82,9 @@ it('seeds the railpack examples in development mode', function () {
     $pythonFlask = $applications->firstWhere('uuid', 'railpack-python-flask');
     $goGin = $applications->firstWhere('uuid', 'railpack-go-gin');
     $rust = $applications->firstWhere('uuid', 'railpack-rust');
+    $githubDeployKey = $applications->firstWhere('uuid', 'railpack-github-deploy-key');
+    $gitlabDeployKey = $applications->firstWhere('uuid', 'railpack-gitlab-deploy-key');
+    $gitlabPublic = $applications->firstWhere('uuid', 'railpack-gitlab-public-example');
 
     expect($nestjs)
         ->not->toBeNull()
@@ -113,6 +119,33 @@ it('seeds the railpack examples in development mode', function () {
     expect($rust)
         ->not->toBeNull()
         ->and($rust->ports_exposes)->toBe('8000');
+
+    expect($githubDeployKey)
+        ->not->toBeNull()
+        ->and($githubDeployKey->git_repository)->toBe('git@github.com:coollabsio/coolify-examples-deploy-key.git')
+        ->and($githubDeployKey->git_branch)->toBe('main')
+        ->and($githubDeployKey->build_pack)->toBe('railpack')
+        ->and($githubDeployKey->private_key_id)->toBe(1)
+        ->and($githubDeployKey->source_type)->toBe(GithubApp::class)
+        ->and($githubDeployKey->source_id)->toBe(0);
+
+    expect($gitlabDeployKey)
+        ->not->toBeNull()
+        ->and($gitlabDeployKey->git_repository)->toBe('git@gitlab.com:coollabsio/php-example.git')
+        ->and($gitlabDeployKey->git_branch)->toBe('main')
+        ->and($gitlabDeployKey->build_pack)->toBe('railpack')
+        ->and($gitlabDeployKey->private_key_id)->toBe(1)
+        ->and($gitlabDeployKey->source_type)->toBe(GitlabApp::class)
+        ->and($gitlabDeployKey->source_id)->toBe(1);
+
+    expect($gitlabPublic)
+        ->not->toBeNull()
+        ->and($gitlabPublic->git_repository)->toBe('https://gitlab.com/andrasbacsai/coolify-examples.git')
+        ->and($gitlabPublic->base_directory)->toBe('/astro/static')
+        ->and($gitlabPublic->publish_directory)->toBe('/dist')
+        ->and($gitlabPublic->build_pack)->toBe('railpack')
+        ->and($gitlabPublic->source_type)->toBe(GitlabApp::class)
+        ->and($gitlabPublic->settings->is_static)->toBeTrue();
 });
 
 it('skips the railpack examples outside development mode', function () {

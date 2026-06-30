@@ -323,5 +323,5 @@ test('member cannot update an existing team at model level', function () {
     session(['currentTeam' => $this->team]);
 
     expect(fn () => $this->team->update(['name' => 'Hacked']))
-        ->toThrow(\Exception::class, 'You are not allowed to update this team.');
+        ->toThrow(Exception::class, 'You are not allowed to update this team.');
 });

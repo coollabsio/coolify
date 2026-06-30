@@ -15,7 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0], ['is_api_enabled' => true]));
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -250,5 +250,96 @@ describe('PATCH /api/v1/applications/{uuid}/envs', function () {
 
         $response->assertStatus(422);
         $response->assertJsonFragment(['uuid' => ['This field is not allowed.']]);
+    });
+});
+
+describe('environment variable key validation for app and service APIs', function () {
+    test('rejects invalid service environment variable keys on create update and bulk', function () {
+        $service = Service::factory()->create([
+            'server_id' => $this->server->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'environment_id' => $this->environment->id,
+        ]);
+
+        EnvironmentVariable::create([
+            'key' => 'SAFE_KEY',
+            'value' => 'old-value',
+            'resourceable_type' => Service::class,
+            'resourceable_id' => $service->id,
+            'is_preview' => false,
+        ]);
+
+        $headers = [
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ];
+
+        $this->withHeaders($headers)
+            ->postJson("/api/v1/services/{$service->uuid}/envs", [
+                'key' => 'BAD$(id)',
+                'value' => '1',
+            ])
+            ->assertStatus(422);
+
+        $this->withHeaders($headers)
+            ->patchJson("/api/v1/services/{$service->uuid}/envs", [
+                'key' => 'BAD$(id)',
+                'value' => '1',
+            ])
+            ->assertStatus(422);
+
+        $this->withHeaders($headers)
+            ->patchJson("/api/v1/services/{$service->uuid}/envs/bulk", [
+                'data' => [[
+                    'key' => 'BAD$(id)',
+                    'value' => '1',
+                ]],
+            ])
+            ->assertStatus(422);
+    });
+
+    test('rejects invalid application environment variable keys on create update and bulk', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        EnvironmentVariable::create([
+            'key' => 'SAFE_KEY',
+            'value' => 'old-value',
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
+            'is_preview' => false,
+        ]);
+
+        $headers = [
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ];
+
+        $this->withHeaders($headers)
+            ->postJson("/api/v1/applications/{$application->uuid}/envs", [
+                'key' => 'BAD$(id)',
+                'value' => '1',
+            ])
+            ->assertStatus(422);
+
+        $this->withHeaders($headers)
+            ->patchJson("/api/v1/applications/{$application->uuid}/envs", [
+                'key' => 'BAD$(id)',
+                'value' => '1',
+            ])
+            ->assertStatus(422);
+
+        $this->withHeaders($headers)
+            ->patchJson("/api/v1/applications/{$application->uuid}/envs/bulk", [
+                'data' => [[
+                    'key' => 'BAD$(id)',
+                    'value' => '1',
+                ]],
+            ])
+            ->assertStatus(422);
     });
 });

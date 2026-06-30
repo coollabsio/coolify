@@ -7,6 +7,7 @@ use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -360,6 +361,36 @@ class DevelopmentRailpackExamplesSeeder extends Seeder
                 'ports_exposes' => '3000',
                 'git_branch' => 'v4.x',
             ],
+            [
+                'uuid' => 'railpack-github-deploy-key',
+                'name' => 'Railpack GitHub Deploy Key Example',
+                'git_repository' => 'git@github.com:coollabsio/coolify-examples-deploy-key.git',
+                'git_branch' => 'main',
+                'ports_exposes' => '80',
+                'private_key_id' => 1,
+            ],
+            [
+                'uuid' => 'railpack-gitlab-deploy-key',
+                'name' => 'Railpack GitLab Deploy Key Example',
+                'git_repository' => 'git@gitlab.com:coollabsio/php-example.git',
+                'git_branch' => 'main',
+                'ports_exposes' => '80',
+                'source_id' => 1,
+                'source_type' => GitlabApp::class,
+                'private_key_id' => 1,
+            ],
+            [
+                'uuid' => 'railpack-gitlab-public-example',
+                'name' => 'Railpack GitLab Public Example',
+                'git_repository' => 'https://gitlab.com/andrasbacsai/coolify-examples.git',
+                'git_branch' => 'main',
+                'base_directory' => '/astro/static',
+                'publish_directory' => '/dist',
+                'ports_exposes' => '80',
+                'source_id' => 1,
+                'source_type' => GitlabApp::class,
+                'is_static' => true,
+            ],
         ];
     }
 
@@ -420,6 +451,7 @@ KEY,
         );
 
         $this->ensurePublicGithubSourceExists();
+        $this->ensurePublicGitlabSourceExists();
     }
 
     private function ensurePublicGithubSourceExists(): void
@@ -431,6 +463,21 @@ KEY,
                 'name' => 'Public GitHub',
                 'api_url' => 'https://api.github.com',
                 'html_url' => 'https://github.com',
+                'is_public' => true,
+                'team_id' => 0,
+            ],
+        );
+    }
+
+    private function ensurePublicGitlabSourceExists(): void
+    {
+        GitlabApp::query()->firstOrCreate(
+            ['id' => 1],
+            [
+                'uuid' => 'gitlab-public',
+                'name' => 'Public GitLab',
+                'api_url' => 'https://gitlab.com/api/v4',
+                'html_url' => 'https://gitlab.com',
                 'is_public' => true,
                 'team_id' => 0,
             ],
@@ -479,12 +526,12 @@ KEY,
             'name' => $example['name'],
             'description' => $example['name'],
             'fqdn' => "http://{$example['uuid']}.127.0.0.1.sslip.io",
-            'repository_project_id' => self::REPOSITORY_PROJECT_ID,
-            'git_repository' => self::GIT_REPOSITORY,
+            'repository_project_id' => $example['repository_project_id'] ?? self::REPOSITORY_PROJECT_ID,
+            'git_repository' => $example['git_repository'] ?? self::GIT_REPOSITORY,
             'git_branch' => $example['git_branch'] ?? self::GIT_BRANCH,
             'build_pack' => 'railpack',
             'ports_exposes' => $example['ports_exposes'],
-            'base_directory' => $example['base_directory'],
+            'base_directory' => $example['base_directory'] ?? '/',
             'publish_directory' => $example['publish_directory'] ?? null,
             'static_image' => 'nginx:alpine',
             'install_command' => $example['install_command'] ?? null,
@@ -493,8 +540,9 @@ KEY,
             'environment_id' => $environment->id,
             'destination_id' => $destination->id,
             'destination_type' => StandaloneDocker::class,
-            'source_id' => 0,
-            'source_type' => GithubApp::class,
+            'source_id' => $example['source_id'] ?? 0,
+            'source_type' => $example['source_type'] ?? GithubApp::class,
+            'private_key_id' => $example['private_key_id'] ?? null,
         ]);
         $application->save();
 

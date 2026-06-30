@@ -6,10 +6,13 @@ use App\Models\Application;
 use App\Models\Project;
 use App\Services\DockerImageParser;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class DockerImage extends Component
 {
+    use AuthorizesRequests;
+
     public string $imageName = '';
 
     public string $imageTag = '';
@@ -80,6 +83,8 @@ class DockerImage extends Component
 
     public function submit()
     {
+        $this->authorize('create', Application::class);
+
         $this->validate([
             'imageName' => ValidationPatterns::dockerImageNameRules(required: true),
             'imageTag' => ValidationPatterns::dockerImageTagRules(),

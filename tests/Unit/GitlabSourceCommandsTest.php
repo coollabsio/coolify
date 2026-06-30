@@ -3,10 +3,44 @@
 use App\Models\Application;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
+use Illuminate\Support\Collection;
 
 afterEach(function () {
     Mockery::close();
 });
+
+function gitlabCommandStrings(array|Collection|string $commands): Collection
+{
+    if (is_string($commands)) {
+        return collect([$commands]);
+    }
+
+    return collect($commands)->map(fn ($command) => data_get($command, 'command') ?? $command[0] ?? $command);
+}
+
+function expectGitlabCommandListToContain(array|Collection|string $commands, string $expected): void
+{
+    expect(gitlabCommandStrings($commands)->implode(' && '))->toContain($expected);
+}
+
+function expectGitlabCommandListNotToContain(array|Collection|string $commands, string $expected): void
+{
+    expect(gitlabCommandStrings($commands)->implode(' && '))->not->toContain($expected);
+}
+
+function expectGitlabPrivateKeyMaterializationCommandsSkipLogging(array|Collection|string $commands): void
+{
+    if (is_string($commands)) {
+        $commands = [$commands];
+    }
+
+    $keyCommands = collect($commands)->filter(fn ($command) => str(data_get($command, 'command') ?? $command[0] ?? $command)->contains('base64 -d | tee /root/.ssh/id_rsa_coolify_'));
+
+    expect($keyCommands)->not->toBeEmpty();
+    $keyCommands->each(function ($command): void {
+        expect(data_get($command, 'skip_command_log'))->toBeTrue();
+    });
+}
 
 it('generates ls-remote commands for GitLab source with private key', function () {
     $deploymentUuid = 'test-deployment-uuid';
@@ -15,7 +49,8 @@ it('generates ls-remote commands for GitLab source with private key', function (
     $privateKey->shouldReceive('getAttribute')->with('private_key')->andReturn('fake-private-key');
 
     $gitlabSource = Mockery::mock(GitlabApp::class)->makePartial();
-    $gitlabSource->shouldReceive('getMorphClass')->andReturn(\App\Models\GitlabApp::class);
+    $gitlabSource->shouldReceive('getMorphClass')->andReturn(GitlabApp::class);
+    $gitlabSource->shouldReceive('getAttribute')->with('html_url')->andReturn('https://gitlab.com');
     $gitlabSource->shouldReceive('getAttribute')->with('privateKey')->andReturn($privateKey);
     $gitlabSource->shouldReceive('getAttribute')->with('private_key_id')->andReturn(1);
     $gitlabSource->shouldReceive('getAttribute')->with('custom_port')->andReturn(22);
@@ -34,16 +69,18 @@ it('generates ls-remote commands for GitLab source with private key', function (
 
     expect($result)->toBeArray();
     expect($result)->toHaveKey('commands');
-    expect($result['commands'])->toContain('git ls-remote');
-    expect($result['commands'])->toContain('id_rsa');
-    expect($result['commands'])->toContain('mkdir -p /root/.ssh');
+    expectGitlabCommandListToContain($result['commands'], 'git ls-remote');
+    expectGitlabCommandListToContain($result['commands'], 'id_rsa');
+    expectGitlabCommandListToContain($result['commands'], 'mkdir -p /root/.ssh');
+    expectGitlabPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
 });
 
 it('generates ls-remote commands for GitLab source without private key', function () {
     $deploymentUuid = 'test-deployment-uuid';
 
     $gitlabSource = Mockery::mock(GitlabApp::class)->makePartial();
-    $gitlabSource->shouldReceive('getMorphClass')->andReturn(\App\Models\GitlabApp::class);
+    $gitlabSource->shouldReceive('getMorphClass')->andReturn(GitlabApp::class);
+    $gitlabSource->shouldReceive('getAttribute')->with('html_url')->andReturn('https://gitlab.com');
     $gitlabSource->shouldReceive('getAttribute')->with('privateKey')->andReturn(null);
     $gitlabSource->shouldReceive('getAttribute')->with('private_key_id')->andReturn(null);
 
@@ -61,17 +98,18 @@ it('generates ls-remote commands for GitLab source without private key', functio
 
     expect($result)->toBeArray();
     expect($result)->toHaveKey('commands');
-    expect($result['commands'])->toContain('git ls-remote');
-    expect($result['commands'])->toContain('https://gitlab.com/user/repo.git');
+    expectGitlabCommandListToContain($result['commands'], 'git ls-remote');
+    expectGitlabCommandListToContain($result['commands'], 'https://gitlab.com/user/repo.git');
     // Should NOT contain SSH key setup
-    expect($result['commands'])->not->toContain('id_rsa');
+    expectGitlabCommandListNotToContain($result['commands'], 'id_rsa');
 });
 
 it('does not return null for GitLab source type', function () {
     $deploymentUuid = 'test-deployment-uuid';
 
     $gitlabSource = Mockery::mock(GitlabApp::class)->makePartial();
-    $gitlabSource->shouldReceive('getMorphClass')->andReturn(\App\Models\GitlabApp::class);
+    $gitlabSource->shouldReceive('getMorphClass')->andReturn(GitlabApp::class);
+    $gitlabSource->shouldReceive('getAttribute')->with('html_url')->andReturn('https://gitlab.com');
     $gitlabSource->shouldReceive('getAttribute')->with('privateKey')->andReturn(null);
     $gitlabSource->shouldReceive('getAttribute')->with('private_key_id')->andReturn(null);
 
