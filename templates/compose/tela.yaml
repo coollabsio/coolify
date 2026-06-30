@@ -1,0 +1,72 @@
+# documentation: https://telawiki.com
+# slogan: Self-hostable, agent-native team wiki that documents itself.
+# category: productivity
+# tags: wiki,documentation,knowledge-base,mcp,markdown
+# logo: svgs/tela.png
+# port: 80
+
+services:
+  tela:
+    image: ghcr.io/zcag/tela-proxy:0.7.0
+    environment:
+      - SERVICE_FQDN_TELA_80
+      - TELA_SITE_ADDRESS=:80
+      - TELA_UPSTREAM_BACKEND=backend:8080
+      - TELA_UPSTREAM_FRONTEND=frontend:80
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/api/version"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  backend:
+    image: ghcr.io/zcag/tela-backend:0.7.0
+    environment:
+      - TELA_PUBLIC_BASE_URL=$SERVICE_URL_TELA
+      - TELA_DATABASE_URL=postgres://tela:$SERVICE_PASSWORD_POSTGRES@postgres:5432/tela?sslmode=disable
+      - TELA_SHARE_SECRET=$SERVICE_BASE64_64_SHARE
+      - TELA_API_KEY_SECRET=$SERVICE_BASE64_64_APIKEY
+      - TELA_ADMIN_USERNAME=${TELA_ADMIN_USERNAME}
+      - TELA_ADMIN_PASSWORD=${TELA_ADMIN_PASSWORD}
+      - TELA_ADMIN_EMAIL=${TELA_ADMIN_EMAIL}
+      - TELA_SMTP_HOST=${TELA_SMTP_HOST}
+      - TELA_SMTP_PORT=${TELA_SMTP_PORT}
+      - TELA_SMTP_USERNAME=${TELA_SMTP_USERNAME}
+      - TELA_SMTP_PASSWORD=${TELA_SMTP_PASSWORD}
+      - TELA_SMTP_FROM=${TELA_SMTP_FROM}
+      - TELA_SMTP_TLS=${TELA_SMTP_TLS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/version"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  frontend:
+    image: ghcr.io/zcag/tela-frontend:0.7.0
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80/"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      - POSTGRES_USER=tela
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=tela
+    volumes:
+      - tela-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tela -d tela"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
