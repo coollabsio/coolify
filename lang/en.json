@@ -10,6 +10,7 @@
     "auth.login.google": "Login with Google",
     "auth.login.infomaniak": "Login with Infomaniak",
     "auth.login.zitadel": "Login with Zitadel",
+    "auth.login.oidc": "Login with SSO",
     "auth.already_registered": "Already registered?",
     "auth.confirm_password": "Confirm password",
     "auth.forgot_password_link": "Forgot password?",

@@ -9,6 +9,7 @@
     "auth.login.google": "Mit Google anmelden",
     "auth.login.infomaniak": "Mit Infomaniak anmelden",
     "auth.login.zitadel": "Mit Zitadel anmelden",
+    "auth.login.oidc": "Mit SSO anmelden",
     "auth.already_registered": "Bereits registriert?",
     "auth.confirm_password": "Passwort bestätigen",
     "auth.forgot_password_link": "Passwort vergessen?",
