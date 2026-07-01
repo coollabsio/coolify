@@ -34,7 +34,7 @@ test('buildRestoreCommand handles PostgreSQL with dumpAll', function () {
 
     $result = $component->buildRestoreCommand('/tmp/test.dump');
 
-    expect($result)->toContain('gunzip -cf /tmp/test.dump');
+    expect($result)->toContain("gunzip -cf '/tmp/test.dump'");
     expect($result)->toContain('psql -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}');
 });
 
@@ -46,7 +46,7 @@ test('buildRestoreCommand handles MySQL without dumpAll', function () {
     $result = $component->buildRestoreCommand('/tmp/test.dump');
 
     expect($result)->toContain('mysql -u $MYSQL_USER');
-    expect($result)->toContain('< /tmp/test.dump');
+    expect($result)->toContain("< '/tmp/test.dump'");
 });
 
 test('buildRestoreCommand handles MariaDB without dumpAll', function () {
@@ -57,7 +57,7 @@ test('buildRestoreCommand handles MariaDB without dumpAll', function () {
     $result = $component->buildRestoreCommand('/tmp/test.dump');
 
     expect($result)->toContain('mariadb -u $MARIADB_USER');
-    expect($result)->toContain('< /tmp/test.dump');
+    expect($result)->toContain("< '/tmp/test.dump'");
 });
 
 test('buildRestoreCommand always appends the MongoDB archive path', function (bool $dumpAll) {
@@ -68,5 +68,5 @@ test('buildRestoreCommand always appends the MongoDB archive path', function (bo
     $result = $component->buildRestoreCommand('/tmp/test.dump');
 
     expect($result)->toContain('mongorestore');
-    expect($result)->toContain('--archive=/tmp/test.dump');
+    expect($result)->toContain("--archive='/tmp/test.dump'");
 })->with([false, true]);

@@ -37,7 +37,6 @@ use JsonException;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
-use Visus\Cuid2\Cuid2;
 
 class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -1834,8 +1833,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     ]
                 );
             }
-        } elseif ($this->build_pack === 'dockercompose' || $this->build_pack === 'dockerfile') {
-            // For Docker Compose and Dockerfile, create an empty .env file even if there are no build-time variables
+        } elseif (in_array($this->build_pack, ['dockercompose', 'dockerfile', 'railpack'], true)) {
+            // For build packs that source the build-time .env file, create an empty file even if there are no build-time variables
             // This ensures the file exists when referenced in build commands
             $this->application_deployment_queue->addLogEntry('Creating empty build-time .env file in /artifacts (no build-time variables defined).', hidden: true);
 
@@ -2207,7 +2206,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 continue;
             }
-            $deployment_uuid = new Cuid2;
+            $deployment_uuid = new_public_id();
             queue_application_deployment(
                 deployment_uuid: $deployment_uuid,
                 application: $this->application,
@@ -2307,6 +2306,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ],
                 [
                     executeInDocker($this->deployment_uuid, "echo '{$private_key}' | base64 -d | tee {$customSshKeyLocation} > /dev/null"),
+                    'hidden' => true,
+                    'skip_command_log' => true,
                 ],
                 [
                     executeInDocker($this->deployment_uuid, "chmod 600 {$customSshKeyLocation}"),
@@ -2366,12 +2367,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->pull_request_id !== 0) {
             $this->application_deployment_queue->addLogEntry("Checking out tag pull/{$this->pull_request_id}/head.");
         }
-        $this->execute_remote_command(
-            [
-                $importCommands,
-                'hidden' => true,
-            ]
-        );
+        $this->execute_remote_command(...$this->gitCommandDefinitions($importCommands));
         $this->create_workdir();
         $this->execute_remote_command(
             [
@@ -2399,6 +2395,39 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         );
 
         return $commands;
+    }
+
+    private function gitCommandDefinitions(Collection|array|string $commands): array
+    {
+        if (is_string($commands)) {
+            return [
+                [
+                    $commands,
+                    'hidden' => true,
+                ],
+            ];
+        }
+
+        return collect($commands)
+            ->map(function ($command): array {
+                if (is_string($command)) {
+                    return [
+                        $command,
+                        'hidden' => true,
+                    ];
+                }
+
+                if (is_array($command)) {
+                    return $command + ['hidden' => true];
+                }
+
+                return [
+                    'command' => $command,
+                    'hidden' => true,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     private function cleanup_git()
@@ -2668,12 +2697,22 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $cacheArgs .= ' --build-arg secrets-hash='.$this->generate_secrets_hash($variables);
         }
 
-        $environmentPrefix = $this->railpack_build_environment_prefix($variables);
+        // Build-time variables reach the build through the sourced build-time .env file
+        // (written by save_buildtime_environment_variables), which interpolates shell-style
+        // references such as BETTER_AUTH_URL=$COOLIFY_URL. Passing them inline via `env`
+        // would forward the literal `$COOLIFY_URL` because each value is single-quoted and
+        // `env` does not interpolate its own assignments. Only buildpack control variables
+        // (NIXPACKS_/RAILPACK_) — which are excluded from the build-time .env file and never
+        // need interpolation — are still passed inline.
+        $controlVariables = $variables->filter(
+            fn ($value, $key) => str($key)->startsWith(EnvironmentVariable::BUILDPACK_CONTROL_VARIABLE_PREFIXES)
+        );
+
+        $environmentPrefix = $this->railpack_build_environment_prefix($controlVariables);
         $secretFlags = $this->railpack_build_secret_flags($variables);
         $frontendImage = 'ghcr.io/railwayapp/railpack-frontend:v'.config('constants.coolify.railpack_version');
 
-        return 'docker buildx create --name coolify-railpack --driver docker-container 2>/dev/null || true'
-            ." && {$environmentPrefix}docker buildx build --builder coolify-railpack"
+        $buildxBuildCommand = "{$environmentPrefix}docker buildx build --builder coolify-railpack"
             ." {$this->addHosts} --network host"
             ." --build-arg BUILDKIT_SYNTAX=\"{$frontendImage}\""
             ." {$cacheArgs}"
@@ -2683,6 +2722,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             .' --load'
             ." -t {$imageName}"
             ." {$this->workdir}";
+
+        return 'docker buildx create --name coolify-railpack --driver docker-container 2>/dev/null || true'
+            .' && '.$this->wrap_build_command_with_env_export($buildxBuildCommand);
     }
 
     private function decode_railpack_config(string $config, string $source): array

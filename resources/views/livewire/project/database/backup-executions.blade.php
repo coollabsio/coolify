@@ -1,7 +1,7 @@
 <div wire:init='refreshBackupExecutions'>
     @isset($backup)
-        <div class="flex items-center gap-2">
-            <h3 class="py-4">Executions <span class="text-xs">({{ $executions_count }})</span></h3>
+        <div class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <h3 class="py-0">Executions <span class="text-xs">({{ $executions_count }})</span></h3>
             @if ($executions_count > 0)
                 <div class="flex items-center gap-2">
                     <x-forms.button disabled="{{ !$showPrev }}" wire:click="previousPage('{{ $defaultTake }}')">
@@ -21,13 +21,15 @@
                     </x-forms.button>
                 </div>
             @endif
-            <x-forms.button wire:click='cleanupFailed'>Cleanup Failed Backups</x-forms.button>
-            <x-modal-confirmation title="Cleanup Deleted Backup Entries?" buttonTitle="Cleanup Deleted" isErrorButton
-                submitAction="cleanupDeleted()" 
-                :actions="['This will permanently delete all backup execution entries that are marked as deleted from local storage.', 'This only removes database entries, not actual backup files.']" 
-                confirmationText="cleanup deleted backups"
-                confirmationLabel="Please confirm by typing 'cleanup deleted backups' below"
-                shortConfirmationLabel="Confirmation" />
+            <div class="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap sm:justify-end">
+                <x-forms.button wire:click='cleanupFailed' class="w-full sm:w-auto">Cleanup Failed Backups</x-forms.button>
+                <x-modal-confirmation title="Cleanup Deleted Backup Entries?" buttonTitle="Cleanup Deleted" isErrorButton
+                    buttonFullWidth submitAction="cleanupDeleted()"
+                    :actions="['This will permanently delete all backup execution entries that are marked as deleted from local storage.', 'This only removes database entries, not actual backup files.']"
+                    confirmationText="cleanup deleted backups"
+                    confirmationLabel="Please confirm by typing 'cleanup deleted backups' below"
+                    shortConfirmationLabel="Confirmation" />
+            </div>
         </div>
         <div @if (!$skip) wire:poll.5000ms="refreshBackupExecutions" @endif
             class="flex flex-col gap-4">
@@ -87,7 +89,7 @@
                     <div class="text-gray-600 dark:text-gray-400 text-sm">
                         Location: {{ data_get($execution, 'filename', 'N/A') }}
                     </div>
-                    <div class="flex items-center gap-3 mt-2">
+                    <div class="flex flex-col gap-2 mt-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                         <div class="text-gray-600 dark:text-gray-400 text-sm">
                             Backup Availability:
                         </div>
@@ -154,9 +156,9 @@
                             <pre class="whitespace-pre-wrap text-sm">{{ data_get($execution, 'message') }}</pre>
                         </div>
                     @endif
-                    <div class="flex gap-2 mt-4">
+                    <div class="flex flex-col gap-2 mt-4 min-[420px]:flex-row min-[420px]:flex-wrap">
                         @if (data_get($execution, 'status') === 'success')
-                            <x-forms.button class="dark:hover:bg-coolgray-400"
+                            <x-forms.button class="w-full dark:hover:bg-coolgray-400 min-[420px]:w-auto"
                                 x-on:click="download_file('{{ data_get($execution, 'id') }}')">Download</x-forms.button>
                         @endif
                         @php

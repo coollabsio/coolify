@@ -101,16 +101,10 @@
                     </div>
                 </div>
             </div>
-        @else
-            <x-callout type="warning" title="Access Restricted">
-                You don't have permission to clone resources. Contact your team administrator to request access.
-            </x-callout>
-        @endcan
 
-        <h3 class="pt-4">Move Resource</h3>
-        <div class="pb-4">Transfer this resource between projects and environments.</div>
+            <h3 class="pt-4">Move Resource</h3>
+            <div class="pb-4">Transfer this resource between projects and environments.</div>
 
-        @can('update', $resource)
             @if ($projects->count() > 0)
                 <div class="space-y-4">
                     <div class="flex flex-col lg:flex-row gap-4">
@@ -160,9 +154,8 @@
                 </div>
             @endif
         @else
-            <x-callout type="warning" title="Access Restricted">
-                You don't have permission to move resources between projects or environments. Contact your team
-                administrator to request access.
+            <x-callout type="danger" title="Insufficient Permissions">
+                You don't have permission to modify this resource. Contact your team administrator for access.
             </x-callout>
         @endcan
     </div>

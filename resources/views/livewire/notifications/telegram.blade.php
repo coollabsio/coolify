@@ -24,12 +24,21 @@
             <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSaveTelegramEnabled" id="telegramEnabled" label="Enabled" />
         </div>
         <div class="flex gap-2">
-            <x-forms.input canGate="update" :canResource="$settings" type="password" autocomplete="new-password"
-                helper="Get it from the <a class='inline-block underline dark:text-white' href='https://t.me/botfather' target='_blank'>BotFather Bot</a> on Telegram."
-                required id="telegramToken" label="Bot API Token" />
-            <x-forms.input canGate="update" :canResource="$settings" type="password" autocomplete="new-password"
-                helper="Add your bot to a group chat and add its Chat ID here." required id="telegramChatId"
-                label="Chat ID" />
+            @can('update', $settings)
+                <x-forms.input type="password" autocomplete="new-password"
+                    helper="Get it from the <a class='inline-block underline dark:text-white' href='https://t.me/botfather' target='_blank'>BotFather Bot</a> on Telegram."
+                    required id="telegramToken" label="Bot API Token" />
+                <x-forms.input type="password" autocomplete="new-password"
+                    helper="Add your bot to a group chat and add its Chat ID here." required id="telegramChatId"
+                    label="Chat ID" />
+            @else
+                <x-forms.input disabled autocomplete="new-password"
+                    helper="Get it from the <a class='inline-block underline dark:text-white' href='https://t.me/botfather' target='_blank'>BotFather Bot</a> on Telegram."
+                    required label="Bot API Token" value="Hidden (only admins can view)" />
+                <x-forms.input disabled autocomplete="new-password"
+                    helper="Add your bot to a group chat and add its Chat ID here." required label="Chat ID"
+                    value="Hidden (only admins can view)" />
+            @endcan
         </div>
     </form>
     <h2 class="mt-4">Notification Settings</h2>
