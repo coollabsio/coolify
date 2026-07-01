@@ -4,6 +4,7 @@ use App\Livewire\Project\Database\BackupEdit;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
+use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -43,6 +44,20 @@ function createBackupForEditValidationTest(Team $team, array $overrides = []): S
     ], $overrides));
 }
 
+function createS3StorageForBackupEditValidationTest(Team|int $team, string $name = 'Backup Edit S3'): S3Storage
+{
+    return S3Storage::create([
+        'name' => $name,
+        'region' => 'us-east-1',
+        'key' => 'test-key',
+        'secret' => 'test-secret',
+        'bucket' => 'test-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'is_usable' => true,
+        'team_id' => $team instanceof Team ? $team->id : $team,
+    ]);
+}
+
 beforeEach(function () {
     if (InstanceSettings::find(0) === null) {
         $settings = new InstanceSettings;
@@ -60,7 +75,7 @@ beforeEach(function () {
 it('disables S3 backup when saved without a selected S3 storage', function () {
     $backup = createBackupForEditValidationTest($this->team);
 
-    Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 's3s' => $this->team->s3s])
+    Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s])
         ->call('submit')
         ->assertDispatched('success');
 
@@ -74,7 +89,7 @@ it('cascades to disabling local backup deletion when S3 is force-disabled', func
         'disable_local_backup' => true,
     ]);
 
-    Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 's3s' => $this->team->s3s])
+    Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s])
         ->call('submit')
         ->assertDispatched('success');
 
@@ -82,4 +97,58 @@ it('cascades to disabling local backup deletion when S3 is force-disabled', func
     expect($backup->save_s3)->toBeFalsy();
     expect($backup->s3_storage_id)->toBeNull();
     expect($backup->disable_local_backup)->toBeFalsy();
+});
+
+it('keeps S3 enabled by selecting the only available team storage when none is selected yet', function () {
+    createS3StorageForBackupEditValidationTest(Team::factory()->create());
+    $s3 = createS3StorageForBackupEditValidationTest($this->team);
+    $backup = createBackupForEditValidationTest($this->team, [
+        'save_s3' => false,
+        's3_storage_id' => null,
+    ]);
+
+    Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s])
+        ->set('saveS3', true)
+        ->call('instantSave')
+        ->assertDispatched('success');
+
+    $backup->refresh();
+    expect($backup->save_s3)->toBeTruthy();
+    expect($backup->s3_storage_id)->toBe($s3->id);
+});
+
+it('requires an explicit S3 selection when multiple storages are available', function () {
+    createS3StorageForBackupEditValidationTest($this->team, 'First S3');
+    createS3StorageForBackupEditValidationTest($this->team, 'Second S3');
+    $backup = createBackupForEditValidationTest($this->team, [
+        'save_s3' => false,
+        's3_storage_id' => null,
+    ]);
+
+    Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s])
+        ->set('saveS3', true)
+        ->call('instantSave')
+        ->assertDispatched('error');
+
+    $backup->refresh();
+    expect($backup->save_s3)->toBeFalsy();
+    expect($backup->s3_storage_id)->toBeNull();
+});
+
+it('accepts the S3 storage scope passed to the component', function () {
+    $s3 = createS3StorageForBackupEditValidationTest(0);
+    $backup = createBackupForEditValidationTest($this->team, [
+        'save_s3' => false,
+        's3_storage_id' => null,
+    ]);
+
+    Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => collect([$s3])])
+        ->set('saveS3', true)
+        ->set('s3StorageId', $s3->id)
+        ->call('instantSave')
+        ->assertDispatched('success');
+
+    $backup->refresh();
+    expect($backup->save_s3)->toBeTruthy();
+    expect($backup->s3_storage_id)->toBe($s3->id);
 });

@@ -3,10 +3,12 @@
 namespace App\Livewire\Project\Database;
 
 use App\Jobs\DatabaseBackupJob;
+use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -18,7 +20,7 @@ class BackupEdit extends Component
     public ScheduledDatabaseBackup $backup;
 
     #[Locked]
-    public $s3s;
+    public $availableS3Storages;
 
     #[Locked]
     public $parameters;
@@ -69,7 +71,7 @@ class BackupEdit extends Component
     public bool $disableLocalBackup = false;
 
     #[Validate(['nullable', 'integer'])]
-    public ?int $s3StorageId = 1;
+    public ?int $s3StorageId = null;
 
     #[Validate(['nullable', 'string'])]
     public ?string $databasesToBackup = null;
@@ -222,10 +224,18 @@ class BackupEdit extends Component
         }
 
         // S3 backup cannot be enabled without a valid S3 storage owned by the team
-        $availableS3Ids = collect($this->s3s)->pluck('id');
+        $availableS3Ids = $this->availableS3StorageIds();
         if ($this->backup->save_s3 && ! $availableS3Ids->contains($this->backup->s3_storage_id)) {
-            $this->backup->save_s3 = $this->saveS3 = false;
-            $this->backup->s3_storage_id = $this->s3StorageId = null;
+            if ($availableS3Ids->isEmpty()) {
+                $this->backup->s3_storage_id = $this->s3StorageId = null;
+                $this->backup->save_s3 = $this->saveS3 = false;
+            } elseif ($this->backup->s3_storage_id === null && $availableS3Ids->count() === 1) {
+                $this->backup->s3_storage_id = $this->s3StorageId = $availableS3Ids->first();
+            } else {
+                $this->backup->s3_storage_id = $this->s3StorageId = null;
+
+                throw new Exception('Please select a valid S3 storage to enable S3 backups.');
+            }
         }
 
         // Validate that disable_local_backup can only be true when S3 backup is enabled
@@ -238,6 +248,23 @@ class BackupEdit extends Component
             throw new Exception('Invalid Cron / Human expression');
         }
         $this->validate();
+    }
+
+    private function availableS3StorageIds(): Collection
+    {
+        $storages = collect($this->availableS3Storages);
+        $storageIds = $storages->pluck('id')->filter()->all();
+        $teamIds = $storages->pluck('team_id')->reject(fn ($teamId) => $teamId === null)->unique()->values()->all();
+
+        if (empty($storageIds) || empty($teamIds)) {
+            return collect();
+        }
+
+        return S3Storage::query()
+            ->whereKey($storageIds)
+            ->whereIn('team_id', $teamIds)
+            ->where('is_usable', true)
+            ->pluck('id');
     }
 
     public function submit()
