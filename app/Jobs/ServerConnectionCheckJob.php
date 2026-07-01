@@ -22,18 +22,32 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    private const CONNECTION_CHECK_BUFFER = 5;
+
+    private const DOCKER_CHECK_COMMAND_TIMEOUT = 30;
+
+    private const JOB_TIMEOUT_BUFFER = 10;
+
+    private const OVERLAP_LOCK_BUFFER = 10;
+
     public $tries = 1;
 
-    public $timeout = 15;
+    public $timeout = 65;
 
     public function __construct(
         public Server $server,
         public bool $disableMux = true
-    ) {}
+    ) {
+        $this->timeout = $this->jobTimeout();
+    }
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping('server-connection-check-'.$this->server->uuid))->expireAfter(25)->dontRelease()];
+        return [
+            (new WithoutOverlapping('server-connection-check-'.$this->server->uuid))
+                ->expireAfter($this->timeout + self::OVERLAP_LOCK_BUFFER)
+                ->dontRelease(),
+        ];
     }
 
     private function disableSshMux(): void
@@ -42,7 +56,7 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
         $configRepository->disableSshMux();
     }
 
-    public function handle()
+    public function handle(): void
     {
         $wasReachable = (bool) $this->server->settings->is_reachable;
         $wasNotified = (bool) $this->server->unreachable_notification_sent;
@@ -197,8 +211,14 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             }
             $commandString = implode("\n", $commands);
 
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $commandString, true);
-            $process = Process::timeout(10)->run($sshCommand);
+            $timeout = $this->connectionCheckProcessTimeout();
+            $sshCommand = SshMultiplexingHelper::generateSshCommand(
+                $this->server,
+                $commandString,
+                true,
+                $timeout,
+            );
+            $process = Process::timeout($timeout)->run($sshCommand);
 
             return $process->exitCode() === 0;
         } catch (\Throwable $e) {
@@ -214,20 +234,27 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
     private function checkDockerAvailability(): bool
     {
         try {
-            // Use instant_remote_process to check Docker
-            // The function will automatically handle sudo for non-root users
-            $output = instant_remote_process_with_timeout(
-                ['docker version --format json'],
-                $this->server,
-                false // don't throw error
-            );
+            $commands = ['docker version --format json'];
+            if ($this->server->isNonRoot()) {
+                $commands = parseCommandsByLineForSudo(collect($commands), $this->server);
+            }
 
-            if ($output === null) {
+            $commandString = implode("\n", $commands);
+            $timeout = $this->dockerCheckProcessTimeout();
+            $sshCommand = SshMultiplexingHelper::generateSshCommand(
+                $this->server,
+                $commandString,
+                true,
+                $timeout,
+            );
+            $process = Process::timeout($timeout)->run($sshCommand);
+
+            if ($process->exitCode() !== 0) {
                 return false;
             }
 
             // Try to parse the JSON output to ensure Docker is really working
-            $output = trim($output);
+            $output = trim($process->output());
             if (! empty($output)) {
                 $dockerInfo = json_decode($output, true);
 
@@ -243,5 +270,31 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 
             return false;
         }
+    }
+
+    private function connectionCheckProcessTimeout(): int
+    {
+        return $this->connectionTimeout() + self::CONNECTION_CHECK_BUFFER;
+    }
+
+    private function dockerCheckProcessTimeout(): int
+    {
+        return $this->connectionTimeout() + self::DOCKER_CHECK_COMMAND_TIMEOUT;
+    }
+
+    private function jobTimeout(): int
+    {
+        $connectionTimeout = $this->connectionTimeout();
+
+        return $connectionTimeout
+            + self::CONNECTION_CHECK_BUFFER
+            + $connectionTimeout
+            + self::DOCKER_CHECK_COMMAND_TIMEOUT
+            + self::JOB_TIMEOUT_BUFFER;
+    }
+
+    private function connectionTimeout(): int
+    {
+        return SshMultiplexingHelper::getConnectionTimeout($this->server);
     }
 }

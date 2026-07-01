@@ -127,11 +127,29 @@ describe('shouldSkipDueToBackoff', function () {
 });
 
 describe('ServerConnectionCheckJob unreachable_count', function () {
+    it('scales job and overlap timeouts from the server connection timeout', function () {
+        $server = new Server;
+        $server->uuid = 'server-uuid';
+        $server->setRelation('settings', (object) [
+            'connection_timeout' => 45,
+        ]);
+
+        $job = new ServerConnectionCheckJob($server);
+
+        expect($job->timeout)->toBe(135);
+
+        $middleware = $job->middleware()[0];
+        $expiresAfter = new ReflectionProperty($middleware, 'expiresAfter');
+
+        expect($expiresAfter->getValue($middleware))->toBe(145);
+    });
+
     it('increments unreachable_count on timeout', function () {
         Event::fake([ServerReachabilityChanged::class]);
 
         $settings = Mockery::mock();
         $settings->is_reachable = true;
+        $settings->connection_timeout = 10;
         $settings->shouldReceive('update')
             ->with(['is_reachable' => false, 'is_usable' => false])
             ->once();
@@ -150,6 +168,9 @@ describe('ServerConnectionCheckJob unreachable_count', function () {
 
     it('does not increment unreachable_count for non-timeout failures', function () {
         $server = Mockery::mock(Server::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $server->shouldReceive('getAttribute')->with('settings')->andReturn((object) [
+            'connection_timeout' => 10,
+        ]);
         $server->shouldNotReceive('increment');
         $server->id = 1;
         $server->name = 'test-server';
@@ -163,8 +184,17 @@ describe('ServerConnectionCheckJob ServerReachabilityChanged dispatch', function
     // ServerReachabilityChanged's constructor calls $server->isReachableChanged() — verifying that
     // call is a clean proxy for "the event was dispatched", and avoids serializing a Mockery proxy
     // through the event dispatcher (which trips Eloquent static method lookups on the proxy class).
-    $invoke = function (bool $wasReachable, bool $wasNotified, bool $isReachable, int $unreachableCount, bool $expectDispatch) {
+    $invoke = function (
+        bool $wasReachable,
+        bool $wasNotified,
+        bool $isReachable,
+        int $unreachableCount,
+        bool $expectDispatch
+    ) {
         $server = Mockery::mock(Server::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $server->shouldReceive('getAttribute')->with('settings')->andReturn((object) [
+            'connection_timeout' => 10,
+        ]);
         $server->shouldReceive('getAttribute')->with('unreachable_count')->andReturn($unreachableCount);
         $server->shouldReceive('getAttribute')->with('id')->andReturn(1);
         if ($expectDispatch) {
