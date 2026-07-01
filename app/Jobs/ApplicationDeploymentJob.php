@@ -2237,9 +2237,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $fqdn = $this->preview->fqdn;
         }
         if (isset($fqdn)) {
-            $url = Url::fromString($fqdn);
-            $fqdn = $url->getHost();
-            $url = $url->withHost($fqdn)->withPort(null)->__toString();
+            // The fqdn may be a comma-separated list of domains (e.g. a compose
+            // service with multiple domains). Parse each entry separately:
+            // passing the whole list to Url::fromString() makes the second
+            // scheme's colon parse as a host:port separator, mangling both values.
+            $parsed = str($fqdn)->explode(',')->map(fn ($entry) => Url::fromString(trim($entry)));
+            $fqdn = $parsed->map(fn (Url $entry) => $entry->getHost())->implode(',');
+            $url = $parsed->map(fn (Url $entry) => (string) $entry->withPort(null))->implode(',');
             if ((int) $this->application->compose_parsing_version >= 3) {
                 $this->coolify_variables .= "COOLIFY_URL={$url} ";
                 $this->coolify_variables .= "COOLIFY_FQDN={$fqdn} ";
