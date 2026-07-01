@@ -1,0 +1,211 @@
+# documentation: https://grafana.com/docs/
+# documentation: https://prometheus.io/docs/
+# documentation: https://grafana.com/docs/tempo/latest/
+# documentation: https://opentelemetry.io/docs/
+# slogan: Observability stack with Grafana, Prometheus, Tempo and OpenTelemetry Collector.
+# category: Monitoring
+# tags: grafana,prometheus,tempo,opentelemetry,observability,metrics,traces
+# logo: svgs/grafana-observability.svg
+# port: 3000
+
+services:
+  grafana:
+    image: grafana/grafana-oss:latest
+    environment:
+      - SERVICE_URL_GRAFANA_3000
+      - GF_SERVER_ROOT_URL=${SERVICE_URL_GRAFANA_3000}
+      - GF_SERVER_DOMAIN=${SERVICE_FQDN_GRAFANA}
+      - GF_SECURITY_ADMIN_PASSWORD=${SERVICE_PASSWORD_GRAFANA}
+      - GF_DATABASE_TYPE=postgres
+      - GF_DATABASE_HOST=postgresql
+      - GF_DATABASE_USER=${SERVICE_USER_POSTGRES}
+      - GF_DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - GF_DATABASE_NAME=${POSTGRES_DB:-grafana}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+    configs:
+      - source: grafana-datasources
+        target: /etc/grafana/provisioning/datasources/datasources.yaml
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -qO- http://127.0.0.1:3000/api/health || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      tempo:
+        condition: service_started
+      prometheus:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgresql:
+    image: postgres:16-alpine
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-grafana}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  otel:
+    image: otel/opentelemetry-collector-contrib:latest
+    command:
+      - --config=/etc/otel-collector-config.yaml
+    configs:
+      - source: otel-collector-config
+        target: /etc/otel-collector-config.yaml
+    depends_on:
+      tempo:
+        condition: service_started
+      prometheus:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo:latest
+    command:
+      - -config.file=/etc/tempo.yaml
+    configs:
+      - source: tempo-config
+        target: /etc/tempo.yaml
+    volumes:
+      - tempo-data:/var/tempo
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    configs:
+      - source: prometheus-config
+        target: /etc/prometheus/prometheus.yml
+    volumes:
+      - prometheus-data:/prometheus
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -qO- http://127.0.0.1:9090/-/healthy || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  grafana-data:
+  postgresql-data:
+  tempo-data:
+  prometheus-data:
+
+configs:
+  otel-collector-config:
+    content: |
+      receivers:
+        otlp:
+          protocols:
+            http:
+              endpoint: 0.0.0.0:4318
+            grpc:
+              endpoint: 0.0.0.0:4317
+
+      extensions:
+        health_check:
+          endpoint: 0.0.0.0:13133
+
+      processors:
+        batch:
+
+      exporters:
+        otlp/tempo:
+          endpoint: tempo:4317
+          tls:
+            insecure: true
+
+        prometheus:
+          endpoint: 0.0.0.0:8889
+
+        debug:
+          verbosity: basic
+
+      service:
+        extensions:
+          - health_check
+
+        pipelines:
+          traces:
+            receivers:
+              - otlp
+            processors:
+              - batch
+            exporters:
+              - otlp/tempo
+              - debug
+
+          metrics:
+            receivers:
+              - otlp
+            processors:
+              - batch
+            exporters:
+              - prometheus
+              - debug
+
+  tempo-config:
+    content: |
+      server:
+        http_listen_port: 3200
+
+      distributor:
+        receivers:
+          otlp:
+            protocols:
+              grpc:
+                endpoint: 0.0.0.0:4317
+
+      storage:
+        trace:
+          backend: local
+          local:
+            path: /var/tempo/traces
+
+  prometheus-config:
+    content: |
+      global:
+        scrape_interval: 15s
+
+      scrape_configs:
+        - job_name: otel-collector
+          static_configs:
+            - targets:
+                - otel:8889
+
+  grafana-datasources:
+    content: |
+      apiVersion: 1
+
+      datasources:
+        - name: Tempo
+          type: tempo
+          access: proxy
+          url: http://tempo:3200
+          isDefault: true
+          editable: true
+
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          url: http://prometheus:9090
+          editable: true
