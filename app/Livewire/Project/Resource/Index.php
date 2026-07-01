@@ -184,6 +184,8 @@ class Index extends Component
             'status' => $item->status ?? '',
             'server_status' => $item->server_status ?? null,
             'hrefLink' => $item->hrefLink ?? '',
+            'created_at' => optional($item->created_at)->toIso8601String(),
+            'updated_at' => optional($item->updated_at)->toIso8601String(),
             'destination' => [
                 'server' => [
                     'name' => $item->destination?->server?->name ?? 'Unknown',

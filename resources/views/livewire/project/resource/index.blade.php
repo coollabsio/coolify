@@ -206,7 +206,42 @@
         @endcan
     @else
         <div x-data="searchComponent()">
-            <x-forms.input placeholder="Search for name, fqdn..." x-model="search" id="null" />
+            <div class="flex flex-wrap items-center gap-2 pb-2">
+                <div class="flex-1 min-w-48">
+                    <x-forms.input placeholder="Search for name, fqdn..." x-model="search" id="null" />
+                </div>
+                <div class="w-44">
+                    <select x-model="sort" aria-label="Sort resources" class="select text-xs">
+                        <option value="name_asc">Name (A–Z)</option>
+                        <option value="name_desc">Name (Z–A)</option>
+                        <option value="created_desc">Recently created</option>
+                        <option value="updated_desc">Recently updated</option>
+                    </select>
+                </div>
+                <div class="flex items-center overflow-hidden border rounded border-neutral-200 dark:border-coolgray-400"
+                    role="group" aria-label="Resource view mode">
+                    <button type="button" @click="setView('card')" title="Card view"
+                        :aria-pressed="view === 'card' ? 'true' : 'false'"
+                        class="flex items-center justify-center p-1.5 cursor-pointer"
+                        :class="view === 'card' ? 'bg-neutral-200 dark:bg-coolgray-300 text-black dark:text-white' : 'text-neutral-500 hover:text-black dark:hover:text-white'">
+                        <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                            stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 8.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25a2.25 2.25 0 01-2.25 2.25h-2.25A2.25 2.25 0 0113.5 8.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25a2.25 2.25 0 01-2.25-2.25v-2.25z" />
+                        </svg>
+                    </button>
+                    <button type="button" @click="setView('list')" title="List view"
+                        :aria-pressed="view === 'list' ? 'true' : 'false'"
+                        class="flex items-center justify-center p-1.5 cursor-pointer"
+                        :class="view === 'list' ? 'bg-neutral-200 dark:bg-coolgray-300 text-black dark:text-white' : 'text-neutral-500 hover:text-black dark:hover:text-white'">
+                        <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                            stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 17.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
             <template
                 x-if="filteredApplications.length === 0 && filteredDatabases.length === 0 && filteredServices.length === 0">
                 <div class="flex flex-col items-center justify-center p-8 text-center">
@@ -226,175 +261,20 @@
                 </div>
             </template>
 
-            <template x-if="filteredApplications.length > 0">
-                <h2 class="pt-4">Applications</h2>
-            </template>
-            <div x-show="filteredApplications.length > 0"
-                class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
-                <template x-for="item in filteredApplications" :key="item.uuid">
-                    <span>
-                        <a class="h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
-                            <div class="flex flex-col w-full">
-                                <div class="flex gap-2 px-4">
-                                    <div class="pb-2 truncate box-title" x-text="item.name"></div>
-                                    <div class="flex-1"></div>
-                                    <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="bg-success badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="bg-error badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('starting')">
-                                        <div title="starting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                </div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
-                                <div class="max-w-full px-4 pt-1 truncate box-description">Server: <span
-                                        x-text="item.destination?.server?.name || 'Unknown'"></span></div>
-                                <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or
-                                        misconfigured
-                                    </div>
-                                </template>
-                            </div>
-                        </a>
-                        <div
-                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
-                            <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
-                                </a>
-                            </template>
-                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
-                                Add tag
-                            </a>
-                        </div>
-                    </span>
-                </template>
-            </div>
-            <template x-if="filteredDatabases.length > 0">
-                <h2 class="pt-4">Databases</h2>
-            </template>
-            <div x-show="filteredDatabases.length > 0"
-                class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
-                <template x-for="item in filteredDatabases" :key="item.uuid">
-                    <span>
-                        <a class="h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
-                            <div class="flex flex-col w-full">
-                                <div class="flex gap-2 px-4">
-                                    <div class="pb-2 truncate box-title" x-text="item.name"></div>
-                                    <div class="flex-1"></div>
-                                    <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="bg-success badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="bg-error badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('starting')">
-                                        <div title="starting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                </div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
-                                <div class="max-w-full px-4 pt-1 truncate box-description">Server: <span
-                                        x-text="item.destination?.server?.name || 'Unknown'"></span></div>
-                                <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or
-                                        misconfigured
-                                    </div>
-                                </template>
-                            </div>
-                        </a>
-                        <div
-                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
-                            <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
-                                </a>
-                            </template>
-                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
-                                Add tag
-                            </a>
-                        </div>
-                    </span>
-                </template>
-            </div>
-            <template x-if="filteredServices.length > 0">
-                <h2 class="pt-4">Services</h2>
-            </template>
-            <div x-show="filteredServices.length > 0"
-                class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
-                <template x-for="item in filteredServices" :key="item.uuid">
-                    <span>
-                        <a class="h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
-                            <div class="flex flex-col w-full">
-                                <div class="flex gap-2 px-4">
-                                    <div class="pb-2 truncate box-title" x-text="item.name"></div>
-                                    <div class="flex-1"></div>
-                                    <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="bg-success badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="bg-error badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('starting')">
-                                        <div title="starting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                </div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
-                                <div class="max-w-full px-4 pt-1 truncate box-description">Server: <span
-                                        x-text="item.destination?.server?.name || 'Unknown'"></span></div>
-                                <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or
-                                        misconfigured
-                                    </div>
-                                </template>
-                            </div>
-                        </a>
-                        <div
-                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
-                            <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
-                                </a>
-                            </template>
-                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
-                                Add tag
-                            </a>
-                        </div>
-                    </span>
-                </template>
-            </div>
+            @include('livewire.project.resource._listing', ['heading' => 'Applications', 'items' => 'filteredApplications'])
+            @include('livewire.project.resource._listing', ['heading' => 'Databases', 'items' => 'filteredDatabases'])
+            @include('livewire.project.resource._listing', ['heading' => 'Services', 'items' => 'filteredServices'])
         </div>
     @endif
 
 </div>
 
 <script>
-    function sortFn(a, b) {
-        return a.name.localeCompare(b.name)
-    }
-
     function searchComponent() {
         return {
             search: '',
+            sort: 'name_asc',
+            view: 'card',
             applications: @js($applicationsJs),
             postgresqls: @js($postgresqlsJs),
             redis: @js($redisJs),
@@ -405,35 +285,65 @@
             dragonflies: @js($dragonfliesJs),
             clickhouses: @js($clickhousesJs),
             services: @js($servicesJs),
-            filterAndSort(items) {
-                if (this.search === '') {
-                    return Object.values(items).sort(sortFn);
+            init() {
+                const allowed = ['name_asc', 'name_desc', 'created_desc', 'updated_desc'];
+                const savedSort = localStorage.getItem('resourceSort');
+                this.sort = allowed.includes(savedSort) ? savedSort : 'name_asc';
+                this.view = localStorage.getItem('resourceView') === 'list' ? 'list' : 'card';
+                this.$watch('sort', (value) => {
+                    if (!allowed.includes(value)) { this.sort = 'name_asc'; return; }
+                    localStorage.setItem('resourceSort', value);
+                });
+            },
+            setView(mode) {
+                this.view = mode === 'list' ? 'list' : 'card';
+                localStorage.setItem('resourceView', this.view);
+            },
+            statusColor(status) {
+                if (!status) return 'bg-neutral-400 dark:bg-coolgray-400';
+                if (status.startsWith('running')) return 'bg-success';
+                if (status.startsWith('exited')) return 'bg-error';
+                if (status.startsWith('starting') || status.startsWith('restarting') || status.startsWith('degraded')) return 'bg-warning';
+                return 'bg-neutral-400 dark:bg-coolgray-400';
+            },
+            compare(a, b) {
+                switch (this.sort) {
+                    case 'name_desc': return (b.name || '').localeCompare(a.name || '');
+                    case 'created_desc': return (b.created_at || '').localeCompare(a.created_at || '');
+                    case 'updated_desc': return (b.updated_at || '').localeCompare(a.updated_at || '');
+                    default: return (a.name || '').localeCompare(b.name || '');
                 }
-                const searchLower = this.search.toLowerCase();
-                return Object.values(items).filter(item => {
-                    return (item.name?.toLowerCase().includes(searchLower) ||
-                        item.fqdn?.toLowerCase().includes(searchLower) ||
-                        item.description?.toLowerCase().includes(searchLower) ||
-                        item.tags?.some(tag => tag.name.toLowerCase().includes(searchLower)));
-                }).sort(sortFn);
+            },
+            filterAndSort(items) {
+                let arr = Object.values(items);
+                if (this.search !== '') {
+                    const s = this.search.toLowerCase();
+                    arr = arr.filter((item) =>
+                        item.name?.toLowerCase().includes(s) ||
+                        item.fqdn?.toLowerCase().includes(s) ||
+                        item.description?.toLowerCase().includes(s) ||
+                        item.tags?.some((tag) => tag.name.toLowerCase().includes(s)));
+                }
+                return arr.sort((a, b) => this.compare(a, b));
             },
             get filteredApplications() {
-                return this.filterAndSort(this.applications)
+                return this.filterAndSort(this.applications);
             },
             get filteredDatabases() {
-                return [
-                    this.postgresqls,
-                    this.redis,
-                    this.mongodbs,
-                    this.mysqls,
-                    this.mariadbs,
-                    this.keydbs,
-                    this.dragonflies,
-                    this.clickhouses,
-                ].flatMap((items) => this.filterAndSort(items))
+                const all = [
+                    ...Object.values(this.postgresqls),
+                    ...Object.values(this.redis),
+                    ...Object.values(this.mongodbs),
+                    ...Object.values(this.mysqls),
+                    ...Object.values(this.mariadbs),
+                    ...Object.values(this.keydbs),
+                    ...Object.values(this.dragonflies),
+                    ...Object.values(this.clickhouses),
+                ];
+                return this.filterAndSort(all);
             },
             get filteredServices() {
-                return this.filterAndSort(this.services)
+                return this.filterAndSort(this.services);
             }
         };
     }
