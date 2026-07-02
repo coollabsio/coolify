@@ -803,7 +803,7 @@
         "category": "backend",
         "logo": "svgs/convex.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-05-09T19:26:30+05:30",
+        "template_last_updated_at": "2026-06-12T10:45:52+02:00",
         "port": "6791"
     },
     "cryptgeon": {
@@ -1779,7 +1779,7 @@
         "category": "devtools",
         "logo": "svgs/gitea.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-06-01T07:54:27-05:00"
+        "template_last_updated_at": "2026-06-06T00:11:24+02:00"
     },
     "gitea-with-mariadb": {
         "documentation": "https://docs.gitea.com?utm_source=coolify.io",
@@ -2361,7 +2361,7 @@
         "category": "automation",
         "logo": "svgs/inngest.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": null,
+        "template_last_updated_at": "2026-07-02T13:25:47+02:00",
         "port": "8288"
     },
     "invoice-ninja": {

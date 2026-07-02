@@ -122,7 +122,10 @@ class UpdateCoolify
 
         remote_process([
             "curl -fsSL {$upgradeScriptUrl} -o /data/coolify/source/upgrade.sh",
-            "bash /data/coolify/source/upgrade.sh $this->latestVersion $latestHelperImageVersion $registryUrl",
+            'bash /data/coolify/source/upgrade.sh '.
+                escapeshellarg($this->latestVersion).' '.
+                escapeshellarg($latestHelperImageVersion).' '.
+                escapeshellarg($registryUrl),
         ], $this->server);
     }
 }

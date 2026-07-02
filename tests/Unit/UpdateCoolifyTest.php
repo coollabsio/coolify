@@ -1,21 +1,43 @@
 <?php
 
 use App\Actions\Server\UpdateCoolify;
+use App\Livewire\Settings\Updates;
 use App\Models\InstanceSettings;
 use App\Models\Server;
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Once;
+use Livewire\Livewire;
+use Spatie\Activitylog\Models\Activity;
+use Tests\TestCase;
 
-beforeEach(function () {
-    // Mock Server
-    $this->mockServer = Mockery::mock(Server::class)->makePartial();
-    $this->mockServer->id = 0;
+uses(TestCase::class, RefreshDatabase::class);
 
-    // Mock InstanceSettings
-    $this->settings = Mockery::mock(InstanceSettings::class)->makePartial();
-    $this->settings->is_auto_update_enabled = true;
-    $this->settings->shouldReceive('save')->andReturn(true);
-});
+function updateCoolifyTestCreateRootServerAndSettings(array $settings = []): void
+{
+    Team::factory()->create(['id' => 0]);
+    Server::forceCreate([
+        'id' => 0,
+        'name' => 'localhost',
+        'ip' => '127.0.0.1',
+        'user' => 'root',
+        'team_id' => 0,
+        'private_key_id' => 1,
+    ]);
+    InstanceSettings::forceCreate(array_merge([
+        'id' => 0,
+        'is_auto_update_enabled' => true,
+        'auto_update_frequency' => '0 0 * * *',
+        'update_check_frequency' => '0 * * * *',
+    ], $settings));
+    Once::flush();
+}
 
 afterEach(function () {
     Mockery::close();
@@ -26,15 +48,7 @@ it('has UpdateCoolify action class', function () {
 });
 
 it('validates cache against running version before fallback', function () {
-    // Mock Server::find to return our mock server
-    Server::shouldReceive('find')
-        ->with(0)
-        ->andReturn($this->mockServer);
-
-    // Mock instanceSettings
-    $this->app->instance('App\Models\InstanceSettings', function () {
-        return $this->settings;
-    });
+    updateCoolifyTestCreateRootServerAndSettings();
 
     // CDN fails
     Http::fake(['*' => Http::response(null, 500)]);
@@ -51,7 +65,7 @@ it('validates cache against running version before fallback', function () {
     try {
         $action->handle(manual_update: false);
         expect(false)->toBeTrue('Expected exception was not thrown');
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         expect($e->getMessage())->toContain('cache version');
         expect($e->getMessage())->toContain('4.0.5');
         expect($e->getMessage())->toContain('4.0.10');
@@ -59,15 +73,9 @@ it('validates cache against running version before fallback', function () {
 });
 
 it('uses validated cache when CDN fails and cache is newer', function () {
-    // Mock Server::find
-    Server::shouldReceive('find')
-        ->with(0)
-        ->andReturn($this->mockServer);
-
-    // Mock instanceSettings
-    $this->app->instance('App\Models\InstanceSettings', function () {
-        return $this->settings;
-    });
+    updateCoolifyTestCreateRootServerAndSettings();
+    Queue::fake();
+    config(['constants.ssh.mux_enabled' => false]);
 
     // CDN fails
     Http::fake(['*' => Http::response(null, 500)]);
@@ -78,12 +86,9 @@ it('uses validated cache when CDN fails and cache is newer', function () {
 
     config(['constants.coolify.version' => '4.0.5']);
 
-    // Mock the update method to prevent actual update
-    $action = Mockery::mock(UpdateCoolify::class)->makePartial();
-    $action->shouldReceive('update')->once();
-    $action->server = $this->mockServer;
+    $action = new UpdateCoolify;
 
-    \Illuminate\Support\Facades\Log::shouldReceive('warning')
+    Log::shouldReceive('warning')
         ->once()
         ->with('Failed to fetch fresh version from CDN, using validated cache', Mockery::type('array'));
 
@@ -93,35 +98,97 @@ it('uses validated cache when CDN fails and cache is newer', function () {
     expect($action->latestVersion)->toBe('4.0.10');
 });
 
-it('passes registry URL to upgrade script', function () {
-    $action = new UpdateCoolify;
+it('passes the saved registry URL to the upgrade script command', function () {
+    Queue::fake();
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.version' => '4.0.9',
+        'constants.coolify.helper_version' => '1.0.14',
+        'constants.coolify.upgrade_script_url' => 'https://cdn.example.com/upgrade.sh',
+        'constants.ssh.mux_enabled' => false,
+    ]);
 
-    $reflection = new ReflectionMethod($action, 'update');
+    updateCoolifyTestCreateRootServerAndSettings([
+        'is_auto_update_enabled' => true,
+        'docker_registry_url' => 'ghcr.io',
+    ]);
 
-    // Read the source code of the update method to verify it passes registry URL
-    $filename = $reflection->getFileName();
-    $startLine = $reflection->getStartLine();
-    $endLine = $reflection->getEndLine();
-    $source = implode('', array_slice(file($filename), $startLine - 1, $endLine - $startLine + 1));
+    Http::fake([
+        '*' => Http::response([
+            'coolify' => ['v4' => ['version' => '4.0.10']],
+        ], 200),
+    ]);
 
-    // Verify the method reads registry_url from DB first, then falls back to config
-    expect($source)->toContain('instanceSettings()->docker_registry_url');
-    expect($source)->toContain("config('constants.coolify.registry_url')");
-    // Verify it passes $registryUrl as the third argument to upgrade.sh
-    expect($source)->toContain('$registryUrl');
-    expect($source)->toMatch('/upgrade\.sh.*\$registryUrl/');
+    (new UpdateCoolify)->handle();
+
+    expect(Activity::query()->latest('id')->first()?->getExtraProperty('command'))->toBe(
+        "curl -fsSL https://cdn.example.com/upgrade.sh -o /data/coolify/source/upgrade.sh\n".
+        "bash /data/coolify/source/upgrade.sh '4.0.10' '1.0.14' 'ghcr.io'"
+    );
+});
+
+it('falls back to the configured registry URL for the upgrade script command', function () {
+    Queue::fake();
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.version' => '4.0.9',
+        'constants.coolify.helper_version' => '1.0.14',
+        'constants.coolify.registry_url' => 'docker.io',
+        'constants.coolify.upgrade_script_url' => 'https://cdn.example.com/upgrade.sh',
+        'constants.ssh.mux_enabled' => false,
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings([
+        'is_auto_update_enabled' => true,
+        'docker_registry_url' => null,
+    ]);
+
+    Http::fake([
+        '*' => Http::response([
+            'coolify' => ['v4' => ['version' => '4.0.10']],
+        ], 200),
+    ]);
+
+    (new UpdateCoolify)->handle();
+
+    expect(Activity::query()->latest('id')->first()?->getExtraProperty('command'))->toBe(
+        "curl -fsSL https://cdn.example.com/upgrade.sh -o /data/coolify/source/upgrade.sh\n".
+        "bash /data/coolify/source/upgrade.sh '4.0.10' '1.0.14' 'docker.io'"
+    );
+});
+
+it('rejects invalid registry values and does not sync them', function () {
+    Process::fake();
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.registry_url' => 'docker.io',
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings([
+        'is_auto_update_enabled' => true,
+        'auto_update_frequency' => '0 0 * * *',
+        'update_check_frequency' => '0 * * * *',
+        'docker_registry_url' => 'docker.io',
+    ]);
+
+    $rootTeam = Team::findOrFail(0);
+    $user = User::factory()->create();
+    $rootTeam->members()->attach($user->id, ['role' => 'admin']);
+
+    $this->actingAs($user);
+    session(['currentTeam' => ['id' => $rootTeam->id]]);
+
+    Livewire::test(Updates::class)
+        ->set('docker_registry_url', 'ghcr.io; touch /tmp/pwned')
+        ->call('submit')
+        ->assertHasErrors(['docker_registry_url' => ['in']]);
+
+    expect(InstanceSettings::findOrFail(0)->docker_registry_url)->toBe('docker.io');
+    Process::assertDidntRun(fn () => true);
 });
 
 it('prevents downgrade even with manual update', function () {
-    // Mock Server::find
-    Server::shouldReceive('find')
-        ->with(0)
-        ->andReturn($this->mockServer);
-
-    // Mock instanceSettings
-    $this->app->instance('App\Models\InstanceSettings', function () {
-        return $this->settings;
-    });
+    updateCoolifyTestCreateRootServerAndSettings();
 
     // CDN returns older version
     Http::fake([
@@ -135,7 +202,7 @@ it('prevents downgrade even with manual update', function () {
 
     $action = new UpdateCoolify;
 
-    \Illuminate\Support\Facades\Log::shouldReceive('error')
+    Log::shouldReceive('error')
         ->once()
         ->with('Downgrade prevented', Mockery::type('array'));
 
@@ -143,7 +210,7 @@ it('prevents downgrade even with manual update', function () {
     try {
         $action->handle(manual_update: true);
         expect(false)->toBeTrue('Expected exception was not thrown');
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         expect($e->getMessage())->toContain('Cannot downgrade');
         expect($e->getMessage())->toContain('4.0.10');
         expect($e->getMessage())->toContain('4.0.0');

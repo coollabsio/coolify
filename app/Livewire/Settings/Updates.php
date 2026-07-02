@@ -6,6 +6,8 @@ use App\Jobs\CheckForUpdatesJob;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -54,31 +56,36 @@ class Updates extends Component
                     'auto_update_frequency' => ['required', 'string'],
                 ]);
             }
+            $validated = $this->validate([
+                'docker_registry_url' => ['required', 'string', 'in:docker.io,ghcr.io'],
+            ]);
             $this->settings->auto_update_frequency = $this->auto_update_frequency;
             $this->settings->update_check_frequency = $this->update_check_frequency;
             $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
-            $this->settings->docker_registry_url = $this->docker_registry_url;
+            $this->settings->docker_registry_url = $validated['docker_registry_url'];
             $this->settings->save();
-            $this->syncRegistryUrlToEnv();
+            $this->syncRegistryUrlToEnv($validated['docker_registry_url']);
             $this->dispatch('success', 'Settings updated!');
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
     }
 
-    private function syncRegistryUrlToEnv(): void
+    private function syncRegistryUrlToEnv(string $registryUrl): void
     {
         if (! $this->server) {
             return;
         }
 
         try {
-            $registryUrl = $this->docker_registry_url;
+            $sedExpression = escapeshellarg("s|^REGISTRY_URL=.*|REGISTRY_URL={$registryUrl}|");
             instant_remote_process([
-                "sed -i 's|^REGISTRY_URL=.*|REGISTRY_URL={$registryUrl}|' /data/coolify/source/.env",
+                "sed -i {$sedExpression} /data/coolify/source/.env",
             ], $this->server);
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::warning('Failed to sync REGISTRY_URL to .env', [
+            Log::warning('Failed to sync REGISTRY_URL to .env', [
                 'error' => $e->getMessage(),
             ]);
         }
@@ -113,6 +120,8 @@ class Updates extends Component
             if ($this->server) {
                 $this->server->setupDynamicProxyConfiguration();
             }
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
