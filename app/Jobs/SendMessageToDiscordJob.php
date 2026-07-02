@@ -51,13 +51,24 @@ class SendMessageToDiscordJob implements ShouldBeEncrypted, ShouldQueue
 
         if ($validator->fails()) {
             Log::warning('SendMessageToDiscordJob: blocked unsafe webhook URL', [
-                'url' => $this->webhookUrl,
+                'url' => SafeWebhookUrl::redactedUrlForLog($this->webhookUrl),
                 'errors' => $validator->errors()->all(),
             ]);
 
             return;
         }
 
-        Http::withOptions(['allow_redirects' => false])->post($this->webhookUrl, $this->message->toPayload());
+        try {
+            $httpOptions = SafeWebhookUrl::httpClientOptions($this->webhookUrl);
+        } catch (\RuntimeException $e) {
+            Log::warning('SendMessageToDiscordJob: blocked unsafe webhook URL at send time', [
+                'url' => SafeWebhookUrl::redactedUrlForLog($this->webhookUrl),
+                'error' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+
+        Http::withOptions($httpOptions)->post($this->webhookUrl, $this->message->toPayload());
     }
 }

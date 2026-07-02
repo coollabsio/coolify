@@ -173,11 +173,10 @@ class S3Storage extends BaseModel
                 'bucket' => $this['bucket'],
                 'endpoint' => $this['endpoint'],
                 'use_path_style_endpoint' => true,
-                'http' => [
+                'http' => array_merge(SafeWebhookUrl::httpClientOptions($this['endpoint']), [
                     'connect_timeout' => self::CONNECTION_TIMEOUT_SECONDS,
                     'timeout' => self::REQUEST_TIMEOUT_SECONDS,
-                    'allow_redirects' => false,
-                ],
+                ]),
             ]);
             // Test the connection by listing files with ListObjectsV2 (S3)
             $disk->files();

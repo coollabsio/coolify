@@ -1,21 +1,23 @@
 <?php
 
+use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Rules\SafeWebhookUrl;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Validator;
 use Tests\TestCase;
 
-uses(TestCase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 /**
- * Regression tests for SSRF via S3 Storage endpoint.
+ * Regression tests for S3 Storage endpoint validation.
  *
  * The Livewire forms (Create.php, Form.php) and the model-level defense in
  * S3Storage::testConnection() share the same SafeWebhookUrl rule. These tests
  * assert the rule rejects the concrete payloads and that the model refuses to
  * build an S3 client for an unsafe endpoint.
  */
-it('rejects SSRF payloads on the S3 endpoint', function (string $endpoint) {
+it('rejects disallowed targets on the S3 endpoint', function (string $endpoint) {
     $validator = Validator::make(
         ['endpoint' => $endpoint],
         ['endpoint' => ['required', 'max:255', new SafeWebhookUrl]],
@@ -43,19 +45,15 @@ it('rejects SSRF payloads on the S3 endpoint', function (string $endpoint) {
 it('accepts real-world S3 endpoints', function (string $endpoint) {
     $validator = Validator::make(
         ['endpoint' => $endpoint],
-        ['endpoint' => ['required', 'max:255', new SafeWebhookUrl]],
+        ['endpoint' => ['required', 'max:255', new SafeWebhookUrl(fn (string $host): array => ['93.184.216.34'])]],
     );
 
     expect($validator->passes())->toBeTrue("Expected accepted: {$endpoint}");
 })->with([
     'AWS S3' => 'https://s3.us-east-1.amazonaws.com',
-    'Cloudflare R2' => 'https://fake.r2.cloudflarestorage.com',
     'DigitalOcean Spaces' => 'https://nyc3.digitaloceanspaces.com',
     'Backblaze B2' => 'https://s3.us-west-001.backblazeb2.com',
-    'Self-hosted MinIO on 10.x' => 'http://10.0.0.5:9000',
-    'Self-hosted MinIO on 172.16.x' => 'http://172.16.0.10:9000',
-    'Self-hosted MinIO on 192.168.x' => 'http://192.168.1.50:9000',
-    'Custom domain MinIO' => 'https://minio.example.com',
+    'Custom public domain S3-compatible endpoint' => 'https://example.com',
 ]);
 
 it('blocks testConnection() on an unsafe endpoint without issuing HTTP', function () {
@@ -90,4 +88,19 @@ it('blocks testConnection() for loopback endpoints', function (string $endpoint)
     'IPv6 loopback' => 'http://[::1]',
     'IPv4-mapped IPv6 link-local' => 'http://[::ffff:169.254.169.254]',
     'internal TLD' => 'http://backend.internal',
+]);
+
+it('accepts explicitly allowlisted intranet S3 endpoints', function (string $endpoint, array $allowlist) {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], ['webhook_allowed_internal_hosts' => $allowlist]));
+
+    $validator = Validator::make(
+        ['endpoint' => $endpoint],
+        ['endpoint' => ['required', 'max:255', new SafeWebhookUrl]],
+    );
+
+    expect($validator->passes())->toBeTrue("Expected allowlisted intranet S3 endpoint: {$endpoint}");
+})->with([
+    'Self-hosted MinIO on 10.x CIDR' => ['http://10.0.0.5:9000', ['10.0.0.0/8']],
+    'Self-hosted MinIO on 172.16.x CIDR' => ['http://172.16.0.10:9000', ['172.16.0.0/12']],
+    'Self-hosted MinIO on 192.168.x exact IP' => ['http://192.168.1.50:9000', ['192.168.1.50']],
 ]);
