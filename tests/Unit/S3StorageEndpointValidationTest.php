@@ -23,8 +23,9 @@ it('rejects SSRF payloads on the S3 endpoint', function (string $endpoint) {
 
     expect($validator->fails())->toBeTrue("Expected rejection: {$endpoint}");
 })->with([
-    'AWS IMDS' => 'http://169.254.169.254/latest/meta-data/',
-    'AWS IMDS bare' => 'http://169.254.169.254',
+    'link-local address' => 'http://169.254.169.254/',
+    'link-local address bare' => 'http://169.254.169.254',
+    'link-local address IPv4-mapped IPv6' => 'http://[::ffff:169.254.169.254]/',
     'GCP metadata via link-local' => 'http://169.254.0.1',
     'loopback v4' => 'http://127.0.0.1',
     'loopback Redis' => 'http://127.0.0.1:6379',
@@ -87,5 +88,6 @@ it('blocks testConnection() for loopback endpoints', function (string $endpoint)
     'http loopback' => 'http://127.0.0.1:6379',
     'localhost' => 'http://localhost:9000',
     'IPv6 loopback' => 'http://[::1]',
+    'IPv4-mapped IPv6 link-local' => 'http://[::ffff:169.254.169.254]',
     'internal TLD' => 'http://backend.internal',
 ]);

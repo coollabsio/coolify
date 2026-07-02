@@ -170,11 +170,15 @@ class Email extends Component
             $this->smtpPort = $this->settings->smtp_port;
             $this->smtpEncryption = $this->settings->smtp_encryption;
             $this->smtpUsername = $this->settings->smtp_username;
-            $this->smtpPassword = $this->settings->smtp_password;
+            $this->smtpPassword = auth()->user()->can('update', $this->settings)
+                ? $this->settings->smtp_password
+                : null;
             $this->smtpTimeout = $this->settings->smtp_timeout;
 
             $this->resendEnabled = $this->settings->resend_enabled;
-            $this->resendApiKey = $this->settings->resend_api_key;
+            $this->resendApiKey = auth()->user()->can('update', $this->settings)
+                ? $this->settings->resend_api_key
+                : null;
 
             $this->useInstanceEmailSettings = $this->settings->use_instance_email_settings;
 
@@ -288,6 +292,8 @@ class Email extends Component
 
     public function submitSmtp()
     {
+        $this->authorize('update', $this->settings);
+
         try {
             $this->resetErrorBag();
             $this->validateSmtpSettings();
@@ -317,6 +323,8 @@ class Email extends Component
 
     public function submitResend()
     {
+        $this->authorize('update', $this->settings);
+
         try {
             $this->resetErrorBag();
             $this->validateResendSettings();

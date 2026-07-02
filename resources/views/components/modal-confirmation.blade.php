@@ -129,9 +129,13 @@
     }
 }"
     @keydown.escape.window="if (modalOpen) { modalOpen = false; resetModal(); }" :class="{ 'z-40': modalOpen }"
-    class="relative w-auto h-auto">
+    @class([
+        'relative h-auto',
+        'w-full' => $buttonFullWidth,
+        'w-full sm:w-auto' => ! $buttonFullWidth,
+    ])>
     @if (isset($trigger))
-        <div @click="modalOpen=true">
+        <div class="w-full" @click="modalOpen=true">
             {{ $trigger }}
         </div>
     @elseif ($customButton)

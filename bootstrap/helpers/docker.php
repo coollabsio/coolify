@@ -1363,7 +1363,7 @@ function generateDockerBuildArgs($variables): Collection
         $key = is_array($var) ? data_get($var, 'key') : $var->key;
 
         // Only return the key - Docker will get the value from the environment
-        return "--build-arg {$key}";
+        return '--build-arg '.escapeshellarg((string) $key);
     });
 }
 

@@ -433,6 +433,7 @@ CREATE TABLE IF NOT EXISTS "local_file_volumes" (
     "created_at" TEXT,
     "updated_at" TEXT,
     "is_directory" INTEGER DEFAULT false NOT NULL,
+    "is_host_file" INTEGER DEFAULT false NOT NULL,
     "chown" TEXT,
     "chmod" TEXT,
     "is_based_on_git" INTEGER DEFAULT false NOT NULL

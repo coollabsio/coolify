@@ -5,10 +5,13 @@ namespace App\Livewire\Project\New;
 use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\Project;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class SimpleDockerfile extends Component
 {
+    use AuthorizesRequests;
+
     public string $dockerfile = '';
 
     public array $parameters;
@@ -29,6 +32,8 @@ CMD ["nginx", "-g", "daemon off;"]
 
     public function submit()
     {
+        $this->authorize('create', Application::class);
+
         $this->validate([
             'dockerfile' => 'required',
         ]);

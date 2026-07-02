@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\DatabaseBackupFileValidator;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -16,24 +17,7 @@ class UploadController extends BaseController
 
     private const MAX_BYTES = 10 * 1024 * 1024 * 1024; // 10 GiB
 
-    private const ALLOWED_EXTENSIONS = [
-        'sql',
-        'sql.gz',
-        'gz',
-        'zip',
-        'tar',
-        'tar.gz',
-        'tgz',
-        'dump',
-        'bak',
-        'bson',
-        'bson.gz',
-        'archive',
-        'archive.gz',
-        'bz2',
-        'xz',
-        'dmp',
-    ];
+    private const ALLOWED_EXTENSIONS = DatabaseBackupFileValidator::ALLOWED_EXTENSIONS;
 
     public function upload(Request $request)
     {
@@ -85,10 +69,7 @@ class UploadController extends BaseController
 
     protected function saveFile(UploadedFile $file, string $resourceIdentifier)
     {
-        $originalName = $file->getClientOriginalName();
-        $size = $file->getSize();
-
-        if (! self::hasAllowedExtension($originalName) || $size === false || $size > self::MAX_BYTES) {
+        if (! DatabaseBackupFileValidator::isUploadAllowed($file, self::MAX_BYTES)) {
             @unlink($file->getPathname());
 
             return response()->json([
@@ -108,24 +89,7 @@ class UploadController extends BaseController
 
     private static function hasAllowedExtension(string $name): bool
     {
-        $lower = strtolower($name);
-        $suffixes = array_map(fn ($ext) => '.'.$ext, self::ALLOWED_EXTENSIONS);
-        usort($suffixes, fn ($a, $b) => strlen($b) <=> strlen($a));
-
-        foreach ($suffixes as $suffix) {
-            if (! str_ends_with($lower, $suffix)) {
-                continue;
-            }
-
-            $stem = substr($lower, 0, -strlen($suffix));
-            if ($stem !== '' && ! str_ends_with($stem, '.')) {
-                return true;
-            }
-
-            return false;
-        }
-
-        return false;
+        return DatabaseBackupFileValidator::hasAllowedExtension($name);
     }
 
     private static function formatMaxSize(): string

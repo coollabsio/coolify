@@ -18,7 +18,9 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    $this->withoutVite();
+
+    InstanceSettings::unguarded(fn () => InstanceSettings::updateOrCreate(['id' => 0], ['id' => 0]));
 
     $this->team = Team::factory()->create();
 

@@ -59,6 +59,33 @@ it('rejects link-local range', function () {
     expect($validator->fails())->toBeTrue('Expected rejection: link-local IP');
 });
 
+it('rejects hostnames that resolve to blocked addresses', function (string $url, array $resolvedIps) {
+    $rule = new SafeWebhookUrl(fn (string $host): array => $resolvedIps);
+
+    $validator = Validator::make(['url' => $url], ['url' => $rule]);
+
+    expect($validator->fails())->toBeTrue("Expected rejection after DNS resolution: {$url}");
+})->with([
+    'hostname to link-local IP' => ['http://169.254.169.254.nip.io/', ['169.254.169.254']],
+    'hostname to loopback' => ['http://loopback.example.test/', ['127.0.0.1']],
+    'hostname to IPv6 loopback' => ['http://ipv6-loopback.example.test/', ['::1']],
+    'hostname to IPv6 link-local' => ['http://ipv6-link-local.example.test/', ['fe80::1']],
+    'hostname to IPv6 ULA' => ['http://ipv6-ula.example.test/', ['fc00::1']],
+    'hostname to mapped link-local IP' => ['http://mapped-link-local.example.test/', ['::ffff:169.254.169.254']],
+]);
+
+it('rejects IPv4-mapped IPv6 literals for blocked IPv4 ranges', function (string $url) {
+    $rule = new SafeWebhookUrl;
+
+    $validator = Validator::make(['url' => $url], ['url' => $rule]);
+
+    expect($validator->fails())->toBeTrue("Expected rejection: {$url}");
+})->with([
+    'mapped link-local IP' => 'http://[::ffff:169.254.169.254]/',
+    'mapped loopback' => 'http://[::ffff:127.0.0.1]/',
+    'mapped zero' => 'http://[::ffff:0.0.0.0]/',
+]);
+
 it('rejects localhost and internal hostnames', function (string $url) {
     $rule = new SafeWebhookUrl;
 
@@ -67,7 +94,9 @@ it('rejects localhost and internal hostnames', function (string $url) {
 })->with([
     'localhost' => 'http://localhost',
     'localhost with port' => 'http://localhost:8080',
+    'localhost with trailing dot' => 'http://localhost.',
     '.internal domain' => 'http://myservice.internal',
+    '.internal domain with trailing dot' => 'http://myservice.internal.',
 ]);
 
 it('rejects non-http schemes', function (string $value) {

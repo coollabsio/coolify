@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Rules\SafeWebhookUrl;
+use App\Rules\ValidS3BucketName;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -147,11 +148,21 @@ class S3Storage extends BaseModel
     {
         try {
             $validator = Validator::make(
-                ['endpoint' => $this['endpoint']],
-                ['endpoint' => ['required', new SafeWebhookUrl]],
+                [
+                    'endpoint' => $this['endpoint'],
+                    'bucket' => $this['bucket'],
+                ],
+                [
+                    'endpoint' => ['required', new SafeWebhookUrl],
+                    'bucket' => ['required', new ValidS3BucketName],
+                ],
             );
-            if ($validator->fails()) {
+            $validator->fails();
+            if ($validator->errors()->has('endpoint')) {
                 throw new \RuntimeException('S3 endpoint is not allowed: '.$validator->errors()->first('endpoint'));
+            }
+            if ($validator->errors()->has('bucket')) {
+                throw new \RuntimeException('S3 bucket name is not allowed: '.$validator->errors()->first('bucket'));
             }
 
             $disk = Storage::build([
@@ -165,6 +176,7 @@ class S3Storage extends BaseModel
                 'http' => [
                     'connect_timeout' => self::CONNECTION_TIMEOUT_SECONDS,
                     'timeout' => self::REQUEST_TIMEOUT_SECONDS,
+                    'allow_redirects' => false,
                 ],
             ]);
             // Test the connection by listing files with ListObjectsV2 (S3)
