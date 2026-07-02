@@ -218,6 +218,75 @@ it('fails fast when docker buildx is unavailable for railpack builds', function 
         ->toThrow(DeploymentException::class, 'Railpack deployments require the Docker buildx CLI plugin');
 });
 
+it('checks buildx inside the helper container before railpack builds', function () {
+    [$job, $reflection] = makeRailpackDeploymentJob([], [
+        'railpack_helper_buildx_available' => 'available',
+    ]);
+
+    invokeRailpackMethod($job, $reflection, 'ensure_helper_docker_buildx_available_for_railpack');
+
+    expect($job->recordedCommands[0][0][0])
+        ->toContain('DOCKER_CONFIG=/root/.docker docker buildx version');
+});
+
+it('fails clearly when buildx is missing inside the helper container', function () {
+    [$job, $reflection] = makeRailpackDeploymentJob([], [
+        'railpack_helper_buildx_available' => 'not-available',
+    ]);
+
+    expect(fn () => invokeRailpackMethod($job, $reflection, 'ensure_helper_docker_buildx_available_for_railpack'))
+        ->toThrow(DeploymentException::class, 'helper container');
+});
+
+it('pins docker config while running railpack buildx commands', function () {
+    [$job, $reflection] = makeRailpackDeploymentJob([
+        'uuid' => 'application-uuid',
+    ]);
+
+    $command = invokeRailpackMethod(
+        $job,
+        $reflection,
+        'railpack_build_command',
+        [
+            'coollabsio/coolify:test',
+            collect([]),
+        ],
+    );
+
+    expect($command)
+        ->toContain('DOCKER_CONFIG=/root/.docker docker buildx create --name coolify-railpack')
+        ->toContain('DOCKER_CONFIG=/root/.docker docker buildx build --builder coolify-railpack');
+});
+
+it('filters reserved docker client variables from railpack build secrets', function () {
+    [$job, $reflection] = makeRailpackDeploymentJob([
+        'uuid' => 'application-uuid',
+    ]);
+
+    $command = invokeRailpackMethod(
+        $job,
+        $reflection,
+        'railpack_build_command',
+        [
+            'coollabsio/coolify:test',
+            collect([
+                'DOCKER_CONFIG' => '/tmp/no-buildx',
+                'DOCKER_HOST' => 'tcp://invalid:2375',
+                'RAILPACK_NODE_VERSION' => '22',
+                'APP_ENV' => 'production',
+            ]),
+        ],
+    );
+
+    expect($command)
+        ->toContain("--secret 'id=RAILPACK_NODE_VERSION,env=RAILPACK_NODE_VERSION'")
+        ->toContain("--secret 'id=APP_ENV,env=APP_ENV'")
+        ->not->toContain('id=DOCKER_CONFIG')
+        ->not->toContain('id=DOCKER_HOST')
+        ->not->toContain("env 'DOCKER_CONFIG=")
+        ->not->toContain("env 'DOCKER_HOST=");
+});
+
 it('builds railpack docker command with matching env and secret flags for all railpack variables', function () {
     [$job, $reflection] = makeRailpackDeploymentJob([
         'uuid' => 'application-uuid',

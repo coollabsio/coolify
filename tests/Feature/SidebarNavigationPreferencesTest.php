@@ -28,6 +28,7 @@ it('keeps changelog and appearance options out of the preferences dropdown', fun
         ->toContain('wire:click="openWhatsNewModal"')
         ->toContain('class="relative text-left menu-item"')
         ->toContain('class="text-left menu-item-label"')
+        ->toContain('class="absolute right-2 top-1/2 -translate-y-1/2 bg-error')
         ->toContain("What's New</span>")
         ->toContain('M9.813 15.904 9 18.75')
         ->not->toContain('<span>Changelog</span>')

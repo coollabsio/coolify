@@ -180,3 +180,10 @@ it('normalizes environment variable keys before model validation', function () {
 
     expect($environmentVariable->key)->toBe('APP_ENV');
 });
+
+it('normalizes application domain scheme and host without lowercasing path query or fragment', function () {
+    $domains = ' HTTPS://EXAMPLE.COM/MixedCase/Path?Token=ABC#Fragment, http://Sub.EXAMPLE.com/Api/V1 ';
+
+    expect(ValidationPatterns::normalizeApplicationDomains($domains))
+        ->toBe('https://example.com/MixedCase/Path?Token=ABC#Fragment,http://sub.example.com/Api/V1');
+});
