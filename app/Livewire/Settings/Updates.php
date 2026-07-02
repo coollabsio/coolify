@@ -63,8 +63,8 @@ class Updates extends Component
             $this->settings->update_check_frequency = $this->update_check_frequency;
             $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
             $this->settings->docker_registry_url = $validated['docker_registry_url'];
-            $this->settings->save();
             $this->syncRegistryUrlToEnv($validated['docker_registry_url']);
+            $this->settings->save();
             $this->dispatch('success', 'Settings updated!');
         } catch (ValidationException $e) {
             throw $e;
@@ -73,22 +73,32 @@ class Updates extends Component
         }
     }
 
-    private function syncRegistryUrlToEnv(string $registryUrl): void
+    protected function syncRegistryUrlToEnv(string $registryUrl): void
     {
         if (! $this->server) {
             return;
         }
 
         try {
-            $sedExpression = escapeshellarg("s|^REGISTRY_URL=.*|REGISTRY_URL={$registryUrl}|");
             instant_remote_process([
-                "sed -i {$sedExpression} /data/coolify/source/.env",
+                $this->registryEnvSyncCommand($registryUrl),
             ], $this->server);
         } catch (\Exception $e) {
             Log::warning('Failed to sync REGISTRY_URL to .env', [
                 'error' => $e->getMessage(),
             ]);
+
+            throw new \RuntimeException('Failed to sync REGISTRY_URL to .env. Settings were not saved.', previous: $e);
         }
+    }
+
+    private function registryEnvSyncCommand(string $registryUrl): string
+    {
+        $envFile = '/data/coolify/source/.env';
+        $sedExpression = escapeshellarg("s|^REGISTRY_URL=.*|REGISTRY_URL={$registryUrl}|");
+        $registryLine = escapeshellarg("REGISTRY_URL={$registryUrl}");
+
+        return "if grep -q '^REGISTRY_URL=' {$envFile}; then sed -i {$sedExpression} {$envFile}; else printf '%s\\n' {$registryLine} >> {$envFile}; fi";
     }
 
     public function submit()

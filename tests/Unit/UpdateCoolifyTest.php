@@ -187,6 +187,55 @@ it('rejects invalid registry values and does not sync them', function () {
     Process::assertDidntRun(fn () => true);
 });
 
+it('does not save registry changes when syncing the env file fails', function () {
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.registry_url' => 'docker.io',
+        'constants.coolify.self_hosted' => true,
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings([
+        'is_auto_update_enabled' => true,
+        'auto_update_frequency' => '0 0 * * *',
+        'update_check_frequency' => '0 * * * *',
+        'docker_registry_url' => 'docker.io',
+    ]);
+
+    $rootTeam = Team::findOrFail(0);
+    $user = User::factory()->create();
+    $rootTeam->members()->attach($user->id, ['role' => 'admin']);
+
+    $this->actingAs($user);
+    session(['currentTeam' => ['id' => $rootTeam->id]]);
+
+    $component = new class extends Updates
+    {
+        protected function syncRegistryUrlToEnv(string $registryUrl): void
+        {
+            throw new RuntimeException('sync failed');
+        }
+    };
+    $component->settings = InstanceSettings::findOrFail(0);
+    $component->auto_update_frequency = '0 0 * * *';
+    $component->update_check_frequency = '0 * * * *';
+    $component->is_auto_update_enabled = true;
+    $component->docker_registry_url = 'ghcr.io';
+
+    $component->instantSave();
+
+    expect(InstanceSettings::findOrFail(0)->docker_registry_url)->toBe('docker.io');
+});
+
+it('appends registry url to env file when the key is missing', function () {
+    $component = new Updates;
+    $method = new ReflectionMethod(Updates::class, 'registryEnvSyncCommand');
+
+    expect($method->invoke($component, 'ghcr.io'))
+        ->toContain("grep -q '^REGISTRY_URL=' /data/coolify/source/.env")
+        ->toContain("sed -i 's|^REGISTRY_URL=.*|REGISTRY_URL=ghcr.io|' /data/coolify/source/.env")
+        ->toContain("printf '%s\\n' 'REGISTRY_URL=ghcr.io' >> /data/coolify/source/.env");
+});
+
 it('prevents downgrade even with manual update', function () {
     updateCoolifyTestCreateRootServerAndSettings();
 
