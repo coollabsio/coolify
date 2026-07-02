@@ -80,7 +80,7 @@ fi
 
 # Get all unique images from docker compose config
 # LATEST_IMAGE env var is needed for image substitution in compose files
-IMAGES=$(LATEST_IMAGE=${LATEST_IMAGE} docker compose --env-file "$ENV_FILE" $COMPOSE_FILES config --images 2>/dev/null | sort -u)
+IMAGES=$(REGISTRY_URL=${REGISTRY_URL} LATEST_IMAGE=${LATEST_IMAGE} docker compose --env-file "$ENV_FILE" $COMPOSE_FILES config --images 2>/dev/null | sort -u)
 
 if [ -z "$IMAGES" ]; then
     log "ERROR: Failed to extract images from docker-compose files"
