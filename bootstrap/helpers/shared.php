@@ -3749,6 +3749,27 @@ function redirectRoute(Component $component, string $name, array $parameters = [
     return $component->redirectRoute($name, $parameters, navigate: $navigate);
 }
 
+function coolifyRegistryUrl(): string
+{
+    try {
+        return instanceSettings()->docker_registry_url ?: 'docker.io';
+    } catch (Throwable) {
+        return config('constants.coolify.registry_url', 'docker.io');
+    }
+}
+
+function coolifyHelperImage(): string
+{
+    $configuredHelperImage = config('constants.coolify.helper_image');
+    $configuredDefaultHelperImage = config('constants.coolify.registry_url', 'docker.io').'/coollabsio/coolify-helper';
+
+    if ($configuredHelperImage !== $configuredDefaultHelperImage) {
+        return $configuredHelperImage;
+    }
+
+    return coolifyRegistryUrl().'/coollabsio/coolify-helper';
+}
+
 function getHelperVersion(): string
 {
     $settings = instanceSettings();

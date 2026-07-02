@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('instance_settings', function (Blueprint $table) {
-            $table->string('docker_registry_url')->nullable()->after('is_auto_update_enabled');
+            $table->string('docker_registry_url')->default('docker.io')->after('is_auto_update_enabled');
         });
     }
 

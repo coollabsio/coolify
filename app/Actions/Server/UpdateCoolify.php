@@ -118,7 +118,7 @@ class UpdateCoolify
     {
         $latestHelperImageVersion = getHelperVersion();
         $upgradeScriptUrl = config('constants.coolify.upgrade_script_url');
-        $registryUrl = instanceSettings()->docker_registry_url ?: 'docker.io';
+        $registryUrl = coolifyRegistryUrl();
 
         remote_process([
             "curl -fsSL {$upgradeScriptUrl} -o /data/coolify/source/upgrade.sh",

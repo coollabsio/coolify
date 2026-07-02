@@ -58,5 +58,5 @@ test('instance admin cannot save an invalid docker registry url', function () {
         ->call('instantSave')
         ->assertHasErrors(['docker_registry_url' => 'in']);
 
-    expect($settings->fresh()->docker_registry_url)->toBeNull();
+    expect($settings->fresh()->docker_registry_url)->toBe('docker.io');
 });

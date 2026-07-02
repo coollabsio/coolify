@@ -62,6 +62,20 @@ it('persists the selected registry url during upgrades', function (string $path)
     'nightly upgrade' => 'other/nightly/upgrade.sh',
 ]);
 
+it('uses the existing env registry url when old callers do not pass a registry argument', function (string $path) {
+    $script = file_get_contents(getcwd().'/'.$path);
+
+    expect($script)
+        ->toContain('if [ -n "${3+x}" ]; then')
+        ->toContain('REGISTRY_URL="$3"')
+        ->toContain('elif [ -f "$ENV_FILE" ] && grep -q "^REGISTRY_URL=" "$ENV_FILE"; then')
+        ->toContain("REGISTRY_URL=$(grep \"^REGISTRY_URL=\" \"\$ENV_FILE\" | cut -d '=' -f2- | head -n1)")
+        ->toContain('REGISTRY_URL="docker.io"');
+})->with([
+    'stable upgrade' => 'scripts/upgrade.sh',
+    'nightly upgrade' => 'other/nightly/upgrade.sh',
+]);
+
 it('keeps postgres upgrade compose override in future upgrade compose commands', function (string $path) {
     $script = file_get_contents(getcwd().'/'.$path);
 

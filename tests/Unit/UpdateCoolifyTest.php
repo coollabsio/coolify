@@ -140,7 +140,6 @@ it('falls back to docker io for the upgrade script command when no registry is s
 
     updateCoolifyTestCreateRootServerAndSettings([
         'is_auto_update_enabled' => true,
-        'docker_registry_url' => null,
     ]);
 
     Http::fake([
@@ -164,9 +163,7 @@ it('defaults the registry setting to docker io when no registry is saved', funct
         'constants.coolify.self_hosted' => true,
     ]);
 
-    updateCoolifyTestCreateRootServerAndSettings([
-        'docker_registry_url' => null,
-    ]);
+    updateCoolifyTestCreateRootServerAndSettings();
 
     $rootTeam = Team::findOrFail(0);
     $user = User::factory()->create();
@@ -177,6 +174,33 @@ it('defaults the registry setting to docker io when no registry is saved', funct
 
     Livewire::test(Updates::class)
         ->assertSet('docker_registry_url', 'docker.io');
+});
+
+it('uses the database registry for helper images when the configured helper image is default', function () {
+    config([
+        'constants.coolify.registry_url' => 'ghcr.io',
+        'constants.coolify.helper_image' => 'ghcr.io/coollabsio/coolify-helper',
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings([
+        'docker_registry_url' => 'docker.io',
+    ]);
+
+    expect(coolifyRegistryUrl())->toBe('docker.io')
+        ->and(coolifyHelperImage())->toBe('docker.io/coollabsio/coolify-helper');
+});
+
+it('preserves an explicit custom helper image override', function () {
+    config([
+        'constants.coolify.registry_url' => 'docker.io',
+        'constants.coolify.helper_image' => 'registry.example.com/custom/helper',
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings([
+        'docker_registry_url' => 'ghcr.io',
+    ]);
+
+    expect(coolifyHelperImage())->toBe('registry.example.com/custom/helper');
 });
 
 it('rejects invalid registry values and does not sync them', function () {

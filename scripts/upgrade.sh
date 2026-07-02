@@ -4,9 +4,15 @@
 CDN="https://cdn.coollabs.io/coolify"
 LATEST_IMAGE=${1:-latest}
 LATEST_HELPER_VERSION=${2:-latest}
-REGISTRY_URL=${3:-docker.io}
-SKIP_BACKUP=${4:-false}
 ENV_FILE="/data/coolify/source/.env"
+if [ -n "${3+x}" ]; then
+    REGISTRY_URL="$3"
+elif [ -f "$ENV_FILE" ] && grep -q "^REGISTRY_URL=" "$ENV_FILE"; then
+    REGISTRY_URL=$(grep "^REGISTRY_URL=" "$ENV_FILE" | cut -d '=' -f2- | head -n1)
+else
+    REGISTRY_URL="docker.io"
+fi
+SKIP_BACKUP=${4:-false}
 STATUS_FILE="/data/coolify/source/.upgrade-status"
 
 DATE=$(date +%Y-%m-%d-%H-%M-%S)
