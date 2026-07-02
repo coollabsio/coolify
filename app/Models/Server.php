@@ -533,6 +533,9 @@ class Server extends BaseModel
                     ];
 
                     $traefik_dynamic_conf['http']['routers']['coolify-https'] = [
+                        'middlewares' => [
+                            0 => 'gzip',
+                        ],
                         'entryPoints' => [
                             0 => 'https',
                         ],
