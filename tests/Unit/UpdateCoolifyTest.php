@@ -127,13 +127,13 @@ it('passes the saved registry URL to the upgrade script command', function () {
     );
 });
 
-it('falls back to the configured registry URL for the upgrade script command', function () {
+it('falls back to docker io for the upgrade script command when no registry is saved', function () {
     Queue::fake();
     config([
         'app.env' => 'testing',
         'constants.coolify.version' => '4.0.9',
         'constants.coolify.helper_version' => '1.0.14',
-        'constants.coolify.registry_url' => 'docker.io',
+        'constants.coolify.registry_url' => 'ghcr.io',
         'constants.coolify.upgrade_script_url' => 'https://cdn.example.com/upgrade.sh',
         'constants.ssh.mux_enabled' => false,
     ]);
@@ -155,6 +155,28 @@ it('falls back to the configured registry URL for the upgrade script command', f
         "curl -fsSL https://cdn.example.com/upgrade.sh -o /data/coolify/source/upgrade.sh\n".
         "bash /data/coolify/source/upgrade.sh '4.0.10' '1.0.14' 'docker.io'"
     );
+});
+
+it('defaults the registry setting to docker io when no registry is saved', function () {
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.registry_url' => 'ghcr.io',
+        'constants.coolify.self_hosted' => true,
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings([
+        'docker_registry_url' => null,
+    ]);
+
+    $rootTeam = Team::findOrFail(0);
+    $user = User::factory()->create();
+    $rootTeam->members()->attach($user->id, ['role' => 'admin']);
+
+    $this->actingAs($user);
+    session(['currentTeam' => ['id' => $rootTeam->id]]);
+
+    Livewire::test(Updates::class)
+        ->assertSet('docker_registry_url', 'docker.io');
 });
 
 it('rejects invalid registry values and does not sync them', function () {

@@ -44,7 +44,7 @@ class Updates extends Component
         $this->auto_update_frequency = $this->settings->auto_update_frequency;
         $this->update_check_frequency = $this->settings->update_check_frequency;
         $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
-        $this->docker_registry_url = $this->settings->docker_registry_url ?: config('constants.coolify.registry_url');
+        $this->docker_registry_url = $this->settings->docker_registry_url ?: 'docker.io';
     }
 
     public function instantSave()

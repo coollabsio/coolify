@@ -44,6 +44,15 @@ it('downloads postgres upgrade script during install and upgrade without auto-ru
     'nightly upgrade' => 'other/nightly/upgrade.sh',
 ]);
 
+it('persists the selected registry url during upgrades', function (string $path) {
+    $script = file_get_contents(getcwd().'/'.$path);
+
+    expect($script)->toContain('set_env_var "REGISTRY_URL" "$REGISTRY_URL"');
+})->with([
+    'stable upgrade' => 'scripts/upgrade.sh',
+    'nightly upgrade' => 'other/nightly/upgrade.sh',
+]);
+
 it('keeps postgres upgrade compose override in future upgrade compose commands', function (string $path) {
     $script = file_get_contents(getcwd().'/'.$path);
 
