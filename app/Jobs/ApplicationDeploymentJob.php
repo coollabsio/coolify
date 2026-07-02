@@ -52,6 +52,21 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private const RAILPACK_GENERATED_CONFIG_PATH = '.coolify/railpack.generated.json';
 
+    private const DOCKER_CLIENT_ENV_KEYS = [
+        'BUILDKIT_HOST',
+        'BUILDX_BUILDER',
+        'BUILDX_CONFIG',
+        'DOCKER_API_VERSION',
+        'DOCKER_BUILDKIT',
+        'DOCKER_CERT_PATH',
+        'DOCKER_CLI_EXPERIMENTAL',
+        'DOCKER_CONFIG',
+        'DOCKER_CONTEXT',
+        'DOCKER_HOST',
+        'DOCKER_TLS',
+        'DOCKER_TLS_VERIFY',
+    ];
+
     public $tries = 1;
 
     public $timeout = 3600;
@@ -1701,6 +1716,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($sorted_environment_variables as $env) {
+                if ($this->build_pack === 'railpack' && $this->is_reserved_docker_client_env_key($env->key)) {
+                    continue;
+                }
+
                 $resolvedValue = $env->getResolvedValueWithServer($this->mainServer);
                 // For literal/multiline vars, real_value includes quotes that we need to remove
                 if ($env->is_literal || $env->is_multiline) {
@@ -1752,6 +1771,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($sorted_environment_variables as $env) {
+                if ($this->build_pack === 'railpack' && $this->is_reserved_docker_client_env_key($env->key)) {
+                    continue;
+                }
+
                 $resolvedValue = $env->getResolvedValueWithServer($this->mainServer);
                 // For literal/multiline vars, real_value includes quotes that we need to remove
                 if ($env->is_literal || $env->is_multiline) {
@@ -2573,6 +2596,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->env_nixpacks_args = $this->env_nixpacks_args->implode(' ');
     }
 
+    private function is_reserved_docker_client_env_key(?string $key): bool
+    {
+        if (blank($key)) {
+            return false;
+        }
+
+        return in_array(strtoupper($key), self::DOCKER_CLIENT_ENV_KEYS, true);
+    }
+
+    private function without_reserved_docker_client_variables(Collection $variables): Collection
+    {
+        return $variables->reject(fn ($value, $key) => $this->is_reserved_docker_client_env_key((string) $key));
+    }
+
     private function generate_railpack_env_variables(): Collection
     {
         $variables = $this->railpack_build_variables();
@@ -2693,6 +2730,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function railpack_build_command(string $imageName, Collection $variables): string
     {
+        $variables = $this->without_reserved_docker_client_variables($variables);
+
         $cacheArgs = '';
         if ($this->force_rebuild) {
             $cacheArgs = '--no-cache';
@@ -2719,7 +2758,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $secretFlags = $this->railpack_build_secret_flags($variables);
         $frontendImage = 'ghcr.io/railwayapp/railpack-frontend:v'.config('constants.coolify.railpack_version');
 
-        $buildxBuildCommand = "{$environmentPrefix}docker buildx build --builder coolify-railpack"
+        $buildxBuildCommand = "{$environmentPrefix}DOCKER_CONFIG=/root/.docker docker buildx build --builder coolify-railpack"
             ." {$this->addHosts} --network host"
             ." --build-arg BUILDKIT_SYNTAX=\"{$frontendImage}\""
             ." {$cacheArgs}"
@@ -2730,7 +2769,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ." -t {$imageName}"
             ." {$this->workdir}";
 
-        return 'docker buildx create --name coolify-railpack --driver docker-container 2>/dev/null || true'
+        return 'DOCKER_CONFIG=/root/.docker docker buildx create --name coolify-railpack --driver docker-container 2>/dev/null || true'
             .' && '.$this->wrap_build_command_with_env_export($buildxBuildCommand);
     }
 
@@ -2885,9 +2924,25 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         throw new DeploymentException('Railpack deployments require the Docker buildx CLI plugin on the build server. Install or enable docker buildx and retry the deployment.');
     }
 
+    private function ensure_helper_docker_buildx_available_for_railpack(): void
+    {
+        $this->execute_remote_command([
+            executeInDocker($this->deployment_uuid, 'DOCKER_CONFIG=/root/.docker docker buildx version >/dev/null 2>&1 && echo available || echo not-available'),
+            'hidden' => true,
+            'save' => 'railpack_helper_buildx_available',
+        ]);
+
+        if (trim((string) $this->saved_outputs->get('railpack_helper_buildx_available')) === 'available') {
+            return;
+        }
+
+        throw new DeploymentException('Railpack deployments require the Docker buildx CLI plugin inside the Coolify helper container. The helper could not find buildx at /root/.docker/cli-plugins/docker-buildx. Pull the latest helper image and retry the deployment.');
+    }
+
     private function build_railpack_image(): void
     {
         $this->ensure_docker_buildx_available_for_railpack();
+        $this->ensure_helper_docker_buildx_available_for_railpack();
 
         $railpackVariables = $this->generate_railpack_env_variables();
         $railpackConfigPath = $this->generate_railpack_config_file();
@@ -4086,6 +4141,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         $variables = $this->env_args;
+
+        if ($this->build_pack === 'railpack') {
+            $variables = $this->without_reserved_docker_client_variables($variables);
+        }
 
         if ($variables->isEmpty()) {
             return '';
