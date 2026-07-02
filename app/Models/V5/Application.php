@@ -15,6 +15,7 @@ class Application extends V5Model
     protected $table = 'v5_applications';
 
     protected $fillable = [
+        'uuid',
         'team_id',
         'project_id',
         'environment_id',

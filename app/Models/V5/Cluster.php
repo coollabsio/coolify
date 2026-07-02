@@ -40,6 +40,7 @@ class Cluster extends V5Model
     public const DEFAULT_BUILDER_TIMEOUT_SECS = 1800;
 
     protected $fillable = [
+        'uuid',
         'team_id',
         'created_by_user_id',
         'name',

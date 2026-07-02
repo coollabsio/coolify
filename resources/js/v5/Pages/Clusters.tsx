@@ -59,7 +59,7 @@ type ServerFormErrors = {
     host?: string[];
     ssh_user?: string[];
     ssh_port?: string[];
-    private_key_id?: string[];
+    private_key_uuid?: string[];
     node_address?: string[];
     builder_enabled?: string[];
     builder_capacity?: string[];
@@ -530,7 +530,7 @@ export default function Clusters({
                 host: serverHost,
                 ssh_user: serverSshUser,
                 ssh_port: Number(serverSshPort),
-                private_key_id: selectedPrivateKeyId === '' ? null : Number(selectedPrivateKeyId),
+                private_key_uuid: selectedPrivateKeyId === '' ? null : selectedPrivateKeyId,
                 node_address: serverNodeAddress.trim() === '' ? null : serverNodeAddress,
                 builder_enabled: serverBuilderEnabled,
                 ingress_enabled: serverIngressEnabled,
@@ -1835,7 +1835,7 @@ export default function Clusters({
                                             value={selectedPrivateKeyId}
                                             onChange={(event) => setSelectedPrivateKeyId(event.target.value)}
                                             className="appearance-none rounded-md border border-border bg-background bg-[length:1rem_1rem] bg-[position:right_0.75rem_center] bg-no-repeat px-3 py-2 pr-10 text-sm outline-none transition focus:border-ring focus:ring-0 aria-invalid:border-destructive aria-invalid:ring-0 dark:aria-invalid:border-destructive/50"
-                                            aria-invalid={serverErrors.private_key_id ? true : undefined}
+                                            aria-invalid={serverErrors.private_key_uuid ? true : undefined}
                                             style={{
                                                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 256 256' fill='none' stroke='%23ffffff' stroke-width='28' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m64 96 64 64 64-64'/%3E%3C/svg%3E")`,
                                             }}
@@ -1847,7 +1847,7 @@ export default function Clusters({
                                                 </option>
                                             ))}
                                         </select>
-                                        <FieldError message={serverErrors.private_key_id?.[0]} />
+                                        <FieldError message={serverErrors.private_key_uuid?.[0]} />
                                     </Field>
 
                                     <div className="rounded-lg border border-border bg-muted/20 transition-colors focus-within:border-ring">

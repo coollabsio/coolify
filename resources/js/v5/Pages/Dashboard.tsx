@@ -413,8 +413,8 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                     'X-CSRF-TOKEN': csrfToken(),
                 },
                 body: JSON.stringify({
-                    resource_one: { type: 'application', id: Number(fromApplicationId) },
-                    resource_two: { type: 'application', id: Number(toApplicationId) },
+                    resource_one: { type: 'application', uuid: fromApplicationId },
+                    resource_two: { type: 'application', uuid: toApplicationId },
                 }),
             });
             const payload = (await response.json()) as { connection?: V5ResourceConnection; message?: string; detail?: string };
@@ -896,7 +896,7 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                     'X-CSRF-TOKEN': csrfToken(),
                 },
                 body: JSON.stringify({
-                    server_id: selectedNginxServerId || null,
+                    server_uuid: selectedNginxServerId || null,
                     image: nginxImage.trim() || DEFAULT_NGINX_IMAGE,
                 }),
             });

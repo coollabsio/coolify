@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('v5_applications', function (Blueprint $table) {
             $table->id();
+            $table->string('uuid')->unique();
             $table->foreignId('team_id')->constrained('teams')->cascadeOnDelete();
             $table->foreignId('project_id')->constrained('projects')->cascadeOnDelete();
             $table->foreignId('environment_id')->constrained('environments')->cascadeOnDelete();

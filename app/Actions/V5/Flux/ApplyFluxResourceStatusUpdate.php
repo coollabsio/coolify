@@ -152,21 +152,16 @@ class ApplyFluxResourceStatusUpdate
     private function findApplication(array $payload): ?V5Application
     {
         $query = V5Application::query()->with('server');
-        $teamId = $this->intValue($payload, 'team_id');
         $server = $this->findServer($payload);
-
-        if ($teamId !== null) {
-            $query->where('team_id', $teamId);
-        }
 
         if ($server instanceof V5Server) {
             $query->where('server_id', $server->id);
         }
 
-        $applicationId = $this->intValue($payload, 'application_id') ?? $this->intValue($payload, 'resource_id');
+        $applicationUuid = $this->stringValue($payload, 'application_uuid') ?? $this->stringValue($payload, 'resource_uuid');
 
-        if ($applicationId !== null) {
-            return $query->whereKey($applicationId)->first();
+        if ($applicationUuid !== null) {
+            return $query->where('uuid', $applicationUuid)->first();
         }
 
         $containerName = $this->stringValue($payload, 'container_name') ?? $this->stringValue($payload, 'name');
@@ -202,10 +197,10 @@ class ApplyFluxResourceStatusUpdate
      */
     private function findServer(array $payload): ?V5Server
     {
-        $serverId = $this->intValue($payload, 'server_id') ?? $this->intValue($payload, 'host_server_id');
+        $serverUuid = $this->stringValue($payload, 'server_uuid') ?? $this->stringValue($payload, 'host_server_uuid');
 
-        if ($serverId !== null) {
-            return V5Server::query()->find($serverId);
+        if ($serverUuid !== null) {
+            return V5Server::query()->where('uuid', $serverUuid)->first();
         }
 
         $hostId = $this->stringValue($payload, 'host_id')

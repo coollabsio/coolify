@@ -197,7 +197,7 @@ class DashboardController extends Controller
         }
 
         $validated = $request->validate([
-            'server_id' => ['nullable', 'integer'],
+            'server_uuid' => ['nullable', 'string', 'max:255'],
             'image' => ['nullable', 'string', 'max:255', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\/:@-]*$/'],
         ]);
         $image = trim($validated['image'] ?? '') ?: self::DEFAULT_NGINX_IMAGE;
@@ -205,8 +205,8 @@ class DashboardController extends Controller
         $server = V5Server::query()
             ->where('team_id', $currentTeam->id)
             ->when(
-                isset($validated['server_id']),
-                fn (Builder $query) => $query->whereKey($validated['server_id']),
+                isset($validated['server_uuid']),
+                fn (Builder $query) => $query->where('uuid', $validated['server_uuid']),
                 fn (Builder $query) => $query
                     ->orderByRaw('last_bootstrapped_at is null')
                     ->orderBy('name')
@@ -520,10 +520,10 @@ class DashboardController extends Controller
         $validated = $request->validate([
             'resource_one' => ['required', 'array'],
             'resource_one.type' => ['required', 'string', Rule::in(['application'])],
-            'resource_one.id' => ['required', 'integer'],
+            'resource_one.uuid' => ['required', 'string', 'max:255'],
             'resource_two' => ['required', 'array'],
             'resource_two.type' => ['required', 'string', Rule::in(['application'])],
-            'resource_two.id' => ['required', 'integer'],
+            'resource_two.uuid' => ['required', 'string', 'max:255'],
         ]);
 
         $resourceOne = $this->resolveConnectableResource($currentTeam, $project, $environment, $validated['resource_one']);
@@ -574,20 +574,23 @@ class DashboardController extends Controller
 
         DB::transaction(function () use ($connection, $validated): void {
             $connection->rules()->delete();
+            $resourcesByUuid = $this->connectionApplicationsByUuid($connection);
 
             foreach ($validated['ports_by_direction'] as $direction => $ports) {
-                [$sourceResourceId, $targetResourceId] = array_pad(explode('->', (string) $direction, 2), 2, null);
+                [$sourceResourceUuid, $targetResourceUuid] = array_pad(explode('->', (string) $direction, 2), 2, null);
+                $sourceResource = is_string($sourceResourceUuid) ? $resourcesByUuid->get($sourceResourceUuid) : null;
+                $targetResource = is_string($targetResourceUuid) ? $resourcesByUuid->get($targetResourceUuid) : null;
 
-                if (! $this->connectionHasResourceId($connection, $sourceResourceId) || ! $this->connectionHasResourceId($connection, $targetResourceId)) {
+                if (! $sourceResource instanceof V5Application || ! $targetResource instanceof V5Application) {
                     continue;
                 }
 
                 foreach (array_unique($ports) as $port) {
                     $connection->rules()->create([
-                        'source_resource_type' => $this->resourceTypeForConnectionId($connection, (int) $sourceResourceId),
-                        'source_resource_id' => (int) $sourceResourceId,
-                        'target_resource_type' => $this->resourceTypeForConnectionId($connection, (int) $targetResourceId),
-                        'target_resource_id' => (int) $targetResourceId,
+                        'source_resource_type' => $this->resourceTypeForConnectionUuid($connection, $sourceResource->uuid),
+                        'source_resource_id' => $sourceResource->id,
+                        'target_resource_type' => $this->resourceTypeForConnectionUuid($connection, $targetResource->uuid),
+                        'target_resource_id' => $targetResource->id,
                         'protocol' => 'tcp',
                         'port' => (int) $port,
                     ]);
@@ -775,10 +778,10 @@ class DashboardController extends Controller
             ],
             'ssh_user' => ['required', 'string', 'max:255'],
             'ssh_port' => ['required', 'integer', 'min:1', 'max:65535'],
-            'private_key_id' => [
+            'private_key_uuid' => [
                 'required',
-                'integer',
-                Rule::exists('private_keys', 'id')->where('team_id', $currentTeam->id),
+                'string',
+                Rule::exists('private_keys', 'uuid')->where('team_id', $currentTeam->id),
             ],
             'node_address' => ['nullable', 'string', 'max:255'],
             'builder_enabled' => ['sometimes', 'boolean'],
@@ -803,6 +806,10 @@ class DashboardController extends Controller
         $builderCapacity = (int) ($validated['builder_capacity'] ?? $cluster->builder_capacity);
         $builderCpuQuota = $validated['builder_cpu_quota'] ?? $cluster->builder_cpu_quota;
         $devWireguardOverrides = $this->devLimaWireguardOverrides($validated['host'], (int) $validated['ssh_port']);
+        $privateKey = PrivateKey::query()
+            ->where('team_id', $currentTeam->id)
+            ->where('uuid', $validated['private_key_uuid'])
+            ->firstOrFail();
 
         V5Server::query()->create([
             'team_id' => $currentTeam->id,
@@ -812,7 +819,7 @@ class DashboardController extends Controller
             'host' => $validated['host'],
             'ssh_user' => $validated['ssh_user'],
             'ssh_port' => $validated['ssh_port'],
-            'private_key_id' => $validated['private_key_id'] ?? null,
+            'private_key_id' => $privateKey->id,
             'status' => 'added',
             'ingress_type' => $ingressType,
             'capabilities' => $this->serverCapabilities($builderEnabled, $ingressEnabled),
@@ -1363,9 +1370,9 @@ class DashboardController extends Controller
             ->where('team_id', $currentTeam->id)
             ->orderByRaw('last_bootstrapped_at is null')
             ->orderBy('name')
-            ->get(['id', 'name', 'host', 'status'])
+            ->get(['id', 'uuid', 'name', 'host', 'status'])
             ->map(fn (V5Server $server) => [
-                'id' => (string) $server->id,
+                'id' => $server->uuid,
                 'name' => $server->name,
                 'host' => $server->host,
                 'status' => $server->status,
@@ -1440,7 +1447,7 @@ class DashboardController extends Controller
         $isServerReachable = $this->isServerReachable($server);
 
         return [
-            'id' => (string) $server->id,
+            'id' => $server->uuid,
             'name' => $server->name,
             'host' => $server->host,
             'type' => $server->ingressType(),
@@ -1456,16 +1463,27 @@ class DashboardController extends Controller
      */
     private function serializeResourceConnection(ResourceConnection $connection): array
     {
+        $applications = $this->connectionApplicationsById($connection);
+        $resourceOneUuid = $applications->get($connection->resource_one_id)?->uuid;
+        $resourceTwoUuid = $applications->get($connection->resource_two_id)?->uuid;
+        $applicationsById = $applications;
+
         return [
-            'id' => (string) $connection->id,
-            'applicationIds' => [
-                (string) $connection->resource_one_id,
-                (string) $connection->resource_two_id,
-            ],
-            'fromApplicationId' => (string) $connection->resource_one_id,
-            'toApplicationId' => (string) $connection->resource_two_id,
+            'id' => $connection->uuid,
+            'applicationIds' => array_values(array_filter([
+                $resourceOneUuid,
+                $resourceTwoUuid,
+            ])),
+            'fromApplicationId' => $resourceOneUuid,
+            'toApplicationId' => $resourceTwoUuid,
             'portsByDirection' => $connection->rules
-                ->groupBy(fn ($rule) => "{$rule->source_resource_id}->{$rule->target_resource_id}")
+                ->groupBy(function ($rule) use ($applicationsById): string {
+                    $sourceUuid = $applicationsById->get($rule->source_resource_id)?->uuid;
+                    $targetUuid = $applicationsById->get($rule->target_resource_id)?->uuid;
+
+                    return "{$sourceUuid}->{$targetUuid}";
+                })
+                ->filter(fn (Collection $rules, string $direction): bool => ! str_starts_with($direction, '->') && ! str_ends_with($direction, '->'))
                 ->map(fn (Collection $rules) => $rules
                     ->sortBy('port')
                     ->pluck('port')
@@ -1477,7 +1495,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param  array{type: string, id: int}  $resource
+     * @param  array{type: string, uuid: string}  $resource
      */
     private function resolveConnectableResource(Team $team, Project $project, Environment $environment, array $resource): Model
     {
@@ -1486,7 +1504,7 @@ class DashboardController extends Controller
                 ->where('team_id', $team->id)
                 ->where('project_id', $project->id)
                 ->where('environment_id', $environment->id)
-                ->whereKey($resource['id'])
+                ->where('uuid', $resource['uuid'])
                 ->firstOrFail(),
         };
     }
@@ -1504,17 +1522,34 @@ class DashboardController extends Controller
         return $resource->getMorphClass().':'.$resource->getKey();
     }
 
-    private function connectionHasResourceId(ResourceConnection $connection, mixed $resourceId): bool
+    /**
+     * @return Collection<string, V5Application>
+     */
+    private function connectionApplicationsByUuid(ResourceConnection $connection): Collection
     {
-        return in_array((int) $resourceId, [
-            (int) $connection->resource_one_id,
-            (int) $connection->resource_two_id,
-        ], true);
+        return $this->connectionApplicationsById($connection)->keyBy('uuid');
     }
 
-    private function resourceTypeForConnectionId(ResourceConnection $connection, int $resourceId): string
+    /**
+     * @return Collection<int, V5Application>
+     */
+    private function connectionApplicationsById(ResourceConnection $connection): Collection
     {
-        return (int) $connection->resource_one_id === $resourceId
+        return V5Application::query()
+            ->whereIn('id', [
+                (int) $connection->resource_one_id,
+                (int) $connection->resource_two_id,
+            ])
+            ->get()
+            ->keyBy('id');
+    }
+
+    private function resourceTypeForConnectionUuid(ResourceConnection $connection, string $resourceUuid): string
+    {
+        $resourcesByUuid = $this->connectionApplicationsByUuid($connection);
+        $resource = $resourcesByUuid->get($resourceUuid);
+
+        return $resource instanceof V5Application && (int) $connection->resource_one_id === $resource->id
             ? $connection->resource_one_type
             : $connection->resource_two_type;
     }
@@ -1686,7 +1721,7 @@ class DashboardController extends Controller
         $isServerReachable = ! $server instanceof V5Server || $this->isServerReachable($server);
 
         return [
-            'id' => (string) $application->id,
+            'id' => $application->uuid,
             'name' => $application->name,
             'image' => $application->image,
             'containerName' => $application->container_name,
@@ -1756,9 +1791,9 @@ class DashboardController extends Controller
             ->where('team_id', $currentTeam->id)
             ->where('is_git_related', false)
             ->orderBy('name')
-            ->get(['id', 'name'])
+            ->get(['id', 'uuid', 'name'])
             ->map(fn (PrivateKey $privateKey) => [
-                'id' => (string) $privateKey->id,
+                'id' => $privateKey->uuid,
                 'name' => $privateKey->name,
             ])
             ->all();
@@ -1830,7 +1865,7 @@ class DashboardController extends Controller
     private function serializeCluster(V5Cluster $cluster): array
     {
         return [
-            'id' => (string) $cluster->id,
+            'id' => $cluster->uuid,
             'name' => $cluster->name,
             'description' => $cluster->description,
             'wireguardInterface' => $cluster->wireguard_interface,
@@ -1855,7 +1890,7 @@ class DashboardController extends Controller
             'lastCliRanAt' => $cluster->last_cli_ran_at?->toJSON(),
             'serversCount' => $cluster->servers_count ?? $cluster->servers->count(),
             'servers' => $cluster->servers->map(fn (V5Server $server) => [
-                'id' => (string) $server->id,
+                'id' => $server->uuid,
                 'name' => $server->name,
                 'host' => $server->host,
                 'status' => $server->status,

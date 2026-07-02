@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('v5_clusters', function (Blueprint $table) {
             $table->id();
+            $table->string('uuid')->unique();
             $table->foreignId('team_id')->constrained('teams')->cascadeOnDelete();
             $table->foreignId('created_by_user_id')->constrained('users')->cascadeOnDelete();
             $table->string('name');

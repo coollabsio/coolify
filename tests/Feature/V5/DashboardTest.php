@@ -155,6 +155,160 @@ it('shows a loading state while toggling application ingress', function () {
         ->toContain("isSavingIngress ? 'Saving...' : 'Enable ingress'");
 });
 
+it('uses v5 resource uuids at http boundaries while keeping database ids internal', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Project', 'production');
+    $server = V5Server::query()->create([
+        'uuid' => 'server-public-uuid',
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.20',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => [],
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+        'builder_cpu_quota' => '200%',
+        'wireguard_management_ip' => '100.64.0.10',
+        'last_bootstrapped_at' => now(),
+    ]);
+    $application = V5Application::query()->create([
+        'uuid' => 'application-public-uuid',
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-test',
+        'status' => 'running',
+        'mesh_namespace' => 'default',
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->patchJson("/v5/applications/{$application->uuid}/position", [
+            'canvas_x' => 123,
+            'canvas_y' => 456,
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('application.id', $application->uuid);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->patchJson("/v5/applications/{$application->id}/position", [
+            'canvas_x' => 789,
+            'canvas_y' => 999,
+        ])
+        ->assertNotFound();
+
+    $fluxClient = Mockery::mock(FluxClient::class);
+    $fluxClient->shouldReceive('pullImage')->once()->andReturn('Image pulled.');
+    $fluxClient->shouldReceive('createContainer')->once()->andReturn('container-id');
+    $fluxClient->shouldReceive('startContainer')->once()->andReturn('Container started.');
+    $fluxClient->shouldReceive('inspectContainer')->once()->andReturn(['State' => ['Running' => true]]);
+    app()->instance(FluxClient::class, $fluxClient);
+
+    $this
+        ->actingAs($user)
+        ->withSession([
+            'currentTeam' => $team,
+            'v5.selected_project' => ['uuid' => $project->uuid, 'name' => $project->name],
+            'v5.selected_environment' => ['uuid' => $environment->uuid, 'name' => $environment->name],
+        ])
+        ->postJson('/v5/applications/nginx', [
+            'server_uuid' => $server->uuid,
+            'image' => 'docker.io/library/nginx:alpine',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('application.id', fn (string $id): bool => $id !== (string) V5Application::query()->latest('id')->value('id'));
+});
+
+it('uses v5 resource uuids for resource connection requests and responses', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Project', 'production');
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.20',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => [],
+        'wireguard_management_ip' => '100.64.0.10',
+    ]);
+    $source = V5Application::query()->create([
+        'uuid' => 'source-application-uuid',
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'source',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'source-container',
+        'status' => 'running',
+    ]);
+    $target = V5Application::query()->create([
+        'uuid' => 'target-application-uuid',
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'target',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'target-container',
+        'status' => 'running',
+    ]);
+
+    $response = $this
+        ->actingAs($user)
+        ->withSession([
+            'currentTeam' => $team,
+            'v5.selected_project' => ['uuid' => $project->uuid, 'name' => $project->name],
+            'v5.selected_environment' => ['uuid' => $environment->uuid, 'name' => $environment->name],
+        ])
+        ->postJson('/v5/resource-connections', [
+            'resource_one' => ['type' => 'application', 'uuid' => $source->uuid],
+            'resource_two' => ['type' => 'application', 'uuid' => $target->uuid],
+        ])
+        ->assertCreated()
+        ->assertJsonPath('connection.fromApplicationId', $source->uuid)
+        ->assertJsonPath('connection.toApplicationId', $target->uuid);
+
+    $connectionUuid = $response->json('connection.id');
+
+    $fluxClient = Mockery::mock(FluxClient::class);
+    $fluxClient->shouldReceive('applyFirewallRule')->once()->andReturn('Firewall rule applied.');
+    app()->instance(FluxClient::class, $fluxClient);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->patchJson("/v5/resource-connections/{$connectionUuid}", [
+            'ports_by_direction' => [
+                "{$source->uuid}->{$target->uuid}" => [8080],
+            ],
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath("connection.portsByDirection.{$source->uuid}->{$target->uuid}.0", '8080');
+
+    expect(ResourceConnection::query()->first())
+        ->resource_one_id->toBe($source->id)
+        ->resource_two_id->toBe($target->id);
+});
+
 it('generates http-only caddy routes for application ingress', function () {
     createSharedUserAndTeamTables();
 
@@ -215,7 +369,7 @@ it('generates http-only caddy routes for application ingress', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->patchJson("/v5/applications/{$application->id}/ingress", [
+        ->patchJson("/v5/applications/{$application->uuid}/ingress", [
             'ingress_enabled' => true,
             'internal_port' => 3000,
             'domains' => ['app.example.com'],
@@ -972,12 +1126,12 @@ it('persists generic v5 resource connections and direction-specific ports', func
         ])
         ->withHeader('X-CSRF-TOKEN', 'test-csrf-token')
         ->postJson('/v5/resource-connections', [
-            'resource_one' => ['type' => 'application', 'id' => $source->id],
-            'resource_two' => ['type' => 'application', 'id' => $target->id],
+            'resource_one' => ['type' => 'application', 'uuid' => $source->uuid],
+            'resource_two' => ['type' => 'application', 'uuid' => $target->uuid],
         ])
         ->assertCreated()
-        ->assertJsonPath('connection.applicationIds.0', (string) $source->id)
-        ->assertJsonPath('connection.applicationIds.1', (string) $target->id);
+        ->assertJsonPath('connection.applicationIds.0', $source->uuid)
+        ->assertJsonPath('connection.applicationIds.1', $target->uuid);
 
     $connectionId = $response->json('connection.id');
 
@@ -987,13 +1141,13 @@ it('persists generic v5 resource connections and direction-specific ports', func
         ->withHeader('X-CSRF-TOKEN', 'test-csrf-token')
         ->patchJson("/v5/resource-connections/{$connectionId}", [
             'ports_by_direction' => [
-                "{$source->id}->{$target->id}" => [80],
-                "{$target->id}->{$source->id}" => [443],
+                "{$source->uuid}->{$target->uuid}" => [80],
+                "{$target->uuid}->{$source->uuid}" => [443],
             ],
         ])
         ->assertSuccessful()
-        ->assertJsonPath("connection.portsByDirection.{$source->id}->{$target->id}.0", '80')
-        ->assertJsonPath("connection.portsByDirection.{$target->id}->{$source->id}.0", '443');
+        ->assertJsonPath("connection.portsByDirection.{$source->uuid}->{$target->uuid}.0", '80')
+        ->assertJsonPath("connection.portsByDirection.{$target->uuid}->{$source->uuid}.0", '443');
 
     $this
         ->actingAs($user)
@@ -1006,8 +1160,8 @@ it('persists generic v5 resource connections and direction-specific ports', func
         ->assertSuccessful()
         ->assertSee('"resourceConnections":[', false)
         ->assertSee("\"id\":\"{$connectionId}\"", false)
-        ->assertSee("\"{$source->id}->{$target->id}\":[\"80\"]", false)
-        ->assertSee("\"{$target->id}->{$source->id}\":[\"443\"]", false);
+        ->assertSee("\"{$source->uuid}->{$target->uuid}\":[\"80\"]", false)
+        ->assertSee("\"{$target->uuid}->{$source->uuid}\":[\"443\"]", false);
 });
 
 it('reports flux failures when syncing v5 resource connection firewall rules', function () {
@@ -1084,9 +1238,9 @@ it('reports flux failures when syncing v5 resource connection firewall rules', f
         ->actingAs($user)
         ->withSession(['currentTeam' => $team, '_token' => 'test-csrf-token'])
         ->withHeader('X-CSRF-TOKEN', 'test-csrf-token')
-        ->patchJson("/v5/resource-connections/{$connection->id}", [
+        ->patchJson("/v5/resource-connections/{$connection->uuid}", [
             'ports_by_direction' => [
-                "{$source->id}->{$target->id}" => [5432],
+                "{$source->uuid}->{$target->uuid}" => [5432],
             ],
         ])
         ->assertStatus(502)
@@ -1196,9 +1350,9 @@ it('syncs cross-server v5 resource connection ports on both endpoint hosts', fun
         ->actingAs($user)
         ->withSession(['currentTeam' => $team, '_token' => 'test-csrf-token'])
         ->withHeader('X-CSRF-TOKEN', 'test-csrf-token')
-        ->patchJson("/v5/resource-connections/{$connection->id}", [
+        ->patchJson("/v5/resource-connections/{$connection->uuid}", [
             'ports_by_direction' => [
-                "{$source->id}->{$target->id}" => [5432],
+                "{$source->uuid}->{$target->uuid}" => [5432],
             ],
         ])
         ->assertSuccessful();
@@ -1293,9 +1447,9 @@ it('syncs v5 resource connection ports through flux firewall primitives', functi
         ->actingAs($user)
         ->withSession(['currentTeam' => $team, '_token' => 'test-csrf-token'])
         ->withHeader('X-CSRF-TOKEN', 'test-csrf-token')
-        ->patchJson("/v5/resource-connections/{$connection->id}", [
+        ->patchJson("/v5/resource-connections/{$connection->uuid}", [
             'ports_by_direction' => [
-                "{$source->id}->{$target->id}" => [5432],
+                "{$source->uuid}->{$target->uuid}" => [5432],
             ],
         ])
         ->assertSuccessful();
@@ -1304,7 +1458,7 @@ it('syncs v5 resource connection ports through flux firewall primitives', functi
         ->actingAs($user)
         ->withSession(['currentTeam' => $team, '_token' => 'test-csrf-token'])
         ->withHeader('X-CSRF-TOKEN', 'test-csrf-token')
-        ->deleteJson("/v5/resource-connections/{$connection->id}")
+        ->deleteJson("/v5/resource-connections/{$connection->uuid}")
         ->assertNoContent();
 });
 
@@ -1426,7 +1580,7 @@ it('creates an nginx v5 application with a custom image', function () {
     V5Server::query()->create([
         'team_id' => $team->id,
         'created_by_user_id' => $user->id,
-        'private_key_id' => $privateKey->id,
+        'private_key_uuid' => $privateKey->uuid,
         'name' => 'edge-01',
         'host' => '203.0.113.10',
         'ssh_user' => 'root',
@@ -1498,7 +1652,7 @@ it('creates an nginx v5 application on the selected team server', function () {
             'v5.selectedEnvironmentUuid' => $environment->uuid,
         ])
         ->postJson('/v5/applications/nginx', [
-            'server_id' => $selectedServer->id,
+            'server_uuid' => $selectedServer->uuid,
         ])
         ->assertCreated()
         ->assertJsonPath('application.serverName', 'edge-02');
@@ -1568,7 +1722,7 @@ it('marks an nginx v5 application failed when the launch command fails', functio
     V5Server::query()->create([
         'team_id' => $team->id,
         'created_by_user_id' => $user->id,
-        'private_key_id' => $privateKey->id,
+        'private_key_uuid' => $privateKey->uuid,
         'name' => 'edge-01',
         'host' => '203.0.113.10',
         'ssh_user' => 'root',
@@ -1605,7 +1759,7 @@ it('does not create an nginx v5 application on another teams selected server', f
     $otherServer = V5Server::query()->create([
         'team_id' => $otherTeam->id,
         'created_by_user_id' => $otherUser->id,
-        'private_key_id' => $privateKey->id,
+        'private_key_uuid' => $privateKey->uuid,
         'name' => 'other-edge-01',
         'host' => '203.0.113.20',
         'ssh_user' => 'root',
@@ -1681,7 +1835,7 @@ it('deletes a v5 application for the current team', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->deleteJson("/v5/applications/{$application->id}")
+        ->deleteJson("/v5/applications/{$application->uuid}")
         ->assertNoContent();
 
     expect(V5Application::query()->whereKey($application->id)->exists())->toBeFalse();
@@ -1724,7 +1878,7 @@ it('stops and deletes the nginx container before deleting a v5 application', fun
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->deleteJson("/v5/applications/{$application->id}")
+        ->deleteJson("/v5/applications/{$application->uuid}")
         ->assertNoContent();
 
     Process::assertRan(function ($process): bool {
@@ -1769,7 +1923,7 @@ it('does not delete another teams v5 application', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->deleteJson("/v5/applications/{$application->id}")
+        ->deleteJson("/v5/applications/{$application->uuid}")
         ->assertNotFound();
 
     expect(V5Application::query()->whereKey($application->id)->exists())->toBeTrue();
@@ -1807,7 +1961,7 @@ it('updates v5 application canvas position for the current team', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->patchJson("/v5/applications/{$application->id}/position", [
+        ->patchJson("/v5/applications/{$application->uuid}/position", [
             'canvas_x' => 320,
             'canvas_y' => -160,
         ])
@@ -1839,7 +1993,7 @@ it('updates v5 caddy ingress canvas position for the current team', function () 
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->patchJson("/v5/caddy-ingresses/{$server->id}/position", [
+        ->patchJson("/v5/caddy-ingresses/{$server->uuid}/position", [
             'canvas_x' => -160,
             'canvas_y' => 240,
         ])
@@ -2145,6 +2299,69 @@ it('rejects flux resource status http updates without the shared token', functio
         ->assertUnauthorized();
 });
 
+it('accepts flux resource status http updates identified by resource uuids', function () {
+    createSharedUserAndTeamTables();
+    Config::set('flux.laravel_api_token', 'test-flux-token');
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'Production Project', 'Production');
+    $server = V5Server::query()->create([
+        'uuid' => 'server-public-uuid',
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'edge-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'capabilities' => [],
+        'wireguard_management_ip' => '100.64.0.5',
+    ]);
+    $application = V5Application::query()->create([
+        'uuid' => 'application-public-uuid',
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'nginx-test',
+        'image' => 'docker.io/library/nginx:alpine',
+        'container_name' => 'coolify-v5-nginx-1',
+        'status' => 'starting',
+        'status_message' => 'Container starting.',
+    ]);
+
+    $this
+        ->withToken('test-flux-token')
+        ->postJson('/api/v1/internal/flux/resource-status', [
+            'resource_type' => 'application',
+            'server_uuid' => $server->uuid,
+            'application_uuid' => $application->uuid,
+            'container_id' => 'new-container-id',
+            'status' => 'running',
+            'status_message' => 'Status received from coold through flux.',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('message', 'Resource status updated.');
+
+    expect($application->refresh()->status)->toBe('running')
+        ->and($application->runtime_container_id)->toBe('new-container-id');
+});
+
+it('rejects numeric laravel ids in flux resource status http payloads', function () {
+    Config::set('flux.laravel_api_token', 'test-flux-token');
+
+    $this
+        ->withToken('test-flux-token')
+        ->postJson('/api/v1/internal/flux/resource-status', [
+            'resource_type' => 'application',
+            'server_id' => 1,
+            'application_id' => 1,
+            'status' => 'running',
+        ])
+        ->assertInvalid(['server_id', 'application_id']);
+});
+
 it('accepts flux resource status http updates and stores them in the database', function () {
     createSharedUserAndTeamTables();
     Config::set('flux.laravel_api_token', 'test-flux-token');
@@ -2440,7 +2657,7 @@ it('refreshes v5 application state from flux container inventory', function () {
         ])
         ->postJson('/v5/applications/refresh')
         ->assertSuccessful()
-        ->assertJsonPath('applications.0.id', (string) $application->id)
+        ->assertJsonPath('applications.0.id', $application->uuid)
         ->assertJsonPath('applications.0.status', 'exited')
         ->assertJsonPath('applications.0.statusMessage', 'Container state refreshed from coold.');
 
@@ -2491,7 +2708,7 @@ it('refreshes v5 caddy ingress state from flux container inventory', function ()
         ])
         ->postJson('/v5/applications/refresh')
         ->assertSuccessful()
-        ->assertJsonPath('caddyIngresses.0.id', (string) $server->id)
+        ->assertJsonPath('caddyIngresses.0.id', $server->uuid)
         ->assertJsonPath('caddyIngresses.0.type', 'caddy')
         ->assertJsonPath('caddyIngresses.0.status', 'exited');
 
@@ -2537,7 +2754,7 @@ it('broadcasts v5 cluster updates when bootstrap state changes', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->postJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/bootstrap")
+        ->postJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}/bootstrap")
         ->assertAccepted();
 
     Event::assertDispatched(V5ClusterUpdated::class, fn ($event): bool => $event->clusterId === $cluster->id
@@ -2589,7 +2806,7 @@ it('fetches v5 server coold logs through flux', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->getJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/coold-logs?tail=200")
+        ->getJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}/coold-logs?tail=200")
         ->assertSuccessful()
         ->assertJsonPath('output', 'Jun 22 coold[123]: started')
         ->assertJsonStructure(['output', 'fetchedAt']);
@@ -2630,7 +2847,7 @@ it('fetches v5 server corrosion tables through flux', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->getJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/corrosion-tables?limit=200")
+        ->getJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}/corrosion-tables?limit=200")
         ->assertSuccessful()
         ->assertJsonPath('output', '{"limit":200,"tables":[{"name":"service_endpoints","columns":["container_name"],"rows":[["coolify-v5-nginx"]]}]}')
         ->assertJsonStructure(['output', 'fetchedAt']);
@@ -2678,7 +2895,7 @@ it('fetches v5 server firewall rules through flux', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->getJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/firewall-rules")
+        ->getJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}/firewall-rules")
         ->assertSuccessful()
         ->assertJsonPath('rules.0.id', 'v5-resource-connection:1:1:2:tcp:5432')
         ->assertJsonPath('rules.0.port', 5432)
@@ -2742,10 +2959,10 @@ it('returns fresh v5 cluster bootstrap state for realtime fallback refreshes', f
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->getJson("/v5/clusters/{$cluster->id}")
+        ->getJson("/v5/clusters/{$cluster->uuid}")
         ->assertSuccessful()
-        ->assertJsonPath('cluster.id', (string) $cluster->id)
-        ->assertJsonPath('cluster.servers.0.id', (string) $server->id)
+        ->assertJsonPath('cluster.id', $cluster->uuid)
+        ->assertJsonPath('cluster.servers.0.id', $server->uuid)
         ->assertJsonPath('cluster.servers.0.lastBootstrapStatus', 'running')
         ->assertJsonPath('cluster.servers.0.lastBootstrapOutput', 'Starting Coolify CLI bootstrap for prod-01...');
 });
@@ -3035,12 +3252,12 @@ it('adds a v5 server to a cluster for the current team', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->postJson("/v5/clusters/{$cluster->id}/servers", [
+        ->postJson("/v5/clusters/{$cluster->uuid}/servers", [
             'name' => 'prod-01',
             'host' => '203.0.113.10',
             'ssh_user' => 'root',
             'ssh_port' => 22,
-            'private_key_id' => $privateKey->id,
+            'private_key_uuid' => $privateKey->uuid,
             'node_address' => '203.0.113.10',
             'builder_enabled' => true,
             'builder_capacity' => 3,
@@ -3102,12 +3319,12 @@ it('adds a v5 server with caddy ingress enabled', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->postJson("/v5/clusters/{$cluster->id}/servers", [
+        ->postJson("/v5/clusters/{$cluster->uuid}/servers", [
             'name' => 'edge-01',
             'host' => '203.0.113.20',
             'ssh_user' => 'root',
             'ssh_port' => 22,
-            'private_key_id' => $privateKey->id,
+            'private_key_uuid' => $privateKey->uuid,
             'builder_enabled' => false,
             'builder_capacity' => 0,
             'ingress_enabled' => true,
@@ -3142,12 +3359,12 @@ it('keeps added v5 server builder capacity when builder is disabled', function (
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->postJson("/v5/clusters/{$cluster->id}/servers", [
+        ->postJson("/v5/clusters/{$cluster->uuid}/servers", [
             'name' => 'prod-01',
             'host' => '203.0.113.10',
             'ssh_user' => 'root',
             'ssh_port' => 22,
-            'private_key_id' => $privateKey->id,
+            'private_key_uuid' => $privateKey->uuid,
             'builder_enabled' => false,
             'builder_capacity' => 3,
         ])
@@ -3178,12 +3395,12 @@ it('requires positive v5 server builder capacity when builder is enabled', funct
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->postJson("/v5/clusters/{$cluster->id}/servers", [
+        ->postJson("/v5/clusters/{$cluster->uuid}/servers", [
             'name' => 'prod-01',
             'host' => '203.0.113.10',
             'ssh_user' => 'root',
             'ssh_port' => 22,
-            'private_key_id' => $privateKey->id,
+            'private_key_uuid' => $privateKey->uuid,
             'builder_enabled' => true,
             'builder_capacity' => 0,
         ])
@@ -3206,12 +3423,12 @@ it('defaults dev Lima wireguard overrides for host docker internal servers', fun
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->postJson("/v5/clusters/{$cluster->id}/servers", [
+        ->postJson("/v5/clusters/{$cluster->uuid}/servers", [
             'name' => 'coolify-naked-test',
             'host' => 'host.docker.internal',
             'ssh_user' => 'root',
             'ssh_port' => 60003,
-            'private_key_id' => $privateKey->id,
+            'private_key_uuid' => $privateKey->uuid,
         ])
         ->assertCreated()
         ->assertJsonPath('cluster.servers.0.wireguardListenPortOverride', 51823)
@@ -3238,7 +3455,7 @@ it('rejects adding a v5 server to another teams cluster', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->postJson("/v5/clusters/{$cluster->id}/servers", [
+        ->postJson("/v5/clusters/{$cluster->uuid}/servers", [
             'name' => 'prod-01',
             'host' => '203.0.113.10',
             'ssh_user' => 'root',
@@ -3261,12 +3478,12 @@ it('validates v5 server creation input', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->postJson("/v5/clusters/{$cluster->id}/servers", [
+        ->postJson("/v5/clusters/{$cluster->uuid}/servers", [
             'name' => '',
             'host' => '',
             'ssh_user' => '',
             'ssh_port' => 70000,
-            'private_key_id' => null,
+            'private_key_uuid' => null,
             'wireguard_listen_port_override' => 70000,
         ])
         ->assertUnprocessable()
@@ -3275,7 +3492,7 @@ it('validates v5 server creation input', function () {
             'host',
             'ssh_user',
             'ssh_port',
-            'private_key_id',
+            'private_key_uuid',
             'wireguard_listen_port_override',
         ]);
 });
@@ -3301,15 +3518,15 @@ it('rejects private keys from another team when adding a v5 server', function ()
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->postJson("/v5/clusters/{$cluster->id}/servers", [
+        ->postJson("/v5/clusters/{$cluster->uuid}/servers", [
             'name' => 'prod-01',
             'host' => '203.0.113.10',
             'ssh_user' => 'root',
             'ssh_port' => 22,
-            'private_key_id' => $otherPrivateKey->id,
+            'private_key_uuid' => $otherPrivateKey->uuid,
         ])
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['private_key_id']);
+        ->assertJsonValidationErrors(['private_key_uuid']);
 });
 
 it('checks v5 server ssh status without storing diagnostic output', function () {
@@ -3344,7 +3561,7 @@ it('checks v5 server ssh status without storing diagnostic output', function () 
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->postJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/check")
+        ->postJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}/check")
         ->assertSuccessful()
         ->assertJsonPath('status', 'reachable')
         ->assertJsonPath('output', "SSH connection OK\nprod-01\nLinux aarch64\n/usr/bin/docker")
@@ -3456,7 +3673,7 @@ it('bootstraps a single v5 server with the Coolify CLI', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->postJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/bootstrap")
+        ->postJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}/bootstrap")
         ->assertAccepted()
         ->assertJsonPath('message', 'Bootstrap queued.')
         ->assertJsonPath('cluster.servers.0.status', 'added')
@@ -3538,7 +3755,7 @@ it('does not run a macOS development Coolify CLI binary from Docker during v5 se
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->postJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/bootstrap")
+        ->postJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}/bootstrap")
         ->assertAccepted();
 
     Process::fake([
@@ -3583,7 +3800,7 @@ it('keeps a v5 server added when Coolify CLI bootstrap fails', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->postJson("/v5/clusters/{$cluster->id}/servers/{$server->id}/bootstrap")
+        ->postJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}/bootstrap")
         ->assertAccepted()
         ->assertJsonPath('cluster.servers.0.status', 'added')
         ->assertJsonPath('cluster.servers.0.lastBootstrappedAt', null)
@@ -3653,7 +3870,7 @@ it('extends a v5 cluster when bootstrapping a new server', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->postJson("/v5/clusters/{$cluster->id}/servers/{$newServer->id}/bootstrap")
+        ->postJson("/v5/clusters/{$cluster->uuid}/servers/{$newServer->uuid}/bootstrap")
         ->assertAccepted()
         ->assertJsonPath('cluster.servers.1.lastBootstrapAction', 'extend')
         ->assertJsonPath('cluster.servers.1.lastBootstrapStatus', 'queued');
@@ -3817,7 +4034,7 @@ it('deletes an unbootstrapped v5 server from a cluster', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->deleteJson("/v5/clusters/{$cluster->id}/servers/{$server->id}")
+        ->deleteJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}")
         ->assertSuccessful()
         ->assertJsonPath('cluster.serversCount', 0)
         ->assertJsonPath('cluster.servers', []);
@@ -3852,7 +4069,7 @@ it('deletes a bootstrapped v5 server from a cluster', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->deleteJson("/v5/clusters/{$cluster->id}/servers/{$server->id}")
+        ->deleteJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}")
         ->assertSuccessful()
         ->assertJsonPath('cluster.serversCount', 0)
         ->assertJsonPath('cluster.servers', []);
@@ -3891,7 +4108,7 @@ it('updates editable v5 server builder details without changing networking', fun
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->patchJson("/v5/clusters/{$cluster->id}/servers/{$server->id}", [
+        ->patchJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}", [
             'builder_enabled' => true,
             'builder_capacity' => 5,
             'builder_cpu_quota' => '350%',
@@ -3953,7 +4170,7 @@ it('updates editable v5 server caddy ingress capability independently from build
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->patchJson("/v5/clusters/{$cluster->id}/servers/{$server->id}", [
+        ->patchJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}", [
             'builder_enabled' => false,
             'builder_capacity' => 2,
             'builder_cpu_quota' => '200%',
@@ -4021,7 +4238,7 @@ it('rejects application ingress when server ingress is disabled', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->patchJson("/v5/applications/{$application->id}/ingress", [
+        ->patchJson("/v5/applications/{$application->uuid}/ingress", [
             'ingress_enabled' => true,
             'internal_port' => 3000,
             'domains' => ['app.example.com'],
@@ -4094,7 +4311,7 @@ it('enables application ingress without publishing domains by default', function
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->patchJson("/v5/applications/{$application->id}/ingress", [
+        ->patchJson("/v5/applications/{$application->uuid}/ingress", [
             'ingress_enabled' => false,
             'internal_port' => 8080,
         ])
@@ -4153,7 +4370,7 @@ it('validates application ingress domains', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->patchJson("/v5/applications/{$application->id}/ingress", [
+        ->patchJson("/v5/applications/{$application->uuid}/ingress", [
             'ingress_enabled' => true,
             'internal_port' => 3000,
             'domains' => ['https://bad.example.com'],
@@ -4223,7 +4440,7 @@ it('enables application ingress with explicit domains and port', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->patchJson("/v5/applications/{$application->id}/ingress", [
+        ->patchJson("/v5/applications/{$application->uuid}/ingress", [
             'ingress_enabled' => true,
             'internal_port' => 3000,
             'domains' => ['app.example.com'],
@@ -4288,7 +4505,7 @@ it('returns flux error details when application ingress sync fails', function ()
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->patchJson("/v5/applications/{$application->id}/ingress", [
+        ->patchJson("/v5/applications/{$application->uuid}/ingress", [
             'ingress_enabled' => true,
             'internal_port' => 3000,
             'domains' => ['app.example.com'],
@@ -4368,7 +4585,7 @@ it('syncs caddy ingress routes through flux when enabling ingress on an installe
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->patchJson("/v5/clusters/{$cluster->id}/servers/{$server->id}", [
+        ->patchJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}", [
             'builder_enabled' => false,
             'builder_capacity' => 0,
             'builder_cpu_quota' => '200%',
@@ -4439,7 +4656,7 @@ it('returns flux error details when server ingress activation fails', function (
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->patchJson("/v5/clusters/{$cluster->id}/servers/{$server->id}", [
+        ->patchJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}", [
             'builder_enabled' => false,
             'builder_capacity' => 0,
             'builder_cpu_quota' => '200%',
@@ -4479,7 +4696,7 @@ it('keeps editable v5 server builder capacity when disabling builder', function 
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->patchJson("/v5/clusters/{$cluster->id}/servers/{$server->id}", [
+        ->patchJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}", [
             'builder_enabled' => false,
             'builder_capacity' => 5,
             'builder_cpu_quota' => '350%',
@@ -4524,7 +4741,7 @@ it('validates editable v5 server builder details', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->patchJson("/v5/clusters/{$cluster->id}/servers/{$server->id}", [
+        ->patchJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}", [
             'builder_enabled' => true,
             'builder_capacity' => 1001,
             'builder_cpu_quota' => str_repeat('a', 33),
@@ -4561,7 +4778,7 @@ it('requires positive editable v5 server builder capacity when builder is enable
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->patchJson("/v5/clusters/{$cluster->id}/servers/{$server->id}", [
+        ->patchJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}", [
             'builder_enabled' => true,
             'builder_capacity' => 0,
             'builder_cpu_quota' => '200%',
@@ -4622,7 +4839,7 @@ it('deletes an empty v5 cluster in the current team', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->deleteJson('/v5/clusters/'.$cluster->id)
+        ->deleteJson('/v5/clusters/'.$cluster->uuid)
         ->assertNoContent();
 
     expect(Cluster::query()->whereKey($cluster->id)->exists())->toBeFalse();
@@ -4658,7 +4875,7 @@ it('does not delete a v5 cluster that has servers', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->deleteJson('/v5/clusters/'.$cluster->id)
+        ->deleteJson('/v5/clusters/'.$cluster->uuid)
         ->assertUnprocessable()
         ->assertJsonPath('message', 'Only empty clusters can be deleted.');
 
@@ -4691,7 +4908,7 @@ it('does not delete a v5 cluster outside the current team', function () {
     $this
         ->actingAs($user)
         ->withSession(['currentTeam' => $team])
-        ->deleteJson('/v5/clusters/'.$cluster->id)
+        ->deleteJson('/v5/clusters/'.$cluster->uuid)
         ->assertNotFound();
 
     expect(Cluster::query()->whereKey($cluster->id)->exists())->toBeTrue();
@@ -4869,7 +5086,7 @@ it('defines the v5 dashboard page as a shadcn styled canvas shell', function () 
         ->toContain('selectedNginxServerId')
         ->toContain('nginxImage')
         ->toContain('docker.io/library/nginx:alpine')
-        ->toContain('server_id: selectedNginxServerId || null')
+        ->toContain('server_uuid: selectedNginxServerId || null')
         ->toContain('image: nginxImage.trim() || DEFAULT_NGINX_IMAGE')
         ->toContain('Center')
         ->toContain('Delete')
@@ -5284,7 +5501,7 @@ it('provides reusable v5 form field primitives with reserved validation error sp
         ->toContain("import { Input } from '@/components/ui/input';")
         ->toContain("import { Textarea } from '@/components/ui/textarea';")
         ->toContain('<FieldError message={errors.name?.[0]} />')
-        ->toContain('<FieldError message={serverErrors.private_key_id?.[0]} />')
+        ->toContain('<FieldError message={serverErrors.private_key_uuid?.[0]} />')
         ->not->toContain('{errors.name ? <span className="text-xs text-destructive">{errors.name[0]}</span> : null}')
         ->not->toContain('{serverErrors.name ? (');
 });
@@ -5675,6 +5892,7 @@ function createSharedUserAndTeamTables(): void
 
     Schema::create('v5_clusters', function ($table) {
         $table->id();
+        $table->string('uuid')->nullable()->unique();
         $table->foreignId('team_id');
         $table->foreignId('created_by_user_id');
         $table->string('name');
@@ -5756,6 +5974,7 @@ function createSharedUserAndTeamTables(): void
 
     Schema::create('v5_applications', function ($table) {
         $table->id();
+        $table->string('uuid')->nullable()->unique();
         $table->foreignId('team_id');
         $table->foreignId('project_id');
         $table->foreignId('environment_id');
@@ -5786,6 +6005,7 @@ function createSharedUserAndTeamTables(): void
 
     Schema::create('v5_resource_connections', function ($table) {
         $table->id();
+        $table->string('uuid')->nullable()->unique();
         $table->foreignId('team_id');
         $table->foreignId('project_id');
         $table->foreignId('environment_id');

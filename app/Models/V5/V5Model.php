@@ -7,6 +7,11 @@ use Illuminate\Support\Facades\Schema;
 
 abstract class V5Model extends Model
 {
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     protected static function boot(): void
     {
         parent::boot();
