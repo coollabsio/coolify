@@ -64,7 +64,7 @@ class SendWebhookJob implements ShouldBeEncrypted, ShouldQueue
             ]);
         }
 
-        $response = Http::post($this->webhookUrl, $this->payload);
+        $response = Http::withOptions(['allow_redirects' => false])->post($this->webhookUrl, $this->payload);
 
         if (isDev()) {
             ray('Webhook response', [

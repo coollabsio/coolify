@@ -30,6 +30,8 @@ trait HasDatabaseStatusInfo
 
     public ?Carbon $certificateValidUntil = null;
 
+    public bool $isPasswordHiddenForMember = false;
+
     abstract protected function databaseLabel(): string;
 
     protected function supportsSsl(): bool
@@ -73,14 +75,20 @@ trait HasDatabaseStatusInfo
 
     public function mount(): void
     {
+        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
         $this->refresh();
     }
 
     public function refresh(): void
     {
         $this->database->refresh();
-        $this->dbUrl = $this->database->internal_db_url;
-        $this->dbUrlPublic = $this->database->external_db_url;
+        if ($this->isPasswordHiddenForMember) {
+            $this->dbUrl = null;
+            $this->dbUrlPublic = null;
+        } else {
+            $this->dbUrl = $this->database->internal_db_url;
+            $this->dbUrlPublic = $this->database->external_db_url;
+        }
         if ($this->supportsSsl()) {
             $this->enableSsl = (bool) $this->database->enable_ssl;
             $this->certificateValidUntil = $this->database->sslCertificates()->first()?->valid_until;
@@ -167,6 +175,7 @@ trait HasDatabaseStatusInfo
             'sslModeHelper' => $this->sslModeHelper(),
             'showPublicUrlPlaceholder' => $this->showPublicUrlPlaceholder(),
             'isExited' => str($this->database->status)->contains('exited'),
+            'isPasswordHiddenForMember' => $this->isPasswordHiddenForMember,
         ]);
     }
 }

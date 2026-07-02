@@ -5,11 +5,13 @@ namespace App\Livewire\Project\New;
 use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\Project;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class SimpleDockerfile extends Component
 {
+    use AuthorizesRequests;
+
     public string $dockerfile = '';
 
     public array $parameters;
@@ -30,6 +32,8 @@ CMD ["nginx", "-g", "daemon off;"]
 
     public function submit()
     {
+        $this->authorize('create', Application::class);
+
         $this->validate([
             'dockerfile' => 'required',
         ]);
@@ -48,7 +52,7 @@ CMD ["nginx", "-g", "daemon off;"]
             $port = 80;
         }
         $application = Application::create([
-            'name' => 'dockerfile-'.new Cuid2,
+            'name' => 'dockerfile-'.new_public_id(),
             'repository_project_id' => 0,
             'git_repository' => 'coollabsio/coolify',
             'git_branch' => 'main',

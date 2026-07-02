@@ -92,11 +92,11 @@ it('renders responsive checkbox classes on the application configuration page', 
     $response->assertSee('<optgroup label="Application">', false);
     $response->assertSee('<optgroup label="Configuration">', false);
     $response->assertSee('<optgroup label="Links">', false);
-    $response->assertSee('<optgroup label="Actions">', false);
+    $response->assertSee('application-mobile-actions');
+    $response->assertDontSee('<optgroup label="Actions">', false);
     $response->assertSee('value="navigate|application|', false);
     $response->assertSee('value="navigate|configuration|', false);
     $response->assertSee('window.Livewire?.navigate ? window.Livewire.navigate(url) : window.location.href = url', false);
-    $response->assertSee('value="action:force-deploy"', false);
     $response->assertSee('application-mobile-stop-trigger');
     $response->assertSee('application-mobile-deploy-trigger');
     $response->assertSee('application-mobile-restart-trigger');

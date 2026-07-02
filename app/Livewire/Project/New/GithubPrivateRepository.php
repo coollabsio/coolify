@@ -7,6 +7,7 @@ use App\Models\GithubApp;
 use App\Models\Project;
 use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Livewire\Attributes\Locked;
@@ -14,6 +15,8 @@ use Livewire\Component;
 
 class GithubPrivateRepository extends Component
 {
+    use AuthorizesRequests;
+
     public $current_step = 'github_apps';
 
     public $github_apps;
@@ -169,6 +172,8 @@ class GithubPrivateRepository extends Component
     public function submit()
     {
         try {
+            $this->authorize('create', Application::class);
+
             // Validate git repository parts and branch
             $validator = validator([
                 'selected_repository_owner' => $this->selected_repository_owner,

@@ -72,7 +72,7 @@
                     @endif
                     <h4 class="pt-4">MCP Server</h4>
                     <div class="md:w-96">
-                        <x-forms.checkbox instantSave id="is_mcp_server_enabled" label="Enable MCP Server"
+                        <x-forms.checkbox instantSave id="is_mcp_server_enabled" label="Enable MCP Server Instance-wide"
                             helper="Exposes a Streamable HTTP Model Context Protocol endpoint at /mcp for AI clients (Claude Desktop, Cursor, etc.). Authenticates via Sanctum API tokens (Security > API Tokens). Requires API Access to be enabled." />
                     </div>
                     @if ($is_mcp_server_enabled)

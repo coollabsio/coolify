@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // SQLite (testing) uses type affinity, so json columns already accept text
+        // SQLite (testing) uses type affinity, so json columns already accept text.
         if (DB::connection()->getDriverName() !== 'pgsql') {
             return;
         }

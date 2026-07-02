@@ -30,7 +30,6 @@ use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 class ApplicationsController extends Controller
 {
@@ -57,6 +56,10 @@ class ApplicationsController extends Controller
                 'real_value',
                 'http_basic_auth_password',
             ]);
+        }
+
+        if ($application->is_shown_once ?? false) {
+            $application->makeHidden(['value', 'real_value']);
         }
 
         return serializeApiResponse($application);
@@ -1193,7 +1196,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2;
+                $deployment_uuid = new_public_id();
 
                 $result = queue_application_deployment(
                     application: $application,
@@ -1432,7 +1435,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2;
+                $deployment_uuid = new_public_id();
 
                 $result = queue_application_deployment(
                     application: $application,
@@ -1641,7 +1644,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2;
+                $deployment_uuid = new_public_id();
 
                 $result = queue_application_deployment(
                     application: $application,
@@ -1687,7 +1690,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'dockerfile-'.new Cuid2);
+                $request->offsetSet('name', 'dockerfile-'.new_public_id());
             }
 
             $return = $this->validateDataApplications($request, $server);
@@ -1761,7 +1764,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2;
+                $deployment_uuid = new_public_id();
 
                 $result = queue_application_deployment(
                     application: $application,
@@ -1805,7 +1808,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'docker-image-'.new Cuid2);
+                $request->offsetSet('name', 'docker-image-'.new_public_id());
             }
             $return = $this->validateDataApplications($request, $server);
             if ($return instanceof JsonResponse) {
@@ -1880,7 +1883,7 @@ class ApplicationsController extends Controller
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2;
+                $deployment_uuid = new_public_id();
 
                 $result = queue_application_deployment(
                     application: $application,
@@ -2678,7 +2681,7 @@ class ApplicationsController extends Controller
         ]);
 
         if ($instantDeploy) {
-            $deployment_uuid = new Cuid2;
+            $deployment_uuid = new_public_id();
 
             $result = queue_application_deployment(
                 application: $application,
@@ -2873,8 +2876,12 @@ class ApplicationsController extends Controller
 
         $this->authorize('manageEnvironment', $application);
 
+        if ($request->has('key')) {
+            $request->merge(['key' => ValidationPatterns::normalizeEnvironmentVariableKey((string) $request->key)]);
+        }
+
         $validator = customApiValidator($request->all(), [
-            'key' => 'string|required',
+            'key' => ValidationPatterns::environmentVariableKeyRules(),
             'value' => 'string|nullable',
             'is_preview' => 'boolean',
             'is_literal' => 'boolean',
@@ -3097,12 +3104,18 @@ class ApplicationsController extends Controller
             ], 400);
         }
         $bulk_data = collect($bulk_data)->map(function ($item) {
-            return collect($item)->only(['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment']);
+            $item = collect($item)->only(['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment']);
+
+            if ($item->has('key')) {
+                $item->put('key', ValidationPatterns::normalizeEnvironmentVariableKey((string) $item->get('key')));
+            }
+
+            return $item;
         });
         $returnedEnvs = collect();
         foreach ($bulk_data as $item) {
             $validator = customApiValidator($item, [
-                'key' => 'string|required',
+                'key' => ValidationPatterns::environmentVariableKeyRules(),
                 'value' => 'string|nullable',
                 'is_preview' => 'boolean',
                 'is_literal' => 'boolean',
@@ -3299,8 +3312,12 @@ class ApplicationsController extends Controller
 
         $this->authorize('manageEnvironment', $application);
 
+        if ($request->has('key')) {
+            $request->merge(['key' => ValidationPatterns::normalizeEnvironmentVariableKey((string) $request->key)]);
+        }
+
         $validator = customApiValidator($request->all(), [
-            'key' => 'string|required',
+            'key' => ValidationPatterns::environmentVariableKeyRules(),
             'value' => 'string|nullable',
             'is_preview' => 'boolean',
             'is_literal' => 'boolean',
@@ -3585,7 +3602,7 @@ class ApplicationsController extends Controller
 
         $this->authorize('deploy', $application);
 
-        $deployment_uuid = new Cuid2;
+        $deployment_uuid = new_public_id();
 
         $result = queue_application_deployment(
             application: $application,
@@ -3783,7 +3800,7 @@ class ApplicationsController extends Controller
 
         $this->authorize('deploy', $application);
 
-        $deployment_uuid = new Cuid2;
+        $deployment_uuid = new_public_id();
 
         $result = queue_application_deployment(
             application: $application,
@@ -4262,10 +4279,11 @@ class ApplicationsController extends Controller
             'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
             'is_directory' => 'boolean',
+            'is_host_file' => 'boolean',
             'fs_path' => 'string',
         ]);
 
-        $allAllowedFields = ['type', 'name', 'mount_path', 'host_path', 'content', 'is_directory', 'fs_path'];
+        $allAllowedFields = ['type', 'name', 'mount_path', 'host_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -4289,7 +4307,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
 
-            $typeSpecificInvalidFields = array_intersect(['content', 'is_directory', 'fs_path'], array_keys($request->all()));
+            $typeSpecificInvalidFields = array_intersect(['content', 'is_directory', 'is_host_file', 'fs_path'], array_keys($request->all()));
             if (! empty($typeSpecificInvalidFields)) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -4320,6 +4338,14 @@ class ApplicationsController extends Controller
         }
 
         $isDirectory = $request->boolean('is_directory', false);
+        $isHostFile = $request->boolean('is_host_file', false);
+
+        if ($isDirectory && $isHostFile) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['is_host_file' => 'Host file mounts cannot also be directory mounts.'],
+            ], 422);
+        }
 
         if ($isDirectory) {
             if (! $request->fs_path) {
@@ -4342,12 +4368,50 @@ class ApplicationsController extends Controller
                 'resource_id' => $application->id,
                 'resource_type' => get_class($application),
             ]);
+        } elseif ($isHostFile) {
+            if (! $request->fs_path) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['fs_path' => 'The fs_path field is required for host file mounts.'],
+                ], 422);
+            }
+
+            if ($request->filled('content')) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['content' => 'Content is not valid for host file mounts.'],
+                ], 422);
+            }
+
+            try {
+                $fsPath = validateHostFileMountPath($request->fs_path, 'host file source path');
+                $mountPath = validateFileMountPath($request->mount_path, 'host file destination path');
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['mount_path' => $e->getMessage()],
+                ], 422);
+            }
+
+            $storage = LocalFileVolume::create([
+                'fs_path' => $fsPath,
+                'mount_path' => $mountPath,
+                'content' => null,
+                'is_directory' => false,
+                'is_host_file' => true,
+                'resource_id' => $application->id,
+                'resource_type' => get_class($application),
+            ]);
         } else {
-            $mountPath = str($request->mount_path)->trim()->start('/')->value();
-
-            validateShellSafePath($mountPath, 'file storage path');
-
-            $fsPath = application_configuration_dir().'/'.$application->uuid.$mountPath;
+            try {
+                $mountPath = validateFileMountPath($request->mount_path, 'file storage path');
+                $fsPath = confineFileMountPath(application_configuration_dir().'/'.$application->uuid, $mountPath, 'file storage path');
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['mount_path' => $e->getMessage()],
+                ], 422);
+            }
 
             $storage = LocalFileVolume::create([
                 'fs_path' => $fsPath,

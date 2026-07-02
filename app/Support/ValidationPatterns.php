@@ -94,10 +94,19 @@ class ValidationPatterns
     public const DOCKER_NETWORK_PATTERN = '/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/';
 
     /**
-     * Pattern for Docker-compatible environment variable keys.
-     * Docker environment entries are KEY=value strings, so keys must be non-empty and cannot contain '=' or NUL.
+     * Pattern for S3 bucket names.
+     *
+     * Bucket names must be 3-63 lowercase characters, start and end with a
+     * letter or digit, and contain only lowercase letters, digits, dots, and
+     * hyphens. Additional semantic checks live in isValidS3BucketName().
      */
-    public const ENVIRONMENT_VARIABLE_KEY_PATTERN = '/\A[^=\x00]+\z/u';
+    public const S3_BUCKET_NAME_PATTERN = '/\A(?=.{3,63}\z)[a-z0-9][a-z0-9.-]*[a-z0-9]\z/';
+
+    /**
+     * Pattern for Docker-compatible environment variable keys.
+     * Environment variable keys are later interpolated into shell commands as Docker build args, so only shell-safe identifier characters are allowed.
+     */
+    public const ENVIRONMENT_VARIABLE_KEY_PATTERN = '/\A[A-Za-z_][A-Za-z0-9_.]*\z/u';
 
     /**
      * Pattern for SQL-safe unquoted database identifiers (usernames, database names).
@@ -164,7 +173,7 @@ class ValidationPatterns
     public static function environmentVariableKeyMessages(string $field = 'key', string $label = 'key'): array
     {
         return [
-            "{$field}.regex" => "The {$label} must be a non-empty Docker-compatible environment variable key and cannot contain '=' or NUL characters.",
+            "{$field}.regex" => "The {$label} must start with a letter or underscore and may only contain letters, numbers, underscores, and dots.",
             "{$field}.max" => "The {$label} may not be greater than :max characters.",
         ];
     }
@@ -175,6 +184,22 @@ class ValidationPatterns
     public static function isValidEnvironmentVariableKey(string $value): bool
     {
         return preg_match(self::ENVIRONMENT_VARIABLE_KEY_PATTERN, $value) === 1;
+    }
+
+    /**
+     * Check if a string is a valid S3 bucket name.
+     */
+    public static function isValidS3BucketName(string $value): bool
+    {
+        if (preg_match(self::S3_BUCKET_NAME_PATTERN, $value) !== 1) {
+            return false;
+        }
+
+        if (str_contains($value, '..') || str_contains($value, '.-') || str_contains($value, '-.')) {
+            return false;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false;
     }
 
     /**

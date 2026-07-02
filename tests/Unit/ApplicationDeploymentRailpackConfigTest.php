@@ -3,6 +3,8 @@
 use App\Exceptions\DeploymentException;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
+use App\Models\ApplicationSetting;
+use App\Models\EnvironmentVariable;
 use Illuminate\Support\Collection;
 use Tests\TestCase;
 
@@ -236,14 +238,85 @@ it('builds railpack docker command with matching env and secret flags for all ra
         ],
     );
 
+    // Build-time variables are interpolated by sourcing the build-time .env file before
+    // the build, so user/Coolify variables must NOT be forwarded inline as literals.
+    expect($command)->toContain('set -a && source /artifacts/build-time.env && set +a');
     expect($command)->toContain("env 'RAILPACK_NODE_VERSION=22'");
     expect($command)->toContain("'RAILPACK_INSTALL_CMD=npm ci && npm run postinstall'");
     expect($command)->toContain("'RAILPACK_DEPLOY_APT_PACKAGES=curl wget'");
-    expect($command)->toContain("'SECRET_JSON={\"token\":\"abc\"}'");
+    // SECRET_JSON is not a buildpack control variable, so it is provided via the sourced
+    // build-time .env file (which supports $VAR interpolation) rather than inline `env`.
+    expect($command)->not->toContain("'SECRET_JSON={\"token\":\"abc\"}'");
     expect($command)->toContain("--secret 'id=RAILPACK_NODE_VERSION,env=RAILPACK_NODE_VERSION'");
     expect($command)->toContain("--secret 'id=RAILPACK_INSTALL_CMD,env=RAILPACK_INSTALL_CMD'");
     expect($command)->toContain("--secret 'id=RAILPACK_DEPLOY_APT_PACKAGES,env=RAILPACK_DEPLOY_APT_PACKAGES'");
     expect($command)->toContain("--secret 'id=SECRET_JSON,env=SECRET_JSON'");
     expect($command)->toContain(' --build-arg secrets-hash=');
     expect($command)->toContain('--build-arg BUILDKIT_SYNTAX="ghcr.io/railwayapp/railpack-frontend:v'.config('constants.coolify.railpack_version').'"');
+});
+
+it('interpolates build-time variable references for railpack by sourcing the build-time env file', function () {
+    [$job, $reflection] = makeRailpackDeploymentJob([
+        'uuid' => 'application-uuid',
+    ]);
+
+    // Mirrors the issue: BETTER_AUTH_URL=$COOLIFY_URL must be interpolated at build time.
+    $command = invokeRailpackMethod(
+        $job,
+        $reflection,
+        'railpack_build_command',
+        [
+            'coollabsio/coolify:test',
+            collect([
+                'BETTER_AUTH_URL' => '$COOLIFY_URL',
+                'COOLIFY_URL' => 'https://sapere-10.bobman.dev',
+            ]),
+        ],
+    );
+
+    // The literal `$COOLIFY_URL` must NOT be forwarded inline; it is resolved by the shell
+    // after sourcing the build-time .env file, then read through the build secret.
+    expect($command)->toContain('set -a && source /artifacts/build-time.env && set +a');
+    expect($command)->not->toContain("'BETTER_AUTH_URL=\$COOLIFY_URL'");
+    expect($command)->not->toContain("env 'BETTER_AUTH_URL");
+    expect($command)->toContain("--secret 'id=BETTER_AUTH_URL,env=BETTER_AUTH_URL'");
+    expect($command)->toContain("--secret 'id=COOLIFY_URL,env=COOLIFY_URL'");
+});
+
+it('creates an empty build-time env file for railpack when there are no generated build-time variables', function () {
+    [$job, $reflection] = makeRailpackDeploymentJob([
+        'build_pack' => 'railpack',
+        'compose_parsing_version' => '3',
+    ]);
+
+    $applicationProperty = $reflection->getProperty('application');
+    $applicationProperty->setAccessible(true);
+    $application = $applicationProperty->getValue($job);
+    $application->setRelation('settings', new ApplicationSetting([
+        'include_source_commit_in_build' => false,
+        'is_env_sorting_enabled' => false,
+    ]));
+    $application->setRelation('environment_variables', collect([
+        new EnvironmentVariable(['key' => 'COOLIFY_FQDN']),
+        new EnvironmentVariable(['key' => 'COOLIFY_URL']),
+        new EnvironmentVariable(['key' => 'COOLIFY_BRANCH']),
+        new EnvironmentVariable(['key' => 'COOLIFY_RESOURCE_UUID']),
+    ]));
+
+    foreach ([
+        'application_deployment_queue' => new class
+        {
+            public function addLogEntry(string $message, string $type = 'info', bool $hidden = false): void {}
+        },
+        'build_pack' => 'railpack',
+        'pull_request_id' => 0,
+    ] as $property => $value) {
+        $reflectionProperty = $reflection->getProperty($property);
+        $reflectionProperty->setAccessible(true);
+        $reflectionProperty->setValue($job, $value);
+    }
+
+    invokeRailpackMethod($job, $reflection, 'save_buildtime_environment_variables');
+
+    expect(collect($job->recordedCommands)->flatten()->implode(' '))->toContain('touch /artifacts/build-time.env');
 });

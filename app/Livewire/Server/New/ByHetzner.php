@@ -79,14 +79,18 @@ class ByHetzner extends Component
 
     public function mount()
     {
-        $this->authorize('viewAny', CloudProviderToken::class);
-        $this->loadTokens();
-        $this->loadSavedCloudInitScripts();
-        $this->server_name = generate_random_name();
-        $this->private_keys = PrivateKey::ownedAndOnlySShKeys()->where('id', '!=', 0)->get();
+        try {
+            $this->authorize('viewAny', CloudProviderToken::class);
+            $this->loadTokens();
+            $this->loadSavedCloudInitScripts();
+            $this->server_name = generate_random_name();
+            $this->private_keys = PrivateKey::ownedAndOnlySShKeys()->where('id', '!=', 0)->get();
 
-        if ($this->private_keys->count() > 0) {
-            $this->private_key_id = $this->private_keys->first()->id;
+            if ($this->private_keys->count() > 0) {
+                $this->private_key_id = $this->private_keys->first()->id;
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 
