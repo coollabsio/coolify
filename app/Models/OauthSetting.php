@@ -11,13 +11,14 @@ class OauthSetting extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['provider', 'client_id', 'client_secret', 'redirect_uri', 'tenant', 'base_url', 'enabled', 'custom_label', 'scopes', 'allow_registration', 'require_email_verified', 'use_pkce', 'clock_skew_seconds'];
+    protected $fillable = ['provider', 'client_id', 'client_secret', 'redirect_uri', 'tenant', 'base_url', 'enabled', 'custom_label', 'scopes', 'allow_registration', 'auto_join_root_team', 'require_email_verified', 'use_pkce', 'clock_skew_seconds'];
 
     protected function casts(): array
     {
         return [
             'enabled' => 'boolean',
             'allow_registration' => 'boolean',
+            'auto_join_root_team' => 'boolean',
             'require_email_verified' => 'boolean',
             'use_pkce' => 'boolean',
             'clock_skew_seconds' => 'integer',

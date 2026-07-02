@@ -44,7 +44,7 @@ class OauthLoginService
             throw new HttpException(403, 'Registration is disabled');
         }
 
-        return $this->createUser($oauthUser->name ?: $email, $email);
+        return $this->createUser($oauthUser->name ?: $email, $email, $oauthSetting);
     }
 
     private function resolveOidcUser(object $oauthUser, OauthSetting $oauthSetting, string $email): User
@@ -100,7 +100,7 @@ class OauthLoginService
                     throw new HttpException(403, 'Registration is disabled');
                 }
 
-                $user = $this->createUser($oauthUser->name ?: $email, $email);
+                $user = $this->createUser($oauthUser->name ?: $email, $email, $oauthSetting);
             }
 
             OauthIdentity::create([
@@ -122,7 +122,7 @@ class OauthLoginService
         return instanceSettings()->is_registration_enabled || $oauthSetting->allow_registration;
     }
 
-    private function createUser(string $name, string $email): User
+    private function createUser(string $name, string $email, OauthSetting $oauthSetting): User
     {
         if (User::count() === 0) {
             $user = (new User)->forceFill([
@@ -143,10 +143,34 @@ class OauthLoginService
             return $user;
         }
 
+        if ($oauthSetting->auto_join_root_team) {
+            return $this->createRootTeamOnlyUser($name, $email);
+        }
+
         return User::create([
             'name' => $name,
             'email' => $email,
             'password' => Hash::make(Str::random(64)),
         ]);
+    }
+
+    private function createRootTeamOnlyUser(string $name, string $email): User
+    {
+        return DB::transaction(function () use ($name, $email) {
+            $rootTeam = Team::find(0);
+            if ($rootTeam === null) {
+                throw new HttpException(403, 'Root team is not available for OAuth user provisioning');
+            }
+
+            $user = User::withoutEvents(fn () => User::create([
+                'name' => $name,
+                'email' => $email,
+                'password' => Hash::make(Str::random(64)),
+            ]));
+
+            $user->teams()->attach($rootTeam, ['role' => 'member']);
+
+            return $user;
+        });
     }
 }

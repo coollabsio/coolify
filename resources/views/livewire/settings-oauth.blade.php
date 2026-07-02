@@ -136,6 +136,14 @@
                                     </div>
                                 </div>
                             @endif
+                            <div class="flex flex-col gap-2 pt-2">
+                                <div class="md:w-96">
+                                    <x-forms.checkbox canGate="update" :canResource="$settings"
+                                        id="oauth_settings_map.{{ $oauth_setting['provider'] }}.auto_join_root_team"
+                                        label="Auto-join new users to Root team"
+                                        helper="When enabled, newly-created OAuth users are added to the Root team as members and no personal team is created for them." />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 @endif

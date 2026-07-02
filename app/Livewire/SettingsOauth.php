@@ -42,6 +42,7 @@ class SettingsOauth extends Component
             $carry["oauth_settings_map.$setting->provider.custom_label"] = 'nullable|string|max:255';
             $carry["oauth_settings_map.$setting->provider.scopes"] = 'nullable|string|max:1000';
             $carry["oauth_settings_map.$setting->provider.allow_registration"] = 'boolean';
+            $carry["oauth_settings_map.$setting->provider.auto_join_root_team"] = 'boolean';
             $carry["oauth_settings_map.$setting->provider.require_email_verified"] = 'boolean';
             $carry["oauth_settings_map.$setting->provider.use_pkce"] = 'boolean';
             $carry["oauth_settings_map.$setting->provider.clock_skew_seconds"] = 'nullable|integer|min:0|max:600';
@@ -148,6 +149,7 @@ class SettingsOauth extends Component
             'custom_label' => $data['custom_label'] ?? null,
             'scopes' => $data['scopes'] ?? null,
             'allow_registration' => (bool) ($data['allow_registration'] ?? false),
+            'auto_join_root_team' => (bool) ($data['auto_join_root_team'] ?? false),
             'require_email_verified' => (bool) ($data['require_email_verified'] ?? true),
             'use_pkce' => (bool) ($data['use_pkce'] ?? true),
             'clock_skew_seconds' => (int) ($data['clock_skew_seconds'] ?? 60),
@@ -196,6 +198,7 @@ class SettingsOauth extends Component
             'custom_label' => $setting->custom_label,
             'scopes' => $setting->scopes ?: 'openid email profile',
             'allow_registration' => $setting->allow_registration,
+            'auto_join_root_team' => $setting->auto_join_root_team,
             'require_email_verified' => $setting->require_email_verified ?? true,
             'use_pkce' => $setting->use_pkce ?? true,
             'clock_skew_seconds' => $setting->clock_skew_seconds ?? 60,

@@ -93,6 +93,40 @@ it('creates a new oidc user when provider registration is allowed while normal r
     ]);
 });
 
+it('creates a new oidc user in the root team only when provider root auto-join is enabled', function () {
+    Team::forceCreate(['id' => 0, 'name' => 'Root Team', 'personal_team' => true]);
+    (new User)->forceFill([
+        'id' => 0,
+        'name' => 'Root User',
+        'email' => 'root@example.com',
+        'password' => 'password',
+    ])->save();
+
+    OauthSetting::where('provider', 'oidc')->update([
+        'allow_registration' => true,
+        'auto_join_root_team' => true,
+    ]);
+
+    fakeOidcProvider(['email' => 'root-member@example.com', 'name' => 'Root Member']);
+
+    $response = $this->get(route('auth.callback', 'oidc'));
+
+    $response->assertRedirect('/');
+    $user = User::whereEmail('root-member@example.com')->first();
+    expect($user)->not->toBeNull()
+        ->and($user->teams()->count())->toBe(1);
+
+    $rootMembership = $user->teams()->where('teams.id', 0)->first();
+    expect($rootMembership)->not->toBeNull()
+        ->and($rootMembership->pivot->role)->toBe('member');
+
+    $this->assertDatabaseMissing('teams', [
+        'name' => "Root Member's Team",
+    ]);
+    expect(session('currentTeam')->id)->toBe(0);
+    $this->assertAuthenticatedAs($user);
+});
+
 it('rejects linking an unverified oidc email to an existing local account', function () {
     $user = User::factory()->create(['email' => 'victim@example.com']);
 

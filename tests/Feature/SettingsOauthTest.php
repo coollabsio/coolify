@@ -26,6 +26,9 @@ function actingAsInstanceAdmin(): User
 }
 
 beforeEach(function () {
+    $this->withoutVite();
+    config()->set('app.maintenance.driver', 'file');
+
     InstanceSettings::forceCreate(['id' => 0, 'is_registration_enabled' => true]);
     Once::flush();
     OauthSetting::create(['provider' => 'oidc']);
@@ -124,7 +127,8 @@ it('defaults oidc user creation and verified email requirement to enabled', func
     $setting = OauthSetting::where('provider', 'oidc')->first();
 
     expect($setting->allow_registration)->toBeTrue()
-        ->and($setting->require_email_verified)->toBeTrue();
+        ->and($setting->require_email_verified)->toBeTrue()
+        ->and($setting->auto_join_root_team)->toBeFalse();
 });
 
 it('persists oidc oauth settings from livewire', function () {
@@ -139,6 +143,7 @@ it('persists oidc oauth settings from livewire', function () {
         ->set('oauth_settings_map.oidc.scopes', 'openid email profile groups')
         ->set('oauth_settings_map.oidc.custom_label', 'Login with Okta')
         ->set('oauth_settings_map.oidc.allow_registration', true)
+        ->set('oauth_settings_map.oidc.auto_join_root_team', true)
         ->set('oauth_settings_map.oidc.require_email_verified', true)
         ->set('disable_registration_when_oauth_enabled', true)
         ->call('submit')
@@ -150,7 +155,8 @@ it('persists oidc oauth settings from livewire', function () {
         ->and($setting->base_url)->toBe('https://idp.example.com')
         ->and($setting->custom_label)->toBe('Login with Okta')
         ->and($setting->scopeList())->toBe(['openid', 'email', 'profile', 'groups'])
-        ->and($setting->allow_registration)->toBeTrue();
+        ->and($setting->allow_registration)->toBeTrue()
+        ->and($setting->auto_join_root_team)->toBeTrue();
 
     expect(instanceSettings()->fresh()->disable_registration_when_oauth_enabled)->toBeTrue();
 });
