@@ -219,6 +219,11 @@ A: Yes, but keep in mind a PR closure is feedback, not a rejection of your effor
 ## Local Development
 To build and run Coolify locally, see: [Development](./DEVELOPMENT.md)
 
+### macOS Development with Lima
+Mac users can use [Lima](https://lima-vm.io/) to run a lightweight Linux virtual machine for local Coolify development. This is useful if you prefer a Linux-based Docker environment on macOS.
+
+After creating and starting a Lima VM, run the normal local development commands from inside the VM as described in [Development](./DEVELOPMENT.md).
+
 ## Adding a New Service
 To add a new one-click service, follow: https://coolify.io/docs/get-started/contribute/service
 
