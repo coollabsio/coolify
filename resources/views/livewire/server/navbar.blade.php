@@ -15,7 +15,10 @@
     <div class="flex flex-col gap-1.5">
         <div class="flex flex-wrap items-center gap-2">
             <h1>Server</h1>
-            @if ($server->proxySet() || $server->isSentinelEnabled())
+            @php
+                $showSentinelStatus = $server->isFunctional() && $server->isSentinelEnabled();
+            @endphp
+            @if ($server->proxySet() || $showSentinelStatus)
                 <div data-testid="server-status-summary" class="flex flex-wrap items-center gap-2">
                     @if ($server->proxySet())
                         <div class="flex items-center gap-1">
@@ -38,7 +41,7 @@
                                 type="warning" />
                         </div>
                     @endif
-                    @if ($server->isSentinelEnabled())
+                    @if ($showSentinelStatus)
                         @if ($server->isSentinelLive())
                             <x-status-badge label="Sentinel" status="In sync" type="success" />
                         @else

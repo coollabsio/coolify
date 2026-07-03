@@ -17,6 +17,7 @@ use Database\Seeders\StandaloneDockerSeeder;
 use Database\Seeders\TeamSeeder;
 use Database\Seeders\UserSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 
 uses(RefreshDatabase::class);
 
@@ -33,6 +34,11 @@ function seedRailpackExamplePrerequisites(): void
     ]);
 }
 
+function limaServers(): Collection
+{
+    return collect(DevelopmentRailpackExamplesSeeder::LIMA_SERVERS);
+}
+
 it('can seed the railpack examples directly on a clean development database', function () {
     config()->set('app.env', 'local');
 
@@ -44,14 +50,51 @@ it('can seed the railpack examples directly on a clean development database', fu
     expect(StandaloneDocker::query()->find(0))->not->toBeNull();
     expect(GithubApp::query()->find(0))->not->toBeNull();
     expect(GitlabApp::query()->find(1))->not->toBeNull();
-    expect(Project::query()->where('uuid', DevelopmentRailpackExamplesSeeder::PROJECT_UUID)->exists())->toBeTrue();
-    expect(Application::query()->count())->toBe(count(DevelopmentRailpackExamplesSeeder::examples()));
+    expect(Application::query()->count())->toBe(count(DevelopmentRailpackExamplesSeeder::examples()) * limaServers()->count());
+
+    $project = Project::query()
+        ->where('uuid', DevelopmentRailpackExamplesSeeder::PROJECT_UUID)
+        ->first();
+
+    expect($project)
+        ->not->toBeNull()
+        ->and($project->environments)->toHaveCount(limaServers()->count());
+
+    foreach (limaServers() as $limaServer) {
+        $server = Server::query()->where('uuid', $limaServer['server_uuid'])->first();
+
+        expect($server)->not->toBeNull();
+        expect($server->settings->sentinel_custom_url)->toBe('http://host.lima.internal:8000');
+        expect(StandaloneDocker::query()->whereRelation('server', 'uuid', $limaServer['server_uuid'])->exists())->toBeTrue();
+        expect($project->environments()->where('uuid', $limaServer['environment_uuid'])->exists())->toBeTrue();
+    }
 });
 
 it('seeds the railpack examples in development mode', function () {
     config()->set('app.env', 'local');
 
     seedRailpackExamplePrerequisites();
+    $legacyProject = Project::query()->create([
+        'uuid' => 'railpack-examples-lima-ubuntu-2404',
+        'name' => 'Railpack Examples - lima-ubuntu-2404',
+        'description' => 'Legacy generated Railpack examples project',
+        'team_id' => 0,
+    ]);
+    Application::query()->create([
+        'uuid' => 'lima-ubuntu-2404-railpack-nextjs-ssr',
+        'name' => 'Legacy Railpack Next.js SSR Example',
+        'repository_project_id' => DevelopmentRailpackExamplesSeeder::REPOSITORY_PROJECT_ID,
+        'git_repository' => DevelopmentRailpackExamplesSeeder::GIT_REPOSITORY,
+        'git_branch' => DevelopmentRailpackExamplesSeeder::GIT_BRANCH,
+        'build_pack' => 'railpack',
+        'ports_exposes' => '3000',
+        'environment_id' => $legacyProject->environments()->first()->id,
+        'destination_id' => 0,
+        'destination_type' => StandaloneDocker::class,
+        'source_id' => 0,
+        'source_type' => GithubApp::class,
+    ]);
+
     $this->seed(DevelopmentRailpackExamplesSeeder::class);
 
     $project = Project::query()
@@ -61,30 +104,58 @@ it('seeds the railpack examples in development mode', function () {
     expect($project)
         ->not->toBeNull()
         ->and($project->name)->toBe('Railpack Examples')
-        ->and($project->environments)->toHaveCount(1)
-        ->and($project->environments->first()->uuid)->toBe(DevelopmentRailpackExamplesSeeder::ENVIRONMENT_UUID);
+        ->and($project->environments)->toHaveCount(limaServers()->count());
+    expect(Project::query()->pluck('uuid')->sort()->values()->all())->toBe([
+        'project',
+        DevelopmentRailpackExamplesSeeder::PROJECT_UUID,
+    ]);
+    expect(Application::query()->where('uuid', 'lima-ubuntu-2404-railpack-nextjs-ssr')->exists())->toBeFalse();
 
     $applications = $project->applications()->with('settings')->orderBy('uuid')->get();
 
-    expect($applications)->toHaveCount(count(DevelopmentRailpackExamplesSeeder::examples()));
+    expect($applications)->toHaveCount(count(DevelopmentRailpackExamplesSeeder::examples()) * limaServers()->count());
     expect($applications->every(fn (Application $application) => $application->build_pack === 'railpack'))->toBeTrue();
+
     $examples = collect(DevelopmentRailpackExamplesSeeder::examples())->keyBy('uuid');
     expect($applications->every(
-        fn (Application $application) => $application->git_repository === ($examples->get($application->uuid)['git_repository'] ?? DevelopmentRailpackExamplesSeeder::GIT_REPOSITORY)
+        fn (Application $application) => $application->git_repository === ($examples->get(str($application->uuid)->after('-')->value())['git_repository'] ?? DevelopmentRailpackExamplesSeeder::GIT_REPOSITORY)
     ))->toBeTrue();
     expect($applications->every(
-        fn (Application $application) => $application->git_branch === ($examples->get($application->uuid)['git_branch'] ?? DevelopmentRailpackExamplesSeeder::GIT_BRANCH)
+        fn (Application $application) => $application->git_branch === ($examples->get(str($application->uuid)->after('-')->value())['git_branch'] ?? DevelopmentRailpackExamplesSeeder::GIT_BRANCH)
     ))->toBeTrue();
 
-    $nestjs = $applications->firstWhere('uuid', 'railpack-nestjs');
-    $angularStatic = $applications->firstWhere('uuid', 'railpack-angular-static');
-    $eleventyStatic = $applications->firstWhere('uuid', 'railpack-eleventy-static');
-    $pythonFlask = $applications->firstWhere('uuid', 'railpack-python-flask');
-    $goGin = $applications->firstWhere('uuid', 'railpack-go-gin');
-    $rust = $applications->firstWhere('uuid', 'railpack-rust');
-    $githubDeployKey = $applications->firstWhere('uuid', 'railpack-github-deploy-key');
-    $gitlabDeployKey = $applications->firstWhere('uuid', 'railpack-gitlab-deploy-key');
-    $gitlabPublic = $applications->firstWhere('uuid', 'railpack-gitlab-public-example');
+    foreach (limaServers() as $limaServer) {
+        $limaEnvironment = $project->environments()
+            ->where('uuid', $limaServer['environment_uuid'])
+            ->first();
+
+        expect($limaEnvironment)
+            ->not->toBeNull()
+            ->and($limaEnvironment->name)->toBe($limaServer['environment_name']);
+
+        $limaApplications = $limaEnvironment->applications()->with('settings', 'destination.server')->orderBy('uuid')->get();
+
+        expect($limaApplications)->toHaveCount(count(DevelopmentRailpackExamplesSeeder::examples()));
+        expect($limaApplications->every(fn (Application $application) => $application->build_pack === 'railpack'))->toBeTrue();
+        expect($limaApplications->every(fn (Application $application) => str($application->uuid)->startsWith($limaServer['uuid_prefix'])))->toBeTrue();
+        expect($limaApplications->every(fn (Application $application) => $application->destination->server->uuid === $limaServer['server_uuid']))->toBeTrue();
+        expect($limaApplications->every(
+            fn (Application $application) => $application->git_repository === ($examples->get(str($application->uuid)->after($limaServer['uuid_prefix'])->value())['git_repository'] ?? DevelopmentRailpackExamplesSeeder::GIT_REPOSITORY)
+        ))->toBeTrue();
+        expect($limaApplications->every(
+            fn (Application $application) => $application->git_branch === ($examples->get(str($application->uuid)->after($limaServer['uuid_prefix'])->value())['git_branch'] ?? DevelopmentRailpackExamplesSeeder::GIT_BRANCH)
+        ))->toBeTrue();
+    }
+
+    $nestjs = $applications->firstWhere('uuid', 'ubuntu24-railpack-nestjs');
+    $angularStatic = $applications->firstWhere('uuid', 'ubuntu24-railpack-angular-static');
+    $eleventyStatic = $applications->firstWhere('uuid', 'ubuntu24-railpack-eleventy-static');
+    $pythonFlask = $applications->firstWhere('uuid', 'ubuntu24-railpack-python-flask');
+    $goGin = $applications->firstWhere('uuid', 'ubuntu24-railpack-go-gin');
+    $rust = $applications->firstWhere('uuid', 'ubuntu24-railpack-rust');
+    $githubDeployKey = $applications->firstWhere('uuid', 'ubuntu24-railpack-github-deploy-key');
+    $gitlabDeployKey = $applications->firstWhere('uuid', 'ubuntu24-railpack-gitlab-deploy-key');
+    $gitlabPublic = $applications->firstWhere('uuid', 'ubuntu24-railpack-gitlab-public-example');
 
     expect($nestjs)
         ->not->toBeNull()
@@ -156,6 +227,12 @@ it('skips the railpack examples outside development mode', function () {
 
     expect(Project::query()->where('uuid', DevelopmentRailpackExamplesSeeder::PROJECT_UUID)->exists())->toBeFalse();
     expect(Application::query()->where('uuid', 'railpack-nextjs-ssr')->exists())->toBeFalse();
+
+    foreach (limaServers() as $limaServer) {
+        expect(Project::query()->where('uuid', 'railpack-examples-lima-ubuntu-2404')->exists())->toBeFalse();
+        expect(Project::query()->where('uuid', 'railpack-examples-lima-ubuntu-2604')->exists())->toBeFalse();
+        expect(Application::query()->where('uuid', $limaServer['uuid_prefix'].'railpack-nextjs-ssr')->exists())->toBeFalse();
+    }
 });
 
 it('is idempotent when run multiple times', function () {
@@ -170,5 +247,14 @@ it('is idempotent when run multiple times', function () {
         ->first();
 
     expect($project)->not->toBeNull();
-    expect($project->applications()->count())->toBe(count(DevelopmentRailpackExamplesSeeder::examples()));
+    expect($project->applications()->count())->toBe(count(DevelopmentRailpackExamplesSeeder::examples()) * limaServers()->count());
+
+    foreach (limaServers() as $limaServer) {
+        $limaEnvironment = $project->environments()
+            ->where('uuid', $limaServer['environment_uuid'])
+            ->first();
+
+        expect($limaEnvironment)->not->toBeNull();
+        expect($limaEnvironment->applications()->count())->toBe(count(DevelopmentRailpackExamplesSeeder::examples()));
+    }
 });
