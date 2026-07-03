@@ -14,6 +14,23 @@ use Illuminate\Support\Facades\Bus;
 
 uses(RefreshDatabase::class);
 
+const TWO_FILE_COMPOSE = <<<'YAML'
+services:
+  app:
+    image: nginx:latest
+    volumes:
+      - ./wg_config.conf:/app/ps/wg0.conf
+      - ./override_trays.json:/app/ps/override_tray.json
+YAML;
+
+const DATA_DIR_COMPOSE = <<<'YAML'
+services:
+  app:
+    image: nginx:latest
+    volumes:
+      - ./data:/app/data
+YAML;
+
 beforeEach(function () {
     Bus::fake();
 
@@ -27,39 +44,56 @@ beforeEach(function () {
     $this->environment = $environment;
 });
 
-it('preserves existing application file volume content when reparsing compose bind mounts', function () {
-    $application = Application::factory()->create([
-        'environment_id' => $this->environment->id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => $this->destination->getMorphClass(),
+function makeComposeApplication(string $dockerComposeRaw): Application
+{
+    return Application::factory()->create([
+        'environment_id' => test()->environment->id,
+        'destination_id' => test()->destination->id,
+        'destination_type' => test()->destination->getMorphClass(),
         'build_pack' => 'dockercompose',
-        'docker_compose_raw' => <<<'YAML'
-services:
-  app:
-    image: nginx:latest
-    volumes:
-      - ./wg_config.conf:/app/ps/wg0.conf
-      - ./override_trays.json:/app/ps/override_tray.json
-YAML,
+        'docker_compose_raw' => $dockerComposeRaw,
+    ]);
+}
+
+/**
+ * @return array{0: Service, 1: ServiceApplication}
+ */
+function makeComposeService(string $dockerComposeRaw): array
+{
+    $service = Service::factory()->create([
+        'environment_id' => test()->environment->id,
+        'server_id' => test()->destination->server_id,
+        'destination_id' => test()->destination->id,
+        'destination_type' => test()->destination->getMorphClass(),
+        'docker_compose_raw' => $dockerComposeRaw,
     ]);
 
-    LocalFileVolume::create([
-        'fs_path' => application_configuration_dir()."/{$application->uuid}/wg_config.conf",
-        'mount_path' => '/app/ps/wg0.conf',
-        'content' => 'test-conf',
-        'is_directory' => false,
-        'resource_id' => $application->id,
-        'resource_type' => $application->getMorphClass(),
+    $serviceApplication = ServiceApplication::create([
+        'name' => 'app',
+        'service_id' => $service->id,
     ]);
 
+    return [$service, $serviceApplication];
+}
+
+function seedFileVolume($resource, string $baseDir, string $fileName, string $mountPath, string $content): void
+{
     LocalFileVolume::create([
-        'fs_path' => application_configuration_dir()."/{$application->uuid}/override_trays.json",
-        'mount_path' => '/app/ps/override_tray.json',
-        'content' => '0',
+        'fs_path' => "{$baseDir}/{$fileName}",
+        'mount_path' => $mountPath,
+        'content' => $content,
         'is_directory' => false,
-        'resource_id' => $application->id,
-        'resource_type' => $application->getMorphClass(),
+        'resource_id' => $resource->id,
+        'resource_type' => $resource->getMorphClass(),
     ]);
+}
+
+it('preserves existing application file volume content when reparsing compose bind mounts', function () {
+    $application = makeComposeApplication(TWO_FILE_COMPOSE);
+    $baseDir = application_configuration_dir()."/{$application->uuid}";
+
+    seedFileVolume($application, $baseDir, 'wg_config.conf', '/app/ps/wg0.conf', 'test-conf');
+    seedFileVolume($application, $baseDir, 'override_trays.json', '/app/ps/override_tray.json', '0');
 
     applicationParser($application);
 
@@ -70,38 +104,11 @@ YAML,
 });
 
 it('keeps existing application file volumes as files when content is empty', function () {
-    $application = Application::factory()->create([
-        'environment_id' => $this->environment->id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => $this->destination->getMorphClass(),
-        'build_pack' => 'dockercompose',
-        'docker_compose_raw' => <<<'YAML'
-services:
-  app:
-    image: nginx:latest
-    volumes:
-      - ./wg_config.conf:/app/ps/wg0.conf
-      - ./override_trays.json:/app/ps/override_tray.json
-YAML,
-    ]);
+    $application = makeComposeApplication(TWO_FILE_COMPOSE);
+    $baseDir = application_configuration_dir()."/{$application->uuid}";
 
-    LocalFileVolume::create([
-        'fs_path' => application_configuration_dir()."/{$application->uuid}/wg_config.conf",
-        'mount_path' => '/app/ps/wg0.conf',
-        'content' => 'test-conf',
-        'is_directory' => false,
-        'resource_id' => $application->id,
-        'resource_type' => $application->getMorphClass(),
-    ]);
-
-    LocalFileVolume::create([
-        'fs_path' => application_configuration_dir()."/{$application->uuid}/override_trays.json",
-        'mount_path' => '/app/ps/override_tray.json',
-        'content' => '',
-        'is_directory' => false,
-        'resource_id' => $application->id,
-        'resource_type' => $application->getMorphClass(),
-    ]);
+    seedFileVolume($application, $baseDir, 'wg_config.conf', '/app/ps/wg0.conf', 'test-conf');
+    seedFileVolume($application, $baseDir, 'override_trays.json', '/app/ps/override_tray.json', '');
 
     applicationParser($application);
 
@@ -112,19 +119,7 @@ YAML,
 });
 
 it('defaults new application bind mounts to directories', function () {
-    $application = Application::factory()->create([
-        'environment_id' => $this->environment->id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => $this->destination->getMorphClass(),
-        'build_pack' => 'dockercompose',
-        'docker_compose_raw' => <<<'YAML'
-services:
-  app:
-    image: nginx:latest
-    volumes:
-      - ./data:/app/data
-YAML,
-    ]);
+    $application = makeComposeApplication(DATA_DIR_COMPOSE);
 
     applicationParser($application);
 
@@ -135,43 +130,11 @@ YAML,
 });
 
 it('preserves existing service file volume content when reparsing compose bind mounts', function () {
-    $service = Service::factory()->create([
-        'environment_id' => $this->environment->id,
-        'server_id' => $this->destination->server_id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => $this->destination->getMorphClass(),
-        'docker_compose_raw' => <<<'YAML'
-services:
-  app:
-    image: nginx:latest
-    volumes:
-      - ./wg_config.conf:/app/ps/wg0.conf
-      - ./override_trays.json:/app/ps/override_tray.json
-YAML,
-    ]);
+    [$service, $serviceApplication] = makeComposeService(TWO_FILE_COMPOSE);
+    $baseDir = service_configuration_dir()."/{$service->uuid}";
 
-    $serviceApplication = ServiceApplication::create([
-        'name' => 'app',
-        'service_id' => $service->id,
-    ]);
-
-    LocalFileVolume::create([
-        'fs_path' => service_configuration_dir()."/{$service->uuid}/wg_config.conf",
-        'mount_path' => '/app/ps/wg0.conf',
-        'content' => 'test-conf',
-        'is_directory' => false,
-        'resource_id' => $serviceApplication->id,
-        'resource_type' => $serviceApplication->getMorphClass(),
-    ]);
-
-    LocalFileVolume::create([
-        'fs_path' => service_configuration_dir()."/{$service->uuid}/override_trays.json",
-        'mount_path' => '/app/ps/override_tray.json',
-        'content' => '0',
-        'is_directory' => false,
-        'resource_id' => $serviceApplication->id,
-        'resource_type' => $serviceApplication->getMorphClass(),
-    ]);
+    seedFileVolume($serviceApplication, $baseDir, 'wg_config.conf', '/app/ps/wg0.conf', 'test-conf');
+    seedFileVolume($serviceApplication, $baseDir, 'override_trays.json', '/app/ps/override_tray.json', '0');
 
     serviceParser($service);
 
@@ -182,43 +145,11 @@ YAML,
 });
 
 it('keeps existing service file volumes as files when content is empty', function () {
-    $service = Service::factory()->create([
-        'environment_id' => $this->environment->id,
-        'server_id' => $this->destination->server_id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => $this->destination->getMorphClass(),
-        'docker_compose_raw' => <<<'YAML'
-services:
-  app:
-    image: nginx:latest
-    volumes:
-      - ./wg_config.conf:/app/ps/wg0.conf
-      - ./override_trays.json:/app/ps/override_tray.json
-YAML,
-    ]);
+    [$service, $serviceApplication] = makeComposeService(TWO_FILE_COMPOSE);
+    $baseDir = service_configuration_dir()."/{$service->uuid}";
 
-    $serviceApplication = ServiceApplication::create([
-        'name' => 'app',
-        'service_id' => $service->id,
-    ]);
-
-    LocalFileVolume::create([
-        'fs_path' => service_configuration_dir()."/{$service->uuid}/wg_config.conf",
-        'mount_path' => '/app/ps/wg0.conf',
-        'content' => 'test-conf',
-        'is_directory' => false,
-        'resource_id' => $serviceApplication->id,
-        'resource_type' => $serviceApplication->getMorphClass(),
-    ]);
-
-    LocalFileVolume::create([
-        'fs_path' => service_configuration_dir()."/{$service->uuid}/override_trays.json",
-        'mount_path' => '/app/ps/override_tray.json',
-        'content' => '',
-        'is_directory' => false,
-        'resource_id' => $serviceApplication->id,
-        'resource_type' => $serviceApplication->getMorphClass(),
-    ]);
+    seedFileVolume($serviceApplication, $baseDir, 'wg_config.conf', '/app/ps/wg0.conf', 'test-conf');
+    seedFileVolume($serviceApplication, $baseDir, 'override_trays.json', '/app/ps/override_tray.json', '');
 
     serviceParser($service);
 
@@ -229,25 +160,10 @@ YAML,
 });
 
 it('defaults new service bind mounts to directories', function () {
-    $service = Service::factory()->create([
-        'environment_id' => $this->environment->id,
-        'server_id' => $this->destination->server_id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => $this->destination->getMorphClass(),
-        'docker_compose_raw' => <<<'YAML'
-services:
-  app:
-    image: nginx:latest
-    volumes:
-      - ./data:/app/data
-YAML,
-    ]);
+    [$service, $serviceApplication] = makeComposeService(DATA_DIR_COMPOSE);
 
     serviceParser($service);
 
-    $serviceApplication = ServiceApplication::where('name', 'app')
-        ->where('service_id', $service->id)
-        ->first();
     $fileVolume = $serviceApplication->fileStorages()->where('mount_path', '/app/data')->first();
 
     expect($fileVolume->content)->toBeNull()
