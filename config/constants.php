@@ -86,7 +86,6 @@ return [
 
     'invitation' => [
         'link' => [
-            'base_url' => '/invitations/',
             'expiration_days' => 3,
         ],
     ],
