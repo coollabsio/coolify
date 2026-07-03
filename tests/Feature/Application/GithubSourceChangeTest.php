@@ -147,6 +147,125 @@ describe('GitHub Source Change Component', function () {
             ]);
     });
 
+    test('ghe.com installation path uses github cloud owner scoped route', function () {
+        $githubApp = new GithubApp;
+        $githubApp->forceFill([
+            'id' => 123,
+            'name' => 'provided-github-app',
+            'organization' => 'acme-enterprise',
+            'html_url' => 'https://octocorp.ghe.com',
+            'team_id' => 456,
+        ]);
+
+        $installationUrl = getInstallationPath($githubApp);
+        parse_str(parse_url($installationUrl, PHP_URL_QUERY), $query);
+        $installState = $query['state'] ?? null;
+
+        expect($installationUrl)->toStartWith('https://octocorp.ghe.com/apps/acme-enterprise/provided-github-app/installations/new?')
+            ->and($installState)->not->toBeEmpty()
+            ->and(Cache::get('github-app-setup-state:'.hash('sha256', $installState)))
+            ->toMatchArray([
+                'action' => 'install',
+                'github_app_id' => 123,
+                'team_id' => 456,
+            ]);
+    });
+
+    test('installation path is pure and never calls github or mutates the app', function () {
+        Http::fake();
+
+        $privateKey = PrivateKey::create([
+            'name' => 'github-app-local-name',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+            'is_git_related' => true,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Local Display Name',
+            'organization' => 'acme-enterprise',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://octocorp.ghe.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'private_key_id' => $privateKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        $installationUrl = getInstallationPath($githubApp);
+
+        Http::assertNothingSent();
+
+        expect($installationUrl)->toStartWith('https://octocorp.ghe.com/apps/acme-enterprise/local-display-name/installations/new?')
+            ->and($githubApp->refresh()->name)->toBe('Local Display Name')
+            ->and($privateKey->refresh()->name)->toBe('github-app-local-name');
+    });
+
+    test('syncGithubAppName persists the github slug and renames the private key', function () {
+        Http::fake([
+            '*/app' => Http::response(['slug' => 'actual-github-slug']),
+            '*/zen' => Http::response('Keep it logically awesome.'),
+        ]);
+
+        $privateKey = PrivateKey::create([
+            'name' => 'github-app-local-name',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+            'is_git_related' => true,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Local Display Name',
+            'organization' => 'acme-enterprise',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://octocorp.ghe.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'private_key_id' => $privateKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        $appSlug = syncGithubAppName($githubApp, true);
+
+        expect($appSlug)->toBe('actual-github-slug')
+            ->and($githubApp->refresh()->name)->toBe('actual-github-slug')
+            ->and($privateKey->refresh()->name)->toBe('github-app-actual-github-slug');
+    });
+
+    test('ghe.com installation path encodes the organization segment', function () {
+        $githubApp = new GithubApp;
+        $githubApp->forceFill([
+            'id' => 123,
+            'name' => 'provided-github-app',
+            'organization' => '/acme enterprise/',
+            'html_url' => 'https://octocorp.ghe.com',
+            'team_id' => 456,
+        ]);
+
+        $installationUrl = getInstallationPath($githubApp);
+
+        expect($installationUrl)->toStartWith('https://octocorp.ghe.com/apps/acme%20enterprise/provided-github-app/installations/new?');
+    });
+
+    test('ghe.com installation path keeps app scoped fallback when organization is blank', function () {
+        $githubApp = new GithubApp;
+        $githubApp->forceFill([
+            'id' => 123,
+            'name' => 'provided-github-app',
+            'organization' => null,
+            'html_url' => 'https://octocorp.ghe.com',
+            'team_id' => 456,
+        ]);
+
+        $installationUrl = getInstallationPath($githubApp);
+
+        expect($installationUrl)->toStartWith('https://octocorp.ghe.com/apps/provided-github-app/installations/new?');
+    });
+
     test('defaults webhook endpoint to app url when it is the first available endpoint', function () {
         config(['app.url' => 'http://localhost:8000']);
 
@@ -207,6 +326,10 @@ describe('GitHub Source Change Component', function () {
     });
 
     test('can mount with fully configured github app', function () {
+        Http::fake([
+            'https://api.github.com/app' => Http::response(['slug' => 'test-github-app']),
+        ]);
+
         $privateKey = PrivateKey::create([
             'name' => 'Test Key',
             'private_key' => validPrivateKey(),
@@ -241,6 +364,10 @@ describe('GitHub Source Change Component', function () {
     });
 
     test('can update github app from null to valid values', function () {
+        Http::fake([
+            'https://api.github.com/app' => Http::response(['slug' => 'test-github-app']),
+        ]);
+
         $privateKey = PrivateKey::create([
             'name' => 'Test Key',
             'private_key' => validPrivateKey(),
