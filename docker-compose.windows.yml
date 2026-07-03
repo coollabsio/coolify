@@ -1,14 +1,14 @@
 services:
   coolify-testing-host:
     init: true
-    image: "ghcr.io/coollabsio/coolify-testing-host:latest"
+    image: "docker.io/coollabsio/coolify-testing-host:latest"
     pull_policy: always
     container_name: coolify-testing-host
     volumes:
       - //var/run/docker.sock://var/run/docker.sock
       - ./:/data/coolify
   coolify:
-    image: "ghcr.io/coollabsio/coolify:latest"
+    image: "docker.io/coollabsio/coolify:latest"
     pull_policy: always
     container_name: coolify
     restart: always
@@ -96,7 +96,7 @@ services:
       retries: 10
       timeout: 2s
   soketi:
-    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.10'
+    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.16'
     pull_policy: always
     container_name: coolify-realtime
     restart: always

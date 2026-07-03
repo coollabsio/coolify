@@ -9,7 +9,7 @@
 ## DOCKER_ADDRESS_POOL_SIZE - Custom Docker address pool size (default: 24)
 ## DOCKER_POOL_FORCE_OVERRIDE - Force override Docker address pool configuration (default: false)
 ## AUTOUPDATE - Set to "false" to disable auto-updates
-## REGISTRY_URL - Custom registry URL for Docker images (default: ghcr.io)
+## REGISTRY_URL - Custom registry URL for Docker images (default: docker.io)
 
 set -e # Exit immediately if a command exits with a non-zero status
 ## $1 could be empty, so we need to disable this check
@@ -50,7 +50,7 @@ else
         REGISTRY_URL=$(grep "^REGISTRY_URL=" "$ENV_FILE" | cut -d '=' -f2)
         echo "Using registry URL from .env: $REGISTRY_URL"
     else
-        REGISTRY_URL="ghcr.io"
+        REGISTRY_URL="docker.io"
         echo "Using default registry URL: $REGISTRY_URL"
     fi
 fi
@@ -539,6 +539,15 @@ install_docker_manually() {
         echo "Docker installed successfully."
     fi
 }
+
+install_docker_from_rhel_repo() {
+    echo " - Installing Docker from the RHEL repository for Rocky Linux..."
+    rm -f /etc/yum.repos.d/docker-ce.repo /etc/yum.repos.d/docker-ce-staging.repo
+    dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+    dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    systemctl --now enable docker
+}
+
 log_section "Step 3/9: Checking Docker installation"
 echo "3/9 Checking Docker installation..."
 if ! [ -x "$(command -v docker)" ]; then
@@ -576,6 +585,13 @@ if ! [ -x "$(command -v docker)" ]; then
         if ! [ -x "$(command -v docker)" ]; then
             echo " - Failed to install Docker with dnf. Try to install it manually."
             echo "   Please visit https://www.cyberciti.biz/faq/how-to-install-docker-on-amazon-linux-2/ for more information."
+            exit 1
+        fi
+        ;;
+    "rocky")
+        install_docker_from_rhel_repo
+        if ! [ -x "$(command -v docker)" ]; then
+            echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
             exit 1
         fi
         ;;
@@ -765,10 +781,12 @@ curl -fsSL -L $CDN/.env.production -o /data/coolify/source/.env.production &
 PID3=$!
 curl -fsSL -L $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh &
 PID4=$!
+curl -fsSL -L $CDN/upgrade-postgres.sh -o /data/coolify/source/upgrade-postgres.sh &
+PID5=$!
 
 # Wait for all downloads to complete and check for errors
 DOWNLOAD_FAILED=false
-for PID in $PID1 $PID2 $PID3 $PID4; do
+for PID in $PID1 $PID2 $PID3 $PID4 $PID5; do
     if ! wait $PID; then
         DOWNLOAD_FAILED=true
     fi
@@ -779,6 +797,7 @@ if [ "$DOWNLOAD_FAILED" = true ]; then
     exit 1
 fi
 
+chmod +x /data/coolify/source/upgrade.sh /data/coolify/source/upgrade-postgres.sh
 log "All configuration files downloaded successfully"
 echo "     Done."
 
@@ -901,9 +920,9 @@ echo -e " - Please wait."
 getAJoke
 
 if [[ $- == *x* ]]; then
-    bash -x /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}" "true"
+    bash -x /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-docker.io}" "true"
 else
-    bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}" "true"
+    bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-docker.io}" "true"
 fi
 echo " - Coolify installed successfully."
 echo " - Waiting for Coolify to be ready..."

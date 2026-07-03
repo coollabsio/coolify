@@ -1,6 +1,14 @@
 <div>
     <div class="flex flex-col gap-4 p-4 bg-white border dark:bg-base dark:border-coolgray-300 border-neutral-200">
-        @if ($isReadOnly)
+        @if ($fileStorage->is_too_large)
+            <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
+                File on server exceeds 5 MB and cannot be edited from the UI. Edit it directly on the server.
+            </div>
+        @elseif ($fileStorage->is_host_file)
+            <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
+                This host file mount is bind-only. Coolify will not create, edit, load, chmod, or delete the source file.
+            </div>
+        @elseif ($isReadOnly)
             <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
                 @if ($fileStorage->is_directory)
                     This directory is mounted as read-only inside the container. Content editing is disabled, but you can still convert or delete it.
@@ -18,7 +26,7 @@
         </div>
         @if ($resource instanceof \App\Models\Application)
             @can('update', $resource)
-                <div class="w-96">
+                <div class="w-full sm:w-96">
                     <x-forms.checkbox instantSave canGate="update" :canResource="$resource" label="Add suffix for PR deployments"
                         id="isPreviewSuffixEnabled"
                         helper="When enabled, a -pr-N suffix is added to this volume's path for preview deployments (e.g. ./scripts becomes ./scripts-pr-1). Disable this for volumes that contain shared config or scripts from your repository."></x-forms.checkbox>
@@ -26,10 +34,16 @@
             @endcan
         @endif
         <form wire:submit='submit' class="flex flex-col gap-2">
-            {{-- Action buttons: always available with update permission, regardless of read-only status --}}
             @can('update', $resource)
                 <div class="flex gap-2">
-                    @if ($fileStorage->is_directory)
+                    @if ($fileStorage->is_host_file)
+                        <x-modal-confirmation :ignoreWire="false" title="Confirm Host File Mount Removal?"
+                            buttonTitle="Delete" isErrorButton submitAction="delete" :checkboxes="$hostFileDeletionCheckboxes"
+                            :actions="['Only the mount configuration will be removed. The host file will not be deleted.']"
+                            confirmationText="{{ $fs_path }}"
+                            confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
+                            shortConfirmationLabel="Filepath" />
+                    @elseif ($fileStorage->is_directory)
                         <x-modal-confirmation :ignoreWire="false" title="Confirm Directory Conversion to File?"
                             buttonTitle="Convert to file" submitAction="convertToFile" :actions="[
                                 'All files in this directory will be permanently deleted and an empty file will be created in its place.',
@@ -45,7 +59,7 @@
                             confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
                             shortConfirmationLabel="Filepath" />
                     @else
-                        @if (!$fileStorage->is_binary)
+                        @if (!$fileStorage->is_binary && !$fileStorage->is_too_large)
                             <x-modal-confirmation :ignoreWire="false" title="Confirm File Conversion to Directory?"
                                 buttonTitle="Convert to directory" submitAction="convertToDirectory" :actions="[
                                     'The selected file will be permanently deleted and an empty directory will be created in its place.',
@@ -64,23 +78,13 @@
                             shortConfirmationLabel="Filepath" />
                     @endif
                 </div>
-            @else
-                @if (!$fileStorage->is_directory)
-                    @can('view', $resource)
-                        <div class="flex gap-2">
-                            <x-forms.button type="button" wire:click="loadStorageOnServer">Load from
-                                server</x-forms.button>
-                        </div>
-                    @endcan
-                @endif
             @endcan
 
-            {{-- Content editing: gated by read-only status --}}
-            @if (!$fileStorage->is_directory)
-                @can('update', $resource)
-                    @if (!$isReadOnly)
+            @if (!$fileStorage->is_directory && !$fileStorage->is_host_file)
+                @if (!$isReadOnly)
+                    @can('update', $resource)
                         @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
-                            <div class="w-96">
+                            <div class="w-full sm:w-96">
                                 <x-forms.checkbox instantSave label="Is this based on the Git repository?"
                                     id="isBasedOnGit"></x-forms.checkbox>
                             </div>
@@ -89,13 +93,36 @@
                             label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
                             helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
                             rows="20" id="content"
-                            readonly="{{ $fileStorage->is_based_on_git || $fileStorage->is_binary }}"></x-forms.textarea>
-                        @if (!$fileStorage->is_based_on_git && !$fileStorage->is_binary)
+                            readonly="{{ $fileStorage->is_based_on_git || $fileStorage->is_binary || $fileStorage->is_too_large }}"></x-forms.textarea>
+                        @if (!$fileStorage->is_based_on_git && !$fileStorage->is_binary && !$fileStorage->is_too_large)
                             <x-forms.button class="w-full" type="submit">Save</x-forms.button>
                         @endif
                     @else
+                        @can('view', $resource)
+                            @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
+                                <div class="w-full sm:w-96">
+                                    <x-forms.checkbox disabled label="Is this based on the Git repository?"
+                                        id="isBasedOnGit"></x-forms.checkbox>
+                                </div>
+                            @endif
+                            <x-forms.textarea
+                                label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
+                                helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
+                                rows="20" id="content" disabled></x-forms.textarea>
+                        @endcan
+                    @endcan
+                @else
+                    @can('update', $resource)
+                        @if (!$fileStorage->is_too_large)
+                            <div class="flex gap-2">
+                                <x-forms.button type="button" wire:click="loadStorageOnServer">Load from
+                                    server</x-forms.button>
+                            </div>
+                        @endif
+                    @endcan
+                    @can('view', $resource)
                         @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
-                            <div class="w-96">
+                            <div class="w-full sm:w-96">
                                 <x-forms.checkbox disabled label="Is this based on the Git repository?"
                                     id="isBasedOnGit"></x-forms.checkbox>
                             </div>
@@ -104,19 +131,8 @@
                             label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
                             helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
                             rows="20" id="content" disabled></x-forms.textarea>
-                    @endif
-                @else
-                    @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
-                        <div class="w-96">
-                            <x-forms.checkbox disabled label="Is this based on the Git repository?"
-                                id="isBasedOnGit"></x-forms.checkbox>
-                        </div>
-                    @endif
-                    <x-forms.textarea
-                        label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
-                        helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
-                        rows="20" id="content" disabled></x-forms.textarea>
-                @endcan
+                    @endcan
+                @endif
             @endif
         </form>
     </div>

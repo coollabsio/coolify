@@ -23,9 +23,15 @@
         <div class="w-32">
             <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSaveSlackEnabled" id="slackEnabled" label="Enabled" />
         </div>
-        <x-forms.input canGate="update" :canResource="$settings" type="password"
-            helper="Create a Slack APP and generate a Incoming Webhook URL. <br><a class='inline-block underline dark:text-white' href='https://api.slack.com/apps' target='_blank'>Create Slack APP</a>"
-            required id="slackWebhookUrl" label="Webhook" />
+        @can('update', $settings)
+            <x-forms.input type="password"
+                helper="Create a Slack APP and generate a Incoming Webhook URL. <br><a class='inline-block underline dark:text-white' href='https://api.slack.com/apps' target='_blank'>Create Slack APP</a>"
+                required id="slackWebhookUrl" label="Webhook" />
+        @else
+            <x-forms.input disabled
+                helper="Create a Slack APP and generate a Incoming Webhook URL. <br><a class='inline-block underline dark:text-white' href='https://api.slack.com/apps' target='_blank'>Create Slack APP</a>"
+                required label="Webhook" value="Hidden (only admins can view)" />
+        @endcan
     </form>
     <h2 class="mt-4">Notification Settings</h2>
     <p class="mb-4">

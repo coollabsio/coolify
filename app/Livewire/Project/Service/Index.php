@@ -8,11 +8,11 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
-use Spatie\Url\Url;
 
 class Index extends Component
 {
@@ -108,10 +108,16 @@ class Index extends Component
             $this->parameters = get_route_parameters();
             $this->query = request()->query();
             $this->currentRoute = request()->route()->getName();
-            $this->service = Service::whereUuid($this->parameters['service_uuid'])->first();
-            if (! $this->service) {
-                return redirect()->route('dashboard');
-            }
+            $project = currentTeam()
+                ->projects()
+                ->select('id', 'uuid', 'team_id')
+                ->where('uuid', $this->parameters['project_uuid'])
+                ->firstOrFail();
+            $environment = $project->environments()
+                ->select('id', 'uuid', 'name', 'project_id')
+                ->where('uuid', $this->parameters['environment_uuid'])
+                ->firstOrFail();
+            $this->service = $environment->services()->whereUuid($this->parameters['service_uuid'])->firstOrFail();
             $this->authorize('view', $this->service);
             $service = $this->service->applications()->whereUuid($this->parameters['stack_service_uuid'])->first();
             if ($service) {
@@ -474,15 +480,11 @@ class Index extends Component
     {
         try {
             $this->authorize('update', $this->serviceApplication);
-            $this->fqdn = str($this->fqdn)->replaceEnd(',', '')->trim()->toString();
-            $this->fqdn = str($this->fqdn)->replaceStart(',', '')->trim()->toString();
-            $domains = str($this->fqdn)->trim()->explode(',')->map(function ($domain) {
-                $domain = trim($domain);
-                Url::fromString($domain, ['http', 'https']);
+            $this->validate([
+                'fqdn' => ValidationPatterns::applicationDomainRules(),
+            ]);
 
-                return str($domain)->lower();
-            });
-            $this->fqdn = $domains->unique()->implode(',');
+            $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
             $warning = sslipDomainWarning($this->fqdn);
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));

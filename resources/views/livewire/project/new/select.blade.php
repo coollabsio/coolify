@@ -138,9 +138,14 @@
                     </div>
                 </div>
                 <div x-show="filteredServices.length > 0" class="mt-8">
-                    <div class="flex items-center gap-4" x-init="loadResources">
+                    <div class="flex flex-wrap items-center gap-4" x-init="loadResources">
                         <h2>Services</h2>
                         <x-forms.button x-on:click="loadResources">Reload List</x-forms.button>
+                        <div x-show="serviceTemplatesLastUpdated"
+                            class="text-xs text-neutral-500 dark:text-neutral-400">
+                            Last Updated on Service Templates:
+                            <span x-text="serviceTemplatesLastUpdated"></span>
+                        </div>
                     </div>
                     <x-callout type="info" title="Trademarks Policy" class="mt-4 mb-6">
                         The respective trademarks mentioned here are owned by the respective companies, and use of them
@@ -149,12 +154,19 @@
 
                     <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                         <template x-for="service in filteredServices" :key="service.name">
-                            <div class="relative" x-on:click="setType('one-click-service-' + service.name)"
+                            <div class="relative" x-on:click="setType('one-click-service-' + service.id)"
                                 :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
                                 <x-resource-view>
                                     <x-slot:title>
                                         <template x-if="service.name">
-                                            <span x-text="service.name"></span>
+                                            <div>
+                                                <span x-text="service.name"></span>
+                                                <template x-if="service.templateLastUpdated">
+                                                    <div class="mt-1 text-[0.7rem] font-normal text-neutral-500 dark:text-neutral-500">
+                                                        Updated: <span x-text="service.templateLastUpdated"></span>
+                                                    </div>
+                                                </template>
+                                            </div>
                                         </template>
                                     </x-slot>
                                     <x-slot:description>
@@ -173,8 +185,36 @@
                                         </template>
                                     </x-slot:logo>
                                 </x-resource-view>
+                                <template x-if="service.amd_only">
+                                    <div class="absolute top-2 right-10 group">
+                                        <span
+                                            class="px-2 py-0.5 text-xs rounded bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 cursor-pointer">
+                                            AMD only
+                                        </span>
+                                        <div class="info-helper-popup right-0 w-sm">
+                                            <div class="p-4">
+                                                This service only supports AMD64/x86_64 architecture. It will not work
+                                                on ARM-based servers (e.g., Apple Silicon, Raspberry Pi, AWS Graviton).
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                                <template x-if="service.arm_only">
+                                    <div class="absolute top-2 right-10 group">
+                                        <span
+                                            class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 cursor-pointer">
+                                            ARM only
+                                        </span>
+                                        <div class="info-helper-popup right-0 w-sm">
+                                            <div class="p-4">
+                                                This service only supports ARM64/aarch64 architecture. It will not work
+                                                on AMD64/x86_64-based servers.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
                                 <template x-if="shouldShowDocIcon(service)">
-                                    <a :href="getDocLink(service) || coolifyDocsUrl(service.name)" target="_blank"
+                                    <a :href="getDocLink(service) || coolifyDocsUrl(service)" target="_blank"
                                         @click.stop @mouseenter="resolveDocLink(service)"
                                         class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
                                         :class="{ 'opacity-50': docCheckInProgress[service.name] }"
@@ -209,6 +249,7 @@
                         isSticky: false,
                         selecting: false,
                         services: [],
+                        serviceTemplatesLastUpdated: null,
                         gitBasedApplications: [],
                         dockerBasedApplications: [],
                         databases: [],
@@ -223,12 +264,14 @@
                             this.loading = true;
                             const {
                                 services,
+                                serviceTemplatesLastUpdated,
                                 categories,
                                 gitBasedApplications,
                                 dockerBasedApplications,
                                 databases
                             } = await this.$wire.loadServices();
                             this.services = services;
+                            this.serviceTemplatesLastUpdated = serviceTemplatesLastUpdated;
                             this.categories = categories || [];
                             this.gitBasedApplications = gitBasedApplications;
                             this.dockerBasedApplications = dockerBasedApplications;
@@ -244,8 +287,8 @@
                             // Remove flavor suffixes: -with-*, -without-*
                             return normalized.replace(/-(with|without)-.+$/, '');
                         },
-                        coolifyDocsUrl(serviceName) {
-                            const baseName = this.extractBaseServiceName(serviceName);
+                        coolifyDocsUrl(service) {
+                            const baseName = service.docsSlug || this.extractBaseServiceName(service.name);
                             return 'https://coolify.io/docs/services/' + baseName;
                         },
                         officialDocsUrl(service) {
@@ -279,7 +322,7 @@
                             this.docCheckInProgress[serviceName] = true;
 
                             // 1. Try Coolify docs first
-                            const coolifyUrl = this.coolifyDocsUrl(serviceName);
+                            const coolifyUrl = this.coolifyDocsUrl(service);
                             const coolifyExists = await this.checkUrlExists(coolifyUrl);
 
                             if (coolifyExists) {
@@ -424,6 +467,7 @@
                         <div class="flex flex-col mx-6">
                             <div class="font-bold dark:group-hover:text-white">
                                 Swarm Docker <span class="text-xs">({{ $swarmDocker->name }})</span>
+                                <x-deprecated-badge />
                             </div>
                         </div>
                     </div>

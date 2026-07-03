@@ -6,6 +6,7 @@
     'buttonFullWidth' => false,
     'customButton' => null,
     'disabled' => false,
+    'authDisabled' => false,
     'dispatchAction' => false,
     'submitAction' => 'delete',
     'content' => null,
@@ -128,8 +129,16 @@
     }
 }"
     @keydown.escape.window="if (modalOpen) { modalOpen = false; resetModal(); }" :class="{ 'z-40': modalOpen }"
-    class="relative w-auto h-auto">
-    @if ($customButton)
+    @class([
+        'relative h-auto',
+        'w-full' => $buttonFullWidth,
+        'w-full sm:w-auto' => ! $buttonFullWidth,
+    ])>
+    @if (isset($trigger))
+        <div class="w-full" @click="modalOpen=true">
+            {{ $trigger }}
+        </div>
+    @elseif ($customButton)
         @if ($buttonFullWidth)
             <x-forms.button @click="modalOpen=true" class="w-full">
                 {{ $customButton }}
@@ -147,11 +156,11 @@
         @else
             @if ($disabled)
                 @if ($buttonFullWidth)
-                    <x-forms.button class="w-full" isError disabled wire:target>
+                    <x-forms.button class="w-full" isError disabled :authDisabled="$authDisabled" wire:target>
                         {{ $buttonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button isError disabled wire:target>
+                    <x-forms.button isError disabled :authDisabled="$authDisabled" wire:target>
                         {{ $buttonTitle }}
                     </x-forms.button>
                 @endif

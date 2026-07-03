@@ -2,7 +2,9 @@
 
 namespace App\Traits;
 
-use App\Models\ServerSetting;
+use App\Models\Server;
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Support\Facades\Log;
 
 trait HasMetrics
 {
@@ -28,9 +30,15 @@ trait HasMetrics
         $from = now()->subMinutes($mins)->toIso8601ZuluString();
         $endpoint = $this->getMetricsEndpoint($type, $from);
 
-        $token = $server->settings->sentinel_token;
-        if (! ServerSetting::isValidSentinelToken($token)) {
-            throw new \Exception('Invalid sentinel token format. Please regenerate the token.');
+        $previousToken = null;
+        try {
+            $previousToken = $server->settings->sentinel_token;
+        } catch (DecryptException) {
+            // fall through to ensureValidSentinelToken which will regenerate
+        }
+        $token = $server->settings->ensureValidSentinelToken();
+        if ($token !== $previousToken) {
+            Log::warning('Regenerated sentinel token during metrics read; sentinel container restart required', ['server_id' => $server->id]);
         }
 
         $response = instant_remote_process(
@@ -61,10 +69,10 @@ trait HasMetrics
 
     private function isServerMetrics(): bool
     {
-        return $this instanceof \App\Models\Server;
+        return $this instanceof Server;
     }
 
-    private function getMetricsServer(): \App\Models\Server
+    private function getMetricsServer(): Server
     {
         return $this->isServerMetrics() ? $this : $this->destination->server;
     }

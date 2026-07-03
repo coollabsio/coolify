@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Application\CleanupPreviewDeployment;
 use App\Enums\ProcessStatus;
+use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GithubApp;
@@ -13,10 +14,11 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Visus\Cuid2\Cuid2;
+use Throwable;
 
 class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
 {
+    use DetectsSkipDeployCommits;
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
@@ -31,11 +33,13 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
         public string $action,
         public int $pullRequestId,
         public string $pullRequestHtmlUrl,
+        public ?string $pullRequestTitle,
         public ?string $beforeSha,
         public ?string $afterSha,
         public string $commitSha,
         public ?string $authorAssociation,
         public string $fullName,
+        public bool $isForkPullRequest = false,
     ) {
         $this->onQueue('high');
     }
@@ -67,14 +71,23 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
             ->first();
 
         if ($found) {
-            ApplicationPullRequestUpdateJob::dispatchSync(
-                application: $application,
-                preview: $found,
-                status: ProcessStatus::CLOSED
-            );
-
-            CleanupPreviewDeployment::run($application, $this->pullRequestId, $found);
+            try {
+                $this->dispatchPullRequestClosedUpdate($application, $found);
+            } catch (Throwable $e) {
+                report($e);
+            } finally {
+                CleanupPreviewDeployment::run($application, $this->pullRequestId, $found);
+            }
         }
+    }
+
+    protected function dispatchPullRequestClosedUpdate(Application $application, ApplicationPreview $preview): void
+    {
+        ApplicationPullRequestUpdateJob::dispatchSync(
+            application: $application,
+            preview: $preview,
+            status: ProcessStatus::CLOSED
+        );
     }
 
     private function handleOpenAction(Application $application, ?GithubApp $githubApp): void
@@ -83,9 +96,23 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
+        if (self::shouldSkipDeployAny([$this->pullRequestTitle])) {
+            return;
+        }
+
         // Check if PR deployments from public contributors are restricted
         if (! $application->settings->is_pr_deployments_public_enabled) {
-            $trustedAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR', 'CONTRIBUTOR'];
+            // Fork PRs carry untrusted code from a repository outside our control.
+            // GitHub's author_association cannot be trusted to gate these (it grants
+            // CONTRIBUTOR to anyone who has merely opened an issue/PR before), so fork
+            // PRs are never deployed automatically when public previews are off.
+            if ($this->isForkPullRequest) {
+                return;
+            }
+
+            // Same-repo (non-fork) branch PRs require push access to the base repo,
+            // so only trusted associations are allowed to trigger a deployment.
+            $trustedAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR'];
             if (! in_array($this->authorAssociation, $trustedAssociations)) {
                 return;
             }
@@ -138,7 +165,7 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
         }
 
         // Queue the deployment
-        $deployment_uuid = new Cuid2;
+        $deployment_uuid = new_public_id();
         queue_application_deployment(
             application: $application,
             pull_request_id: $this->pullRequestId,

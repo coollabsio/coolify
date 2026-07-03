@@ -39,6 +39,10 @@ class ServicesController extends Controller
             ]);
         }
 
+        if ($service->is_shown_once ?? false) {
+            $service->makeHidden(['value', 'real_value']);
+        }
+
         return serializeApiResponse($service);
     }
 
@@ -56,19 +60,10 @@ class ServicesController extends Controller
             return str($urlValue)->replaceStart(',', '')->replaceEnd(',', '')->trim()->explode(',')->map(fn ($url) => trim($url))->filter();
         });
 
-        $urls = $urls->map(function ($url) use (&$errors) {
-            if (! filter_var($url, FILTER_VALIDATE_URL)) {
-                $errors[] = "Invalid URL: {$url}";
-
-                return $url;
-            }
-            $scheme = parse_url($url, PHP_URL_SCHEME) ?? '';
-            if (! in_array(strtolower($scheme), ['http', 'https'])) {
-                $errors[] = "Invalid URL scheme: {$scheme} for URL: {$url}. Only http and https are supported.";
-            }
-
-            return $url;
-        });
+        $errors = ValidationPatterns::validateApplicationDomains($urls->implode(','));
+        $urls = collect(ValidationPatterns::applicationDomainList(
+            ValidationPatterns::normalizeApplicationDomains($urls->implode(','))
+        ));
 
         $duplicates = $urls->duplicates()->unique()->values();
         if ($duplicates->isNotEmpty() && ! $forceDomainOverride) {
@@ -97,10 +92,10 @@ class ServicesController extends Controller
             }
 
             if (filled($containerUrls)) {
-                $containerUrls = str($containerUrls)->replaceStart(',', '')->replaceEnd(',', '')->trim();
-                $containerUrls = str($containerUrls)->explode(',')->map(fn ($url) => str(trim($url))->lower());
+                $containerUrls = ValidationPatterns::normalizeApplicationDomains($containerUrls);
+                $containerUrlCollection = collect(ValidationPatterns::applicationDomainList($containerUrls));
 
-                $result = checkIfDomainIsAlreadyUsedViaAPI($containerUrls, $teamId, $application->uuid);
+                $result = checkIfDomainIsAlreadyUsedViaAPI($containerUrlCollection, $teamId, $application->uuid);
                 if (isset($result['error'])) {
                     $errors[] = $result['error'];
 
@@ -112,8 +107,6 @@ class ServicesController extends Controller
 
                     return;
                 }
-
-                $containerUrls = $containerUrls->filter(fn ($u) => filled($u))->unique()->implode(',');
             } else {
                 $containerUrls = null;
             }
@@ -221,7 +214,7 @@ class ServicesController extends Controller
                                 type: 'object',
                                 properties: [
                                     'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
-                                    'url' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io").'],
+                                    'url' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io").'],
                                 ],
                             ),
                         ],
@@ -486,6 +479,14 @@ class ServicesController extends Controller
                     StartService::dispatch($service);
                 }
 
+                auditLog('api.service.created', [
+                    'team_id' => $teamId,
+                    'service_uuid' => $service->uuid,
+                    'service_name' => $service->name,
+                    'service_type' => $oneClickServiceName ?? null,
+                    'instant_deploy' => (bool) $instantDeploy,
+                ]);
+
                 return response()->json([
                     'uuid' => $service->uuid,
                     'domains' => $service->applications()->pluck('fqdn')->filter()->sort()->values(),
@@ -650,6 +651,14 @@ class ServicesController extends Controller
                 StartService::dispatch($service);
             }
 
+            auditLog('api.service.created', [
+                'team_id' => $teamId,
+                'service_uuid' => $service->uuid,
+                'service_name' => $service->name,
+                'service_type' => 'docker_compose',
+                'instant_deploy' => (bool) $instantDeploy,
+            ]);
+
             return response()->json([
                 'uuid' => $service->uuid,
                 'domains' => $service->applications()->pluck('fqdn')->filter()->sort()->values(),
@@ -792,6 +801,12 @@ class ServicesController extends Controller
             dockerCleanup: $request->boolean('docker_cleanup', true)
         );
 
+        auditLog('api.service.deleted', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'service_name' => $service->name,
+        ]);
+
         return response()->json([
             'message' => 'Service deletion request queued.',
         ]);
@@ -843,7 +858,7 @@ class ServicesController extends Controller
                                     type: 'object',
                                     properties: [
                                         'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
-                                        'url' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io").'],
+                                        'url' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io").'],
                                     ],
                                 ),
                             ],
@@ -1046,6 +1061,13 @@ class ServicesController extends Controller
             StartService::dispatch($service);
         }
 
+        auditLog('api.service.updated', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'service_name' => $service->name,
+            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
+        ]);
+
         return response()->json([
             'uuid' => $service->uuid,
             'domains' => $service->applications()->pluck('fqdn')->filter()->sort()->values(),
@@ -1218,8 +1240,12 @@ class ServicesController extends Controller
 
         $this->authorize('manageEnvironment', $service);
 
+        if ($request->has('key')) {
+            $request->merge(['key' => ValidationPatterns::normalizeEnvironmentVariableKey((string) $request->key)]);
+        }
+
         $validator = customApiValidator($request->all(), [
-            'key' => 'string|required',
+            'key' => ValidationPatterns::environmentVariableKeyRules(),
             'value' => 'string|nullable',
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
@@ -1254,6 +1280,13 @@ class ServicesController extends Controller
             $env->comment = $request->comment;
         }
         $env->save();
+
+        auditLog('api.service.env_updated', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'env_uuid' => $env->uuid,
+            'env_key' => $env->key,
+        ]);
 
         return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
     }
@@ -1360,8 +1393,12 @@ class ServicesController extends Controller
 
         $updatedEnvs = collect();
         foreach ($bulk_data as $item) {
+            if (array_key_exists('key', $item)) {
+                $item['key'] = ValidationPatterns::normalizeEnvironmentVariableKey((string) $item['key']);
+            }
+
             $validator = customApiValidator($item, [
-                'key' => 'string|required',
+                'key' => ValidationPatterns::environmentVariableKeyRules(),
                 'value' => 'string|nullable',
                 'is_literal' => 'boolean',
                 'is_multiline' => 'boolean',
@@ -1383,6 +1420,12 @@ class ServicesController extends Controller
 
             $updatedEnvs->push($this->removeSensitiveData($env));
         }
+
+        auditLog('api.service.env_bulk_upserted', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'env_count' => $updatedEnvs->count(),
+        ]);
 
         return response()->json($updatedEnvs)->setStatusCode(201);
     }
@@ -1473,8 +1516,12 @@ class ServicesController extends Controller
 
         $this->authorize('manageEnvironment', $service);
 
+        if ($request->has('key')) {
+            $request->merge(['key' => ValidationPatterns::normalizeEnvironmentVariableKey((string) $request->key)]);
+        }
+
         $validator = customApiValidator($request->all(), [
-            'key' => 'string|required',
+            'key' => ValidationPatterns::environmentVariableKeyRules(),
             'value' => 'string|nullable',
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
@@ -1504,6 +1551,13 @@ class ServicesController extends Controller
             'is_multiline' => $request->is_multiline ?? false,
             'is_shown_once' => $request->is_shown_once ?? false,
             'comment' => $request->comment ?? null,
+        ]);
+
+        auditLog('api.service.env_created', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'env_uuid' => $env->uuid,
+            'env_key' => $env->key,
         ]);
 
         return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
@@ -1591,7 +1645,16 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Environment variable not found.'], 404);
         }
 
+        $envKey = $env->key;
+        $envUuid = $env->uuid;
         $env->forceDelete();
+
+        auditLog('api.service.env_deleted', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'env_uuid' => $envUuid,
+            'env_key' => $envKey,
+        ]);
 
         return response()->json(['message' => 'Environment variable deleted.']);
     }
@@ -1667,6 +1730,12 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service is already running.'], 400);
         }
         StartService::dispatch($service);
+
+        auditLog('api.service.deployed', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'service_name' => $service->name,
+        ]);
 
         return response()->json(
             [
@@ -1759,6 +1828,13 @@ class ServicesController extends Controller
         $dockerCleanup = $request->boolean('docker_cleanup', true);
         StopService::dispatch($service, false, $dockerCleanup);
 
+        auditLog('api.service.stopped', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'service_name' => $service->name,
+            'docker_cleanup' => $dockerCleanup,
+        ]);
+
         return response()->json(
             [
                 'message' => 'Service stopping request queued.',
@@ -1845,6 +1921,13 @@ class ServicesController extends Controller
 
         $pullLatest = $request->boolean('latest');
         RestartService::dispatch($service, $pullLatest);
+
+        auditLog('api.service.restarted', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'service_name' => $service->name,
+            'pull_latest' => $pullLatest,
+        ]);
 
         return response()->json(
             [
@@ -2018,13 +2101,14 @@ class ServicesController extends Controller
             'resource_uuid' => 'required|string',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'required|string',
-            'host_path' => 'string|nullable',
+            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
             'is_directory' => 'boolean',
+            'is_host_file' => 'boolean',
             'fs_path' => 'string',
         ]);
 
-        $allAllowedFields = ['type', 'resource_uuid', 'name', 'mount_path', 'host_path', 'content', 'is_directory', 'fs_path'];
+        $allAllowedFields = ['type', 'resource_uuid', 'name', 'mount_path', 'host_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -2056,7 +2140,7 @@ class ServicesController extends Controller
                 ], 422);
             }
 
-            $typeSpecificInvalidFields = array_intersect(['content', 'is_directory', 'fs_path'], array_keys($request->all()));
+            $typeSpecificInvalidFields = array_intersect(['content', 'is_directory', 'is_host_file', 'fs_path'], array_keys($request->all()));
             if (! empty($typeSpecificInvalidFields)) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -2087,6 +2171,14 @@ class ServicesController extends Controller
         }
 
         $isDirectory = $request->boolean('is_directory', false);
+        $isHostFile = $request->boolean('is_host_file', false);
+
+        if ($isDirectory && $isHostFile) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['is_host_file' => 'Host file mounts cannot also be directory mounts.'],
+            ], 422);
+        }
 
         if ($isDirectory) {
             if (! $request->fs_path) {
@@ -2109,12 +2201,50 @@ class ServicesController extends Controller
                 'resource_id' => $subResource->id,
                 'resource_type' => get_class($subResource),
             ]);
+        } elseif ($isHostFile) {
+            if (! $request->fs_path) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['fs_path' => 'The fs_path field is required for host file mounts.'],
+                ], 422);
+            }
+
+            if ($request->filled('content')) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['content' => 'Content is not valid for host file mounts.'],
+                ], 422);
+            }
+
+            try {
+                $fsPath = validateHostFileMountPath($request->fs_path, 'host file source path');
+                $mountPath = validateFileMountPath($request->mount_path, 'host file destination path');
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['mount_path' => $e->getMessage()],
+                ], 422);
+            }
+
+            $storage = LocalFileVolume::create([
+                'fs_path' => $fsPath,
+                'mount_path' => $mountPath,
+                'content' => null,
+                'is_directory' => false,
+                'is_host_file' => true,
+                'resource_id' => $subResource->id,
+                'resource_type' => get_class($subResource),
+            ]);
         } else {
-            $mountPath = str($request->mount_path)->trim()->start('/')->value();
-
-            validateShellSafePath($mountPath, 'file storage path');
-
-            $fsPath = service_configuration_dir().'/'.$service->uuid.$mountPath;
+            try {
+                $mountPath = validateFileMountPath($request->mount_path, 'file storage path');
+                $fsPath = confineFileMountPath(service_configuration_dir().'/'.$service->uuid, $mountPath, 'file storage path');
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['mount_path' => $e->getMessage()],
+                ], 422);
+            }
 
             $storage = LocalFileVolume::create([
                 'fs_path' => $fsPath,
@@ -2125,6 +2255,15 @@ class ServicesController extends Controller
                 'resource_type' => get_class($subResource),
             ]);
         }
+
+        auditLog('api.service.storage_created', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'storage_uuid' => $storage->uuid ?? null,
+            'storage_id' => $storage->id,
+            'storage_type' => $request->type,
+            'mount_path' => $storage->mount_path,
+        ]);
 
         return response()->json($storage, 201);
     }
@@ -2227,7 +2366,7 @@ class ServicesController extends Controller
             'is_preview_suffix_enabled' => 'boolean',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'string',
-            'host_path' => 'string|nullable',
+            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
         ]);
 
@@ -2354,6 +2493,15 @@ class ServicesController extends Controller
 
         $storage->save();
 
+        auditLog('api.service.storage_updated', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'storage_uuid' => $storage->uuid ?? null,
+            'storage_id' => $storage->id,
+            'storage_type' => $request->type,
+            'mount_path' => $storage->mount_path ?? null,
+        ]);
+
         return response()->json($storage);
     }
 
@@ -2454,7 +2602,17 @@ class ServicesController extends Controller
             $storage->deleteStorageOnServer();
         }
 
+        $storageType = $storage instanceof LocalFileVolume ? 'file' : 'persistent';
+        $storageMountPath = $storage->mount_path ?? null;
         $storage->delete();
+
+        auditLog('api.service.storage_deleted', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'storage_uuid' => $storageUuid,
+            'storage_type' => $storageType,
+            'mount_path' => $storageMountPath,
+        ]);
 
         return response()->json(['message' => 'Storage deleted.']);
     }

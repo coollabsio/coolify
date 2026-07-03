@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 /**
  * Validates a Docker Compose YAML string for command injection vulnerabilities.
@@ -370,8 +369,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     $pullRequestId = $pull_request_id;
     $isPullRequest = $pullRequestId == 0 ? false : true;
     $server = data_get($resource, 'destination.server');
-    $fileStorages = $resource->fileStorages();
-
     try {
         $yaml = Yaml::parse($compose);
     } catch (Exception) {
@@ -714,14 +711,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         $source = resolveEnvVarDefault($source, $allEnvironments);
                     }
                     // Mode is available in $parsed['mode'] if needed
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
                         if ($foundConfig) {
-                            $contentNotNull_temp = data_get($foundConfig, 'content');
-                            if ($contentNotNull_temp) {
-                                $content = $contentNotNull_temp;
-                            }
+                            $content = data_get($foundConfig, 'content');
                             $isDirectory = data_get($foundConfig, 'is_directory');
                         } else {
                             // By default, we cannot determine if the bind is a directory or not, so we set it to directory
@@ -771,12 +765,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
 
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if ($foundConfig) {
-                        $contentNotNull_temp = data_get($foundConfig, 'content');
-                        if ($contentNotNull_temp) {
-                            $content = $contentNotNull_temp;
-                        }
+                        $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
                     } else {
                         // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
@@ -1254,7 +1245,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         $schema = $url->getScheme();
                         $portInt = $url->getPort();
                         $port = $portInt !== null ? ':'.$portInt : '';
-                        $random = new Cuid2;
+                        $random = new_public_id();
                         $preview_fqdn = str_replace('{{random}}', $random, $template);
                         $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
                         $preview_fqdn = str_replace('{{pr_id}}', $pullRequestId, $preview_fqdn);
@@ -2085,7 +2076,6 @@ function serviceParser(Service $resource): Collection
                 'service_id' => $resource->id,
             ]);
         }
-        $fileStorages = $savedService->fileStorages();
         if ($savedService->image !== $image) {
             $savedService->image = $image;
             $savedService->save();
@@ -2110,14 +2100,11 @@ function serviceParser(Service $resource): Collection
                         $source = resolveEnvVarDefault($source, $allEnvironments);
                     }
                     // Mode is available in $parsed['mode'] if needed
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
                         if ($foundConfig) {
-                            $contentNotNull_temp = data_get($foundConfig, 'content');
-                            if ($contentNotNull_temp) {
-                                $content = $contentNotNull_temp;
-                            }
+                            $content = data_get($foundConfig, 'content');
                             $isDirectory = data_get($foundConfig, 'is_directory');
                         } else {
                             // By default, we cannot determine if the bind is a directory or not, so we set it to directory
@@ -2167,12 +2154,9 @@ function serviceParser(Service $resource): Collection
                         }
                     }
 
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if ($foundConfig) {
-                        $contentNotNull_temp = data_get($foundConfig, 'content');
-                        if ($contentNotNull_temp) {
-                            $content = $contentNotNull_temp;
-                        }
+                        $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
                     } else {
                         // if isDirectory is not set (or false) & content is also not set, we assume it is a directory

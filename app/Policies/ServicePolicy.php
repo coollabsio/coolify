@@ -20,7 +20,9 @@ class ServicePolicy
      */
     public function view(User $user, Service $service): bool
     {
-        return true;
+        $teamId = $this->getTeamId($service);
+
+        return $teamId !== null && $user->teams->contains('id', $teamId);
     }
 
     /**
@@ -28,8 +30,7 @@ class ServicePolicy
      */
     public function create(User $user): bool
     {
-        // return $user->isAdmin();
-        return true;
+        return $user->isAdmin();
     }
 
     /**
@@ -37,13 +38,9 @@ class ServicePolicy
      */
     public function update(User $user, Service $service): bool
     {
-        $team = $service->team();
-        if (! $team) {
-            return false;
-        }
+        $teamId = $this->getTeamId($service);
 
-        // return $user->isAdmin() && $user->teams->contains('id', $team->id);
-        return true;
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
     }
 
     /**
@@ -51,12 +48,9 @@ class ServicePolicy
      */
     public function delete(User $user, Service $service): bool
     {
-        // if ($user->isAdmin()) {
-        //    return true;
-        // }
+        $teamId = $this->getTeamId($service);
 
-        // return false;
-        return true;
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
     }
 
     /**
@@ -64,8 +58,7 @@ class ServicePolicy
      */
     public function restore(User $user, Service $service): bool
     {
-        // return true;
-        return true;
+        return false;
     }
 
     /**
@@ -73,23 +66,17 @@ class ServicePolicy
      */
     public function forceDelete(User $user, Service $service): bool
     {
-        // if ($user->isAdmin()) {
-        //    return true;
-        // }
-
-        // return false;
-        return true;
+        return false;
     }
 
+    /**
+     * Determine whether the user can stop the service.
+     */
     public function stop(User $user, Service $service): bool
     {
-        $team = $service->team();
-        if (! $team) {
-            return false;
-        }
+        $teamId = $this->getTeamId($service);
 
-        // return $user->teams->contains('id', $team->id);
-        return true;
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
     }
 
     /**
@@ -97,13 +84,19 @@ class ServicePolicy
      */
     public function manageEnvironment(User $user, Service $service): bool
     {
-        $team = $service->team();
-        if (! $team) {
-            return false;
-        }
+        $teamId = $this->getTeamId($service);
 
-        // return $user->isAdmin() && $user->teams->contains('id', $team->id);
-        return true;
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
+    }
+
+    /**
+     * Determine whether the user can upload a backup archive for a database within this service.
+     */
+    public function uploadBackup(User $user, Service $service): bool
+    {
+        $teamId = $this->getTeamId($service);
+
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
     }
 
     /**
@@ -111,18 +104,23 @@ class ServicePolicy
      */
     public function deploy(User $user, Service $service): bool
     {
-        $team = $service->team();
-        if (! $team) {
-            return false;
-        }
+        $teamId = $this->getTeamId($service);
 
-        // return $user->teams->contains('id', $team->id);
-        return true;
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
     }
 
+    /**
+     * Determine whether the user can access the terminal.
+     */
     public function accessTerminal(User $user, Service $service): bool
     {
-        // return $user->isAdmin() || $user->teams->contains('id', $service->team()->id);
-        return true;
+        $teamId = $this->getTeamId($service);
+
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
+    }
+
+    private function getTeamId(Service $service): ?int
+    {
+        return $service->team()?->id;
     }
 }

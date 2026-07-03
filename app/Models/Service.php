@@ -16,7 +16,6 @@ use OpenApi\Attributes as OA;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Service model',
@@ -71,7 +70,7 @@ class Service extends BaseModel
     {
         static::creating(function ($service) {
             if (blank($service->name)) {
-                $service->name = 'service-'.(new Cuid2);
+                $service->name = 'service-'.new_public_id();
             }
         });
         static::created(function ($service) {
@@ -626,7 +625,7 @@ class Service extends BaseModel
                     }
                     $fields->put('Unleash', $data->toArray());
                     break;
-                case $image->contains('grafana'):
+                case $this->isGrafanaImage($image->toString()):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GRAFANA')->first();
                     $data = $data->merge([
@@ -778,7 +777,8 @@ class Service extends BaseModel
                     }
                     $rpc_secret = $this->environment_variables()->where('key', 'GARAGE_RPC_SECRET')->first();
                     if (is_null($rpc_secret)) {
-                        $rpc_secret = $this->environment_variables()->where('key', 'SERVICE_HEX_32_RPCSECRET')->first();
+                        $rpc_secret = $this->environment_variables()->where('key', 'SERVICE_HEX_64_RPCSECRET')->first()
+                            ?? $this->environment_variables()->where('key', 'SERVICE_HEX_32_RPCSECRET')->first();
                     }
                     $metrics_token = $this->environment_variables()->where('key', 'GARAGE_METRICS_TOKEN')->first();
                     if (is_null($metrics_token)) {
@@ -1379,6 +1379,15 @@ class Service extends BaseModel
         return $fields;
     }
 
+    private function isGrafanaImage(string $image): bool
+    {
+        return in_array($image, [
+            'grafana/grafana',
+            'grafana/grafana-oss',
+            'grafana/grafana-enterprise',
+        ], true);
+    }
+
     public function saveExtraFields($fields)
     {
         foreach ($fields as $field) {
@@ -1554,7 +1563,7 @@ class Service extends BaseModel
             "cd $workdir",
         ], $this->server);
 
-        $filename = new Cuid2.'-docker-compose.yml';
+        $filename = new_public_id().'-docker-compose.yml';
         Storage::disk('local')->put("tmp/{$filename}", $this->docker_compose);
         $path = Storage::path("tmp/{$filename}");
         instant_scp($path, "{$workdir}/docker-compose.yml", $this->server);

@@ -5,12 +5,17 @@ namespace App\Livewire\Project\Shared;
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Terminal extends Component
 {
+    use AuthorizesRequests;
+
     public bool $hasShell = true;
+
+    public bool $isTerminalConnected = false;
 
     private function checkShellAvailability(Server $server, string $container): bool
     {
@@ -30,7 +35,11 @@ class Terminal extends Component
     #[On('send-terminal-command')]
     public function sendTerminalCommand($isContainer, $identifier, $serverUuid)
     {
+        $this->authorize('canAccessTerminal');
+
         $server = Server::ownedByCurrentTeam()->whereUuid($serverUuid)->firstOrFail();
+        $this->authorize('view', $server);
+
         if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
             abort(403, 'Terminal access is disabled on this server.');
         }
@@ -65,12 +74,20 @@ class Terminal extends Component
                 $dockerCommand = "sudo {$dockerCommand}";
             }
 
-            $command = SshMultiplexingHelper::generateSshCommand($server, $dockerCommand);
+            $command = SshMultiplexingHelper::generateSshCommand(
+                $server,
+                $dockerCommand,
+                commandTimeout: (int) config('constants.terminal.command_timeout')
+            );
         } else {
             $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
                             'if [ -f ~/.profile ]; then . ~/.profile; fi && '.
                             'if [ -n "$SHELL" ] && [ -x "$SHELL" ]; then exec $SHELL; else sh; fi';
-            $command = SshMultiplexingHelper::generateSshCommand($server, $shellCommand);
+            $command = SshMultiplexingHelper::generateSshCommand(
+                $server,
+                $shellCommand,
+                commandTimeout: (int) config('constants.terminal.command_timeout')
+            );
         }
         // ssh command is sent back to frontend then to websocket
         // this is done because the websocket connection is not available here
@@ -82,6 +99,23 @@ class Terminal extends Component
         //     - https://github.com/coollabsio/coolify/issues/2298
         //     - https://github.com/coollabsio/coolify/discussions/3362
         $this->dispatch('send-back-command', $command);
+    }
+
+    #[On('terminalConnected')]
+    public function markTerminalConnected(): void
+    {
+        $this->isTerminalConnected = true;
+    }
+
+    #[On('terminalDisconnected')]
+    public function markTerminalDisconnected(): void
+    {
+        $this->isTerminalConnected = false;
+    }
+
+    public function keepTerminalPageAlive(): void
+    {
+        $this->isTerminalConnected = true;
     }
 
     public function render()

@@ -4,7 +4,7 @@
     'isImportSupported' => false,
 ])
 
-<div class="sub-menu-wrapper">
+<div class="sub-menu-wrapper hidden md:flex">
     <a class="sub-menu-item"
         class="{{ request()->routeIs('project.service.configuration') ? 'menu-item-active' : '' }}"
         {{ wireNavigate() }}
@@ -16,6 +16,8 @@
     </a>
     <a class="sub-menu-item" wire:current.exact="menu-item-active" {{ wireNavigate() }}
         href="{{ route('project.service.index', $parameters) }}"><span class="menu-item-label">General</span></a>
+    <a class="sub-menu-item" wire:current.exact="menu-item-active" {{ wireNavigate() }}
+        href="{{ route('project.service.index.advanced', $parameters) }}"><span class="menu-item-label">Advanced</span></a>
     @if ($serviceDatabase?->isBackupSolutionAvailable() || $serviceDatabase?->is_migrated)
         <a class="sub-menu-item" wire:current.exact="menu-item-active" {{ wireNavigate() }}
             href="{{ route('project.service.database.backups', $parameters) }}"><span class="menu-item-label">Backups</span></a>

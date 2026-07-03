@@ -7,7 +7,7 @@
 
 services:
   frontend:
-    image: ghcr.io/smaug6739/alexandrie-frontend:v8.4.1
+    image: ghcr.io/smaug6739/alexandrie-frontend:v8.7.2
     environment:
       - SERVICE_URL_FRONTEND_8200
       - PORT=8200
@@ -21,7 +21,7 @@ services:
       - backend
 
   backend:
-    image: ghcr.io/smaug6739/alexandrie-backend:v8.4.1
+    image: ghcr.io/smaug6739/alexandrie-backend:v8.7.2
     environment:
       - SERVICE_URL_BACKEND_8201
       - BACKEND_PORT=8201
@@ -74,7 +74,7 @@ services:
       retries: 5
 
   rustfs:
-    image: rustfs/rustfs:1.0.0-alpha.81
+    image: rustfs/rustfs:1.0.0-alpha.90
     environment:
       - SERVICE_URL_RUSTFS_9000
       - RUSTFS_ACCESS_KEY=${SERVICE_USER_RUSTFS}

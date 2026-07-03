@@ -122,7 +122,11 @@
 }
 
 @utility button {
-    @apply flex gap-2 justify-center items-center px-2 h-8 text-sm text-black normal-case rounded-sm border-2 outline-0 cursor-pointer font-medium bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-coolgray-100 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-200 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-neutral-600 disabled:border-transparent disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base;
+    @apply flex gap-2 justify-center items-center px-2 h-8 text-sm text-black normal-case rounded-sm border-2 outline-0 cursor-pointer font-medium bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-coolgray-100 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-200 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-neutral-600 disabled:border-neutral-200 dark:disabled:border-coolgray-300 disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base;
+}
+
+@utility auth-tooltip {
+    @apply fixed z-[99] px-2.5 py-1.5 text-xs rounded-sm pointer-events-none whitespace-nowrap text-neutral-700 bg-neutral-200 dark:text-neutral-300 dark:bg-coolgray-400;
 }
 
 @utility alert-success {
@@ -143,6 +147,10 @@
 
 @utility dropdown-item {
     @apply flex relative gap-2 justify-start items-center py-1 pr-4 pl-2 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50 focus-visible:bg-neutral-100 dark:focus-visible:bg-coollabs;
+}
+
+@utility dropdown-item-touch {
+    @apply min-h-10 px-3 py-2 text-sm;
 }
 
 @utility dropdown-item-no-padding {
@@ -177,7 +185,7 @@
     @apply flex gap-3 items-center px-2 py-1 w-full text-sm dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300 rounded-sm truncate min-w-0;
 }
 @utility menu-item-icon {
-    @apply flex-shrink-0 w-6 h-6 dark:hover:text-white;
+    @apply shrink-0 size-4 dark:hover:text-white;
 }
 
 @utility menu-item-label {
@@ -197,7 +205,7 @@
 }
 
 @utility sub-menu-item-icon {
-    @apply flex-shrink-0 w-4 h-4 dark:hover:text-white;
+    @apply shrink-0 size-4 dark:hover:text-white;
 }
 
 @utility heading-item-active {
@@ -338,4 +346,21 @@
 
 @utility log-info {
     @apply bg-blue-500/10 dark:bg-blue-500/15;
+}
+
+@media (min-width: 1024px) {
+    .sidebar-collapsed .menu-item {
+        justify-content: center;
+        width: var(--button-h, 2rem);
+        height: var(--button-h, 2rem);
+        min-height: var(--button-h, 2rem);
+        padding-left: 0;
+        padding-right: 0;
+        gap: 0;
+        margin-inline: auto;
+    }
+
+    .sidebar-collapsed .sidebar-collapsed-label {
+        display: none;
+    }
 }

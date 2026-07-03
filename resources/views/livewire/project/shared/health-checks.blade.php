@@ -1,14 +1,14 @@
 <form wire:submit='submit' class="flex flex-col">
     <div class="flex items-center gap-2">
-        <h2>Healthchecks</h2>
+        <h2>Healthcheck</h2>
         <x-forms.button canGate="update" :canResource="$resource" type="submit">Save</x-forms.button>
         @if (!$healthCheckEnabled)
-            <x-modal-confirmation title="Confirm Healthcheck Enable?" buttonTitle="Enable Healthcheck"
-                submitAction="toggleHealthcheck" :actions="['Enable healthcheck for this resource.']"
-                warningMessage="If the health check fails, your application will become inaccessible. Please review the <a href='https://coolify.io/docs/knowledge-base/health-checks' target='_blank' class='underline text-white'>Health Checks</a> guide before proceeding!"
-                step2ButtonText="Enable Healthcheck" :confirmWithText="false" :confirmWithPassword="false"
-                isHighlightedButton>
-            </x-modal-confirmation>
+                <x-modal-confirmation :disabled="!auth()->user()->can('update', $resource)" :authDisabled="!auth()->user()->can('update', $resource)" title="Confirm Healthcheck Enable?" buttonTitle="Enable Healthcheck"
+                    submitAction="toggleHealthcheck" :actions="['Enable healthcheck for this resource.']"
+                    warningMessage="If the health check fails, your application will become inaccessible. Please review the <a href='https://coolify.io/docs/knowledge-base/health-checks' target='_blank' class='underline text-white'>Health Checks</a> guide before proceeding!"
+                    step2ButtonText="Enable Healthcheck" :confirmWithText="false" :confirmWithPassword="false"
+                    isHighlightedButton>
+                </x-modal-confirmation>
         @else
             <x-forms.button canGate="update" :canResource="$resource" wire:click="toggleHealthcheck">Disable Healthcheck</x-forms.button>
         @endif

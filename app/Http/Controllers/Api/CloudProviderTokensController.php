@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\CloudProviderToken;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -176,6 +177,7 @@ class CloudProviderTokensController extends Controller
         if (is_null($token)) {
             return response()->json(['message' => 'Cloud provider token not found.'], 404);
         }
+        $this->authorize('view', $token);
 
         return response()->json($this->removeSensitiveData($token));
     }
@@ -242,9 +244,10 @@ class CloudProviderTokensController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
+        $this->authorize('create', [CloudProviderToken::class]);
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
 
@@ -284,6 +287,13 @@ class CloudProviderTokensController extends Controller
             'provider' => $body['provider'],
             'token' => $body['token'],
             'name' => $body['name'],
+        ]);
+
+        auditLog('api.cloud_token.created', [
+            'team_id' => $teamId,
+            'cloud_token_uuid' => $cloudProviderToken->uuid,
+            'cloud_token_name' => $cloudProviderToken->name,
+            'provider' => $cloudProviderToken->provider,
         ]);
 
         return response()->json([
@@ -355,7 +365,7 @@ class CloudProviderTokensController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
 
@@ -386,8 +396,17 @@ class CloudProviderTokensController extends Controller
         if (! $token) {
             return response()->json(['message' => 'Cloud provider token not found.'], 404);
         }
+        $this->authorize('update', $token);
 
         $token->update(array_intersect_key($body, array_flip($allowedFields)));
+
+        auditLog('api.cloud_token.updated', [
+            'team_id' => $teamId,
+            'cloud_token_uuid' => $token->uuid,
+            'cloud_token_name' => $token->name,
+            'provider' => $token->provider,
+            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($body))),
+        ]);
 
         return response()->json([
             'uuid' => $token->uuid,
@@ -459,12 +478,23 @@ class CloudProviderTokensController extends Controller
         if (! $token) {
             return response()->json(['message' => 'Cloud provider token not found.'], 404);
         }
+        $this->authorize('delete', $token);
 
         if ($token->hasServers()) {
             return response()->json(['message' => 'Cannot delete token that is used by servers.'], 400);
         }
 
+        $tokenUuid = $token->uuid;
+        $tokenName = $token->name;
+        $tokenProvider = $token->provider;
         $token->delete();
+
+        auditLog('api.cloud_token.deleted', [
+            'team_id' => $teamId,
+            'cloud_token_uuid' => $tokenUuid,
+            'cloud_token_name' => $tokenName,
+            'provider' => $tokenProvider,
+        ]);
 
         return response()->json(['message' => 'Cloud provider token deleted.']);
     }
@@ -519,8 +549,17 @@ class CloudProviderTokensController extends Controller
         if (! $cloudToken) {
             return response()->json(['message' => 'Cloud provider token not found.'], 404);
         }
+        $this->authorize('view', $cloudToken);
 
         $validation = $this->validateProviderToken($cloudToken->provider, $cloudToken->token);
+
+        auditLog('api.cloud_token.validated', [
+            'team_id' => $teamId,
+            'cloud_token_uuid' => $cloudToken->uuid,
+            'cloud_token_name' => $cloudToken->name,
+            'provider' => $cloudToken->provider,
+            'valid' => $validation['valid'],
+        ]);
 
         return response()->json([
             'valid' => $validation['valid'],

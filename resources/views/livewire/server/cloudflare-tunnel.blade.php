@@ -71,6 +71,11 @@
                     </x-callout>
                 @endif
                 @if (!$isCloudflareTunnelsEnabled && $server->isFunctional())
+                    @cannot('update', $server)
+                        <x-callout type="danger" title="Insufficient Permissions" class="mb-4">
+                            You don't have permission to configure Cloudflare Tunnel for this server.
+                        </x-callout>
+                    @endcannot
                     <div class="flex  flex-col pb-2">
                         <h3>Automated </h3>
                         <a href="https://coolify.io/docs/knowledge-base/cloudflare/tunnels/server-ssh" target="_blank"
@@ -91,10 +96,6 @@
                                     helper="The SSH domain you configured in Cloudflare. Make sure there is no protocol like http(s):// so you provide a FQDN not a URL. <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/cloudflare/tunnels/server-ssh' target='_blank'>Documentation</a>" />
                                 <x-forms.button type="submit" isHighlighted>Continue</x-forms.button>
                             </form>
-                        @else
-                            <x-callout type="warning" title="Permission Required" class="mb-4">
-                                You don't have permission to configure Cloudflare Tunnel for this server.
-                            </x-callout>
                         @endcan
                     </div>
                     @script
@@ -121,10 +122,6 @@
                         ]" confirmationText="I manually configured Cloudflare Tunnel"
                         confirmationLabel="Please type the confirmation text to confirm that you manually configured Cloudflare Tunnel."
                         shortConfirmationLabel="Confirmation text" />
-                @else
-                    <x-callout type="warning" title="Permission Required" class="mb-4">
-                        You don't have permission to configure Cloudflare Tunnel for this server.
-                    </x-callout>
                 @endcan
             </div>
             @endif

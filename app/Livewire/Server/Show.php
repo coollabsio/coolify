@@ -32,6 +32,8 @@ class Show extends Component
 
     public string $port;
 
+    public int $connectionTimeout;
+
     public ?string $validationLogs = null;
 
     public ?string $wildcardDomain = null;
@@ -108,8 +110,9 @@ class Show extends Component
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
             'ip' => ['required', new ValidServerIp],
-            'user' => ['required', 'regex:/^[a-zA-Z0-9_-]+$/'],
+            'user' => ValidationPatterns::serverUsernameRules(),
             'port' => 'required|integer|between:1,65535',
+            'connectionTimeout' => 'required|integer|min:1|max:300',
             'validationLogs' => 'nullable',
             'wildcardDomain' => 'nullable|url',
             'isReachable' => 'required',
@@ -137,7 +140,12 @@ class Show extends Component
             [
                 'ip.required' => 'The IP Address field is required.',
                 'user.required' => 'The User field is required.',
+                ...ValidationPatterns::serverUsernameMessages(),
                 'port.required' => 'The Port field is required.',
+                'connectionTimeout.required' => 'The SSH Connection Timeout field is required.',
+                'connectionTimeout.integer' => 'The SSH Connection Timeout must be an integer.',
+                'connectionTimeout.min' => 'The SSH Connection Timeout must be at least 1 second.',
+                'connectionTimeout.max' => 'The SSH Connection Timeout must not exceed 300 seconds.',
                 'wildcardDomain.url' => 'The Wildcard Domain must be a valid URL.',
                 'sentinelToken.required' => 'The Sentinel Token field is required.',
                 'sentinelMetricsRefreshRateSeconds.required' => 'The Metrics Refresh Rate field is required.',
@@ -210,6 +218,7 @@ class Show extends Component
             $this->server->validation_logs = $this->validationLogs;
             $this->server->save();
 
+            $this->server->settings->connection_timeout = $this->connectionTimeout;
             $this->server->settings->is_swarm_manager = $this->isSwarmManager;
             $this->server->settings->wildcard_domain = $this->wildcardDomain;
             $this->server->settings->is_swarm_worker = $this->isSwarmWorker;
@@ -237,6 +246,7 @@ class Show extends Component
             $this->ip = $this->server->ip;
             $this->user = $this->server->user;
             $this->port = $this->server->port;
+            $this->connectionTimeout = $this->server->settings->connection_timeout;
 
             $this->wildcardDomain = $this->server->settings->wildcard_domain;
             $this->isReachable = $this->server->settings->is_reachable;
@@ -268,7 +278,9 @@ class Show extends Component
         // Only refresh if the event is for this server
         if (isset($event['serverUuid']) && $event['serverUuid'] === $this->server->uuid) {
             $this->server->refresh();
-            $this->syncData();
+            // Only refresh display-only state; never re-sync text-input properties
+            // (would clobber any unsaved typing — see coolify#6062 / #6354 / #9695).
+            $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
             $this->dispatch('success', 'Sentinel has been restarted successfully.');
         }
     }
@@ -287,18 +299,22 @@ class Show extends Component
 
     public function checkLocalhostConnection()
     {
-        $this->syncData(true);
-        ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection();
-        if ($uptime) {
-            $this->dispatch('success', 'Server is reachable.');
-            $this->server->settings->is_reachable = $this->isReachable = true;
-            $this->server->settings->is_usable = $this->isUsable = true;
-            $this->server->settings->save();
-            ServerReachabilityChanged::dispatch($this->server);
-        } else {
-            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error);
+        try {
+            $this->syncData(true);
+            ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection();
+            if ($uptime) {
+                $this->dispatch('success', 'Server is reachable.');
+                $this->server->settings->is_reachable = $this->isReachable = true;
+                $this->server->settings->is_usable = $this->isUsable = true;
+                $this->server->settings->save();
+                ServerReachabilityChanged::dispatch($this->server);
+            } else {
+                $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error);
 
-            return;
+                return;
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 
@@ -401,13 +417,14 @@ class Show extends Component
     public function checkHetznerServerStatus(bool $manual = false)
     {
         try {
+            $this->authorize('view', $this->server);
             if (! $this->server->hetzner_server_id || ! $this->server->cloudProviderToken) {
                 $this->dispatch('error', 'This server is not associated with a Hetzner Cloud server or token.');
 
                 return;
             }
 
-            $hetznerService = new \App\Services\HetznerService($this->server->cloudProviderToken->token);
+            $hetznerService = new HetznerService($this->server->cloudProviderToken->token);
             $serverData = $hetznerService->getServer($this->server->hetzner_server_id);
 
             $this->hetznerServerStatus = $serverData['status'] ?? null;
@@ -448,12 +465,15 @@ class Show extends Component
             return;
         }
 
-        // Refresh server data
+        // Refresh server data and only the display-only state that validation produces.
+        // Never re-sync text-input properties via syncData() — would clobber any
+        // unsaved typing (see coolify#6062 / #6354 / #9695).
         $this->server->refresh();
-        $this->syncData();
-
-        // Update validation state
+        $this->server->settings->refresh();
         $this->isValidating = $this->server->is_validating ?? false;
+        $this->validationLogs = $this->server->validation_logs;
+        $this->isReachable = $this->server->settings->is_reachable;
+        $this->isUsable = $this->server->settings->is_usable;
 
         // Reload Hetzner tokens in case the linking section should now be shown
         $this->loadHetznerTokens();
@@ -465,13 +485,14 @@ class Show extends Component
     public function startHetznerServer()
     {
         try {
+            $this->authorize('update', $this->server);
             if (! $this->server->hetzner_server_id || ! $this->server->cloudProviderToken) {
                 $this->dispatch('error', 'This server is not associated with a Hetzner Cloud server or token.');
 
                 return;
             }
 
-            $hetznerService = new \App\Services\HetznerService($this->server->cloudProviderToken->token);
+            $hetznerService = new HetznerService($this->server->cloudProviderToken->token);
             $hetznerService->powerOnServer($this->server->hetzner_server_id);
 
             $this->hetznerServerStatus = 'starting';
@@ -514,6 +535,20 @@ class Show extends Component
         $this->availableHetznerTokens = CloudProviderToken::ownedByCurrentTeam()
             ->where('provider', 'hetzner')
             ->get();
+    }
+
+    #[Computed]
+    public function limaStartCommand(): ?string
+    {
+        if (! isDev()) {
+            return null;
+        }
+
+        return match ($this->server->uuid) {
+            'lima-ubuntu-2404' => 'limactl start --yes --name=coolify-lima-ubuntu-2404 docker/lima/ubuntu-2404.yaml',
+            'lima-ubuntu-2604' => 'limactl start --yes --name=coolify-lima-ubuntu-2604 docker/lima/ubuntu-2604.yaml',
+            default => null,
+        };
     }
 
     public function searchHetznerServer(): void

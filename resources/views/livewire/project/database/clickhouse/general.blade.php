@@ -5,6 +5,9 @@
             <x-forms.button type="submit" canGate="update" :canResource="$database">
                 Save
             </x-forms.button>
+            <x-modal-input title="Resource Details" buttonTitle="Details">
+                <livewire:project.shared.resource-details :resource="$database" />
+            </x-modal-input>
         </div>
         <div class="flex gap-2">
             <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
@@ -17,8 +20,12 @@
             <div class="flex gap-2">
                 <x-forms.input label="Initial Username" id="clickhouseAdminUser" placeholder="If empty: clickhouse"
                     readonly helper="You can only change this in the database." canGate="update" :canResource="$database" />
-                <x-forms.input label="Initial Password" id="clickhouseAdminPassword" type="password" required readonly
-                    helper="You can only change this in the database." canGate="update" :canResource="$database" />
+                @if ($isPasswordHiddenForMember)
+                    <x-forms.input label="Initial Password" disabled value="Hidden (only admins can view)" />
+                @else
+                    <x-forms.input label="Initial Password" id="clickhouseAdminPassword" type="password" required readonly
+                        helper="You can only change this in the database." canGate="update" :canResource="$database" />
+                @endif
             </div>
         @else
             <div class=" dark:text-warning">Please verify these values. You can only modify them before the initial
@@ -26,8 +33,12 @@
             </div>
             <div class="flex gap-2">
                 <x-forms.input label="Username" id="clickhouseAdminUser" required canGate="update" :canResource="$database" />
-                <x-forms.input label="Password" id="clickhouseAdminPassword" type="password" required canGate="update"
-                    :canResource="$database" />
+                @if ($isPasswordHiddenForMember)
+                    <x-forms.input label="Password" disabled value="Hidden (only admins can view)" />
+                @else
+                    <x-forms.input label="Password" id="clickhouseAdminPassword" type="password" required canGate="update"
+                        :canResource="$database" />
+                @endif
             </div>
         @endif
         <x-forms.input
@@ -41,20 +52,8 @@
                     helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433"
                     canGate="update" :canResource="$database" />
             </div>
-            <x-forms.input label="Clickhouse URL (internal)"
-                helper="If you change the user/password/port, this could be different. This is with the default values."
-                type="password" readonly wire:model="dbUrl" canGate="update" :canResource="$database" />
-            @if ($dbUrlPublic)
-                <x-forms.input label="Clickhouse URL (public)"
-                    helper="If you change the user/password/port, this could be different. This is with the default values."
-                    type="password" readonly wire:model="dbUrlPublic" canGate="update" :canResource="$database" />
-            @else
-                <x-forms.input label="Clickhouse URL (public)"
-                    helper="If you change the user/password/port, this could be different. This is with the default values."
-                    readonly value="Starting the database will generate this." canGate="update" :canResource="$database" />
-            @endif
         </div>
-        <div>
+        <livewire:project.database.clickhouse.status-info :database="$database" />
             <div class="flex flex-col py-2 w-64">
                 <div class="flex items-center gap-2 pb-2">
                     <div class="flex items-center">
@@ -76,11 +75,12 @@
                 <x-forms.checkbox instantSave id="isPublic" label="Make it publicly available" canGate="update"
                     :canResource="$database" />
             </div>
+            <div class="flex flex-col gap-2">
             <x-forms.input type="number" placeholder="5432" disabled="{{ $isPublic }}" id="publicPort" label="Public Port"
                 canGate="update" :canResource="$database" />
             <x-forms.input type="number" placeholder="3600" disabled="{{ $isPublic }}" id="publicPortTimeout"
                 label="Proxy Timeout (seconds)" helper="Timeout for the public TCP proxy connection in seconds. Default: 3600 (1 hour)." canGate="update" :canResource="$database" />
-        </div>
+            </div>
     </form>
     <h3 class="pt-4">Advanced</h3>
     <div class="w-64">
