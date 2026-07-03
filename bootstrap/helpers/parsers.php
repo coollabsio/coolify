@@ -1480,9 +1480,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             }
         }
         $resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);
-    } catch (Exception $e) {
+    } catch (Exception) {
         // If parsing fails, keep the original docker_compose_raw unchanged
-        ray('Failed to update docker_compose_raw in applicationParser: '.$e->getMessage());
     }
 
     data_forget($resource, 'environment_variables');
@@ -2732,7 +2731,6 @@ function serviceParser(Service $resource): Collection
         $resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);
     } catch (Exception $e) {
         // If parsing fails, keep the original docker_compose_raw unchanged
-        ray('Failed to update docker_compose_raw in serviceParser: '.$e->getMessage());
     }
 
     data_forget($resource, 'environment_variables');

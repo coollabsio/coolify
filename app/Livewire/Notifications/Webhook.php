@@ -168,13 +168,6 @@ class Webhook extends Component
         $this->syncData(true);
         refreshSession();
 
-        if (isDev()) {
-            ray('Webhook settings saved', [
-                'webhook_enabled' => $this->settings->webhook_enabled,
-                'webhook_url' => $this->settings->webhook_url,
-            ]);
-        }
-
         $this->dispatch('success', 'Settings saved.');
     }
 
@@ -182,13 +175,6 @@ class Webhook extends Component
     {
         try {
             $this->authorize('sendTest', $this->settings);
-
-            if (isDev()) {
-                ray('Sending test webhook notification', [
-                    'team_id' => $this->team->id,
-                    'webhook_url' => $this->settings->webhook_url,
-                ]);
-            }
 
             $this->team->notify(new Test(channel: 'webhook'));
             $this->dispatch('success', 'Test notification sent.');
