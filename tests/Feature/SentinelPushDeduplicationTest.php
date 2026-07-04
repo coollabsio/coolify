@@ -8,6 +8,7 @@ use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -75,6 +76,23 @@ it('dispatches the job on the first push', function () use ($running) {
 });
 
 it('skips the job when the second push is identical', function () use ($running) {
+    pushSentinel($this->token, sentinelPayload($running()))->assertOk();
+    pushSentinel($this->token, sentinelPayload($running()))->assertOk();
+
+    Queue::assertPushed(PushServerUpdateJob::class, 1);
+});
+
+it('only audits sentinel pushes that dispatch a state update', function () use ($running) {
+    $auditChannel = Mockery::mock();
+    $auditChannel->shouldReceive('info')
+        ->once()
+        ->with('sentinel.metrics_pushed', Mockery::on(function (array $context) {
+            return $context['server_uuid'] === $this->server->uuid
+                && $context['team_id'] === $this->team->id;
+        }));
+
+    Log::shouldReceive('channel')->with('audit')->andReturn($auditChannel);
+
     pushSentinel($this->token, sentinelPayload($running()))->assertOk();
     pushSentinel($this->token, sentinelPayload($running()))->assertOk();
 

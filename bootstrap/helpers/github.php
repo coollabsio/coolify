@@ -2,6 +2,7 @@
 
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\PrivateKey;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
@@ -13,9 +14,9 @@ use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Rsa\Sha256;
 use Lcobucci\JWT\Token\Builder;
 
-function generateGithubToken(GithubApp $source, string $type)
+function assertGithubClockInSync(string $apiUrl): void
 {
-    $response = Http::get("{$source->api_url}/zen");
+    $response = Http::get("{$apiUrl}/zen");
     $serverTime = CarbonImmutable::now()->setTimezone('UTC');
     $githubTime = Carbon::parse($response->header('date'));
     $timeDiff = abs($serverTime->diffInSeconds($githubTime));
@@ -29,6 +30,11 @@ function generateGithubToken(GithubApp $source, string $type)
             'Please synchronize your system clock.'
         );
     }
+}
+
+function generateGithubToken(GithubApp $source, string $type)
+{
+    assertGithubClockInSync($source->api_url);
 
     $signingKey = InMemory::plainText($source->privateKey->private_key);
     $algorithm = new Sha256;
@@ -117,10 +123,81 @@ function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $m
     ];
 }
 
+function generateGithubAppJwt(string $privateKey, string|int $appId): string
+{
+    $algorithm = new Sha256;
+    $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
+    $now = CarbonImmutable::now()->setTimezone('UTC');
+    $now = $now->setTime($now->format('H'), $now->format('i'), $now->format('s'));
+
+    return $tokenBuilder
+        ->issuedBy((string) $appId)
+        ->issuedAt($now->modify('-1 minute'))
+        ->expiresAt($now->modify('+8 minutes'))
+        ->getToken($algorithm, InMemory::plainText($privateKey))
+        ->toString();
+}
+
+function syncGithubAppName(GithubApp $source, bool $throw = false): ?string
+{
+    try {
+        if (blank($source->app_id) || blank($source->private_key_id)) {
+            return null;
+        }
+
+        $privateKey = $source->privateKey ?: PrivateKey::find($source->private_key_id);
+
+        if (! $privateKey) {
+            return null;
+        }
+
+        assertGithubClockInSync($source->api_url);
+
+        $jwt = generateGithubAppJwt($privateKey->private_key, $source->app_id);
+
+        $response = Http::withHeaders([
+            'Accept' => 'application/vnd.github+json',
+            'X-GitHub-Api-Version' => '2022-11-28',
+            'Authorization' => "Bearer {$jwt}",
+        ])->get("{$source->api_url}/app");
+
+        if (! $response->successful()) {
+            throw new RuntimeException(data_get($response->json(), 'message', 'Failed to fetch GitHub App information.'));
+        }
+
+        $appSlug = data_get($response->json(), 'slug');
+
+        if (blank($appSlug)) {
+            return null;
+        }
+
+        $source->name = $appSlug;
+
+        if ($source->exists) {
+            $source->save();
+        }
+
+        $privateKey->name = "github-app-{$appSlug}";
+        $privateKey->save();
+
+        return $appSlug;
+    } catch (Throwable $e) {
+        if ($throw) {
+            throw $e;
+        }
+
+        return null;
+    }
+}
+
 function getInstallationPath(GithubApp $source): string
 {
     $name = str(Str::kebab($source->name));
-    $installation_path = $source->html_url === 'https://github.com' ? 'apps' : 'github-apps';
+    $baseUrl = rtrim($source->html_url, '/');
+    $host = parse_url($source->html_url, PHP_URL_HOST);
+    $host = blank($host) ? null : Str::lower($host);
+    $usesDataResidencyPath = filled($host) && Str::endsWith($host, '.ghe.com');
+    $installation_path = $host === 'github.com' || $usesDataResidencyPath ? 'apps' : 'github-apps';
     $state = Str::random(64);
 
     Cache::put('github-app-setup-state:'.hash('sha256', $state), [
@@ -129,7 +206,17 @@ function getInstallationPath(GithubApp $source): string
         'team_id' => $source->team_id,
     ], now()->addMinutes(60));
 
-    return "$source->html_url/$installation_path/$name/installations/new?".http_build_query(['state' => $state]);
+    if ($usesDataResidencyPath) {
+        $organization = str($source->organization)->trim('/');
+
+        if ($organization->isNotEmpty()) {
+            $organization = rawurlencode((string) $organization);
+
+            return "$baseUrl/$installation_path/$organization/$name/installations/new?".http_build_query(['state' => $state]);
+        }
+    }
+
+    return "$baseUrl/$installation_path/$name/installations/new?".http_build_query(['state' => $state]);
 }
 
 function getPermissionsPath(GithubApp $source)
@@ -189,7 +276,6 @@ function getGithubCommitRangeFiles(?GithubApp $source, string $owner, string $re
 
         return $files->pluck('filename')->filter()->values()->toArray();
     } catch (Exception $e) {
-        ray('Error fetching GitHub commit range files: '.$e->getMessage());
 
         return [];
     }
@@ -215,7 +301,6 @@ function getGithubPullRequestFiles(?GithubApp $source, string $owner, string $re
 
         return $files->pluck('filename')->filter()->values()->toArray();
     } catch (Exception $e) {
-        ray('Error fetching GitHub PR files: '.$e->getMessage());
 
         return [];
     }

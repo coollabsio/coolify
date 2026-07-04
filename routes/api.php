@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\ApplicationsController;
 use App\Http\Controllers\Api\CloudProviderTokensController;
 use App\Http\Controllers\Api\DatabasesController;
 use App\Http\Controllers\Api\DeployController;
+use App\Http\Controllers\Api\DestinationsController;
 use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\HetznerController;
 use App\Http\Controllers\Api\OtherController;
@@ -85,6 +86,13 @@ Route::group([
     Route::get('/servers/{uuid}', [ServersController::class, 'server_by_uuid'])->middleware(['api.ability:read']);
     Route::get('/servers/{uuid}/domains', [ServersController::class, 'domains_by_server'])->middleware(['api.ability:read']);
     Route::get('/servers/{uuid}/resources', [ServersController::class, 'resources_by_server'])->middleware(['api.ability:read']);
+
+    // Destinations — REST surface for the Coolify "Destinations" UI section (added).
+    Route::get('/destinations', [DestinationsController::class, 'index'])->middleware(['api.ability:read']);
+    Route::get('/destinations/{uuid}', [DestinationsController::class, 'show'])->middleware(['api.ability:read']);
+    Route::delete('/destinations/{uuid}', [DestinationsController::class, 'delete'])->middleware(['api.ability:write']);
+    Route::get('/servers/{server_uuid}/destinations', [DestinationsController::class, 'index_by_server'])->middleware(['api.ability:read']);
+    Route::post('/servers/{server_uuid}/destinations', [DestinationsController::class, 'create'])->middleware(['api.ability:write']);
 
     Route::get('/servers/{uuid}/validate', [ServersController::class, 'validate_server'])->middleware(['api.ability:write']);
 

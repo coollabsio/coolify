@@ -12,11 +12,6 @@ class ApiTokenPolicy
      */
     public function viewAny(User $user): bool
     {
-        // Authorization temporarily disabled
-        /*
-        // Users can view their own API tokens
-        return true;
-        */
         return true;
     }
 
@@ -25,12 +20,7 @@ class ApiTokenPolicy
      */
     public function view(User $user, PersonalAccessToken $token): bool
     {
-        // Authorization temporarily disabled
-        /*
-        // Users can only view their own tokens
         return $user->id === $token->tokenable_id && $token->tokenable_type === User::class;
-        */
-        return true;
     }
 
     /**
@@ -38,11 +28,6 @@ class ApiTokenPolicy
      */
     public function create(User $user): bool
     {
-        // Authorization temporarily disabled
-        /*
-        // All authenticated users can create their own API tokens
-        return true;
-        */
         return true;
     }
 
@@ -51,12 +36,7 @@ class ApiTokenPolicy
      */
     public function update(User $user, PersonalAccessToken $token): bool
     {
-        // Authorization temporarily disabled
-        /*
-        // Users can only update their own tokens
         return $user->id === $token->tokenable_id && $token->tokenable_type === User::class;
-        */
-        return true;
     }
 
     /**
@@ -64,12 +44,7 @@ class ApiTokenPolicy
      */
     public function delete(User $user, PersonalAccessToken $token): bool
     {
-        // Authorization temporarily disabled
-        /*
-        // Users can only delete their own tokens
         return $user->id === $token->tokenable_id && $token->tokenable_type === User::class;
-        */
-        return true;
     }
 
     /**
@@ -77,11 +52,6 @@ class ApiTokenPolicy
      */
     public function manage(User $user): bool
     {
-        // Authorization temporarily disabled
-        /*
-        // All authenticated users can manage their own API tokens
-        return true;
-        */
         return true;
     }
 
@@ -90,7 +60,6 @@ class ApiTokenPolicy
      */
     public function useRootPermissions(User $user): bool
     {
-        // Only admins and owners can use root permissions
         return $user->isAdmin() || $user->isOwner();
     }
 
@@ -99,11 +68,22 @@ class ApiTokenPolicy
      */
     public function useWritePermissions(User $user): bool
     {
-        // Authorization temporarily disabled
-        /*
-        // Only admins and owners can use write permissions
         return $user->isAdmin() || $user->isOwner();
-        */
-        return true;
+    }
+
+    /**
+     * Determine whether the user can use deploy permissions for API tokens.
+     */
+    public function useDeployPermissions(User $user): bool
+    {
+        return $user->isAdmin() || $user->isOwner();
+    }
+
+    /**
+     * Determine whether the user can use read:sensitive permissions for API tokens.
+     */
+    public function useSensitivePermissions(User $user): bool
+    {
+        return $user->isAdmin() || $user->isOwner();
     }
 }

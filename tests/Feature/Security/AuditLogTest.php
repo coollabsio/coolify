@@ -1,19 +1,36 @@
 <?php
 
+use App\Livewire\Security\CloudInitScriptForm;
+use App\Livewire\Security\CloudInitScripts;
+use App\Livewire\Security\CloudProviderTokenForm;
+use App\Livewire\Security\CloudProviderTokens;
 use App\Models\Application;
+use App\Models\CloudInitScript;
+use App\Models\CloudProviderToken;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Once;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 function makeAuditTeamUser(): array
 {
+    if (! InstanceSettings::query()->whereKey(0)->exists()) {
+        $settings = new InstanceSettings;
+        $settings->id = 0;
+        $settings->save();
+    }
+    Once::flush();
+
     $team = Team::factory()->create();
     $user = User::factory()->create();
     $team->members()->attach($user->id, ['role' => 'owner']);
@@ -119,6 +136,89 @@ describe('audit channel helper', function () {
         foreach (array_keys($captured) as $key) {
             expect(in_array(strtolower($key), $disallowed, true))->toBeFalse();
         }
+    });
+});
+
+describe('security UI audit logging', function () {
+    test('creating a cloud provider token from Livewire writes an audit entry', function () {
+        [$team] = makeAuditTeamUser();
+
+        Http::fake([
+            'https://api.hetzner.cloud/v1/servers' => Http::response([], 200),
+        ]);
+
+        $auditChannel = Mockery::mock();
+        $auditChannel->shouldReceive('info')
+            ->once()
+            ->with('ui.cloud_token.created', Mockery::on(function (array $context) use ($team) {
+                return $context['team_id'] === $team->id
+                    && $context['provider'] === 'hetzner'
+                    && $context['cloud_token_name'] === 'UI Token';
+            }));
+
+        Log::shouldReceive('channel')->with('audit')->andReturn($auditChannel);
+
+        Livewire::test(CloudProviderTokenForm::class)
+            ->set('provider', 'hetzner')
+            ->set('token', 'secret-token')
+            ->set('name', 'UI Token')
+            ->call('addToken');
+    });
+
+    test('deleting a cloud provider token from Livewire writes an audit entry', function () {
+        [$team] = makeAuditTeamUser();
+        $token = CloudProviderToken::factory()->create([
+            'team_id' => $team->id,
+            'provider' => 'hetzner',
+            'name' => 'Delete Me',
+        ]);
+
+        $auditChannel = Mockery::mock();
+        $auditChannel->shouldReceive('info')
+            ->once()
+            ->with('ui.cloud_token.deleted', Mockery::on(function (array $context) use ($token) {
+                return $context['cloud_token_uuid'] === $token->uuid
+                    && $context['cloud_token_name'] === 'Delete Me';
+            }));
+
+        Log::shouldReceive('channel')->with('audit')->andReturn($auditChannel);
+
+        Livewire::test(CloudProviderTokens::class)
+            ->call('deleteToken', $token->id);
+    });
+
+    test('creating and deleting cloud-init scripts from Livewire write audit entries', function () {
+        [$team] = makeAuditTeamUser();
+
+        $auditChannel = Mockery::mock();
+        $auditChannel->shouldReceive('info')
+            ->once()
+            ->with('ui.cloud_init_script.created', Mockery::on(function (array $context) use ($team) {
+                return $context['team_id'] === $team->id
+                    && $context['cloud_init_script_name'] === 'Bootstrap';
+            }));
+        $auditChannel->shouldReceive('info')
+            ->once()
+            ->with('ui.cloud_init_script.deleted', Mockery::on(function (array $context) {
+                return $context['cloud_init_script_name'] === 'Bootstrap';
+            }));
+
+        Log::shouldReceive('channel')->with('audit')->andReturn($auditChannel);
+
+        Livewire::test(CloudInitScriptForm::class)
+            ->set('name', 'Bootstrap')
+            ->set('script', "#cloud-config\npackages: []")
+            ->call('save');
+
+        $script = CloudInitScript::where('team_id', $team->id)->firstOrFail();
+
+        Livewire::test(CloudInitScripts::class)
+            ->call('deleteScript', $script->id);
+    });
+
+    test('cloud provider token form does not contain debug ray calls', function () {
+        expect(file_get_contents(app_path('Livewire/Security/CloudProviderTokenForm.php')))
+            ->not->toContain('ray'.'(');
     });
 });
 

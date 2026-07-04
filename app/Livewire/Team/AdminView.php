@@ -25,6 +25,9 @@ class AdminView extends Component
 
     public function submitSearch()
     {
+        if (! isInstanceAdmin()) {
+            return;
+        }
         if ($this->search !== '') {
             $this->users = User::where(function ($query) {
                 $query->where('name', 'like', "%{$this->search}%")
@@ -39,6 +42,9 @@ class AdminView extends Component
 
     public function getUsers()
     {
+        if (! isInstanceAdmin()) {
+            return;
+        }
         $users = User::where('id', '!=', auth()->id())->get();
         if ($users->count() > $this->number_of_users_to_show) {
             $this->lots_of_users = true;

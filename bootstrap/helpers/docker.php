@@ -9,7 +9,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
 {
@@ -459,7 +458,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     foreach ($domains as $loop => $domain) {
         try {
             if ($generate_unique_uuid) {
-                $uuid = new Cuid2;
+                $uuid = new_public_id();
             }
 
             $url = Url::fromString($domain);
@@ -1364,7 +1363,7 @@ function generateDockerBuildArgs($variables): Collection
         $key = is_array($var) ? data_get($var, 'key') : $var->key;
 
         // Only return the key - Docker will get the value from the environment
-        return "--build-arg {$key}";
+        return '--build-arg '.escapeshellarg((string) $key);
     });
 }
 

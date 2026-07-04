@@ -63,7 +63,7 @@
         </x-forms.button>
     </form>
 @else
-    <x-callout type="warning" title="Permission Required">
+    <x-callout type="danger" title="Insufficient Permissions">
         You don't have permission to create new GitHub Apps. Please contact your team administrator for access.
     </x-callout>
 @endcan

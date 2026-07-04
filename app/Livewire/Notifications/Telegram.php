@@ -169,8 +169,13 @@ class Telegram extends Component
             $this->settings->save();
         } else {
             $this->telegramEnabled = $this->settings->telegram_enabled;
-            $this->telegramToken = $this->settings->telegram_token;
-            $this->telegramChatId = $this->settings->telegram_chat_id;
+            if (auth()->user()->can('update', $this->settings)) {
+                $this->telegramToken = $this->settings->telegram_token;
+                $this->telegramChatId = $this->settings->telegram_chat_id;
+            } else {
+                $this->telegramToken = null;
+                $this->telegramChatId = null;
+            }
 
             $this->deploymentSuccessTelegramNotifications = $this->settings->deployment_success_telegram_notifications;
             $this->deploymentFailureTelegramNotifications = $this->settings->deployment_failure_telegram_notifications;

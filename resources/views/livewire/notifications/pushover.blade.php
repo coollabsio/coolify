@@ -24,12 +24,21 @@
             <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSavePushoverEnabled" id="pushoverEnabled" label="Enabled" />
         </div>
         <div class="flex  gap-2">
-            <x-forms.input canGate="update" :canResource="$settings" type="password"
-                helper="Get your User Key in Pushover. You need to be logged in to Pushover to see your user key in the top right corner. <br><a class='inline-block underline dark:text-white' href='https://pushover.net/' target='_blank'>Pushover Dashboard</a>"
-                required id="pushoverUserKey" label="User Key" />
-            <x-forms.input canGate="update" :canResource="$settings" type="password"
-                helper="Generate an API Token/Key in Pushover by creating a new application. <br><a class='inline-block underline dark:text-white' href='https://pushover.net/apps/build' target='_blank'>Create Pushover Application</a>"
-                required id="pushoverApiToken" label="API Token" />
+            @can('update', $settings)
+                <x-forms.input type="password"
+                    helper="Get your User Key in Pushover. You need to be logged in to Pushover to see your user key in the top right corner. <br><a class='inline-block underline dark:text-white' href='https://pushover.net/' target='_blank'>Pushover Dashboard</a>"
+                    required id="pushoverUserKey" label="User Key" />
+                <x-forms.input type="password"
+                    helper="Generate an API Token/Key in Pushover by creating a new application. <br><a class='inline-block underline dark:text-white' href='https://pushover.net/apps/build' target='_blank'>Create Pushover Application</a>"
+                    required id="pushoverApiToken" label="API Token" />
+            @else
+                <x-forms.input disabled
+                    helper="Get your User Key in Pushover. You need to be logged in to Pushover to see your user key in the top right corner. <br><a class='inline-block underline dark:text-white' href='https://pushover.net/' target='_blank'>Pushover Dashboard</a>"
+                    required label="User Key" value="Hidden (only admins can view)" />
+                <x-forms.input disabled
+                    helper="Generate an API Token/Key in Pushover by creating a new application. <br><a class='inline-block underline dark:text-white' href='https://pushover.net/apps/build' target='_blank'>Create Pushover Application</a>"
+                    required label="API Token" value="Hidden (only admins can view)" />
+            @endcan
         </div>
     </form>
     <h2 class="mt-4">Notification Settings</h2>

@@ -16,6 +16,7 @@ use App\Models\Team;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
+use App\Rules\SafeWebhookUrl;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -27,7 +28,6 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
-use Visus\Cuid2\Cuid2;
 
 class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -309,7 +309,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 // Generate unique UUID for each database backup execution
                 $attempts = 0;
                 do {
-                    $this->backup_log_uuid = (string) new Cuid2;
+                    $this->backup_log_uuid = new_public_id();
                     $exists = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->exists();
                     $attempts++;
                     if ($attempts >= 3 && $exists) {
@@ -715,9 +715,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $escapedEndpoint = escapeshellarg($endpoint);
             $escapedKey = escapeshellarg($key);
             $escapedSecret = escapeshellarg($secret);
+            $escapedBackupLocation = escapeshellarg($this->backup_location);
+            $escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");
+            $resolveOptions = collect(SafeWebhookUrl::minioClientResolveOptions($endpoint))
+                ->map(fn (string $resolveOption): string => '--resolve '.escapeshellarg($resolveOption))
+                ->implode(' ');
+            $resolveOptions = $resolveOptions === '' ? '' : ' '.$resolveOptions;
 
-            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc alias set temporary {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
-            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
+            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc alias set{$resolveOptions} temporary {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
+            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc cp {$escapedBackupLocation} {$escapedS3Destination}";
             instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
 
             $this->s3_uploaded = true;
@@ -733,7 +739,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private function getFullImageName(): string
     {
-        $helperImage = config('constants.coolify.helper_image');
+        $helperImage = coolifyHelperImage();
         $latestVersion = getHelperVersion();
 
         return "{$helperImage}:{$latestVersion}";
