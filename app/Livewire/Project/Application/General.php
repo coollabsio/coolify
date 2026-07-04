@@ -134,7 +134,7 @@ class General extends Component
 
     protected $listeners = [
         'resetDefaultLabels',
-        'configurationChanged' => '$refresh',
+        'configurationChanged' => 'handleConfigurationChanged',
         'confirmDomainUsage',
     ];
 
@@ -669,6 +669,12 @@ class General extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function handleConfigurationChanged(): void
+    {
+        $this->application->refresh();
+        $this->syncData();
     }
 
     public function resetDefaultLabels($manualReset = false)
