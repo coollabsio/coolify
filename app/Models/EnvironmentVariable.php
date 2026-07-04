@@ -356,7 +356,7 @@ class EnvironmentVariable extends BaseModel
 
     private function set_environment_variables(?string $environment_variable = null): ?string
     {
-        if (is_null($environment_variable) && $environment_variable === '') {
+        if (is_null($environment_variable)) {
             return null;
         }
         $environment_variable = trim($environment_variable);

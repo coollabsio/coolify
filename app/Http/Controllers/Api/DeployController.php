@@ -425,7 +425,7 @@ class DeployController extends Controller
                 }
                 ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $result;
                 if ($deployment_uuid) {
-                    $deployments->push(['message' => $return_message, 'resource_uuid' => $uuid, 'deployment_uuid' => $deployment_uuid->toString()]);
+                    $deployments->push(['message' => $return_message, 'resource_uuid' => $uuid, 'deployment_uuid' => $deployment_uuid]);
                 } else {
                     $deployments->push(['message' => $return_message, 'resource_uuid' => $uuid]);
                 }
@@ -471,7 +471,7 @@ class DeployController extends Controller
                 }
                 ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $result;
                 if ($deployment_uuid) {
-                    $deployments->push(['resource_uuid' => $resource->uuid, 'deployment_uuid' => $deployment_uuid->toString()]);
+                    $deployments->push(['resource_uuid' => $resource->uuid, 'deployment_uuid' => $deployment_uuid]);
                 }
                 $message = $message->merge($return_message);
             }
@@ -529,7 +529,7 @@ class DeployController extends Controller
                         'resource_type' => 'application',
                         'application_uuid' => $resource->uuid,
                         'application_name' => $resource->name,
-                        'deployment_uuid' => $deployment_uuid?->toString(),
+                        'deployment_uuid' => $deployment_uuid,
                         'force_rebuild' => $force,
                         'pull_request_id' => $pr,
                     ]);

@@ -370,8 +370,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     $pullRequestId = $pull_request_id;
     $isPullRequest = $pullRequestId == 0 ? false : true;
     $server = data_get($resource, 'destination.server');
-    $fileStorages = $resource->fileStorages();
-
     try {
         $yaml = Yaml::parse($compose);
     } catch (Exception) {
@@ -703,14 +701,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $source = $parsed['source'];
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
                         if ($foundConfig) {
-                            $contentNotNull_temp = data_get($foundConfig, 'content');
-                            if ($contentNotNull_temp) {
-                                $content = $contentNotNull_temp;
-                            }
+                            $content = data_get($foundConfig, 'content');
                             $isDirectory = data_get($foundConfig, 'is_directory');
                         } else {
                             // By default, we cannot determine if the bind is a directory or not, so we set it to directory
@@ -756,12 +751,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
 
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if ($foundConfig) {
-                        $contentNotNull_temp = data_get($foundConfig, 'content');
-                        if ($contentNotNull_temp) {
-                            $content = $contentNotNull_temp;
-                        }
+                        $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
                     } else {
                         // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
@@ -1488,9 +1480,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             }
         }
         $resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);
-    } catch (Exception $e) {
+    } catch (Exception) {
         // If parsing fails, keep the original docker_compose_raw unchanged
-        ray('Failed to update docker_compose_raw in applicationParser: '.$e->getMessage());
     }
 
     data_forget($resource, 'environment_variables');
@@ -2070,7 +2061,6 @@ function serviceParser(Service $resource): Collection
                 'service_id' => $resource->id,
             ]);
         }
-        $fileStorages = $savedService->fileStorages();
         if ($savedService->image !== $image) {
             $savedService->image = $image;
             $savedService->save();
@@ -2090,14 +2080,11 @@ function serviceParser(Service $resource): Collection
                     $source = $parsed['source'];
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
                         if ($foundConfig) {
-                            $contentNotNull_temp = data_get($foundConfig, 'content');
-                            if ($contentNotNull_temp) {
-                                $content = $contentNotNull_temp;
-                            }
+                            $content = data_get($foundConfig, 'content');
                             $isDirectory = data_get($foundConfig, 'is_directory');
                         } else {
                             // By default, we cannot determine if the bind is a directory or not, so we set it to directory
@@ -2143,12 +2130,9 @@ function serviceParser(Service $resource): Collection
                         }
                     }
 
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if ($foundConfig) {
-                        $contentNotNull_temp = data_get($foundConfig, 'content');
-                        if ($contentNotNull_temp) {
-                            $content = $contentNotNull_temp;
-                        }
+                        $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
                     } else {
                         // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
@@ -2747,7 +2731,6 @@ function serviceParser(Service $resource): Collection
         $resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);
     } catch (Exception $e) {
         // If parsing fails, keep the original docker_compose_raw unchanged
-        ray('Failed to update docker_compose_raw in serviceParser: '.$e->getMessage());
     }
 
     data_forget($resource, 'environment_variables');

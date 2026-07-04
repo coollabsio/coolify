@@ -6,6 +6,7 @@ use App\Actions\Docker\GetContainersStatus;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -117,12 +118,14 @@ class Previews extends Component
             });
 
             if ($previewKey !== false && isset($this->previewFqdns[$previewKey])) {
+                $this->validate([
+                    "previewFqdns.{$previewKey}" => ValidationPatterns::applicationDomainRules(),
+                ]);
+
                 $fqdn = $this->previewFqdns[$previewKey];
 
                 if (! empty($fqdn)) {
-                    $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
-                    $fqdn = str($fqdn)->replaceStart(',', '')->trim();
-                    $fqdn = str($fqdn)->trim()->lower();
+                    $fqdn = ValidationPatterns::normalizeApplicationDomains($fqdn);
                     $this->previewFqdns[$previewKey] = $fqdn;
 
                     if (! validateDNSEntry($fqdn, $this->application->destination->server)) {

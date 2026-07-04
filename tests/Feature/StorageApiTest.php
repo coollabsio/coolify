@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ServerStorageSaveJob;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -7,6 +8,8 @@ use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceApplication;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
@@ -18,8 +21,9 @@ use Illuminate\Support\Str;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config(['app.maintenance.store' => 'array', 'cache.default' => 'array']);
     Bus::fake();
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    InstanceSettings::unguarded(fn () => InstanceSettings::updateOrCreate(['id' => 0], ['id' => 0]));
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -59,6 +63,24 @@ function createTestDatabase($context): StandalonePostgresql
         'destination_id' => $context->destination->id,
         'destination_type' => $context->destination->getMorphClass(),
     ]);
+}
+
+function createTestServiceApplication($context): array
+{
+    $service = Service::factory()->create([
+        'environment_id' => $context->environment->id,
+        'destination_id' => $context->destination->id,
+        'destination_type' => $context->destination->getMorphClass(),
+    ]);
+
+    $serviceApplication = ServiceApplication::create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'test-service-app',
+        'service_id' => $service->id,
+        'image' => 'nginx:alpine',
+    ]);
+
+    return [$service, $serviceApplication];
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -140,6 +162,56 @@ describe('POST /api/v1/applications/{uuid}/storages', function () {
         expect($vol)->not->toBeNull();
         expect($vol->mount_path)->toBe('/app/config.json');
         expect($vol->is_directory)->toBeFalse();
+        expect($vol->fs_path)->toBe(application_configuration_dir().'/'.$app->uuid.'/app/config.json');
+    });
+
+    test('creates bind only host file storage for application', function () {
+        $app = createTestApplication($this);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson("/api/v1/applications/{$app->uuid}/storages", [
+            'type' => 'file',
+            'is_host_file' => true,
+            'fs_path' => '/etc/nginx/nginx.conf',
+            'mount_path' => '/etc/nginx/nginx.conf',
+        ]);
+
+        $response->assertStatus(201);
+
+        $vol = LocalFileVolume::where('resource_id', $app->id)
+            ->where('resource_type', get_class($app))
+            ->first();
+
+        expect($vol)->not->toBeNull();
+        expect($vol->fs_path)->toBe('/etc/nginx/nginx.conf');
+        expect($vol->mount_path)->toBe('/etc/nginx/nginx.conf');
+        expect($vol->content)->toBeNull();
+        expect($vol->is_host_file)->toBeTrue();
+        expect($vol->is_directory)->toBeFalse();
+
+        Bus::assertNotDispatched(ServerStorageSaveJob::class);
+    });
+
+    test('rejects file storage paths with parent segments', function () {
+        $app = createTestApplication($this);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson("/api/v1/applications/{$app->uuid}/storages", [
+            'type' => 'file',
+            'mount_path' => '/../../../../../../etc/example.conf',
+            'content' => 'owned',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', 'Validation failed.');
+
+        expect(LocalFileVolume::where('resource_id', $app->id)
+            ->where('resource_type', get_class($app))
+            ->exists())->toBeFalse();
     });
 
     test('rejects persistent storage without name', function () {
@@ -330,6 +402,92 @@ describe('POST /api/v1/databases/{uuid}/storages', function () {
         $vol = LocalPersistentVolume::where('name', $db->uuid.'-extra-data')->first();
         expect($vol)->not->toBeNull();
         expect($vol->mount_path)->toBe('/extra');
+    });
+
+    test('creates a file storage for a database under the database configuration root', function () {
+        $db = createTestDatabase($this);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson("/api/v1/databases/{$db->uuid}/storages", [
+            'type' => 'file',
+            'mount_path' => '/postgres/postgresql.conf',
+            'content' => 'listen_addresses = "*"',
+        ]);
+
+        $response->assertStatus(201);
+
+        $vol = LocalFileVolume::where('resource_id', $db->id)
+            ->where('resource_type', get_class($db))
+            ->first();
+
+        expect($vol)->not->toBeNull();
+        expect($vol->fs_path)->toBe(database_configuration_dir().'/'.$db->uuid.'/postgres/postgresql.conf');
+    });
+
+    test('rejects file storage paths with parent segments for a database', function () {
+        $db = createTestDatabase($this);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson("/api/v1/databases/{$db->uuid}/storages", [
+            'type' => 'file',
+            'mount_path' => '/postgres/../../../etc/shadow',
+            'content' => 'owned',
+        ]);
+
+        $response->assertStatus(422);
+
+        expect(LocalFileVolume::where('resource_id', $db->id)
+            ->where('resource_type', get_class($db))
+            ->exists())->toBeFalse();
+    });
+});
+
+describe('POST /api/v1/services/{uuid}/storages', function () {
+    test('creates a file storage for a service resource under the service configuration root', function () {
+        [$service, $serviceApplication] = createTestServiceApplication($this);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson("/api/v1/services/{$service->uuid}/storages", [
+            'type' => 'file',
+            'resource_uuid' => $serviceApplication->uuid,
+            'mount_path' => '/etc/nginx/nginx.conf',
+            'content' => 'server {}',
+        ]);
+
+        $response->assertStatus(201);
+
+        $vol = LocalFileVolume::where('resource_id', $serviceApplication->id)
+            ->where('resource_type', get_class($serviceApplication))
+            ->first();
+
+        expect($vol)->not->toBeNull();
+        expect($vol->fs_path)->toBe(service_configuration_dir().'/'.$service->uuid.'/etc/nginx/nginx.conf');
+    });
+
+    test('rejects file storage paths with parent segments for a service resource', function () {
+        [$service, $serviceApplication] = createTestServiceApplication($this);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson("/api/v1/services/{$service->uuid}/storages", [
+            'type' => 'file',
+            'resource_uuid' => $serviceApplication->uuid,
+            'mount_path' => '/../../../../../../root/.ssh/authorized_keys',
+            'content' => 'owned',
+        ]);
+
+        $response->assertStatus(422);
+
+        expect(LocalFileVolume::where('resource_id', $serviceApplication->id)
+            ->where('resource_type', get_class($serviceApplication))
+            ->exists())->toBeFalse();
     });
 });
 

@@ -126,6 +126,18 @@ test('member cannot submit team settings via policy', function () {
     expect(auth()->user()->can('update', $this->team))->toBeFalse();
 });
 
+test('owner can update team MCP setting', function () {
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(TeamIndex::class)
+        ->set('is_mcp_server_enabled', false)
+        ->call('submit')
+        ->assertDispatched('success');
+
+    expect($this->team->fresh()->is_mcp_server_enabled)->toBeFalse();
+});
+
 // --- Team Index Livewire: delete ---
 
 test('member cannot delete team via index', function () {

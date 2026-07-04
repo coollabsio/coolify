@@ -87,3 +87,32 @@ it('renders the service templates last updated hint placeholder', function () {
     $view->assertSee('serviceTemplatesLastUpdated');
     $view->assertSee('service.templateLastUpdated');
 });
+
+it('keeps service template keys for service selection and docs links', function () {
+    $services = collect((new Select)->loadServices()['services']);
+    $denoKv = $services->firstWhere('id', 'denoKV');
+
+    expect($denoKv)
+        ->not->toBeNull()
+        ->and($denoKv['docsSlug'])->toBe('denokv');
+
+    View::share('errors', new ViewErrorBag);
+
+    $view = $this->view('livewire.project.new.select', [
+        'current_step' => 'type',
+        'environments' => collect(),
+    ]);
+
+    $view->assertSee("setType('one-click-service-' + service.id)", false);
+    $view->assertSee('service.docsSlug || this.extractBaseServiceName(service.name)', false);
+});
+
+it('preserves one click service key casing when selecting a service template', function () {
+    $component = new Select;
+    $component->servers = collect();
+    $component->allServers = collect();
+
+    $component->setType('one-click-service-denoKV');
+
+    expect($component->type)->toBe('one-click-service-denoKV');
+});

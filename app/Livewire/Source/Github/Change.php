@@ -8,11 +8,7 @@ use App\Models\PrivateKey;
 use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Lcobucci\JWT\Configuration;
-use Lcobucci\JWT\Signer\Key\InMemory;
-use Lcobucci\JWT\Signer\Rsa\Sha256;
 use Livewire\Component;
 
 class Change extends Component
@@ -208,6 +204,8 @@ class Change extends Component
                 return;
             }
 
+            syncGithubAppName($this->github_app);
+
             GithubAppPermissionJob::dispatchSync($this->github_app);
             $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
             $this->syncData(false);
@@ -303,64 +301,34 @@ class Change extends Component
         return "{$this->github_app->html_url}/settings/apps/{$this->github_app->name}";
     }
 
-    private function generateGithubJwt($private_key, $app_id): string
-    {
-        $configuration = Configuration::forAsymmetricSigner(
-            new Sha256,
-            InMemory::plainText($private_key),
-            InMemory::plainText($private_key)
-        );
-
-        $now = time();
-
-        return $configuration->builder()
-            ->issuedBy((string) $app_id)
-            ->permittedFor('https://api.github.com')
-            ->identifiedBy((string) $now)
-            ->issuedAt(new \DateTimeImmutable("@{$now}"))
-            ->expiresAt(new \DateTimeImmutable('@'.($now + 600)))
-            ->getToken($configuration->signer(), $configuration->signingKey())
-            ->toString();
-    }
-
     public function updateGithubAppName()
     {
         try {
             $this->authorize('update', $this->github_app);
 
-            $privateKey = PrivateKey::ownedByCurrentTeam()->find($this->github_app->private_key_id);
+            $this->github_app->app_id = $this->appId;
+            $this->github_app->private_key_id = $this->privateKeyId;
+            $this->github_app->unsetRelation('privateKey');
 
-            if (! $privateKey) {
+            if (! $this->appId) {
+                $this->dispatch('error', 'App ID is required before synchronizing the GitHub App name.');
+
+                return;
+            }
+
+            if (! PrivateKey::ownedByCurrentTeam()->find($this->privateKeyId)) {
                 $this->dispatch('error', 'No private key found for this GitHub App.');
 
                 return;
             }
 
-            $jwt = $this->generateGithubJwt($privateKey->private_key, $this->github_app->app_id);
+            $appSlug = syncGithubAppName($this->github_app, true);
 
-            $response = Http::withHeaders([
-                'Accept' => 'application/vnd.github+json',
-                'X-GitHub-Api-Version' => '2022-11-28',
-                'Authorization' => "Bearer {$jwt}",
-            ])->get("{$this->github_app->api_url}/app");
-
-            if ($response->successful()) {
-                $app_data = $response->json();
-                $app_slug = $app_data['slug'] ?? null;
-
-                if ($app_slug) {
-                    $this->github_app->name = $app_slug;
-                    $this->name = str($app_slug)->kebab();
-                    $privateKey->name = "github-app-{$app_slug}";
-                    $privateKey->save();
-                    $this->github_app->save();
-                    $this->dispatch('success', 'GitHub App name and SSH key name synchronized successfully.');
-                } else {
-                    $this->dispatch('info', 'Could not find App Name (slug) in GitHub response.');
-                }
+            if ($appSlug) {
+                $this->name = str($appSlug)->kebab();
+                $this->dispatch('success', 'GitHub App name and private key name synchronized successfully.');
             } else {
-                $error_message = $response->json()['message'] ?? 'Unknown error';
-                $this->dispatch('error', "Failed to fetch GitHub App information: {$error_message}");
+                $this->dispatch('info', 'Could not find App Name (slug) in GitHub response.');
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);

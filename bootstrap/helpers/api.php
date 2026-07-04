@@ -98,7 +98,7 @@ function sharedDataApplications()
         'is_auto_deploy_enabled' => 'boolean',
         'is_force_https_enabled' => 'boolean',
         'static_image' => Rule::enum(StaticImageTypes::class),
-        'domains' => 'string|nullable',
+        'domains' => ValidationPatterns::applicationDomainRules(),
         'redirect' => Rule::enum(RedirectTypes::class),
         'git_commit_sha' => ['string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
         'docker_registry_image_name' => ValidationPatterns::dockerImageNameRules(),
