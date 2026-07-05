@@ -115,6 +115,7 @@ class Select extends Component
             $local_logo_path = public_path($logo);
 
             return [
+                'id' => (string) $key,
                 'name' => str($key)->headline(),
                 'logo' => asset($logo),
                 'logo_github_url' => file_exists($local_logo_path)
@@ -325,7 +326,10 @@ class Select extends Component
 
     public function setType(string $type)
     {
-        $type = str($type)->lower()->slug()->value();
+        $type = str($type)->trim()->value();
+        if (! str($type)->startsWith('one-click-service-')) {
+            $type = str($type)->lower()->slug()->value();
+        }
         if ($this->loading) {
             return;
         }

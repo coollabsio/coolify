@@ -97,8 +97,8 @@ class Create extends Component
                     $service->save();
                     if ($oneClickDotEnvs?->count() > 0) {
                         $oneClickDotEnvs->each(function ($value) use ($service) {
-                            $key = str()->before($value, '=');
-                            $value = str(str()->after($value, '='));
+                            $key = str($value)->before('=');
+                            $value = str(str($value)->after('='));
                             if ($value) {
                                 EnvironmentVariable::create([
                                     'key' => $key,

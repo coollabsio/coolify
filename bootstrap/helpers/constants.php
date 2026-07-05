@@ -73,6 +73,7 @@ const DATABASE_DOCKER_IMAGES = [
     'timescaledb',  // Matches timescale/timescaledb
     'timescaledb-ha',  // Matches timescale/timescaledb-ha
     'pgvector/pgvector',
+    'denokv',  // Matches ghcr.io/denoland/denokv
 ];
 const SPECIFIC_SERVICES = [
     'quay.io/minio/minio',
