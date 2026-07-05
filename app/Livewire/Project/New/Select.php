@@ -113,15 +113,17 @@ class Select extends Component
             $default_logo = 'images/default.webp';
             $logo = data_get($service, 'logo', $default_logo);
             $local_logo_path = public_path($logo);
+            $serviceKey = (string) $key;
 
             return [
-                'id' => (string) $key,
-                'name' => str($key)->headline(),
+                'id' => $serviceKey,
+                'name' => str($serviceKey)->headline(),
+                'docsSlug' => str($serviceKey)->lower()->value(),
                 'logo' => asset($logo),
                 'logo_github_url' => file_exists($local_logo_path)
                     ? 'https://raw.githubusercontent.com/coollabsio/coolify/refs/heads/main/public/'.$logo
                     : asset($default_logo),
-                'templateLastUpdated' => $templateLastUpdatedMap[(string) $key] ?? null,
+                'templateLastUpdated' => $templateLastUpdatedMap[$serviceKey] ?? null,
             ] + (array) $service;
         })->all();
 
