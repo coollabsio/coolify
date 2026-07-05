@@ -632,7 +632,7 @@
                                     @foreach ($searchResults as $result)
                                         @if (!isset($result['is_creatable_suggestion']))
                                             <a href="{{ $result['link'] ?? '#' }}"
-                                                class="search-result-item block px-4 py-3 hover:bg-neutral-50 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-warning-50 dark:focus:bg-warning-900/20 border-transparent hover:border-coollabs focus:border-warning-500 dark:focus:border-warning-400">
+                                                class="search-result-item block px-4 py-3 hover:bg-neutral-100 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-neutral-100 dark:focus:bg-coolgray-200 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-coollabs dark:focus-visible:ring-warning">
                                                 <div class="flex items-center justify-between gap-3">
                                                     <div class="flex-1 min-w-0">
                                                         <div class="flex items-center gap-2 mb-1">
@@ -696,12 +696,12 @@
                                     <!-- Category Items -->
                                     @foreach ($items as $item)
                                         <button type="button" wire:click="navigateToResource('{{ $item['type'] }}')"
-                                            class="search-result-item w-full text-left block px-4 py-3 hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors focus:outline-none focus:bg-warning-100 dark:focus:bg-warning-900/30 border-transparent hover:border-warning-500 focus:border-warning-500">
+                                            class="search-result-item w-full text-left block px-4 py-3 hover:bg-neutral-100 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-neutral-100 dark:focus:bg-coolgray-200 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-coollabs dark:focus-visible:ring-warning">
                                             <div class="flex items-center justify-between gap-3">
                                                 <div class="flex items-center gap-3 flex-1 min-w-0">
                                                     @if (! empty($item['logo']))
                                                         <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center overflow-hidden">
-                                                            <img src="{{ asset($item['logo']) }}" alt="{{ $item['name'] }}" class="w-7 h-7 object-contain">
+                                                            <img src="{{ asset($item['logo']) }}" alt="{{ $item['name'] }}" class="w-8 h-8 object-contain">
                                                         </div>
                                                     @else
                                                         <div
@@ -755,7 +755,7 @@
                                 </template>
                                 <template x-for="(result, index) in searchResults" :key="index">
                                     <a :href="result.link || '#'"
-                                        class="search-result-item block px-4 py-3 hover:bg-neutral-50 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-warning-50 dark:focus:bg-warning-900/20 border-transparent hover:border-coollabs focus:border-warning-500 dark:focus:border-warning-400">
+                                        class="search-result-item block px-4 py-3 hover:bg-neutral-100 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-neutral-100 dark:focus:bg-coolgray-200 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-coollabs dark:focus-visible:ring-warning">
                                         <div class="flex items-center justify-between gap-3">
                                             <div class="flex-1 min-w-0">
                                                 <div class="flex items-center gap-2 mb-1">
@@ -811,12 +811,12 @@
 
                                         <template x-for="item in items" :key="item.type">
                                             <button type="button" @click="$wire.navigateToResource(item.type)"
-                                                class="search-result-item w-full text-left block px-4 py-3 hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors focus:outline-none focus:bg-warning-100 dark:focus:bg-warning-900/30 border-transparent hover:border-warning-500 focus:border-warning-500">
+                                                class="search-result-item w-full text-left block px-4 py-3 hover:bg-neutral-100 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-neutral-100 dark:focus:bg-coolgray-200 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-coollabs dark:focus-visible:ring-warning">
                                                 <div class="flex items-center justify-between gap-3">
                                                     <div class="flex items-center gap-3 flex-1 min-w-0">
                                                         <template x-if="item.logo">
                                                             <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center overflow-hidden">
-                                                                <img :src="'/' + item.logo" :alt="item.name" class="w-7 h-7 object-contain">
+                                                                <img :src="'/' + item.logo" :alt="item.name" class="w-8 h-8 object-contain">
                                                             </div>
                                                         </template>
                                                         <template x-if="!item.logo">

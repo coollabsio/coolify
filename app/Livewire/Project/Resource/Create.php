@@ -4,16 +4,20 @@ namespace App\Livewire\Project\Resource;
 
 use App\Models\EnvironmentVariable;
 use App\Models\Service;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Create extends Component
 {
+    use AuthorizesRequests;
+
     public $type;
 
     public $project;
 
     public function mount()
     {
+        $this->authorize('createAnyResource');
 
         $type = str(request()->query('type'));
         $destination_uuid = request()->query('destination');

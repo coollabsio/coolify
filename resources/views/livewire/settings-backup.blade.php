@@ -27,7 +27,7 @@
                             <x-forms.input type="password" label="Password" readonly id="postgres_password" />
                         </div>
                     </div>
-                    <livewire:project.database.backup-edit :backup="$backup" :s3s="$s3s" :status="data_get($database, 'status')" />
+                    <livewire:project.database.backup-edit :backup="$backup" :available-s3-storages="$s3s" :status="data_get($database, 'status')" />
                     <div class="py-4">
                         <livewire:project.database.backup-executions :backup="$backup" />
                     </div>

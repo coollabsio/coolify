@@ -214,7 +214,7 @@
                                     </div>
                                 </template>
                                 <template x-if="shouldShowDocIcon(service)">
-                                    <a :href="getDocLink(service) || coolifyDocsUrl(service.name)" target="_blank"
+                                    <a :href="getDocLink(service) || coolifyDocsUrl(service)" target="_blank"
                                         @click.stop @mouseenter="resolveDocLink(service)"
                                         class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
                                         :class="{ 'opacity-50': docCheckInProgress[service.name] }"
@@ -287,8 +287,8 @@
                             // Remove flavor suffixes: -with-*, -without-*
                             return normalized.replace(/-(with|without)-.+$/, '');
                         },
-                        coolifyDocsUrl(serviceName) {
-                            const baseName = this.extractBaseServiceName(serviceName);
+                        coolifyDocsUrl(service) {
+                            const baseName = service.docsSlug || this.extractBaseServiceName(service.name);
                             return 'https://coolify.io/docs/services/' + baseName;
                         },
                         officialDocsUrl(service) {
@@ -322,7 +322,7 @@
                             this.docCheckInProgress[serviceName] = true;
 
                             // 1. Try Coolify docs first
-                            const coolifyUrl = this.coolifyDocsUrl(serviceName);
+                            const coolifyUrl = this.coolifyDocsUrl(service);
                             const coolifyExists = await this.checkUrlExists(coolifyUrl);
 
                             if (coolifyExists) {

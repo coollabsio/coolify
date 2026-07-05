@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class InviteLink extends Component
 {
@@ -40,6 +39,16 @@ class InviteLink extends Component
         $this->generateInviteLink(sendEmail: false);
     }
 
+    private function invitationUrl(string $routeName, array $parameters): string
+    {
+        $fqdn = instanceSettings()->fqdn;
+        if (filled($fqdn)) {
+            return rtrim($fqdn, '/').route($routeName, $parameters, false);
+        }
+
+        return route($routeName, $parameters);
+    }
+
     private function generateInviteLink(bool $sendEmail = false)
     {
         try {
@@ -61,8 +70,8 @@ class InviteLink extends Component
             if ($member_emails->contains($this->email)) {
                 return handleError(livewire: $this, customErrorMessage: "$this->email is already a member of ".currentTeam()->name.'.');
             }
-            $uuid = (string) new Cuid2(32);
-            $link = url('/').config('constants.invitation.link.base_url').$uuid;
+            $uuid = new_public_id(32);
+            $link = $this->invitationUrl('team.invitation.show', ['uuid' => $uuid]);
             $user = User::whereEmail($this->email)->first();
 
             if (is_null($user)) {
@@ -74,7 +83,7 @@ class InviteLink extends Component
                     'force_password_reset' => true,
                 ]);
                 $token = Crypt::encryptString("{$user->email}@@@{$uuid}@@@{$password}");
-                $link = route('auth.link', ['token' => $token]);
+                $link = $this->invitationUrl('auth.link', ['token' => $token]);
             }
             $invitation = TeamInvitation::whereEmail($this->email)->first();
             if (! is_null($invitation)) {

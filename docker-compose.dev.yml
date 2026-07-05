@@ -10,6 +10,8 @@ services:
         - GROUP_ID=${GROUPID:-1000}
     ports:
       - "${APP_PORT:-8000}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       AUTORUN_ENABLED: false
       PUSHER_HOST: "${PUSHER_HOST}"
@@ -70,6 +72,8 @@ services:
     ports:
       - "${FORWARD_SOKETI_PORT:-6001}:6001"
       - "6002:6002"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./storage:/var/www/html/storage
       - ./docker/coolify-realtime/terminal-server.js:/terminal/terminal-server.js

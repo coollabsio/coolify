@@ -93,6 +93,10 @@ class All extends Component
 
     private function getEnvironmentVariables(bool $isPreview, bool $withSearch = true): Collection
     {
+        if ($isPreview && ! $this->supportsPreviewEnvironmentVariables()) {
+            return collect();
+        }
+
         $query = $isPreview
             ? $this->resource->environment_variables_preview()
             : $this->resource->environment_variables();
@@ -111,7 +115,7 @@ class All extends Component
             $query->orderBy('order');
         }
 
-        return $query->get();
+        return $this->nullLockedValues($query->get());
     }
 
     private function searchTerm(): string
@@ -119,12 +123,35 @@ class All extends Component
         return trim($this->search);
     }
 
+    private function supportsPreviewEnvironmentVariables(): bool
+    {
+        return $this->showPreview && $this->resource instanceof Application;
+    }
+
     public function getHasEnvironmentVariablesProperty(): bool
     {
-        return $this->environmentVariables->isNotEmpty() ||
+        $hasPreviewEnvironmentVariables = $this->supportsPreviewEnvironmentVariables() && (
             $this->environmentVariablesPreview->isNotEmpty() ||
+            $this->hardcodedEnvironmentVariablesPreview->isNotEmpty()
+        );
+
+        return $this->environmentVariables->isNotEmpty() ||
             $this->hardcodedEnvironmentVariables->isNotEmpty() ||
-            $this->hardcodedEnvironmentVariablesPreview->isNotEmpty();
+            $hasPreviewEnvironmentVariables;
+    }
+
+    private function nullLockedValues($envs)
+    {
+        $isMember = auth()->user()?->isMember();
+
+        $envs->each(function ($env) use ($isMember) {
+            if ($env->is_shown_once || $isMember) {
+                $env->value = null;
+                $env->real_value = null;
+            }
+        });
+
+        return $envs;
     }
 
     public function getIsSearchActiveProperty(): bool
@@ -144,6 +171,10 @@ class All extends Component
 
     protected function getHardcodedVariables(bool $isPreview)
     {
+        if ($isPreview && ! $this->supportsPreviewEnvironmentVariables()) {
+            return collect([]);
+        }
+
         // Only for services and docker-compose applications
         if ($this->resource->type() !== 'service' &&
             ($this->resourceClass !== 'App\Models\Application' ||
@@ -204,7 +235,12 @@ class All extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        return $variables->map(function ($item) {
+        $isMember = auth()->user()?->isMember();
+
+        return $variables->map(function ($item) use ($isMember) {
+            if ($isMember) {
+                return "$item->key=(Hidden, only admins can view)";
+            }
             if ($item->is_shown_once) {
                 return "$item->key=(Locked Secret, delete and add again to change)";
             }

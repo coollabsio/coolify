@@ -17,7 +17,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Visus\Cuid2\Cuid2;
 
 class Github extends Controller
 {
@@ -144,7 +143,7 @@ class Github extends Controller
 
                                     continue;
                                 }
-                                $deployment_uuid = new Cuid2;
+                                $deployment_uuid = new_public_id();
                                 $result = queue_application_deployment(
                                     application: $application,
                                     deployment_uuid: $deployment_uuid,
@@ -262,6 +261,16 @@ class Github extends Controller
                 return response('Nothing to do. No GitHub App found.');
             }
             $webhook_secret = data_get($github_app, 'webhook_secret');
+            if (empty($webhook_secret)) {
+                auditLogWebhookFailure('github', 'webhook_secret_missing', [
+                    'mode' => 'app',
+                    'github_app_id' => $github_app->id,
+                    'github_app_name' => $github_app->name,
+                    'installation_target_id' => $x_github_hook_installation_target_id,
+                ]);
+
+                return response('Invalid signature.');
+            }
             $hmac = hash_hmac('sha256', $request->getContent(), $webhook_secret);
             if (config('app.env') !== 'local') {
                 if (! hash_equals($x_hub_signature_256, $hmac)) {
@@ -362,7 +371,7 @@ class Github extends Controller
 
                                     continue;
                                 }
-                                $deployment_uuid = new Cuid2;
+                                $deployment_uuid = new_public_id();
                                 $result = queue_application_deployment(
                                     application: $application,
                                     deployment_uuid: $deployment_uuid,

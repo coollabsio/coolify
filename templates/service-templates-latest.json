@@ -12,6 +12,7 @@
         "category": "automation",
         "logo": "svgs/activepieces.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-03T22:32:03+01:00",
         "port": "80"
     },
     "actualbudget": {
@@ -30,6 +31,7 @@
         "category": "finance",
         "logo": "svgs/actualbudget.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "5006"
     },
     "affine": {
@@ -45,6 +47,7 @@
         "category": "productivity",
         "logo": "svgs/affine.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-18T18:12:16+02:00",
         "port": "3010"
     },
     "alexandrie": {
@@ -61,6 +64,7 @@
         "category": "productivity",
         "logo": "svgs/alexandrie.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-05T13:36:24+02:00",
         "port": "8200"
     },
     "anythingllm": {
@@ -84,6 +88,7 @@
         "category": "ai",
         "logo": "svgs/anythingllm.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3001"
     },
     "appflowy": {
@@ -102,6 +107,7 @@
         "category": "productivity",
         "logo": "svgs/appflowy.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-10-16T11:26:29-05:00",
         "port": "80"
     },
     "apprise-api": {
@@ -115,6 +121,7 @@
         "category": "automation",
         "logo": "svgs/apprise.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8000"
     },
     "appsmith": {
@@ -130,7 +137,8 @@
         ],
         "category": "productivity",
         "logo": "svgs/appsmith.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "appwrite": {
         "documentation": "https://appwrite.io/docs?utm_source=coolify.io",
@@ -143,7 +151,8 @@
         ],
         "category": "backend",
         "logo": "svgs/appwrite.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-10-23T19:52:21+05:30"
     },
     "argilla": {
         "documentation": "https://docs.argilla.io/latest/?utm_source=coolify.io",
@@ -166,6 +175,7 @@
         "category": "ai",
         "logo": "svgs/argilla.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "6900"
     },
     "audiobookshelf": {
@@ -182,6 +192,7 @@
         "category": "media",
         "logo": "svgs/audiobookshelf.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-05-12T09:09:36+02:00",
         "port": "80"
     },
     "authentik": {
@@ -203,6 +214,7 @@
         "category": "auth",
         "logo": "svgs/authentik.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-04T16:46:50+01:00",
         "port": "9000"
     },
     "autobase": {
@@ -219,6 +231,7 @@
         "category": "database",
         "logo": "svgs/autobase.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "80"
     },
     "babybuddy": {
@@ -234,7 +247,8 @@
         ],
         "category": "productivity",
         "logo": "svgs/babybuddy.png",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "bento-pdf": {
         "documentation": "https://bentopdf.com/docs?utm_source=coolify.io",
@@ -249,6 +263,7 @@
         "category": "productivity",
         "logo": "svgs/bento-pdf.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-03T22:27:36+01:00",
         "port": "8080"
     },
     "beszel-agent": {
@@ -264,7 +279,8 @@
         ],
         "category": "monitoring",
         "logo": "svgs/beszel.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-24T02:22:08+05:30"
     },
     "beszel": {
         "documentation": "https://github.com/henrygd/beszel?tab=readme-ov-file#getting-started?utm_source=coolify.io",
@@ -280,6 +296,7 @@
         "category": "monitoring",
         "logo": "svgs/beszel.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-24T02:21:33+05:30",
         "port": "8090"
     },
     "bitcoin-core": {
@@ -294,7 +311,8 @@
         ],
         "category": "backend",
         "logo": "svgs/bitcoin.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "bluesky-pds": {
         "documentation": "https://github.com/bluesky-social/pds?utm_source=coolify.io",
@@ -308,6 +326,7 @@
         "category": "backend",
         "logo": "svgs/bluesky.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-05-09T19:19:48+05:30",
         "port": "3000"
     },
     "bookstack": {
@@ -327,6 +346,7 @@
         "category": "cms",
         "logo": "svgs/bookstack.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "browserless": {
@@ -342,6 +362,7 @@
         "category": "devtools",
         "logo": "svgs/browserless.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "budge": {
@@ -355,7 +376,8 @@
         ],
         "category": "finance",
         "logo": "svgs/budge.png",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00"
     },
     "budibase": {
         "documentation": "https://docs.budibase.com/docs/docker-compose?utm_source=coolify.io",
@@ -377,6 +399,7 @@
         "category": "automation",
         "logo": "svgs/budibase.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-06T23:10:38+01:00",
         "port": "10000"
     },
     "bugsink": {
@@ -392,6 +415,7 @@
         "category": "monitoring",
         "logo": "svgs/bugsink.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-03T22:15:02+01:00",
         "port": "8000"
     },
     "calibre-web-automated-book-downloader": {
@@ -414,6 +438,7 @@
         "category": "media",
         "logo": "svgs/calibre-web-automated-with-downloader.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "8083"
     },
     "calibre-web": {
@@ -434,6 +459,7 @@
         "category": "media",
         "logo": "svgs/calibre-web.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8083"
     },
     "cap-captcha": {
@@ -449,6 +475,7 @@
         "category": "security",
         "logo": "svgs/cap-captcha.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-23T01:07:14+05:30",
         "port": "3000"
     },
     "cap": {
@@ -466,6 +493,7 @@
         "category": "media",
         "logo": "svgs/cap.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "5679"
     },
     "castopod": {
@@ -485,6 +513,7 @@
         "category": "media",
         "logo": "svgs/castopod.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-03-13T12:05:06+05:30",
         "port": "8080"
     },
     "changedetection": {
@@ -499,6 +528,7 @@
         "category": "monitoring",
         "logo": "svgs/changedetection.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "5000"
     },
     "chaskiq": {
@@ -522,6 +552,7 @@
         "category": "helpdesk",
         "logo": "svgs/chaskiq.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "3000"
     },
     "chatwoot": {
@@ -542,6 +573,7 @@
         "category": "helpdesk",
         "logo": "svgs/chatwoot.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-05-27T09:31:29-03:00",
         "port": "3000"
     },
     "checkmate": {
@@ -557,6 +589,7 @@
         "category": "monitoring",
         "logo": "svgs/checkmate.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-19T18:28:33+01:00",
         "port": "52345"
     },
     "chibisafe": {
@@ -572,6 +605,7 @@
         "category": "storage",
         "logo": "svgs/chibisafe.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "80"
     },
     "chroma": {
@@ -590,6 +624,7 @@
         "category": "ai",
         "logo": "svgs/chroma.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8000"
     },
     "classicpress-with-mariadb": {
@@ -604,7 +639,8 @@
         ],
         "category": "cms",
         "logo": "svgs/classicpress.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "classicpress-with-mysql": {
         "documentation": "https://www.classicpress.net/?utm_source=coolify.io",
@@ -618,7 +654,8 @@
         ],
         "category": "cms",
         "logo": "svgs/classicpress.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "classicpress-without-database": {
         "documentation": "https://www.classicpress.net/?utm_source=coolify.io",
@@ -632,7 +669,8 @@
         ],
         "category": "cms",
         "logo": "svgs/classicpress.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "cloudbeaver": {
         "documentation": "https://dbeaver.com/docs/cloudbeaver/?utm_source=coolify.io",
@@ -652,6 +690,7 @@
         "category": "devtools",
         "logo": "svgs/cloudbeaver.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8978"
     },
     "cloudflare-ddns": {
@@ -664,7 +703,8 @@
         ],
         "category": "automation",
         "logo": "svgs/cloudflare-ddns.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-05-18T15:42:31+10:00"
     },
     "cloudflared": {
         "documentation": "https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/?utm_source=coolify.io",
@@ -673,7 +713,8 @@
         "tags": null,
         "category": "proxy",
         "logo": "svgs/cloudflared.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "cloudreve": {
         "documentation": "https://docs.cloudreve.org/?utm_source=coolify.io",
@@ -688,6 +729,7 @@
         "category": "storage",
         "logo": "svgs/cloudreve.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-03-03T11:20:40+05:30",
         "port": "5212"
     },
     "cockpit": {
@@ -704,6 +746,7 @@
         "category": "cms",
         "logo": "svgs/cockpit.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "code-server": {
@@ -719,6 +762,7 @@
         "category": "devtools",
         "logo": "svgs/code-server.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8443"
     },
     "codimd": {
@@ -737,12 +781,13 @@
         "category": "productivity",
         "logo": "svgs/codimd.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-11-03T21:29:53+08:00",
         "port": "3000"
     },
     "convex": {
         "documentation": "https://github.com/get-convex/convex-backend/blob/main/self-hosted/README.md?utm_source=coolify.io",
         "slogan": "Convex is the open-source reactive database for app developers.",
-        "compose": "c2VydmljZXM6CiAgYmFja2VuZDoKICAgIGltYWdlOiAnZ2hjci5pby9nZXQtY29udmV4L2NvbnZleC1iYWNrZW5kOmE5YTc2MGNhMTAzOTllZDQyZTFiNGJiODdjNzg1MzlhMjM1NDg4YzcnCiAgICB2b2x1bWVzOgogICAgICAtICdkYXRhOi9jb252ZXgvZGF0YScKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0JBQ0tFTkRfMzIxMAogICAgICAtICdJTlNUQU5DRV9OQU1FPSR7SU5TVEFOQ0VfTkFNRTotc2VsZi1ob3N0ZWQtY29udmV4fScKICAgICAgLSAnSU5TVEFOQ0VfU0VDUkVUPSR7U0VSVklDRV9IRVhfNjRfU0VDUkVUfScKICAgICAgLSAnQ09OVkVYX1JFTEVBU0VfVkVSU0lPTl9ERVY9JHtDT05WRVhfUkVMRUFTRV9WRVJTSU9OX0RFVjotfScKICAgICAgLSAnQUNUSU9OU19VU0VSX1RJTUVPVVRfU0VDUz0ke0FDVElPTlNfVVNFUl9USU1FT1VUX1NFQ1M6LX0nCiAgICAgIC0gJ0NPTlZFWF9DTE9VRF9PUklHSU49JHtTRVJWSUNFX1VSTF9EQVNIQk9BUkR9JwogICAgICAtICdDT05WRVhfU0lURV9PUklHSU49JHtTRVJWSUNFX1VSTF9CQUNLRU5EfScKICAgICAgLSAnREFUQUJBU0VfVVJMPSR7REFUQUJBU0VfVVJMOi19JwogICAgICAtICdESVNBQkxFX0JFQUNPTj0ke0RJU0FCTEVfQkVBQ09OOj9mYWxzZX0nCiAgICAgIC0gJ1JFREFDVF9MT0dTX1RPX0NMSUVOVD0ke1JFREFDVF9MT0dTX1RPX0NMSUVOVDo/ZmFsc2V9JwogICAgICAtICdET19OT1RfUkVRVUlSRV9TU0w9JHtET19OT1RfUkVRVUlSRV9TU0w6P3RydWV9JwogICAgICAtICdQT1NUR1JFU19VUkw9JHtQT1NUR1JFU19VUkw6LX0nCiAgICAgIC0gJ01ZU1FMX1VSTD0ke01ZU1FMX1VSTDotfScKICAgICAgLSAnUlVTVF9MT0c9JHtSVVNUX0xPRzotaW5mb30nCiAgICAgIC0gJ1JVU1RfQkFDS1RSQUNFPSR7UlVTVF9CQUNLVFJBQ0U6LX0nCiAgICAgIC0gJ0FXU19SRUdJT049JHtBV1NfUkVHSU9OOi19JwogICAgICAtICdBV1NfQUNDRVNTX0tFWV9JRD0ke0FXU19BQ0NFU1NfS0VZX0lEOi19JwogICAgICAtICdBV1NfU0VDUkVUX0FDQ0VTU19LRVk9JHtBV1NfU0VDUkVUX0FDQ0VTU19LRVk6LX0nCiAgICAgIC0gJ0FXU19TRVNTSU9OX1RPS0VOPSR7QVdTX1NFU1NJT05fVE9LRU46LX0nCiAgICAgIC0gJ0FXU19TM19GT1JDRV9QQVRIX1NUWUxFPSR7QVdTX1MzX0ZPUkNFX1BBVEhfU1RZTEU6LX0nCiAgICAgIC0gJ0FXU19TM19ESVNBQkxFX1NTRT0ke0FXU19TM19ESVNBQkxFX1NTRTotfScKICAgICAgLSAnQVdTX1MzX0RJU0FCTEVfQ0hFQ0tTVU1TPSR7QVdTX1MzX0RJU0FCTEVfQ0hFQ0tTVU1TOi19JwogICAgICAtICdTM19TVE9SQUdFX0VYUE9SVFNfQlVDS0VUPSR7UzNfU1RPUkFHRV9FWFBPUlRTX0JVQ0tFVDotfScKICAgICAgLSAnUzNfU1RPUkFHRV9TTkFQU0hPVF9JTVBPUlRTX0JVQ0tFVD0ke1MzX1NUT1JBR0VfU05BUFNIT1RfSU1QT1JUU19CVUNLRVQ6LX0nCiAgICAgIC0gJ1MzX1NUT1JBR0VfTU9EVUxFU19CVUNLRVQ9JHtTM19TVE9SQUdFX01PRFVMRVNfQlVDS0VUOi19JwogICAgICAtICdTM19TVE9SQUdFX0ZJTEVTX0JVQ0tFVD0ke1MzX1NUT1JBR0VfRklMRVNfQlVDS0VUOi19JwogICAgICAtICdTM19TVE9SQUdFX1NFQVJDSF9CVUNLRVQ9JHtTM19TVE9SQUdFX1NFQVJDSF9CVUNLRVQ6LX0nCiAgICAgIC0gJ1MzX0VORFBPSU5UX1VSTD0ke1MzX0VORFBPSU5UX1VSTDotfScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiAnY3VybCAtZiBodHRwOi8vMTI3LjAuMC4xOjMyMTAvdmVyc2lvbicKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHN0YXJ0X3BlcmlvZDogMTBzCiAgZGFzaGJvYXJkOgogICAgaW1hZ2U6ICdnaGNyLmlvL2dldC1jb252ZXgvY29udmV4LWRhc2hib2FyZDphOWE3NjBjYTEwMzk5ZWQ0MmUxYjRiYjg3Yzc4NTM5YTIzNTQ4OGM3JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfREFTSEJPQVJEXzY3OTEKICAgICAgLSAnTkVYVF9QVUJMSUNfREVQTE9ZTUVOVF9VUkw9JHtTRVJWSUNFX1VSTF9CQUNLRU5EfScKICAgIGRlcGVuZHNfb246CiAgICAgIGJhY2tlbmQ6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiAnY3VybCAtZiBodHRwOi8vMTI3LjAuMC4xOjY3OTEvJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgc3RhcnRfcGVyaW9kOiA1cwo=",
+        "compose": "c2VydmljZXM6CiAgYmFja2VuZDoKICAgIGltYWdlOiAnZ2hjci5pby9nZXQtY29udmV4L2NvbnZleC1iYWNrZW5kOmE5YTc2MGNhMTAzOTllZDQyZTFiNGJiODdjNzg1MzlhMjM1NDg4YzcnCiAgICB2b2x1bWVzOgogICAgICAtICdkYXRhOi9jb252ZXgvZGF0YScKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0JBQ0tFTkRfMzIxMAogICAgICAtIFNFUlZJQ0VfVVJMX1NJVEVfMzIxMQogICAgICAtICdJTlNUQU5DRV9OQU1FPSR7SU5TVEFOQ0VfTkFNRTotc2VsZi1ob3N0ZWQtY29udmV4fScKICAgICAgLSAnSU5TVEFOQ0VfU0VDUkVUPSR7U0VSVklDRV9IRVhfNjRfU0VDUkVUfScKICAgICAgLSAnQ09OVkVYX1JFTEVBU0VfVkVSU0lPTl9ERVY9JHtDT05WRVhfUkVMRUFTRV9WRVJTSU9OX0RFVjotfScKICAgICAgLSAnQUNUSU9OU19VU0VSX1RJTUVPVVRfU0VDUz0ke0FDVElPTlNfVVNFUl9USU1FT1VUX1NFQ1M6LX0nCiAgICAgIC0gJ0NPTlZFWF9DTE9VRF9PUklHSU49JHtTRVJWSUNFX1VSTF9CQUNLRU5EfScKICAgICAgLSAnQ09OVkVYX1NJVEVfT1JJR0lOPSR7U0VSVklDRV9VUkxfU0lURX0nCiAgICAgIC0gJ0RBVEFCQVNFX1VSTD0ke0RBVEFCQVNFX1VSTDotfScKICAgICAgLSAnRElTQUJMRV9CRUFDT049JHtESVNBQkxFX0JFQUNPTjo/ZmFsc2V9JwogICAgICAtICdSRURBQ1RfTE9HU19UT19DTElFTlQ9JHtSRURBQ1RfTE9HU19UT19DTElFTlQ6P2ZhbHNlfScKICAgICAgLSAnRE9fTk9UX1JFUVVJUkVfU1NMPSR7RE9fTk9UX1JFUVVJUkVfU1NMOj90cnVlfScKICAgICAgLSAnUE9TVEdSRVNfVVJMPSR7UE9TVEdSRVNfVVJMOi19JwogICAgICAtICdNWVNRTF9VUkw9JHtNWVNRTF9VUkw6LX0nCiAgICAgIC0gJ1JVU1RfTE9HPSR7UlVTVF9MT0c6LWluZm99JwogICAgICAtICdSVVNUX0JBQ0tUUkFDRT0ke1JVU1RfQkFDS1RSQUNFOi19JwogICAgICAtICdBV1NfUkVHSU9OPSR7QVdTX1JFR0lPTjotfScKICAgICAgLSAnQVdTX0FDQ0VTU19LRVlfSUQ9JHtBV1NfQUNDRVNTX0tFWV9JRDotfScKICAgICAgLSAnQVdTX1NFQ1JFVF9BQ0NFU1NfS0VZPSR7QVdTX1NFQ1JFVF9BQ0NFU1NfS0VZOi19JwogICAgICAtICdBV1NfU0VTU0lPTl9UT0tFTj0ke0FXU19TRVNTSU9OX1RPS0VOOi19JwogICAgICAtICdBV1NfUzNfRk9SQ0VfUEFUSF9TVFlMRT0ke0FXU19TM19GT1JDRV9QQVRIX1NUWUxFOi19JwogICAgICAtICdBV1NfUzNfRElTQUJMRV9TU0U9JHtBV1NfUzNfRElTQUJMRV9TU0U6LX0nCiAgICAgIC0gJ0FXU19TM19ESVNBQkxFX0NIRUNLU1VNUz0ke0FXU19TM19ESVNBQkxFX0NIRUNLU1VNUzotfScKICAgICAgLSAnUzNfU1RPUkFHRV9FWFBPUlRTX0JVQ0tFVD0ke1MzX1NUT1JBR0VfRVhQT1JUU19CVUNLRVQ6LX0nCiAgICAgIC0gJ1MzX1NUT1JBR0VfU05BUFNIT1RfSU1QT1JUU19CVUNLRVQ9JHtTM19TVE9SQUdFX1NOQVBTSE9UX0lNUE9SVFNfQlVDS0VUOi19JwogICAgICAtICdTM19TVE9SQUdFX01PRFVMRVNfQlVDS0VUPSR7UzNfU1RPUkFHRV9NT0RVTEVTX0JVQ0tFVDotfScKICAgICAgLSAnUzNfU1RPUkFHRV9GSUxFU19CVUNLRVQ9JHtTM19TVE9SQUdFX0ZJTEVTX0JVQ0tFVDotfScKICAgICAgLSAnUzNfU1RPUkFHRV9TRUFSQ0hfQlVDS0VUPSR7UzNfU1RPUkFHRV9TRUFSQ0hfQlVDS0VUOi19JwogICAgICAtICdTM19FTkRQT0lOVF9VUkw9JHtTM19FTkRQT0lOVF9VUkw6LX0nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDogJ2N1cmwgLWYgaHR0cDovLzEyNy4wLjAuMTozMjEwL3ZlcnNpb24nCiAgICAgIGludGVydmFsOiA1cwogICAgICBzdGFydF9wZXJpb2Q6IDEwcwogIGRhc2hib2FyZDoKICAgIGltYWdlOiAnZ2hjci5pby9nZXQtY29udmV4L2NvbnZleC1kYXNoYm9hcmQ6YTlhNzYwY2ExMDM5OWVkNDJlMWI0YmI4N2M3ODUzOWEyMzU0ODhjNycKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0RBU0hCT0FSRF82NzkxCiAgICAgIC0gJ05FWFRfUFVCTElDX0RFUExPWU1FTlRfVVJMPSR7U0VSVklDRV9VUkxfQkFDS0VORH0nCiAgICBkZXBlbmRzX29uOgogICAgICBiYWNrZW5kOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDogJ2N1cmwgLWYgaHR0cDovLzEyNy4wLjAuMTo2NzkxLycKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHN0YXJ0X3BlcmlvZDogNXMK",
         "tags": [
             "database",
             "reactive",
@@ -758,6 +803,7 @@
         "category": "backend",
         "logo": "svgs/convex.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-06-12T10:45:52+02:00",
         "port": "6791"
     },
     "cryptgeon": {
@@ -776,6 +822,7 @@
         "category": "security",
         "logo": "svgs/cryptgeon.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8000"
     },
     "cyberchef": {
@@ -793,6 +840,7 @@
         "category": "security",
         "logo": "svgs/cyberchef.jpeg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "dashy": {
@@ -807,6 +855,7 @@
         "category": "productivity",
         "logo": "svgs/dashy.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "databasus": {
@@ -822,6 +871,7 @@
         "category": "devtools",
         "logo": "svgs/databasus.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-24T11:25:17+08:00",
         "port": "4005"
     },
     "denoKV": {
@@ -837,6 +887,7 @@
         "category": "database",
         "logo": "svgs/denokv.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "4512"
     },
     "directus-with-postgresql": {
@@ -852,6 +903,7 @@
         "category": "cms",
         "logo": "svgs/directus.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-03T19:25:51+05:30",
         "port": "8055"
     },
     "directus": {
@@ -867,6 +919,7 @@
         "category": "cms",
         "logo": "svgs/directus.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-03T19:26:06+05:30",
         "port": "8055"
     },
     "diun": {
@@ -880,7 +933,8 @@
         ],
         "category": "automation",
         "logo": "svgs/diun.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "docker-registry": {
         "documentation": "https://distribution.github.io/distribution/?utm_source=coolify.io",
@@ -894,6 +948,7 @@
         "category": "devtools",
         "logo": "svgs/docker-registry.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-05T14:13:42+01:00",
         "port": "5000"
     },
     "docmost": {
@@ -913,6 +968,7 @@
         "category": "productivity",
         "logo": "svgs/docmost.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-05-15T13:36:02+02:00",
         "port": "3000"
     },
     "documenso": {
@@ -933,6 +989,7 @@
         "category": "productivity",
         "logo": "svgs/documenso.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-11-07T17:08:01+05:30",
         "port": "3000"
     },
     "docuseal-with-postgres": {
@@ -945,6 +1002,7 @@
         "category": "productivity",
         "logo": "svgs/docuseal.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "docuseal": {
@@ -957,6 +1015,7 @@
         "category": "productivity",
         "logo": "svgs/docuseal.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "dokuwiki": {
@@ -971,7 +1030,8 @@
         ],
         "category": "cms",
         "logo": "svgs/dokuwiki.png",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "dolibarr": {
         "documentation": "https://www.dolibarr.org/documentation-home.php?utm_source=coolify.io",
@@ -984,6 +1044,7 @@
         "category": "productivity",
         "logo": "svgs/dolibarr.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "80"
     },
     "dozzle-with-auth": {
@@ -999,6 +1060,7 @@
         "category": "devtools",
         "logo": "svgs/dozzle.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "dozzle": {
@@ -1014,6 +1076,7 @@
         "category": "devtools",
         "logo": "svgs/dozzle.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "drizzle-gateway": {
@@ -1030,6 +1093,7 @@
         "category": "devtools",
         "logo": "svgs/drizzle.jpeg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "4983"
     },
     "drupal-with-postgresql": {
@@ -1045,7 +1109,8 @@
         ],
         "category": "cms",
         "logo": "svgs/drupal.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "duplicati": {
         "documentation": "https://duplicati.readthedocs.io?utm_source=coolify.io",
@@ -1058,6 +1123,7 @@
         "category": "storage",
         "logo": "svgs/duplicati.webp",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8200"
     },
     "easyappointments": {
@@ -1072,6 +1138,7 @@
         "category": "productivity",
         "logo": "svgs/easyappointments.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "elasticsearch-with-kibana": {
@@ -1094,6 +1161,7 @@
         "category": "monitoring",
         "logo": "svgs/elasticsearch.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-09T00:43:59-05:00",
         "port": "5601"
     },
     "elasticsearch": {
@@ -1111,6 +1179,7 @@
         "category": "search",
         "logo": "svgs/elasticsearch.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-18T18:30:06+02:00",
         "port": "9200"
     },
     "electricsql": {
@@ -1127,6 +1196,7 @@
         "category": "backend",
         "logo": "svgs/electricsql.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-07T20:35:51+01:00",
         "port": "3000"
     },
     "emby": {
@@ -1143,6 +1213,7 @@
         "category": "media",
         "logo": "svgs/emby.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8096"
     },
     "embystat": {
@@ -1159,6 +1230,7 @@
         "category": "analytics",
         "logo": "svgs/default.webp",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-11-07T13:50:19+01:00",
         "port": "6555"
     },
     "emqx-enterprise": {
@@ -1176,6 +1248,7 @@
         "category": "Networking",
         "logo": "svgs/emqx-enterprise.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-27T09:25:48+03:00",
         "port": "18083"
     },
     "ente-photos-with-s3": {
@@ -1195,6 +1268,7 @@
         "category": "media",
         "logo": "svgs/ente-photos.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-10-22T16:05:17+02:00",
         "port": "8080"
     },
     "ente-photos": {
@@ -1214,6 +1288,7 @@
         "category": "media",
         "logo": "svgs/ente-photos.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-03-02T12:00:19+01:00",
         "port": "8080"
     },
     "esphome": {
@@ -1229,6 +1304,7 @@
         "category": "automation",
         "logo": "svgs/esphome.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-05T14:20:17+01:00",
         "port": "6052"
     },
     "espocrm": {
@@ -1246,6 +1322,7 @@
         "category": "productivity",
         "logo": "svgs/espocrm.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "80"
     },
     "evolution-api": {
@@ -1264,6 +1341,7 @@
         "category": "backend",
         "logo": "svgs/evolution-api.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-04T21:54:50+01:00",
         "port": "8080"
     },
     "excalidraw": {
@@ -1280,6 +1358,7 @@
         "category": "productivity",
         "logo": "svgs/excalidraw.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "faraday": {
@@ -1294,6 +1373,7 @@
         "category": "security",
         "logo": "svgs/faraday.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "5985"
     },
     "fider": {
@@ -1307,6 +1387,7 @@
         "category": "productivity",
         "logo": "svgs/fider.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "filebrowser": {
@@ -1323,6 +1404,7 @@
         "category": "storage",
         "logo": "svgs/filebrowser.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-09-12T02:43:33+07:00",
         "port": "80"
     },
     "fileflows": {
@@ -1338,6 +1420,7 @@
         "category": "media",
         "logo": "svgs/fileflows.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "5000"
     },
     "firefly": {
@@ -1353,6 +1436,7 @@
         "category": "finance",
         "logo": "svgs/firefly.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "8080"
     },
     "firefox": {
@@ -1367,6 +1451,7 @@
         "category": "productivity",
         "logo": "svgs/firefox.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "5800"
     },
     "fizzy": {
@@ -1385,6 +1470,7 @@
         "category": "productivity",
         "logo": "svgs/fizzy.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-12-03T09:32:48+01:00",
         "port": "80"
     },
     "flipt": {
@@ -1400,6 +1486,7 @@
         "category": "backend",
         "logo": "svgs/flipt.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "flowise-with-databases": {
@@ -1425,6 +1512,7 @@
         "category": "ai",
         "logo": "svgs/flowise.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3001"
     },
     "flowise": {
@@ -1450,6 +1538,7 @@
         "category": "ai",
         "logo": "svgs/flowise.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3001"
     },
     "forgejo-with-mariadb": {
@@ -1467,6 +1556,7 @@
         "category": "git",
         "logo": "svgs/forgejo.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-04T17:34:52+01:00",
         "port": "3000"
     },
     "forgejo-with-mysql": {
@@ -1484,6 +1574,7 @@
         "category": "git",
         "logo": "svgs/forgejo.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-04T17:34:52+01:00",
         "port": "3000"
     },
     "forgejo-with-postgresql": {
@@ -1501,6 +1592,7 @@
         "category": "git",
         "logo": "svgs/forgejo.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-04T17:34:52+01:00",
         "port": "3000"
     },
     "forgejo": {
@@ -1517,6 +1609,7 @@
         "category": "git",
         "logo": "svgs/forgejo.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-04T17:34:52+01:00",
         "port": "3000"
     },
     "formbricks": {
@@ -1532,6 +1625,7 @@
         "category": "productivity",
         "logo": "svgs/formbricks.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "3000"
     },
     "foundryvtt": {
@@ -1548,6 +1642,7 @@
         "category": "games",
         "logo": "svgs/foundryvtt.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "30000"
     },
     "freescout": {
@@ -1563,6 +1658,7 @@
         "category": "helpdesk",
         "logo": "svgs/freescout.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "80"
     },
     "freshrss-with-mariadb": {
@@ -1576,6 +1672,7 @@
         "category": "RSS",
         "logo": "svgs/freshrss.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "80"
     },
     "freshrss-with-mysql": {
@@ -1589,6 +1686,7 @@
         "category": "RSS",
         "logo": "svgs/freshrss.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "80"
     },
     "freshrss-with-postgresql": {
@@ -1602,6 +1700,7 @@
         "category": "RSS",
         "logo": "svgs/freshrss.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "80"
     },
     "freshrss": {
@@ -1615,6 +1714,7 @@
         "category": "RSS",
         "logo": "svgs/freshrss.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "80"
     },
     "garage": {
@@ -1632,6 +1732,7 @@
         "category": "storage",
         "logo": "svgs/garage.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-05-31T23:57:46+02:00",
         "port": "3900"
     },
     "getoutline": {
@@ -1645,6 +1746,7 @@
         "category": "productivity",
         "logo": "svgs/getoutline.jpeg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-05-09T19:19:29+05:30",
         "port": "3000"
     },
     "ghost": {
@@ -1661,12 +1763,13 @@
         "category": "cms",
         "logo": "svgs/ghost.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-11-14T23:33:47+05:30",
         "port": "2368"
     },
     "gitea-runner": {
         "documentation": "https://github.com/go-gitea/gitea?utm_source=coolify.io",
         "slogan": "Gitea Actions runner for docker",
-        "compose": "c2VydmljZXM6CiAgcnVubmVyOgogICAgaW1hZ2U6ICdkb2NrZXIuaW8vZ2l0ZWEvcnVubmVyOjEuMC43JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ0dJVEVBX0lOU1RBTkNFX1VSTD0ke0dJVEVBX0lOU1RBTkNFX1VSTH0nCiAgICAgIC0gJ0dJVEVBX1JVTk5FUl9SRUdJU1RSQVRJT05fVE9LRU49JHtHSVRFQV9SVU5ORVJfUkVHSVNUUkFUSU9OX1RPS0VOfScKICAgICAgLSAnR0lURUFfUlVOTkVSX05BTUU9JHtHSVRFQV9SVU5ORVJfTkFNRTotZ2l0ZWEtcnVubmVyfScKICAgICAgLSAnR0lURUFfUlVOTkVSX0xBQkVMUz0ke0dJVEVBX1JVTk5FUl9MQUJFTFM6LXVidW50dS1sYXRlc3Q6ZG9ja2VyOi8vbm9kZToyMn0nCiAgICAgIC0gJ0dJVEVBX1RPS0VOPSR7R0lURUFfVE9LRU59JwogICAgd29ya2luZ19kaXI6IC9kYXRhCiAgICB2b2x1bWVzOgogICAgICAtICdydW5uZXItZGF0YTovZGF0YScKICAgICAgLSAnL3Zhci9ydW4vZG9ja2VyLnNvY2s6L3Zhci9ydW4vZG9ja2VyLnNvY2snCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gInBzIGF1eCB8IGdyZXAgJ1tSXXVubmVyJyA+IC9kZXYvbnVsbCB8fCBleGl0IDEiCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
+        "compose": "c2VydmljZXM6CiAgcnVubmVyOgogICAgaW1hZ2U6ICdkb2NrZXIuaW8vZ2l0ZWEvcnVubmVyOjEuMC44JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ0dJVEVBX0lOU1RBTkNFX1VSTD0ke0dJVEVBX0lOU1RBTkNFX1VSTH0nCiAgICAgIC0gJ0dJVEVBX1JVTk5FUl9SRUdJU1RSQVRJT05fVE9LRU49JHtHSVRFQV9SVU5ORVJfUkVHSVNUUkFUSU9OX1RPS0VOfScKICAgICAgLSAnR0lURUFfUlVOTkVSX05BTUU9JHtHSVRFQV9SVU5ORVJfTkFNRTotZ2l0ZWEtcnVubmVyfScKICAgICAgLSAnR0lURUFfUlVOTkVSX0xBQkVMUz0ke0dJVEVBX1JVTk5FUl9MQUJFTFM6LXVidW50dS1sYXRlc3Q6ZG9ja2VyOi8vbm9kZToyMn0nCiAgICAgIC0gJ0dJVEVBX1RPS0VOPSR7R0lURUFfVE9LRU59JwogICAgd29ya2luZ19kaXI6IC9kYXRhCiAgICB2b2x1bWVzOgogICAgICAtICdydW5uZXItZGF0YTovZGF0YScKICAgICAgLSAnL3Zhci9ydW4vZG9ja2VyLnNvY2s6L3Zhci9ydW4vZG9ja2VyLnNvY2snCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gInBzIGF1eCB8IGdyZXAgJ1tSXXVubmVyJyA+IC9kZXYvbnVsbCB8fCBleGl0IDEiCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
         "tags": [
             "gitea",
             "actions",
@@ -1675,7 +1778,8 @@
         ],
         "category": "devtools",
         "logo": "svgs/gitea.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-06-06T00:11:24+02:00"
     },
     "gitea-with-mariadb": {
         "documentation": "https://docs.gitea.com?utm_source=coolify.io",
@@ -1691,7 +1795,8 @@
         ],
         "category": "git",
         "logo": "svgs/gitea.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "gitea-with-mysql": {
         "documentation": "https://docs.gitea.com?utm_source=coolify.io",
@@ -1707,7 +1812,8 @@
         ],
         "category": "git",
         "logo": "svgs/gitea.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "gitea-with-postgresql": {
         "documentation": "https://docs.gitea.com?utm_source=coolify.io",
@@ -1723,7 +1829,8 @@
         ],
         "category": "git",
         "logo": "svgs/gitea.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "gitea": {
         "documentation": "https://docs.gitea.com?utm_source=coolify.io",
@@ -1738,7 +1845,8 @@
         ],
         "category": "git",
         "logo": "svgs/gitea.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "github-runner": {
         "documentation": "https://github.com/myoung34/docker-github-actions-runner/wiki/Usage?utm_source=coolify.io",
@@ -1752,7 +1860,8 @@
         ],
         "category": "devtools",
         "logo": "svgs/github-runner.png",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "gitlab": {
         "documentation": "https://docs.gitlab.com/ee/install/docker.html?utm_source=coolify.io",
@@ -1784,6 +1893,7 @@
         "category": "git",
         "logo": "svgs/gitlab.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "glance": {
@@ -1800,6 +1910,7 @@
         "category": "productivity",
         "logo": "svgs/glance.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "8080"
     },
     "glances": {
@@ -1812,6 +1923,7 @@
         "category": "monitoring",
         "logo": "svgs/glances.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "61208"
     },
     "glitchtip": {
@@ -1826,6 +1938,7 @@
         "category": "monitoring",
         "logo": "svgs/glitchtip.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-10T11:22:57+05:30",
         "port": "8000"
     },
     "glpi": {
@@ -1841,6 +1954,7 @@
         "category": "helpdesk",
         "logo": "svgs/glpi.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-13T21:07:54+01:00",
         "port": "80"
     },
     "goatcounter": {
@@ -1855,6 +1969,7 @@
         "category": "analytics",
         "logo": "svgs/goatcounter.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-27T21:23:59+01:00",
         "port": "8080"
     },
     "gotenberg": {
@@ -1870,6 +1985,7 @@
         "category": "devtools",
         "logo": "svgs/gotenberg.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "gotify": {
@@ -1884,6 +2000,7 @@
         "category": "messaging",
         "logo": "svgs/gotify.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "80"
     },
     "gowa": {
@@ -1900,6 +2017,7 @@
         "category": "messaging",
         "logo": "svgs/gowa.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "3000"
     },
     "grafana-with-postgresql": {
@@ -1915,6 +2033,7 @@
         "category": "monitoring",
         "logo": "svgs/grafana.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-03-22T22:04:22+07:00",
         "port": "3000"
     },
     "grafana": {
@@ -1930,6 +2049,7 @@
         "category": "monitoring",
         "logo": "svgs/grafana.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-03-22T22:04:22+07:00",
         "port": "3000"
     },
     "gramps-web": {
@@ -1944,6 +2064,7 @@
         "category": "family",
         "logo": "svgs/gramps-web.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-10-09T00:14:17+03:00",
         "port": "5000"
     },
     "grimmory": {
@@ -1959,6 +2080,7 @@
         "category": null,
         "logo": "svgs/grimmory.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-03T18:59:26+05:30",
         "port": "80"
     },
     "grist": {
@@ -1975,6 +2097,7 @@
         "category": "productivity",
         "logo": "svgs/grist.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-16T15:13:50+02:00",
         "port": "8484"
     },
     "grocy": {
@@ -1990,7 +2113,8 @@
         ],
         "category": "productivity",
         "logo": "svgs/grocy.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-05-12T09:10:44+02:00"
     },
     "hatchet": {
         "documentation": "https://docs.hatchet.run/self-hosting/docker-compose?utm_source=coolify.io",
@@ -2005,6 +2129,7 @@
         "category": "automation",
         "logo": "svgs/hatchet.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "80"
     },
     "healthchecks": {
@@ -2023,6 +2148,7 @@
         "category": "monitoring",
         "logo": "svgs/healthchecks.webp",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-05-25T13:06:59-04:00",
         "port": "80000"
     },
     "heimdall": {
@@ -2037,7 +2163,8 @@
         ],
         "category": "productivity",
         "logo": "svgs/heimdall.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "hermes-agent-with-webui": {
         "documentation": "https://github.com/nesquena/hermes-webui?utm_source=coolify.io",
@@ -2056,6 +2183,7 @@
         "category": "ai",
         "logo": "svgs/hermes-agent.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-05-29T12:14:17+05:30",
         "port": "8787"
     },
     "heyform": {
@@ -2075,6 +2203,7 @@
         "category": "productivity",
         "logo": "svgs/heyform.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-03-03T17:57:00+08:00",
         "port": "9157"
     },
     "homarr": {
@@ -2089,6 +2218,7 @@
         "category": "productivity",
         "logo": "svgs/homarr.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-05-09T19:30:07+05:30",
         "port": "7575"
     },
     "home-assistant": {
@@ -2108,6 +2238,7 @@
         "category": "automation",
         "logo": "svgs/home-assistant.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-10-18T14:40:21+02:00",
         "port": "8123"
     },
     "homebox": {
@@ -2122,6 +2253,7 @@
         "category": "productivity",
         "logo": "svgs/homebox.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "7745"
     },
     "homepage": {
@@ -2135,6 +2267,7 @@
         "category": "productivity",
         "logo": "svgs/homepage.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "hoppscotch": {
@@ -2149,6 +2282,7 @@
         "category": "devtools",
         "logo": "svgs/hoppscotch.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-03-13T11:40:25+05:30",
         "port": "80"
     },
     "imgcompress": {
@@ -2164,6 +2298,7 @@
         "category": "media",
         "logo": "svgs/imgcompress.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-03-13T12:28:25+05:30",
         "port": "5000"
     },
     "immich": {
@@ -2185,6 +2320,7 @@
         "category": "media",
         "logo": "svgs/immich.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "2283"
     },
     "infisical": {
@@ -2207,7 +2343,26 @@
         "category": "security",
         "logo": "svgs/infisical.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-12-15T17:56:33+01:00",
         "port": "8080"
+    },
+    "inngest": {
+        "documentation": "https://www.inngest.com/docs/self-hosting?utm_source=coolify.io",
+        "slogan": "Durable workflow engine for background jobs, queues and scheduled tasks.",
+        "compose": "c2VydmljZXM6CiAgaW5uZ2VzdDoKICAgIGltYWdlOiAnaW5uZ2VzdC9pbm5nZXN0OnYxLjI3LjAnCiAgICBjb21tYW5kOiAnaW5uZ2VzdCBzdGFydCAtLWhvc3QgMC4wLjAuMCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0lOTkdFU1RfODI4OAogICAgICAtICdJTk5HRVNUX0VWRU5UX0tFWT0ke1NFUlZJQ0VfSEVYXzMyX0VWRU5US0VZfScKICAgICAgLSAnSU5OR0VTVF9TSUdOSU5HX0tFWT0ke1NFUlZJQ0VfSEVYXzMyX1NJR05JTkdLRVl9JwogICAgICAtICdJTk5HRVNUX1BPU1RHUkVTX1VSST1wb3N0Z3JlczovL2lubmdlc3Q6JHtTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTfUBwb3N0Z3Jlczo1NDMyL2lubmdlc3QnCiAgICAgIC0gJ0lOTkdFU1RfUkVESVNfVVJJPXJlZGlzOi8vcmVkaXM6NjM3OScKICAgIGRlcGVuZHNfb246CiAgICAgIHBvc3RncmVzOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICAgIHJlZGlzOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gaW5uZ2VzdAogICAgICAgIC0gYWxwaGEKICAgICAgICAtIGRvY3RvcgogICAgICAgIC0gaGVhbHRoY2hlY2sKICAgICAgaW50ZXJ2YWw6IDMwcwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMwogICAgICBzdGFydF9wZXJpb2Q6IDQwcwogICAgcmVzdGFydDogdW5sZXNzLXN0b3BwZWQKICBwb3N0Z3JlczoKICAgIGltYWdlOiAncG9zdGdyZXM6MTcnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBQT1NUR1JFU19EQj1pbm5nZXN0CiAgICAgIC0gUE9TVEdSRVNfVVNFUj1pbm5nZXN0CiAgICAgIC0gJ1BPU1RHUkVTX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9QT1NUR1JFU30nCiAgICB2b2x1bWVzOgogICAgICAtICdwb3N0Z3Jlcy1kYXRhOi92YXIvbGliL3Bvc3RncmVzcWwvZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAncGdfaXNyZWFkeSAtVSBpbm5nZXN0IC1kIGlubmdlc3QnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiA1cwogICAgICByZXRyaWVzOiA1CiAgICByZXN0YXJ0OiB1bmxlc3Mtc3RvcHBlZAogIHJlZGlzOgogICAgaW1hZ2U6ICdyZWRpczo3LWFscGluZScKICAgIGNvbW1hbmQ6ICdyZWRpcy1zZXJ2ZXIgLS1hcHBlbmRvbmx5IHllcycKICAgIHZvbHVtZXM6CiAgICAgIC0gJ3JlZGlzLWRhdGE6L2RhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gcmVkaXMtY2xpCiAgICAgICAgLSBwaW5nCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAzcwogICAgICByZXRyaWVzOiA1CiAgICByZXN0YXJ0OiB1bmxlc3Mtc3RvcHBlZAo=",
+        "tags": [
+            "queue",
+            "workflow",
+            "jobs",
+            "events",
+            "background",
+            "automation"
+        ],
+        "category": "automation",
+        "logo": "svgs/inngest.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-07-02T13:25:47+02:00",
+        "port": "8288"
     },
     "invoice-ninja": {
         "documentation": "https://invoiceninja.github.io/selfhost.html?utm_source=coolify.io",
@@ -2223,6 +2378,7 @@
         "category": "finance",
         "logo": "svgs/invoiceninja.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "9000"
     },
     "it-tools": {
@@ -2237,6 +2393,7 @@
         "category": "devtools",
         "logo": "svgs/it-tools.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "jellyfin": {
@@ -2253,6 +2410,7 @@
         "category": "media",
         "logo": "svgs/jellyfin.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-05-12T08:58:05+02:00",
         "port": "8096"
     },
     "jenkins": {
@@ -2267,6 +2425,7 @@
         "category": "ci",
         "logo": "svgs/jenkins.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "jitsi": {
@@ -2284,6 +2443,7 @@
         "category": "productivity",
         "logo": "svgs/jitsi.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-24T09:40:01+05:30",
         "port": "80"
     },
     "joomla-with-mariadb": {
@@ -2300,6 +2460,7 @@
         "category": "cms",
         "logo": "svgs/joomla.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "joplin": {
@@ -2312,6 +2473,7 @@
         "category": "productivity",
         "logo": "svgs/joplin.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "22300"
     },
     "jupyter-notebook-python": {
@@ -2327,6 +2489,7 @@
         "category": "devtools",
         "logo": "svgs/jupyter.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8888"
     },
     "karakeep": {
@@ -2343,6 +2506,7 @@
         "category": "productivity",
         "logo": "svgs/karakeep.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "keycloak-with-postgres": {
@@ -2371,6 +2535,7 @@
         "category": "auth",
         "logo": "svgs/keycloak.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "keycloak": {
@@ -2399,6 +2564,7 @@
         "category": "auth",
         "logo": "svgs/keycloak.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "kimai": {
@@ -2412,6 +2578,7 @@
         "category": "productivity",
         "logo": "svgs/kimai.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-27T21:11:35+01:00",
         "port": "8001"
     },
     "kuzzle": {
@@ -2433,6 +2600,7 @@
         "category": "backend",
         "logo": "svgs/kuzzle.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "7512"
     },
     "labelstudio": {
@@ -2458,6 +2626,7 @@
         "category": "ai",
         "logo": "svgs/labelstudio.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "langflow": {
@@ -2478,6 +2647,7 @@
         "category": "ai",
         "logo": "svgs/langflow.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-20T22:59:13+01:00",
         "port": "7860"
     },
     "langfuse": {
@@ -2502,6 +2672,7 @@
         "category": "ai",
         "logo": "svgs/langfuse.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-23T18:08:40+02:00",
         "port": "3000"
     },
     "leantime": {
@@ -2519,6 +2690,7 @@
         "category": "productivity",
         "logo": "svgs/leantime.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "librechat": {
@@ -2541,6 +2713,7 @@
         "category": "ai",
         "logo": "svgs/librechat.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-03T18:29:44+05:30",
         "port": "3080"
     },
     "libreoffice": {
@@ -2557,6 +2730,7 @@
         "category": "productivity",
         "logo": "svgs/libreoffice.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "librespeed": {
@@ -2570,6 +2744,7 @@
         "category": "devtools",
         "logo": "svgs/librespeed.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-25T23:48:15Z",
         "port": "82"
     },
     "libretranslate": {
@@ -2583,6 +2758,7 @@
         "category": "ai",
         "logo": "svgs/libretranslate.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "5000"
     },
     "limesurvey": {
@@ -2598,6 +2774,7 @@
         "category": "productivity",
         "logo": "svgs/limesurvey.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "linkding-plus": {
@@ -2611,6 +2788,7 @@
         "category": "RSS",
         "logo": "svgs/linkding.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-13T00:05:43+01:00",
         "port": "9090"
     },
     "linkding": {
@@ -2624,6 +2802,7 @@
         "category": "RSS",
         "logo": "svgs/linkding.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-13T00:05:43+01:00",
         "port": "9090"
     },
     "listmonk": {
@@ -2639,6 +2818,7 @@
         "category": "email",
         "logo": "svgs/listmonk.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-03-29T14:35:48+10:00",
         "port": "9000"
     },
     "litellm": {
@@ -2665,6 +2845,7 @@
         "category": "ai",
         "logo": "svgs/litellm.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-12-14T21:08:27+01:00",
         "port": "4000"
     },
     "lobe-chat": {
@@ -2681,6 +2862,7 @@
         "category": "ai",
         "logo": "svgs/lobe-chat.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-10-08T13:32:11+02:00",
         "port": "3210"
     },
     "logto": {
@@ -2698,7 +2880,8 @@
         ],
         "category": "auth",
         "logo": "svgs/logto_dark.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-01T13:19:47Z"
     },
     "lowcoder": {
         "documentation": "https://docs.lowcoder.cloud/?utm_source=coolify.io",
@@ -2718,6 +2901,7 @@
         "category": "productivity",
         "logo": "svgs/lowcoder.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "mage-ai": {
@@ -2733,6 +2917,7 @@
         "category": "automation",
         "logo": "svgs/mage-ai.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-12-19T18:57:35+11:00",
         "port": "6789"
     },
     "mailpit": {
@@ -2748,6 +2933,7 @@
         "category": "email",
         "logo": "svgs/mailpit.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8025"
     },
     "martin": {
@@ -2762,6 +2948,7 @@
         "category": "backend",
         "logo": "svgs/martin.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "matrix-synapse-with-postgresql": {
@@ -2782,6 +2969,7 @@
         "category": "messaging",
         "logo": "svgs/matrix.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-08T22:11:03+01:00",
         "port": "8008"
     },
     "matrix-synapse-with-sqlite": {
@@ -2802,6 +2990,7 @@
         "category": "messaging",
         "logo": "svgs/matrix.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-08T22:11:03+01:00",
         "port": "8008"
     },
     "mattermost": {
@@ -2816,6 +3005,7 @@
         "category": "messaging",
         "logo": "svgs/mattermost.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T13:57:40-05:00",
         "port": "8065"
     },
     "mealie": {
@@ -2831,6 +3021,7 @@
         "category": "productivity",
         "logo": "svgs/mealie.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-05-12T09:22:15+02:00",
         "port": "9000"
     },
     "mediawiki": {
@@ -2845,6 +3036,7 @@
         "category": "cms",
         "logo": "svgs/mediawiki.ico",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "meilisearch": {
@@ -2862,6 +3054,7 @@
         "category": "search",
         "logo": "svgs/meilisearch.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "7700"
     },
     "memos": {
@@ -2877,6 +3070,7 @@
         "category": "productivity",
         "logo": "svgs/memos.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "5230"
     },
     "metabase": {
@@ -2892,6 +3086,7 @@
         "category": "analytics",
         "logo": "svgs/metabase.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "metamcp": {
@@ -2909,6 +3104,7 @@
         "category": "mcp",
         "logo": "svgs/metamcp.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-10-19T18:04:06+02:00",
         "port": "12008"
     },
     "metube": {
@@ -2924,6 +3120,7 @@
         "category": "media",
         "logo": "svgs/default.webp",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8081"
     },
     "mindsdb": {
@@ -2939,6 +3136,7 @@
         "category": "ai",
         "logo": "svgs/mindsdb.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "47334"
     },
     "minecraft": {
@@ -2951,6 +3149,7 @@
         "category": "games",
         "logo": "svgs/minecraft.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-01T15:06:17-05:00",
         "port": "25565"
     },
     "miniflux": {
@@ -2967,6 +3166,7 @@
         "category": "RSS",
         "logo": "svgs/miniflux.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "8080"
     },
     "mixpost": {
@@ -2984,6 +3184,7 @@
         "category": "analytics",
         "logo": "svgs/mixpost.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "moodle": {
@@ -3004,6 +3205,7 @@
         "category": "cms",
         "logo": "svgs/moodle.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-10-09T09:49:33+05:30",
         "port": "8080"
     },
     "mosquitto": {
@@ -3018,6 +3220,7 @@
         "category": "messaging",
         "logo": "svgs/mosquitto.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-05T18:25:15+01:00",
         "port": "1883"
     },
     "n8n-with-postgres-and-worker": {
@@ -3039,6 +3242,7 @@
         "category": "automation",
         "logo": "svgs/n8n.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-03-30T20:40:07+02:00",
         "port": "5678"
     },
     "n8n-with-postgresql": {
@@ -3057,6 +3261,7 @@
         "category": "automation",
         "logo": "svgs/n8n.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-03-30T20:40:07+02:00",
         "port": "5678"
     },
     "n8n": {
@@ -3075,6 +3280,7 @@
         "category": "automation",
         "logo": "svgs/n8n.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-03-30T20:40:07+02:00",
         "port": "5678"
     },
     "navidrome": {
@@ -3090,6 +3296,7 @@
         "category": "media",
         "logo": "svgs/navidrome.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "4533"
     },
     "neon-ws-proxy": {
@@ -3104,6 +3311,7 @@
         "category": "proxy",
         "logo": "svgs/neon.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80, 2112"
     },
     "netbird-client": {
@@ -3119,7 +3327,8 @@
         ],
         "category": "vpn",
         "logo": "svgs/netbird.png",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-09T00:00:38+05:30"
     },
     "newapi": {
         "documentation": "https://docs.newapi.pro/en/getting-started/?utm_source=coolify.io",
@@ -3135,6 +3344,7 @@
         "category": "api",
         "logo": "svgs/newapi.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-10-02T16:37:31+08:00",
         "port": "3000"
     },
     "newt-pangolin": {
@@ -3149,7 +3359,8 @@
         ],
         "category": "proxy",
         "logo": "svgs/pangolin-logo.png",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00"
     },
     "next-image-transformation": {
         "documentation": "https://github.com/coollabsio/next-image-transformation?utm_source=coolify.io",
@@ -3164,6 +3375,7 @@
         "category": "media",
         "logo": "coolify-logo.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "nextcloud-with-mariadb": {
@@ -3180,6 +3392,7 @@
         "category": "storage",
         "logo": "svgs/nextcloud.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-07T23:32:57+05:30",
         "port": "80"
     },
     "nextcloud-with-mysql": {
@@ -3196,6 +3409,7 @@
         "category": "storage",
         "logo": "svgs/nextcloud.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-07T23:32:57+05:30",
         "port": "80"
     },
     "nextcloud-with-postgres": {
@@ -3212,6 +3426,7 @@
         "category": "storage",
         "logo": "svgs/nextcloud.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-07T23:32:57+05:30",
         "port": "80"
     },
     "nextcloud": {
@@ -3228,6 +3443,7 @@
         "category": "storage",
         "logo": "svgs/nextcloud.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-07T23:32:57+05:30",
         "port": "80"
     },
     "nexus-arm": {
@@ -3246,6 +3462,7 @@
         "category": "devtools",
         "logo": "svgs/nexus.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8081"
     },
     "nexus": {
@@ -3264,6 +3481,7 @@
         "category": "devtools",
         "logo": "svgs/nexus.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8081"
     },
     "nitropage-with-postgresql": {
@@ -3282,6 +3500,7 @@
         "category": "cms",
         "logo": "svgs/nitropage.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "nitropage": {
@@ -3300,6 +3519,7 @@
         "category": "cms",
         "logo": "svgs/nitropage.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "nocobase": {
@@ -3315,6 +3535,7 @@
         "category": "development",
         "logo": "svgs/nocobase.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-06T15:08:23+01:00",
         "port": "13000"
     },
     "nocodb": {
@@ -3333,6 +3554,7 @@
         "category": "productivity",
         "logo": "svgs/nocodb.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "8080"
     },
     "nodebb": {
@@ -3347,6 +3569,7 @@
         "category": "messaging",
         "logo": "svgs/nodebb.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "4567"
     },
     "ntfy": {
@@ -3363,6 +3586,7 @@
         "category": "messaging",
         "logo": "svgs/ntfy.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "observium": {
@@ -3376,6 +3600,7 @@
         "category": "monitoring",
         "logo": "svgs/observium.webp",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "odoo": {
@@ -3396,6 +3621,7 @@
         "category": "productivity",
         "logo": "svgs/odoo.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "8069"
     },
     "ollama-with-open-webui": {
@@ -3412,7 +3638,8 @@
         ],
         "category": "ai",
         "logo": "svgs/ollama.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "once-campfire": {
         "documentation": "https://github.com/basecamp/once-campfire?utm_source=coolify.io",
@@ -3430,6 +3657,7 @@
         "category": "messaging",
         "logo": "svgs/once-campfire.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-09-14T09:16:02+02:00",
         "port": "80"
     },
     "onedev": {
@@ -3452,6 +3680,7 @@
         "category": "git",
         "logo": "svgs/onedev.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "6610"
     },
     "onetimesecret": {
@@ -3467,6 +3696,7 @@
         "category": "security",
         "logo": "svgs/onetimesecret.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "open-archiver": {
@@ -3482,6 +3712,7 @@
         "category": "email",
         "logo": "svgs/openarchiver.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-05-09T19:35:15+05:30",
         "port": "3000"
     },
     "open-webui": {
@@ -3498,6 +3729,7 @@
         "category": "ai",
         "logo": "svgs/openwebui.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "openclaw": {
@@ -3516,6 +3748,7 @@
         "category": "ai",
         "logo": "svgs/openclaw.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-09T12:35:36+01:00",
         "port": "8080"
     },
     "openobserve": {
@@ -3537,6 +3770,7 @@
         "category": "monitoring",
         "logo": "svgs/openobserve.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-05-19T16:40:18+05:30",
         "port": "5080"
     },
     "openpanel": {
@@ -3555,6 +3789,7 @@
         "category": "analytics",
         "logo": "svgs/openpanel.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "3000"
     },
     "opnform": {
@@ -3575,6 +3810,7 @@
         "category": "productivity",
         "logo": "svg/opnform.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "80"
     },
     "orangehrm": {
@@ -3592,6 +3828,7 @@
         "category": "productivity",
         "logo": "svgs/orangehrm.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "80"
     },
     "organizr": {
@@ -3604,6 +3841,7 @@
         "category": "productivity",
         "logo": "svgs/organizr.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "osticket": {
@@ -3619,6 +3857,7 @@
         "category": "helpdesk",
         "logo": "svgs/osticket.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "80"
     },
     "overseerr": {
@@ -3635,6 +3874,7 @@
         "category": "media",
         "logo": "svgs/overseerr.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "5055"
     },
     "owncloud": {
@@ -3651,6 +3891,7 @@
         "category": "storage",
         "logo": "svgs/owncloud.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-06-02T12:12:42+03:00",
         "port": "8080"
     },
     "pairdrop": {
@@ -3666,6 +3907,7 @@
         "category": "productivity",
         "logo": "svgs/pairdrop.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "palworld": {
@@ -3675,7 +3917,8 @@
         "tags": null,
         "category": "games",
         "logo": "svgs/default.webp",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00"
     },
     "paperless": {
         "documentation": "https://docs.paperless-ngx.com/configuration/?utm_source=coolify.io",
@@ -3685,6 +3928,7 @@
         "category": "productivity",
         "logo": "svgs/paperless.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-12-02T12:07:14+01:00",
         "port": "8000"
     },
     "passbolt": {
@@ -3700,6 +3944,7 @@
         "category": "auth",
         "logo": "svgs/passbolt.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "paymenter": {
@@ -3714,6 +3959,7 @@
         "category": "finance",
         "logo": "svgs/paymenter.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "80"
     },
     "penpot-with-s3": {
@@ -3731,6 +3977,7 @@
         "category": "productivity",
         "logo": "svgs/penpot.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-11-29T15:56:03+05:30",
         "port": "8080"
     },
     "penpot": {
@@ -3748,6 +3995,7 @@
         "category": "productivity",
         "logo": "svgs/penpot.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-11-29T17:45:19+05:30",
         "port": "8080"
     },
     "pgadmin": {
@@ -3760,6 +4008,7 @@
         "category": "database",
         "logo": "svgs/postgresql.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-09-09T22:48:07+05:30",
         "port": "80"
     },
     "pgbackweb": {
@@ -3774,6 +4023,7 @@
         "category": "devtools",
         "logo": "svgs/pgbackweb.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8085"
     },
     "phpmyadmin": {
@@ -3785,7 +4035,8 @@
         ],
         "category": "database",
         "logo": "svgs/phpmyadmin.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "pi-hole": {
         "documentation": "https://pi-hole.net/?utm_source=coolify.io",
@@ -3801,6 +4052,7 @@
         "category": "proxy",
         "logo": "svgs/pihole.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "plane": {
@@ -3823,6 +4075,7 @@
         "category": "productivity",
         "logo": "svgs/plane.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-24T00:12:17+05:30",
         "port": "80"
     },
     "plex": {
@@ -3839,6 +4092,7 @@
         "category": "media",
         "logo": "svgs/plex.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "32400"
     },
     "plunk": {
@@ -3854,6 +4108,7 @@
         "category": "email",
         "logo": "svgs/plunk.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "3000"
     },
     "pocket-id-with-postgresql": {
@@ -3874,6 +4129,7 @@
         "category": "auth",
         "logo": "svgs/pocketid-logo.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-10-19T21:35:18+02:00",
         "port": "1411"
     },
     "pocket-id": {
@@ -3893,6 +4149,7 @@
         "category": "auth",
         "logo": "svgs/pocketid-logo.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-10-19T21:35:49+02:00",
         "port": "1411"
     },
     "pocketbase": {
@@ -3909,6 +4166,7 @@
         "category": "backend",
         "logo": "svgs/pocketbase.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "portainer": {
@@ -3923,6 +4181,7 @@
         "category": "devtools",
         "logo": "svgs/portainer.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "9000"
     },
     "postiz": {
@@ -3937,6 +4196,7 @@
         "category": "analytics",
         "logo": "svgs/postiz.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-05T15:14:32+01:00",
         "port": "5000"
     },
     "prefect": {
@@ -3956,6 +4216,7 @@
         "category": "automation",
         "logo": "svgs/prefect.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "4200"
     },
     "privatebin": {
@@ -3969,6 +4230,7 @@
         "category": "security",
         "logo": "svgs/privatebin.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "prowlarr": {
@@ -3988,6 +4250,7 @@
         "category": "media",
         "logo": "svgs/prowlarr.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "9696"
     },
     "proxyscotch": {
@@ -4002,6 +4265,7 @@
         "category": "proxy",
         "logo": "svgs/hoppscotch.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "9159"
     },
     "qbittorrent": {
@@ -4016,6 +4280,7 @@
         "category": "media",
         "logo": "svgs/qbittorrent.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "qdrant": {
@@ -4034,6 +4299,7 @@
         "category": "database",
         "logo": "svgs/qdrant.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "6333"
     },
     "rabbitmq": {
@@ -4053,6 +4319,7 @@
         "category": "messaging",
         "logo": "svgs/rabbitmq.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "15672"
     },
     "radarr": {
@@ -4067,6 +4334,7 @@
         "category": "media",
         "logo": "svgs/radarr.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "7878"
     },
     "rallly": {
@@ -4083,6 +4351,7 @@
         "category": "productivity",
         "logo": "svgs/rallly.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-03-19T16:11:50+01:00",
         "port": "3000"
     },
     "reactive-resume": {
@@ -4098,6 +4367,7 @@
         "category": "productivity",
         "logo": "svgs/rxresume.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-27T21:30:50+01:00",
         "port": "3000"
     },
     "readeck": {
@@ -4113,6 +4383,7 @@
         "category": "productivity",
         "logo": "svgs/readeck.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8000"
     },
     "redis-insight": {
@@ -4129,6 +4400,7 @@
         "category": "database,observability,developer-tools",
         "logo": "svgs/redisinsight.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-11-10T15:25:33+05:30",
         "port": "5540"
     },
     "redlib": {
@@ -4142,6 +4414,7 @@
         "category": "productivity",
         "logo": "svgs/redlib.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "redmine": {
@@ -4155,6 +4428,7 @@
         "category": "productivity",
         "logo": "svgs/redmine.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "3000"
     },
     "rivet-engine": {
@@ -4172,6 +4446,7 @@
         "category": "development",
         "logo": "svgs/rivet.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-01T19:58:30+02:00",
         "port": "6420"
     },
     "rocketchat": {
@@ -4190,6 +4465,7 @@
         "category": "messaging",
         "logo": "svgs/rocketchat.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-20T19:15:03+01:00",
         "port": "3000"
     },
     "rybbit": {
@@ -4207,6 +4483,7 @@
         "category": "analytics",
         "logo": "svgs/rybbit.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-12-26T18:16:03-08:00",
         "port": "3002"
     },
     "ryot": {
@@ -4225,6 +4502,7 @@
         "category": "productivity",
         "logo": "svgs/ryot.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-05-12T08:34:57+02:00",
         "port": "8000"
     },
     "satisfactory": {
@@ -4241,7 +4519,8 @@
         ],
         "category": "games",
         "logo": "svgs/satisfactory.jpg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-03T22:06:58+01:00"
     },
     "seafile": {
         "documentation": "https://manual.seafile.com?utm_source=coolify.io",
@@ -4255,6 +4534,7 @@
         "category": "storage",
         "logo": "svgs/seafile.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-10-23T08:56:51+05:30",
         "port": "80"
     },
     "searxng": {
@@ -4276,6 +4556,7 @@
         "category": "search",
         "logo": "svgs/searxng.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "seaweedfs": {
@@ -4292,6 +4573,7 @@
         "category": "storage",
         "logo": "svgs/seaweedfs.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-03-02T20:04:29-03:00",
         "port": "8333"
     },
     "sequin": {
@@ -4306,6 +4588,7 @@
         "category": "analytics",
         "logo": "svgs/sequin.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-05T15:49:25+01:00",
         "port": "7376"
     },
     "sessy": {
@@ -4321,6 +4604,7 @@
         "category": "monitoring",
         "logo": "svgs/sessy.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-14T13:27:32+01:00",
         "port": "80"
     },
     "sftpgo": {
@@ -4337,6 +4621,7 @@
         "category": "storage",
         "logo": "svgs/sftpgo.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "8080"
     },
     "shlink": {
@@ -4355,6 +4640,7 @@
         "category": "productivity",
         "logo": "svgs/default.webp",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-10-02T19:40:32+02:00",
         "port": "8080"
     },
     "signoz": {
@@ -4374,6 +4660,7 @@
         "category": "monitoring",
         "logo": "svgs/signoz.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "8080"
     },
     "silverbullet": {
@@ -4388,6 +4675,7 @@
         "category": "productivity",
         "logo": "svgs/silverbullet.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "3000"
     },
     "siyuan": {
@@ -4402,6 +4690,7 @@
         "category": "documentation",
         "logo": "svgs/siyuan.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-10-24T13:24:48+02:00",
         "port": "6806"
     },
     "slash": {
@@ -4420,6 +4709,7 @@
         "category": "productivity",
         "logo": "svgs/default.webp",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "5231"
     },
     "snapdrop": {
@@ -4436,7 +4726,8 @@
         ],
         "category": "productivity",
         "logo": "svgs/default.webp",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "soju": {
         "documentation": "https://soju.im/?utm_source=coolify.io",
@@ -4452,6 +4743,7 @@
         "category": "communication",
         "logo": "svgs/soju.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-12-09T00:35:53+03:00",
         "port": "80"
     },
     "soketi-app-manager": {
@@ -4467,6 +4759,7 @@
         "category": "devtools",
         "logo": "svgs/soketi-app-manager.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "8080"
     },
     "soketi": {
@@ -4482,6 +4775,7 @@
         "category": "messaging",
         "logo": "svgs/soketi.jpeg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "6001"
     },
     "sonarr": {
@@ -4496,6 +4790,7 @@
         "category": "media",
         "logo": "svgs/sonarr.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8989"
     },
     "spacebot": {
@@ -4515,6 +4810,7 @@
         "category": "ai",
         "logo": "svgs/spacebot.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-18T11:20:32+01:00",
         "port": "19898"
     },
     "sparkyfitness": {
@@ -4532,6 +4828,7 @@
         "category": "health",
         "logo": "svgs/sparkyfitness.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-10-22T07:08:46+07:00",
         "port": "80"
     },
     "statusnook": {
@@ -4554,6 +4851,7 @@
         "category": "monitoring",
         "logo": "svgs/statusnook.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8000"
     },
     "stirling-pdf": {
@@ -4569,6 +4867,7 @@
         "category": "productivity",
         "logo": "svgs/stirling.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "strapi": {
@@ -4584,6 +4883,7 @@
         "category": "backend",
         "logo": "svgs/strapi.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-03T22:19:16+01:00",
         "port": "1337"
     },
     "supabase": {
@@ -4598,6 +4898,7 @@
         "category": "backend",
         "logo": "svgs/supabase.svg",
         "minversion": "4.0.0-beta.228",
+        "template_last_updated_at": "2026-04-05T20:21:11+02:00",
         "port": "8000"
     },
     "superset-with-postgresql": {
@@ -4615,6 +4916,7 @@
         "category": "analytics",
         "logo": "svgs/superset.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-12-21T12:02:19+11:00",
         "port": "8088"
     },
     "supertokens-with-mysql": {
@@ -4637,6 +4939,7 @@
         "category": "auth",
         "logo": "svgs/supertokens.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3567"
     },
     "supertokens-with-postgresql": {
@@ -4659,6 +4962,7 @@
         "category": "auth",
         "logo": "svgs/supertokens.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3567"
     },
     "sure": {
@@ -4675,6 +4979,7 @@
         "category": "finance",
         "logo": "svgs/sure.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-02-05T06:44:13+01:00",
         "port": "3000"
     },
     "swetrix": {
@@ -4692,6 +4997,7 @@
         "category": "analytics",
         "logo": "svgs/swetrix.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-10-11T21:48:53+01:00",
         "port": "3000"
     },
     "syncthing": {
@@ -4706,6 +5012,7 @@
         "category": "storage",
         "logo": "svgs/syncthing.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8384"
     },
     "tailscale-client": {
@@ -4719,7 +5026,8 @@
         ],
         "category": "networking",
         "logo": "svgs/tailscale.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-11-14T21:14:13+01:00"
     },
     "teable": {
         "documentation": "https://help.teable.io/?utm_source=coolify.io",
@@ -4737,6 +5045,7 @@
         "category": "productivity",
         "logo": "svgs/teable.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "terraria-server": {
@@ -4749,6 +5058,7 @@
         "category": "games",
         "logo": "svgs/terraria.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-11-25T08:30:31-03:00",
         "port": "7777"
     },
     "tolgee": {
@@ -4764,6 +5074,7 @@
         "category": "productivity",
         "logo": "svgs/tolgee.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "traccar": {
@@ -4780,6 +5091,7 @@
         "category": "monitoring",
         "logo": "svgs/traccar.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-09-29T04:21:17+05:30",
         "port": "8082"
     },
     "trailbase": {
@@ -4796,6 +5108,7 @@
         "category": "backend",
         "logo": "svgs/trailbase.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-05T13:56:41+01:00",
         "port": "4000"
     },
     "transmission": {
@@ -4810,6 +5123,7 @@
         "category": "media",
         "logo": "svgs/transmission.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "9091"
     },
     "trigger": {
@@ -4829,6 +5143,7 @@
         "category": "automation",
         "logo": "svgs/trigger.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-07T19:01:32+01:00",
         "port": "3000"
     },
     "triliumnext": {
@@ -4846,6 +5161,7 @@
         "category": "productivity",
         "logo": "svgs/triliumnext.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "twenty": {
@@ -4860,6 +5176,7 @@
         "category": "productivity",
         "logo": "svgs/twenty.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-16T23:18:19+05:30",
         "port": "3000"
     },
     "typesense": {
@@ -4875,6 +5192,7 @@
         "category": "search",
         "logo": "svgs/typesense.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8108"
     },
     "umami": {
@@ -4889,6 +5207,7 @@
         "category": "analytics",
         "logo": "svgs/umami.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-12-17T22:34:31+05:30",
         "port": "3000"
     },
     "unleash-with-postgresql": {
@@ -4905,6 +5224,7 @@
         "category": "devtools",
         "logo": "svgs/unleash.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "4242"
     },
     "unleash-without-database": {
@@ -4921,6 +5241,7 @@
         "category": "devtools",
         "logo": "svgs/unleash.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "4242"
     },
     "unstructured": {
@@ -4943,6 +5264,7 @@
         "category": "ai",
         "logo": "svgs/unstructured.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8000"
     },
     "uptime-kuma-with-mariadb": {
@@ -4961,6 +5283,7 @@
         "category": "monitoring",
         "logo": "svgs/uptime-kuma.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-08T21:13:56+01:00",
         "port": "3001"
     },
     "uptime-kuma-with-mysql": {
@@ -4979,6 +5302,7 @@
         "category": "monitoring",
         "logo": "svgs/uptime-kuma.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-08T21:10:43+01:00",
         "port": "3001"
     },
     "uptime-kuma": {
@@ -4997,6 +5321,7 @@
         "category": "monitoring",
         "logo": "svgs/uptime-kuma.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-08T21:10:17+01:00",
         "port": "3001"
     },
     "usesend": {
@@ -5014,6 +5339,7 @@
         "category": "email",
         "logo": "svgs/usesend.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "3000"
     },
     "vaultwarden": {
@@ -5027,6 +5353,7 @@
         "category": "auth",
         "logo": "svgs/bitwarden.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "vert": {
@@ -5044,6 +5371,7 @@
         "category": "devtools",
         "logo": "svgs/vert.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "vikunja-with-postgresql": {
@@ -5057,6 +5385,7 @@
         "category": "productivity",
         "logo": "svgs/vikunja.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3456"
     },
     "vikunja": {
@@ -5070,6 +5399,7 @@
         "category": "productivity",
         "logo": "svgs/vikunja.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3456"
     },
     "vvveb-with-mariadb": {
@@ -5091,6 +5421,7 @@
         "category": "cms",
         "logo": "svgs/vvveb.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "vvveb-with-mysql": {
@@ -5112,6 +5443,7 @@
         "category": "cms",
         "logo": "svgs/vvveb.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "vvveb": {
@@ -5133,6 +5465,7 @@
         "category": "cms",
         "logo": "svgs/vvveb.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "wakapi": {
@@ -5154,6 +5487,7 @@
         "category": "analytics",
         "logo": "svgs/wakapi.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "weaviate": {
@@ -5172,6 +5506,7 @@
         "category": "ai",
         "logo": "svgs/weaviate.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "web-check": {
@@ -5186,6 +5521,7 @@
         "category": "monitoring",
         "logo": "svgs/web-check.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "weblate": {
@@ -5204,6 +5540,7 @@
         "category": "productivity",
         "logo": "svgs/weblate.webp",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-12-31T17:36:41+02:00",
         "port": "8080"
     },
     "whoogle": {
@@ -5217,6 +5554,7 @@
         "category": "search",
         "logo": "svgs/whoogle.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "5000"
     },
     "wikijs": {
@@ -5231,6 +5569,7 @@
         "category": "cms",
         "logo": "svgs/wikijs.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
     "windmill": {
@@ -5247,6 +5586,7 @@
         "category": "automation",
         "logo": "svgs/windmill.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8000"
     },
     "wings": {
@@ -5263,6 +5603,7 @@
         "category": "devtools",
         "logo": "svgs/pterodactyl.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-19T19:14:41+01:00",
         "port": "8443"
     },
     "wireguard-easy": {
@@ -5278,6 +5619,7 @@
         "category": "vpn",
         "logo": "svgs/wireguard.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-01-05T15:54:25+01:00",
         "port": "8000"
     },
     "wordpress-with-mariadb": {
@@ -5293,7 +5635,8 @@
         ],
         "category": "cms",
         "logo": "svgs/wordpress.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "wordpress-with-mysql": {
         "documentation": "https://wordpress.org?utm_source=coolify.io",
@@ -5308,7 +5651,8 @@
         ],
         "category": "cms",
         "logo": "svgs/wordpress.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "wordpress-without-database": {
         "documentation": "https://wordpress.org?utm_source=coolify.io",
@@ -5322,7 +5666,8 @@
         ],
         "category": "cms",
         "logo": "svgs/wordpress.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00"
     },
     "yamtrack-with-postgresql": {
         "documentation": "https://github.com/FuzzyGrim/Yamtrack/wiki?utm_source=coolify.io",
@@ -5344,6 +5689,7 @@
         "category": "productivity",
         "logo": "svgs/yamtrack.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8000"
     },
     "yamtrack": {
@@ -5366,6 +5712,7 @@
         "category": "productivity",
         "logo": "svgs/yamtrack.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8000"
     },
     "zipline": {
@@ -5381,6 +5728,7 @@
         "category": "media",
         "logo": "svgs/zipline.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "convertx": {
@@ -5397,6 +5745,7 @@
         "category": "backend",
         "logo": "svgs/convertx.png",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
     "marimo": {
@@ -5412,6 +5761,7 @@
         "category": "devtools",
         "logo": "svgs/marimo.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "8080"
     },
     "pydio-cells": {
@@ -5424,6 +5774,7 @@
         "category": "storage",
         "logo": "svgs/cells.svg",
         "minversion": "0.0.0",
+        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "8080"
     }
 }

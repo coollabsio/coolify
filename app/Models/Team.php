@@ -47,10 +47,12 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'personal_team',
         'show_boarding',
         'custom_server_limit',
+        'is_mcp_server_enabled',
     ];
 
     protected $casts = [
         'personal_team' => 'boolean',
+        'is_mcp_server_enabled' => 'boolean',
     ];
 
     protected static function booted()
@@ -66,7 +68,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $team->webhookNotificationSettings()->create();
         });
 
-        static::saving(function ($team) {
+        static::updating(function ($team) {
             if (auth()->user()?->isMember()) {
                 throw new \Exception('You are not allowed to update this team.');
             }

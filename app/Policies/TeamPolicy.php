@@ -37,12 +37,11 @@ class TeamPolicy
      */
     public function update(User $user, Team $team): bool
     {
-        // Only admins and owners can update team settings
         if (! $user->teams->contains('id', $team->id)) {
             return false;
         }
 
-        return $user->isAdmin() || $user->isOwner();
+        return $user->isAdminOfTeam($team->id);
     }
 
     /**
@@ -50,12 +49,11 @@ class TeamPolicy
      */
     public function delete(User $user, Team $team): bool
     {
-        // Only admins and owners can delete teams
         if (! $user->teams->contains('id', $team->id)) {
             return false;
         }
 
-        return $user->isAdmin() || $user->isOwner();
+        return $user->isAdminOfTeam($team->id);
     }
 
     /**
@@ -63,12 +61,11 @@ class TeamPolicy
      */
     public function manageMembers(User $user, Team $team): bool
     {
-        // Only admins and owners can manage team members
         if (! $user->teams->contains('id', $team->id)) {
             return false;
         }
 
-        return $user->isAdmin() || $user->isOwner();
+        return $user->isAdminOfTeam($team->id);
     }
 
     /**
@@ -76,12 +73,11 @@ class TeamPolicy
      */
     public function viewAdmin(User $user, Team $team): bool
     {
-        // Only admins and owners can view admin panel
         if (! $user->teams->contains('id', $team->id)) {
             return false;
         }
 
-        return $user->isAdmin() || $user->isOwner();
+        return $user->isAdminOfTeam($team->id);
     }
 
     /**
@@ -89,11 +85,10 @@ class TeamPolicy
      */
     public function manageInvitations(User $user, Team $team): bool
     {
-        // Only admins and owners can manage invitations
         if (! $user->teams->contains('id', $team->id)) {
             return false;
         }
 
-        return $user->isAdmin() || $user->isOwner();
+        return $user->isAdminOfTeam($team->id);
     }
 }

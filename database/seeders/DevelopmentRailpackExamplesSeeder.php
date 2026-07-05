@@ -7,6 +7,7 @@ use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -19,13 +20,32 @@ class DevelopmentRailpackExamplesSeeder extends Seeder
 {
     public const PROJECT_UUID = 'railpack-examples';
 
-    public const ENVIRONMENT_UUID = 'railpack-examples-production';
-
     public const GIT_REPOSITORY = 'coollabsio/coolify-examples';
 
     public const GIT_BRANCH = 'next';
 
     public const REPOSITORY_PROJECT_ID = 603035348;
+
+    public const LIMA_SERVERS = [
+        [
+            'server_uuid' => 'lima-ubuntu-2404',
+            'server_name' => 'lima-ubuntu-2404',
+            'port' => 2222,
+            'environment_name' => 'ubuntu24',
+            'environment_uuid' => 'railpack-examples-ubuntu24',
+            'uuid_prefix' => 'ubuntu24-',
+        ],
+        [
+            'server_uuid' => 'lima-ubuntu-2604',
+            'server_name' => 'lima-ubuntu-2604',
+            'port' => 2223,
+            'environment_name' => 'ubuntu26',
+            'environment_uuid' => 'railpack-examples-ubuntu26',
+            'uuid_prefix' => 'ubuntu26-',
+        ],
+    ];
+
+    private const LIMA_SENTINEL_URL = 'http://host.lima.internal:8000';
 
     public function run(): void
     {
@@ -36,16 +56,22 @@ class DevelopmentRailpackExamplesSeeder extends Seeder
         }
 
         $this->ensureDevelopmentPrerequisitesExist();
-        $destination = StandaloneDocker::query()->find(0);
 
-        if (! $destination) {
+        if (! StandaloneDocker::query()->find(0)) {
             throw new RuntimeException('StandaloneDocker with id=0 is required before running DevelopmentRailpackExamplesSeeder.');
         }
 
-        $environment = $this->prepareEnvironment();
+        $this->cleanupLegacyLimaProjects();
+        $this->cleanupLegacyProductionExamples();
 
-        foreach (self::examples() as $example) {
-            $this->upsertApplication($environment, $destination, $example);
+        foreach (self::LIMA_SERVERS as $limaServer) {
+            $this->seedEnvironment(
+                environmentUuid: $limaServer['environment_uuid'],
+                environmentName: $limaServer['environment_name'],
+                destination: $this->limaDestination($limaServer['server_uuid']),
+                uuidPrefix: $limaServer['uuid_prefix'],
+                nameSuffix: " ({$limaServer['environment_name']})",
+            );
         }
     }
 
@@ -360,6 +386,36 @@ class DevelopmentRailpackExamplesSeeder extends Seeder
                 'ports_exposes' => '3000',
                 'git_branch' => 'v4.x',
             ],
+            [
+                'uuid' => 'railpack-github-deploy-key',
+                'name' => 'Railpack GitHub Deploy Key Example',
+                'git_repository' => 'git@github.com:coollabsio/coolify-examples-deploy-key.git',
+                'git_branch' => 'main',
+                'ports_exposes' => '80',
+                'private_key_id' => 1,
+            ],
+            [
+                'uuid' => 'railpack-gitlab-deploy-key',
+                'name' => 'Railpack GitLab Deploy Key Example',
+                'git_repository' => 'git@gitlab.com:coollabsio/php-example.git',
+                'git_branch' => 'main',
+                'ports_exposes' => '80',
+                'source_id' => 1,
+                'source_type' => GitlabApp::class,
+                'private_key_id' => 1,
+            ],
+            [
+                'uuid' => 'railpack-gitlab-public-example',
+                'name' => 'Railpack GitLab Public Example',
+                'git_repository' => 'https://gitlab.com/andrasbacsai/coolify-examples.git',
+                'git_branch' => 'main',
+                'base_directory' => '/astro/static',
+                'publish_directory' => '/dist',
+                'ports_exposes' => '80',
+                'source_id' => 1,
+                'source_type' => GitlabApp::class,
+                'is_static' => true,
+            ],
         ];
     }
 
@@ -409,6 +465,37 @@ KEY,
             ],
         );
 
+        foreach (self::LIMA_SERVERS as $limaServer) {
+            $server = Server::query()->firstOrCreate(
+                ['uuid' => $limaServer['server_uuid']],
+                [
+                    'name' => $limaServer['server_name'],
+                    'description' => 'This is a Lima VM for local development testing',
+                    'ip' => 'host.docker.internal',
+                    'port' => $limaServer['port'],
+                    'team_id' => 0,
+                    'private_key_id' => 1,
+                    'proxy' => [
+                        'type' => ProxyTypes::TRAEFIK->value,
+                        'status' => ProxyStatus::EXITED->value,
+                    ],
+                ],
+            );
+
+            $server->settings->forceFill([
+                'sentinel_custom_url' => self::LIMA_SENTINEL_URL,
+            ])->saveQuietly();
+
+            StandaloneDocker::query()->firstOrCreate(
+                ['server_id' => $server->id],
+                [
+                    'uuid' => "{$limaServer['server_uuid']}-docker",
+                    'name' => "{$limaServer['server_name']} Docker",
+                    'network' => 'coolify',
+                ],
+            );
+        }
+
         StandaloneDocker::query()->firstOrCreate(
             ['id' => 0],
             [
@@ -420,6 +507,7 @@ KEY,
         );
 
         $this->ensurePublicGithubSourceExists();
+        $this->ensurePublicGitlabSourceExists();
     }
 
     private function ensurePublicGithubSourceExists(): void
@@ -437,12 +525,91 @@ KEY,
         );
     }
 
+    private function ensurePublicGitlabSourceExists(): void
+    {
+        GitlabApp::query()->firstOrCreate(
+            ['id' => 1],
+            [
+                'uuid' => 'gitlab-public',
+                'name' => 'Public GitLab',
+                'api_url' => 'https://gitlab.com/api/v4',
+                'html_url' => 'https://gitlab.com',
+                'is_public' => true,
+                'team_id' => 0,
+            ],
+        );
+    }
+
     private function isDevelopmentEnvironment(): bool
     {
         return in_array(config('app.env'), ['local', 'development', 'dev'], true);
     }
 
-    private function prepareEnvironment(): Environment
+    private function limaDestination(string $serverUuid): StandaloneDocker
+    {
+        $limaDestination = Server::query()
+            ->where('uuid', $serverUuid)
+            ->first()
+            ?->standaloneDockers()
+            ->first();
+
+        if (! $limaDestination) {
+            throw new RuntimeException("Lima StandaloneDocker destination is required for {$serverUuid} before running DevelopmentRailpackExamplesSeeder.");
+        }
+
+        return $limaDestination;
+    }
+
+    private function cleanupLegacyLimaProjects(): void
+    {
+        Project::query()
+            ->whereIn('uuid', [
+                'railpack-examples-lima-ubuntu-2404',
+                'railpack-examples-lima-ubuntu-2604',
+            ])
+            ->get()
+            ->each(function (Project $project): void {
+                Application::withTrashed()
+                    ->whereIn('environment_id', $project->environments()->pluck('id'))
+                    ->get()
+                    ->each
+                    ->forceDelete();
+
+                $project->delete();
+            });
+    }
+
+    private function cleanupLegacyProductionExamples(): void
+    {
+        $project = Project::query()->where('uuid', self::PROJECT_UUID)->first();
+
+        if (! $project) {
+            return;
+        }
+
+        Application::withTrashed()
+            ->whereIn('environment_id', $project->environments()->pluck('id'))
+            ->whereIn('uuid', collect(self::examples())->pluck('uuid'))
+            ->get()
+            ->each
+            ->forceDelete();
+    }
+
+    private function seedEnvironment(
+        string $environmentUuid,
+        string $environmentName,
+        StandaloneDocker $destination,
+        string $uuidPrefix = '',
+        string $nameSuffix = '',
+    ): void {
+        $environment = $this->prepareEnvironment($environmentUuid, $environmentName);
+
+        foreach (self::examples() as $example) {
+            $this->upsertApplication($environment, $destination, $example, $uuidPrefix, $nameSuffix);
+        }
+    }
+
+    private function prepareEnvironment(string $environmentUuid, string $environmentName): Environment
     {
         $project = Project::query()->firstOrNew(['uuid' => self::PROJECT_UUID]);
         $project->fill([
@@ -452,17 +619,29 @@ KEY,
         ]);
         $project->save();
 
-        $environment = $project->environments()->first();
+        $environment = $project->environments()
+            ->where(function ($query) use ($environmentName, $environmentUuid): void {
+                $query
+                    ->where('name', $environmentName)
+                    ->orWhere('uuid', $environmentUuid);
+            })
+            ->first();
+
+        $existingEnvironment = $project->environments()->first();
+
+        if (! $environment && $project->environments()->count() === 1 && $existingEnvironment?->name === 'production') {
+            $environment = $existingEnvironment;
+        }
 
         if (! $environment) {
             $environment = $project->environments()->create([
-                'name' => 'production',
-                'uuid' => self::ENVIRONMENT_UUID,
+                'name' => $environmentName,
+                'uuid' => $environmentUuid,
             ]);
         } else {
             $environment->update([
-                'name' => 'production',
-                'uuid' => self::ENVIRONMENT_UUID,
+                'name' => $environmentName,
+                'uuid' => $environmentUuid,
             ]);
         }
 
@@ -472,19 +651,21 @@ KEY,
     /**
      * @param  array<string, mixed>  $example
      */
-    private function upsertApplication(Environment $environment, StandaloneDocker $destination, array $example): void
+    private function upsertApplication(Environment $environment, StandaloneDocker $destination, array $example, string $uuidPrefix = '', string $nameSuffix = ''): void
     {
-        $application = Application::withTrashed()->firstOrNew(['uuid' => $example['uuid']]);
+        $uuid = $uuidPrefix.$example['uuid'];
+        $name = $example['name'].$nameSuffix;
+        $application = Application::withTrashed()->firstOrNew(['uuid' => $uuid]);
         $application->fill([
-            'name' => $example['name'],
-            'description' => $example['name'],
-            'fqdn' => "http://{$example['uuid']}.127.0.0.1.sslip.io",
-            'repository_project_id' => self::REPOSITORY_PROJECT_ID,
-            'git_repository' => self::GIT_REPOSITORY,
+            'name' => $name,
+            'description' => $name,
+            'fqdn' => "http://{$uuid}.127.0.0.1.sslip.io",
+            'repository_project_id' => $example['repository_project_id'] ?? self::REPOSITORY_PROJECT_ID,
+            'git_repository' => $example['git_repository'] ?? self::GIT_REPOSITORY,
             'git_branch' => $example['git_branch'] ?? self::GIT_BRANCH,
             'build_pack' => 'railpack',
             'ports_exposes' => $example['ports_exposes'],
-            'base_directory' => $example['base_directory'],
+            'base_directory' => $example['base_directory'] ?? '/',
             'publish_directory' => $example['publish_directory'] ?? null,
             'static_image' => 'nginx:alpine',
             'install_command' => $example['install_command'] ?? null,
@@ -493,8 +674,9 @@ KEY,
             'environment_id' => $environment->id,
             'destination_id' => $destination->id,
             'destination_type' => StandaloneDocker::class,
-            'source_id' => 0,
-            'source_type' => GithubApp::class,
+            'source_id' => $example['source_id'] ?? 0,
+            'source_type' => $example['source_type'] ?? GithubApp::class,
+            'private_key_id' => $example['private_key_id'] ?? null,
         ]);
         $application->save();
 

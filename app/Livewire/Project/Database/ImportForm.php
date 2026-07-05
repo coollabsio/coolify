@@ -14,6 +14,8 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Rules\SafeWebhookUrl;
+use App\Support\DatabaseBackupFileValidator;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Storage;
@@ -27,11 +29,10 @@ class ImportForm extends Component
 
     /**
      * Validate that a string is safe for use as an S3 bucket name.
-     * Allows alphanumerics, dots, dashes, and underscores.
      */
     private function validateBucketName(string $bucket): bool
     {
-        return preg_match('/^[a-zA-Z0-9.\-_]+$/', $bucket) === 1;
+        return ValidationPatterns::isValidS3BucketName($bucket);
     }
 
     /**
@@ -451,10 +452,20 @@ EOD;
             // Check if an uploaded file exists first (takes priority over custom location)
             if (Storage::exists($backupFileName)) {
                 $path = Storage::path($backupFileName);
+
+                // Reject malicious PostgreSQL payloads before transferring the file anywhere.
+                if ($this->isPostgresqlRestore() && DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($path)) {
+                    Storage::delete($backupFileName);
+                    $this->dispatch('error', 'The uploaded backup contains disallowed PostgreSQL restore directives (COPY ... PROGRAM or psql shell commands) and was rejected.');
+
+                    return true;
+                }
+
                 $tmpPath = '/tmp/'.basename($backupFileName).'_'.$this->resourceUuid;
                 instant_scp($path, $tmpPath, $this->server);
                 Storage::delete($backupFileName);
                 $this->importCommands[] = "docker cp {$tmpPath} {$this->container}:{$tmpPath}";
+                $this->addRestoreSafetyCheckCommand($this->importCommands, $tmpPath);
             } elseif (filled($this->customLocation)) {
                 // Validate the custom location to prevent command injection
                 if (! $this->validateServerPath($this->customLocation)) {
@@ -465,6 +476,7 @@ EOD;
                 $tmpPath = '/tmp/restore_'.$this->resourceUuid;
                 $escapedCustomLocation = escapeshellarg($this->customLocation);
                 $this->importCommands[] = "docker cp {$escapedCustomLocation} {$this->container}:{$tmpPath}";
+                $this->addRestoreSafetyCheckCommand($this->importCommands, $tmpPath);
             } else {
                 $this->dispatch('error', 'The file does not exist or has been deleted.');
 
@@ -570,7 +582,7 @@ EOD;
 
             // Validate bucket name early
             if (! $this->validateBucketName($s3Storage->bucket)) {
-                $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only alphanumerics, dots, dashes, and underscores.');
+                $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only lowercase letters, numbers, dots, and dashes, and must follow S3 bucket naming rules.');
 
                 return;
             }
@@ -587,6 +599,7 @@ EOD;
                 'bucket' => $s3Storage->bucket,
                 'endpoint' => $s3Storage->endpoint,
                 'use_path_style_endpoint' => true,
+                'http' => SafeWebhookUrl::httpClientOptions($s3Storage->endpoint),
             ]);
 
             // Check if file exists
@@ -651,7 +664,7 @@ EOD;
 
             // Validate bucket name to prevent command injection
             if (! $this->validateBucketName($bucket)) {
-                $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only alphanumerics, dots, dashes, and underscores.');
+                $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only lowercase letters, numbers, dots, and dashes, and must follow S3 bucket naming rules.');
 
                 return true;
             }
@@ -667,7 +680,7 @@ EOD;
             }
 
             // Get helper image
-            $helperImage = config('constants.coolify.helper_image');
+            $helperImage = coolifyHelperImage();
             $latestVersion = getHelperVersion();
             $fullImageName = "{$helperImage}:{$latestVersion}";
 
@@ -721,6 +734,7 @@ EOD;
             // 6. Copy from helper to server, then immediately to database container
             $commands[] = "docker cp {$escapedHelperContainerPath} {$escapedServerTmpPath}";
             $commands[] = "docker cp {$escapedServerTmpPath} {$escapedDatabaseContainerTmpPath}";
+            $this->addRestoreSafetyCheckCommand($commands, $containerTmpPath);
 
             // 7. Cleanup helper container and server temp file immediately (no longer needed)
             $commands[] = "docker rm -f {$containerName} 2>/dev/null || true";
@@ -763,6 +777,69 @@ EOD;
         }
 
         return true;
+    }
+
+    public function buildRestoreSafetyCheckCommand(string $tmpPath): ?string
+    {
+        $script = $this->buildPostgresRestoreScanScript($tmpPath);
+
+        if ($script === null) {
+            return null;
+        }
+
+        return "docker exec {$this->container} sh -c ".escapeshellarg($script);
+    }
+
+    /**
+     * Build the POSIX shell snippet that aborts (exit 1) when a PostgreSQL
+     * backup contains directives leading to OS command execution.
+     *
+     * Hardened against bypasses:
+     *  - decompresses gzip backups before scanning,
+     *  - strips `--` line comments and flattens newlines so multi-line and
+     *    comment-separated payloads (e.g. `FROM/**​/PROGRAM`) are caught,
+     *  - matches a literal `\!` shell escape and `\o|`/`\g|` pipe redirects.
+     */
+    public function buildPostgresRestoreScanScript(string $tmpPath): ?string
+    {
+        if (! $this->isPostgresqlRestore()) {
+            return null;
+        }
+
+        $escapedTmpPath = escapeshellarg($tmpPath);
+
+        // Token separator PostgreSQL treats as whitespace: real whitespace or a
+        // /* ... */ block comment (used to split keywords like FROM/**/PROGRAM).
+        $sep = '([[:space:]]|/\\*[^*]*\\*/)';
+
+        $pattern = implode('|', [
+            "copy{$sep}+[^;]*(from|to){$sep}+program",
+            '(^|[[:space:]])\\\\!',
+            "(^|[[:space:]])\\\\(o|g){$sep}*\\|",
+        ]);
+        $escapedPattern = escapeshellarg($pattern);
+
+        return "if (gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}) | sed 's/--.*//' | tr '\n\r\t' '   ' | grep -Eiq {$escapedPattern}; then echo 'Blocked PostgreSQL restore: COPY ... PROGRAM and psql shell commands are not allowed.'; exit 1; fi";
+    }
+
+    private function addRestoreSafetyCheckCommand(array &$commands, string $tmpPath): void
+    {
+        $command = $this->buildRestoreSafetyCheckCommand($tmpPath);
+
+        if ($command !== null) {
+            $commands[] = $command;
+        }
+    }
+
+    private function isPostgresqlRestore(): bool
+    {
+        $morphClass = $this->resource->getMorphClass();
+
+        if ($morphClass === ServiceDatabase::class) {
+            return str_contains($this->resource->databaseType(), 'postgres');
+        }
+
+        return $morphClass === StandalonePostgresql::class || $morphClass === 'postgresql';
     }
 
     public function buildRestoreCommand(string $tmpPath): string

@@ -5,11 +5,14 @@ namespace App\Livewire\Project\Shared;
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Terminal extends Component
 {
+    use AuthorizesRequests;
+
     public bool $hasShell = true;
 
     public bool $isTerminalConnected = false;
@@ -32,7 +35,11 @@ class Terminal extends Component
     #[On('send-terminal-command')]
     public function sendTerminalCommand($isContainer, $identifier, $serverUuid)
     {
+        $this->authorize('canAccessTerminal');
+
         $server = Server::ownedByCurrentTeam()->whereUuid($serverUuid)->firstOrFail();
+        $this->authorize('view', $server);
+
         if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
             abort(403, 'Terminal access is disabled on this server.');
         }

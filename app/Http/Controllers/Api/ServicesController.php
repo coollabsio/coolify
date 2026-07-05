@@ -39,6 +39,10 @@ class ServicesController extends Controller
             ]);
         }
 
+        if ($service->is_shown_once ?? false) {
+            $service->makeHidden(['value', 'real_value']);
+        }
+
         return serializeApiResponse($service);
     }
 
@@ -56,19 +60,10 @@ class ServicesController extends Controller
             return str($urlValue)->replaceStart(',', '')->replaceEnd(',', '')->trim()->explode(',')->map(fn ($url) => trim($url))->filter();
         });
 
-        $urls = $urls->map(function ($url) use (&$errors) {
-            if (! filter_var($url, FILTER_VALIDATE_URL)) {
-                $errors[] = "Invalid URL: {$url}";
-
-                return $url;
-            }
-            $scheme = parse_url($url, PHP_URL_SCHEME) ?? '';
-            if (! in_array(strtolower($scheme), ['http', 'https'])) {
-                $errors[] = "Invalid URL scheme: {$scheme} for URL: {$url}. Only http and https are supported.";
-            }
-
-            return $url;
-        });
+        $errors = ValidationPatterns::validateApplicationDomains($urls->implode(','));
+        $urls = collect(ValidationPatterns::applicationDomainList(
+            ValidationPatterns::normalizeApplicationDomains($urls->implode(','))
+        ));
 
         $duplicates = $urls->duplicates()->unique()->values();
         if ($duplicates->isNotEmpty() && ! $forceDomainOverride) {
@@ -97,10 +92,10 @@ class ServicesController extends Controller
             }
 
             if (filled($containerUrls)) {
-                $containerUrls = str($containerUrls)->replaceStart(',', '')->replaceEnd(',', '')->trim();
-                $containerUrls = str($containerUrls)->explode(',')->map(fn ($url) => str(trim($url))->lower());
+                $containerUrls = ValidationPatterns::normalizeApplicationDomains($containerUrls);
+                $containerUrlCollection = collect(ValidationPatterns::applicationDomainList($containerUrls));
 
-                $result = checkIfDomainIsAlreadyUsedViaAPI($containerUrls, $teamId, $application->uuid);
+                $result = checkIfDomainIsAlreadyUsedViaAPI($containerUrlCollection, $teamId, $application->uuid);
                 if (isset($result['error'])) {
                     $errors[] = $result['error'];
 
@@ -112,8 +107,6 @@ class ServicesController extends Controller
 
                     return;
                 }
-
-                $containerUrls = $containerUrls->filter(fn ($u) => filled($u))->unique()->implode(',');
             } else {
                 $containerUrls = null;
             }
@@ -1247,8 +1240,12 @@ class ServicesController extends Controller
 
         $this->authorize('manageEnvironment', $service);
 
+        if ($request->has('key')) {
+            $request->merge(['key' => ValidationPatterns::normalizeEnvironmentVariableKey((string) $request->key)]);
+        }
+
         $validator = customApiValidator($request->all(), [
-            'key' => 'string|required',
+            'key' => ValidationPatterns::environmentVariableKeyRules(),
             'value' => 'string|nullable',
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
@@ -1396,8 +1393,12 @@ class ServicesController extends Controller
 
         $updatedEnvs = collect();
         foreach ($bulk_data as $item) {
+            if (array_key_exists('key', $item)) {
+                $item['key'] = ValidationPatterns::normalizeEnvironmentVariableKey((string) $item['key']);
+            }
+
             $validator = customApiValidator($item, [
-                'key' => 'string|required',
+                'key' => ValidationPatterns::environmentVariableKeyRules(),
                 'value' => 'string|nullable',
                 'is_literal' => 'boolean',
                 'is_multiline' => 'boolean',
@@ -1515,8 +1516,12 @@ class ServicesController extends Controller
 
         $this->authorize('manageEnvironment', $service);
 
+        if ($request->has('key')) {
+            $request->merge(['key' => ValidationPatterns::normalizeEnvironmentVariableKey((string) $request->key)]);
+        }
+
         $validator = customApiValidator($request->all(), [
-            'key' => 'string|required',
+            'key' => ValidationPatterns::environmentVariableKeyRules(),
             'value' => 'string|nullable',
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
@@ -2099,10 +2104,11 @@ class ServicesController extends Controller
             'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
             'is_directory' => 'boolean',
+            'is_host_file' => 'boolean',
             'fs_path' => 'string',
         ]);
 
-        $allAllowedFields = ['type', 'resource_uuid', 'name', 'mount_path', 'host_path', 'content', 'is_directory', 'fs_path'];
+        $allAllowedFields = ['type', 'resource_uuid', 'name', 'mount_path', 'host_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -2134,7 +2140,7 @@ class ServicesController extends Controller
                 ], 422);
             }
 
-            $typeSpecificInvalidFields = array_intersect(['content', 'is_directory', 'fs_path'], array_keys($request->all()));
+            $typeSpecificInvalidFields = array_intersect(['content', 'is_directory', 'is_host_file', 'fs_path'], array_keys($request->all()));
             if (! empty($typeSpecificInvalidFields)) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -2165,6 +2171,14 @@ class ServicesController extends Controller
         }
 
         $isDirectory = $request->boolean('is_directory', false);
+        $isHostFile = $request->boolean('is_host_file', false);
+
+        if ($isDirectory && $isHostFile) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['is_host_file' => 'Host file mounts cannot also be directory mounts.'],
+            ], 422);
+        }
 
         if ($isDirectory) {
             if (! $request->fs_path) {
@@ -2187,12 +2201,50 @@ class ServicesController extends Controller
                 'resource_id' => $subResource->id,
                 'resource_type' => get_class($subResource),
             ]);
+        } elseif ($isHostFile) {
+            if (! $request->fs_path) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['fs_path' => 'The fs_path field is required for host file mounts.'],
+                ], 422);
+            }
+
+            if ($request->filled('content')) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['content' => 'Content is not valid for host file mounts.'],
+                ], 422);
+            }
+
+            try {
+                $fsPath = validateHostFileMountPath($request->fs_path, 'host file source path');
+                $mountPath = validateFileMountPath($request->mount_path, 'host file destination path');
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['mount_path' => $e->getMessage()],
+                ], 422);
+            }
+
+            $storage = LocalFileVolume::create([
+                'fs_path' => $fsPath,
+                'mount_path' => $mountPath,
+                'content' => null,
+                'is_directory' => false,
+                'is_host_file' => true,
+                'resource_id' => $subResource->id,
+                'resource_type' => get_class($subResource),
+            ]);
         } else {
-            $mountPath = str($request->mount_path)->trim()->start('/')->value();
-
-            validateShellSafePath($mountPath, 'file storage path');
-
-            $fsPath = service_configuration_dir().'/'.$service->uuid.$mountPath;
+            try {
+                $mountPath = validateFileMountPath($request->mount_path, 'file storage path');
+                $fsPath = confineFileMountPath(service_configuration_dir().'/'.$service->uuid, $mountPath, 'file storage path');
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['mount_path' => $e->getMessage()],
+                ], 422);
+            }
 
             $storage = LocalFileVolume::create([
                 'fs_path' => $fsPath,

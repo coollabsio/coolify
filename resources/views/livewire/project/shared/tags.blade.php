@@ -10,8 +10,8 @@
             <x-forms.button type="submit">Add</x-forms.button>
         </form>
     @else
-        <x-callout type="warning" title="Access Restricted" class="mt-4">
-            You don't have permission to manage tags. Contact your team administrator to request access.
+        <x-callout type="danger" title="Insufficient Permissions" class="mt-4">
+            You don't have permission to manage this resource. Contact your team administrator for access.
         </x-callout>
     @endcan
     @if (data_get($this->resource, 'tags') && count(data_get($this->resource, 'tags')) > 0)

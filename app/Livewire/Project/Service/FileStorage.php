@@ -94,6 +94,10 @@ class FileStorage extends Component
         try {
             $this->authorize('update', $this->resource);
 
+            if ($this->fileStorage->is_host_file) {
+                throw new \Exception('Host file mounts are bind-only and cannot be converted.');
+            }
+
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = true;
             $this->fileStorage->content = null;
@@ -110,8 +114,11 @@ class FileStorage extends Component
     public function loadStorageOnServer()
     {
         try {
-            // Loading content is a read operation, so we use 'view' permission
-            $this->authorize('view', $this->resource);
+            $this->authorize('update', $this->resource);
+
+            if ($this->fileStorage->is_host_file) {
+                throw new \Exception('Host file mounts are bind-only and cannot be loaded from the server.');
+            }
 
             $this->fileStorage->loadStorageOnServer();
             $this->syncData();
@@ -127,6 +134,10 @@ class FileStorage extends Component
     {
         try {
             $this->authorize('update', $this->resource);
+
+            if ($this->fileStorage->is_host_file) {
+                throw new \Exception('Host file mounts are bind-only and cannot be converted.');
+            }
 
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = false;
@@ -155,8 +166,10 @@ class FileStorage extends Component
             $message = 'File deleted.';
             if ($this->fileStorage->is_directory) {
                 $message = 'Directory deleted.';
+            } elseif ($this->fileStorage->is_host_file) {
+                $message = 'Host file mount removed.';
             }
-            if ($this->permanently_delete) {
+            if ($this->permanently_delete && ! $this->fileStorage->is_host_file) {
                 $message = 'Directory deleted from the server.';
                 $this->fileStorage->deleteStorageOnServer();
             }
@@ -174,6 +187,12 @@ class FileStorage extends Component
     public function submit()
     {
         $this->authorize('update', $this->resource);
+
+        if ($this->fileStorage->is_host_file) {
+            $this->dispatch('error', 'Host file mounts are bind-only and cannot be edited from the UI.');
+
+            return;
+        }
 
         if ($this->fileStorage->is_too_large) {
             $this->dispatch('error', 'File on server is too large to edit from the UI.');
@@ -206,6 +225,12 @@ class FileStorage extends Component
     public function instantSave(): void
     {
         $this->authorize('update', $this->resource);
+        if ($this->fileStorage->is_host_file) {
+            $this->dispatch('error', 'Host file mounts are bind-only and cannot be edited from the UI.');
+
+            return;
+        }
+
         if ($this->fileStorage->is_too_large) {
             $this->dispatch('error', 'File on server is too large to edit from the UI.');
 
@@ -223,6 +248,9 @@ class FileStorage extends Component
             ],
             'fileDeletionCheckboxes' => [
                 ['id' => 'permanently_delete', 'label' => 'The selected file will be permanently deleted form the server.'],
+            ],
+            'hostFileDeletionCheckboxes' => [
+                ['id' => 'permanently_delete', 'label' => 'Only the mount configuration will be removed. The host file will not be deleted.'],
             ],
         ]);
     }

@@ -5,8 +5,8 @@
     <h1>Configuration</h1>
     <livewire:project.shared.configuration-checker :resource="$database" />
     <livewire:project.database.heading :database="$database" />
-    <div class="flex flex-col h-full gap-8 sm:flex-row">
-        <div class="sub-menu-wrapper">
+    <div class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
+        <div class="sub-menu-wrapper hidden md:flex">
             <a class='sub-menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.database.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"><span class="menu-item-label">General</span></a>
             <a class='sub-menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
