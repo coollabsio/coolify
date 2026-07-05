@@ -11,6 +11,7 @@ use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Notifications\Application\RestartLimitReached as ApplicationRestartLimitReached;
+use App\Notifications\Application\HealthChanged;
 use App\Services\ContainerStatusAggregator;
 use App\Traits\CalculatesExcludedStatus;
 use Illuminate\Support\Arr;
@@ -492,6 +493,17 @@ class GetContainersStatus
                         $statusFromDb = $application->status;
                         if ($statusFromDb !== $aggregatedStatus) {
                             $application->update(['status' => $aggregatedStatus]);
+
+                            // Notify on health status transitions (healthy ↔ unhealthy) for running containers.
+                            // Skip during deployment — deployment has its own failure notifications.
+                            $wasHealthy = str($statusFromDb)->contains(':healthy');
+                            $isHealthy = str($aggregatedStatus)->contains(':healthy');
+                            $wasUnhealthy = str($statusFromDb)->contains(':unhealthy');
+                            $isUnhealthy = str($aggregatedStatus)->contains(':unhealthy');
+
+                            if (($wasHealthy && $isUnhealthy) || ($wasUnhealthy && $isHealthy)) {
+                                $application->environment->project->team?->notify(new HealthChanged($application, $aggregatedStatus));
+                            }
                         } else {
                             $application->update(['last_online_at' => now()]);
                         }

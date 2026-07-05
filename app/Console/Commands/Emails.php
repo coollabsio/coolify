@@ -10,6 +10,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Notifications\Application\HealthChanged;
 use App\Notifications\Application\StatusChanged;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
@@ -60,6 +61,7 @@ class Emails extends Command
                 'application-deployment-success' => 'Application - Deployment Success',
                 'application-deployment-failed' => 'Application - Deployment Failed',
                 'application-status-changed' => 'Application - Status Changed',
+                'application-health-changed' => 'Application - Health Status Changed',
                 'backup-success' => 'Database - Backup Success',
                 'backup-failed' => 'Database - Backup Failed',
                 // 'invitation-link' => 'Invitation Link',
@@ -152,6 +154,11 @@ class Emails extends Command
             case 'application-status-changed':
                 $application = Application::all()->first();
                 $this->mail = (new StatusChanged($application))->toMail();
+                $this->sendEmail();
+                break;
+            case 'application-health-changed':
+                $application = Application::all()->first();
+                $this->mail = (new HealthChanged($application, 'running:unhealthy'))->toMail();
                 $this->sendEmail();
                 break;
             case 'backup-failed':
