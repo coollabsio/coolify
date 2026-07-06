@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\RateLimitException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 
 class HetznerService
@@ -24,7 +25,7 @@ class HetznerService
             ->timeout(30)
             ->retry(3, function (int $attempt, \Exception $exception) {
                 // Handle rate limiting (429 Too Many Requests)
-                if ($exception instanceof \Illuminate\Http\Client\RequestException) {
+                if ($exception instanceof RequestException) {
                     $response = $exception->response;
 
                     if ($response && $response->status() === 429) {
@@ -129,16 +130,8 @@ class HetznerService
 
     public function createServer(array $params): array
     {
-        ray('Hetzner createServer request', [
-            'endpoint' => '/servers',
-            'params' => $params,
-        ]);
 
         $response = $this->request('post', '/servers', $params);
-
-        ray('Hetzner createServer response', [
-            'response' => $response,
-        ]);
 
         return $response['server'] ?? [];
     }

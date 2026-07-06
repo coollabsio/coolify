@@ -366,7 +366,6 @@ class LocalFileVolume extends BaseModel
 
             return false;
         } catch (\Throwable $e) {
-            ray($e->getMessage(), 'Error checking read-only volume');
 
             return false;
         }

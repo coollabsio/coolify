@@ -26,22 +26,14 @@ class DeleteServer
             );
         }
 
-        ray($server ? 'Deleting server from Coolify' : 'Server already deleted from Coolify, skipping Coolify deletion');
-
         // If server is already deleted from Coolify, skip this part
         if (! $server) {
             return; // Server already force deleted from Coolify
         }
 
-        ray('force deleting server from Coolify', ['server_id' => $server->id]);
-
         try {
             $server->forceDelete();
         } catch (\Throwable $e) {
-            ray('Failed to force delete server from Coolify', [
-                'error' => $e->getMessage(),
-                'server_id' => $server->id,
-            ]);
             logger()->error('Failed to force delete server from Coolify', [
                 'error' => $e->getMessage(),
                 'server_id' => $server->id,
@@ -66,10 +58,6 @@ class DeleteServer
             }
 
             if (! $token) {
-                ray('No Hetzner token found for team, skipping Hetzner deletion', [
-                    'team_id' => $teamId,
-                    'hetzner_server_id' => $hetznerServerId,
-                ]);
 
                 return;
             }
@@ -77,16 +65,7 @@ class DeleteServer
             $hetznerService = new HetznerService($token->token);
             $hetznerService->deleteServer($hetznerServerId);
 
-            ray('Deleted server from Hetzner', [
-                'hetzner_server_id' => $hetznerServerId,
-                'team_id' => $teamId,
-            ]);
         } catch (\Throwable $e) {
-            ray('Failed to delete server from Hetzner', [
-                'error' => $e->getMessage(),
-                'hetzner_server_id' => $hetznerServerId,
-                'team_id' => $teamId,
-            ]);
 
             // Log the error but don't prevent the server from being deleted from Coolify
             logger()->error('Failed to delete server from Hetzner', [

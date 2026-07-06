@@ -3609,7 +3609,7 @@ class ApplicationsController extends Controller
             'team_id' => $teamId,
             'application_uuid' => $application->uuid,
             'application_name' => $application->name,
-            'deployment_uuid' => $deployment_uuid->toString(),
+            'deployment_uuid' => $deployment_uuid,
             'force_rebuild' => $force,
             'instant_deploy' => $instant_deploy,
         ]);
@@ -3617,7 +3617,7 @@ class ApplicationsController extends Controller
         return response()->json(
             [
                 'message' => 'Deployment request queued.',
-                'deployment_uuid' => $deployment_uuid->toString(),
+                'deployment_uuid' => $deployment_uuid,
             ],
             200
         );
@@ -3803,13 +3803,13 @@ class ApplicationsController extends Controller
             'team_id' => $teamId,
             'application_uuid' => $application->uuid,
             'application_name' => $application->name,
-            'deployment_uuid' => $deployment_uuid->toString(),
+            'deployment_uuid' => $deployment_uuid,
         ]);
 
         return response()->json(
             [
                 'message' => 'Restart request queued.',
-                'deployment_uuid' => $deployment_uuid->toString(),
+                'deployment_uuid' => $deployment_uuid,
             ],
         );
     }

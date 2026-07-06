@@ -57,13 +57,6 @@ class SendWebhookJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        if (isDev()) {
-            ray('Sending webhook notification', [
-                'url' => $this->webhookUrl,
-                'payload' => $this->payload,
-            ]);
-        }
-
         try {
             $httpOptions = SafeWebhookUrl::httpClientOptions($this->webhookUrl);
         } catch (\RuntimeException $e) {
@@ -75,14 +68,6 @@ class SendWebhookJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        $response = Http::withOptions($httpOptions)->post($this->webhookUrl, $this->payload);
-
-        if (isDev()) {
-            ray('Webhook response', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-                'successful' => $response->successful(),
-            ]);
-        }
+        Http::withOptions($httpOptions)->post($this->webhookUrl, $this->payload);
     }
 }

@@ -1764,7 +1764,6 @@ function validateDNSEntry(string $fqdn, Server $server)
             $query = new DNSQuery($dns_server);
             $results = $query->query($host, $type);
             if ($results === false || $query->hasError()) {
-                ray('Error: '.$query->getLasterror());
             } else {
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
@@ -3786,9 +3785,6 @@ function loggy($message = null, array $context = [])
 {
     if (! isDev()) {
         return;
-    }
-    if (function_exists('ray') && config('app.debug')) {
-        ray($message, $context);
     }
     if (is_null($message)) {
         return app('log');

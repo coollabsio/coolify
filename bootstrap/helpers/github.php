@@ -276,7 +276,6 @@ function getGithubCommitRangeFiles(?GithubApp $source, string $owner, string $re
 
         return $files->pluck('filename')->filter()->values()->toArray();
     } catch (Exception $e) {
-        ray('Error fetching GitHub commit range files: '.$e->getMessage());
 
         return [];
     }
@@ -302,7 +301,6 @@ function getGithubPullRequestFiles(?GithubApp $source, string $owner, string $re
 
         return $files->pluck('filename')->filter()->values()->toArray();
     } catch (Exception $e) {
-        ray('Error fetching GitHub PR files: '.$e->getMessage());
 
         return [];
     }
