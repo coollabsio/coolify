@@ -17,6 +17,7 @@ use App\Models\V5\Application as V5Application;
 use App\Models\V5\Cluster as V5Cluster;
 use App\Models\V5\Server as V5Server;
 use App\Rules\ValidServerIp;
+use App\Services\Flux\AgentTokenIssuer;
 use App\Services\Flux\FluxClient;
 use App\Support\V5\ClusterSerializer;
 use Illuminate\Http\JsonResponse;
@@ -273,6 +274,78 @@ class ServerController extends Controller
         ]);
     }
 
+    public function restartCoold(Request $request, V5Cluster $cluster, V5Server $server, AgentTokenIssuer $agentTokenIssuer, FluxClient $fluxClient): JsonResponse
+    {
+        $currentTeam = $this->currentTeamOrFail($request);
+        $this->authorize('restartCoold', [$server, $currentTeam, $cluster]);
+
+        $server->loadMissing('privateKey');
+
+        if (! $server->privateKey instanceof PrivateKey) {
+            return response()->json([
+                'message' => 'No private key is attached to this server.',
+            ], 422);
+        }
+
+        try {
+            $token = $agentTokenIssuer->issueForServer($server);
+            $output = $this->restartCooldOverSsh($server, $token);
+        } catch (\Throwable $e) {
+            Log::warning('V5 coold restart over SSH failed', [
+                'server_id' => $server->id,
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => str($e->getMessage() !== '' ? $e->getMessage() : 'Could not restart coold over SSH.')->limit(10000)->toString(),
+            ], 502);
+        }
+
+        $connected = false;
+
+        try {
+            usleep(500_000);
+            $fluxClient->cooldLogs($server->fluxHostId(), 1);
+            $connected = true;
+            $server->forceFill([
+                'status' => ServerStatus::Installed->value,
+                'last_status_check' => 'flux',
+                'last_status_output' => 'coold restarted over SSH and reconnected to Flux.',
+            ])->save();
+        } catch (\Throwable $e) {
+            Log::info('V5 coold restart succeeded but Flux reconnect is not confirmed yet', [
+                'server_id' => $server->id,
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        return response()->json([
+            'cluster' => app(ClusterSerializer::class)->serializeFresh($cluster),
+            'output' => $output,
+            'connected' => $connected,
+            'restartedAt' => now()->toJSON(),
+        ]);
+    }
+
+    private function restartCooldOverSsh(V5Server $server, string $token): string
+    {
+        $encodedToken = base64_encode($token);
+        $script = implode(PHP_EOL, [
+            'set -e',
+            "SUDO=''",
+            'if [ "$(id -u)" != "0" ]; then SUDO="sudo -n"; fi',
+            '$SUDO mkdir -p /etc/coolify',
+            'printf %s '.escapeshellarg($encodedToken).' | base64 -d | $SUDO tee /etc/coolify/host-jwt >/dev/null',
+            '$SUDO chmod 600 /etc/coolify/host-jwt',
+            '$SUDO systemctl reset-failed coold.service || true',
+            '$SUDO systemctl restart coold.service',
+            '$SUDO systemctl is-active coold.service',
+            '$SUDO systemctl status coold.service --no-pager -l | sed -n "1,18p"',
+        ]);
+
+        return $this->runServerSshCommand($server, $script, 'SSH coold restart command failed.', 45);
+    }
+
     public function cooldLogs(Request $request, V5Cluster $cluster, V5Server $server, FluxClient $fluxClient): JsonResponse
     {
         $currentTeam = $this->currentTeamOrFail($request);
@@ -334,7 +407,7 @@ class ServerController extends Controller
         );
     }
 
-    private function runServerSshCommand(V5Server $server, string $remoteCommand, string $failureMessage): string
+    private function runServerSshCommand(V5Server $server, string $remoteCommand, string $failureMessage, int $timeout = 15): string
     {
         $keyDirectory = storage_path('app/ssh/keys');
         if (! is_dir($keyDirectory)) {
@@ -350,7 +423,7 @@ class ServerController extends Controller
         chmod($keyLocation, 0600);
 
         try {
-            $result = Process::timeout(15)->run([
+            $result = Process::timeout($timeout)->run([
                 'ssh',
                 '-o',
                 'BatchMode=yes',
@@ -505,6 +578,21 @@ PYTHON;
                 'message' => $e->getMessage(),
             ]);
 
+            if ($server->privateKey instanceof PrivateKey) {
+                try {
+                    return response()->json([
+                        'rules' => $this->firewallRulesOverSsh($server, (string) ($validated['namespace'] ?? '')),
+                        'source' => 'ssh',
+                        'fetchedAt' => now()->toJSON(),
+                    ]);
+                } catch (\Throwable $sshException) {
+                    Log::warning('V5 firewall rules SSH fallback failed', [
+                        'server_id' => $server->id,
+                        'message' => $sshException->getMessage(),
+                    ]);
+                }
+            }
+
             return response()->json([
                 'message' => 'Could not fetch firewall rules through Flux. Check the Flux and coold status, then try again.',
             ], 502);
@@ -515,6 +603,58 @@ PYTHON;
             'source' => 'flux',
             'fetchedAt' => now()->toJSON(),
         ]);
+    }
+
+    /**
+     * @return array<int, array{id: string, namespace: string, src: string, dst: string, proto: string, port: int}>
+     */
+    private function firewallRulesOverSsh(V5Server $server, string $namespace): array
+    {
+        $script = str_replace('__NAMESPACE__', json_encode($namespace, JSON_THROW_ON_ERROR), <<<'PYTHON'
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+namespace = __NAMESPACE__
+path = Path("/etc/coolify/firewall-rules.tsv")
+rules = []
+
+if path.exists():
+    for line in path.read_text().splitlines():
+        parts = line.split("\t")
+        if len(parts) == 6:
+            rule_id, rule_namespace, src, dst, proto, port = parts
+        elif len(parts) == 5:
+            rule_id = ""
+            rule_namespace, src, dst, proto, port = parts
+        else:
+            continue
+
+        if namespace and rule_namespace != namespace:
+            continue
+
+        try:
+            port = int(port)
+        except ValueError:
+            continue
+
+        rules.append({
+            "id": rule_id,
+            "namespace": rule_namespace,
+            "src": src,
+            "dst": dst,
+            "proto": proto,
+            "port": port,
+        })
+
+print(json.dumps(rules, separators=(",", ":")))
+PY
+PYTHON);
+
+        $output = $this->runServerSshCommand($server, $script, 'SSH firewall rules command failed.');
+        $rules = json_decode($output, true, 512, JSON_THROW_ON_ERROR);
+
+        return is_array($rules) ? $rules : [];
     }
 
     public function bootstrap(Request $request, V5Cluster $cluster, V5Server $server): JsonResponse

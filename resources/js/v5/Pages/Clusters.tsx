@@ -85,6 +85,13 @@ type CheckServerResponse = {
     checkedAt: string;
 };
 
+type RestartCooldResponse = {
+    cluster?: V5Cluster;
+    output?: string;
+    connected?: boolean;
+    restartedAt?: string;
+};
+
 type DeleteServerResponse = {
     cluster: V5Cluster;
 };
@@ -112,6 +119,7 @@ type FirewallRule = {
 
 type FirewallRulesResponse = {
     rules: FirewallRule[];
+    source: 'flux' | 'ssh';
     fetchedAt: string;
 };
 
@@ -448,6 +456,7 @@ export default function Clusters({
     const [isServerSubmitting, setIsServerSubmitting] = useState(false);
     const [isServerUpdateSubmitting, setIsServerUpdateSubmitting] = useState(false);
     const checkingServers = usePendingIds<string>();
+    const restartingCooldServers = usePendingIds<string>();
     const [serverConnectionNotice, setServerConnectionNotice] = useState<ServerConnectionNotice | null>(null);
     const [isBootstrapLogsDialogOpen, setIsBootstrapLogsDialogOpen] = useState(false);
     const [bootstrapLogsServerId, setBootstrapLogsServerId] = useState<string | null>(null);
@@ -480,6 +489,7 @@ export default function Clusters({
     const [firewallRulesServer, setFirewallRulesServer] = useState<V5Server | null>(null);
     const [firewallRules, setFirewallRules] = useState<FirewallRule[]>([]);
     const [firewallRulesFetchedAt, setFirewallRulesFetchedAt] = useState<string | null>(null);
+    const [firewallRulesSource, setFirewallRulesSource] = useState<'flux' | 'ssh' | null>(null);
     const [firewallRulesError, setFirewallRulesError] = useState<string | null>(null);
     const [isLoadingFirewallRules, setIsLoadingFirewallRules] = useState(false);
     const [showAdvancedConfiguration, setShowAdvancedConfiguration] = useState(false);
@@ -748,6 +758,37 @@ export default function Clusters({
         checkingServers.finish(server.id);
     }
 
+    async function restartCoold(server: V5Server): Promise<void> {
+        if (!selectedCluster) {
+            return;
+        }
+
+        restartingCooldServers.start(server.id);
+
+        const response = await apiRequest(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/restart-coold`, {
+            method: 'POST',
+        }).catch(() => null);
+        const payload = (await response?.json().catch(() => null)) as (RestartCooldResponse & { message?: string }) | null;
+
+        if (payload?.cluster) {
+            setClusterList((currentClusters) =>
+                currentClusters.map((cluster) => (cluster.id === payload.cluster?.id ? payload.cluster : cluster)),
+            );
+        }
+
+        setServerConnectionNotice({
+            message: response?.ok ? `Restarted coold on ${server.name}` : `Failed to restart coold on ${server.name}`,
+            description: response?.ok
+                ? payload?.connected
+                    ? 'coold restarted over SSH and reconnected to Flux.'
+                    : (payload?.output ?? 'coold restarted over SSH. Flux reconnection is not confirmed yet.')
+                : (payload?.message ?? 'Unable to restart coold over SSH.'),
+            variant: response?.ok ? 'success' : 'danger',
+        });
+
+        restartingCooldServers.finish(server.id);
+    }
+
     async function bootstrapServer(server: V5Server): Promise<void> {
         if (!selectedCluster) {
             return;
@@ -856,6 +897,7 @@ export default function Clusters({
         setFirewallRulesError(null);
         setFirewallRules([]);
         setFirewallRulesFetchedAt(null);
+        setFirewallRulesSource(null);
 
         const response = await apiRequest(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/firewall-rules`, {
             method: 'GET',
@@ -872,6 +914,7 @@ export default function Clusters({
 
         setFirewallRules(Array.isArray(payload?.rules) ? payload.rules : []);
         setFirewallRulesFetchedAt(payload?.fetchedAt ?? null);
+        setFirewallRulesSource(payload?.source ?? null);
         setIsLoadingFirewallRules(false);
     }
 
@@ -1048,6 +1091,7 @@ export default function Clusters({
 
     function renderServerCard(server: V5Server) {
         const isCheckingServer = checkingServers.has(server.id);
+        const isRestartingCoold = restartingCooldServers.has(server.id);
         const isBootstrapInProgress = ['queued', 'running'].includes(server.lastBootstrapStatus ?? '');
         const isBootstrappingServer = bootstrappingServers.has(server.id) || isBootstrapInProgress;
         const isDeletingServer = deletingServers.has(server.id);
@@ -1119,6 +1163,12 @@ export default function Clusters({
                                             View install logs
                                         </DropdownMenuItem>
                                     ) : null}
+                                    <DropdownMenuItem
+                                        disabled={isRestartingCoold}
+                                        onClick={() => void restartCoold(server)}
+                                    >
+                                        {isRestartingCoold ? 'Restarting coold...' : 'Restart coold'}
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => void loadCooldLogs(server)}>
                                         Coold logs
                                     </DropdownMenuItem>
@@ -2356,6 +2406,7 @@ export default function Clusters({
                                     setFirewallRulesServer(null);
                                     setFirewallRules([]);
                                     setFirewallRulesFetchedAt(null);
+                                    setFirewallRulesSource(null);
                                     setFirewallRulesError(null);
                                 }
                             }}
@@ -2372,7 +2423,7 @@ export default function Clusters({
                                     <div className="flex items-center justify-between gap-3">
                                         <p className="text-xs text-muted-foreground">
                                             {firewallRulesFetchedAt
-                                                ? `Fetched ${formatDate(firewallRulesFetchedAt)}`
+                                                ? `Fetched ${formatDate(firewallRulesFetchedAt)} · Source: ${diagnosticsSourceLabel(firewallRulesSource)}`
                                                 : 'Rules currently persisted by coold'}
                                         </p>
                                         {firewallRulesServer ? (

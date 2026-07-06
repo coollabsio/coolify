@@ -58,6 +58,14 @@ class ServerPolicy
     }
 
     /**
+     * Determine whether the user can restart coold over SSH.
+     */
+    public function restartCoold(User $user, Server $server, Team $team, Cluster $cluster): Response
+    {
+        return $this->allowIfAdminAndScoped($user, $server, $team, $cluster);
+    }
+
+    /**
      * Determine whether the user can view server diagnostics (coold logs,
      * corrosion tables, firewall rules). Read-only, so gated on team
      * membership alone.

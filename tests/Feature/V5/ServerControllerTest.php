@@ -5,6 +5,7 @@ use App\Models\V5\Application as V5Application;
 use App\Models\V5\ApplicationDomain as V5ApplicationDomain;
 use App\Models\V5\Cluster;
 use App\Models\V5\Server as V5Server;
+use App\Services\Flux\AgentTokenIssuer;
 use App\Services\Flux\FluxClient;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
@@ -44,6 +45,109 @@ it('updates v5 caddy ingress canvas position for the current team', function () 
 
     expect($server->refresh()->canvas_x)->toBe(-160)
         ->and($server->canvas_y)->toBe(240);
+});
+
+it('restarts v5 server coold over ssh with a freshly minted host jwt', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'unreachable',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+        'wireguard_management_ip' => '100.64.0.10',
+        'node_address' => '203.0.113.10',
+    ]);
+
+    $this->mock(AgentTokenIssuer::class, function (MockInterface $mock) use ($server): void {
+        $mock->shouldReceive('issueForServer')
+            ->once()
+            ->with(Mockery::on(fn (V5Server $subject): bool => $subject->is($server)))
+            ->andReturn('fresh-host-jwt');
+    });
+
+    $this->mock(FluxClient::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('cooldLogs')
+            ->once()
+            ->with(Mockery::type('string'), 1)
+            ->andReturn('coold restarted');
+    });
+
+    Process::fake([
+        '*' => Process::result(output: "active\n● coold.service - Coolify host agent\n"),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}/restart-coold")
+        ->assertSuccessful()
+        ->assertJsonPath('connected', true)
+        ->assertJsonPath('output', "active\n● coold.service - Coolify host agent")
+        ->assertJsonStructure(['cluster', 'output', 'connected', 'restartedAt']);
+
+    expect($server->refresh()->status)->toBe('installed')
+        ->and($server->last_status_check)->toBe('flux')
+        ->and($server->last_status_output)->toBe('coold restarted over SSH and reconnected to Flux.');
+
+    Process::assertRan(function ($process): bool {
+        $command = implode(' ', array_map(fn ($part) => is_string($part) ? $part : json_encode($part), $process->command));
+
+        return str_contains($command, '203.0.113.10')
+            && str_contains($command, base64_encode('fresh-host-jwt'))
+            && str_contains($command, '/etc/coolify/host-jwt')
+            && str_contains($command, 'systemctl restart coold.service');
+    });
+});
+
+it('requires a private key before restarting v5 server coold over ssh', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'unreachable',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+        'wireguard_management_ip' => '100.64.0.10',
+        'node_address' => '203.0.113.10',
+    ]);
+
+    Process::fake();
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->postJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}/restart-coold")
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'No private key is attached to this server.');
 });
 
 it('fetches v5 server coold logs through flux', function () {
@@ -334,6 +438,62 @@ it('fetches v5 server firewall rules through flux', function () {
         ->assertJsonPath('rules.0.id', 'v5-resource-connection:1:1:2:tcp:5432')
         ->assertJsonPath('rules.0.port', 5432)
         ->assertJsonStructure(['rules', 'fetchedAt']);
+});
+
+it('falls back to ssh for v5 server firewall rules when flux fails', function () {
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    $privateKey = createV5PrivateKey($team, 'Production SSH Key');
+    $cluster = Cluster::query()->create([
+        'team_id' => $team->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'Production Mesh',
+        'description' => null,
+    ]);
+    $server = V5Server::query()->create([
+        'team_id' => $team->id,
+        'cluster_id' => $cluster->id,
+        'created_by_user_id' => $user->id,
+        'private_key_id' => $privateKey->id,
+        'name' => 'prod-01',
+        'host' => '203.0.113.10',
+        'ssh_user' => 'root',
+        'ssh_port' => 22,
+        'status' => 'installed',
+        'builder_enabled' => false,
+        'builder_capacity' => 0,
+        'wireguard_management_ip' => '100.64.0.10',
+        'node_address' => '203.0.113.10',
+    ]);
+
+    $this->mock(FluxClient::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('listFirewallRules')
+            ->once()
+            ->with(Mockery::type('string'), '')
+            ->andThrow(new RuntimeException('host is not connected'));
+    });
+
+    Process::fake([
+        '*' => Process::result(output: '[{"id":"v5-resource-connection:1:1:2:tcp:5432","namespace":"default","src":"coolify-v5-api","dst":"coolify-v5-postgres","proto":"tcp","port":5432}]'),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->getJson("/v5/clusters/{$cluster->uuid}/servers/{$server->uuid}/firewall-rules")
+        ->assertSuccessful()
+        ->assertJsonPath('rules.0.id', 'v5-resource-connection:1:1:2:tcp:5432')
+        ->assertJsonPath('rules.0.port', 5432)
+        ->assertJsonPath('source', 'ssh');
+
+    Process::assertRan(function ($process): bool {
+        $command = implode(' ', array_map(fn ($part) => is_string($part) ? $part : json_encode($part), $process->command));
+
+        return str_contains($command, '/etc/coolify/firewall-rules.tsv')
+            && str_contains($command, '203.0.113.10')
+            && in_array('LogLevel=ERROR', $process->command, true);
+    });
 });
 
 it('adds a v5 server to a cluster for the current team', function () {

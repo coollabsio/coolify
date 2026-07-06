@@ -29,6 +29,7 @@ Route::middleware('v5.authenticated')->group(function () {
     Route::post('/clusters/{cluster}/servers', [ServerController::class, 'store'])->name('clusters.servers.store');
     Route::patch('/clusters/{cluster}/servers/{server}', [ServerController::class, 'update'])->name('clusters.servers.update');
     Route::post('/clusters/{cluster}/servers/{server}/check', [ServerController::class, 'check'])->name('clusters.servers.check');
+    Route::post('/clusters/{cluster}/servers/{server}/restart-coold', [ServerController::class, 'restartCoold'])->name('clusters.servers.restart-coold');
     Route::get('/clusters/{cluster}/servers/{server}/coold-logs', [ServerController::class, 'cooldLogs'])->name('clusters.servers.coold-logs');
     Route::get('/clusters/{cluster}/servers/{server}/corrosion-tables', [ServerController::class, 'corrosionTables'])->name('clusters.servers.corrosion-tables');
     Route::get('/clusters/{cluster}/servers/{server}/firewall-rules', [ServerController::class, 'firewallRules'])->name('clusters.servers.firewall-rules');
