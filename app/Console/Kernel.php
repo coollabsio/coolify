@@ -57,7 +57,7 @@ class Kernel extends ConsoleKernel
 
         // V5 host JWT rotation: re-mints and SSH-pushes a fresh host token
         // before the on-disk token expires so coold reconnects stay authorized.
-        $this->scheduleInstance->job(new V5RotateAgentTokensJob)->hourly()->withoutOverlapping()->onOneServer();
+        $this->scheduleInstance->job(new V5RotateAgentTokensJob)->everyFifteenMinutes()->withoutOverlapping()->onOneServer();
 
         if (isDev()) {
             // Instance Jobs
