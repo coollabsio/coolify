@@ -28,6 +28,23 @@ export function pruneConnectionPortsByDirection(
     };
 }
 
+function connectionPortsPayload(connection: CanvasConnection): Record<string, number[]> {
+    return Object.fromEntries(
+        Object.entries(connection.portsByDirection).map(([direction, ports]) => [
+            direction,
+            ports.map((port) => Number(port)).filter((port) => Number.isInteger(port)),
+        ]),
+    );
+}
+
+function preserveActiveDirection(connection: CanvasConnection, activeConnection: CanvasConnection): CanvasConnection {
+    return {
+        ...connection,
+        fromApplicationId: activeConnection.fromApplicationId,
+        toApplicationId: activeConnection.toApplicationId,
+    };
+}
+
 function normalizeConnection(connection: V5ResourceConnection): CanvasConnection {
     return {
         ...connection,
@@ -124,27 +141,20 @@ export function useCanvasConnections(initialConnections: V5ResourceConnection[],
 
     const persistConnectionPorts = useCallback(
         async (updatedConnection: CanvasConnection, previousConnection: CanvasConnection): Promise<void> => {
-            const portsByDirection = Object.fromEntries(
-                Object.entries(pruneConnectionPortsByDirection(updatedConnection)).map(([direction, ports]) => [
-                    direction,
-                    ports.map((port) => Number(port)).filter((port) => Number.isInteger(port)),
-                ]),
-            );
-
             await runOptimisticUpdate<CanvasConnection>({
                 apply: () => replaceConnection(updatedConnection),
                 rollback: () => replaceConnection(previousConnection),
                 request: async () => {
                     const response = await canvasRequest(`/v5/resource-connections/${updatedConnection.id}`, {
                         method: 'PATCH',
-                        body: { ports_by_direction: portsByDirection },
+                        body: { ports_by_direction: connectionPortsPayload(updatedConnection) },
                     });
 
                     return parseConnectionResponse(response, 'Could not save allowed ports.');
                 },
                 fallbackErrorMessage: 'Could not save allowed ports.',
                 notify,
-                onSuccess: replaceConnection,
+                onSuccess: (nextConnection) => replaceConnection(preserveActiveDirection(nextConnection, updatedConnection)),
             });
         },
         [notify, replaceConnection],
@@ -198,12 +208,11 @@ export function useCanvasConnections(initialConnections: V5ResourceConnection[],
                 ...connection,
                 fromApplicationId,
                 toApplicationId,
-                portsByDirection: pruneConnectionPortsByDirection(connection, fromApplicationId, toApplicationId),
             };
 
-            void persistConnectionPorts(updatedConnection, connection);
+            replaceConnection(updatedConnection);
         },
-        [persistConnectionPorts],
+        [replaceConnection],
     );
 
     const setConnectionPortDraft = useCallback((connectionId: string, value: string): void => {

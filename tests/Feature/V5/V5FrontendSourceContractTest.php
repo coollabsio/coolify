@@ -930,3 +930,20 @@ it('hardens v5 dashboard fetches and websocket merges against failures', functio
 
     expect(strpos($addNginxSource, '!response.ok'))->not->toBeFalse();
 });
+
+it('preserves all v5 resource connection firewall directions when editing ports', function () {
+    $connectionsHook = file_get_contents(resource_path('js/v5/lib/use-canvas-connections.ts'));
+    $updateDirectionSource = substr(
+        $connectionsHook,
+        strpos($connectionsHook, 'const updateConnectionDirection'),
+        strpos($connectionsHook, 'const setConnectionPortDraft') - strpos($connectionsHook, 'const updateConnectionDirection'),
+    );
+
+    expect($connectionsHook)
+        ->toContain('function connectionPortsPayload(connection: CanvasConnection)')
+        ->toContain('body: { ports_by_direction: connectionPortsPayload(updatedConnection) }')
+        ->toContain('preserveActiveDirection(nextConnection, updatedConnection)')
+        ->and($updateDirectionSource)
+        ->toContain('replaceConnection(updatedConnection)')
+        ->not->toContain('persistConnectionPorts(updatedConnection, connection)');
+});
