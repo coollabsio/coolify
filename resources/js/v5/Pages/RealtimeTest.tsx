@@ -1,10 +1,11 @@
 import { Head } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { AppNavbar } from '@/components/app-navbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { csrfToken } from '@/lib/csrf';
+import { useTeamChannel } from '@/lib/use-team-channel';
 import type { V5DashboardProps } from '@/types';
 
 type RealtimeTestProps = V5DashboardProps & {
@@ -19,24 +20,6 @@ type RealtimeTestEvent = {
     sentAt: string;
 };
 
-type EchoChannel = {
-    listen: (event: string, callback: (payload: unknown) => void) => EchoChannel;
-    subscribed?: (callback: () => void) => EchoChannel;
-    error?: (callback: (error: unknown) => void) => EchoChannel;
-};
-
-type EchoClient = {
-    private: (channel: string) => EchoChannel;
-    leave?: (channel: string) => void;
-    leaveChannel?: (channel: string) => void;
-};
-
-declare global {
-    interface Window {
-        Echo?: EchoClient;
-    }
-}
-
 function formatLogPayload(payload: unknown): string {
     if (typeof payload === 'string') {
         return payload;
@@ -50,65 +33,30 @@ export default function RealtimeTest({ currentTeam, flux, projects = [], selecte
     const [isBroadcasting, setIsBroadcasting] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
 
-    function addLog(label: string, payload?: unknown): void {
+    const addLog = useCallback((label: string, payload?: unknown): void => {
         const timestamp = new Date().toLocaleTimeString();
         setLogs((currentLogs) => [
             `[${timestamp}] ${label}${payload === undefined ? '' : `\n${formatLogPayload(payload)}`}`,
             ...currentLogs,
         ]);
-    }
+    }, []);
 
     useEffect(() => {
         if (!currentTeam) {
             addLog('No current team was provided to the page.');
-
-            return;
         }
+    }, [currentTeam, addLog]);
 
-        let isCancelled = false;
-        let attempts = 0;
-        const channelName = `team.${currentTeam.id}`;
+    useTeamChannel(
+        currentTeam?.id ?? null,
+        '.v5.realtime.test',
+        (payload) => {
+            const event = payload as RealtimeTestEvent;
 
-        const interval = window.setInterval(() => {
-            attempts += 1;
-
-            if (!window.Echo) {
-                if (attempts === 1) {
-                    addLog('Waiting for window.Echo...');
-                }
-
-                if (attempts >= 20) {
-                    window.clearInterval(interval);
-                    addLog('window.Echo was not available after 10 seconds.');
-                }
-
-                return;
-            }
-
-            window.clearInterval(interval);
-
-            if (isCancelled) {
-                return;
-            }
-
-            addLog(`Subscribing to private-${channelName}`);
-            const channel = window.Echo.private(channelName);
-
-            channel.subscribed?.(() => addLog(`Subscribed to private-${channelName}`));
-            channel.error?.((error: unknown) => addLog(`Subscription error on private-${channelName}`, error));
-            channel.listen('.v5.realtime.test', (payload) => {
-                const event = payload as RealtimeTestEvent;
-
-                addLog('Received .v5.realtime.test', event);
-            });
-        }, 500);
-
-        return () => {
-            isCancelled = true;
-            window.clearInterval(interval);
-            window.Echo?.leave?.(channelName) ?? window.Echo?.leaveChannel?.(`private-${channelName}`);
-        };
-    }, [currentTeam]);
+            addLog('Received .v5.realtime.test', event);
+        },
+        { onDebug: addLog, onError: addLog },
+    );
 
     async function broadcastTestEvent(): Promise<void> {
         setIsBroadcasting(true);

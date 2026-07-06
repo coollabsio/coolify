@@ -17,7 +17,8 @@ it('issues production host tokens with the default capability profile', function
 
     expect($claims->sub)->toBe('100.64.0.10')
         ->and($claims->aud)->toBe('coold')
-        ->and($claims->caps)->toBe(['host-agent:default'])
+        ->and((array) $claims->caps)->toBe(config('flux.host_capabilities'))
+        ->and((array) $claims->caps)->not->toContain('host-agent:default')
         ->and($claims->exp)->toBeGreaterThan(time());
 });
 
@@ -28,6 +29,7 @@ it('issues production server tokens with server identity claims', function () {
 
     $server = new V5Server;
     $server->forceFill([
+        'uuid' => 'server_prod_123',
         'id' => 123,
         'team_id' => 7,
         'cluster_id' => 'cluster-456',
@@ -38,11 +40,12 @@ it('issues production server tokens with server identity claims', function () {
     $token = app(AgentTokenIssuer::class)->issueForServer($server);
     $claims = JWT::decode($token, new Key(file_get_contents($publicKeyPath), 'ES256'));
 
-    expect($claims->sub)->toBe('100.64.0.10')
-        ->and($claims->caps)->toBe(['host-agent:default'])
-        ->and($claims->team_id)->toBe(7)
+    expect($claims->sub)->toBe('server_prod_123')
+        ->and((array) $claims->caps)->toBe(config('flux.host_capabilities'))
+        ->and($claims->team_id)->toBe('7')
         ->and($claims->cluster_id)->toBe('cluster-456')
-        ->and($claims->server_id)->toBe(123);
+        ->and($claims->server_id)->toBe('server_prod_123')
+        ->and($claims->wireguard_management_ip)->toBe('100.64.0.10');
 });
 
 it('mints a host jwt signed by the configured flux private key', function () {

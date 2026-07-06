@@ -9,7 +9,6 @@ export type V5Server = {
     id: string;
     name: string;
     host: string;
-    type: string;
     status: string;
     capabilities: string[];
     builderEnabled: boolean;
@@ -23,7 +22,8 @@ export type V5Server = {
     wireguardEndpointOverride: string | null;
     wireguardManagementIp: string | null;
     wireguardPublicKey: string | null;
-    containerSubnets: Record<string, string> | string[];
+    /** Namespace → subnet map; serialized as an empty JSON array when no subnets are recorded. */
+    containerSubnets: Record<string, string> | [];
     privateKeyName: string | null;
     lastBootstrappedAt: string | null;
     lastBootstrapAction: string | null;
@@ -105,6 +105,8 @@ export type V5Application = {
     internalPort: number | null;
     domains: string[];
     meshFqdn: string;
+    projectUuid: string | null;
+    environmentUuid: string | null;
     canvasX: number;
     canvasY: number;
 };
@@ -113,6 +115,7 @@ export type V5CaddyIngress = {
     id: string;
     name: string;
     host: string;
+    type: string;
     status: string;
     statusMessage: string | null;
     canvasX: number;
@@ -122,7 +125,7 @@ export type V5CaddyIngress = {
 
 export type V5ResourceConnection = {
     id: string;
-    applicationIds: [string, string];
+    applicationIds: string[];
     fromApplicationId: string;
     toApplicationId: string;
     portsByDirection: Record<string, string[]>;

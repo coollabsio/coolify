@@ -8,6 +8,8 @@ class ApplicationDomain extends V5Model
 {
     protected $table = 'v5_application_domains';
 
+    protected bool $hasUuidColumn = false;
+
     protected $fillable = [
         'application_id',
         'domain',

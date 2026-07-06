@@ -9,6 +9,8 @@ class ContainerStatus extends V5Model
 {
     protected $table = 'v5_container_statuses';
 
+    protected bool $hasUuidColumn = false;
+
     protected $fillable = [
         'team_id',
         'server_id',
@@ -17,12 +19,14 @@ class ContainerStatus extends V5Model
         'image',
         'status',
         'status_message',
+        'status_observed_at',
         'last_seen_at',
     ];
 
     protected function casts(): array
     {
         return [
+            'status_observed_at' => 'datetime',
             'last_seen_at' => 'datetime',
         ];
     }

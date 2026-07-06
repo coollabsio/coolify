@@ -60,6 +60,14 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($request->user()?->id ?: $request->ip());
         });
 
+        // v5 authenticated web endpoints run synchronous SSH/Flux work per
+        // request (connectivity checks, bootstrap, diagnostics). Throttle per
+        // user so a single member cannot pin FPM workers by hammering them,
+        // while leaving ample headroom for the canvas's 3s cluster polling.
+        RateLimiter::for('v5', function (Request $request) {
+            return Limit::perMinute(120)->by($request->user()?->id ?: $request->ip());
+        });
+
         RateLimiter::for('feedback', function (Request $request) {
             return Limit::perMinute(3)->by($request->user()?->id ?: $request->ip());
         });

@@ -92,6 +92,7 @@ class Kernel extends HttpKernel
         'v5.authenticated' => [
             'auth',
             'verified',
+            'throttle:v5',
             V5EnsureCurrentTeam::class,
         ],
 

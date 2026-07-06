@@ -2,6 +2,7 @@
 
 namespace App\Services\Flux;
 
+use App\Exceptions\V5\UnsupportedCooldVerb;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -58,6 +59,28 @@ class FluxClient
         ]);
 
         return $this->output($payload, 'Container started.');
+    }
+
+    public function stopContainer(string $hostId, string $id, int $timeoutSeconds = 10): string
+    {
+        $payload = $this->dispatch($hostId, [
+            'type' => 'containers.stop',
+            'id' => $id,
+            'timeout_seconds' => max(0, $timeoutSeconds),
+        ]);
+
+        return $this->output($payload, 'Container stopped.');
+    }
+
+    public function removeContainer(string $hostId, string $id, bool $force = false): string
+    {
+        $payload = $this->dispatch($hostId, [
+            'type' => 'containers.delete',
+            'id' => $id,
+            'force' => $force,
+        ]);
+
+        return $this->output($payload, 'Container removed.');
     }
 
     /**
@@ -151,6 +174,19 @@ class FluxClient
         return $this->output($payload, 'No coold logs returned.');
     }
 
+    public function containerLogs(string $hostId, string $containerId, int $tail = 200): string
+    {
+        $payload = $this->dispatch($hostId, [
+            'type' => 'containers.logs',
+            'id' => $containerId,
+            'tail' => max(1, min($tail, 1000)),
+            'stdout' => true,
+            'stderr' => true,
+        ]);
+
+        return $this->output($payload, 'No container logs returned.');
+    }
+
     public function corrosionTables(string $hostId, int $limit = 200): string
     {
         $payload = $this->dispatch($hostId, [
@@ -162,10 +198,106 @@ class FluxClient
     }
 
     /**
+     * Deliver a freshly minted host JWT to the node over the live coold RPC
+     * stream (flux gates the `host.jwt.set` capability; the token must carry
+     * it). Preferred over the SSH push because it reuses the already
+     * authenticated flux<->coold channel and works while the current token is
+     * still valid — exactly the rotation window. Throws like the sibling
+     * dispatch methods (host not connected / UnsupportedCooldVerb / generic
+     * failure) so the caller can catch and fall back to SSH.
+     */
+    public function pushHostToken(string $hostId, string $token): void
+    {
+        $this->dispatch($hostId, [
+            'type' => 'host.jwt.set',
+            'jwt' => $token,
+        ]);
+    }
+
+    /**
+     * Revoke a host token by its `jti` on the flux revocation store so flux
+     * rejects it at verify immediately, instead of waiting for the token's TTL
+     * to lapse (flux/src/unix_bridge.rs `POST /v1/tokens/revoke`,
+     * flux/src/auth.rs `is_revoked`). The optional `expiresAt` (the token `exp`,
+     * unix seconds) lets flux prune the denylist entry once it can no longer
+     * matter.
+     *
+     * Best-effort like the sibling dispatch methods: throws a RuntimeException on
+     * connection failure / timeout / non-2xx so the caller can catch and treat
+     * an unreachable flux as non-fatal (the local revocation record still
+     * stands and the short TTL + rotation bound the exposure).
+     */
+    public function revokeToken(string $jti, ?int $expiresAt = null): void
+    {
+        if (trim($jti) === '') {
+            return;
+        }
+
+        $requestBody = ['jti' => $jti];
+
+        if ($expiresAt !== null) {
+            $requestBody['expires_at'] = $expiresAt;
+        }
+
+        $body = json_encode($requestBody, JSON_THROW_ON_ERROR);
+        $response = $this->sendOverSocket('/v1/tokens/revoke', $body);
+        $statusCode = $this->statusCode($response);
+
+        if ($statusCode < 200 || $statusCode >= 300) {
+            $responseBody = $this->responseBody($response);
+            $payload = $responseBody === '' ? null : json_decode($responseBody, true);
+
+            throw new RuntimeException(
+                $this->errorMessage($payload, $responseBody) ?? "Flux token revocation returned HTTP {$statusCode}."
+            );
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $command
      * @return array<string, mixed>
      */
     private function dispatch(string $hostId, array $command): array
+    {
+        $body = json_encode([
+            'host_id' => $hostId,
+            'request_id' => (string) Str::uuid(),
+            'command' => $command,
+        ], JSON_THROW_ON_ERROR);
+
+        $response = $this->sendOverSocket('/v1/coold/dispatch', $body);
+
+        $statusCode = $this->statusCode($response);
+        $responseBody = $this->responseBody($response);
+        $payload = $responseBody === '' ? null : json_decode($responseBody, true);
+
+        if ($statusCode < 200 || $statusCode >= 300) {
+            throw $this->dispatchException(
+                $command,
+                $statusCode,
+                $this->errorMessage($payload, $responseBody) ?? "Flux dispatch returned HTTP {$statusCode}."
+            );
+        }
+
+        if (! is_array($payload)) {
+            throw new RuntimeException('Flux dispatch returned an invalid response.');
+        }
+
+        if (($payload['status'] ?? null) === 'error') {
+            $message = is_string($payload['message'] ?? null) ? $payload['message'] : 'Flux dispatch failed.';
+
+            throw $this->dispatchException($command, $statusCode, $message);
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Send a single HTTP/1.1 request over the flux Unix-domain socket and return
+     * the raw response. Shared by every flux verb (coold dispatch, host token
+     * rotation, token revocation) — only the request path and JSON body differ.
+     */
+    private function sendOverSocket(string $path, string $body): string
     {
         $socketPath = config('flux.unix_socket_path');
 
@@ -177,11 +309,6 @@ class FluxClient
             throw new RuntimeException('Flux socket was not found.');
         }
 
-        $body = json_encode([
-            'host_id' => $hostId,
-            'request_id' => (string) Str::uuid(),
-            'command' => $command,
-        ], JSON_THROW_ON_ERROR);
         $connectionTimeout = (float) config('flux.connection_timeout_seconds', 1.0);
         $dispatchTimeout = (float) config('flux.dispatch_timeout_seconds', 35.0);
         $stream = @stream_socket_client("unix://{$socketPath}", $errorCode, $errorMessage, $connectionTimeout);
@@ -193,7 +320,7 @@ class FluxClient
         stream_set_timeout($stream, (int) ceil($dispatchTimeout));
 
         fwrite($stream, implode("\r\n", [
-            'POST /v1/coold/dispatch HTTP/1.1',
+            "POST {$path} HTTP/1.1",
             'Host: flux',
             'Accept: application/json',
             'Content-Type: application/json',
@@ -206,25 +333,27 @@ class FluxClient
         $response = stream_get_contents($stream) ?: '';
         fclose($stream);
 
-        $statusCode = $this->statusCode($response);
-        $responseBody = $this->responseBody($response);
-        $payload = $responseBody === '' ? null : json_decode($responseBody, true);
+        return $response;
+    }
 
-        if ($statusCode < 200 || $statusCode >= 300) {
-            throw new RuntimeException($this->errorMessage($payload, $responseBody) ?? "Flux dispatch returned HTTP {$statusCode}.");
+    /**
+     * Flux answers a verb the node's coold did not advertise with HTTP 501 and
+     * the message "primitive <verb> is not supported by host" (coold repo:
+     * flux/src/routing.rs:50-53, flux/src/unix_bridge.rs:227-245). Anything
+     * else — including coold-side command failures relayed with their own
+     * status code — is a generic dispatch failure.
+     *
+     * @param  array<string, mixed>  $command
+     */
+    private function dispatchException(array $command, int $statusCode, string $message): RuntimeException
+    {
+        $verb = is_string($command['type'] ?? null) ? $command['type'] : 'unknown';
+
+        if ($statusCode === 501 || preg_match('/primitive .+ is not supported by host/i', $message) === 1) {
+            return new UnsupportedCooldVerb($verb, $message);
         }
 
-        if (! is_array($payload)) {
-            throw new RuntimeException('Flux dispatch returned an invalid response.');
-        }
-
-        if (($payload['status'] ?? null) === 'error') {
-            $message = is_string($payload['message'] ?? null) ? $payload['message'] : 'Flux dispatch failed.';
-
-            throw new RuntimeException($message);
-        }
-
-        return $payload;
+        return new RuntimeException($message);
     }
 
     private function statusCode(string $response): int

@@ -11,6 +11,12 @@ class Cluster extends V5Model
 {
     protected $table = 'v5_clusters';
 
+    /**
+     * Single source of truth for cluster defaults: `$attributes` below is
+     * built from these consts, and the column defaults in
+     * 2026_06_16_130649_v5_create_clusters_table mirror them (kept there for
+     * historical rows only — update both when changing a default).
+     */
     public const DEFAULT_WIREGUARD_INTERFACE = 'wg0';
 
     public const DEFAULT_WIREGUARD_MANAGEMENT_POOL = '100.64.0.0/16';

@@ -25,7 +25,13 @@ class EnsureCurrentTeam
             abort(403, 'No team available for this user.');
         }
 
-        session(['currentTeam' => $currentTeam]);
+        // The v4 UI stores a full Team model under the same session key and
+        // reads arbitrary columns off it, so only rewrite the session when the
+        // resolved team actually changed — and always store the full model.
+        if (data_get(session('currentTeam'), 'id') !== $currentTeam->id) {
+            session(['currentTeam' => $currentTeam]);
+        }
+
         $request->attributes->set('v5.currentTeam', $currentTeam);
 
         return $next($request);
@@ -37,7 +43,6 @@ class EnsureCurrentTeam
 
         if ($sessionTeamId) {
             $sessionTeam = $user->teams()
-                ->select('teams.id', 'teams.name', 'teams.description', 'teams.personal_team')
                 ->whereKey($sessionTeamId)
                 ->first();
 
@@ -47,7 +52,6 @@ class EnsureCurrentTeam
         }
 
         return $user->teams()
-            ->select('teams.id', 'teams.name', 'teams.description', 'teams.personal_team')
             ->orderBy('teams.id')
             ->first();
     }

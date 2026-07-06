@@ -35,6 +35,14 @@ it('runs the v5 dev Lima seeder with the normal development database seeder', fu
         ->and($developmentSeederBlock)->toContain('V5DevLimaSeeder::class');
 });
 
+it('disables Flux host binding by default in the Docker development environment', function () {
+    $compose = file_get_contents(base_path('docker-compose.dev.yml'));
+    $runScript = file_get_contents(base_path('docker/development/etc/s6-overlay/s6-rc.d/flux/run'));
+
+    expect($compose)->toContain('COOLIFY_FLUX_REQUIRE_HOST_BINDING: "${COOLIFY_FLUX_REQUIRE_HOST_BINDING:-0}"')
+        ->and($runScript)->toContain('COOLIFY_FLUX_REQUIRE_HOST_BINDING="${COOLIFY_FLUX_REQUIRE_HOST_BINDING:-0}"');
+});
+
 it('cache busts mutable nightly coold assets with resolved checksums', function () {
     $compose = file_get_contents(base_path('docker-compose.dev.yml'));
     $dockerfile = file_get_contents(base_path('docker/development/Dockerfile'));

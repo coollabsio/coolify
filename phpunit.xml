@@ -23,6 +23,9 @@
     <env name="SESSION_DRIVER" value="array" force="true"/>
     <env name="TELESCOPE_ENABLED" value="false"/>
     <env name="NIGHTWATCH_ENABLED" value="false"/>
+    <!-- The v5 bootstrap endpoint refuses to queue without a Flux URL; tests
+         that exercise the unconfigured path blank it via Config::set. -->
+    <env name="COOLIFY_COOLD_FLUX_URL" value="http://flux.testing:6443" force="true"/>
   </php>
   <source>
     <include>

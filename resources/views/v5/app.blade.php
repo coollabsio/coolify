@@ -27,7 +27,7 @@
                 forceTLS: false,
                 encrypted: true,
                 enableStats: false,
-                enableLogging: true,
+                enableLogging: @json(app()->environment('local')),
                 enabledTransports: ['ws', 'wss'],
                 disabledTransports: ['sockjs', 'xhr_streaming', 'xhr_polling'],
             });

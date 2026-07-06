@@ -2,10 +2,18 @@
 
 namespace App\Actions\V5\Flux;
 
+use App\Enums\V5\ApplicationStatus;
+use App\Enums\V5\ContainerState;
+use App\Enums\V5\IngressStatus;
+use App\Enums\V5\ServerStatus;
 use App\Models\V5\Application as V5Application;
 use App\Models\V5\ContainerStatus;
 use App\Models\V5\Server as V5Server;
+use App\Support\V5\StatusObservation;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ApplyFluxResourceStatusUpdate
@@ -37,7 +45,7 @@ class ApplyFluxResourceStatusUpdate
      */
     private function upsertContainerStatus(array $payload): ?ContainerStatus
     {
-        $status = $this->status($payload);
+        $status = $this->status($payload, ContainerState::class);
         $containerId = $this->stringValue($payload, 'container_id') ?? $this->stringValue($payload, 'runtime_container_id');
         $server = $this->findServer($payload);
 
@@ -45,17 +53,36 @@ class ApplyFluxResourceStatusUpdate
             return null;
         }
 
-        ContainerStatus::query()->updateOrCreate([
+        $observedAt = $this->observedAt($payload);
+        $existing = ContainerStatus::query()
+            ->where('server_id', $server->id)
+            ->where('container_id', $containerId)
+            ->first();
+
+        if ($this->isStaleObservation($observedAt, $existing?->status_observed_at, 'container status', [
             'server_id' => $server->id,
             'container_id' => $containerId,
-        ], [
+        ])) {
+            return $existing;
+        }
+
+        $attributes = [
             'team_id' => $server->team_id,
             'container_name' => $this->stringValue($payload, 'container_name') ?? $this->stringValue($payload, 'name'),
             'image' => $this->stringValue($payload, 'image'),
             'status' => $status,
             'status_message' => $this->statusMessage($payload, 'Container state received from coold.'),
             'last_seen_at' => now(),
-        ]);
+        ];
+
+        if ($observedAt !== null) {
+            $attributes['status_observed_at'] = $observedAt;
+        }
+
+        ContainerStatus::query()->updateOrCreate([
+            'server_id' => $server->id,
+            'container_id' => $containerId,
+        ], $attributes);
 
         return ContainerStatus::query()
             ->where('server_id', $server->id)
@@ -68,7 +95,7 @@ class ApplyFluxResourceStatusUpdate
      */
     private function updateApplication(array $payload): ?V5Application
     {
-        $status = $this->status($payload);
+        $status = $this->status($payload, ApplicationStatus::class);
 
         if ($status === null) {
             return null;
@@ -80,13 +107,39 @@ class ApplyFluxResourceStatusUpdate
             return null;
         }
 
-        $application->update([
+        $observedAt = $this->observedAt($payload);
+
+        if ($this->isStaleObservation($observedAt, $application->status_observed_at, 'application status', [
+            'application_id' => $application->id,
+        ])) {
+            return $application;
+        }
+
+        $payloadContainerId = $this->stringValue($payload, 'runtime_container_id')
+            ?? $this->stringValue($payload, 'container_id');
+
+        // Payloads may carry no timestamp, so the container id remains an
+        // ordering signal as a second layer: an update for a superseded
+        // container is stale and must not overwrite the current one's state.
+        if (
+            $payloadContainerId !== null
+            && $application->runtime_container_id !== null
+            && $payloadContainerId !== $application->runtime_container_id
+        ) {
+            return $application;
+        }
+
+        $attributes = [
             'status' => $status,
             'status_message' => $this->statusMessage($payload, 'Status updated by flux.'),
-            'runtime_container_id' => $this->stringValue($payload, 'runtime_container_id')
-                ?? $this->stringValue($payload, 'container_id')
-                ?? $application->runtime_container_id,
-        ]);
+            'runtime_container_id' => $payloadContainerId ?? $application->runtime_container_id,
+        ];
+
+        if ($observedAt !== null) {
+            $attributes['status_observed_at'] = $observedAt;
+        }
+
+        $application->update($attributes);
 
         return $application->refresh();
     }
@@ -96,7 +149,7 @@ class ApplyFluxResourceStatusUpdate
      */
     private function updateServer(array $payload): ?V5Server
     {
-        $status = $this->status($payload);
+        $status = $this->status($payload, ServerStatus::class);
 
         if ($status === null) {
             return null;
@@ -108,22 +161,40 @@ class ApplyFluxResourceStatusUpdate
             return null;
         }
 
-        $server->update([
+        $observedAt = $this->observedAt($payload);
+
+        if ($this->isStaleObservation($observedAt, $server->status_observed_at, 'server status', [
+            'server_id' => $server->id,
+        ])) {
+            return $server;
+        }
+
+        $attributes = [
             'status' => $status,
             'last_status_check' => 'flux',
             'last_status_output' => $this->statusMessage($payload, 'Status updated by flux.'),
             'last_status_checked_at' => now(),
-        ]);
+        ];
+
+        if ($observedAt !== null) {
+            $attributes['status_observed_at'] = $observedAt;
+        }
+
+        $server->update($attributes);
 
         return $server->refresh();
     }
 
     /**
+     * The ingress state shares the server row but describes a different
+     * resource, so it deliberately does not read or write the server's
+     * `status_observed_at` watermark.
+     *
      * @param  array<string, mixed>  $payload
      */
     private function updateCaddyIngress(array $payload): ?V5Server
     {
-        $status = $this->status($payload);
+        $status = $this->status($payload, IngressStatus::class);
 
         if ($status === null) {
             return null;
@@ -151,12 +222,16 @@ class ApplyFluxResourceStatusUpdate
      */
     private function findApplication(array $payload): ?V5Application
     {
-        $query = V5Application::query()->with('server');
         $server = $this->findServer($payload);
 
-        if ($server instanceof V5Server) {
-            $query->where('server_id', $server->id);
+        if (! $server instanceof V5Server) {
+            return null;
         }
+
+        $query = V5Application::query()
+            ->with('server')
+            ->where('server_id', $server->id)
+            ->where('team_id', $server->team_id);
 
         $applicationUuid = $this->stringValue($payload, 'application_uuid') ?? $this->stringValue($payload, 'resource_uuid');
 
@@ -211,21 +286,62 @@ class ApplyFluxResourceStatusUpdate
             return null;
         }
 
-        return V5Server::query()
-            ->where('wireguard_management_ip', $hostId)
-            ->orWhere('node_address', $hostId)
-            ->orWhere('host', $hostId)
-            ->first();
+        $matches = V5Server::query()
+            ->where('uuid', $hostId)
+            ->limit(2)
+            ->get();
+
+        if ($matches->count() > 1) {
+            Log::warning('Dropping flux resource status update: host id matches multiple v5 servers.', [
+                'host_id' => $hostId,
+                'server_ids' => $matches->pluck('id')->all(),
+            ]);
+
+            return null;
+        }
+
+        return $matches->first();
+    }
+
+    /**
+     * Map the raw payload status onto the given status enum. Unknown values
+     * are never written to the database: they fall back to the enum's
+     * Unknown case and are logged.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  class-string<ApplicationStatus|ContainerState|IngressStatus|ServerStatus>  $enumClass
+     */
+    private function status(array $payload, string $enumClass): ?string
+    {
+        $raw = $this->stringValue($payload, 'status') ?? $this->stringValue($payload, 'state');
+
+        return StatusObservation::normalize($raw, $enumClass);
     }
 
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function status(array $payload): ?string
+    private function observedAt(array $payload): ?CarbonInterface
     {
-        $status = $this->stringValue($payload, 'status') ?? $this->stringValue($payload, 'state');
+        $observedAt = $this->stringValue($payload, 'observed_at');
 
-        return $status === null ? null : strtolower($status);
+        if ($observedAt === null) {
+            return null;
+        }
+
+        return rescue(fn (): CarbonImmutable => CarbonImmutable::parse($observedAt), null, false);
+    }
+
+    /**
+     * A payload that carries an observation timestamp older than the one
+     * already persisted is stale (delivered out of order) and must not
+     * clobber the newer state.
+     *
+     * @param  array<string, mixed>  $logContext
+     */
+    private function isStaleObservation(?CarbonInterface $observedAt, ?CarbonInterface $currentObservedAt, string $context, array $logContext): bool
+    {
+        return StatusObservation::isStale($observedAt, $currentObservedAt, $context, $logContext);
     }
 
     /**
@@ -246,19 +362,5 @@ class ApplyFluxResourceStatusUpdate
         $value = data_get($payload, $key);
 
         return is_string($value) && $value !== '' ? $value : null;
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function intValue(array $payload, string $key): ?int
-    {
-        $value = data_get($payload, $key);
-
-        if (is_int($value)) {
-            return $value;
-        }
-
-        return is_string($value) && ctype_digit($value) ? (int) $value : null;
     }
 }

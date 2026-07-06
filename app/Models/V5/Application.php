@@ -2,6 +2,7 @@
 
 namespace App\Models\V5;
 
+use App\Enums\V5\ApplicationStatus;
 use App\Events\V5CanvasResourceUpdated;
 use App\Models\Environment;
 use App\Models\Project;
@@ -9,6 +10,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class Application extends V5Model
 {
@@ -26,6 +28,7 @@ class Application extends V5Model
         'container_name',
         'status',
         'status_message',
+        'status_observed_at',
         'runtime_container_id',
         'mesh_namespace',
         'ingress_enabled',
@@ -35,7 +38,7 @@ class Application extends V5Model
     ];
 
     protected $attributes = [
-        'status' => 'creating',
+        'status' => ApplicationStatus::Creating->value,
         'mesh_namespace' => 'default',
         'ingress_enabled' => false,
         'canvas_x' => 0,
@@ -46,7 +49,7 @@ class Application extends V5Model
     {
         static::updated(function (self $application): void {
             if ($application->wasChanged(['status', 'status_message', 'runtime_container_id'])) {
-                V5CanvasResourceUpdated::dispatch($application->team_id, $application->id);
+                DB::afterCommit(fn () => V5CanvasResourceUpdated::dispatch($application->team_id, $application->id));
             }
         });
     }
@@ -54,6 +57,7 @@ class Application extends V5Model
     protected function casts(): array
     {
         return [
+            'status_observed_at' => 'datetime',
             'ingress_enabled' => 'boolean',
             'internal_port' => 'integer',
             'canvas_x' => 'integer',

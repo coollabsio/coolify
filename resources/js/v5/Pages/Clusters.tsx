@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 
 import { AppNavbar } from '@/components/app-navbar';
+import { CanvasNotice } from '@/components/canvas/canvas-notice';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -25,8 +26,9 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { csrfToken } from '@/lib/csrf';
+import { apiRequest } from '@/lib/api';
 import { usePendingIds } from '@/lib/use-pending-ids';
+import { useTeamChannel } from '@/lib/use-team-channel';
 import type { V5Cluster, V5DashboardProps, V5Server } from '@/types';
 
 type ClusterFormErrors = {
@@ -90,11 +92,13 @@ type DeleteServerResponse = {
 type CooldLogsResponse = {
     output: string;
     fetchedAt: string;
+    source: 'flux' | 'ssh';
 };
 
 type CorrosionTablesResponse = {
     output: string;
     fetchedAt: string;
+    source: 'flux' | 'ssh';
 };
 
 type FirewallRule = {
@@ -127,14 +131,26 @@ type BootstrapServerResponse = {
     message?: string;
 };
 
-type ServerSshCheck = {
-    status: string;
-    output: string;
-    checkedAt: string;
+type ServerConnectionNotice = {
+    message: string;
+    description: string;
+    variant: 'danger' | 'success';
 };
 
 type V5ClusterUpdatedEvent = {
     cluster: V5Cluster | null;
+};
+
+type ParsedBootstrapLogSummary = {
+    label: string;
+    value: string;
+    tone: 'success' | 'muted';
+};
+
+type ParsedBootstrapLogs = {
+    summary: ParsedBootstrapLogSummary[];
+    visibleOutput: string;
+    rawOutput: string;
 };
 
 function formatCorrosionCell(value: unknown): string {
@@ -163,6 +179,147 @@ function parseCorrosionTables(output: string): CorrosionTableDump | null {
     }
 }
 
+function jsonValueToString(value: unknown): string {
+    if (value === null || value === undefined || value === '') {
+        return 'n/a';
+    }
+
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        return String(value);
+    }
+
+    return JSON.stringify(value);
+}
+
+function initialJsonEnd(output: string): number | null {
+    const trimmedStart = output.search(/\S/);
+
+    if (trimmedStart === -1 || output[trimmedStart] !== '{') {
+        return null;
+    }
+
+    let depth = 0;
+    let inString = false;
+    let isEscaped = false;
+
+    for (let index = trimmedStart; index < output.length; index += 1) {
+        const character = output[index];
+
+        if (isEscaped) {
+            isEscaped = false;
+            continue;
+        }
+
+        if (character === '\\') {
+            isEscaped = inString;
+            continue;
+        }
+
+        if (character === '"') {
+            inString = !inString;
+            continue;
+        }
+
+        if (inString) {
+            continue;
+        }
+
+        if (character === '{') {
+            depth += 1;
+        }
+
+        if (character === '}') {
+            depth -= 1;
+        }
+
+        if (depth === 0) {
+            return index + 1;
+        }
+    }
+
+    return null;
+}
+
+function hideRawBootstrapPlan(output: string): string {
+    const visibleLines: string[] = [];
+    let isSkippingPlan = false;
+
+    output.split('\n').forEach((line) => {
+        if (line.trim() === 'Plan:') {
+            isSkippingPlan = true;
+
+            return;
+        }
+
+        if (isSkippingPlan) {
+            const trimmedLine = line.trim();
+
+            if (trimmedLine === '' || trimmedLine.startsWith('[') || line.startsWith(' ')) {
+                return;
+            }
+
+            isSkippingPlan = false;
+        }
+
+        visibleLines.push(line);
+    });
+
+    return visibleLines.join('\n').trim();
+}
+
+function parseBootstrapOutput(output: string | null): ParsedBootstrapLogs {
+    const rawOutput = output?.trim() || 'No install logs captured yet.';
+    const jsonEnd = initialJsonEnd(rawOutput);
+
+    if (jsonEnd === null) {
+        return {
+            summary: [],
+            visibleOutput: rawOutput,
+            rawOutput,
+        };
+    }
+
+    try {
+        const parsed = JSON.parse(rawOutput.slice(0, jsonEnd)) as {
+            results?: Array<{
+                action?: { action?: unknown; host?: unknown };
+                status?: unknown;
+                detail?: unknown;
+            }>;
+            verified?: Array<Record<string, unknown>>;
+        };
+        const summary = [
+            ...(parsed.results ?? []).map((result) => ({
+                label: jsonValueToString(result.action?.action ?? result.action?.host ?? 'Action'),
+                value: `${jsonValueToString(result.status)}${result.detail ? ` · ${jsonValueToString(result.detail)}` : ''}`,
+                tone: result.status === 'ok' ? ('success' as const) : ('muted' as const),
+            })),
+            ...(parsed.verified ?? []).map((node) => ({
+                label: `Verified ${jsonValueToString(node.host)}`,
+                value: [
+                    `status ${jsonValueToString(node.status)}`,
+                    `wg ${jsonValueToString(node.wireguard_ip)}`,
+                    `peers ${jsonValueToString(node.peer_count)}`,
+                ].join(' · '),
+                tone: node.status === 'ok' ? ('success' as const) : ('muted' as const),
+            })),
+        ];
+        const remainingOutput = rawOutput.slice(jsonEnd).trim();
+
+        return {
+            summary,
+            visibleOutput: hideRawBootstrapPlan(remainingOutput),
+            rawOutput,
+        };
+    } catch {
+        return {
+            summary: [],
+            visibleOutput: rawOutput,
+            rawOutput,
+        };
+    }
+}
+
 function statusLabel(status: string): string {
     return status
         .split(/[-_\s]+/)
@@ -185,24 +342,6 @@ function statusBadgeClass(status: string): string {
     }
 
     return 'border-border bg-muted/40 text-muted-foreground';
-}
-
-type EchoChannel = {
-    listen: (event: string, callback: (payload: unknown) => void) => EchoChannel;
-    subscribed?: (callback: () => void) => EchoChannel;
-    error?: (callback: (error: unknown) => void) => EchoChannel;
-};
-
-type EchoClient = {
-    private: (channel: string) => EchoChannel;
-    leave?: (channel: string) => void;
-    leaveChannel?: (channel: string) => void;
-};
-
-declare global {
-    interface Window {
-        Echo?: EchoClient;
-    }
 }
 
 const clusterDefaults = {
@@ -240,6 +379,18 @@ function formatDate(value: string | null): string {
         dateStyle: 'medium',
         timeStyle: 'short',
     }).format(new Date(value));
+}
+
+function diagnosticsSourceLabel(source: 'flux' | 'ssh' | null): string {
+    if (source === 'ssh') {
+        return 'SSH';
+    }
+
+    if (source === 'flux') {
+        return 'Flux';
+    }
+
+    return 'Unknown';
 }
 
 export default function Clusters({
@@ -297,8 +448,9 @@ export default function Clusters({
     const [isServerSubmitting, setIsServerSubmitting] = useState(false);
     const [isServerUpdateSubmitting, setIsServerUpdateSubmitting] = useState(false);
     const checkingServers = usePendingIds<string>();
-    const [sshChecks, setSshChecks] = useState<Record<string, ServerSshCheck>>({});
-    const [visibleBootstrapLogs, setVisibleBootstrapLogs] = useState<Record<string, boolean>>({});
+    const [serverConnectionNotice, setServerConnectionNotice] = useState<ServerConnectionNotice | null>(null);
+    const [isBootstrapLogsDialogOpen, setIsBootstrapLogsDialogOpen] = useState(false);
+    const [bootstrapLogsServerId, setBootstrapLogsServerId] = useState<string | null>(null);
     const bootstrappingServers = usePendingIds<string>();
     const [bootstrapServerError, setBootstrapServerError] = useState<string | null>(null);
     const deletingServers = usePendingIds<string>();
@@ -314,12 +466,14 @@ export default function Clusters({
     const [cooldLogsServer, setCooldLogsServer] = useState<V5Server | null>(null);
     const [cooldLogsOutput, setCooldLogsOutput] = useState('');
     const [cooldLogsFetchedAt, setCooldLogsFetchedAt] = useState<string | null>(null);
+    const [cooldLogsSource, setCooldLogsSource] = useState<'flux' | 'ssh' | null>(null);
     const [cooldLogsError, setCooldLogsError] = useState<string | null>(null);
     const [isLoadingCooldLogs, setIsLoadingCooldLogs] = useState(false);
     const [isCorrosionTablesDialogOpen, setIsCorrosionTablesDialogOpen] = useState(false);
     const [corrosionTablesServer, setCorrosionTablesServer] = useState<V5Server | null>(null);
     const [corrosionTablesOutput, setCorrosionTablesOutput] = useState('');
     const [corrosionTablesFetchedAt, setCorrosionTablesFetchedAt] = useState<string | null>(null);
+    const [corrosionTablesSource, setCorrosionTablesSource] = useState<'flux' | 'ssh' | null>(null);
     const [corrosionTablesError, setCorrosionTablesError] = useState<string | null>(null);
     const [isLoadingCorrosionTables, setIsLoadingCorrosionTables] = useState(false);
     const [isFirewallRulesDialogOpen, setIsFirewallRulesDialogOpen] = useState(false);
@@ -340,60 +494,23 @@ export default function Clusters({
     const initializedServers = selectedCluster?.servers.filter((server) => server.lastBootstrappedAt !== null) ?? [];
     const hasBootstrapInProgress =
         selectedCluster?.servers.some((server) => ['queued', 'running'].includes(server.lastBootstrapStatus ?? '')) ?? false;
+    const bootstrapLogsServer = useMemo(
+        () => clusterList.flatMap((cluster) => cluster.servers).find((server) => server.id === bootstrapLogsServerId) ?? null,
+        [bootstrapLogsServerId, clusterList],
+    );
+    const parsedBootstrapLogs = parseBootstrapOutput(bootstrapLogsServer?.lastBootstrapOutput ?? null);
 
-    useEffect(() => {
-        if (!currentTeam) {
+    useTeamChannel(currentTeam?.id ?? null, '.v5.cluster.updated', (payload) => {
+        const event = payload as V5ClusterUpdatedEvent;
+
+        if (!event.cluster) {
             return;
         }
 
-        let isCancelled = false;
-        let attempts = 0;
-        const channelName = `team.${currentTeam.id}`;
-
-        const interval = window.setInterval(() => {
-            attempts += 1;
-
-            if (!window.Echo) {
-                if (attempts === 1) {
-                    console.debug('Waiting for window.Echo before subscribing to cluster updates');
-                }
-
-                if (attempts >= 20) {
-                    window.clearInterval(interval);
-                }
-
-                return;
-            }
-
-            window.clearInterval(interval);
-
-            if (isCancelled) {
-                return;
-            }
-
-            const channel = window.Echo.private(channelName);
-
-            channel.subscribed?.(() => console.debug(`Subscribed to private-${channelName} for cluster updates`));
-            channel.error?.((error) => console.error(`Subscription error on private-${channelName}`, error));
-            channel.listen('.v5.cluster.updated', (payload) => {
-                const event = payload as V5ClusterUpdatedEvent;
-
-                if (!event.cluster) {
-                    return;
-                }
-
-                setClusterList((currentClusters) =>
-                    currentClusters.map((cluster) => (cluster.id === event.cluster?.id ? event.cluster : cluster)),
-                );
-            });
-        }, 500);
-
-        return () => {
-            isCancelled = true;
-            window.clearInterval(interval);
-            window.Echo?.leave?.(channelName) ?? window.Echo?.leaveChannel?.(`private-${channelName}`);
-        };
-    }, [currentTeam]);
+        setClusterList((currentClusters) =>
+            currentClusters.map((cluster) => (cluster.id === event.cluster?.id ? event.cluster : cluster)),
+        );
+    });
 
     useEffect(() => {
         if (!selectedCluster || !hasBootstrapInProgress) {
@@ -407,15 +524,9 @@ export default function Clusters({
                 return;
             }
 
-            const response = await fetch(`/v5/clusters/${selectedCluster.id}`, {
-                method: 'GET',
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                },
-            });
+            const response = await apiRequest(`/v5/clusters/${selectedCluster.id}`, { method: 'GET' }).catch(() => null);
 
-            if (!response.ok || isCancelled) {
+            if (!response?.ok || isCancelled) {
                 return;
             }
 
@@ -441,15 +552,9 @@ export default function Clusters({
         setIsSubmitting(true);
         setErrors({});
 
-        const response = await fetch('/v5/clusters', {
+        const response = await apiRequest('/v5/clusters', {
             method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken(),
-            },
-            body: JSON.stringify({
+            body: {
                 name,
                 description: description.trim() === '' ? null : description,
                 wireguard_interface: wireguardInterface,
@@ -471,10 +576,10 @@ export default function Clusters({
                 builder_cpu_quota: builderCpuQuota,
                 builder_memory_max: builderMemoryMax,
                 builder_timeout_secs: Number(builderTimeoutSecs),
-            }),
-        });
+            },
+        }).catch(() => null);
 
-        if (response.status === 422) {
+        if (response?.status === 422) {
             const payload = (await response.json()) as {
                 errors?: ClusterFormErrors;
             };
@@ -484,7 +589,7 @@ export default function Clusters({
             return;
         }
 
-        if (!response.ok) {
+        if (!response?.ok) {
             setErrors({
                 name: ['Unable to create this cluster. Please try again.'],
             });
@@ -517,15 +622,9 @@ export default function Clusters({
         setIsServerSubmitting(true);
         setServerErrors({});
 
-        const response = await fetch(`/v5/clusters/${selectedCluster.id}/servers`, {
+        const response = await apiRequest(`/v5/clusters/${selectedCluster.id}/servers`, {
             method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken(),
-            },
-            body: JSON.stringify({
+            body: {
                 name: serverName,
                 host: serverHost,
                 ssh_user: serverSshUser,
@@ -540,10 +639,10 @@ export default function Clusters({
                 wireguard_listen_port_override:
                     wireguardListenPortOverride.trim() === '' ? null : Number(wireguardListenPortOverride),
                 wireguard_endpoint_override: wireguardEndpointOverride.trim() === '' ? null : wireguardEndpointOverride,
-            }),
-        });
+            },
+        }).catch(() => null);
 
-        if (response.status === 422) {
+        if (response?.status === 422) {
             const payload = (await response.json()) as {
                 errors?: ServerFormErrors;
             };
@@ -553,7 +652,7 @@ export default function Clusters({
             return;
         }
 
-        if (!response.ok) {
+        if (!response?.ok) {
             setServerErrors({
                 name: ['Unable to add this server. Please try again.'],
             });
@@ -582,24 +681,18 @@ export default function Clusters({
         setIsServerUpdateSubmitting(true);
         setEditServerErrors({});
 
-        const response = await fetch(`/v5/clusters/${selectedCluster.id}/servers/${editingServer.id}`, {
+        const response = await apiRequest(`/v5/clusters/${selectedCluster.id}/servers/${editingServer.id}`, {
             method: 'PATCH',
-            credentials: 'same-origin',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken(),
-            },
-            body: JSON.stringify({
+            body: {
                 builder_enabled: editServerBuilderEnabled,
                 ingress_enabled: editServerIngressEnabled,
                 ingress_type: editServerIngressEnabled ? editServerIngressType : null,
                 builder_capacity: Number(editServerBuilderCapacity),
                 builder_cpu_quota: editServerBuilderCpuQuota,
-            }),
-        });
+            },
+        }).catch(() => null);
 
-        if (response.status === 422) {
+        if (response?.status === 422) {
             const payload = (await response.json()) as {
                 errors?: ServerFormErrors;
             };
@@ -609,8 +702,8 @@ export default function Clusters({
             return;
         }
 
-        if (!response.ok) {
-            const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        if (!response?.ok) {
+            const payload = (await response?.json().catch(() => null)) as { message?: string } | null;
 
             setEditServerErrors({
                 builder_capacity: [payload?.message ?? 'Unable to update this server. Please try again.'],
@@ -637,23 +730,20 @@ export default function Clusters({
 
         checkingServers.start(server.id);
 
-        const response = await fetch(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/check`, {
+        const response = await apiRequest(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/check`, {
             method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken(),
-            },
-        });
+        }).catch(() => null);
+        const payload = (await response?.json().catch(() => null)) as (CheckServerResponse & { message?: string }) | null;
 
-        if (response.ok) {
-            const payload = (await response.json()) as CheckServerResponse;
-            setSshChecks((currentChecks) => ({
-                ...currentChecks,
-                [server.id]: payload,
-            }));
-        }
+        setServerConnectionNotice({
+            message: response?.ok
+                ? `Connection check for ${server.name}: ${payload?.status ?? 'unknown'}`
+                : `Connection check failed for ${server.name}`,
+            description: response?.ok
+                ? (payload?.output ?? 'No output returned.')
+                : (payload?.message ?? 'Unable to check server connection.'),
+            variant: response?.ok ? 'success' : 'danger',
+        });
 
         checkingServers.finish(server.id);
     }
@@ -665,17 +755,12 @@ export default function Clusters({
 
         bootstrappingServers.start(server.id);
         setBootstrapServerError(null);
+        openBootstrapLogs(server);
 
-        const response = await fetch(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/bootstrap`, {
+        const response = await apiRequest(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/bootstrap`, {
             method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken(),
-            },
-        });
-        const payload = (await response.json()) as BootstrapServerResponse;
+        }).catch(() => null);
+        const payload = ((await response?.json().catch(() => null)) ?? {}) as BootstrapServerResponse;
 
         if (payload.cluster) {
             setClusterList((currentClusters) =>
@@ -683,13 +768,17 @@ export default function Clusters({
             );
         }
 
-        if (!response.ok) {
+        if (!response?.ok) {
             setBootstrapServerError(payload.message ?? 'Unable to queue bootstrap for this server.');
         }
 
         bootstrappingServers.finish(server.id);
     }
 
+    function openBootstrapLogs(server: V5Server): void {
+        setBootstrapLogsServerId(server.id);
+        setIsBootstrapLogsDialogOpen(true);
+    }
 
     async function loadCooldLogs(server: V5Server): Promise<void> {
         if (!selectedCluster) {
@@ -702,18 +791,15 @@ export default function Clusters({
         setCooldLogsError(null);
         setCooldLogsOutput('');
         setCooldLogsFetchedAt(null);
+        setCooldLogsSource(null);
 
-        const response = await fetch(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/coold-logs?tail=200`, {
+        const response = await apiRequest(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/coold-logs?tail=200`, {
             method: 'GET',
-            credentials: 'same-origin',
-            headers: {
-                Accept: 'application/json',
-            },
-        });
+        }).catch(() => null);
 
-        const payload = (await response.json().catch(() => null)) as CooldLogsResponse & { message?: string } | null;
+        const payload = (await response?.json().catch(() => null)) as CooldLogsResponse & { message?: string } | null;
 
-        if (!response.ok) {
+        if (!response?.ok) {
             setCooldLogsError(payload?.message ?? 'Unable to load coold logs.');
             setIsLoadingCooldLogs(false);
 
@@ -722,6 +808,7 @@ export default function Clusters({
 
         setCooldLogsOutput(payload?.output ?? '');
         setCooldLogsFetchedAt(payload?.fetchedAt ?? null);
+        setCooldLogsSource(payload?.source ?? null);
         setIsLoadingCooldLogs(false);
     }
 
@@ -736,18 +823,15 @@ export default function Clusters({
         setCorrosionTablesError(null);
         setCorrosionTablesOutput('');
         setCorrosionTablesFetchedAt(null);
+        setCorrosionTablesSource(null);
 
-        const response = await fetch(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/corrosion-tables?limit=200`, {
+        const response = await apiRequest(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/corrosion-tables?limit=200`, {
             method: 'GET',
-            credentials: 'same-origin',
-            headers: {
-                Accept: 'application/json',
-            },
-        });
+        }).catch(() => null);
 
-        const payload = (await response.json().catch(() => null)) as CorrosionTablesResponse & { message?: string } | null;
+        const payload = (await response?.json().catch(() => null)) as CorrosionTablesResponse & { message?: string } | null;
 
-        if (!response.ok) {
+        if (!response?.ok) {
             setCorrosionTablesError(payload?.message ?? 'Unable to load Corrosion tables.');
             setIsLoadingCorrosionTables(false);
 
@@ -756,6 +840,7 @@ export default function Clusters({
 
         setCorrosionTablesOutput(payload?.output ?? '');
         setCorrosionTablesFetchedAt(payload?.fetchedAt ?? null);
+        setCorrosionTablesSource(payload?.source ?? null);
         setIsLoadingCorrosionTables(false);
     }
 
@@ -772,17 +857,13 @@ export default function Clusters({
         setFirewallRules([]);
         setFirewallRulesFetchedAt(null);
 
-        const response = await fetch(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/firewall-rules`, {
+        const response = await apiRequest(`/v5/clusters/${selectedCluster.id}/servers/${server.id}/firewall-rules`, {
             method: 'GET',
-            credentials: 'same-origin',
-            headers: {
-                Accept: 'application/json',
-            },
-        });
+        }).catch(() => null);
 
-        const payload = (await response.json().catch(() => null)) as FirewallRulesResponse & { message?: string } | null;
+        const payload = (await response?.json().catch(() => null)) as FirewallRulesResponse & { message?: string } | null;
 
-        if (!response.ok) {
+        if (!response?.ok) {
             setFirewallRulesError(payload?.message ?? 'Unable to load firewall rules.');
             setIsLoadingFirewallRules(false);
 
@@ -820,24 +901,31 @@ export default function Clusters({
 
     async function deleteServer(cluster: V5Cluster, server: V5Server): Promise<void> {
         deletingServers.start(server.id);
+        setDeleteClusterError(null);
 
-        const response = await fetch(`/v5/clusters/${cluster.id}/servers/${server.id}`, {
+        const response = await apiRequest(`/v5/clusters/${cluster.id}/servers/${server.id}`, {
             method: 'DELETE',
-            credentials: 'same-origin',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken(),
-            },
-        });
+        }).catch(() => null);
 
-        if (response.ok) {
-            const payload = (await response.json()) as DeleteServerResponse;
+        if (!response?.ok) {
+            const payload = (await response?.json().catch(() => null)) as { message?: string } | null;
 
-            setClusterList((currentClusters) =>
-                currentClusters.map((cluster) => (cluster.id === payload.cluster.id ? payload.cluster : cluster)),
+            setDeleteClusterError(
+                payload?.message ??
+                    (response?.status === 422
+                        ? 'Delete or move applications from this server before deleting it.'
+                        : 'Unable to delete this server. Please try again.'),
             );
+            deletingServers.finish(server.id);
+
+            return;
         }
+
+        const payload = (await response.json()) as DeleteServerResponse;
+
+        setClusterList((currentClusters) =>
+            currentClusters.map((cluster) => (cluster.id === payload.cluster.id ? payload.cluster : cluster)),
+        );
 
         deletingServers.finish(server.id);
         setIsDeleteDialogOpen(false);
@@ -866,16 +954,11 @@ export default function Clusters({
         setIsDeletingCluster(true);
         setDeleteClusterError(null);
 
-        const response = await fetch(`/v5/clusters/${cluster.id}`, {
+        const response = await apiRequest(`/v5/clusters/${cluster.id}`, {
             method: 'DELETE',
-            credentials: 'same-origin',
-            headers: {
-                Accept: 'application/json',
-                'X-CSRF-TOKEN': csrfToken(),
-            },
-        });
+        }).catch(() => null);
 
-        if (response.status === 422) {
+        if (response?.status === 422) {
             const payload = (await response.json()) as { message?: string };
             setDeleteClusterError(payload.message ?? 'Only empty clusters can be deleted.');
             setIsDeletingCluster(false);
@@ -883,14 +966,14 @@ export default function Clusters({
             return;
         }
 
-        if (!response.ok) {
+        if (!response?.ok) {
             setDeleteClusterError('Unable to delete this cluster. Please try again.');
             setIsDeletingCluster(false);
 
             return;
         }
 
-        const nextClusters = clusterList.filter((cluster) => cluster.id !== selectedCluster.id);
+        const nextClusters = clusterList.filter((remainingCluster) => remainingCluster.id !== cluster.id);
 
         setClusterList(nextClusters);
         setSelectedClusterId(nextClusters[0]?.id ?? '');
@@ -969,11 +1052,8 @@ export default function Clusters({
         const isBootstrappingServer = bootstrappingServers.has(server.id) || isBootstrapInProgress;
         const isDeletingServer = deletingServers.has(server.id);
         const isServerInitialized = server.lastBootstrappedAt !== null;
-        const latestSshCheck = sshChecks[server.id] ?? null;
         const hasBootstrapLogs = server.lastBootstrapOutput !== null && server.lastBootstrapOutput.trim() !== '';
         const canShowBootstrapLogs = hasBootstrapLogs || isBootstrapInProgress;
-        const isBootstrapLogVisible =
-            isBootstrapInProgress || (canShowBootstrapLogs && (visibleBootstrapLogs[server.id] ?? false));
 
         return (
             <article key={server.id} className="rounded-lg border border-border bg-background p-4">
@@ -1035,20 +1115,8 @@ export default function Clusters({
                                         {isCheckingServer ? 'Checking...' : 'Check connection'}
                                     </DropdownMenuItem>
                                     {canShowBootstrapLogs ? (
-                                        <DropdownMenuItem
-                                            disabled={isBootstrapInProgress}
-                                            onClick={() =>
-                                                setVisibleBootstrapLogs((currentLogs) => ({
-                                                    ...currentLogs,
-                                                    [server.id]: !isBootstrapLogVisible,
-                                                }))
-                                            }
-                                        >
-                                            {isBootstrapInProgress
-                                                ? 'Install logs shown'
-                                                : isBootstrapLogVisible
-                                                  ? 'Hide install logs'
-                                                  : 'Show install logs'}
+                                        <DropdownMenuItem onClick={() => openBootstrapLogs(server)}>
+                                            View install logs
                                         </DropdownMenuItem>
                                     ) : null}
                                     <DropdownMenuItem onClick={() => void loadCooldLogs(server)}>
@@ -1113,37 +1181,6 @@ export default function Clusters({
                         </dd>
                     </div>
                 </dl>
-
-                {latestSshCheck ? (
-                    <div className="mt-4 rounded-md border border-border bg-muted/30 p-3 text-xs">
-                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                            <span className="font-medium text-foreground">Latest SSH check: {latestSshCheck.status}</span>
-                            <span className="text-muted-foreground">{formatDate(latestSshCheck.checkedAt)}</span>
-                        </div>
-                        <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-background p-2 text-muted-foreground">
-                            {latestSshCheck.output}
-                        </pre>
-                    </div>
-                ) : null}
-
-                {isBootstrapLogVisible ? (
-                    <div className="mt-4 rounded-md border border-border bg-muted/30 p-3 text-xs">
-                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                            <span className="font-medium text-foreground">
-                                Install logs
-                                {server.lastBootstrapStatus ? `: ${server.lastBootstrapStatus}` : ''}
-                            </span>
-                            <span className="text-muted-foreground">{formatDate(server.lastBootstrapRanAt)}</span>
-                        </div>
-                        {server.lastBootstrapOutput ? (
-                            <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-background p-2 text-muted-foreground">
-                                {server.lastBootstrapOutput}
-                            </pre>
-                        ) : (
-                            <p className="mt-2 text-muted-foreground">No install logs captured yet.</p>
-                        )}
-                    </div>
-                ) : null}
             </article>
         );
     }
@@ -1160,6 +1197,15 @@ export default function Clusters({
                     selectedProjectUuid={selectedProjectUuid}
                     selectedEnvironmentUuid={selectedEnvironmentUuid}
                 />
+
+                {serverConnectionNotice ? (
+                    <CanvasNotice
+                        message={serverConnectionNotice.message}
+                        description={serverConnectionNotice.description}
+                        variant={serverConnectionNotice.variant}
+                        onDismiss={() => setServerConnectionNotice(null)}
+                    />
+                ) : null}
 
                 <main className="flex min-h-dvh overflow-visible px-4 pt-16 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-6">
                     <section className="flex w-full flex-col gap-4 py-4 lg:min-h-0 lg:py-6">
@@ -1487,6 +1533,7 @@ export default function Clusters({
                                 setIsDeleteDialogOpen(open);
 
                                 if (!open) {
+                                    setDeleteClusterError(null);
                                     setClusterPendingDelete(null);
                                     setServerPendingDelete(null);
                                 }
@@ -1501,6 +1548,14 @@ export default function Clusters({
                                             : `Delete cluster ${clusterPendingDelete?.name ?? ''}? This cannot be undone.`}
                                     </DialogDescription>
                                 </DialogHeader>
+                                {deleteClusterError ? (
+                                    <p
+                                        role="alert"
+                                        className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+                                    >
+                                        {deleteClusterError}
+                                    </p>
+                                ) : null}
                                 <DialogFooter>
                                     <Button
                                         type="button"
@@ -2027,6 +2082,82 @@ export default function Clusters({
                             </DialogContent>
                         </Dialog>
 
+                        <Dialog
+                            open={isBootstrapLogsDialogOpen}
+                            onOpenChange={(open) => {
+                                setIsBootstrapLogsDialogOpen(open);
+
+                                if (!open) {
+                                    setBootstrapLogsServerId(null);
+                                }
+                            }}
+                        >
+                            <DialogContent className="max-w-6xl">
+                                <DialogHeader>
+                                    <DialogTitle>Install logs</DialogTitle>
+                                    <DialogDescription>
+                                        Bootstrap output for {bootstrapLogsServer?.name ?? 'this server'}.
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                <div className="mt-5 flex flex-col gap-3">
+                                    <div className="flex flex-col gap-1 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                                        <p>
+                                            Status: {bootstrapLogsServer?.lastBootstrapStatus ?? 'unknown'}
+                                            {['queued', 'running'].includes(bootstrapLogsServer?.lastBootstrapStatus ?? '')
+                                                ? ' · Auto-refreshing while bootstrap runs'
+                                                : ''}
+                                        </p>
+                                        <p>{formatDate(bootstrapLogsServer?.lastBootstrapRanAt ?? null)}</p>
+                                    </div>
+
+                                    {parsedBootstrapLogs.summary.length > 0 ? (
+                                        <div className="rounded-lg border border-border bg-muted/20 p-4">
+                                            <p className="mb-3 text-sm font-medium text-foreground">Action results</p>
+                                            <div className="grid gap-2 sm:grid-cols-2">
+                                                {parsedBootstrapLogs.summary.map((item, index) => (
+                                                    <div
+                                                        key={`${item.label}-${index}`}
+                                                        className="rounded-md border border-border bg-background p-3"
+                                                    >
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <p className="text-sm font-medium text-foreground">{item.label}</p>
+                                                            <span
+                                                                className={`rounded-full px-2 py-0.5 text-xs ${
+                                                                    item.tone === 'success'
+                                                                        ? 'bg-emerald-500/10 text-emerald-400'
+                                                                        : 'bg-muted text-muted-foreground'
+                                                                }`}
+                                                            >
+                                                                {item.tone === 'success' ? 'OK' : 'Info'}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-1 text-xs text-muted-foreground">{item.value}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : null}
+
+                                    {parsedBootstrapLogs.visibleOutput ? (
+                                        <pre className="max-h-[70dvh] max-w-full overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-black p-4 font-mono text-xs leading-relaxed text-white">
+                                            {parsedBootstrapLogs.visibleOutput}
+                                        </pre>
+                                    ) : null}
+
+                                    {parsedBootstrapLogs.summary.length > 0 ? (
+                                        <details className="rounded-lg border border-border bg-muted/20 p-4">
+                                            <summary className="cursor-pointer text-sm font-medium text-foreground">
+                                                Raw JSON output
+                                            </summary>
+                                            <pre className="mt-3 max-h-80 max-w-full overflow-auto whitespace-pre-wrap rounded-md bg-black p-3 font-mono text-xs leading-relaxed text-white">
+                                                {parsedBootstrapLogs.rawOutput}
+                                            </pre>
+                                        </details>
+                                    ) : null}
+                                </div>
+                            </DialogContent>
+                        </Dialog>
 
                         <Dialog
                             open={isCooldLogsDialogOpen}
@@ -2037,6 +2168,7 @@ export default function Clusters({
                                     setCooldLogsServer(null);
                                     setCooldLogsOutput('');
                                     setCooldLogsFetchedAt(null);
+                                    setCooldLogsSource(null);
                                     setCooldLogsError(null);
                                 }
                             }}
@@ -2051,9 +2183,16 @@ export default function Clusters({
 
                                 <div className="mt-5 flex flex-col gap-3">
                                     <div className="flex items-center justify-between gap-3">
-                                        <p className="text-xs text-muted-foreground">
-                                            {cooldLogsFetchedAt ? `Fetched ${formatDate(cooldLogsFetchedAt)}` : 'Last 200 lines'}
-                                        </p>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                {cooldLogsFetchedAt ? `Fetched ${formatDate(cooldLogsFetchedAt)}` : 'Last 200 lines'}
+                                            </p>
+                                            {cooldLogsSource ? (
+                                                <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-xs text-muted-foreground">
+                                                    Source: {diagnosticsSourceLabel(cooldLogsSource)}
+                                                </span>
+                                            ) : null}
+                                        </div>
                                         {cooldLogsServer ? (
                                             <Button
                                                 type="button"
@@ -2089,6 +2228,7 @@ export default function Clusters({
                                     setCorrosionTablesServer(null);
                                     setCorrosionTablesOutput('');
                                     setCorrosionTablesFetchedAt(null);
+                                    setCorrosionTablesSource(null);
                                     setCorrosionTablesError(null);
                                 }
                             }}
@@ -2103,11 +2243,18 @@ export default function Clusters({
 
                                 <div className="mt-5 flex flex-col gap-3">
                                     <div className="flex items-center justify-between gap-3">
-                                        <p className="text-xs text-muted-foreground">
-                                            {corrosionTablesFetchedAt
-                                                ? `Fetched ${formatDate(corrosionTablesFetchedAt)}`
-                                                : 'First 200 rows per table'}
-                                        </p>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                {corrosionTablesFetchedAt
+                                                    ? `Fetched ${formatDate(corrosionTablesFetchedAt)}`
+                                                    : 'First 200 rows per table'}
+                                            </p>
+                                            {corrosionTablesSource ? (
+                                                <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-xs text-muted-foreground">
+                                                    Source: {diagnosticsSourceLabel(corrosionTablesSource)}
+                                                </span>
+                                            ) : null}
+                                        </div>
                                         {corrosionTablesServer ? (
                                             <Button
                                                 type="button"

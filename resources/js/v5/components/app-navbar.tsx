@@ -7,25 +7,44 @@ import { csrfToken } from '@/lib/csrf';
 import { cn } from '@/lib/utils';
 import type { SelectItemOption, V5DashboardProps, V5Project } from '@/types';
 
-async function persistSelection(projectUuid: string, environmentUuid: string): Promise<void> {
-    await fetch('/v5/selection', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': csrfToken(),
-        },
-        body: JSON.stringify({
-            project_uuid: projectUuid,
-            environment_uuid: environmentUuid,
-        }),
-    });
+async function persistSelection(projectUuid: string, environmentUuid: string): Promise<boolean> {
+    try {
+        const response = await fetch('/v5/selection', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
+            },
+            body: JSON.stringify({
+                project_uuid: projectUuid,
+                environment_uuid: environmentUuid,
+            }),
+        });
+
+        if (!response.ok) {
+            console.error(`Could not persist the project/environment selection (HTTP ${response.status}).`);
+        }
+
+        return response.ok;
+    } catch (error) {
+        console.error('Could not persist the project/environment selection.', error);
+
+        return false;
+    }
 }
 
 function refreshCurrentPageSelection(): void {
     router.reload({
-        only: ['applications', 'selectedProjectUuid', 'selectedEnvironmentUuid'],
+        only: [
+            'applications',
+            'caddyIngresses',
+            'resourceConnections',
+            'nginxServers',
+            'selectedProjectUuid',
+            'selectedEnvironmentUuid',
+        ],
     });
 }
 
@@ -65,10 +84,21 @@ export function AppNavbar({
 
         const nextProject = projects.find((project) => project.uuid === nextProjectUuid);
         const nextEnvironmentUuid = nextProject?.environments?.[0]?.uuid ?? '';
+        const previousProjectUuid = projectUuid;
+        const previousEnvironmentUuid = environmentUuid;
 
         setProjectUuid(nextProjectUuid);
         setEnvironmentUuid(nextEnvironmentUuid);
-        void persistSelection(nextProjectUuid, nextEnvironmentUuid).then(refreshCurrentPageSelection);
+        void persistSelection(nextProjectUuid, nextEnvironmentUuid).then((persisted) => {
+            if (persisted) {
+                refreshCurrentPageSelection();
+
+                return;
+            }
+
+            setProjectUuid(previousProjectUuid);
+            setEnvironmentUuid(previousEnvironmentUuid);
+        });
     }
 
     function selectEnvironment(nextEnvironmentUuid: string | null): void {
@@ -76,8 +106,18 @@ export function AppNavbar({
             return;
         }
 
+        const previousEnvironmentUuid = environmentUuid;
+
         setEnvironmentUuid(nextEnvironmentUuid);
-        void persistSelection(projectUuid, nextEnvironmentUuid).then(refreshCurrentPageSelection);
+        void persistSelection(projectUuid, nextEnvironmentUuid).then((persisted) => {
+            if (persisted) {
+                refreshCurrentPageSelection();
+
+                return;
+            }
+
+            setEnvironmentUuid(previousEnvironmentUuid);
+        });
     }
 
     const projectItems: SelectItemOption[] = projects.map((project) => ({

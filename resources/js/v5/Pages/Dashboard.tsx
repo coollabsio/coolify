@@ -1,70 +1,51 @@
 import { Head } from '@inertiajs/react';
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent, type WheelEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from 'react';
 
 import { AppNavbar } from '@/components/app-navbar';
+import { ApplicationCard } from '@/components/canvas/application-card';
+import { ApplicationInspectorSheet } from '@/components/canvas/application-inspector-sheet';
+import { CaddyIngressCard } from '@/components/canvas/caddy-ingress-card';
+import { CanvasNotice } from '@/components/canvas/canvas-notice';
+import { CanvasToolbar } from '@/components/canvas/canvas-toolbar';
+import { ConnectionLines } from '@/components/canvas/connection-lines';
+import { ConnectionPortsEditor } from '@/components/canvas/connection-ports-editor';
+import { IngressDialog } from '@/components/canvas/ingress-dialog';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Field, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { resolveCanvasNodeLayout, resolveCanvasNodePosition, type CanvasNodeBounds } from '@/lib/canvas-collision';
-import { csrfToken } from '@/lib/csrf';
-import { cn } from '@/lib/utils';
-import type { V5Application, V5CaddyIngress, V5DashboardProps, V5ResourceConnection } from '@/types';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { canvasRequest } from '@/lib/canvas-api';
+import {
+    connectorPoint,
+    resolveApplicationPosition,
+    resolveIngressPosition,
+    settleCanvasResources,
+    type ConnectionEndpoint,
+    type ConnectorSide,
+    type DraftConnection,
+} from '@/lib/canvas-geometry';
+import { runOptimisticUpdate } from '@/lib/optimistic';
+import { useApplicationIngress } from '@/lib/use-application-ingress';
+import { useCanvasConnections } from '@/lib/use-canvas-connections';
+import { useCanvasResourceMerge } from '@/lib/use-canvas-resource-merge';
+import { useCanvasViewport, type Viewport } from '@/lib/use-canvas-viewport';
+import { usePendingIds } from '@/lib/use-pending-ids';
+import type { V5Application, V5CaddyIngress, V5DashboardProps } from '@/types';
 
-type Viewport = {
-    x: number;
-    y: number;
-    zoom: number;
+const DEFAULT_NGINX_IMAGE = 'docker.io/library/nginx:alpine';
+
+type CanvasPosition = {
+    canvasX: number;
+    canvasY: number;
 };
 
-type ConnectorSide = 'top' | 'right' | 'bottom' | 'left';
-
-type ConnectionEndpoint = {
-    applicationId: string;
-    side: ConnectorSide;
+type DeleteApplicationResponse = {
+    message?: string;
+    can_delete_locally?: boolean;
 };
 
-type V5CanvasResourceUpdatedEvent = {
-    application: V5Application | null;
-    applications?: V5Application[];
-    caddyIngress: V5CaddyIngress | null;
-};
-
-type IngressModalState = {
+type PendingLocalDelete = {
     application: V5Application;
-    domains: string;
-    internalPort: string;
-    error: string | null;
-};
-
-type EchoChannel = {
-    listen: (event: string, callback: (payload: unknown) => void) => EchoChannel;
-    subscribed?: (callback: () => void) => EchoChannel;
-    error?: (callback: (error: unknown) => void) => EchoChannel;
-};
-
-type EchoClient = {
-    private: (channel: string) => EchoChannel;
-    leave?: (channel: string) => void;
-    leaveChannel?: (channel: string) => void;
-};
-
-declare global {
-    interface Window {
-        Echo?: EchoClient;
-    }
-}
-
-type CanvasConnection = V5ResourceConnection;
-
-type DraftConnection = {
-    from: ConnectionEndpoint;
-    toX: number;
-    toY: number;
+    message: string;
 };
 
 type PointerState =
@@ -99,68 +80,6 @@ type PointerState =
           from: ConnectionEndpoint;
       };
 
-const APPLICATION_CARD_WIDTH = 320;
-const APPLICATION_CARD_HEIGHT = 160;
-const CANVAS_CARD_GAP = 16;
-const CONNECTOR_SIDES: ConnectorSide[] = ['top', 'right', 'bottom', 'left'];
-const MIN_CANVAS_ZOOM = 0.5;
-const MAX_CANVAS_ZOOM = 2;
-const CANVAS_ZOOM_STEP = 0.1;
-const PINCH_CANVAS_ZOOM_STEP = 0.03;
-const DEFAULT_NGINX_IMAGE = 'docker.io/library/nginx:alpine';
-
-function statusBadgeClass(status: string): string | false {
-    if (status === 'running') {
-        return 'bg-emerald-500/15 text-emerald-400';
-    }
-
-    if (status === 'creating') {
-        return 'bg-warning/15 text-warning';
-    }
-
-        if (status === 'unknown') {
-        return 'bg-muted text-muted-foreground';
-    }
-
-    if (['failed', 'exited', 'unreachable'].includes(status)) {
-        return 'bg-destructive/15 text-destructive';
-    }
-
-    return false;
-}
-
-async function persistApplicationPosition(application: V5Application): Promise<void> {
-    await fetch(`/v5/applications/${application.id}/position`, {
-        method: 'PATCH',
-        credentials: 'same-origin',
-        headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': csrfToken(),
-        },
-        body: JSON.stringify({
-            canvas_x: application.canvasX,
-            canvas_y: application.canvasY,
-        }),
-    });
-}
-
-async function persistCaddyIngressPosition(ingress: V5CaddyIngress): Promise<void> {
-    await fetch(`/v5/caddy-ingresses/${ingress.id}/position`, {
-        method: 'PATCH',
-        credentials: 'same-origin',
-        headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': csrfToken(),
-        },
-        body: JSON.stringify({
-            canvas_x: ingress.canvasX,
-            canvas_y: ingress.canvasY,
-        }),
-    });
-}
-
 export default function Dashboard({
     flux,
     currentTeam = null,
@@ -174,26 +93,64 @@ export default function Dashboard({
 }: V5DashboardProps) {
     const [applications, setApplications] = useState<V5Application[]>(initialApplications);
     const [ingresses, setIngresses] = useState<V5CaddyIngress[]>(caddyIngresses);
-    const [connections, setConnections] = useState<CanvasConnection[]>(initialResourceConnections);
-    const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
     const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
     const [selectedInspectorApplicationId, setSelectedInspectorApplicationId] = useState<string | null>(null);
-    const [connectionPortInput, setConnectionPortInput] = useState<Record<string, string>>({});
     const [draftConnection, setDraftConnection] = useState<DraftConnection | null>(null);
-    const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
     const [pointerState, setPointerState] = useState<PointerState | null>(null);
     const [isCreating, setIsCreating] = useState(false);
     const [selectedNginxServerId, setSelectedNginxServerId] = useState<string>(nginxServers[0]?.id ?? '');
     const [nginxImage, setNginxImage] = useState<string>(DEFAULT_NGINX_IMAGE);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [notice, setNotice] = useState<string | null>(null);
-    const [ingressModal, setIngressModal] = useState<IngressModalState | null>(null);
-    const [isSavingIngress, setIsSavingIngress] = useState(false);
-    const [savingIngressApplicationId, setSavingIngressApplicationId] = useState<string | null>(null);
-    const [deletingApplicationIds, setDeletingApplicationIds] = useState<Set<string>>(() => new Set());
-    const canvasRef = useRef<HTMLDivElement | null>(null);
-    const hasCanvasNodes = applications.length > 0 || ingresses.length > 0;
+    const [pendingLocalDelete, setPendingLocalDelete] = useState<PendingLocalDelete | null>(null);
+    const deletingApplications = usePendingIds<string>();
 
+    const applicationsRef = useRef(applications);
+
+    applicationsRef.current = applications;
+
+    /**
+     * Cards that are mid-drag or whose position PATCH has not landed yet keep
+     * their local canvasX/canvasY when a websocket merge arrives.
+     */
+    const locallyPositionedApplicationIdsRef = useRef<Set<string>>(new Set());
+    const locallyPositionedIngressIdsRef = useRef<Set<string>>(new Set());
+
+    const { canvasRef, viewport, setViewport, zoomCanvas, handleCanvasWheel, centerOnCanvasNodes, canvasPointFromPointer } =
+        useCanvasViewport();
+    const {
+        connections,
+        selectedConnectionId,
+        setSelectedConnectionId,
+        connectionPortInput,
+        setConnectionPortDraft,
+        resetConnections,
+        connectionExists,
+        persistNewConnection,
+        deleteConnection,
+        updateConnectionDirection,
+        addConnectionPort,
+        removeConnectionPort,
+        removeConnectionsForApplication,
+    } = useCanvasConnections(initialResourceConnections, setNotice);
+
+    const applyApplicationUpdate = useCallback((application: V5Application): void => {
+        setApplications((currentApplications) =>
+            currentApplications.map((candidate) => (candidate.id === application.id ? application : candidate)),
+        );
+    }, []);
+
+    const {
+        ingressModal,
+        closeIngressModal,
+        setIngressModalDomains,
+        setIngressModalInternalPort,
+        submitApplicationIngress,
+        toggleApplicationIngress,
+        savingIngressApplications,
+    } = useApplicationIngress({ notify: setNotice, onApplicationUpdated: applyApplicationUpdate });
+
+    const hasCanvasNodes = applications.length > 0 || ingresses.length > 0;
     const statusCounts = useMemo(
         () => ({
             running: applications.filter((application) => application.effectiveStatus === 'running').length,
@@ -206,746 +163,175 @@ export default function Dashboard({
         () => applications.find((application) => application.id === selectedInspectorApplicationId) ?? null,
         [applications, selectedInspectorApplicationId],
     );
+    const selectedConnection = useMemo(
+        () => connections.find((connection) => connection.id === selectedConnectionId) ?? null,
+        [connections, selectedConnectionId],
+    );
 
     useEffect(() => {
         const settledResources = settleCanvasResources(initialApplications, caddyIngresses);
 
         setApplications(settledResources.applications);
         setIngresses(settledResources.ingresses);
-        setConnections(initialResourceConnections);
+        resetConnections(initialResourceConnections);
         setSelectedNginxServerId((currentServerId) => currentServerId || nginxServers[0]?.id || '');
-        setSelectedConnectionId(null);
         setSelectedApplicationId(null);
         setSelectedInspectorApplicationId(null);
         centerOnCanvasNodes(settledResources.applications, settledResources.ingresses);
-    }, [initialApplications, caddyIngresses, initialResourceConnections, selectedProjectUuid, selectedEnvironmentUuid]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialApplications, caddyIngresses, initialResourceConnections, nginxServers[0]?.id, selectedProjectUuid, selectedEnvironmentUuid]);
 
-    useEffect(() => {
-        if (!currentTeam) {
-            return;
-        }
+    useCanvasResourceMerge({
+        teamId: currentTeam?.id ?? null,
+        selectedProjectUuid,
+        selectedEnvironmentUuid,
+        setApplications,
+        setIngresses,
+        locallyPositionedApplicationIds: locallyPositionedApplicationIdsRef,
+        locallyPositionedIngressIds: locallyPositionedIngressIdsRef,
+    });
 
-        let isCancelled = false;
-        let attempts = 0;
-        const channelName = `team.${currentTeam.id}`;
-
-        const interval = window.setInterval(() => {
-            attempts += 1;
-
-            if (!window.Echo) {
-                if (attempts === 1) {
-                    console.debug('Waiting for window.Echo before subscribing to canvas updates');
-                }
-
-                if (attempts >= 20) {
-                    window.clearInterval(interval);
-                }
-
-                return;
-            }
-
-            window.clearInterval(interval);
-
-            if (isCancelled) {
-                return;
-            }
-
-            const channel = window.Echo.private(channelName);
-
-            channel.subscribed?.(() => console.debug(`Subscribed to private-${channelName} for canvas updates`));
-            channel.error?.((error) => console.error(`Subscription error on private-${channelName}`, error));
-            channel.listen('.v5.canvas.resource.updated', (payload) => {
-                const event = payload as V5CanvasResourceUpdatedEvent;
-
-                if (event.application) {
-                    setApplications((currentApplications) =>
-                        currentApplications.map((application) =>
-                            application.id === event.application?.id ? event.application : application,
-                        ),
-                    );
-                }
-
-                if (event.applications && event.applications.length > 0) {
-                    setApplications((currentApplications) =>
-                        currentApplications.map((application) => {
-                            const updatedApplication = event.applications?.find((candidate) => candidate.id === application.id);
-
-                            return updatedApplication ?? application;
-                        }),
-                    );
-                }
-
-                if (event.caddyIngress) {
-                    setIngresses((currentIngresses) =>
-                        currentIngresses.map((ingress) =>
-                            ingress.id === event.caddyIngress?.id ? event.caddyIngress : ingress,
-                        ),
-                    );
-                }
-            });
-        }, 500);
-
-        return () => {
-            isCancelled = true;
-            window.clearInterval(interval);
-            window.Echo?.leave?.(channelName) ?? window.Echo?.leaveChannel?.(`private-${channelName}`);
-        };
-    }, [currentTeam]);
-
-    useEffect(() => {
-        function deleteSelectedConnection(event: KeyboardEvent): void {
-            const target = event.target as HTMLElement | null;
-
-            if (target?.closest('input, textarea, [contenteditable="true"]')) {
-                return;
-            }
-
-            if (!['Backspace', 'Delete'].includes(event.key) || !selectedConnectionId) {
-                return;
-            }
-
-            deleteConnection(selectedConnectionId);
-        }
-
-        window.addEventListener('keydown', deleteSelectedConnection);
-
-        return () => window.removeEventListener('keydown', deleteSelectedConnection);
-    }, [selectedConnectionId]);
-
-    function connectorPoint(endpoint: ConnectionEndpoint): { x: number; y: number } | null {
-        const application = applications.find((candidate) => candidate.id === endpoint.applicationId);
-
-        if (!application) {
-            return null;
-        }
-
-        switch (endpoint.side) {
-            case 'top':
-                return { x: application.canvasX + APPLICATION_CARD_WIDTH / 2, y: application.canvasY };
-            case 'right':
-                return { x: application.canvasX + APPLICATION_CARD_WIDTH, y: application.canvasY + APPLICATION_CARD_HEIGHT / 2 };
-            case 'bottom':
-                return { x: application.canvasX + APPLICATION_CARD_WIDTH / 2, y: application.canvasY + APPLICATION_CARD_HEIGHT };
-            case 'left':
-                return { x: application.canvasX, y: application.canvasY + APPLICATION_CARD_HEIGHT / 2 };
-        }
-    }
-
-    function applicationConnectorPoints(applicationId: string): Array<{ side: ConnectorSide; x: number; y: number }> {
-        return CONNECTOR_SIDES.flatMap((side) => {
-            const point = connectorPoint({ applicationId, side });
-
-            return point ? [{ side, ...point }] : [];
-        });
-    }
-
-    function shortestConnectionPoints(connection: CanvasConnection): { from: { x: number; y: number }; to: { x: number; y: number } } | null {
-        const fromPoints = applicationConnectorPoints(connection.fromApplicationId);
-        const toPoints = applicationConnectorPoints(connection.toApplicationId);
-        let shortest: { from: { x: number; y: number }; to: { x: number; y: number }; distance: number } | null = null;
-
-        for (const from of fromPoints) {
-            for (const to of toPoints) {
-                const distance = Math.hypot(from.x - to.x, from.y - to.y);
-
-                if (!shortest || distance < shortest.distance) {
-                    shortest = { from, to, distance };
-                }
-            }
-        }
-
-        return shortest ? { from: shortest.from, to: shortest.to } : null;
-    }
-
-    function connectionExists(fromApplicationId: string, toApplicationId: string): boolean {
-        return connections.some(
-            (connection) =>
-                (connection.fromApplicationId === fromApplicationId && connection.toApplicationId === toApplicationId) ||
-                (connection.fromApplicationId === toApplicationId && connection.toApplicationId === fromApplicationId),
-        );
-    }
-
-    function applicationDirectionLabel(applicationId: string): string {
-        const application = applications.find((candidate) => candidate.id === applicationId);
-
-        if (!application) {
-            return 'Unknown app';
-        }
-
-        return `${application.name} (${application.id.slice(0, 8)})`;
-    }
-
-    function connectionDirectionKey(fromApplicationId: string, toApplicationId: string): string {
-        return `${fromApplicationId}->${toApplicationId}`;
-    }
-
-    function activeConnectionPorts(connection: CanvasConnection): string[] {
-        return connection.portsByDirection[connectionDirectionKey(connection.fromApplicationId, connection.toApplicationId)] ?? [];
-    }
-
-function normalizeConnection(connection: V5ResourceConnection): CanvasConnection {
-        return {
-            ...connection,
-            applicationIds: [connection.applicationIds[0], connection.applicationIds[1]],
-            portsByDirection: connection.portsByDirection ?? {},
-        };
-    }
-
-    function responseErrorMessage(payload: { message?: string; detail?: string }, fallback: string): string {
-        if (payload.message && payload.detail) {
-            return `${payload.message} ${payload.detail}`;
-        }
-
-        return payload.message ?? fallback;
-    }
-
-    async function persistNewConnection(fromApplicationId: string, toApplicationId: string): Promise<void> {
-        setNotice(null);
-
-
-        try {
-            const response = await fetch('/v5/resource-connections', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken(),
-                },
-                body: JSON.stringify({
-                    resource_one: { type: 'application', uuid: fromApplicationId },
-                    resource_two: { type: 'application', uuid: toApplicationId },
-                }),
-            });
-            const payload = (await response.json()) as { connection?: V5ResourceConnection; message?: string; detail?: string };
-
-            if (!response.ok || !payload.connection) {
-                setNotice(responseErrorMessage(payload, 'Could not save resource connection.'));
-
-                return;
-            }
-
-            const nextConnection = normalizeConnection(payload.connection);
-
-            setConnections((currentConnections) => {
-                const withoutDuplicate = currentConnections.filter((connection) => connection.id !== nextConnection.id);
-
-                return [...withoutDuplicate, nextConnection];
-            });
-            setSelectedConnectionId(nextConnection.id);
-        } catch (error) {
-            setNotice(error instanceof Error ? error.message : 'Could not save resource connection.');
-        }
-    }
-
-    async function persistConnectionPorts(connection: CanvasConnection): Promise<void> {
-        const portsByDirection = Object.fromEntries(
-            Object.entries(connection.portsByDirection).map(([direction, ports]) => [
-                direction,
-                ports.map((port) => Number(port)).filter((port) => Number.isInteger(port)),
-            ]),
-        );
-
-
-        try {
-            const response = await fetch(`/v5/resource-connections/${connection.id}`, {
-                method: 'PATCH',
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken(),
-                },
-                body: JSON.stringify({ ports_by_direction: portsByDirection }),
-            });
-            const payload = (await response.json()) as { connection?: V5ResourceConnection; message?: string; detail?: string };
-
-            if (!response.ok || !payload.connection) {
-                setNotice(responseErrorMessage(payload, 'Could not save allowed ports.'));
-
-                return;
-            }
-
-            const nextConnection = normalizeConnection(payload.connection);
-            setConnections((currentConnections) =>
-                currentConnections.map((currentConnection) =>
-                    currentConnection.id === nextConnection.id ? nextConnection : currentConnection,
+    const persistApplicationPosition = useCallback(async (application: V5Application, previousPosition: CanvasPosition): Promise<void> => {
+        await runOptimisticUpdate({
+            rollback: () =>
+                setApplications((currentApplications) =>
+                    currentApplications.map((candidate) => (candidate.id === application.id ? { ...candidate, ...previousPosition } : candidate)),
                 ),
-            );
-        } catch (error) {
-            setNotice(error instanceof Error ? error.message : 'Could not save allowed ports.');
-        }
-    }
+            request: async () => {
+                const response = await canvasRequest(`/v5/applications/${application.id}/position`, {
+                    method: 'PATCH',
+                    body: {
+                        canvas_x: application.canvasX,
+                        canvas_y: application.canvasY,
+                    },
+                });
 
-    async function deletePersistedConnection(connectionId: string): Promise<void> {
-
-        try {
-            const response = await fetch(`/v5/resource-connections/${connectionId}`, {
-                method: 'DELETE',
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': csrfToken(),
-                },
-            });
-
-            if (!response.ok) {
-                setNotice('Could not delete resource connection.');
-            }
-        } catch (error) {
-            setNotice(error instanceof Error ? error.message : 'Could not delete resource connection.');
-        }
-    }
-
-        function deleteConnection(connectionId: string): void {
-        setConnections((currentConnections) => currentConnections.filter((connection) => connection.id !== connectionId));
-        setSelectedConnectionId(null);
-        void deletePersistedConnection(connectionId);
-    }
-
-    function updateConnectionDirection(connectionId: string, fromApplicationId: string, toApplicationId: string): void {
-        setConnections((currentConnections) =>
-            currentConnections.map((connection) =>
-                connection.id === connectionId
-                    ? {
-                          ...connection,
-                          fromApplicationId,
-                          toApplicationId,
-                      }
-                    : connection,
-            ),
-        );
-    }
-
-    function addConnectionPort(connectionId: string): void {
-        const port = connectionPortInput[connectionId]?.trim();
-        const portNumber = Number(port);
-
-        if (!port || !Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535) {
-            return;
-        }
-
-        const connection = connections.find((candidate) => candidate.id === connectionId);
-
-        if (!connection) {
-            return;
-        }
-
-        const directionKey = connectionDirectionKey(connection.fromApplicationId, connection.toApplicationId);
-        const directionPorts = connection.portsByDirection[directionKey] ?? [];
-
-        if (directionPorts.includes(port)) {
-            return;
-        }
-
-        const updatedConnection = {
-            ...connection,
-            portsByDirection: {
-                ...connection.portsByDirection,
-                [directionKey]: [...directionPorts, port],
+                return response.ok ? { ok: true, payload: undefined } : { ok: false };
             },
-        };
-
-        setConnections((currentConnections) =>
-            currentConnections.map((currentConnection) =>
-                currentConnection.id === updatedConnection.id ? updatedConnection : currentConnection,
-            ),
-        );
-        void persistConnectionPorts(updatedConnection);
-        setConnectionPortInput((currentInputs) => ({ ...currentInputs, [connectionId]: '' }));
-    }
-
-    function removeConnectionPort(connectionId: string, port: string): void {
-        const connection = connections.find((candidate) => candidate.id === connectionId);
-
-        if (!connection) {
-            return;
-        }
-
-        const directionKey = connectionDirectionKey(connection.fromApplicationId, connection.toApplicationId);
-        const updatedConnection = {
-            ...connection,
-            portsByDirection: {
-                ...connection.portsByDirection,
-                [directionKey]: activeConnectionPorts(connection).filter((allowedPort) => allowedPort !== port),
-            },
-        };
-
-        setConnections((currentConnections) =>
-            currentConnections.map((currentConnection) =>
-                currentConnection.id === updatedConnection.id ? updatedConnection : currentConnection,
-            ),
-        );
-        void persistConnectionPorts(updatedConnection);
-    }
-
-    function settleCanvasResources(
-        nextApplications: V5Application[],
-        nextIngresses: V5CaddyIngress[],
-    ): { applications: V5Application[]; ingresses: V5CaddyIngress[] } {
-        const settledNodes = resolveCanvasNodeLayout(
-            [
-                ...nextApplications.map((application) => ({
-                    id: `application-${application.id}`,
-                    x: application.canvasX,
-                    y: application.canvasY,
-                    width: APPLICATION_CARD_WIDTH,
-                    height: APPLICATION_CARD_HEIGHT,
-                })),
-                ...nextIngresses.map((ingress) => ({
-                    id: `ingress-${ingress.id}`,
-                    x: ingress.canvasX,
-                    y: ingress.canvasY,
-                    width: APPLICATION_CARD_WIDTH,
-                    height: APPLICATION_CARD_HEIGHT,
-                })),
-            ],
-            CANVAS_CARD_GAP,
-        );
-        const positionsById = new Map(settledNodes.map((node) => [node.id, node]));
-
-        return {
-            applications: nextApplications.map((application) => {
-                const position = positionsById.get(`application-${application.id}`);
-
-                return position ? { ...application, canvasX: position.x, canvasY: position.y } : application;
-            }),
-            ingresses: nextIngresses.map((ingress) => {
-                const position = positionsById.get(`ingress-${ingress.id}`);
-
-                return position ? { ...ingress, canvasX: position.x, canvasY: position.y } : ingress;
-            }),
-        };
-    }
-
-    function canvasCollisionNodes(): CanvasNodeBounds[] {
-        return [
-            ...applications.map((application) => ({
-                id: `application-${application.id}`,
-                x: application.canvasX,
-                y: application.canvasY,
-                width: APPLICATION_CARD_WIDTH,
-                height: APPLICATION_CARD_HEIGHT,
-            })),
-            ...ingresses.map((ingress) => ({
-                id: `ingress-${ingress.id}`,
-                x: ingress.canvasX,
-                y: ingress.canvasY,
-                width: APPLICATION_CARD_WIDTH,
-                height: APPLICATION_CARD_HEIGHT,
-            })),
-        ];
-    }
-
-    function resolveApplicationPosition(application: V5Application): V5Application {
-        const position = resolveCanvasNodePosition(
-            {
-                id: `application-${application.id}`,
-                x: application.canvasX,
-                y: application.canvasY,
-                width: APPLICATION_CARD_WIDTH,
-                height: APPLICATION_CARD_HEIGHT,
-            },
-            canvasCollisionNodes(),
-            CANVAS_CARD_GAP,
-        );
-
-        return { ...application, canvasX: position.x, canvasY: position.y };
-    }
-
-    function resolveIngressPosition(ingress: V5CaddyIngress): V5CaddyIngress {
-        const position = resolveCanvasNodePosition(
-            {
-                id: `ingress-${ingress.id}`,
-                x: ingress.canvasX,
-                y: ingress.canvasY,
-                width: APPLICATION_CARD_WIDTH,
-                height: APPLICATION_CARD_HEIGHT,
-            },
-            canvasCollisionNodes(),
-            CANVAS_CARD_GAP,
-        );
-
-        return { ...ingress, canvasX: position.x, canvasY: position.y };
-    }
-
-    function canvasPointFromPointer(event: PointerEvent): { x: number; y: number } {
-        const rect = canvasRef.current?.getBoundingClientRect();
-
-        if (!rect) {
-            return { x: 0, y: 0 };
-        }
-
-        return {
-            x: (event.clientX - rect.left - viewport.x) / viewport.zoom,
-            y: (event.clientY - rect.top - viewport.y) / viewport.zoom,
-        };
-    }
-
-    async function removeApplication(application: V5Application): Promise<void> {
-        setNotice(null);
-        setDeletingApplicationIds((currentIds) => new Set(currentIds).add(application.id));
-
-
-        try {
-            const response = await fetch(`/v5/applications/${application.id}`, {
-                method: 'DELETE',
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': csrfToken(),
-                },
-            });
-
-            if (!response.ok) {
-                setNotice('Could not delete application.');
-
-                return;
-            }
-
-            setApplications((currentApplications) =>
-                currentApplications.filter((candidate) => candidate.id !== application.id),
-            );
-            setConnections((currentConnections) =>
-                currentConnections.filter(
-                    (connection) =>
-                        connection.fromApplicationId !== application.id && connection.toApplicationId !== application.id,
-                ),
-            );
-        } catch (error) {
-            setNotice(error instanceof Error ? error.message : 'Could not delete application.');
-        } finally {
-            setDeletingApplicationIds((currentIds) => {
-                const nextIds = new Set(currentIds);
-
-                nextIds.delete(application.id);
-
-                return nextIds;
-            });
-        }
-    }
-
-    function openApplicationIngressModal(application: V5Application): void {
-        setNotice(null);
-
-        if (!application.serverIngressEnabled) {
-            setNotice('Enable ingress on the server before enabling app ingress.');
-
-            return;
-        }
-
-        setIngressModal({
-            application,
-            domains: application.domains.join(', '),
-            internalPort: application.internalPort ? String(application.internalPort) : '',
-            error: null,
+            fallbackErrorMessage: 'Could not save the card position.',
+            notify: setNotice,
+            onSettled: () => locallyPositionedApplicationIdsRef.current.delete(application.id),
         });
-    }
+    }, []);
 
-    async function disableApplicationIngress(application: V5Application): Promise<void> {
-        await saveApplicationIngress(application, false, application.domains, application.internalPort);
-    }
+    const persistCaddyIngressPosition = useCallback(async (ingress: V5CaddyIngress, previousPosition: CanvasPosition): Promise<void> => {
+        await runOptimisticUpdate({
+            rollback: () =>
+                setIngresses((currentIngresses) =>
+                    currentIngresses.map((candidate) => (candidate.id === ingress.id ? { ...candidate, ...previousPosition } : candidate)),
+                ),
+            request: async () => {
+                const response = await canvasRequest(`/v5/caddy-ingresses/${ingress.id}/position`, {
+                    method: 'PATCH',
+                    body: {
+                        canvas_x: ingress.canvasX,
+                        canvas_y: ingress.canvasY,
+                    },
+                });
 
-    async function submitApplicationIngress(): Promise<void> {
-        if (!ingressModal) {
-            return;
-        }
+                return response.ok ? { ok: true, payload: undefined } : { ok: false };
+            },
+            fallbackErrorMessage: 'Could not save the card position.',
+            notify: setNotice,
+            onSettled: () => locallyPositionedIngressIdsRef.current.delete(ingress.id),
+        });
+    }, []);
 
-        const domains = ingressModal.domains
-            .split(',')
-            .map((domain) => domain.trim().toLowerCase())
-            .filter(Boolean);
-        const internalPort = Number(ingressModal.internalPort);
-        const invalidDomain = domains.find((domain) => !isValidDomain(domain));
+    const removeApplication = useCallback(
+        async (application: V5Application, deleteLocally = false): Promise<void> => {
+            setNotice(null);
+            deletingApplications.start(application.id);
 
-        if (domains.length === 0) {
-            setIngressModal({ ...ingressModal, error: 'Add at least one valid domain.' });
+            try {
+                const response = await canvasRequest(`/v5/applications/${application.id}`, {
+                    method: 'DELETE',
+                    body: deleteLocally ? { delete_locally: true } : undefined,
+                });
 
-            return;
-        }
+                if (!response.ok) {
+                    const payload = (await response.json().catch(() => ({}))) as DeleteApplicationResponse;
+                    const message = payload.message ?? 'Could not delete application.';
 
-        if (invalidDomain) {
-            setIngressModal({ ...ingressModal, error: `${invalidDomain} is not a valid domain.` });
-
-            return;
-        }
-
-        if (!Number.isInteger(internalPort) || internalPort < 1 || internalPort > 65535) {
-            setIngressModal({ ...ingressModal, error: 'Choose a valid internal port between 1 and 65535.' });
-
-            return;
-        }
-
-        await saveApplicationIngress(ingressModal.application, true, [...new Set(domains)], internalPort);
-    }
-
-    async function saveApplicationIngress(
-        application: V5Application,
-        enabled: boolean,
-        domains: string[],
-        internalPort: number | null,
-    ): Promise<void> {
-        setNotice(null);
-        setIsSavingIngress(true);
-        setSavingIngressApplicationId(application.id);
-
-        try {
-            const response = await fetch(`/v5/applications/${application.id}/ingress`, {
-                method: 'PATCH',
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken(),
-                },
-                body: JSON.stringify({
-                    ingress_enabled: enabled,
-                    internal_port: internalPort,
-                    domains,
-                }),
-            });
-
-            if (!response.ok) {
-                const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-                const message = payload?.message ?? 'Could not update application ingress.';
-
-                if (ingressModal) {
-                    setIngressModal({ ...ingressModal, error: message });
-                } else {
                     setNotice(message);
+
+                    if (payload.can_delete_locally && !deleteLocally) {
+                        setPendingLocalDelete({ application, message });
+                    }
+
+                    return;
                 }
 
-                return;
+                setApplications((currentApplications) => currentApplications.filter((candidate) => candidate.id !== application.id));
+                removeConnectionsForApplication(application.id);
+            } catch (error) {
+                setNotice(error instanceof Error ? error.message : 'Could not delete application.');
+            } finally {
+                deletingApplications.finish(application.id);
             }
+        },
+        [deletingApplications.start, deletingApplications.finish, removeConnectionsForApplication],
+    );
 
-            const payload = (await response.json()) as { application: V5Application };
-            setApplications((currentApplications) =>
-                currentApplications.map((candidate) =>
-                    candidate.id === payload.application.id ? payload.application : candidate,
-                ),
-            );
-            setIngressModal(null);
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Could not update application ingress.';
+    const deleteApplication = useCallback(
+        (application: V5Application): void => {
+            void removeApplication(application);
+        },
+        [removeApplication],
+    );
 
-            if (ingressModal) {
-                setIngressModal({ ...ingressModal, error: message });
-            } else {
-                setNotice(message);
-            }
-        } finally {
-            setIsSavingIngress(false);
-            setSavingIngressApplicationId(null);
-        }
-    }
-
-    function isValidDomain(domain: string): boolean {
-        if (domain.length < 1 || domain.length > 253 || domain.startsWith('.') || domain.endsWith('.')) {
-            return false;
-        }
-
-        return domain.split('.').every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label));
-    }
-
-    function renderIngressButton(application: V5Application) {
-        const isDisabled = !application.ingressEnabled && !application.serverIngressEnabled;
-        const isApplicationIngressSaving = savingIngressApplicationId === application.id;
-        const button = (
-            <button
-                type="button"
-                onPointerDown={(event) => event.stopPropagation()}
-                disabled={isDisabled || isApplicationIngressSaving}
-                onClick={(event) => {
-                    event.stopPropagation();
-                    application.ingressEnabled
-                        ? void disableApplicationIngress(application)
-                        : openApplicationIngressModal(application);
-                }}
-                className="rounded-sm border border-border px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-wide text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-            >
-                {isApplicationIngressSaving ? 'Saving...' : application.ingressEnabled ? 'Disable' : 'Enable'}
-            </button>
-        );
-
-        if (!isDisabled) {
-            return button;
-        }
-
-        return (
-            <Tooltip>
-                <TooltipTrigger render={<span className="inline-flex" />}>{button}</TooltipTrigger>
-                <TooltipContent side="top">
-                    <p>You need to enable ingress in server settings first.</p>
-                </TooltipContent>
-            </Tooltip>
-        );
-    }
-
-    async function addNginx(): Promise<void> {
+    const addNginx = useCallback(async (): Promise<void> => {
         setIsCreating(true);
         setNotice(null);
 
-
         try {
-            const response = await fetch('/v5/applications/nginx', {
+            const response = await canvasRequest('/v5/applications/nginx', {
                 method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken(),
-                },
-                body: JSON.stringify({
+                body: {
                     server_uuid: selectedNginxServerId || null,
                     image: nginxImage.trim() || DEFAULT_NGINX_IMAGE,
-                }),
+                },
             });
             const payload = (await response.json()) as { application?: V5Application; message?: string };
 
-            if (payload.application) {
-                const settledResources = settleCanvasResources([...applications, payload.application], ingresses);
-                const settledApplication = settledResources.applications.find(
-                    (application) => application.id === payload.application?.id,
-                );
+            if (!response.ok || !payload.application) {
+                setNotice(payload.message ?? 'Could not deploy nginx.');
 
-                setApplications(settledResources.applications);
-                setIngresses(settledResources.ingresses);
-                centerOnCanvasNodes(settledResources.applications, settledResources.ingresses);
-
-                if (
-                    settledApplication &&
-                    (settledApplication.canvasX !== payload.application.canvasX ||
-                        settledApplication.canvasY !== payload.application.canvasY)
-                ) {
-                    void persistApplicationPosition(settledApplication);
-                }
+                return;
             }
 
-            if (!response.ok) {
-                setNotice(payload.application?.statusMessage ?? payload.message ?? 'Could not deploy nginx.');
+            const settledResources = settleCanvasResources([...applicationsRef.current, payload.application], ingresses);
+            const settledApplication = settledResources.applications.find(
+                (application) => application.id === payload.application?.id,
+            );
+
+            setApplications(settledResources.applications);
+            setIngresses(settledResources.ingresses);
+            centerOnCanvasNodes(settledResources.applications, settledResources.ingresses);
+
+            if (
+                settledApplication &&
+                (settledApplication.canvasX !== payload.application.canvasX ||
+                    settledApplication.canvasY !== payload.application.canvasY)
+            ) {
+                locallyPositionedApplicationIdsRef.current.add(settledApplication.id);
+                void persistApplicationPosition(settledApplication, {
+                    canvasX: payload.application.canvasX,
+                    canvasY: payload.application.canvasY,
+                });
             }
         } catch (error) {
             setNotice(error instanceof Error ? error.message : 'Could not deploy nginx.');
         } finally {
             setIsCreating(false);
         }
-    }
+    }, [selectedNginxServerId, nginxImage, ingresses, centerOnCanvasNodes, persistApplicationPosition]);
 
-    async function refreshApplications(): Promise<void> {
+    const refreshApplications = useCallback(async (): Promise<void> => {
         setIsRefreshing(true);
         setNotice(null);
 
-
         try {
-            const response = await fetch('/v5/applications/refresh', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken(),
-                },
-            });
+            const response = await canvasRequest('/v5/applications/refresh', { method: 'POST' });
             const payload = (await response.json()) as {
                 applications?: V5Application[];
                 errors?: string[];
@@ -969,45 +355,79 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
         } finally {
             setIsRefreshing(false);
         }
-    }
+    }, [ingresses]);
 
-    function centerOnCanvasNodes(
-        nextApplications = applications,
-        nextCaddyIngresses: V5CaddyIngress[] = ingresses,
-    ): void {
-        const canvas = canvasRef.current;
-        const nodes = [...nextApplications, ...nextCaddyIngresses];
+    const startApplicationDrag = useCallback(
+        (event: PointerEvent<HTMLDivElement>, application: V5Application): void => {
+            event.stopPropagation();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setSelectedConnectionId(null);
+            setSelectedApplicationId(application.id);
+            locallyPositionedApplicationIdsRef.current.add(application.id);
+            setPointerState({
+                type: 'app',
+                pointerId: event.pointerId,
+                applicationId: application.id,
+                startClientX: event.clientX,
+                startClientY: event.clientY,
+                startX: application.canvasX,
+                startY: application.canvasY,
+            });
+        },
+        [setSelectedConnectionId],
+    );
 
-        if (!canvas || nodes.length === 0) {
-            setViewport((currentViewport) => ({ x: 0, y: 0, zoom: currentViewport.zoom }));
+    const startIngressDrag = useCallback((event: PointerEvent<HTMLDivElement>, ingress: V5CaddyIngress): void => {
+        event.stopPropagation();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        locallyPositionedIngressIdsRef.current.add(ingress.id);
+        setPointerState({
+            type: 'ingress',
+            pointerId: event.pointerId,
+            ingressId: ingress.id,
+            startClientX: event.clientX,
+            startClientY: event.clientY,
+            startX: ingress.canvasX,
+            startY: ingress.canvasY,
+        });
+    }, []);
 
-            return;
-        }
+    const startConnectionDrag = useCallback(
+        (event: PointerEvent<HTMLButtonElement>, applicationId: string, side: ConnectorSide): void => {
+            event.stopPropagation();
 
-        const bounds = nodes.reduce(
-            (currentBounds, node) => ({
-                minX: Math.min(currentBounds.minX, node.canvasX),
-                maxX: Math.max(currentBounds.maxX, node.canvasX),
-                minY: Math.min(currentBounds.minY, node.canvasY),
-                maxY: Math.max(currentBounds.maxY, node.canvasY),
-            }),
-            {
-                minX: nodes[0]?.canvasX ?? 0,
-                maxX: nodes[0]?.canvasX ?? 0,
-                minY: nodes[0]?.canvasY ?? 0,
-                maxY: nodes[0]?.canvasY ?? 0,
-            },
-        );
-        const centerX = (bounds.minX + bounds.maxX) / 2;
-        const centerY = (bounds.minY + bounds.maxY) / 2;
-        const rect = canvas.getBoundingClientRect();
+            const from = { applicationId, side };
+            const fromApplication = applicationsRef.current.find((candidate) => candidate.id === applicationId);
+            const startPoint = fromApplication ? connectorPoint(fromApplication, side) : canvasPointFromPointer(event);
 
-        setViewport((currentViewport) => ({
-            x: rect.width / 2 - (centerX + APPLICATION_CARD_WIDTH / 2) * currentViewport.zoom,
-            y: rect.height / 2 - (centerY + APPLICATION_CARD_HEIGHT / 2) * currentViewport.zoom,
-            zoom: currentViewport.zoom,
-        }));
-    }
+            setDraftConnection({
+                from,
+                toX: startPoint.x,
+                toY: startPoint.y,
+            });
+            setPointerState({
+                type: 'connection',
+                pointerId: event.pointerId,
+                from,
+            });
+        },
+        [canvasPointFromPointer],
+    );
+
+    const selectConnection = useCallback(
+        (event: MouseEvent<SVGLineElement>, connectionId: string): void => {
+            event.stopPropagation();
+            setSelectedConnectionId(connectionId);
+            setSelectedApplicationId(null);
+        },
+        [setSelectedConnectionId],
+    );
+
+    const openApplicationInspector = useCallback((event: MouseEvent<HTMLElement>, application: V5Application): void => {
+        event.stopPropagation();
+        setSelectedApplicationId(application.id);
+        setSelectedInspectorApplicationId(application.id);
+    }, []);
 
     function startPan(event: PointerEvent<HTMLDivElement>): void {
         if (event.target !== event.currentTarget) {
@@ -1024,64 +444,6 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
         });
     }
 
-    function startApplicationDrag(event: PointerEvent<HTMLDivElement>, application: V5Application): void {
-        event.stopPropagation();
-        event.currentTarget.setPointerCapture(event.pointerId);
-        setSelectedConnectionId(null);
-        setSelectedApplicationId(application.id);
-        setPointerState({
-            type: 'app',
-            pointerId: event.pointerId,
-            applicationId: application.id,
-            startClientX: event.clientX,
-            startClientY: event.clientY,
-            startX: application.canvasX,
-            startY: application.canvasY,
-        });
-    }
-
-    function startIngressDrag(event: PointerEvent<HTMLDivElement>, ingress: V5CaddyIngress): void {
-        event.stopPropagation();
-        event.currentTarget.setPointerCapture(event.pointerId);
-        setPointerState({
-            type: 'ingress',
-            pointerId: event.pointerId,
-            ingressId: ingress.id,
-            startClientX: event.clientX,
-            startClientY: event.clientY,
-            startX: ingress.canvasX,
-            startY: ingress.canvasY,
-        });
-    }
-
-    function startConnectionDrag(
-        event: PointerEvent<HTMLButtonElement>,
-        applicationId: string,
-        side: ConnectorSide,
-    ): void {
-        event.stopPropagation();
-
-        const from = { applicationId, side };
-        const startPoint = connectorPoint(from) ?? canvasPointFromPointer(event);
-
-        setDraftConnection({
-            from,
-            toX: startPoint.x,
-            toY: startPoint.y,
-        });
-        setPointerState({
-            type: 'connection',
-            pointerId: event.pointerId,
-            from,
-        });
-    }
-
-    function selectConnection(event: MouseEvent<SVGLineElement>, connectionId: string): void {
-        event.stopPropagation();
-        setSelectedConnectionId(connectionId);
-        setSelectedApplicationId(null);
-    }
-
     function clearCanvasSelection(event: MouseEvent<HTMLDivElement>): void {
         if (event.target !== event.currentTarget) {
             return;
@@ -1089,12 +451,6 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
 
         setSelectedConnectionId(null);
         setSelectedApplicationId(null);
-    }
-
-    function openApplicationInspector(event: MouseEvent<HTMLElement>, application: V5Application): void {
-        event.stopPropagation();
-        setSelectedApplicationId(application.id);
-        setSelectedInspectorApplicationId(application.id);
     }
 
     function connectionTargetFromPointer(event: PointerEvent<HTMLDivElement>): HTMLElement | null {
@@ -1163,47 +519,6 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
         );
     }
 
-    function clampCanvasZoom(zoom: number): number {
-        return Math.min(MAX_CANVAS_ZOOM, Math.max(MIN_CANVAS_ZOOM, zoom));
-    }
-
-    function zoomCanvas(direction: 1 | -1, step = CANVAS_ZOOM_STEP, origin?: { x: number; y: number }): void {
-        const rect = canvasRef.current?.getBoundingClientRect();
-
-        setViewport((currentViewport) => {
-            const nextZoom = clampCanvasZoom(currentViewport.zoom + direction * step);
-
-            if (!rect || nextZoom === currentViewport.zoom) {
-                return currentViewport;
-            }
-
-            const originX = origin?.x ?? rect.width / 2;
-            const originY = origin?.y ?? rect.height / 2;
-            const canvasX = (originX - currentViewport.x) / currentViewport.zoom;
-            const canvasY = (originY - currentViewport.y) / currentViewport.zoom;
-
-            return {
-                x: originX - canvasX * nextZoom,
-                y: originY - canvasY * nextZoom,
-                zoom: nextZoom,
-            };
-        });
-    }
-
-    function handleCanvasWheel(event: WheelEvent<HTMLDivElement>): void {
-        if (!event.ctrlKey) {
-            return;
-        }
-
-        const rect = event.currentTarget.getBoundingClientRect();
-
-        event.preventDefault();
-        zoomCanvas(event.deltaY < 0 ? 1 : -1, PINCH_CANVAS_ZOOM_STEP, {
-            x: event.clientX - rect.left,
-            y: event.clientY - rect.top,
-        });
-    }
-
     function stopPointer(event: PointerEvent<HTMLDivElement>): void {
         if (!pointerState || pointerState.pointerId !== event.pointerId) {
             return;
@@ -1234,16 +549,23 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
             const application = applications.find((candidate) => candidate.id === pointerState.applicationId);
 
             if (application) {
-                const updatedApplication = resolveApplicationPosition({
-                    ...application,
-                    canvasX: Math.round(pointerState.startX + deltaX / viewport.zoom),
-                    canvasY: Math.round(pointerState.startY + deltaY / viewport.zoom),
-                });
+                const updatedApplication = resolveApplicationPosition(
+                    {
+                        ...application,
+                        canvasX: Math.round(pointerState.startX + deltaX / viewport.zoom),
+                        canvasY: Math.round(pointerState.startY + deltaY / viewport.zoom),
+                    },
+                    applications,
+                    ingresses,
+                );
 
                 setApplications((currentApplications) =>
                     currentApplications.map((candidate) => (candidate.id === updatedApplication.id ? updatedApplication : candidate)),
                 );
-                void persistApplicationPosition(updatedApplication);
+                void persistApplicationPosition(updatedApplication, {
+                    canvasX: pointerState.startX,
+                    canvasY: pointerState.startY,
+                });
             }
         }
 
@@ -1251,21 +573,45 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
             const ingress = ingresses.find((candidate) => candidate.id === pointerState.ingressId);
 
             if (ingress) {
-                const updatedIngress = resolveIngressPosition({
-                    ...ingress,
-                    canvasX: Math.round(pointerState.startX + deltaX / viewport.zoom),
-                    canvasY: Math.round(pointerState.startY + deltaY / viewport.zoom),
-                });
+                const updatedIngress = resolveIngressPosition(
+                    {
+                        ...ingress,
+                        canvasX: Math.round(pointerState.startX + deltaX / viewport.zoom),
+                        canvasY: Math.round(pointerState.startY + deltaY / viewport.zoom),
+                    },
+                    applications,
+                    ingresses,
+                );
 
                 setIngresses((currentIngresses) =>
                     currentIngresses.map((candidate) => (candidate.id === updatedIngress.id ? updatedIngress : candidate)),
                 );
-                void persistCaddyIngressPosition(updatedIngress);
+                void persistCaddyIngressPosition(updatedIngress, {
+                    canvasX: pointerState.startX,
+                    canvasY: pointerState.startY,
+                });
             }
         }
 
         setPointerState(null);
     }
+
+    const deployNginx = useCallback((): void => {
+        void addNginx();
+    }, [addNginx]);
+    const refreshCanvas = useCallback((): void => {
+        void refreshApplications();
+    }, [refreshApplications]);
+    const centerCanvas = useCallback((): void => {
+        centerOnCanvasNodes(applications, ingresses);
+    }, [applications, ingresses, centerOnCanvasNodes]);
+    const zoomIn = useCallback((): void => zoomCanvas(1), [zoomCanvas]);
+    const zoomOut = useCallback((): void => zoomCanvas(-1), [zoomCanvas]);
+    const dismissNotice = useCallback((): void => setNotice(null), []);
+    const closeInspector = useCallback((): void => setSelectedInspectorApplicationId(null), []);
+    const submitIngress = useCallback((): void => {
+        void submitApplicationIngress();
+    }, [submitApplicationIngress]);
 
     return (
         <TooltipProvider>
@@ -1280,111 +626,25 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                 />
 
                 <main className="relative h-full min-h-0 overflow-hidden pt-16">
-                    <div className="absolute left-4 top-20 z-30 flex max-w-[calc(100%-2rem)] flex-wrap items-center gap-2 rounded-xl border border-border bg-background/95 p-2 shadow-lg backdrop-blur">
-                        <select
-                            aria-label="Select nginx server"
-                            value={selectedNginxServerId}
-                            onChange={(event) => setSelectedNginxServerId(event.target.value)}
-                            disabled={isCreating || nginxServers.length === 0}
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            {nginxServers.length === 0 ? (
-                                <option value="">No servers available</option>
-                            ) : (
-                                nginxServers.map((server) => (
-                                    <option key={server.id} value={server.id}>
-                                        {server.name} ({server.host})
-                                    </option>
-                                ))
-                            )}
-                        </select>
-                        <input
-                            type="text"
-                            aria-label="Nginx image"
-                            value={nginxImage}
-                            onChange={(event) => setNginxImage(event.target.value)}
-                            disabled={isCreating}
-                            className="w-72 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition disabled:cursor-not-allowed disabled:opacity-60"
-                        />
-                        <button
-                            type="button"
-                            onClick={() => void addNginx()}
-                            disabled={isCreating || nginxServers.length === 0}
-                            className="rounded-lg bg-warning px-3 py-2 text-sm font-semibold text-black transition hover:bg-warning/90 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            {isCreating ? 'Deploying…' : 'Deploy'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => centerOnCanvasNodes()}
-                            className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-                        >
-                            Center
-                        </button>
-                        <div className="flex items-center overflow-hidden rounded-lg border border-border">
-                            <button
-                                type="button"
-                                aria-label="Zoom out"
-                                onClick={() => zoomCanvas(-1)}
-                                className="px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                                disabled={viewport.zoom <= MIN_CANVAS_ZOOM}
-                            >
-                                −
-                            </button>
-                            <span className="min-w-14 border-x border-border px-2 py-2 text-center text-xs font-medium text-muted-foreground">
-                                {Math.round(viewport.zoom * 100)}%
-                            </span>
-                            <button
-                                type="button"
-                                aria-label="Zoom in"
-                                onClick={() => zoomCanvas(1)}
-                                className="px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                                disabled={viewport.zoom >= MAX_CANVAS_ZOOM}
-                            >
-                                +
-                            </button>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => void refreshApplications()}
-                            disabled={isRefreshing}
-                            className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            {isRefreshing ? 'Refreshing…' : 'Refresh state'}
-                        </button>
-                        <div className="hidden items-center gap-2 px-2 text-xs text-muted-foreground sm:flex">
-                            <span>{applications.length} apps</span>
-                            <span>•</span>
-                            <span>{statusCounts.running} running</span>
-                            {statusCounts.failed > 0 && (
-                                <>
-                                    <span>•</span>
-                                    <span className="text-destructive">{statusCounts.failed} failed</span>
-                                </>
-                            )}
-                            {statusCounts.unknown > 0 && (
-                                <>
-                                    <span>•</span>
-                                    <span>{statusCounts.unknown} unknown</span>
-                                </>
-                            )}
-                        </div>
-                    </div>
+                    <CanvasToolbar
+                        nginxServers={nginxServers}
+                        selectedNginxServerId={selectedNginxServerId}
+                        onSelectNginxServer={setSelectedNginxServerId}
+                        nginxImage={nginxImage}
+                        onNginxImageChange={setNginxImage}
+                        isCreating={isCreating}
+                        onDeploy={deployNginx}
+                        onCenter={centerCanvas}
+                        zoom={viewport.zoom}
+                        onZoomIn={zoomIn}
+                        onZoomOut={zoomOut}
+                        isRefreshing={isRefreshing}
+                        onRefresh={refreshCanvas}
+                        applicationsCount={applications.length}
+                        statusCounts={statusCounts}
+                    />
 
-                    {notice && (
-                        <div className="absolute right-4 top-20 z-30 flex max-w-sm items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive shadow-lg">
-                            <span>{notice}</span>
-                            <button
-                                type="button"
-                                aria-label="Dismiss notice"
-                                onClick={() => setNotice(null)}
-                                className="-m-1 rounded p-1 text-destructive/80 transition hover:bg-destructive/10 hover:text-destructive"
-                            >
-                                <span aria-hidden="true">×</span>
-                                <span className="sr-only">Dismiss notice</span>
-                            </button>
-                        </div>
-                    )}
+                    {notice && <CanvasNotice message={notice} onDismiss={dismissNotice} />}
 
                     <div
                         ref={canvasRef}
@@ -1413,596 +673,123 @@ function normalizeConnection(connection: V5ResourceConnection): CanvasConnection
                             }}
                         >
                             {ingresses.map((ingress) => (
-                                <div
-                                    key={`caddy-ingress-${ingress.id}`}
-                                    className="absolute w-80 select-none overflow-hidden rounded-xl border border-warning/40 bg-card p-4 shadow-xl transition-shadow hover:shadow-2xl"
-                                    style={{
-                                        transform: `translate3d(${ingress.canvasX}px, ${ingress.canvasY}px, 0)`,
-                                    }}
-                                    onPointerDown={(event) => startIngressDrag(event, ingress)}
-                                >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <div className="truncate text-sm font-semibold text-foreground">Caddy ingress</div>
-                                            <div className="mt-1 truncate text-xs text-muted-foreground">{ingress.name}</div>
-                                        </div>
-                                        <span
-                                            className={cn(
-                                                'shrink-0 rounded-full px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-wide',
-                                                statusBadgeClass(ingress.status),
-                                            )}
-                                            title={ingress.statusMessage ?? undefined}
-                                        >
-                                            {ingress.status}
-                                        </span>
-                                    </div>
-
-                                    <dl className="mt-4 grid gap-2 text-xs">
-                                        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3">
-                                            <dt className="shrink-0 text-muted-foreground">Server</dt>
-                                            <dd className="truncate text-right font-medium text-foreground">{ingress.name}</dd>
-                                        </div>
-                                        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3">
-                                            <dt className="shrink-0 text-muted-foreground">Host</dt>
-                                            <dd className="truncate text-right font-mono text-[0.6875rem] text-foreground">
-                                                {ingress.host}
-                                            </dd>
-                                        </div>
-                                    </dl>
-                                </div>
+                                <CaddyIngressCard key={`caddy-ingress-${ingress.id}`} ingress={ingress} onDragStart={startIngressDrag} />
                             ))}
 
-                            <svg className="pointer-events-none absolute inset-0 overflow-visible">
-                                <defs>
-                                    <marker
-                                        id="dashboard-connection-arrow"
-                                        viewBox="0 0 10 10"
-                                        refX="9"
-                                        refY="5"
-                                        markerWidth="16"
-                                        markerHeight="16"
-                                        orient="auto"
-                                        markerUnits="userSpaceOnUse"
-                                    >
-                                        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--destructive)" />
-                                    </marker>
-                                </defs>
-                                {connections.map((connection) => {
-                                    const points = shortestConnectionPoints(connection);
+                            <ConnectionLines
+                                connections={connections}
+                                applications={applications}
+                                selectedConnectionId={selectedConnectionId}
+                                draftConnection={draftConnection}
+                                onSelectConnection={selectConnection}
+                            />
 
-                                    if (!points) {
-                                        return null;
-                                    }
+                            {selectedConnection && (
+                                <ConnectionPortsEditor
+                                    connection={selectedConnection}
+                                    applications={applications}
+                                    portInput={connectionPortInput[selectedConnection.id] ?? ''}
+                                    onPortInputChange={setConnectionPortDraft}
+                                    onUpdateDirection={updateConnectionDirection}
+                                    onAddPort={addConnectionPort}
+                                    onRemovePort={removeConnectionPort}
+                                    onDelete={deleteConnection}
+                                />
+                            )}
 
-                                    return (
-                                        <g key={connection.id}>
-                                            <line
-                                                x1={points.from.x}
-                                                y1={points.from.y}
-                                                x2={points.to.x}
-                                                y2={points.to.y}
-                                                aria-label="Select connection"
-                                                className="pointer-events-auto cursor-pointer"
-                                                stroke="transparent"
-                                                strokeWidth={12}
-                                                strokeLinecap="round"
-                                                onPointerDown={(event) => event.stopPropagation()}
-                                                onClick={(event) => selectConnection(event, connection.id)}
-                                            />
-                                            <line
-                                                x1={points.from.x}
-                                                y1={points.from.y}
-                                                x2={points.to.x}
-                                                y2={points.to.y}
-                                                className={cn(
-                                                    'pointer-events-none',
-                                                    selectedConnectionId === connection.id ? 'stroke-destructive' : 'stroke-warning',
-                                                )}
-                                                strokeWidth={selectedConnectionId === connection.id ? 4 : 2}
-                                                strokeDasharray="6 6"
-                                                strokeLinecap="round"
-                                                markerEnd={selectedConnectionId === connection.id ? 'url(#dashboard-connection-arrow)' : undefined}
-                                            />
-                                        </g>
-                                    );
-                                })}
-                                {draftConnection &&
-                                    (() => {
-                                        const from = connectorPoint(draftConnection.from);
-
-                                        if (!from) {
-                                            return null;
-                                        }
-
-                                        return (
-                                            <line
-                                                x1={from.x}
-                                                y1={from.y}
-                                                x2={draftConnection.toX}
-                                                y2={draftConnection.toY}
-                                                className="stroke-warning/70"
-                                                strokeWidth={2}
-                                                strokeDasharray="6 6"
-                                                strokeLinecap="round"
-                                            />
-                                        );
-                                    })()}
-                            </svg>
-
-                            {connections.map((connection) => {
-                                if (connection.id !== selectedConnectionId) {
-                                    return null;
-                                }
-
-                                const points = shortestConnectionPoints(connection);
-
-                                if (!points) {
-                                    return null;
-                                }
-
-                                const activePorts = activeConnectionPorts(connection);
-                                const firstApplicationId = connection.applicationIds[0];
-                                const secondApplicationId = connection.applicationIds[1];
-                                const isForwardDirection =
-                                    connection.fromApplicationId === firstApplicationId &&
-                                    connection.toApplicationId === secondApplicationId;
-
-                                return (
-                                    <div
-                                        key={`connection-controls-${connection.id}`}
-                                        className="absolute z-20 flex w-72 -translate-x-1/2 -translate-y-1/2 flex-col gap-3 rounded-md border border-border bg-card p-3 shadow-lg"
-                                        style={{
-                                            left: (points.from.x + points.to.x) / 2,
-                                            top: (points.from.y + points.to.y) / 2,
-                                        }}
-                                        onPointerDown={(event) => event.stopPropagation()}
-                                        onClick={(event) => event.stopPropagation()}
-                                    >
-                                        <div className="space-y-2">
-                                            <div className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                                                Firewall
-                                            </div>
-                                            <div className="grid gap-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        updateConnectionDirection(
-                                                            connection.id,
-                                                            firstApplicationId,
-                                                            secondApplicationId,
-                                                        )
-                                                    }
-                                                    className={cn(
-                                                        'rounded-sm border px-2 py-1 text-left text-xs transition',
-                                                        isForwardDirection
-                                                            ? 'border-warning/40 bg-warning/10 text-foreground hover:bg-warning/20'
-                                                            : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
-                                                    )}
-                                                >
-                                                    {applicationDirectionLabel(firstApplicationId)} →{' '}
-                                                    {applicationDirectionLabel(secondApplicationId)}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        updateConnectionDirection(
-                                                            connection.id,
-                                                            secondApplicationId,
-                                                            firstApplicationId,
-                                                        )
-                                                    }
-                                                    className={cn(
-                                                        'rounded-sm border px-2 py-1 text-left text-xs transition',
-                                                        !isForwardDirection
-                                                            ? 'border-warning/40 bg-warning/10 text-foreground hover:bg-warning/20'
-                                                            : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
-                                                    )}
-                                                >
-                                                    {applicationDirectionLabel(secondApplicationId)} →{' '}
-                                                    {applicationDirectionLabel(firstApplicationId)}
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <div className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                                                Allowed ports
-                                            </div>
-                                            <div className="flex flex-wrap gap-1">
-                                                {activePorts.length === 0 && (
-                                                    <span className="text-xs text-muted-foreground">No ports yet.</span>
-                                                )}
-                                                {activePorts.map((port) => (
-                                                    <button
-                                                        key={port}
-                                                        type="button"
-                                                        onClick={() => removeConnectionPort(connection.id, port)}
-                                                        className="rounded-full border border-border bg-muted px-2 py-1 text-[0.625rem] font-medium text-foreground transition hover:border-destructive/40 hover:text-destructive"
-                                                    >
-                                                        {port} ×
-                                                    </button>
-                                                ))}
-                                            </div>
-                                            <div className="flex gap-1">
-                                                <input
-                                                    type="number"
-                                                    min={1}
-                                                    max={65535}
-                                                    placeholder="Port"
-                                                    value={connectionPortInput[connection.id] ?? ''}
-                                                    onChange={(event) =>
-                                                        setConnectionPortInput((currentInputs) => ({
-                                                            ...currentInputs,
-                                                            [connection.id]: event.target.value,
-                                                        }))
-                                                    }
-                                                    onKeyDown={(event) => {
-                                                        if (event.key === 'Enter') {
-                                                            addConnectionPort(connection.id);
-                                                        }
-                                                    }}
-                                                    className="min-w-0 flex-1 rounded-sm border border-border bg-background px-2 py-1 text-xs text-foreground outline-none transition focus:border-warning"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => addConnectionPort(connection.id)}
-                                                    className="rounded-sm border border-border px-2 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
-                                                >
-                                                    Add
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <button
-                                            type="button"
-                                            aria-label="Delete connection"
-                                            onClick={() => deleteConnection(connection.id)}
-                                            className="rounded-sm border border-destructive/40 px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-wide text-destructive transition hover:bg-destructive/10"
-                                        >
-                                            Delete
-                                        </button>
-                                    </div>
-                                );
-                            })}
-
-                            {applications.map((application) => {
-                                const isDeletingApplication = deletingApplicationIds.has(application.id);
-
-                                return (
-                                    <div
-                                        key={application.id}
-                                        data-application-card="application-card"
-                                        data-application-id={application.id}
-                                        className="group/application absolute h-40 w-80 select-none overflow-visible rounded-xl border border-border bg-card p-4 shadow-xl transition-shadow hover:shadow-2xl"
-                                        style={{
-                                            transform: `translate3d(${application.canvasX}px, ${application.canvasY}px, 0)`,
-                                        }}
-                                        onPointerDown={(event) => startApplicationDrag(event, application)}
-                                        onDoubleClick={(event) => openApplicationInspector(event, application)}
-                                    >
-                                    {CONNECTOR_SIDES.map((side) => (
-                                        <button
-                                            key={side}
-                                            type="button"
-                                            aria-label={`${application.name} ${side} connector`}
-                                            data-application-connector="application-connector"
-                                            data-application-id={application.id}
-                                            data-connector-side={side}
-                                            onPointerDown={(event) => startConnectionDrag(event, application.id, side)}
-                                            className={cn(
-                                                'application-connector group/connector absolute z-10 flex size-8 items-center justify-center rounded-full opacity-0 transition group-hover/application:opacity-100 md:size-3',
-                                                selectedApplicationId === application.id && 'opacity-100',
-                                                side === 'top' && 'left-1/2 top-0 -translate-x-1/2 -translate-y-1/2',
-                                                side === 'right' && 'right-0 top-1/2 -translate-y-1/2 translate-x-1/2',
-                                                side === 'bottom' && 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2',
-                                                side === 'left' && 'left-0 top-1/2 -translate-x-1/2 -translate-y-1/2',
-                                            )}
-                                        >
-                                            <span className="size-3 rounded-full border-2 border-card bg-warning shadow ring-2 ring-background transition group-hover/connector:scale-125 group-hover/connector:bg-warning/90" />
-                                        </button>
-                                    ))}
-
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <div className="truncate text-sm font-semibold text-foreground">{application.name}</div>
-                                            <div className="mt-1 truncate text-xs text-muted-foreground">{application.image}</div>
-                                        </div>
-                                        <div className="flex shrink-0 items-center gap-2">
-                                            <span
-                                                className={cn(
-                                                    'rounded-full px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-wide',
-                                                    statusBadgeClass(application.effectiveStatus),
-                                                )}
-                                                title={application.effectiveStatusMessage ?? undefined}
-                                            >
-                                                {application.effectiveStatus}
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onPointerDown={(event) => event.stopPropagation()}
-                                                onClick={(event) => openApplicationInspector(event, application)}
-                                                className="rounded-md border border-border px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-wide text-foreground transition hover:bg-muted"
-                                            >
-                                                Configure
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onPointerDown={(event) => event.stopPropagation()}
-                                                onClick={(event) => {
-                                                    event.stopPropagation();
-                                                    void removeApplication(application);
-                                                }}
-                                                disabled={isDeletingApplication}
-                                                className="rounded-md border border-destructive/40 px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-wide text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-60"
-                                            >
-                                                {isDeletingApplication ? 'Deleting…' : 'Delete'}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <dl className="mt-4 grid gap-2 text-xs">
-                                        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3">
-                                            <dt className="shrink-0 text-muted-foreground">Server</dt>
-                                            <dd className="truncate text-right font-medium text-foreground">
-                                                {application.serverName ?? 'Unknown'}
-                                                {!application.isServerReachable && (
-                                                    <span className="ml-2 text-destructive">(unreachable)</span>
-                                                )}
-                                            </dd>
-                                        </div>
-                                        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3">
-                                            <dt className="shrink-0 text-muted-foreground">Container</dt>
-                                            <dd className="truncate text-right font-mono text-[0.6875rem] text-foreground">
-                                                {application.containerName}
-                                            </dd>
-                                        </div>
-                                        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
-                                            <dt className="shrink-0 text-muted-foreground">Ingress</dt>
-                                            <dd className="flex items-center justify-end gap-2 text-right">
-                                                <span className="truncate text-muted-foreground">
-                                                    {application.ingressEnabled
-                                                        ? `${application.domains.length} domain${application.domains.length === 1 ? '' : 's'} → ${application.internalPort ?? 'no port'}`
-                                                        : 'Private'}
-                                                </span>
-                                                {renderIngressButton(application)}
-                                            </dd>
-                                        </div>
-                                    </dl>
-                                    </div>
-                                );
-                            })}
+                            {applications.map((application) => (
+                                <ApplicationCard
+                                    key={application.id}
+                                    application={application}
+                                    isSelected={selectedApplicationId === application.id}
+                                    isDeleting={deletingApplications.pendingIds.has(application.id)}
+                                    isIngressSaving={savingIngressApplications.pendingIds.has(application.id)}
+                                    onDragStart={startApplicationDrag}
+                                    onOpenInspector={openApplicationInspector}
+                                    onDelete={deleteApplication}
+                                    onToggleIngress={toggleApplicationIngress}
+                                    onConnectorPointerDown={startConnectionDrag}
+                                />
+                            ))}
                         </div>
                     </div>
                 </main>
             </div>
 
-            <Sheet
-                open={selectedInspectorApplication !== null}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        setSelectedInspectorApplicationId(null);
-                    }
-                }}
-            >
-                <SheetContent side="right" className="w-full overflow-hidden bg-background sm:rounded-l-xl sm:border data-[side=right]:sm:!inset-y-4 data-[side=right]:sm:!h-auto data-[side=right]:sm:!w-[45vw] data-[side=right]:sm:!max-w-[45vw]" showCloseButton blurOverlay={false}>
-                    {selectedInspectorApplication && (
-                        <>
-                            <SheetHeader className="p-6 pb-4">
-                                <SheetTitle>App configuration</SheetTitle>
-                                <SheetDescription>
-                                    Double-click an application card to open configuration. Review runtime, networking, and advanced settings for{' '}
-                                    {selectedInspectorApplication.name}.
-                                </SheetDescription>
-                            </SheetHeader>
+            <ApplicationInspectorSheet
+                application={selectedInspectorApplication}
+                isIngressSaving={
+                    selectedInspectorApplication !== null && savingIngressApplications.pendingIds.has(selectedInspectorApplication.id)
+                }
+                onToggleIngress={toggleApplicationIngress}
+                onClose={closeInspector}
+            />
 
-                            <div className="flex flex-1 flex-col gap-6 px-6 pb-6">
-                                <Tabs defaultValue="overview" className="gap-4">
-                                    <TabsList className="w-full justify-start" variant="line">
-                                        <TabsTrigger value="overview">Overview</TabsTrigger>
-                                        <TabsTrigger value="networking">Networking</TabsTrigger>
-                                        <TabsTrigger value="advanced">Advanced</TabsTrigger>
-                                    </TabsList>
+            <Dialog open={pendingLocalDelete !== null} onOpenChange={(open) => !open && setPendingLocalDelete(null)}>
+                <DialogContent className="max-w-md" showCloseButton={false}>
+                    <DialogHeader>
+                        <DialogTitle>Delete from Coolify only?</DialogTitle>
+                        <DialogDescription>
+                            Coolify could not reach the server to clean up containers, volumes, networks, or ingress config.
+                        </DialogDescription>
+                    </DialogHeader>
 
-                                    <TabsContent value="overview" className="flex flex-col gap-4">
-                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                            <Field>
-                                                <FieldLabel>Name</FieldLabel>
-                                                <Input value={selectedInspectorApplication.name} readOnly />
-                                            </Field>
-
-                                            <Field>
-                                                <FieldLabel>Status</FieldLabel>
-                                                <Input value={selectedInspectorApplication.effectiveStatus} readOnly />
-                                            </Field>
-
-                                            {selectedInspectorApplication.effectiveStatus !== selectedInspectorApplication.status && (
-                                                <Field>
-                                                    <FieldLabel>Last known container status</FieldLabel>
-                                                    <Input value={selectedInspectorApplication.status} readOnly />
-                                                </Field>
-                                            )}
-
-                                            <Field>
-                                                <FieldLabel>Image</FieldLabel>
-                                                <Input value={selectedInspectorApplication.image} readOnly />
-                                            </Field>
-
-                                            <Field>
-                                                <FieldLabel>Server</FieldLabel>
-                                                <Input
-                                                    value={
-                                                        selectedInspectorApplication.isServerReachable
-                                                            ? (selectedInspectorApplication.serverName ?? 'Unknown')
-                                                            : `${selectedInspectorApplication.serverName ?? 'Unknown'} (unreachable)`
-                                                    }
-                                                    readOnly
-                                                />
-                                            </Field>
-
-                                            <Field>
-                                                <FieldLabel>Container</FieldLabel>
-                                                <Input value={selectedInspectorApplication.containerName} readOnly />
-                                            </Field>
-
-                                            <Field>
-                                                <FieldLabel>Runtime container ID</FieldLabel>
-                                                <Input value={selectedInspectorApplication.runtimeContainerId ?? 'Not available'} readOnly />
-                                            </Field>
-                                        </div>
-
-                                        <Field>
-                                            <FieldLabel>Status message</FieldLabel>
-                                            <Textarea
-                                                value={selectedInspectorApplication.effectiveStatusMessage ?? 'No status message yet.'}
-                                                readOnly
-                                                className="min-h-20"
-                                            />
-                                        </Field>
-                                    </TabsContent>
-
-                                    <TabsContent value="networking" className="flex flex-col gap-4">
-                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                            <Field>
-                                                <FieldLabel>Mesh namespace</FieldLabel>
-                                                <Input value={selectedInspectorApplication.meshNamespace} readOnly />
-                                            </Field>
-
-                                            <Field>
-                                                <FieldLabel>Mesh FQDN</FieldLabel>
-                                                <Input value={selectedInspectorApplication.meshFqdn} readOnly />
-                                            </Field>
-
-                                            <Field>
-                                                <FieldLabel>Internal port</FieldLabel>
-                                                <Input value={selectedInspectorApplication.internalPort?.toString() ?? 'Not configured'} readOnly />
-                                            </Field>
-
-                                            <Field>
-                                                <FieldLabel>Public ingress</FieldLabel>
-                                                <Input value={selectedInspectorApplication.ingressEnabled ? 'Enabled' : 'Private'} readOnly />
-                                            </Field>
-                                        </div>
-
-                                        <Field>
-                                            <FieldLabel>Domains</FieldLabel>
-                                            <Textarea
-                                                value={
-                                                    selectedInspectorApplication.domains.length > 0
-                                                        ? selectedInspectorApplication.domains.join('\n')
-                                                        : 'No public domains configured.'
-                                                }
-                                                readOnly
-                                            />
-                                        </Field>
-
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            {renderIngressButton(selectedInspectorApplication)}
-                                            <span className="text-xs text-muted-foreground">
-                                                Use this action to publish or private-route the app through the server ingress.
-                                            </span>
-                                        </div>
-                                    </TabsContent>
-
-                                    <TabsContent value="advanced" className="flex flex-col gap-4">
-                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                            <Field>
-                                                <FieldLabel>Application ID</FieldLabel>
-                                                <Input value={selectedInspectorApplication.id} readOnly />
-                                            </Field>
-
-                                            <Field>
-                                                <FieldLabel>Canvas position</FieldLabel>
-                                                <Input
-                                                    value={`${selectedInspectorApplication.canvasX}, ${selectedInspectorApplication.canvasY}`}
-                                                    readOnly
-                                                />
-                                            </Field>
-                                        </div>
-
-                                        <Field>
-                                            <FieldLabel>Raw app config</FieldLabel>
-                                            <Textarea
-                                                value={JSON.stringify(selectedInspectorApplication, null, 2)}
-                                                readOnly
-                                                className="min-h-80 font-mono text-xs"
-                                            />
-                                        </Field>
-                                    </TabsContent>
-                                </Tabs>
-                            </div>
-                        </>
+                    {pendingLocalDelete && (
+                        <div className="flex flex-col gap-3 text-sm text-muted-foreground">
+                            <p className="break-words rounded-md border border-border bg-muted/40 p-3 font-mono text-xs">
+                                {pendingLocalDelete.message}
+                            </p>
+                            <p>
+                                Deleting locally removes {pendingLocalDelete.application.name} from Coolify, but orphaned resources may remain on the unreachable server.
+                            </p>
+                        </div>
                     )}
-                </SheetContent>
-            </Sheet>
 
-            {ingressModal && (
-                <Dialog
-                    open
-                    onOpenChange={(open) => {
-                        if (!open && !isSavingIngress) {
-                            setIngressModal(null);
-                        }
-                    }}
-                >
-                    <DialogContent className="max-w-lg" showCloseButton>
-                        <DialogHeader>
-                            <DialogTitle>Enable app ingress</DialogTitle>
-                            <DialogDescription>
-                                Route public domains to {ingressModal.application.name} through the server ingress.
-                            </DialogDescription>
-                        </DialogHeader>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setPendingLocalDelete(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                                const application = pendingLocalDelete?.application;
+                                setPendingLocalDelete(null);
 
-                        <form
-                            className="mt-6 flex flex-col gap-4"
-                            onSubmit={(event) => {
-                                event.preventDefault();
-                                void submitApplicationIngress();
+                                if (application) {
+                                    void removeApplication(application);
+                                }
                             }}
                         >
-                            <Field>
-                                <FieldLabel>Domains</FieldLabel>
-                                <Input
-                                    type="text"
-                                    value={ingressModal.domains}
-                                    onChange={(event) =>
-                                        setIngressModal({ ...ingressModal, domains: event.target.value, error: null })
-                                    }
-                                    placeholder="example.com, www.example.com"
-                                />
-                                <span className="text-xs text-muted-foreground">
-                                    Use hostnames only, separated by commas. No scheme, path, wildcard, or port.
-                                </span>
-                            </Field>
+                            Retry
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={() => {
+                                const application = pendingLocalDelete?.application;
+                                setPendingLocalDelete(null);
 
-                            <Field>
-                                <FieldLabel>Internal port</FieldLabel>
-                                <Input
-                                    type="number"
-                                    min="1"
-                                    max="65535"
-                                    value={ingressModal.internalPort}
-                                    onChange={(event) =>
-                                        setIngressModal({ ...ingressModal, internalPort: event.target.value, error: null })
-                                    }
-                                    placeholder="3000"
-                                />
-                            </Field>
+                                if (application) {
+                                    void removeApplication(application, true);
+                                }
+                            }}
+                        >
+                            Delete from Coolify only
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
-                            {ingressModal.error && (
-                                <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                                    <p className="font-medium">Ingress update failed</p>
-                                    <p className="mt-1 text-destructive/90">{ingressModal.error}</p>
-                                </div>
-                            )}
-
-                            <div className="flex justify-end">
-                                <Button type="submit" variant="coolify" disabled={isSavingIngress}>
-                                    {isSavingIngress ? 'Saving...' : 'Enable ingress'}
-                                </Button>
-                            </div>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+            {ingressModal && (
+                <IngressDialog
+                    modal={ingressModal}
+                    isSaving={savingIngressApplications.pendingIds.has(ingressModal.application.id)}
+                    onDomainsChange={setIngressModalDomains}
+                    onInternalPortChange={setIngressModalInternalPort}
+                    onSubmit={submitIngress}
+                    onClose={closeIngressModal}
+                />
             )}
         </TooltipProvider>
     );

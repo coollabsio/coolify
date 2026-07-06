@@ -9,6 +9,7 @@ use App\Models\V5\Server;
 use App\Services\Flux\FluxClient;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -46,6 +47,143 @@ it('generates a caddy ingress compose file with health endpoint and application 
         ->and($configuration['apps'][0]['caddyfile'])->toContain('http://www.nginx.example.com {')
         ->and($configuration['apps'][0]['caddyfile'])->not->toContain('https://')
         ->and($configuration['apps'][0]['caddyfile'])->toContain('reverse_proxy coolify-v5-nginx-test.default.coolify.internal:8080');
+});
+
+it('generates byte-identical caddy routes for valid domains', function () {
+    $application = new Application([
+        'name' => 'nginx-test',
+        'container_name' => 'coolify-v5-nginx-test',
+        'mesh_namespace' => 'default',
+        'ingress_enabled' => true,
+        'internal_port' => 8080,
+    ]);
+    $application->setRelation('domains', new Collection([
+        new ApplicationDomain(['domain' => 'nginx.example.com']),
+        new ApplicationDomain(['domain' => 'www.nginx.example.com']),
+    ]));
+
+    $configuration = GenerateCaddyIngressConfiguration::run(new Collection([$application]));
+
+    expect($configuration['apps'][0]['caddyfile'])->toBe(implode("\n", [
+        'http://nginx.example.com {',
+        '    reverse_proxy coolify-v5-nginx-test.default.coolify.internal:8080',
+        '}',
+        '',
+        'http://www.nginx.example.com {',
+        '    reverse_proxy coolify-v5-nginx-test.default.coolify.internal:8080',
+        '}',
+    ]));
+});
+
+it('never emits domains with caddyfile injection payloads into the configuration', function () {
+    Log::spy();
+
+    $application = new Application([
+        'name' => 'nginx-test',
+        'container_name' => 'coolify-v5-nginx-test',
+        'mesh_namespace' => 'default',
+        'ingress_enabled' => true,
+        'internal_port' => 8080,
+    ]);
+    $application->setRelation('domains', new Collection([
+        new ApplicationDomain(['domain' => "evil.com {\n} http://x"]),
+        new ApplicationDomain(['domain' => "evil\n.com"]),
+        new ApplicationDomain(['domain' => 'safe.example.com']),
+    ]));
+
+    $configuration = GenerateCaddyIngressConfiguration::run(new Collection([$application]));
+
+    expect($configuration['apps'])->toHaveCount(1)
+        ->and($configuration['apps'][0]['caddyfile'])->not->toContain('evil')
+        ->and($configuration['apps'][0]['caddyfile'])->toBe(implode("\n", [
+            'http://safe.example.com {',
+            '    reverse_proxy coolify-v5-nginx-test.default.coolify.internal:8080',
+            '}',
+        ]));
+
+    Log::shouldHaveReceived('warning')
+        ->with('Skipping a caddy ingress route with an unsafe domain.', Mockery::type('array'))
+        ->twice();
+});
+
+it('skips whole applications when every domain is malicious', function () {
+    Log::spy();
+
+    $application = new Application([
+        'name' => 'nginx-test',
+        'container_name' => 'coolify-v5-nginx-test',
+        'mesh_namespace' => 'default',
+        'ingress_enabled' => true,
+        'internal_port' => 8080,
+    ]);
+    $application->setRelation('domains', new Collection([
+        new ApplicationDomain(['domain' => 'evil.com { respond "pwned" }']),
+    ]));
+
+    $configuration = GenerateCaddyIngressConfiguration::run(new Collection([$application]));
+
+    expect($configuration['apps'])->toBe([]);
+
+    Log::shouldHaveReceived('warning')
+        ->with('Skipping a caddy ingress route with an unsafe domain.', Mockery::type('array'))
+        ->once();
+});
+
+it('never emits unsafe container names or namespaces into the configuration', function () {
+    Log::spy();
+
+    $application = new Application([
+        'name' => 'nginx-test',
+        'container_name' => "coolify {\n} injected",
+        'mesh_namespace' => 'default',
+        'ingress_enabled' => true,
+        'internal_port' => 8080,
+    ]);
+    $application->setRelation('domains', new Collection([
+        new ApplicationDomain(['domain' => 'app.example.com']),
+    ]));
+
+    $namespaceApplication = new Application([
+        'name' => 'nginx-test-2',
+        'container_name' => 'coolify-v5-nginx-test',
+        'mesh_namespace' => "default {\n}",
+        'ingress_enabled' => true,
+        'internal_port' => 8080,
+    ]);
+    $namespaceApplication->setRelation('domains', new Collection([
+        new ApplicationDomain(['domain' => 'other.example.com']),
+    ]));
+
+    $configuration = GenerateCaddyIngressConfiguration::run(new Collection([$application, $namespaceApplication]));
+
+    expect($configuration['apps'])->toBe([]);
+
+    Log::shouldHaveReceived('warning')
+        ->with('Skipping a caddy ingress route with an unsafe container name or namespace.', Mockery::type('array'))
+        ->twice();
+});
+
+it('never emits out-of-range internal ports into the configuration', function () {
+    Log::spy();
+
+    $application = new Application([
+        'name' => 'nginx-test',
+        'container_name' => 'coolify-v5-nginx-test',
+        'mesh_namespace' => 'default',
+        'ingress_enabled' => true,
+    ]);
+    $application->internal_port = 70000;
+    $application->setRelation('domains', new Collection([
+        new ApplicationDomain(['domain' => 'app.example.com']),
+    ]));
+
+    $configuration = GenerateCaddyIngressConfiguration::run(new Collection([$application]));
+
+    expect($configuration['apps'])->toBe([]);
+
+    Log::shouldHaveReceived('warning')
+        ->with('Skipping a caddy ingress route with an out-of-range internal port.', Mockery::type('array'))
+        ->once();
 });
 
 it('does not generate app routes for applications without domains', function () {
@@ -103,6 +241,7 @@ it('does not generate app routes when the internal port is missing', function ()
 
 it('applies caddy ingress configuration through flux instead of ssh', function () {
     $server = new Server([
+        'uuid' => 'test-server-uuid',
         'wireguard_management_ip' => '100.64.0.10',
         'node_address' => '10.0.0.10',
         'capabilities' => ['ingress'],
@@ -113,7 +252,7 @@ it('applies caddy ingress configuration through flux instead of ssh', function (
         ->shouldReceive('applyIngress')
         ->once()
         ->with(
-            '100.64.0.10',
+            Mockery::type('string'),
             'caddy',
             Mockery::on(fn (string $caddyfile): bool => str_contains($caddyfile, 'respond /coolify-health 200')),
             []
@@ -122,7 +261,7 @@ it('applies caddy ingress configuration through flux instead of ssh', function (
     $fluxClient
         ->shouldReceive('applyFirewallRule')
         ->once()
-        ->with('100.64.0.10', [
+        ->with(Mockery::type('string'), [
             'id' => 'v5-caddy-ingress:80',
             'namespace' => 'default',
             'src' => '0.0.0.0/0',
@@ -132,17 +271,8 @@ it('applies caddy ingress configuration through flux instead of ssh', function (
         ])
         ->andReturn('Firewall rule applied.');
     $fluxClient
-        ->shouldReceive('applyFirewallRule')
-        ->once()
-        ->with('100.64.0.10', [
-            'id' => 'v5-caddy-ingress:443',
-            'namespace' => 'default',
-            'src' => '0.0.0.0/0',
-            'dst' => 'coolify-v5-caddy',
-            'proto' => 'tcp',
-            'port' => 443,
-        ])
-        ->andReturn('Firewall rule applied.');
+        ->shouldNotReceive('applyFirewallRule')
+        ->with(Mockery::type('string'), Mockery::on(fn (array $rule): bool => ($rule['port'] ?? null) === 443));
     app()->instance(FluxClient::class, $fluxClient);
 
     $result = StartCaddyIngress::run($server);
@@ -162,32 +292,103 @@ it('does not start caddy ingress for non-ingress servers', function () {
 
 it('stops caddy ingress through flux instead of ssh', function () {
     $server = new Server([
+        'uuid' => 'test-server-uuid',
         'wireguard_management_ip' => '100.64.0.10',
         'node_address' => '10.0.0.10',
-        'capabilities' => [],
+        'capabilities' => ['ingress'],
     ]);
 
     $fluxClient = Mockery::mock(FluxClient::class);
     $fluxClient
         ->shouldReceive('stopIngress')
         ->once()
-        ->with('100.64.0.10', 'caddy')
+        ->with(Mockery::type('string'), 'caddy')
         ->andReturn('Caddy ingress stopped.');
     $fluxClient
         ->shouldReceive('revokeFirewallRule')
         ->once()
-        ->with('100.64.0.10', 'v5-caddy-ingress:80')
+        ->with(Mockery::type('string'), 'v5-caddy-ingress:80')
         ->andReturn('Firewall rule removed.');
     $fluxClient
-        ->shouldReceive('revokeFirewallRule')
-        ->once()
-        ->with('100.64.0.10', 'v5-caddy-ingress:443')
-        ->andReturn('Firewall rule removed.');
+        ->shouldNotReceive('revokeFirewallRule')
+        ->with(Mockery::type('string'), 'v5-caddy-ingress:443');
     app()->instance(FluxClient::class, $fluxClient);
 
     $result = StopCaddyIngress::run($server);
 
     expect($result)->toBe('Caddy ingress stopped.');
+});
+
+it('does not stop caddy ingress for servers that never had ingress', function () {
+    $server = new Server([
+        'uuid' => 'test-server-uuid',
+        'wireguard_management_ip' => '100.64.0.10',
+        'capabilities' => [],
+    ]);
+
+    $fluxClient = Mockery::mock(FluxClient::class);
+    $fluxClient->shouldNotReceive('stopIngress');
+    $fluxClient->shouldNotReceive('revokeFirewallRule');
+    app()->instance(FluxClient::class, $fluxClient);
+
+    expect(StopCaddyIngress::run($server))->toBe('Server is not an ingress server.');
+});
+
+it('revokes the caddy firewall rule before stopping the ingress container', function () {
+    $server = new Server([
+        'uuid' => 'test-server-uuid',
+        'wireguard_management_ip' => '100.64.0.10',
+        'capabilities' => ['ingress'],
+    ]);
+
+    $fluxClient = Mockery::mock(FluxClient::class);
+    $fluxClient
+        ->shouldReceive('revokeFirewallRule')
+        ->once()
+        ->with(Mockery::type('string'), 'v5-caddy-ingress:80')
+        ->ordered()
+        ->andReturn('Firewall rule removed.');
+    $fluxClient
+        ->shouldReceive('stopIngress')
+        ->once()
+        ->with(Mockery::type('string'), 'caddy')
+        ->ordered()
+        ->andThrow(new RuntimeException('podman rm failed'));
+    app()->instance(FluxClient::class, $fluxClient);
+
+    expect(fn () => StopCaddyIngress::run($server))->toThrow(RuntimeException::class, 'podman rm failed');
+});
+
+it('tolerates already-revoked caddy firewall rules when stopping ingress', function () {
+    $server = new Server([
+        'uuid' => 'test-server-uuid',
+        'wireguard_management_ip' => '100.64.0.10',
+        'capabilities' => ['ingress'],
+    ]);
+
+    $fluxClient = Mockery::mock(FluxClient::class);
+    $fluxClient
+        ->shouldReceive('revokeFirewallRule')
+        ->once()
+        ->andThrow(new RuntimeException('firewall rule not found'));
+    $fluxClient
+        ->shouldReceive('stopIngress')
+        ->once()
+        ->andReturn('Caddy ingress stopped.');
+    app()->instance(FluxClient::class, $fluxClient);
+
+    expect(StopCaddyIngress::run($server))->toBe('Caddy ingress stopped.');
+});
+
+it('reports an unknown ingress status until coold confirms one', function () {
+    $installed = new Server(['capabilities' => ['ingress']]);
+    $installed->status = 'installed';
+
+    expect($installed->ingressStatus())->toBe('unknown');
+
+    $running = new Server(['capabilities' => ['ingress'], 'ingress_status' => 'running']);
+
+    expect($running->ingressStatus())->toBe('running');
 });
 
 it('includes flux error response details when dispatch returns a non success status', function () {
@@ -315,6 +516,8 @@ it('dispatches image pull and container lifecycle primitives for v5 apps', funct
         ['request_id' => 'test-request', 'status' => 'ok', 'data' => ['id' => 'container-123']],
         ['request_id' => 'test-request', 'status' => 'ok', 'data' => ['output' => 'Container started.']],
         ['request_id' => 'test-request', 'status' => 'ok', 'data' => ['State' => ['Running' => true]]],
+        ['request_id' => 'test-request', 'status' => 'ok', 'data' => ['output' => 'Container stopped.']],
+        ['request_id' => 'test-request', 'status' => 'ok', 'data' => ['output' => 'Container removed.']],
     ];
     $requestPath = storage_path('framework/testing/flux-request-'.bin2hex(random_bytes(8)).'.txt');
 
@@ -332,7 +535,9 @@ it('dispatches image pull and container lifecycle primitives for v5 apps', funct
                 'restart_policy' => 'unless-stopped',
             ]))->toBe('container-123')
             ->and($fluxClient->startContainer('100.64.0.10', 'container-123'))->toBe('Container started.')
-            ->and($fluxClient->inspectContainer('100.64.0.10', 'container-123'))->toBe(['State' => ['Running' => true]]);
+            ->and($fluxClient->inspectContainer('100.64.0.10', 'container-123'))->toBe(['State' => ['Running' => true]])
+            ->and($fluxClient->stopContainer('100.64.0.10', 'container-123'))->toBe('Container stopped.')
+            ->and($fluxClient->removeContainer('100.64.0.10', 'container-123', true))->toBe('Container removed.');
     });
 
     $request = file_get_contents($requestPath) ?: '';
@@ -343,7 +548,10 @@ it('dispatches image pull and container lifecycle primitives for v5 apps', funct
         ->toContain('"network_aliases":["coolify-v5-nginx-test"]')
         ->toContain('"dns_search":["default.coolify.internal"]')
         ->toContain('"type":"containers.start"')
-        ->toContain('"type":"containers.inspect"');
+        ->toContain('"type":"containers.inspect"')
+        ->toContain('"type":"containers.stop"')
+        ->toContain('"type":"containers.delete"')
+        ->toContain('"force":true');
 });
 
 it('dispatches firewall allow through the firewall allow primitive', function () {

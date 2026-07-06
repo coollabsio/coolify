@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Models\PersonalAccessToken;
+use App\Models\V5\Application;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -27,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureCommands();
+        $this->configureMorphMap();
         $this->configureModels();
         $this->configurePasswords();
         $this->configureSanctumModel();
@@ -39,6 +42,18 @@ class AppServiceProvider extends ServiceProvider
         if (App::isProduction()) {
             DB::prohibitDestructiveCommands();
         }
+    }
+
+    /**
+     * Map v5 models to stable morph aliases so polymorphic rows survive class
+     * renames. Deliberately NOT enforced: v4 polymorphic relations store FQCNs
+     * and must keep resolving them.
+     */
+    private function configureMorphMap(): void
+    {
+        Relation::morphMap([
+            'v5.application' => Application::class,
+        ]);
     }
 
     private function configureModels(): void

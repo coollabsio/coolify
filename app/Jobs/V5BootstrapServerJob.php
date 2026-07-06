@@ -3,39 +3,47 @@
 namespace App\Jobs;
 
 use App\Actions\V5\Proxy\StartCaddyIngress;
+use App\Enums\V5\ServerStatus;
 use App\Events\V5ClusterUpdated;
 use App\Models\PrivateKey;
 use App\Models\V5\Cluster as V5Cluster;
 use App\Models\V5\Server as V5Server;
+use App\Services\Flux\AgentTokenIssuer;
+use App\Services\Flux\FluxClient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 
-class V5BootstrapServerJob implements ShouldBeEncrypted, ShouldQueue
+class V5BootstrapServerJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     private const BOOTSTRAP_MARKER_PATH = '/etc/coolify/v5-node.json';
 
+    public const TIMEOUT_SECONDS = 7200;
+
     public int $tries = 1;
 
-    public int $timeout = 7200;
+    public int $timeout = self::TIMEOUT_SECONDS;
+
+    /**
+     * Second idempotency layer on top of the controller's DB bootstrap claim,
+     * aligned with its running-claim window (TIMEOUT_SECONDS plus margin).
+     */
+    public int $uniqueFor = self::TIMEOUT_SECONDS + 300;
 
     public function __construct(public int $clusterId, public int $serverId) {}
 
-    /**
-     * @return array<int, object>
-     */
-    public function middleware(): array
+    public function uniqueId(): string
     {
-        return [(new WithoutOverlapping("v5-bootstrap-server-{$this->serverId}"))->expireAfter(7200)->dontRelease()];
+        return (string) $this->serverId;
     }
 
     public function handle(): void
@@ -58,18 +66,28 @@ class V5BootstrapServerJob implements ShouldBeEncrypted, ShouldQueue
             ->unique('id')
             ->values();
 
+        $started = V5Server::query()
+            ->whereKey($server->id)
+            ->where('last_bootstrap_status', 'queued')
+            ->update([
+                'last_bootstrap_action' => $action,
+                'last_bootstrap_status' => 'running',
+                'last_bootstrap_output' => "Starting Coolify CLI {$action} for {$server->name}...",
+                'last_bootstrap_ran_at' => now(),
+            ]);
+
+        if ($started === 0) {
+            return;
+        }
+
+        $server->refresh();
+
         if ($servers->contains(fn (V5Server $server) => ! $server->privateKey instanceof PrivateKey)) {
             $this->markFailed($server, $action, 'The new server and every already-bootstrapped server in this cluster must have a private key before extending the cluster.');
 
             return;
         }
 
-        $server->update([
-            'last_bootstrap_action' => $action,
-            'last_bootstrap_status' => 'running',
-            'last_bootstrap_output' => "Starting Coolify CLI {$action} for {$server->name}...",
-            'last_bootstrap_ran_at' => now(),
-        ]);
         $this->broadcastClusterUpdated($server);
 
         $keyDirectory = storage_path('app/ssh/keys');
@@ -89,18 +107,23 @@ class V5BootstrapServerJob implements ShouldBeEncrypted, ShouldQueue
             $existingBootstrap = $this->detectExistingBootstrap($server, $sshConfigLocation);
 
             if (($existingBootstrap['cluster_id'] ?? null) !== null) {
-                if ((string) $existingBootstrap['cluster_id'] !== (string) $cluster->id) {
+                $markerClusterUuid = $existingBootstrap['cluster_uuid'] ?? null;
+
+                if (
+                    (string) $existingBootstrap['cluster_id'] !== (string) $cluster->id
+                    || (is_string($markerClusterUuid) && $markerClusterUuid !== $cluster->uuid)
+                ) {
                     $this->markFailed($server, $action, 'This server is already bootstrapped for another cluster. Reset the host bootstrap state before joining this cluster.');
 
                     return;
                 }
 
-                $this->adoptExistingBootstrap($server, $existingBootstrap);
+                $this->adoptExistingBootstrap($cluster, $server, $existingBootstrap, $sshConfigLocation);
 
                 return;
             }
 
-            $result = Process::timeout(300)
+            $result = Process::timeout(7200)
                 ->run($this->bootstrapCommand($cluster, $servers, $server, $sshConfigLocation, $action));
             $output = trim($result->output()."\n".$result->errorOutput());
             $successful = $result->successful();
@@ -117,21 +140,25 @@ class V5BootstrapServerJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
-            $capabilities = collect($server->capabilities ?? [])
-                ->push('coold')
-                ->when($server->isIngress(), fn ($capabilities) => $capabilities->push('ingress'))
-                ->unique()
-                ->values()
-                ->all();
+            $this->persistBootstrapAssignments($cluster, $server, $result->output(), $sshConfigLocation);
+            $server->refresh();
+
+            // Resolve the coold version once so the on-host marker and the
+            // database row always agree.
+            $cooldVersion = $this->bootstrappedCooldVersion($cluster, $result->output());
+
+            $this->writeBootstrapMarker($cluster, $server, $sshConfigLocation, $cooldVersion);
+
+            $this->enrollCooldIntoFlux($server, $sshConfigLocation);
+            $this->waitForFluxHostConnection($server);
 
             $server->update([
-                'status' => 'installed',
-                'capabilities' => $capabilities,
+                'status' => ServerStatus::Installed->value,
+                'has_coold' => true,
+                'coold_version' => $cooldVersion,
                 'last_bootstrapped_at' => now(),
             ]);
             $this->broadcastClusterUpdated($server);
-
-            $this->writeBootstrapMarker($cluster, $server, $sshConfigLocation);
 
             if ($server->isIngress()) {
                 StartCaddyIngress::run($server->fresh('privateKey'));
@@ -183,11 +210,13 @@ class V5BootstrapServerJob implements ShouldBeEncrypted, ShouldQueue
             'init',
             $action,
             '--format',
-            'table',
+            'json',
             '--nodes',
             $servers->map(fn (V5Server $server) => $this->bootstrapNode($server))->implode(','),
             '--ssh-config',
             $sshConfigLocation,
+            '--ssh-user',
+            $newServer->ssh_user,
             '--namespaces',
             implode(',', $cluster->namespaces ?? V5Cluster::DEFAULT_NAMESPACES),
             '--container-pool',
@@ -308,14 +337,17 @@ class V5BootstrapServerJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * @param  array<string, mixed>  $marker
      */
-    private function adoptExistingBootstrap(V5Server $server, array $marker): void
+    private function adoptExistingBootstrap(V5Cluster $cluster, V5Server $server, array $marker, string $sshConfigLocation): void
     {
+        $bootstrapNode = $this->bootstrapNode($server);
         $serverUuid = is_string($marker['server_uuid'] ?? null) ? $marker['server_uuid'] : null;
         $updates = [
             'wireguard_management_ip' => is_string($marker['wireguard_management_ip'] ?? null) ? $marker['wireguard_management_ip'] : $server->wireguard_management_ip,
             'wireguard_public_key' => is_string($marker['wireguard_public_key'] ?? null) ? $marker['wireguard_public_key'] : $server->wireguard_public_key,
+            'coold_version' => is_string($marker['coold_version'] ?? null) && trim($marker['coold_version']) !== '' ? trim($marker['coold_version']) : $cluster->coold_version,
             'container_subnets' => is_array($marker['container_subnets'] ?? null) ? $marker['container_subnets'] : $server->container_subnets,
-            'status' => 'installed',
+            'has_coold' => true,
+            'status' => ServerStatus::Installed->value,
             'last_bootstrap_status' => 'succeeded',
             'last_bootstrap_output' => 'Adopted existing Coolify bootstrap state for this cluster.',
             'last_bootstrap_ran_at' => now(),
@@ -329,28 +361,399 @@ class V5BootstrapServerJob implements ShouldBeEncrypted, ShouldQueue
         $server->update($updates);
         $this->broadcastClusterUpdated($server);
 
+        $this->enrollCooldIntoFlux($server->fresh(), $sshConfigLocation, $bootstrapNode);
+        $this->waitForFluxHostConnection($server->fresh());
+
         if ($server->isIngress()) {
             StartCaddyIngress::run($server->fresh('privateKey'));
         }
     }
 
-    private function writeBootstrapMarker(V5Cluster $cluster, V5Server $server, string $sshConfigLocation): void
+    private function persistBootstrapAssignments(V5Cluster $cluster, V5Server $server, string $output, string $sshConfigLocation): void
+    {
+        $verifiedNode = $this->verifiedBootstrapNode($output, $server);
+        $wireguardManagementIp = is_array($verifiedNode) && is_string($verifiedNode['wireguard_ip'] ?? null)
+            ? $verifiedNode['wireguard_ip']
+            : null;
+        $warnings = [];
+
+        if (! is_string($wireguardManagementIp) || $wireguardManagementIp === '') {
+            $wireguardManagementIp = $this->readWireguardManagementIp($cluster, $server, $sshConfigLocation, $warnings);
+        }
+
+        $wireguardPublicKey = $this->readWireguardPublicKey($cluster, $server, $sshConfigLocation, $warnings);
+        $containerSubnets = $this->readContainerSubnets($cluster, $server, $sshConfigLocation, $warnings);
+        $updates = [];
+
+        if ($wireguardManagementIp !== null && $wireguardManagementIp !== '') {
+            $updates['wireguard_management_ip'] = $wireguardManagementIp;
+
+            if (! is_string($server->node_address) || $server->node_address === '' || $server->node_address === $server->host) {
+                $updates['node_address'] = $wireguardManagementIp;
+            }
+        } else {
+            $warnings[] = 'Warning: could not determine the WireGuard management IP from the CLI output.';
+        }
+
+        if ($wireguardPublicKey !== null && $wireguardPublicKey !== '') {
+            $updates['wireguard_public_key'] = $wireguardPublicKey;
+        }
+
+        if ($containerSubnets !== []) {
+            $updates['container_subnets'] = $containerSubnets;
+        }
+
+        if ($warnings !== []) {
+            $updates['last_bootstrap_output'] = str(trim($server->last_bootstrap_output."\n".implode("\n", $warnings)))
+                ->limit(20000)
+                ->toString();
+        }
+
+        if ($updates !== []) {
+            $server->update($updates);
+        }
+    }
+
+    /**
+     * @param  array<int, string>  $warnings
+     */
+    private function readWireguardManagementIp(V5Cluster $cluster, V5Server $server, string $sshConfigLocation, array &$warnings): ?string
+    {
+        $interface = escapeshellarg($cluster->wireguard_interface);
+        $script = implode("\n", [
+            "SUDO=''",
+            'if [ "$(id -u)" != "0" ]; then SUDO=\'sudo\'; fi',
+            "\$SUDO ip -4 -o addr show dev {$interface} | awk '{print \$4}' | cut -d/ -f1 | head -n1",
+        ]);
+
+        $result = Process::timeout(15)->run([
+            'ssh',
+            '-F',
+            $sshConfigLocation,
+            $this->bootstrapNode($server),
+            $script,
+        ]);
+
+        $ipAddress = trim($result->output());
+
+        if (! $result->successful() || filter_var($ipAddress, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+            $warnings[] = 'Warning: could not read the WireGuard management IP from the server.';
+
+            return null;
+        }
+
+        return $ipAddress;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function verifiedBootstrapNode(string $output, V5Server $server): ?array
+    {
+        $decoded = $this->decodedBootstrapOutput($output);
+
+        if (! is_array($decoded)) {
+            return null;
+        }
+
+        $verifiedNodes = data_get($decoded, 'verified');
+
+        if (! is_array($verifiedNodes)) {
+            return null;
+        }
+
+        $bootstrapNode = $this->bootstrapNode($server);
+
+        foreach ($verifiedNodes as $verifiedNode) {
+            if (! is_array($verifiedNode)) {
+                continue;
+            }
+
+            $host = $verifiedNode['host'] ?? $verifiedNode['node'] ?? $verifiedNode['name'] ?? null;
+
+            if ($host === $bootstrapNode || $host === $server->uuid || $host === $server->name || $host === $server->host) {
+                return $verifiedNode;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function decodedBootstrapOutput(string $output): ?array
+    {
+        $output = trim($output);
+
+        if ($output === '' || ! str_starts_with($output, '{')) {
+            return null;
+        }
+
+        try {
+            $decoded = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
+     * The CLI init JSON output does not currently report the installed coold
+     * version, so fall back to the version the cluster asked the CLI to
+     * install (`--coold-version`). If a future CLI adds a `coold_version` key
+     * to its JSON output, prefer that.
+     */
+    private function bootstrappedCooldVersion(V5Cluster $cluster, string $output): ?string
+    {
+        $reported = data_get($this->decodedBootstrapOutput($output), 'coold_version');
+
+        if (is_string($reported) && trim($reported) !== '') {
+            return trim($reported);
+        }
+
+        return $cluster->coold_version;
+    }
+
+    /**
+     * @param  array<int, string>  $warnings
+     */
+    private function readWireguardPublicKey(V5Cluster $cluster, V5Server $server, string $sshConfigLocation, array &$warnings): ?string
+    {
+        $interface = escapeshellarg($cluster->wireguard_interface);
+        $script = implode("\n", [
+            "SUDO=''",
+            'if [ "$(id -u)" != "0" ]; then SUDO=\'sudo\'; fi',
+            "\$SUDO wg show {$interface} public-key",
+        ]);
+
+        $result = Process::timeout(15)->run([
+            'ssh',
+            '-F',
+            $sshConfigLocation,
+            $this->bootstrapNode($server),
+            $script,
+        ]);
+
+        $publicKey = trim($result->output());
+
+        if (! $result->successful() || $publicKey === '') {
+            $warnings[] = 'Warning: could not read the WireGuard public key from the server.';
+
+            return null;
+        }
+
+        return $publicKey;
+    }
+
+    /**
+     * The container subnets are allocated by the coolify CLI on the host; the podman
+     * networks it creates are the source of truth, so read them back instead of
+     * re-deriving the allocation locally.
+     *
+     * @param  array<int, string>  $warnings
+     * @return array<string, string>
+     */
+    private function readContainerSubnets(V5Cluster $cluster, V5Server $server, string $sshConfigLocation, array &$warnings): array
+    {
+        $namespaces = $cluster->namespaces ?? V5Cluster::DEFAULT_NAMESPACES;
+
+        if ($namespaces === []) {
+            return [];
+        }
+
+        $namespaceArguments = collect($namespaces)
+            ->map(fn (string $namespace): string => escapeshellarg($namespace))
+            ->implode(' ');
+        $script = implode("\n", [
+            "SUDO=''",
+            'if [ "$(id -u)" != "0" ]; then SUDO=\'sudo\'; fi',
+            "for ns in {$namespaceArguments}; do",
+            '  printf \'%s=\' "$ns"',
+            '  $SUDO podman network inspect "coolify-${ns}-mesh" --format \'{{range .Subnets}}{{.Subnet}}{{end}}\' 2>/dev/null || true',
+            '  printf \'\n\'',
+            'done',
+        ]);
+
+        $result = Process::timeout(30)->run([
+            'ssh',
+            '-F',
+            $sshConfigLocation,
+            $this->bootstrapNode($server),
+            $script,
+        ]);
+
+        if (! $result->successful()) {
+            $warnings[] = 'Warning: could not read the container subnets from the server.';
+
+            return [];
+        }
+
+        $subnets = [];
+
+        foreach (preg_split('/\r?\n/', trim($result->output())) ?: [] as $line) {
+            [$namespace, $subnet] = array_pad(explode('=', trim($line), 2), 2, null);
+
+            if (! is_string($namespace) || ! in_array($namespace, $namespaces, true) || ! $this->isIpv4Cidr($subnet)) {
+                continue;
+            }
+
+            $subnets[$namespace] = $subnet;
+        }
+
+        if (count($subnets) !== count($namespaces)) {
+            $warnings[] = 'Warning: could not read every container subnet from the server; the stored subnets may be incomplete.';
+        }
+
+        return $subnets;
+    }
+
+    private function isIpv4Cidr(?string $value): bool
+    {
+        if (! is_string($value) || ! str_contains($value, '/')) {
+            return false;
+        }
+
+        [$ip, $prefix] = explode('/', $value, 2);
+
+        return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false
+            && ctype_digit($prefix)
+            && (int) $prefix <= 32;
+    }
+
+    private function enrollCooldIntoFlux(V5Server $server, string $sshConfigLocation, ?string $bootstrapNode = null): void
+    {
+        $fluxUrl = trim((string) config('coold.flux_url', ''));
+
+        if ($fluxUrl === '') {
+            throw new \RuntimeException('COOLIFY_COOLD_FLUX_URL is not configured, so the server cannot be enrolled into Flux. Set it and retry the bootstrap.');
+        }
+
+        $jwtPath = trim((string) config('coold.flux_host_jwt_path', '/etc/coolify/host-jwt'));
+
+        if ($jwtPath === '') {
+            $jwtPath = '/etc/coolify/host-jwt';
+        }
+
+        $fluxUrl = str_replace(["\r", "\n"], '', $fluxUrl);
+        $jwtPath = str_replace(["\r", "\n"], '', $jwtPath);
+        $hostId = $server->fluxHostId();
+        $token = app(AgentTokenIssuer::class)->issueForServer($server);
+        $tokenArgument = $this->shellArg($token);
+        $hostId = str_replace(["\r", "\n"], '', $hostId);
+        $jwtPathArgument = $this->shellPathArg($jwtPath);
+        $dropInDirectory = '/etc/systemd/system/coold.service.d';
+        $dropInPath = "{$dropInDirectory}/10-flux.conf";
+        $script = <<<SH
+set -e
+SUDO=''
+if [ "\$(id -u)" != "0" ]; then SUDO='sudo'; fi
+\$SUDO mkdir -p /etc/coolify {$dropInDirectory}
+printf %s {$tokenArgument} | \$SUDO tee {$jwtPathArgument} >/dev/null
+\$SUDO chmod 600 {$jwtPathArgument}
+cat <<'COOLIFY_FLUX_ENV' | \$SUDO tee {$dropInPath} >/dev/null
+[Service]
+Environment=COOLIFY_COOLD_FLUX_URL={$fluxUrl}
+Environment=COOLIFY_COOLD_HOST_ID={$hostId}
+Environment=COOLIFY_COOLD_HOST_JWT_PATH={$jwtPath}
+COOLIFY_FLUX_ENV
+\$SUDO systemctl daemon-reload
+\$SUDO systemctl restart coold.service
+SH;
+
+        $result = Process::timeout(60)->run([
+            'ssh',
+            '-F',
+            $sshConfigLocation,
+            $bootstrapNode ?? $this->bootstrapNode($server),
+            $script,
+        ]);
+
+        if (! $result->successful()) {
+            $output = trim($result->output()."\n".$result->errorOutput());
+
+            throw new \RuntimeException(
+                ($output !== '' ? $output : 'Could not enroll coold into Flux.')
+                ."\nThe WireGuard mesh was created successfully; retrying this bootstrap is safe and will resume from Flux enrollment."
+            );
+        }
+    }
+
+    private function waitForFluxHostConnection(V5Server $server): void
+    {
+        $timeoutSeconds = (int) config('flux.bootstrap_host_connection_timeout_seconds', 30);
+
+        if ($timeoutSeconds <= 0) {
+            return;
+        }
+
+        $hostId = $server->fluxHostId();
+
+        if (! is_string($hostId) || $hostId === '') {
+            throw new \RuntimeException('Server is missing its Flux host id after bootstrap.');
+        }
+
+        $deadline = time() + $timeoutSeconds;
+        $lastError = null;
+
+        do {
+            try {
+                app(FluxClient::class)->cooldLogs($hostId, 1);
+
+                return;
+            } catch (\Throwable $exception) {
+                $lastError = $exception->getMessage();
+                sleep(1);
+            }
+        } while (time() < $deadline);
+
+        throw new \RuntimeException(
+            'The server was bootstrapped, but coold did not connect to Flux in time. '
+            .'Wait a moment and retry the bootstrap before deploying applications.'
+            .($lastError !== null ? " Last Flux error: {$lastError}" : '')
+        );
+    }
+
+    private function shellArg(string $value): string
+    {
+        return escapeshellarg($value);
+    }
+
+    private function shellPathArg(string $value): string
+    {
+        if (preg_match('/^[A-Za-z0-9_\/:.,@%+=-]+$/', $value) === 1) {
+            return $value;
+        }
+
+        return $this->shellArg($value);
+    }
+
+    private function writeBootstrapMarker(V5Cluster $cluster, V5Server $server, string $sshConfigLocation, ?string $cooldVersion = null): void
     {
         $payload = base64_encode(json_encode([
             'cluster_id' => $cluster->id,
+            'cluster_uuid' => $cluster->uuid,
             'server_uuid' => $server->uuid,
             'wireguard_management_ip' => $server->wireguard_management_ip,
             'wireguard_public_key' => $server->wireguard_public_key,
+            'coold_version' => $cooldVersion ?? $server->coold_version ?? $cluster->coold_version,
             'container_subnets' => $server->container_subnets ?? [],
         ], JSON_THROW_ON_ERROR));
 
-        Process::timeout(15)->run([
+        $result = Process::timeout(15)->run([
             'ssh',
             '-F',
             $sshConfigLocation,
             $this->bootstrapNode($server),
             "payload='{$payload}'; if [ \"$(id -u)\" = \"0\" ]; then mkdir -p /etc/coolify && printf %s \"$payload\" | base64 -d > ".escapeshellarg(self::BOOTSTRAP_MARKER_PATH)."; else sudo mkdir -p /etc/coolify && printf %s \"$payload\" | base64 -d | sudo tee ".escapeshellarg(self::BOOTSTRAP_MARKER_PATH).' >/dev/null; fi',
         ]);
+
+        if (! $result->successful()) {
+            $output = trim($result->output()."\n".$result->errorOutput());
+
+            throw new \RuntimeException('Could not write the bootstrap marker to the server: '.($output !== '' ? $output : 'the SSH command failed.'));
+        }
     }
 
     /**

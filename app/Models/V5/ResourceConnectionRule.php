@@ -9,6 +9,8 @@ class ResourceConnectionRule extends V5Model
 {
     protected $table = 'v5_resource_connection_rules';
 
+    protected bool $hasUuidColumn = false;
+
     protected $fillable = [
         'connection_id',
         'source_resource_type',
