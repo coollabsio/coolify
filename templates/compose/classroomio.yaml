@@ -1,0 +1,163 @@
+# documentation: https://classroomio.com/docs/self-hosted/coolify
+# slogan: Open-source LMS to build and teach courses — lessons, quizzes, certificates, student management, and an AI tutor, fully self-hosted on your own infrastructure.
+# category: LMS
+# tags: lms,education,courses,teaching,e-learning
+# logo: svgs/classroomio.svg
+# port: 3082
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-classroomio}
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $SERVICE_USER_POSTGRES -d ${POSTGRES_DB:-classroomio}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      # Exposes MinIO's S3 port publicly and generates the storage domain
+      - SERVICE_FQDN_MINIO_9000
+      - MINIO_ROOT_USER=$SERVICE_USER_MINIO
+      - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
+      - MINIO_SERVER_URL=$SERVICE_FQDN_MINIO_9000
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    # Runs once to seed buckets, then exits — don't health-gate the stack on it
+    exclude_from_hc: true
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set local http://minio:9000 $SERVICE_USER_MINIO $SERVICE_PASSWORD_MINIO;
+      mc mb local/videos --ignore-existing;
+      mc mb local/documents --ignore-existing;
+      mc mb local/media --ignore-existing;
+      mc anonymous set download local/media;
+      exit 0;
+      "
+
+  api:
+    image: classroomio/api:${CIO_VERSION:-latest}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - PORT=3081
+      - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-classroomio}
+      - REDIS_URL=redis://redis:6379
+      - PUBLIC_IS_SELFHOSTED=true
+      # Secrets — Coolify generates 64-char hex (= openssl rand -hex 32), reused wherever the name repeats
+      - BETTER_AUTH_SECRET=$SERVICE_HEX_64_BETTERAUTH
+      - PRIVATE_SERVER_KEY=$SERVICE_HEX_64_PRIVATESERVER
+      # Dashboard URL (auto-generated below) → auth base URL + email/invite links
+      - DASHBOARD_ORIGIN=$SERVICE_FQDN_DASHBOARD_3082
+      - PUBLIC_SERVER_URL=$SERVICE_FQDN_DASHBOARD_3082
+      # Object storage → MinIO
+      - OBJECT_STORAGE_ENDPOINT=http://minio:9000
+      - OBJECT_STORAGE_PUBLIC_ENDPOINT=$SERVICE_FQDN_MINIO_9000
+      - OBJECT_STORAGE_ACCESS_KEY_ID=$SERVICE_USER_MINIO
+      - OBJECT_STORAGE_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_MINIO
+      - OBJECT_STORAGE_FORCE_PATH_STYLE=true
+      - OBJECT_STORAGE_MEDIA_PUBLIC_BASE_URL=$SERVICE_FQDN_MINIO_9000/media
+      # Email — user fills these in after deploy
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_SENDER=${SMTP_SENDER}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3081/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  dashboard:
+    image: classroomio/dashboard:${CIO_VERSION:-latest}
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      # Declaring the FQDN here is what exposes the dashboard + wires the proxy
+      - SERVICE_FQDN_DASHBOARD_3082
+      - NODE_ENV=production
+      - PORT=3082
+      - ORIGIN=$SERVICE_FQDN_DASHBOARD_3082
+      - PUBLIC_IS_SELFHOSTED=true
+      - PRIVATE_SERVER_URL=http://api:3081
+      - PRIVATE_SERVER_KEY=$SERVICE_HEX_64_PRIVATESERVER # same value as api
+      - CSP_MEDIA_SRC_DOMAINS=$SERVICE_FQDN_MINIO_9000 # so browsers can load media
+
+  jobs:
+    image: classroomio/jobs:${CIO_VERSION:-latest}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-classroomio}
+      - OBJECT_STORAGE_ENDPOINT=http://minio:9000
+      - OBJECT_STORAGE_PUBLIC_ENDPOINT=$SERVICE_FQDN_MINIO_9000
+      - OBJECT_STORAGE_ACCESS_KEY_ID=$SERVICE_USER_MINIO
+      - OBJECT_STORAGE_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_MINIO
+      - OBJECT_STORAGE_FORCE_PATH_STYLE=true
+      - OBJECT_STORAGE_MEDIA_PUBLIC_BASE_URL=$SERVICE_FQDN_MINIO_9000/media
+      - OBJECT_STORAGE_BUCKET_VIDEOS=videos
+      - OBJECT_STORAGE_BUCKET_DOCUMENTS=documents
+      - OBJECT_STORAGE_BUCKET_MEDIA=media
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_SENDER=${SMTP_SENDER}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
