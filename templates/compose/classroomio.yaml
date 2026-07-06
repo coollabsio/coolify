@@ -1,5 +1,5 @@
 # documentation: https://classroomio.com/docs/self-hosted/coolify
-# slogan: Open-source LMS to build and teach courses — lessons, quizzes, certificates, student management, and an AI tutor, fully self-hosted on your own infrastructure.
+# slogan: Open-source LMS to build and teach courses — lessons, quizzes, certificates, student management, and an AI tutor, fully self-hosted.
 # category: LMS
 # tags: lms,education,courses,teaching,e-learning
 # logo: svgs/classroomio.svg
@@ -39,11 +39,11 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      # Exposes MinIO's S3 port publicly and generates the storage domain
+      # Declaration carries the port (routing); references below drop it
       - SERVICE_FQDN_MINIO_9000
       - MINIO_ROOT_USER=$SERVICE_USER_MINIO
       - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
-      - MINIO_SERVER_URL=$SERVICE_FQDN_MINIO_9000
+      - MINIO_SERVER_URL=$SERVICE_URL_MINIO
     volumes:
       - minio-data:/data
     healthcheck:
@@ -56,7 +56,6 @@ services:
     image: minio/mc:latest
     depends_on:
       - minio
-    # Runs once to seed buckets, then exits — don't health-gate the stack on it
     exclude_from_hc: true
     entrypoint: >
       /bin/sh -c "
@@ -82,20 +81,17 @@ services:
       - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-classroomio}
       - REDIS_URL=redis://redis:6379
       - PUBLIC_IS_SELFHOSTED=true
-      # Secrets — Coolify generates 64-char hex (= openssl rand -hex 32), reused wherever the name repeats
       - BETTER_AUTH_SECRET=$SERVICE_HEX_64_BETTERAUTH
       - PRIVATE_SERVER_KEY=$SERVICE_HEX_64_PRIVATESERVER
-      # Dashboard URL (auto-generated below) → auth base URL + email/invite links
-      - DASHBOARD_ORIGIN=$SERVICE_FQDN_DASHBOARD_3082
-      - PUBLIC_SERVER_URL=$SERVICE_FQDN_DASHBOARD_3082
-      # Object storage → MinIO
+      # Reference WITHOUT the port suffix → clean http(s)://domain
+      - DASHBOARD_ORIGIN=$SERVICE_URL_DASHBOARD
+      - PUBLIC_SERVER_URL=$SERVICE_URL_DASHBOARD
       - OBJECT_STORAGE_ENDPOINT=http://minio:9000
-      - OBJECT_STORAGE_PUBLIC_ENDPOINT=$SERVICE_FQDN_MINIO_9000
+      - OBJECT_STORAGE_PUBLIC_ENDPOINT=$SERVICE_URL_MINIO
       - OBJECT_STORAGE_ACCESS_KEY_ID=$SERVICE_USER_MINIO
       - OBJECT_STORAGE_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_MINIO
       - OBJECT_STORAGE_FORCE_PATH_STYLE=true
-      - OBJECT_STORAGE_MEDIA_PUBLIC_BASE_URL=$SERVICE_FQDN_MINIO_9000/media
-      # Email — user fills these in after deploy
+      - OBJECT_STORAGE_MEDIA_PUBLIC_BASE_URL=$SERVICE_URL_MINIO/media
       - SMTP_HOST=${SMTP_HOST}
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
@@ -120,15 +116,15 @@ services:
       api:
         condition: service_healthy
     environment:
-      # Declaring the FQDN here is what exposes the dashboard + wires the proxy
+      # Declaration carries the port (routing); references drop it
       - SERVICE_FQDN_DASHBOARD_3082
       - NODE_ENV=production
       - PORT=3082
-      - ORIGIN=$SERVICE_FQDN_DASHBOARD_3082
+      - ORIGIN=$SERVICE_URL_DASHBOARD
       - PUBLIC_IS_SELFHOSTED=true
       - PRIVATE_SERVER_URL=http://api:3081
-      - PRIVATE_SERVER_KEY=$SERVICE_HEX_64_PRIVATESERVER # same value as api
-      - CSP_MEDIA_SRC_DOMAINS=$SERVICE_FQDN_MINIO_9000 # so browsers can load media
+      - PRIVATE_SERVER_KEY=$SERVICE_HEX_64_PRIVATESERVER
+      - CSP_MEDIA_SRC_DOMAINS=$SERVICE_URL_MINIO
 
   jobs:
     image: classroomio/jobs:${CIO_VERSION:-latest}
@@ -142,11 +138,11 @@ services:
       - REDIS_URL=redis://redis:6379
       - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-classroomio}
       - OBJECT_STORAGE_ENDPOINT=http://minio:9000
-      - OBJECT_STORAGE_PUBLIC_ENDPOINT=$SERVICE_FQDN_MINIO_9000
+      - OBJECT_STORAGE_PUBLIC_ENDPOINT=$SERVICE_URL_MINIO
       - OBJECT_STORAGE_ACCESS_KEY_ID=$SERVICE_USER_MINIO
       - OBJECT_STORAGE_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_MINIO
       - OBJECT_STORAGE_FORCE_PATH_STYLE=true
-      - OBJECT_STORAGE_MEDIA_PUBLIC_BASE_URL=$SERVICE_FQDN_MINIO_9000/media
+      - OBJECT_STORAGE_MEDIA_PUBLIC_BASE_URL=$SERVICE_URL_MINIO/media
       - OBJECT_STORAGE_BUCKET_VIDEOS=videos
       - OBJECT_STORAGE_BUCKET_DOCUMENTS=documents
       - OBJECT_STORAGE_BUCKET_MEDIA=media
