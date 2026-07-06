@@ -5,6 +5,7 @@ namespace App\Livewire\Subscription;
 use App\Models\InstanceSettings;
 use App\Providers\RouteServiceProvider;
 use Livewire\Component;
+use Stripe\StripeClient;
 
 class Index extends Component
 {
@@ -52,7 +53,7 @@ class Index extends Component
     {
         try {
             $subscription = currentTeam()->subscription;
-            $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
+            $stripe = app(StripeClient::class);
             $customer = $stripe->customers->retrieve(currentTeam()->subscription->stripe_customer_id);
             if ($customer) {
                 $subscriptions = $stripe->subscriptions->all(['customer' => $customer->id]);

@@ -7,12 +7,14 @@ use App\Actions\Docker\GetContainersStatus;
 use App\Events\ApplicationStatusChanged;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Destination extends Component
 {
+    use AuthorizesRequests;
+
     public $resource;
 
     public Collection $networks;
@@ -59,6 +61,7 @@ class Destination extends Component
     public function stop($serverId)
     {
         try {
+            $this->authorize('deploy', $this->resource);
             $server = Server::ownedByCurrentTeam()->findOrFail($serverId);
             StopApplicationOneServer::run($this->resource, $server);
             $this->refreshServers();
@@ -70,12 +73,13 @@ class Destination extends Component
     public function redeploy(int $network_id, int $server_id)
     {
         try {
+            $this->authorize('deploy', $this->resource);
             if ($this->resource->additional_servers->count() > 0 && str($this->resource->docker_registry_image_name)->isEmpty()) {
                 $this->dispatch('error', 'Failed to deploy.', 'Before deploying to multiple servers, you must first set a Docker image in the General tab.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/multiple-servers">documentation</a>');
 
                 return;
             }
-            $deployment_uuid = new Cuid2;
+            $deployment_uuid = new_public_id();
             $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
             $destination = $server->standaloneDockers->where('id', $network_id)->firstOrFail();
             $result = queue_application_deployment(
@@ -128,7 +132,7 @@ class Destination extends Component
             });
             $this->resource->refresh();
             $this->refreshServers();
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
@@ -149,7 +153,7 @@ class Destination extends Component
 
             $this->resource->additional_networks()->attach($network->id, ['server_id' => $server->id]);
             $this->dispatch('refresh');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
@@ -157,6 +161,7 @@ class Destination extends Component
     public function removeServer(int $network_id, int $server_id, $password, $selectedActions = [])
     {
         try {
+            $this->authorize('update', $this->resource);
             if (! verifyPasswordConfirmation($password, $this)) {
                 return 'The provided password is incorrect.';
             }

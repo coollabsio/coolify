@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Rules\SafeWebhookUrl;
+use App\Rules\ValidS3BucketName;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -147,11 +148,21 @@ class S3Storage extends BaseModel
     {
         try {
             $validator = Validator::make(
-                ['endpoint' => $this['endpoint']],
-                ['endpoint' => ['required', new SafeWebhookUrl]],
+                [
+                    'endpoint' => $this['endpoint'],
+                    'bucket' => $this['bucket'],
+                ],
+                [
+                    'endpoint' => ['required', new SafeWebhookUrl],
+                    'bucket' => ['required', new ValidS3BucketName],
+                ],
             );
-            if ($validator->fails()) {
+            $validator->fails();
+            if ($validator->errors()->has('endpoint')) {
                 throw new \RuntimeException('S3 endpoint is not allowed: '.$validator->errors()->first('endpoint'));
+            }
+            if ($validator->errors()->has('bucket')) {
+                throw new \RuntimeException('S3 bucket name is not allowed: '.$validator->errors()->first('bucket'));
             }
 
             $disk = Storage::build([
@@ -162,10 +173,10 @@ class S3Storage extends BaseModel
                 'bucket' => $this['bucket'],
                 'endpoint' => $this['endpoint'],
                 'use_path_style_endpoint' => true,
-                'http' => [
+                'http' => array_merge(SafeWebhookUrl::httpClientOptions($this['endpoint']), [
                     'connect_timeout' => self::CONNECTION_TIMEOUT_SECONDS,
                     'timeout' => self::REQUEST_TIMEOUT_SECONDS,
-                ],
+                ]),
             ]);
             // Test the connection by listing files with ListObjectsV2 (S3)
             $disk->files();
@@ -176,21 +187,25 @@ class S3Storage extends BaseModel
             $exception = $this->toUserFriendlyConnectionException($e);
             $this->is_usable = false;
             if ($this->unusable_email_sent === false && is_transactional_emails_enabled()) {
-                $mail = new MailMessage;
-                $mail->subject('Coolify: S3 Storage Connection Error');
-                $mail->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $exception->getMessage(), 'url' => route('storage.show', ['storage_uuid' => $this->uuid])]);
+                try {
+                    $mail = new MailMessage;
+                    $mail->subject('Coolify: S3 Storage Connection Error');
+                    $mail->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $exception->getMessage(), 'url' => route('storage.show', ['storage_uuid' => $this->uuid])]);
 
-                // Load the team with its members and their roles explicitly
-                $team = $this->team()->with(['members' => function ($query) {
-                    $query->withPivot('role');
-                }])->first();
+                    // Load the team with its members and their roles explicitly
+                    $team = $this->team()->with(['members' => function ($query) {
+                        $query->withPivot('role');
+                    }])->first();
 
-                // Get admins directly from the pivot relationship for this specific team
-                $users = $team->members()->wherePivotIn('role', ['admin', 'owner'])->get(['users.id', 'users.email']);
-                foreach ($users as $user) {
-                    send_user_an_email($mail, $user->email);
+                    // Get admins directly from the pivot relationship for this specific team
+                    $users = $team->members()->wherePivotIn('role', ['admin', 'owner'])->get(['users.id', 'users.email']);
+                    foreach ($users as $user) {
+                        send_user_an_email($mail, $user->email);
+                    }
+                    $this->unusable_email_sent = true;
+                } catch (\Throwable $emailException) {
+                    \Log::warning('Failed to send S3 connection error notification: '.$emailException->getMessage());
                 }
-                $this->unusable_email_sent = true;
             }
 
             throw $exception;

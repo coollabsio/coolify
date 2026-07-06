@@ -13,7 +13,6 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Docker extends Component
 {
@@ -41,7 +40,7 @@ class Docker extends Component
 
     public function mount(?string $server_id = null): void
     {
-        $this->network = (string) new Cuid2;
+        $this->network = new_public_id();
         $this->servers = Server::isUsable()->get();
 
         if (filled($server_id)) {
@@ -74,7 +73,7 @@ class Docker extends Component
 
     public function generateName(): void
     {
-        $name = data_get($this->selectedServer, 'name', new Cuid2);
+        $name = data_get($this->selectedServer, 'name', new_public_id());
         $this->name = str("{$name}-{$this->network}")->kebab();
     }
 

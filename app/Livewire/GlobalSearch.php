@@ -251,7 +251,6 @@ class GlobalSearch extends Component
         $cacheKey = self::getCacheKey(auth()->user()->currentTeam()->id);
 
         $this->allSearchableItems = Cache::remember($cacheKey, 300, function () {
-            ray()->showQueries();
             $items = collect();
             $team = auth()->user()->currentTeam();
 
@@ -530,7 +529,6 @@ class GlobalSearch extends Component
                         'search_text' => strtolower($server->name.' '.$server->ip.' '.$server->description.' server servers'),
                     ];
                 });
-            ray($servers);
             // Get all projects
             $projects = Project::ownedByCurrentTeam()
                 ->withCount(['environments', 'applications', 'services'])

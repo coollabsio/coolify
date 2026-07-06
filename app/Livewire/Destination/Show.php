@@ -5,6 +5,7 @@ namespace App\Livewire\Destination;
 use App\Jobs\RestartProxyJob;
 use App\Models\StandaloneDocker;
 use App\Rules\ValidServerIp;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -37,8 +38,12 @@ class Show extends Component
             if (! $destination) {
                 return redirect()->route('destination.index');
             }
+            $this->authorize('view', $destination);
+
             $this->destination = $destination;
             $this->syncData();
+        } catch (AuthorizationException) {
+            abort(403);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

@@ -37,7 +37,6 @@ use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Spatie\Url\Url;
 use Stevebauman\Purify\Facades\Purify;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 /**
  * @property array{
@@ -1041,7 +1040,7 @@ $schema://$host {
     {
         $attributes = [
             'name' => 'coolify',
-            'uuid' => (string) new Cuid2,
+            'uuid' => new_public_id(),
             'network' => 'coolify',
             'server_id' => $this->id,
         ];
@@ -1524,7 +1523,6 @@ $schema://$host {
     public function generateCaCertificate()
     {
         try {
-            ray('Generating CA certificate for server', $this->id);
             SslHelper::generateSslCertificate(
                 commonName: 'Coolify CA Certificate',
                 serverId: $this->id,
@@ -1532,7 +1530,6 @@ $schema://$host {
                 validityDays: 10 * 365
             );
             $caCertificate = $this->sslCertificates()->where('is_ca_certificate', true)->first();
-            ray('CA certificate generated', $caCertificate);
             if ($caCertificate) {
                 $certificateContent = $caCertificate->ssl_certificate;
                 $caCertPath = config('constants.coolify.base_config_path').'/ssl/';

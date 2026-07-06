@@ -1,6 +1,6 @@
 ---
 name: fortify-development
-description: 'ACTIVATE when the user works on authentication in Laravel. This includes login, registration, password reset, email verification, two-factor authentication (2FA/TOTP/QR codes/recovery codes), profile updates, password confirmation, or any auth-related routes and controllers. Activate when the user mentions Fortify, auth, authentication, login, register, signup, forgot password, verify email, 2FA, or references app/Actions/Fortify/, CreateNewUser, UpdateUserProfileInformation, FortifyServiceProvider, config/fortify.php, or auth guards. Fortify is the frontend-agnostic authentication backend for Laravel that registers all auth routes and controllers. Also activate when building SPA or headless authentication, customizing login redirects, overriding response contracts like LoginResponse, or configuring login throttling. Do NOT activate for Laravel Passport (OAuth2 API tokens), Socialite (OAuth social login), or non-auth Laravel features.'
+description: 'ACTIVATE when the user works on authentication in Laravel. This includes login, registration, password reset, email verification, two-factor authentication (2FA/TOTP/QR codes/recovery codes), passkeys, profile updates, password confirmation, or any auth-related routes and controllers. Activate when the user mentions Fortify, auth, authentication, login, register, signup, forgot password, verify email, 2FA, passkeys, WebAuthn, or references app/Actions/Fortify/, CreateNewUser, UpdateUserProfileInformation, FortifyServiceProvider, config/fortify.php, or auth guards. Fortify is the frontend-agnostic authentication backend for Laravel that registers all auth routes and controllers. Also activate when building SPA or headless authentication, customizing login redirects, overriding response contracts like LoginResponse, or configuring login throttling. Do NOT activate for Laravel Passport (OAuth2 API tokens), Socialite (OAuth social login), or non-auth Laravel features.'
 license: MIT
 metadata:
   author: laravel
@@ -32,6 +32,7 @@ Enable in `config/fortify.php` features array:
 - `Features::updateProfileInformation()` - Profile updates
 - `Features::updatePasswords()` - Password changes
 - `Features::twoFactorAuthentication()` - 2FA with QR codes and recovery codes
+- `Features::passkeys()` - Passwordless authentication with WebAuthn passkeys
 
 > Use `search-docs` for feature configuration options and customization patterns.
 
@@ -49,6 +50,18 @@ Enable in `config/fortify.php` features array:
 ```
 
 > Use `search-docs` for TOTP implementation and recovery code handling patterns.
+
+### Passkeys Setup
+
+```
+- [ ] Add PasskeyAuthenticatable trait to User model and implement PasskeyUser
+- [ ] Enable passkeys feature in config/fortify.php
+- [ ] If the passkeys table migration is missing, publish via `php artisan vendor:publish --tag=fortify-migrations` and migrate
+- [ ] Configure passkeys relying_party_id, allowed_origins, user_handle_secret, and timeout if defaults are not suitable
+- [ ] Build UI with @laravel/passkeys for registration, login, confirmation, and deletion
+```
+
+> Use `search-docs` for passkey configuration options. For `@laravel/passkeys` frontend usage, refer to the package's README on npm.
 
 ### Email Verification Setup
 
@@ -129,3 +142,10 @@ Configure via `fortify.limiters.login` in config. Default configuration throttle
 | 2FA Challenge          | POST     | `/two-factor-challenge`                     |
 | Get QR Code            | GET      | `/user/two-factor-qr-code`                  |
 | Recovery Codes         | GET/POST | `/user/two-factor-recovery-codes`           |
+| Passkey Login Options  | GET      | `/passkeys/login/options`                   |
+| Passkey Login          | POST     | `/passkeys/login`                           |
+| Passkey Confirm Options| GET      | `/passkeys/confirm/options`                 |
+| Passkey Confirm        | POST     | `/passkeys/confirm`                         |
+| Passkey Options        | GET      | `/user/passkeys/options`                    |
+| Register Passkey       | POST     | `/user/passkeys`                            |
+| Delete Passkey         | DELETE   | `/user/passkeys/{passkey}`                  |

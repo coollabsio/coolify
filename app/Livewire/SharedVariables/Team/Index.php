@@ -52,9 +52,13 @@ class Index extends Component
 
     public function switch()
     {
-        $this->authorize('view', $this->team);
-        $this->view = $this->view === 'normal' ? 'dev' : 'normal';
-        $this->getDevView();
+        try {
+            $this->authorize('view', $this->team);
+            $this->view = $this->view === 'normal' ? 'dev' : 'normal';
+            $this->getDevView();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function getDevView()
@@ -64,7 +68,12 @@ class Index extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        return $variables->map(function ($item) {
+        $isMember = auth()->user()?->isMember();
+
+        return $variables->map(function ($item) use ($isMember) {
+            if ($isMember) {
+                return "$item->key=(Hidden, only admins can view)";
+            }
             if ($item->is_shown_once) {
                 return "$item->key=(Locked Secret, delete and add again to change)";
             }
