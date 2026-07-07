@@ -12,6 +12,10 @@ class CloudInitScript extends Model
         'script',
     ];
 
+    protected $hidden = [
+        'script',
+    ];
+
     protected function casts(): array
     {
         return [

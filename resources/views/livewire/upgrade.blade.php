@@ -13,7 +13,7 @@
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                     <path d="M19.5 13.572l-7.5 7.428l-7.5 -7.428m0 0a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" />
                 </svg>
-                <span class="text-left menu-item-label" :class="collapsed && 'lg:hidden'">In progress</span>
+                <span class="text-left menu-item-label sidebar-collapsed-label">In progress</span>
             </button>
             <button title="Upgrade" aria-label="Upgrade" class="menu-item cursor-pointer" @click="modalOpen=true" x-show="!showProgress">
                 <svg xmlns="http://www.w3.org/2000/svg" class="text-pink-500 transition-colors menu-item-icon hover:text-pink-300"
@@ -25,7 +25,7 @@
                     <path d="M9 21h6" />
                     <path d="M9 18h6" />
                 </svg>
-                <span class="text-left menu-item-label" :class="collapsed && 'lg:hidden'">Upgrade</span>
+                <span class="text-left menu-item-label sidebar-collapsed-label">Upgrade</span>
             </button>
             <template x-teleport="body">
                 <div x-show="modalOpen"

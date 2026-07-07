@@ -15,7 +15,10 @@
     <div class="flex flex-col gap-1.5">
         <div class="flex flex-wrap items-center gap-2">
             <h1>Server</h1>
-            @if ($server->proxySet() || $server->isSentinelEnabled())
+            @php
+                $showSentinelStatus = $server->isFunctional() && $server->isSentinelEnabled();
+            @endphp
+            @if ($server->proxySet() || $showSentinelStatus)
                 <div data-testid="server-status-summary" class="flex flex-wrap items-center gap-2">
                     @if ($server->proxySet())
                         <div class="flex items-center gap-1">
@@ -38,7 +41,7 @@
                                 type="warning" />
                         </div>
                     @endif
-                    @if ($server->isSentinelEnabled())
+                    @if ($showSentinelStatus)
                         @if ($server->isSentinelLive())
                             <x-status-badge label="Sentinel" status="In sync" type="success" />
                         @else
@@ -78,7 +81,7 @@
                             @endif
                         </a>
             @endif
-            @if ($server->isFunctional() && !$server->isSwarm() && !$server->settings->is_build_server)
+            @if ($server->isFunctional() && !$server->isSwarm() && !$server->settings->is_build_server && auth()->user()?->can('viewSentinel', $server))
                         <a class="{{ request()->routeIs('server.sentinel') || request()->routeIs('server.sentinel.*') ? 'dark:text-white' : '' }} flex items-center gap-1" href="{{ route('server.sentinel', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}" {{ wireNavigate() }}>
@@ -114,6 +117,7 @@
         <div class="order-first sm:order-last">
             <div>
                 @if ($server->proxySet())
+                    @can('manageProxy', $server)
                     @if ($proxyStatus === 'running')
                             <div class="flex gap-2">
                                 <div class="mt-1" wire:loading wire:target="loadProxyConfiguration">
@@ -178,6 +182,7 @@
                             Start Proxy
                         </button>
                     @endif
+                    @endcan
                 @endif
                 @script
                 <script>

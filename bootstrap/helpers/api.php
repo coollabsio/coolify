@@ -6,6 +6,7 @@ use App\Enums\StaticImageTypes;
 use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -87,6 +88,20 @@ function serializeApiResponse($data)
     }
 }
 
+/**
+ * Re-expose a model's `$hidden` sensitive fields when the current API request
+ * carries the `read:sensitive` or `root` token ability (set by the
+ * ApiSensitiveData middleware).
+ */
+function exposeSensitiveFields(Model $model): Model
+{
+    if (request()->attributes->get('can_read_sensitive', false) === true && filled($model->getHidden())) {
+        $model->makeVisible($model->getHidden());
+    }
+
+    return $model;
+}
+
 function sharedDataApplications()
 {
     return [
@@ -97,8 +112,9 @@ function sharedDataApplications()
         'is_spa' => 'boolean',
         'is_auto_deploy_enabled' => 'boolean',
         'is_force_https_enabled' => 'boolean',
+        'is_preview_deployments_enabled' => 'boolean',
         'static_image' => Rule::enum(StaticImageTypes::class),
-        'domains' => 'string|nullable',
+        'domains' => ValidationPatterns::applicationDomainRules(),
         'redirect' => Rule::enum(RedirectTypes::class),
         'git_commit_sha' => ['string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
         'docker_registry_image_name' => ValidationPatterns::dockerImageNameRules(),
@@ -198,10 +214,13 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('is_spa');
     $request->offsetUnset('is_auto_deploy_enabled');
     $request->offsetUnset('is_force_https_enabled');
+    $request->offsetUnset('is_preview_deployments_enabled');
     $request->offsetUnset('connect_to_docker_network');
     $request->offsetUnset('force_domain_override');
     $request->offsetUnset('autogenerate_domain');
     $request->offsetUnset('is_container_label_escape_enabled');
     $request->offsetUnset('is_preserve_repository_enabled');
+    $request->offsetUnset('include_source_commit_in_build');
     $request->offsetUnset('docker_compose_raw');
+    $request->offsetUnset('tags');
 }

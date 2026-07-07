@@ -23,9 +23,14 @@ class ServersController extends Controller
 {
     private function removeSensitiveDataFromSettings($settings)
     {
-        if (request()->attributes->get('can_read_sensitive', false) === false) {
-            $settings = $settings->makeHidden([
+        if (request()->attributes->get('can_read_sensitive', false) === true) {
+            $settings = $settings->makeVisible([
                 'sentinel_token',
+                'sentinel_custom_url',
+                'logdrain_newrelic_license_key',
+                'logdrain_axiom_api_key',
+                'logdrain_custom_config',
+                'logdrain_custom_config_parser',
             ]);
         }
 
@@ -37,8 +42,11 @@ class ServersController extends Controller
         $server->makeHidden([
             'id',
         ]);
-        if (request()->attributes->get('can_read_sensitive', false) === false) {
-            // Do nothing
+        if (request()->attributes->get('can_read_sensitive', false) === true) {
+            $server->makeVisible([
+                'logdrain_axiom_api_key',
+                'logdrain_newrelic_license_key',
+            ]);
         }
 
         return serializeApiResponse($server);
@@ -148,6 +156,7 @@ class ServersController extends Controller
         if (is_null($server)) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
+        $this->authorize('view', $server);
         if ($with_resources) {
             $server['resources'] = $server->definedResources()->map(function ($resource) {
                 $payload = [
@@ -477,6 +486,7 @@ class ServersController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
+        $this->authorize('create', [ModelsServer::class]);
 
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {
@@ -701,6 +711,7 @@ class ServersController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
+        $this->authorize('update', $server);
         if ($request->proxy_type) {
             $validProxyTypes = collect(ProxyTypes::cases())->map(function ($proxyType) {
                 return str($proxyType->value)->lower();
@@ -825,6 +836,7 @@ class ServersController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
+        $this->authorize('delete', $server);
 
         $force = filter_var($request->query('force', false), FILTER_VALIDATE_BOOLEAN);
 
@@ -924,6 +936,7 @@ class ServersController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
+        $this->authorize('update', $server);
         ValidateServer::dispatch($server);
 
         auditLog('api.server.validated', [

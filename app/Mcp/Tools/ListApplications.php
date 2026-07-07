@@ -8,31 +8,31 @@ use App\Models\Application;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
-use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
 
-#[Name('list_applications')]
-#[Description('List applications owned by the authenticated team. Returns summary (uuid, name, status, fqdn, git_repository). Optional "tag" argument filters by tag name. Use get_application for full details.')]
 class ListApplications extends Tool
 {
+    protected string $name = 'list_applications';
+
+    protected string $description = 'List applications owned by the authenticated team. Returns summary (uuid, name, status, fqdn, git_repository). Optional "tag" argument filters by tag name. Use get_application for full details.';
+
     use BuildsResponse;
     use ResolvesTeam;
 
     public function handle(Request $request): Response
     {
-        if ($error = $this->ensureAbility($request, 'read')) {
+        if ($error = $this->ensureAbility($request, 'read', $this->name)) {
             return $error;
         }
 
         $teamId = $this->resolveTeamId($request);
         if (is_null($teamId)) {
-            return Response::error('Invalid token.');
+            return $this->mcpError($request, 'Invalid token.');
         }
 
         $tagName = $request->get('tag');
         if ($tagName !== null && (! is_string($tagName) || trim($tagName) === '')) {
-            return Response::error('tag argument must be a non-empty string.');
+            return $this->mcpError($request, 'tag argument must be a non-empty string.');
         }
         $args = $this->paginationArgs($request);
 
@@ -59,11 +59,11 @@ class ListApplications extends Tool
 
         $extra = $tagName ? ['tag' => $tagName] : [];
 
-        return $this->respond(
+        return $this->mcpSuccess($request, $this->respond(
             $summaries,
             [],
             $this->paginationMeta('list_applications', $args, $total, $extra),
-        );
+        ));
     }
 
     public function schema(JsonSchema $schema): array

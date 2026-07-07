@@ -73,14 +73,60 @@
     <x-slide-over @startdatabase.window="slideOverOpen = true" closeWithX fullScreen>
         <x-slot:title>Database Startup</x-slot:title>
         <x-slot:content>
-            <div wire:ignore>
+            <div wire:ignore class="h-full min-h-0 min-w-0 max-w-full">
                 <livewire:activity-monitor header="Logs" fullHeight />
             </div>
         </x-slot:content>
     </x-slide-over>
     <div class="navbar-main">
         <div class="w-full md:hidden">
-            <label for="database-mobile-section" class="sr-only">Database menu</label>
+            @if ($database->destination->server->isFunctional())
+                <div id="database-mobile-actions" class="mt-2 mb-3 md:hidden">
+                    <div class="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Actions</div>
+                    <div class="flex flex-nowrap items-center gap-2 overflow-x-auto">
+                    @if (!str($database->status)->startsWith('exited'))
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('database-restart-trigger')?.click()">
+                            <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
+                                xmlns="http://www.w3.org/2000/svg">
+                                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2">
+                                    <path d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
+                                    <path d="M20 4v5h-5" />
+                                </g>
+                            </svg>
+                            Restart
+                        </button>
+                        <x-forms.button isError class="shrink-0"
+                            @click="document.getElementById('database-stop-trigger')?.click()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
+                                stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                </path>
+                                <path
+                                    d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                </path>
+                            </svg>
+                            Stop
+                        </x-forms.button>
+                    @else
+                        <button type="button" class="button shrink-0"
+                            @click="document.getElementById('database-start-trigger')?.click()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
+                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M7 4v16l13 -8z" />
+                            </svg>
+                            Start
+                        </button>
+                    @endif
+                    </div>
+                </div>
+            @endif
+            <label id="database-mobile-section-label" for="database-mobile-section" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Section</label>
             <select id="database-mobile-section" class="select w-full" aria-label="Database menu"
                 data-current-value="{{ $activeDatabaseMobileValue }}"
                 x-data="{
@@ -135,16 +181,6 @@
                         </option>
                     @endforeach
                 </optgroup>
-                @if ($database->destination->server->isFunctional())
-                    <optgroup label="Actions">
-                        @if (!str($database->status)->startsWith('exited'))
-                            <option value="action:restart">Restart</option>
-                            <option value="action:stop">Stop</option>
-                        @else
-                            <option value="action:start">Start</option>
-                        @endif
-                    </optgroup>
-                @endif
             </select>
         </div>
         <nav
@@ -180,7 +216,8 @@
             <div class="flex flex-wrap gap-2 items-center">
                 <div class="hidden flex-wrap items-center gap-2 md:flex">
                     @if (!str($database->status)->startsWith('exited'))
-                        <x-forms.button title="Restart" @click="document.getElementById('database-restart-trigger')?.click()">
+
+                        <x-forms.button canGate="manage" :canResource="$database" title="Restart" @click="document.getElementById('database-restart-trigger')?.click()">
                             <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                 xmlns="http://www.w3.org/2000/svg">
                                 <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -191,7 +228,7 @@
                             </svg>
                             Restart
                         </x-forms.button>
-                        <x-forms.button isError title="Stop" @click="document.getElementById('database-stop-trigger')?.click()">
+                        <x-forms.button canGate="manage" :canResource="$database" isError title="Stop" @click="document.getElementById('database-stop-trigger')?.click()">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                                 stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -205,7 +242,8 @@
                             Stop
                         </x-forms.button>
                     @else
-                        <button @click="document.getElementById('database-start-trigger')?.click()" class="gap-2 button">
+                        <x-forms.button canGate="manage" :canResource="$database" @click="document.getElementById('database-start-trigger')?.click()" class="gap-2">
+
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -213,7 +251,7 @@
                                 <path d="M7 4v16l13 -8z" />
                             </svg>
                             Start
-                        </button>
+                        </x-forms.button>
                     @endif
                 </div>
                 @script

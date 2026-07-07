@@ -8,26 +8,26 @@ use App\Models\Server;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
-use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
 
-#[Name('list_servers')]
-#[Description('List servers visible to the authenticated team token. Returns summary (uuid, name, ip, reachability). Use get_server for full details.')]
 class ListServers extends Tool
 {
+    protected string $name = 'list_servers';
+
+    protected string $description = 'List servers visible to the authenticated team token. Returns summary (uuid, name, ip, reachability). Use get_server for full details.';
+
     use BuildsResponse;
     use ResolvesTeam;
 
     public function handle(Request $request): Response
     {
-        if ($error = $this->ensureAbility($request, 'read')) {
+        if ($error = $this->ensureAbility($request, 'read', $this->name)) {
             return $error;
         }
 
         $teamId = $this->resolveTeamId($request);
         if (is_null($teamId)) {
-            return Response::error('Invalid token.');
+            return $this->mcpError($request, 'Invalid token.');
         }
 
         $args = $this->paginationArgs($request);
@@ -50,11 +50,11 @@ class ListServers extends Tool
             ->values()
             ->all();
 
-        return $this->respond(
+        return $this->mcpSuccess($request, $this->respond(
             $summaries,
             [],
             $this->paginationMeta('list_servers', $args, $total),
-        );
+        ));
     }
 
     public function schema(JsonSchema $schema): array

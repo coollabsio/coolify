@@ -2,18 +2,16 @@
 
 use App\Livewire\SettingsDropdown;
 
-it('keeps changelog and the theme switcher in the sidebar without the old preferences trigger', function () {
+it('keeps changelog in the sidebar without a dedicated theme switcher', function () {
     $navbarView = file_get_contents(resource_path('views/components/navbar.blade.php'));
 
     expect($navbarView)
         ->toContain('<livewire:settings-dropdown trigger="changelog-sidebar" />')
         ->not->toContain('<livewire:settings-dropdown />')
-        ->toContain('aria-label="Theme switcher"')
-        ->toContain('aria-label="Use light theme"')
-        ->toContain('aria-label="Use system theme"')
-        ->toContain('aria-label="Use dark theme"')
-        ->toContain('cycleTheme()')
-        ->toContain("const themes = ['light', 'system', 'dark'];")
+        ->not->toContain('<span class="text-left menu-item-label">Theme</span>')
+        ->not->toContain('Click to change theme.')
+        ->not->toContain('cycleTheme()')
+        ->toContain('this.queryTheme();')
         ->toContain('pl-2 pr-3 items-start gap-3')
         ->toContain('class="flex min-w-0 flex-1 flex-col"')
         ->toContain('class="min-w-0 flex-1"')
@@ -30,6 +28,7 @@ it('keeps changelog and appearance options out of the preferences dropdown', fun
         ->toContain('wire:click="openWhatsNewModal"')
         ->toContain('class="relative text-left menu-item"')
         ->toContain('class="text-left menu-item-label"')
+        ->toContain('class="absolute right-2 top-1/2 -translate-y-1/2 bg-error')
         ->toContain("What's New</span>")
         ->toContain('M9.813 15.904 9 18.75')
         ->not->toContain('<span>Changelog</span>')

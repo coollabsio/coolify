@@ -4,6 +4,10 @@
             <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
                 File on server exceeds 5 MB and cannot be edited from the UI. Edit it directly on the server.
             </div>
+        @elseif ($fileStorage->is_host_file)
+            <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
+                This host file mount is bind-only. Coolify will not create, edit, load, chmod, or delete the source file.
+            </div>
         @elseif ($isReadOnly)
             <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
                 @if ($fileStorage->is_directory)
@@ -32,7 +36,14 @@
             @if (!$isReadOnly)
                 @can('update', $resource)
                     <div class="flex gap-2">
-                        @if ($fileStorage->is_directory)
+                        @if ($fileStorage->is_host_file)
+                            <x-modal-confirmation :ignoreWire="false" title="Confirm Host File Mount Removal?"
+                                buttonTitle="Delete" isErrorButton submitAction="delete" :checkboxes="$hostFileDeletionCheckboxes"
+                                :actions="['Only the mount configuration will be removed. The host file will not be deleted.']"
+                                confirmationText="{{ $fs_path }}"
+                                confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
+                                shortConfirmationLabel="Filepath" />
+                        @elseif ($fileStorage->is_directory)
                             <x-modal-confirmation :ignoreWire="false" title="Confirm Directory Conversion to File?"
                                 buttonTitle="Convert to file" submitAction="convertToFile" :actions="[
                                     'All files in this directory will be permanently deleted and an empty file will be created in its place.',
@@ -68,7 +79,7 @@
                         @endif
                     </div>
                 @endcan
-                @if (!$fileStorage->is_directory)
+                @if (!$fileStorage->is_directory && !$fileStorage->is_host_file)
                     @can('update', $resource)
                         @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
                             <div class="w-full sm:w-96">
@@ -99,8 +110,8 @@
                 @endif
             @else
                 {{-- Read-only view --}}
-                @if (!$fileStorage->is_directory)
-                    @can('view', $resource)
+                @if (!$fileStorage->is_directory && !$fileStorage->is_host_file)
+                    @can('update', $resource)
                         <div class="flex gap-2">
                             <x-forms.button type="button" wire:click="loadStorageOnServer">Load from
                                 server</x-forms.button>

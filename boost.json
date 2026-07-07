@@ -5,23 +5,25 @@
         "codex",
         "opencode"
     ],
+    "cloud": false,
     "guidelines": true,
     "mcp": true,
     "nightwatch_mcp": false,
     "packages": [
-        "laravel/fortify",
         "spatie/laravel-ray",
         "lorisleiva/laravel-actions"
     ],
     "sail": false,
     "skills": [
+        "fortify-development",
         "laravel-best-practices",
         "configuring-horizon",
+        "mcp-development",
+        "configure-nightwatch",
         "socialite-development",
         "livewire-development",
         "pest-testing",
         "tailwindcss-development",
-        "fortify-development",
         "laravel-actions",
         "debugging-output-and-previewing-html-using-ray"
     ]

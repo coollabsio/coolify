@@ -118,6 +118,9 @@ paths:
                 is_force_https_enabled:
                   type: boolean
                   description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
+                is_preview_deployments_enabled:
+                  type: boolean
+                  description: 'Enable preview deployments for pull requests.'
                 static_image:
                   type: string
                   enum: ['nginx:alpine']
@@ -290,6 +293,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the application.'
                 is_preserve_repository_enabled:
                   type: boolean
                   default: false
@@ -405,6 +412,9 @@ paths:
                 is_force_https_enabled:
                   type: boolean
                   description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
+                is_preview_deployments_enabled:
+                  type: boolean
+                  description: 'Enable preview deployments for pull requests.'
                 static_image:
                   type: string
                   enum: ['nginx:alpine']
@@ -577,6 +587,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the application.'
                 is_preserve_repository_enabled:
                   type: boolean
                   default: false
@@ -692,6 +706,9 @@ paths:
                 is_force_https_enabled:
                   type: boolean
                   description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
+                is_preview_deployments_enabled:
+                  type: boolean
+                  description: 'Enable preview deployments for pull requests.'
                 static_image:
                   type: string
                   enum: ['nginx:alpine']
@@ -864,6 +881,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the application.'
                 is_preserve_repository_enabled:
                   type: boolean
                   default: false
@@ -1063,6 +1084,9 @@ paths:
                 is_force_https_enabled:
                   type: boolean
                   description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
+                is_preview_deployments_enabled:
+                  type: boolean
+                  description: 'Enable preview deployments for pull requests.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -1092,6 +1116,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the application.'
               type: object
       responses:
         '201':
@@ -1277,6 +1305,9 @@ paths:
                 is_force_https_enabled:
                   type: boolean
                   description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
+                is_preview_deployments_enabled:
+                  type: boolean
+                  description: 'Enable preview deployments for pull requests.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -1306,6 +1337,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the application.'
               type: object
       responses:
         '201':
@@ -1507,6 +1542,9 @@ paths:
                 is_force_https_enabled:
                   type: boolean
                   description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
+                is_preview_deployments_enabled:
+                  type: boolean
+                  description: 'Enable preview deployments for pull requests.'
                 install_command:
                   type: string
                   description: 'The install command.'
@@ -1663,6 +1701,9 @@ paths:
                 is_preserve_repository_enabled:
                   type: boolean
                   description: 'Preserve git repository during application update. If false, the existing repository will be removed and replaced with the new one. If true, the existing repository will be kept and the new one will be ignored. Default is false.'
+                include_source_commit_in_build:
+                  type: boolean
+                  description: 'Include source commit information in the build. Default is false.'
               type: object
       responses:
         '200':
@@ -1716,6 +1757,14 @@ paths:
             type: integer
             format: int32
             default: 100
+        -
+          name: show_timestamps
+          in: query
+          description: 'Show timestamps in the logs.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'Get application logs by UUID.'
@@ -2344,6 +2393,121 @@ paths:
           $ref: '#/components/responses/404'
         '422':
           $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/tags':
+    get:
+      tags:
+        - Applications
+      summary: 'List Tags'
+      description: 'List tags for an application by UUID.'
+      operationId: list-tags-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of tags.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Applications
+      summary: 'Create Tag'
+      description: 'Add tag(s) to an application by UUID.'
+      operationId: create-tag-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                tag_name:
+                  type: string
+                  description: 'The tag name (min 2 characters). Required if tag_names is not provided.'
+                tag_names:
+                  type: array
+                  items: { type: string }
+                  description: 'Array of tag names (each min 2 characters). Required if tag_name is not provided.'
+              type: object
+      responses:
+        '201':
+          description: 'Tags added successfully.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/tags/{tag_uuid}':
+    delete:
+      tags:
+        - Applications
+      summary: 'Delete Tag'
+      description: 'Remove a tag from an application by UUID.'
+      operationId: delete-tag-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: tag_uuid
+          in: path
+          description: 'UUID of the tag.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Tag removed.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -3215,6 +3379,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
               type: object
       responses:
         '200':
@@ -3310,6 +3478,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
               type: object
       responses:
         '200':
@@ -3402,6 +3574,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
               type: object
       responses:
         '200':
@@ -3497,6 +3673,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
               type: object
       responses:
         '200':
@@ -3592,6 +3772,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
               type: object
       responses:
         '200':
@@ -3696,6 +3880,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
               type: object
       responses:
         '200':
@@ -3800,6 +3988,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
               type: object
       responses:
         '200':
@@ -3895,6 +4087,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
               type: object
       responses:
         '200':
@@ -3905,6 +4101,57 @@ paths:
           $ref: '#/components/responses/400'
         '422':
           $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/logs':
+    get:
+      tags:
+        - Databases
+      summary: 'Get database logs.'
+      description: 'Get database logs by UUID.'
+      operationId: get-database-logs-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: lines
+          in: query
+          description: 'Number of lines to show from the end of the logs.'
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 100
+        -
+          name: show_timestamps
+          in: query
+          description: 'Show timestamps in the logs.'
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: 'Get database logs by UUID.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  logs: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -4556,6 +4803,121 @@ paths:
       security:
         -
           bearerAuth: []
+  '/databases/{uuid}/tags':
+    get:
+      tags:
+        - Databases
+      summary: 'List Tags'
+      description: 'List tags for a database by UUID.'
+      operationId: list-tags-by-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of tags.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Databases
+      summary: 'Create Tag'
+      description: 'Add tag(s) to a database by UUID.'
+      operationId: create-tag-by-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                tag_name:
+                  type: string
+                  description: 'The tag name (min 2 characters). Required if tag_names is not provided.'
+                tag_names:
+                  type: array
+                  items: { type: string }
+                  description: 'Array of tag names (each min 2 characters). Required if tag_name is not provided.'
+              type: object
+      responses:
+        '201':
+          description: 'Tags added successfully.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/tags/{tag_uuid}':
+    delete:
+      tags:
+        - Databases
+      summary: 'Delete Tag'
+      description: 'Remove a tag from a database by UUID.'
+      operationId: delete-tag-by-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+        -
+          name: tag_uuid
+          in: path
+          description: 'UUID of the tag.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Tag removed.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   /deployments:
     get:
       tags:
@@ -4806,7 +5168,6 @@ paths:
             schema:
               required:
                 - name
-                - api_url
                 - html_url
                 - app_id
                 - installation_id
@@ -6929,6 +7290,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the service.'
               type: object
       responses:
         '201':
@@ -7147,6 +7512,65 @@ paths:
                 type: object
         '422':
           $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/logs':
+    get:
+      tags:
+        - Services
+      summary: 'Get service logs.'
+      description: 'Get logs for a specific service sub-resource by service UUID. The `sub_service_name` query parameter must match the `name` field of one of the service applications or databases returned by `GET /services/{uuid}`.'
+      operationId: get-service-logs-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: sub_service_name
+          in: query
+          description: 'Sub-service name from `GET /services/{uuid}` under `applications[].name` or `databases[].name`. Do not use `human_name` or the Docker container name with the service UUID suffix.'
+          required: true
+          schema:
+            type: string
+            example: appwrite-console
+        -
+          name: lines
+          in: query
+          description: 'Number of lines to show from the end of the logs.'
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 100
+        -
+          name: show_timestamps
+          in: query
+          description: 'Show timestamps in the logs.'
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: 'Get service logs by UUID.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  logs: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -7719,6 +8143,144 @@ paths:
           $ref: '#/components/responses/404'
         '422':
           $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/tags':
+    get:
+      tags:
+        - Services
+      summary: 'List Tags'
+      description: 'List tags for a service by UUID.'
+      operationId: list-tags-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of tags.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Services
+      summary: 'Create Tag'
+      description: 'Add tag(s) to a service by UUID.'
+      operationId: create-tag-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                tag_name:
+                  type: string
+                  description: 'The tag name (min 2 characters). Required if tag_names is not provided.'
+                tag_names:
+                  type: array
+                  items: { type: string }
+                  description: 'Array of tag names (each min 2 characters). Required if tag_name is not provided.'
+              type: object
+      responses:
+        '201':
+          description: 'Tags added successfully.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/tags/{tag_uuid}':
+    delete:
+      tags:
+        - Services
+      summary: 'Delete Tag'
+      description: 'Remove a tag from a service by UUID.'
+      operationId: delete-tag-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+        -
+          name: tag_uuid
+          in: path
+          description: 'UUID of the tag.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Tag removed.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /tags:
+    get:
+      tags:
+        - Tags
+      summary: List
+      description: 'List all tags for the current team.'
+      operationId: list-tags
+      responses:
+        '200':
+          description: 'All tags for the current team.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
       security:
         -
           bearerAuth: []
@@ -8602,6 +9164,18 @@ components:
           type: string
           description: 'The date and time when the service was deleted.'
       type: object
+    Tag:
+      description: 'Tag model'
+      properties:
+        uuid:
+          type: string
+        name:
+          type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+      type: object
     Team:
       description: 'Team model'
       properties:
@@ -8773,6 +9347,9 @@ tags:
   -
     name: Services
     description: Services
+  -
+    name: Tags
+    description: Tags
   -
     name: Teams
     description: Teams
