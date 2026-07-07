@@ -27,14 +27,23 @@
                 <div x-init="$wire.initLoadDynamicConfigurations" class="flex flex-col gap-4">
                     @if ($contents?->isNotEmpty())
                         @foreach ($contents as $fileName => $value)
+                            @php
+                                $realName = str_replace('|', '.', $fileName);
+                                $isManagedGateway =
+                                    str_starts_with($realName, 'gateway-') &&
+                                    str_ends_with($realName, '.yaml') &&
+                                    str_contains((string) $value, \App\Livewire\Server\Proxy\Gateway::MANAGED_FILE_MARKER);
+                            @endphp
                             <div class="flex flex-col gap-2 py-2">
-                                @if (str_replace('|', '.', $fileName) === 'coolify.yaml' ||
-                                        str_replace('|', '.', $fileName) === 'Caddyfile' ||
-                                        str_replace('|', '.', $fileName) === 'coolify.caddy' ||
-                                        str_replace('|', '.', $fileName) === 'default_redirect_503.yaml' ||
-                                        str_replace('|', '.', $fileName) === 'default_redirect_503.caddy')
+                                @if (
+                                    $realName === 'coolify.yaml' ||
+                                        $realName === 'Caddyfile' ||
+                                        $realName === 'coolify.caddy' ||
+                                        $realName === 'default_redirect_503.yaml' ||
+                                        $realName === 'default_redirect_503.caddy' ||
+                                        $isManagedGateway)
                                     <div>
-                                        <h3 class="dark:text-white">File: {{ str_replace('|', '.', $fileName) }}</h3>
+                                        <h3 class="dark:text-white">File: {{ $realName }}</h3>
                                     </div>
                                     <x-forms.textarea disabled name="proxy_settings"
                                         wire:model="contents.{{ $fileName }}" rows="5" />
