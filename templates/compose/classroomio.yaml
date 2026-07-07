@@ -1,25 +1,15 @@
 # documentation: https://classroomio.com/docs/self-hosted/coolify
-# slogan: Open-source LMS to build and teach courses — lessons, quizzes, certificates, student management, and an AI tutor, fully self-hosted.
-# category: LMS
-# tags: lms,education,courses,teaching,e-learning
+# slogan: Open-source LMS to build and teach courses with lessons, quizzes, certificates, student management, and an AI tutor.
+# category: lms
+# tags: lms, education, courses, teaching, e-learning
 # logo: svgs/classroomio.svg
 # port: 3082
-#
-# SETUP: after deploying, assign a domain to the `dashboard` and `minio` services.
-#   • With your own domain (recommended): set https://app.yourdomain.com and
-#     https://storage.yourdomain.com, Force HTTPS on. Coolify issues the certs.
-#   • Quick test on the generated *.sslip.io domain: keep it on https:// and add
-#     the container port (:3082 / :9000), then accept the browser's cert warning.
-#     On plain http:// the dashboard styles/scripts won't load.
-# Full guide: https://classroomio.com/docs/self-hosted/coolify
 
 services:
   postgres:
     image: postgres:16-alpine
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-classroomio}
-      # $SERVICE_USER_* / $SERVICE_PASSWORD_* are generated once by Coolify and
-      # reused everywhere the same name appears.
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
     volumes:
@@ -49,35 +39,32 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      # Declaration (carries the port) → exposes this service; assign it a domain
-      # like https://storage.yourdomain.com in Coolify.
       - SERVICE_FQDN_MINIO_9000
       - MINIO_ROOT_USER=$SERVICE_USER_MINIO
       - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
-      # Reference (no port) → full public URL with scheme.
       - MINIO_SERVER_URL=$SERVICE_URL_MINIO
     volumes:
       - minio-data:/data
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s
-      timeout: 5s
+      timeout: 20s
       retries: 10
 
   minio-init:
     image: minio/mc:latest
     depends_on:
-      - minio
-    exclude_from_hc: true # one-shot bucket seeder; don't gate stack health on it
+      minio:
+        condition: service_healthy
+    exclude_from_hc: true
     entrypoint: >
       /bin/sh -c "
-      sleep 5;
+      set -e;
       mc alias set local http://minio:9000 $SERVICE_USER_MINIO $SERVICE_PASSWORD_MINIO;
       mc mb local/videos --ignore-existing;
       mc mb local/documents --ignore-existing;
       mc mb local/media --ignore-existing;
       mc anonymous set download local/media;
-      exit 0;
       "
 
   api:
@@ -93,21 +80,16 @@ services:
       - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-classroomio}
       - REDIS_URL=redis://redis:6379
       - PUBLIC_IS_SELFHOSTED=true
-      # $SERVICE_HEX_64_* → random 64-char hex (= openssl rand -hex 32). The same
-      # PRIVATESERVER name is reused in the dashboard, so the keys match automatically.
       - BETTER_AUTH_SECRET=$SERVICE_HEX_64_BETTERAUTH
       - PRIVATE_SERVER_KEY=$SERVICE_HEX_64_PRIVATESERVER
-      # Reference the dashboard's public URL WITHOUT the port suffix.
       - DASHBOARD_ORIGIN=$SERVICE_URL_DASHBOARD
       - PUBLIC_SERVER_URL=$SERVICE_URL_DASHBOARD
-      # Object storage: internal endpoint for server uploads, public URL for browsers.
       - OBJECT_STORAGE_ENDPOINT=http://minio:9000
       - OBJECT_STORAGE_PUBLIC_ENDPOINT=$SERVICE_URL_MINIO
       - OBJECT_STORAGE_ACCESS_KEY_ID=$SERVICE_USER_MINIO
       - OBJECT_STORAGE_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_MINIO
       - OBJECT_STORAGE_FORCE_PATH_STYLE=true
       - OBJECT_STORAGE_MEDIA_PUBLIC_BASE_URL=$SERVICE_URL_MINIO/media
-      # Email — fill these in after deploy (signup verification, reset, invites).
       - SMTP_HOST=${SMTP_HOST}
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
@@ -132,20 +114,14 @@ services:
       api:
         condition: service_healthy
     environment:
-      # Declaration (carries the port) → exposes this service; assign it your main
-      # domain (https://app.yourdomain.com) in Coolify.
       - SERVICE_FQDN_DASHBOARD_3082
       - NODE_ENV=production
       - PORT=3082
-      # Reference (no port) → this app's own public origin.
       - ORIGIN=$SERVICE_URL_DASHBOARD
       - PUBLIC_IS_SELFHOSTED=true
       - PRIVATE_SERVER_URL=http://api:3081
-      - PRIVATE_SERVER_KEY=$SERVICE_HEX_64_PRIVATESERVER # same generated value as the api
-      # Allow the browser to load media from the storage domain (CSP).
+      - PRIVATE_SERVER_KEY=$SERVICE_HEX_64_PRIVATESERVER
       - CSP_MEDIA_SRC_DOMAINS=$SERVICE_URL_MINIO
-      # Optional: uncomment if any web fonts fail to load.
-      # - ALLOWED_EXTERNAL_DOMAINS=https://fonts.googleapis.com,https://fonts.gstatic.com
 
   jobs:
     image: classroomio/jobs:${CIO_VERSION:-latest}
