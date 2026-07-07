@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ProxyTypes;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
@@ -35,7 +36,7 @@ function makeServerProxyRunning(Server $server): void
         'is_usable' => true,
     ]);
     $server->proxy->status = 'running';
-    $server->proxy->type = \App\Enums\ProxyTypes::TRAEFIK->value;
+    $server->proxy->type = ProxyTypes::TRAEFIK->value;
     $server->save();
     $server->refresh();
 }
@@ -75,7 +76,7 @@ test('member cannot see start proxy button', function () {
     [$user, $team, $server] = setupProxyUser('member');
 
     $server->proxy->status = 'exited';
-    $server->proxy->type = \App\Enums\ProxyTypes::TRAEFIK->value;
+    $server->proxy->type = ProxyTypes::TRAEFIK->value;
     $server->save();
     $server->refresh();
 

@@ -537,6 +537,20 @@ class Show extends Component
             ->get();
     }
 
+    #[Computed]
+    public function limaStartCommand(): ?string
+    {
+        if (! isDev()) {
+            return null;
+        }
+
+        return match ($this->server->uuid) {
+            'lima-ubuntu-2404' => 'limactl start --yes --name=coolify-lima-ubuntu-2404 docker/lima/ubuntu-2404.yaml',
+            'lima-ubuntu-2604' => 'limactl start --yes --name=coolify-lima-ubuntu-2604 docker/lima/ubuntu-2604.yaml',
+            default => null,
+        };
+    }
+
     public function searchHetznerServer(): void
     {
         $this->hetznerSearchError = null;

@@ -69,6 +69,6 @@ class ServiceDatabasePolicy
      */
     public function uploadBackup(User $user, ServiceDatabase $serviceDatabase): bool
     {
-        return Gate::allows('uploadBackup', $serviceDatabase->service);
+        return $user->can('uploadBackup', $serviceDatabase->service);
     }
 }

@@ -13,12 +13,19 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Once;
 use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    $this->withoutVite();
+
+    Once::flush();
+
+    config(['app.maintenance.driver' => 'file']);
+
+    InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
 
     $this->team = Team::factory()->create();
 
@@ -159,7 +166,8 @@ test('member gets 403 from POST /upload/backup and no file lands on disk', funct
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
 
-    $response = $this->post(route('upload.backup', ['databaseUuid' => $this->database->uuid]));
+    $response = $this->withHeader('Accept', 'application/json')
+        ->post(route('upload.backup', ['databaseUuid' => $this->database->uuid]));
 
     $response->assertForbidden();
 

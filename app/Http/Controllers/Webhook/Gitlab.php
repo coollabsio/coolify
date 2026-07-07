@@ -190,7 +190,7 @@ class Gitlab extends Controller
                                     'mode' => 'manual',
                                     'application_uuid' => $application->uuid,
                                     'application_name' => $application->name,
-                                    'deployment_uuid' => $deployment_uuid->toString(),
+                                    'deployment_uuid' => $deployment_uuid,
                                     'commit' => data_get($payload, 'after'),
                                     'repository' => $full_name ?? null,
                                 ]);

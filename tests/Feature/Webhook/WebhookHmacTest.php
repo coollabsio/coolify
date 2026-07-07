@@ -2,6 +2,7 @@
 
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\GithubApp;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
@@ -97,6 +98,38 @@ describe('GitHub Manual Webhook HMAC', function () {
         $content = $response->getContent();
         expect($content)->not->toContain('Invalid signature');
         expect($content)->not->toContain('Webhook secret not configured');
+    });
+});
+
+describe('GitHub App Webhook HMAC', function () {
+    test('rejects push when app webhook secret is empty', function () {
+        $team = Team::factory()->create();
+        GithubApp::create([
+            'uuid' => (string) str()->uuid(),
+            'name' => 'github-app-webhook-test',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'app_id' => 1234567890,
+            'webhook_secret' => null,
+            'team_id' => $team->id,
+        ]);
+
+        $payload = json_encode([
+            'ref' => 'refs/heads/main',
+            'repository' => ['id' => 987654321],
+            'after' => 'abc123',
+            'commits' => [],
+        ]);
+
+        $response = $this->call('POST', '/webhooks/source/github/events', [], [], [], [
+            'HTTP_X-GitHub-Event' => 'push',
+            'HTTP_X-GitHub-Hook-Installation-Target-Id' => '1234567890',
+            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, ''),
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        expect($response->getContent())->toContain('Invalid signature');
     });
 });
 
