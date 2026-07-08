@@ -414,6 +414,28 @@ function getGithubCommitRangeFiles(?GithubApp $source, string $owner, string $re
     }
 }
 
+function getGithubCommitMessage(?GithubApp $source, string $owner, string $repo, string $commitSha): ?string
+{
+    try {
+        if (! $source) {
+            return null;
+        }
+
+        if (blank($owner) || blank($repo) || blank($commitSha) || $commitSha === 'HEAD') {
+            return null;
+        }
+
+        $endpoint = "/repos/{$owner}/{$repo}/commits/{$commitSha}";
+        $response = githubApi($source, $endpoint, 'get', null, false);
+
+        $message = data_get($response, 'data.commit.message');
+
+        return is_string($message) ? $message : null;
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
 function getGithubPullRequestFiles(?GithubApp $source, string $owner, string $repo, int $pullRequestId): array
 {
     try {
