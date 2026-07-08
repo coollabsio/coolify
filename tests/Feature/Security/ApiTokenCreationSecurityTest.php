@@ -5,12 +5,15 @@ use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Once;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0], ['is_api_enabled' => true]);
+    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
+    Once::flush();
 
     $this->team = Team::factory()->create();
 
@@ -61,6 +64,19 @@ describe('Livewire ApiTokens — member cannot create elevated tokens', function
         expect($this->member->tokens()->count())->toBe(0);
     });
 
+    test('member cannot create token with terminal permissions', function () {
+        $this->actingAs($this->member);
+        session(['currentTeam' => $this->team]);
+
+        Livewire::test(ApiTokens::class)
+            ->set('description', 'my-terminal-token')
+            ->set('permissions', ['terminal'])
+            ->call('addNewToken')
+            ->assertDispatched('error');
+
+        expect($this->member->tokens()->count())->toBe(0);
+    });
+
     test('member cannot create token with read:sensitive permissions', function () {
         $this->actingAs($this->member);
         session(['currentTeam' => $this->team]);
@@ -80,14 +96,8 @@ describe('Livewire ApiTokens — member cannot create elevated tokens', function
 
         // Simulate snapshot replay: force the boolean to true
         Livewire::test(ApiTokens::class)
-            ->set('canUseRootPermissions', true)
-            ->set('description', 'sneaky-root-token')
-            ->set('permissions', ['root'])
-            ->call('addNewToken')
-            ->assertDispatched('error');
-
-        expect($this->member->tokens()->count())->toBe(0);
-    });
+            ->set('canUseRootPermissions', true);
+    })->throws(CannotUpdateLockedPropertyException::class);
 
     test('member can create token with read permissions', function () {
         $this->actingAs($this->member);
@@ -115,6 +125,20 @@ describe('Livewire ApiTokens — member cannot create elevated tokens', function
 
         expect($this->owner->tokens()->count())->toBe(1);
         expect($this->owner->tokens()->first()->abilities)->toBe(['root']);
+    });
+
+    test('owner can create token with terminal permissions', function () {
+        $this->actingAs($this->owner);
+        session(['currentTeam' => $this->team]);
+
+        Livewire::test(ApiTokens::class)
+            ->set('description', 'my-terminal-token')
+            ->set('permissions', ['terminal'])
+            ->call('addNewToken')
+            ->assertNotDispatched('error');
+
+        expect($this->owner->tokens()->count())->toBe(1);
+        expect($this->owner->tokens()->first()->abilities)->toBe(['terminal']);
     });
 });
 
@@ -149,6 +173,15 @@ describe('ApiAbility middleware — member with elevated token blocked', functio
     test('member root token is blocked on non-zero team', function () {
         session(['currentTeam' => $this->team]);
         $token = $this->member->createToken('root-token', ['root']);
+
+        $this->withToken($token->plainTextToken)
+            ->getJson('/api/v1/projects')
+            ->assertStatus(403);
+    });
+
+    test('member terminal token is blocked on non-zero team', function () {
+        session(['currentTeam' => $this->team]);
+        $token = $this->member->createToken('terminal-token', ['terminal']);
 
         $this->withToken($token->plainTextToken)
             ->getJson('/api/v1/projects')

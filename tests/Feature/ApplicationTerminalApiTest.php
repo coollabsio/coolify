@@ -9,20 +9,27 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
+    config(['api.rate_limit' => 1000]);
+    RateLimiter::for('api', fn (Request $request) => Limit::perMinute(1000)->by($request->user()?->id ?: $request->ip()));
+    Cache::flush();
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
 
-    $this->bearerToken = createApplicationTerminalApiToken($this->user, $this->team, ['deploy']);
+    $this->bearerToken = createApplicationTerminalApiToken($this->user, $this->team, ['terminal']);
 
     $this->privateKey = PrivateKey::create([
         'name' => 'Test Key',
@@ -92,7 +99,7 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
     test('runs a command in the application container and returns process output', function () {
         Process::fake([
             '*docker ps*' => Process::result(output: dockerPsApplicationContainerOutput()),
-            '*docker exec*' => Process::result(output: "hello\n", errorOutput: '', exitCode: 0),
+            '*docker exec*' => Process::result(output: "hello\n", errorOutput: "warning\n", exitCode: 0),
         ]);
 
         $response = $this->withHeaders(applicationTerminalAuthHeaders($this->bearerToken))
@@ -104,22 +111,33 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
         $response->assertOk();
         $response->assertJson([
             'exit_code' => 0,
-            'stdout' => "hello\n",
-            'stderr' => '',
+            'stdout' => 'hello',
+            'stderr' => 'warning',
         ]);
 
         Process::assertRan(fn ($process) => str($process->command)->contains("docker exec 'app-container' sh -c 'php artisan about'"));
     });
 
-    test('requires deploy token ability', function () {
-        $readOnlyToken = createApplicationTerminalApiToken($this->user, $this->team, ['read']);
+    test('requires terminal token ability', function () {
+        $deployToken = createApplicationTerminalApiToken($this->user, $this->team, ['deploy']);
 
-        $response = $this->withHeaders(applicationTerminalAuthHeaders($readOnlyToken))
+        $response = $this->withHeaders(applicationTerminalAuthHeaders($deployToken))
             ->postJson("/api/v1/applications/{$this->application->uuid}/exec", [
                 'command' => 'whoami',
             ]);
 
         $response->assertStatus(403);
+    });
+
+    test('rejects timeouts over ten seconds', function () {
+        $response = $this->withHeaders(applicationTerminalAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/exec", [
+                'command' => 'whoami',
+                'timeout' => 11,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('timeout');
     });
 
     test('returns 403 when terminal access is disabled', function () {
@@ -148,27 +166,5 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
         $response->assertJsonPath('message', 'Multiple running containers found. Specify a container.');
         $response->assertJsonPath('containers.0.container', 'web');
         $response->assertJsonPath('containers.1.container', 'worker');
-    });
-});
-
-describe('POST /api/v1/applications/{uuid}/terminal-sessions', function () {
-    test('creates a terminal session descriptor for the application container', function () {
-        Process::fake([
-            '*docker ps*' => Process::result(output: dockerPsApplicationContainerOutput()),
-        ]);
-
-        $response = $this->withHeaders(applicationTerminalAuthHeaders($this->bearerToken))
-            ->postJson("/api/v1/applications/{$this->application->uuid}/terminal-sessions", [
-                'command' => 'cd /app',
-            ]);
-
-        $response->assertStatus(201);
-        $response->assertJsonPath('websocket_path', '/terminal/ws');
-        $response->assertJsonStructure([
-            'websocket_path',
-            'websocket_message' => ['command'],
-        ]);
-        expect($response->json('websocket_message.command'))->toContain("docker exec -it 'app-container'");
-        expect($response->json('websocket_message.command'))->toContain('cd /app');
     });
 });

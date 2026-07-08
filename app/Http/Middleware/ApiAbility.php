@@ -15,6 +15,7 @@ class ApiAbility extends CheckForAnyAbility
         'write',
         'write:sensitive',
         'deploy',
+        'terminal',
         'read:sensitive',
     ];
 

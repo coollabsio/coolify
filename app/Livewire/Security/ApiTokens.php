@@ -40,6 +40,9 @@ class ApiTokens extends Component
     public bool $canUseDeployPermissions = false;
 
     #[Locked]
+    public bool $canUseTerminalPermissions = false;
+
+    #[Locked]
     public bool $canUseSensitivePermissions = false;
 
     public function render()
@@ -53,6 +56,7 @@ class ApiTokens extends Component
         $this->canUseRootPermissions = auth()->user()->can('useRootPermissions', PersonalAccessToken::class);
         $this->canUseWritePermissions = auth()->user()->can('useWritePermissions', PersonalAccessToken::class);
         $this->canUseDeployPermissions = auth()->user()->can('useDeployPermissions', PersonalAccessToken::class);
+        $this->canUseTerminalPermissions = auth()->user()->can('useTerminalPermissions', PersonalAccessToken::class);
         $this->canUseSensitivePermissions = auth()->user()->can('useSensitivePermissions', PersonalAccessToken::class);
         $this->getTokens();
     }
@@ -86,6 +90,13 @@ class ApiTokens extends Component
             return;
         }
 
+        if ($permissionToUpdate == 'terminal' && ! auth()->user()->can('useTerminalPermissions', PersonalAccessToken::class)) {
+            $this->dispatch('error', 'You do not have permission to use terminal permissions.');
+            $this->permissions = array_diff($this->permissions, ['terminal']);
+
+            return;
+        }
+
         if ($permissionToUpdate == 'read:sensitive' && ! auth()->user()->can('useSensitivePermissions', PersonalAccessToken::class)) {
             $this->dispatch('error', 'You do not have permission to use read:sensitive permissions.');
             $this->permissions = array_diff($this->permissions, ['read:sensitive']);
@@ -97,8 +108,8 @@ class ApiTokens extends Component
             $this->permissions = ['root'];
         } elseif ($permissionToUpdate == 'read:sensitive' && ! in_array('read', $this->permissions, true)) {
             $this->permissions[] = 'read';
-        } elseif ($permissionToUpdate == 'deploy') {
-            $this->permissions = ['deploy'];
+        } elseif (in_array($permissionToUpdate, ['deploy', 'terminal'], true)) {
+            $this->permissions = [$permissionToUpdate];
         } else {
             if (count($this->permissions) == 0) {
                 $this->permissions = ['read'];
@@ -125,6 +136,10 @@ class ApiTokens extends Component
 
             if (in_array('deploy', $this->permissions, true) && ! auth()->user()->can('useDeployPermissions', PersonalAccessToken::class)) {
                 throw new \Exception('You do not have permission to create tokens with deploy permissions.');
+            }
+
+            if (in_array('terminal', $this->permissions, true) && ! auth()->user()->can('useTerminalPermissions', PersonalAccessToken::class)) {
+                throw new \Exception('You do not have permission to create tokens with terminal permissions.');
             }
 
             if (in_array('read:sensitive', $this->permissions, true) && ! auth()->user()->can('useSensitivePermissions', PersonalAccessToken::class)) {

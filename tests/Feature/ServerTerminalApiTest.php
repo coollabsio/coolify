@@ -5,20 +5,28 @@ use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
+    config(['api.rate_limit' => 1000]);
+    RateLimiter::for('api', fn (Request $request) => Limit::perMinute(1000)->by($request->user()?->id ?: $request->ip()));
+    Cache::flush();
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
 
-    $this->bearerToken = createServerTerminalApiToken($this->user, $this->team, ['deploy']);
+    $this->bearerToken = createServerTerminalApiToken($this->user, $this->team, ['terminal']);
 
     $this->privateKey = PrivateKey::create([
         'name' => 'Test Key',
@@ -68,7 +76,7 @@ function createServerTerminalApiToken(User $user, Team $team, array $abilities):
 describe('POST /api/v1/servers/{uuid}/exec', function () {
     test('runs a command and returns process output', function () {
         Process::fake([
-            '*' => Process::result(output: "hello\n", errorOutput: '', exitCode: 0),
+            '*' => Process::result(output: "hello\n", errorOutput: "warning\n", exitCode: 0),
         ]);
 
         $response = $this->withHeaders(serverTerminalAuthHeaders($this->bearerToken))
@@ -80,15 +88,15 @@ describe('POST /api/v1/servers/{uuid}/exec', function () {
         $response->assertOk();
         $response->assertJson([
             'exit_code' => 0,
-            'stdout' => "hello\n",
-            'stderr' => '',
+            'stdout' => 'hello',
+            'stderr' => 'warning',
         ]);
     });
 
-    test('requires deploy token ability', function () {
-        $readOnlyToken = createServerTerminalApiToken($this->user, $this->team, ['read']);
+    test('requires terminal token ability', function () {
+        $deployToken = createServerTerminalApiToken($this->user, $this->team, ['deploy']);
 
-        $response = $this->withHeaders(serverTerminalAuthHeaders($readOnlyToken))
+        $response = $this->withHeaders(serverTerminalAuthHeaders($deployToken))
             ->postJson("/api/v1/servers/{$this->server->uuid}/exec", [
                 'command' => 'whoami',
             ]);
@@ -118,60 +126,78 @@ describe('POST /api/v1/servers/{uuid}/exec', function () {
         $response->assertStatus(422);
         $response->assertJsonPath('errors.extra.0', 'This field is not allowed.');
     });
-});
 
-describe('POST /api/v1/servers/{uuid}/terminal-sessions', function () {
-    test('creates a terminal session descriptor', function () {
+    test('rejects timeouts over ten seconds', function () {
         $response = $this->withHeaders(serverTerminalAuthHeaders($this->bearerToken))
-            ->postJson("/api/v1/servers/{$this->server->uuid}/terminal-sessions", [
-                'command' => 'cd /tmp',
-            ]);
-
-        $response->assertStatus(201);
-        $response->assertJsonPath('websocket_path', '/terminal/ws');
-        $response->assertJsonStructure([
-            'websocket_path',
-            'websocket_message' => ['command'],
-        ]);
-        expect($response->json('websocket_message.command'))->toContain('cd /tmp');
-        expect($response->json('websocket_message.command'))->toContain('coolify-testing-host');
-    });
-
-    test('requires deploy token ability', function () {
-        $readOnlyToken = createServerTerminalApiToken($this->user, $this->team, ['read']);
-
-        $response = $this->withHeaders(serverTerminalAuthHeaders($readOnlyToken))
-            ->postJson("/api/v1/servers/{$this->server->uuid}/terminal-sessions", [
+            ->postJson("/api/v1/servers/{$this->server->uuid}/exec", [
                 'command' => 'whoami',
+                'timeout' => 11,
             ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('timeout');
     });
 
-    test('returns 403 when terminal access is disabled', function () {
-        $this->server->settings()->update(['is_terminal_enabled' => false]);
+    test('rate limits terminal commands per server', function () {
+        $this->withoutMiddleware(ThrottleRequests::class);
 
-        $response = $this->withHeaders(serverTerminalAuthHeaders($this->bearerToken))
-            ->postJson("/api/v1/servers/{$this->server->uuid}/terminal-sessions", [
-                'command' => 'whoami',
-            ]);
-
-        $response->assertStatus(403);
-        $response->assertJson(['message' => 'Terminal access is disabled on this server.']);
-    });
-
-    test('returns 404 for servers outside the token team', function () {
-        $otherTeam = Team::factory()->create();
-        $otherServer = Server::factory()->create([
-            'team_id' => $otherTeam->id,
-            'private_key_id' => $this->privateKey->id,
+        Process::fake([
+            '*' => Process::result(output: 'ok', exitCode: 0),
         ]);
 
-        $response = $this->withHeaders(serverTerminalAuthHeaders($this->bearerToken))
-            ->postJson("/api/v1/servers/{$otherServer->uuid}/terminal-sessions", [
-                'command' => 'whoami',
-            ]);
+        $tokens = collect(range(1, 21))
+            ->map(fn () => createServerTerminalApiToken($this->user, $this->team, ['terminal']));
 
-        $response->assertStatus(404);
+        foreach ($tokens->take(20) as $token) {
+            $this->withHeaders(serverTerminalAuthHeaders($token))
+                ->postJson("/api/v1/servers/{$this->server->uuid}/exec", [
+                    'command' => 'whoami',
+                ])
+                ->assertOk();
+        }
+
+        $this->withHeaders(serverTerminalAuthHeaders($tokens->last()))
+            ->postJson("/api/v1/servers/{$this->server->uuid}/exec", [
+                'command' => 'whoami',
+            ])
+            ->assertStatus(429)
+            ->assertJsonPath('message', fn (string $message) => str($message)->startsWith('Too many terminal commands for this server.'));
+    });
+
+    test('rate limits terminal commands per token and team', function () {
+        Process::fake([
+            '*' => Process::result(output: 'ok', exitCode: 0),
+        ]);
+
+        $servers = collect([$this->server]);
+        for ($i = 0; $i < 10; $i++) {
+            $server = Server::factory()->create([
+                'team_id' => $this->team->id,
+                'private_key_id' => $this->privateKey->id,
+                'ip' => "coolify-testing-host-{$i}",
+                'user' => 'root',
+            ]);
+            $server->settings()->update([
+                'is_terminal_enabled' => true,
+                'force_disabled' => false,
+            ]);
+            $servers->push($server);
+        }
+
+        foreach ($servers->take(10) as $server) {
+            $this->withHeaders(serverTerminalAuthHeaders($this->bearerToken))
+                ->postJson("/api/v1/servers/{$server->uuid}/exec", [
+                    'command' => 'whoami',
+                ])
+                ->assertOk();
+        }
+
+        $this->withHeaders(serverTerminalAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/servers/{$servers->last()->uuid}/exec", [
+                'command' => 'whoami',
+            ])
+            ->assertStatus(429)
+            ->assertJsonPath('message', fn (string $message) => str($message)->startsWith('Too many terminal command requests. Please retry in '))
+            ->assertJsonPath('retry_after', fn (int $retryAfter) => $retryAfter > 0);
     });
 });

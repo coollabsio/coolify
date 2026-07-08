@@ -18,11 +18,31 @@ use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\RateLimiter;
 use OpenApi\Attributes as OA;
 use Stringable;
 
 class ServersController extends Controller
 {
+    private const TERMINAL_SERVER_RATE_LIMIT = 20;
+
+    private const TERMINAL_COMMAND_TIMEOUT = 10;
+
+    private function enforceTerminalServerRateLimit(ModelsServer $server, int $teamId): ?JsonResponse
+    {
+        $key = "terminal-api-exec:server:{$teamId}:{$server->uuid}";
+
+        if (RateLimiter::tooManyAttempts($key, self::TERMINAL_SERVER_RATE_LIMIT)) {
+            return response()->json([
+                'message' => 'Too many terminal commands for this server. Please retry in '.RateLimiter::availableIn($key).' seconds.',
+            ], 429);
+        }
+
+        RateLimiter::hit($key, 60);
+
+        return null;
+    }
+
     private function removeSensitiveDataFromSettings($settings)
     {
         if (request()->attributes->get('can_read_sensitive', false) === true) {
@@ -974,7 +994,7 @@ class ServersController extends Controller
                     required: ['command'],
                     properties: [
                         'command' => ['type' => 'string', 'description' => 'Shell command to execute on the server.'],
-                        'timeout' => ['type' => 'integer', 'description' => 'Command timeout in seconds. Defaults to the configured SSH command timeout.'],
+                        'timeout' => ['type' => 'integer', 'description' => 'Command timeout in seconds. Maximum 10 seconds. Defaults to 10 seconds.'],
                         'no_sudo' => ['type' => 'boolean', 'description' => 'Do not add sudo for non-root server users.'],
                     ],
                     type: 'object',
@@ -1003,6 +1023,7 @@ class ServersController extends Controller
             new OA\Response(response: 403, description: 'Terminal access is disabled on this server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
+            new OA\Response(response: 429, description: 'Too many terminal command requests.'),
         ]
     )]
     public function execute_command(Request $request)
@@ -1020,7 +1041,7 @@ class ServersController extends Controller
         $allowedFields = ['command', 'timeout', 'no_sudo'];
         $validator = customApiValidator($request->all(), [
             'command' => 'required|string|max:20000',
-            'timeout' => 'integer|nullable|min:1|max:600',
+            'timeout' => 'integer|nullable|min:1|max:10',
             'no_sudo' => 'boolean|nullable',
         ]);
 
@@ -1045,12 +1066,17 @@ class ServersController extends Controller
             return response()->json(['message' => 'Terminal access is disabled on this server.'], 403);
         }
 
+        $rateLimitResponse = $this->enforceTerminalServerRateLimit($server, $teamId);
+        if ($rateLimitResponse instanceof JsonResponse) {
+            return $rateLimitResponse;
+        }
+
         $commands = [$request->command];
         if ($server->isNonRoot() && ! $request->boolean('no_sudo')) {
             $commands = parseCommandsByLineForSudo(collect($commands), $server)->toArray();
         }
         $command = implode("\n", $commands);
-        $timeout = $request->integer('timeout') ?: config('constants.ssh.command_timeout');
+        $timeout = $request->integer('timeout') ?: self::TERMINAL_COMMAND_TIMEOUT;
         $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command, disableMultiplexing: true);
         $process = Process::timeout($timeout)->run($sshCommand);
 
@@ -1063,125 +1089,8 @@ class ServersController extends Controller
 
         return response()->json([
             'exit_code' => $process->exitCode(),
-            'stdout' => sanitize_utf8_text($process->output()),
-            'stderr' => sanitize_utf8_text($process->errorOutput()),
+            'stdout' => rtrim(sanitize_utf8_text($process->output()), "\r\n"),
+            'stderr' => rtrim(sanitize_utf8_text($process->errorOutput()), "\r\n"),
         ]);
-    }
-
-    #[OA\Post(
-        summary: 'Create Terminal Session',
-        description: 'Create a terminal session descriptor for the realtime terminal websocket.',
-        path: '/servers/{uuid}/terminal-sessions',
-        operationId: 'create-terminal-session-for-server-by-uuid',
-        security: [
-            ['bearerAuth' => []],
-        ],
-        tags: ['Servers'],
-        parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
-        ],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\MediaType(
-                mediaType: 'application/json',
-                schema: new OA\Schema(
-                    properties: [
-                        'command' => ['type' => 'string', 'description' => 'Optional shell command to run before opening the terminal shell.'],
-                        'timeout' => ['type' => 'integer', 'description' => 'Optional websocket PTY timeout in seconds.'],
-                    ],
-                    type: 'object',
-                ),
-            ),
-        ),
-        responses: [
-            new OA\Response(
-                response: 201,
-                description: 'Terminal session descriptor created.',
-                content: [
-                    new OA\MediaType(
-                        mediaType: 'application/json',
-                        schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'websocket_path' => ['type' => 'string'],
-                                'websocket_message' => [
-                                    'type' => 'object',
-                                    'description' => 'JSON message the client should send on first websocket connect to start the PTY.',
-                                    'properties' => [
-                                        'command' => ['type' => 'string'],
-                                    ],
-                                ],
-                            ],
-                        ),
-                    ),
-                ],
-            ),
-            new OA\Response(response: 401, ref: '#/components/responses/401'),
-            new OA\Response(response: 403, description: 'Terminal access is disabled on this server.'),
-            new OA\Response(response: 404, ref: '#/components/responses/404'),
-            new OA\Response(response: 422, ref: '#/components/responses/422'),
-        ]
-    )]
-    public function create_terminal_session(Request $request)
-    {
-        $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
-            return invalidTokenResponse();
-        }
-
-        $return = validateIncomingRequest($request);
-        if ($return instanceof JsonResponse) {
-            return $return;
-        }
-
-        $allowedFields = ['command', 'timeout'];
-        $validator = customApiValidator($request->all(), [
-            'command' => 'string|nullable|max:20000',
-            'timeout' => 'integer|nullable|min:1|max:3600',
-        ]);
-
-        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
-            $errors = $validator->errors();
-            foreach ($extraFields as $field) {
-                $errors->add($field, 'This field is not allowed.');
-            }
-
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => $errors,
-            ], 422);
-        }
-
-        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->route('uuid'))->first();
-        if (! $server) {
-            return response()->json(['message' => 'Server not found.'], 404);
-        }
-        if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
-            return response()->json(['message' => 'Terminal access is disabled on this server.'], 403);
-        }
-
-        $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
-                        'if [ -f ~/.profile ]; then . ~/.profile; fi && '.
-                        'if [ -n "$SHELL" ] && [ -x "$SHELL" ]; then exec $SHELL; else sh; fi';
-        if ($request->filled('command')) {
-            $shellCommand = $request->command."\n".$shellCommand;
-        }
-
-        $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $shellCommand, disableMultiplexing: true);
-        if ($request->filled('timeout')) {
-            $sshCommand = 'timeout '.$request->integer('timeout').' '.$sshCommand;
-        }
-
-        auditLog('api.server.terminal_session.created', [
-            'team_id' => $teamId,
-            'server_uuid' => $server->uuid,
-            'server_name' => $server->name,
-        ]);
-
-        return response()->json([
-            'websocket_path' => '/terminal/ws',
-            'websocket_message' => ['command' => $sshCommand],
-        ], 201);
     }
 }
