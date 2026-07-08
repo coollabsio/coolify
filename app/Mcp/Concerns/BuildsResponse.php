@@ -56,7 +56,7 @@ trait BuildsResponse
         'dockerfile', 'docker_compose', 'docker_compose_raw',
         'custom_labels', 'environment_variables',
         'environment_variables_preview', 'validation_logs',
-        'server_metadata',
+        'server_metadata', 'last_crash_logs',
     ];
 
     /**

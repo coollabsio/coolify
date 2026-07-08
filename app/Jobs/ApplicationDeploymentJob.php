@@ -4911,6 +4911,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             'restart_count' => 0,
             'last_restart_at' => null,
             'last_restart_type' => null,
+            'last_crash_logs' => null,
+            'last_crash_logs_captured_at' => null,
         ]);
 
         try {

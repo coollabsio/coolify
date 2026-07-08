@@ -123,6 +123,12 @@ test('MCP endpoint lists tools for an authenticated token', function () {
         'get_database',
         'list_services',
         'get_service',
+        'get_application_health',
+        'list_deployments',
+        'get_deployment_logs',
+        'get_application_logs',
+        'list_service_containers',
+        'get_service_container_logs',
     );
     expect($toolNames)->not->toContain('get_resource_status');
 });

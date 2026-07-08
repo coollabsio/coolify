@@ -203,6 +203,8 @@ class Application extends BaseModel
         'max_restart_count',
         'last_restart_at',
         'last_restart_type',
+        'last_crash_logs',
+        'last_crash_logs_captured_at',
         'uuid',
         'environment_id',
         'destination_id',
@@ -244,6 +246,8 @@ class Application extends BaseModel
             'restart_count' => 'integer',
             'max_restart_count' => 'integer',
             'last_restart_at' => 'datetime',
+            'last_crash_logs' => 'array',
+            'last_crash_logs_captured_at' => 'datetime',
         ];
     }
 
