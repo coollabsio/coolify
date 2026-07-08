@@ -3,7 +3,7 @@
         {{ data_get_str($server, 'name')->limit(10) }} > Server Resources | Coolify
     </x-slot>
     <livewire:server.navbar :server="$server" />
-    <div x-data="{ activeTab: 'managed' }" class="flex flex-col h-full gap-2 md:gap-8 md:flex-row">
+    <div x-data="{ activeTab: 'managed' }" class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
         <div class="w-full">
             <div class="flex flex-col">
                 <div class="flex gap-2">

@@ -12,6 +12,7 @@ use App\Rules\ValidCloudInitYaml;
 use App\Rules\ValidHostname;
 use App\Services\HetznerService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Livewire\Attributes\Locked;
@@ -36,6 +37,8 @@ class ByHetzner extends Component
 
     // Step 1: Token selection
     public ?int $selected_token_id = null;
+
+    public ?string $selectedTokenUuid = null;
 
     // Step 2: Server configuration
     public array $locations = [];
@@ -68,6 +71,8 @@ class ByHetzner extends Component
 
     public bool $loading_data = false;
 
+    public ?string $provider_data_error = null;
+
     public bool $enable_ipv4 = true;
 
     public bool $enable_ipv6 = true;
@@ -89,17 +94,23 @@ class ByHetzner extends Component
 
     public bool $from_onboarding = false;
 
-    public function mount()
+    public function mount(?string $selectedTokenUuid = null)
     {
         try {
             $this->authorize('viewAny', CloudProviderToken::class);
             $this->loadTokens();
+            $this->selectTokenFromUrl($selectedTokenUuid);
             $this->loadSavedCloudInitScripts();
             $this->server_name = generate_random_name();
             $this->private_keys = PrivateKey::ownedAndOnlySShKeys()->where('id', '!=', 0)->get();
 
             if ($this->private_keys->count() > 0) {
                 $this->private_key_id = $this->private_keys->first()->id;
+            }
+
+            if ($this->selectedTokenUuid) {
+                $this->current_step = 2;
+                $this->loading_data = true;
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -114,7 +125,7 @@ class ByHetzner extends Component
     public function getListeners()
     {
         return [
-            'tokenAdded' => 'handleTokenAdded',
+            'tokenAdded.hetzner' => 'handleTokenAdded',
             'privateKeyCreated' => 'handlePrivateKeyCreated',
             'modalClosed' => 'resetSelection',
         ];
@@ -207,9 +218,27 @@ class ByHetzner extends Component
         ];
     }
 
-    public function selectToken(int $tokenId)
+    public function selectToken(int $tokenId): mixed
     {
         $this->selected_token_id = $tokenId;
+
+        return $this->nextStep();
+    }
+
+    private function selectTokenFromUrl(?string $selectedTokenUuid): void
+    {
+        if (! $selectedTokenUuid) {
+            return;
+        }
+
+        $token = $this->available_tokens->firstWhere('uuid', $selectedTokenUuid);
+
+        if (! $token) {
+            return;
+        }
+
+        $this->selectedTokenUuid = $selectedTokenUuid;
+        $this->selected_token_id = $token->id;
     }
 
     private function validateHetznerToken(string $token): bool
@@ -244,17 +273,20 @@ class ByHetzner extends Component
         ]);
 
         try {
-            $hetznerToken = $this->getHetznerToken();
+            if (! $this->selectedTokenUuid) {
+                $token = $this->available_tokens->firstWhere('id', $this->selected_token_id);
 
-            if (! $hetznerToken) {
-                return $this->dispatch('error', 'Please select a valid Hetzner token.');
+                if ($token) {
+                    return $this->redirectRoute('server.create.token', [
+                        'type' => 'hetzner',
+                        'token_uuid' => $token->uuid,
+                    ], navigate: true);
+                }
             }
 
-            // Load Hetzner data
-            $this->loadHetznerData($hetznerToken);
-
-            // Move to step 2
+            // Move to step 2; provider data is loaded after initial render via wire:init.
             $this->current_step = 2;
+            $this->loading_data = true;
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -262,12 +294,26 @@ class ByHetzner extends Component
 
     public function previousStep()
     {
+        if ($this->selectedTokenUuid) {
+            return $this->redirectRoute('server.create.type', ['type' => 'hetzner'], navigate: true);
+        }
+
         $this->current_step = 1;
     }
 
-    private function loadHetznerData(string $token)
+    public function loadHetznerData(): void
     {
+        $token = $this->getHetznerToken();
+
+        if (! $token) {
+            $this->loading_data = false;
+            $this->dispatch('error', 'Please select a valid Hetzner token.');
+
+            return;
+        }
+
         $this->loading_data = true;
+        $this->provider_data_error = null;
         $this->selectedHetznerSshKeyIds = [];
         $this->selectedHetznerFirewallIds = [];
         $this->selectedHetznerNetworkIds = [];
@@ -311,8 +357,20 @@ class ByHetzner extends Component
             $this->loading_data = false;
         } catch (\Throwable $e) {
             $this->loading_data = false;
-            throw $e;
+            $this->provider_data_error = $this->providerDataErrorMessage('Hetzner', $e, 'error.message');
+            $this->dispatch('error', $this->provider_data_error);
         }
+    }
+
+    private function providerDataErrorMessage(string $providerName, \Throwable $e, string $jsonMessageKey): string
+    {
+        $details = $e->getMessage();
+
+        if ($e instanceof RequestException && $e->response) {
+            $details = data_get($e->response->json(), $jsonMessageKey) ?: $e->response->body() ?: $details;
+        }
+
+        return "{$providerName} API error: {$details}";
     }
 
     private function getCpuVendorInfo(array $serverType): ?string

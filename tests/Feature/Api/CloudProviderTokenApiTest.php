@@ -12,6 +12,12 @@ use Illuminate\Support\Once;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config([
+        'app.maintenance.driver' => 'file',
+        'cache.default' => 'array',
+        'session.driver' => 'array',
+    ]);
+
     InstanceSettings::query()->whereKey(0)->delete();
     $settings = new InstanceSettings(['is_api_enabled' => true]);
     $settings->id = 0;
@@ -263,6 +269,30 @@ describe('POST /api/v1/cloud-tokens', function () {
         $response->assertJsonStructure(['uuid']);
     });
 
+    test('creates a Vultr cloud provider token', function () {
+        Http::fake([
+            'https://api.vultr.com/v2/account' => Http::response([], 200),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson('/api/v1/cloud-tokens', [
+            'provider' => 'vultr',
+            'token' => 'test-vultr-token',
+            'name' => 'My Vultr Token',
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonStructure(['uuid']);
+
+        $this->assertDatabaseHas('cloud_provider_tokens', [
+            'team_id' => $this->team->id,
+            'provider' => 'vultr',
+            'name' => 'My Vultr Token',
+        ]);
+    });
+
     test('validates provider is required', function () {
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$this->bearerToken,
@@ -302,7 +332,7 @@ describe('POST /api/v1/cloud-tokens', function () {
         $response->assertJsonValidationErrors(['name']);
     });
 
-    test('validates provider must be hetzner or digitalocean', function () {
+    test('validates provider must be hetzner digitalocean or vultr', function () {
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$this->bearerToken,
             'Content-Type' => 'application/json',
@@ -507,6 +537,25 @@ describe('POST /api/v1/cloud-tokens/{uuid}/validate', function () {
 
         Http::fake([
             'https://api.digitalocean.com/v2/account' => Http::response([], 200),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson("/api/v1/cloud-tokens/{$token->uuid}/validate");
+
+        $response->assertStatus(200);
+        $response->assertJson(['valid' => true, 'message' => 'Token is valid.']);
+    });
+
+    test('validates a valid Vultr token', function () {
+        $token = CloudProviderToken::factory()->create([
+            'team_id' => $this->team->id,
+            'provider' => 'vultr',
+        ]);
+
+        Http::fake([
+            'https://api.vultr.com/v2/account' => Http::response([], 200),
         ]);
 
         $response = $this->withHeaders([

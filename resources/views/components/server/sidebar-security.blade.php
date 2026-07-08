@@ -58,7 +58,7 @@
 @endphp
 
 <div class="w-full md:w-auto">
-    <div class="mb-4 w-full border-b-2 border-solid border-neutral-200 pb-6 md:hidden dark:border-coolgray-200">
+    <div class="mb-4 w-full border-b-2 border-solid border-neutral-200 pb-4 md:hidden dark:border-coolgray-200">
         <label id="server-mobile-section-label" for="server-mobile-section" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Section</label>
         <select id="server-mobile-section" class="select w-full" aria-label="Security menu"
             data-current-value="{{ $activeSecurityMenuValue }}"

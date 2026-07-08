@@ -75,6 +75,19 @@ it('caches parsed local service templates by bundle mtime', function () {
     expect($first->keys()->all())->toBe($second->keys()->all());
 });
 
+it('renders the shared loading indicator while resource choices load', function () {
+    View::share('errors', new ViewErrorBag);
+
+    $view = $this->view('livewire.project.new.select', [
+        'current_step' => 'type',
+        'environments' => collect(),
+    ]);
+
+    $view->assertSee('Loading resources...', false);
+    $view->assertSee('text-coollabs dark:text-warning animate-spin', false);
+    $view->assertDontSee('<div x-show="loading">Loading...</div>', false);
+});
+
 it('renders the service templates last updated hint placeholder', function () {
     View::share('errors', new ViewErrorBag);
 

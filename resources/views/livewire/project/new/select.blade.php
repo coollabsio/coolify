@@ -75,7 +75,9 @@
                     </div>
                 </div>
             </div>
-            <div x-show="loading">Loading...</div>
+            <div x-show="loading" class="flex items-center justify-center py-8">
+                <x-loading text="Loading resources..." />
+            </div>
             <div x-show="!loading" class="flex flex-col gap-4 py-4">
                 <h2 x-show="filteredGitBasedApplications.length > 0">Applications</h2>
                 <div x-show="filteredGitBasedApplications.length > 0 || filteredDockerBasedApplications.length > 0"

@@ -290,10 +290,9 @@ describe('Hetzner data loading', function () {
             ], 200),
         ]);
 
-        $component = Livewire::test(ByHetzner::class)
-            ->set('selected_token_id', $this->hetznerToken->id)
-            ->call('nextStep')
-            ->assertSet('current_step', 2);
+        $component = Livewire::test(ByHetzner::class, ['selectedTokenUuid' => $this->hetznerToken->uuid])
+            ->assertSet('current_step', 2)
+            ->call('loadHetznerData');
 
         expect($component->get('hetznerFirewalls'))->toHaveCount(1)
             ->and($component->get('hetznerNetworks'))->toHaveCount(1);

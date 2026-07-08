@@ -3,7 +3,7 @@
         Sentinel Logs | Coolify
     </x-slot>
     <livewire:server.navbar :server="$server" />
-    <div class="flex flex-col h-full gap-2 md:gap-8 md:flex-row">
+    <div class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
         <x-server.sidebar-sentinel :server="$server" :parameters="$parameters" />
         <div class="w-full">
             <h2 class="pb-4">Logs</h2>

@@ -13,6 +13,7 @@ class CloudProviderToken extends BaseModel
         'provider',
         'token',
         'name',
+        'description',
     ];
 
     protected $hidden = [
