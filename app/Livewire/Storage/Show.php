@@ -4,6 +4,7 @@ namespace App\Livewire\Storage;
 
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -25,7 +26,7 @@ class Show extends Component
         }
         try {
             $this->authorize('view', $this->storage);
-        } catch (\Illuminate\Auth\Access\AuthorizationException) {
+        } catch (AuthorizationException) {
             return $this->redirectRoute('storage.index', navigate: true);
         }
         $this->currentRoute = request()->route()->getName();

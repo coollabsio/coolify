@@ -3,7 +3,7 @@
         {{ data_get_str($server, 'name')->limit(10) }} > Private Key | Coolify
     </x-slot>
     <livewire:server.navbar :server="$server" />
-    <div class="flex flex-col h-full gap-8 sm:flex-row">
+    <div class="flex flex-col h-full gap-2 md:gap-8 md:flex-row">
         <x-server.sidebar :server="$server" activeMenu="private-key" />
         <div class="w-full">
             <div class="flex items-end gap-2">

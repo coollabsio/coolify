@@ -2,9 +2,10 @@
 
 use App\Http\Middleware\TrustHosts;
 use App\Models\InstanceSettings;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     // Clear cache before each test to ensure isolation
@@ -84,7 +85,7 @@ it('extracts host from FQDN with protocol and port', function () {
 
 it('handles exception during InstanceSettings fetch', function () {
     // Drop the instance_settings table to simulate installation
-    \Schema::dropIfExists('instance_settings');
+    Schema::dropIfExists('instance_settings');
 
     $middleware = new TrustHosts($this->app);
 

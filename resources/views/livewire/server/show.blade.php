@@ -3,7 +3,7 @@
         {{ data_get_str($server, 'name')->limit(10) }} > General | Coolify
     </x-slot>
     <livewire:server.navbar :server="$server" />
-    <div class="flex flex-col h-full gap-8 sm:flex-row">
+    <div class="flex flex-col h-full gap-2 md:gap-8 md:flex-row">
         <x-server.sidebar :server="$server" activeMenu="general" />
         <div class="w-full">
             <form wire:submit.prevent='submit' class="flex flex-col">
@@ -119,6 +119,19 @@
                     Server is reachable and validated.
                 @else
                     You can't use this server until it is validated.
+                @endif
+                @if ($this->limaStartCommand)
+                    <div
+                        class="mt-4 rounded border border-coolgray-200 bg-coolgray-100 p-3 text-sm dark:border-coolgray-300 dark:bg-coolgray-100">
+                        <div class="font-semibold">Start this Lima VM locally</div>
+                        <div class="mt-1 dark:text-neutral-400">
+                            Run this from the Coolify repository root before validating this server:
+                        </div>
+                        <code
+                            class="mt-2 block overflow-x-auto rounded bg-black px-3 py-2 font-mono text-xs text-white">
+                            {{ $this->limaStartCommand }}
+                        </code>
+                    </div>
                 @endif
                 @if ($isValidating)
                     <div x-data="{ slideOverOpen: true }">

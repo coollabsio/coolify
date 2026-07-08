@@ -4,7 +4,7 @@
     </x-slot>
     <livewire:server.navbar :server="$server" />
     @if ($server->isFunctional())
-        <div class="flex flex-col h-full gap-8 sm:flex-row">
+        <div class="flex flex-col h-full gap-2 md:gap-8 md:flex-row">
             <x-server.sidebar-sentinel :server="$server" :parameters="$parameters" />
             <div class="w-full">
                 <livewire:server.sentinel :server="$server" />

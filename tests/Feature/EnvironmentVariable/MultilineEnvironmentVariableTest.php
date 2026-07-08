@@ -9,8 +9,8 @@ test('generateDockerBuildArgs returns only keys without values', function () {
     $buildArgs = generateDockerBuildArgs($variables);
 
     // Docker gets values from the environment, so only keys should be in build args
-    expect($buildArgs->first())->toBe('--build-arg SSH_PRIVATE_KEY');
-    expect($buildArgs->last())->toBe('--build-arg REGULAR_VAR');
+    expect($buildArgs->first())->toBe("--build-arg 'SSH_PRIVATE_KEY'");
+    expect($buildArgs->last())->toBe("--build-arg 'REGULAR_VAR'");
 });
 
 test('generateDockerBuildArgs works with collection of objects', function () {
@@ -22,8 +22,8 @@ test('generateDockerBuildArgs works with collection of objects', function () {
     $buildArgs = generateDockerBuildArgs($variables);
     expect($buildArgs)->toHaveCount(2);
     expect($buildArgs->values()->toArray())->toBe([
-        '--build-arg VAR1',
-        '--build-arg VAR2',
+        "--build-arg 'VAR1'",
+        "--build-arg 'VAR2'",
     ]);
 });
 
@@ -38,7 +38,7 @@ test('generateDockerBuildArgs collection can be imploded into valid command stri
     // The collection must be imploded to a string for command interpolation
     // This was the bug: Collection was interpolated as JSON instead of a space-separated string
     $argsString = $buildArgs->implode(' ');
-    expect($argsString)->toBe('--build-arg COOLIFY_URL --build-arg COOLIFY_BRANCH');
+    expect($argsString)->toBe("--build-arg 'COOLIFY_URL' --build-arg 'COOLIFY_BRANCH'");
 
     // Verify it does NOT produce JSON when cast to string
     expect($argsString)->not->toContain('{');
@@ -53,7 +53,7 @@ test('generateDockerBuildArgs handles variables without is_multiline', function 
     $buildArgs = generateDockerBuildArgs($variables);
     $arg = $buildArgs->first();
 
-    expect($arg)->toBe('--build-arg NO_FLAG_VAR');
+    expect($arg)->toBe("--build-arg 'NO_FLAG_VAR'");
 });
 
 test('generateDockerEnvFlags produces correct format', function () {
@@ -80,4 +80,18 @@ test('generateDockerEnvFlags works with collection input', function () {
     expect($envFlags)->toBeString();
     expect($envFlags)->toContain('-e VAR1=');
     expect($envFlags)->toContain('-e VAR2="');
+});
+
+test('generateDockerBuildArgs escapes legacy keys', function () {
+    $variables = [
+        ['key' => 'BAD$(id)', 'value' => '1'],
+        ['key' => "BAD'KEY", 'value' => '1'],
+    ];
+
+    $buildArgs = generateDockerBuildArgs($variables);
+
+    expect($buildArgs->values()->toArray())->toBe([
+        "--build-arg 'BAD$(id)'",
+        "--build-arg 'BAD'\''KEY'",
+    ]);
 });

@@ -2,6 +2,7 @@
 
 use App\Models\Server;
 use Illuminate\Support\Once;
+use Tests\TestCase;
 
 /*
 |--------------------------------------------------------------------------
@@ -13,7 +14,7 @@ use Illuminate\Support\Once;
 | need to change it using the "uses()" function to bind a different classes or traits.
 |
 */
-uses(Tests\TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser');
+uses(TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser');
 
 /*
 |--------------------------------------------------------------------------

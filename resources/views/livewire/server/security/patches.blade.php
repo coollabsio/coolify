@@ -10,7 +10,7 @@
         </x-slot:content>
     </x-slide-over>
 
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 sm:flex-row">
+    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-2 md:gap-8 md:flex-row">
         <x-server.sidebar-security :server="$server" :parameters="$parameters" />
         <form wire:submit='submit' class="w-full">
             <div>

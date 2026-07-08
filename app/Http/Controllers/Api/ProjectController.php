@@ -166,6 +166,9 @@ class ProjectController extends Controller
             return response()->json(['message' => 'Environment not found.'], 404);
         }
         $environment = $environment->load(['applications', 'postgresqls', 'redis', 'mongodbs', 'mysqls', 'mariadbs', 'services']);
+        collect(['applications', 'postgresqls', 'redis', 'mongodbs', 'mysqls', 'mariadbs', 'services'])
+            ->flatMap(fn (string $relation) => $environment->{$relation})
+            ->each(fn ($resource) => exposeSensitiveFields($resource));
 
         return response()->json(serializeApiResponse($environment));
     }

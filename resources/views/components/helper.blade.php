@@ -1,5 +1,5 @@
 <div x-data="{ open: false }" @click.stop="open = !open" @click.outside="open = false"
-    {{ $attributes->merge(['class' => 'group']) }}>
+    {{ $attributes->merge(['class' => 'group relative inline-block align-middle']) }}>
     <div class="info-helper">
         @isset($icon)
             {{ $icon }}

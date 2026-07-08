@@ -112,7 +112,7 @@
         ));
     @endphp
 
-    <div class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
+    <div class="flex flex-col h-full gap-2 md:gap-8 md:flex-row">
         <div class="sub-menu-wrapper hidden md:flex">
             @foreach ($configurationMenuItems as $menuItem)
                 <a @class([

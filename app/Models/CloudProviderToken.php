@@ -15,6 +15,10 @@ class CloudProviderToken extends BaseModel
         'name',
     ];
 
+    protected $hidden = [
+        'token',
+    ];
+
     protected $casts = [
         'token' => 'encrypted',
     ];

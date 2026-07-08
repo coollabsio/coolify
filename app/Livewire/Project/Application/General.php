@@ -12,7 +12,6 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 use Livewire\Features\SupportEvents\Event;
-use Spatie\Url\Url;
 
 class General extends Component
 {
@@ -142,7 +141,8 @@ class General extends Component
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'fqdn' => 'nullable',
+            'fqdn' => ValidationPatterns::applicationDomainRules(),
+            'parsedServiceDomains.*.domain' => ValidationPatterns::applicationDomainRules(),
             'gitRepository' => 'required',
             'gitBranch' => ['required', 'string', new ValidGitBranch],
             'gitCommitSha' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
@@ -771,16 +771,7 @@ class General extends Component
             $oldBaseDirectory = $this->application->base_directory;
 
             // Process FQDN with intermediate variable to avoid Collection/string confusion
-            $this->fqdn = str($this->fqdn)->replaceEnd(',', '')->trim()->toString();
-            $this->fqdn = str($this->fqdn)->replaceStart(',', '')->trim()->toString();
-            $domains = str($this->fqdn)->trim()->explode(',')->map(function ($domain) {
-                $domain = trim($domain);
-                Url::fromString($domain, ['http', 'https']);
-
-                return str($domain)->lower();
-            });
-
-            $this->fqdn = $domains->unique()->implode(',');
+            $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
             $warning = sslipDomainWarning($this->fqdn);
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));
@@ -863,6 +854,9 @@ class General extends Component
                 }
             }
             if ($this->buildPack === 'dockercompose') {
+                foreach ($this->parsedServiceDomains as $serviceName => $service) {
+                    $this->parsedServiceDomains[$serviceName]['domain'] = ValidationPatterns::normalizeApplicationDomains(data_get($service, 'domain'));
+                }
                 $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
                 if ($this->application->isDirty('docker_compose_domains')) {
                     foreach ($this->parsedServiceDomains as $service) {

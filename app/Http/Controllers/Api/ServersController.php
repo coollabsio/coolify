@@ -25,9 +25,14 @@ class ServersController extends Controller
 {
     private function removeSensitiveDataFromSettings($settings)
     {
-        if (request()->attributes->get('can_read_sensitive', false) === false) {
-            $settings = $settings->makeHidden([
+        if (request()->attributes->get('can_read_sensitive', false) === true) {
+            $settings = $settings->makeVisible([
                 'sentinel_token',
+                'sentinel_custom_url',
+                'logdrain_newrelic_license_key',
+                'logdrain_axiom_api_key',
+                'logdrain_custom_config',
+                'logdrain_custom_config_parser',
             ]);
         }
 
@@ -39,8 +44,11 @@ class ServersController extends Controller
         $server->makeHidden([
             'id',
         ]);
-        if (request()->attributes->get('can_read_sensitive', false) === false) {
-            // Do nothing
+        if (request()->attributes->get('can_read_sensitive', false) === true) {
+            $server->makeVisible([
+                'logdrain_axiom_api_key',
+                'logdrain_newrelic_license_key',
+            ]);
         }
 
         return serializeApiResponse($server);

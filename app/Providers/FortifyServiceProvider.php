@@ -7,6 +7,7 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\OauthSetting;
+use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -82,7 +83,7 @@ class FortifyServiceProvider extends ServiceProvider
                 $user->save();
 
                 // Check if user has a pending invitation they haven't accepted yet
-                $invitation = \App\Models\TeamInvitation::whereEmail($email)->first();
+                $invitation = TeamInvitation::whereEmail($email)->first();
                 if ($invitation && $invitation->isValid()) {
                     // User is logging in for the first time after being invited
                     // Attach them to the invited team if not already attached
@@ -130,7 +131,16 @@ class FortifyServiceProvider extends ServiceProvider
             // Use real client IP (not spoofable forwarded headers)
             $realIp = $request->server('REMOTE_ADDR') ?? $request->ip();
 
-            return Limit::perMinute(5)->by($realIp);
+            $limits = [
+                Limit::perMinutes(10, 3)->by('forgot-password:ip:'.sha1($realIp)),
+            ];
+
+            $emailIdentity = normalize_email_identity($request->input('email'));
+            if ($emailIdentity !== null) {
+                $limits[] = Limit::perHour(3)->by('forgot-password:email-identity:'.sha1($emailIdentity));
+            }
+
+            return $limits;
         });
 
         RateLimiter::for('login', function (Request $request) {

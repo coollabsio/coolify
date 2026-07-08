@@ -161,6 +161,33 @@ test('member cannot update email notification settings', function () {
         ->assertForbidden();
 });
 
+test('member cannot update smtp email transport directly', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(EmailNotification::class)
+        ->set('smtpFromAddress', 'member@example.com')
+        ->set('smtpFromName', 'Member')
+        ->set('smtpHost', 'smtp.example.com')
+        ->set('smtpPort', '587')
+        ->set('smtpEncryption', 'starttls')
+        ->set('smtpPassword', 'member-smtp-password')
+        ->call('submitSmtp')
+        ->assertForbidden();
+});
+
+test('member cannot update resend email transport directly', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(EmailNotification::class)
+        ->set('smtpFromAddress', 'member@example.com')
+        ->set('smtpFromName', 'Member')
+        ->set('resendApiKey', 'member-resend-api-key')
+        ->call('submitResend')
+        ->assertForbidden();
+});
+
 test('member cannot copy instance email settings', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
@@ -312,6 +339,10 @@ test('member cannot view notification secrets', function (string $component, str
     'generic webhook' => [WebhookNotification::class, 'webhookNotificationSettings', [
         'webhook_url' => 'https://example.com/secret-webhook',
     ]],
+    'email credentials' => [EmailNotification::class, 'emailNotificationSettings', [
+        'smtp_password' => 'smtp-secret-password',
+        'resend_api_key' => 'resend-secret-api-key',
+    ]],
 ]);
 
 test('admin can view notification secrets', function (string $component, string $settingsRelation, array $secrets) {
@@ -345,5 +376,9 @@ test('admin can view notification secrets', function (string $component, string 
     ]],
     'generic webhook' => [WebhookNotification::class, 'webhookNotificationSettings', [
         'webhook_url' => 'https://example.com/admin-webhook',
+    ]],
+    'email credentials' => [EmailNotification::class, 'emailNotificationSettings', [
+        'smtp_password' => 'smtp-admin-password',
+        'resend_api_key' => 'resend-admin-api-key',
     ]],
 ]);

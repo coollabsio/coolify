@@ -114,7 +114,7 @@
             <span class="text-left menu-item-label" :class="collapsed && 'lg:hidden'">What's New</span>
             @if ($unreadCount > 0)
                 <span
-                    class="absolute top-0 right-0 bg-error text-white text-[10px] rounded-full min-w-4 h-4 px-1 flex items-center justify-center"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 bg-error text-white text-[10px] rounded-full min-w-4 h-4 px-1 flex items-center justify-center"
                     aria-label="{{ $unreadCount }} unread changelog {{ Str::plural('entry', $unreadCount) }}">
                     {{ $unreadCount > 9 ? '9+' : $unreadCount }}
                 </span>

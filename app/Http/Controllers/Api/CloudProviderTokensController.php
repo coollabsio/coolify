@@ -16,8 +16,13 @@ class CloudProviderTokensController extends Controller
     {
         $token->makeHidden([
             'id',
-            'token',
         ]);
+
+        if (request()->attributes->get('can_read_sensitive', false) === true) {
+            $token->makeVisible([
+                'token',
+            ]);
+        }
 
         return serializeApiResponse($token);
     }

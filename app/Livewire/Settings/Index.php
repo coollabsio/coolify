@@ -47,8 +47,6 @@ class Index extends Component
 
     public bool $forceSaveDomains = false;
 
-    public $buildActivityId = null;
-
     protected array $messages = [
         'fqdn.url' => 'Invalid instance URL.',
         'fqdn.max' => 'URL must not exceed 255 characters.',
