@@ -49,6 +49,16 @@ class RestartLimitReached extends CustomEmailNotification
         return $notifiable->getEnabledChannels('status_change');
     }
 
+    public function deduplicationKey(object $notifiable, string $channel): ?string
+    {
+        return "restart-limit-reached:application:{$this->resource->uuid}:count:{$this->restart_count}";
+    }
+
+    public function deduplicateFor(): int
+    {
+        return 86400;
+    }
+
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;

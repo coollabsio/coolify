@@ -557,7 +557,7 @@ class ValidationPatterns
                 continue;
             }
 
-            if (! filter_var($url, FILTER_VALIDATE_URL)) {
+            if (! isValidDomainUrl($url)) {
                 $errors[] = "Invalid URL: {$url}";
 
                 continue;

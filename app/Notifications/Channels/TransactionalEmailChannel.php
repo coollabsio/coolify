@@ -3,6 +3,7 @@
 namespace App\Notifications\Channels;
 
 use App\Models\User;
+use App\Services\NotificationDeduplicator;
 use Exception;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Notification;
@@ -10,6 +11,8 @@ use Illuminate\Support\Facades\Mail;
 
 class TransactionalEmailChannel
 {
+    public function __construct(private NotificationDeduplicator $deduplicator) {}
+
     public function send(User $notifiable, Notification $notification): void
     {
         $settings = instanceSettings();
@@ -27,13 +30,19 @@ class TransactionalEmailChannel
         }
         $this->bootConfigs();
         $mailMessage = $notification->toMail($notifiable);
+        $renderedMail = (string) $mailMessage->render();
+
+        if (! $this->deduplicator->shouldSend($notifiable, $notification, self::class, [$email], $mailMessage->subject, $renderedMail)) {
+            return;
+        }
+
         Mail::send(
             [],
             [],
             fn (Message $message) => $message
                 ->to($email)
                 ->subject($mailMessage->subject)
-                ->html((string) $mailMessage->render())
+                ->html($renderedMail)
         );
     }
 

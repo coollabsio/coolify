@@ -52,6 +52,16 @@ class DeploymentSuccess extends CustomEmailNotification
         return $notifiable->getEnabledChannels('deployment_success');
     }
 
+    public function deduplicationKey(object $notifiable, string $channel): ?string
+    {
+        return "deployment-success:{$this->deployment_uuid}";
+    }
+
+    public function deduplicateFor(): int
+    {
+        return 86400;
+    }
+
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;

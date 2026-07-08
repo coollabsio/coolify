@@ -81,7 +81,7 @@ test('admin sees add server button on dashboard', function () {
     createServerWithKeyForTeam($team);
 
     Livewire::test(Dashboard::class)
-        ->assertSee('New Server');
+        ->assertSee(route('server.create'));
 });
 
 test('member does not see add server button on dashboard', function () {
@@ -93,5 +93,5 @@ test('member does not see add server button on dashboard', function () {
     createServerWithKeyForTeam($team);
 
     Livewire::test(Dashboard::class)
-        ->assertDontSee('New Server');
+        ->assertDontSee(route('server.create'));
 });

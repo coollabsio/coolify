@@ -30,6 +30,16 @@ class Unreachable extends CustomEmailNotification
         return $notifiable->getEnabledChannels('server_unreachable');
     }
 
+    public function deduplicationKey(object $notifiable, string $channel): ?string
+    {
+        return "server-unreachable:{$this->server->uuid}";
+    }
+
+    public function deduplicateFor(): int
+    {
+        return 3600;
+    }
+
     public function toMail(): ?MailMessage
     {
         $mail = new MailMessage;

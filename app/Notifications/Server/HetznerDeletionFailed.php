@@ -21,6 +21,16 @@ class HetznerDeletionFailed extends CustomEmailNotification
         return $notifiable->getEnabledChannels('hetzner_deletion_failed');
     }
 
+    public function deduplicationKey(object $notifiable, string $channel): ?string
+    {
+        return "hetzner-deletion-failed:{$this->hetznerServerId}:error:".hash('sha256', $this->errorMessage);
+    }
+
+    public function deduplicateFor(): int
+    {
+        return 86400;
+    }
+
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;

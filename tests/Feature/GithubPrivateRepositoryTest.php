@@ -82,6 +82,13 @@ function githubPrivateRepositoryTestPrivateKeyForTeam(Team $team): PrivateKey
 }
 
 describe('GitHub Private Repository Component', function () {
+    test('github app selection uses coolbox loading border', function () {
+        Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app'])
+            ->assertSee('wire:loading.class="coolbox-loading"', false)
+            ->assertSee('wire:target="loadRepositories('.$this->githubApp->id.')"', false)
+            ->assertDontSee('loading-spinner', false);
+    });
+
     test('loadRepositories fetches and displays repositories', function () {
         $repos = [
             ['id' => 1, 'name' => 'alpha-repo', 'owner' => ['login' => 'testuser']],

@@ -187,3 +187,7 @@ it('normalizes application domain scheme and host without lowercasing path query
     expect(ValidationPatterns::normalizeApplicationDomains($domains))
         ->toBe('https://example.com/MixedCase/Path?Token=ABC#Fragment,http://sub.example.com/Api/V1');
 });
+
+it('validates application domains with underscores in the hostname', function () {
+    expect(ValidationPatterns::validateApplicationDomains('https://myapp_service.example.com'))->toBeEmpty();
+});

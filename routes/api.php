@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\CloudProviderTokensController;
 use App\Http\Controllers\Api\DatabasesController;
 use App\Http\Controllers\Api\DeployController;
 use App\Http\Controllers\Api\DestinationsController;
+use App\Http\Controllers\Api\DigitalOceanController;
 use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\HetznerController;
 use App\Http\Controllers\Api\OtherController;
@@ -14,8 +15,11 @@ use App\Http\Controllers\Api\ScheduledTasksController;
 use App\Http\Controllers\Api\SecurityController;
 use App\Http\Controllers\Api\SentinelController;
 use App\Http\Controllers\Api\ServersController;
+use App\Http\Controllers\Api\ServiceApplicationsController;
 use App\Http\Controllers\Api\ServicesController;
+use App\Http\Controllers\Api\TagsController;
 use App\Http\Controllers\Api\TeamController;
+use App\Http\Controllers\Api\VultrController;
 use App\Http\Middleware\ApiAllowed;
 use Illuminate\Support\Facades\Route;
 
@@ -104,9 +108,25 @@ Route::group([
     Route::get('/hetzner/server-types', [HetznerController::class, 'serverTypes'])->middleware(['api.ability:read']);
     Route::get('/hetzner/images', [HetznerController::class, 'images'])->middleware(['api.ability:read']);
     Route::get('/hetzner/ssh-keys', [HetznerController::class, 'sshKeys'])->middleware(['api.ability:read']);
+    Route::get('/hetzner/firewalls', [HetznerController::class, 'firewalls'])->middleware(['api.ability:read']);
+    Route::get('/hetzner/networks', [HetznerController::class, 'networks'])->middleware(['api.ability:read']);
     Route::post('/servers/hetzner', [HetznerController::class, 'createServer'])->middleware(['api.ability:write']);
 
+    Route::get('/vultr/regions', [VultrController::class, 'regions'])->middleware(['api.ability:read']);
+    Route::get('/vultr/plans', [VultrController::class, 'plans'])->middleware(['api.ability:read']);
+    Route::get('/vultr/os', [VultrController::class, 'operatingSystems'])->middleware(['api.ability:read']);
+    Route::get('/vultr/ssh-keys', [VultrController::class, 'sshKeys'])->middleware(['api.ability:read']);
+    Route::post('/servers/vultr', [VultrController::class, 'createServer'])->middleware(['api.ability:write']);
+
+    Route::get('/digitalocean/regions', [DigitalOceanController::class, 'regions'])->middleware(['api.ability:read']);
+    Route::get('/digitalocean/sizes', [DigitalOceanController::class, 'sizes'])->middleware(['api.ability:read']);
+    Route::get('/digitalocean/images', [DigitalOceanController::class, 'images'])->middleware(['api.ability:read']);
+    Route::get('/digitalocean/ssh-keys', [DigitalOceanController::class, 'sshKeys'])->middleware(['api.ability:read']);
+    Route::post('/servers/digitalocean', [DigitalOceanController::class, 'createServer'])->middleware(['api.ability:write']);
+
     Route::get('/resources', [ResourcesController::class, 'resources'])->middleware(['api.ability:read']);
+
+    Route::get('/tags', [TagsController::class, 'tags'])->middleware(['api.ability:read']);
 
     Route::get('/applications', [ApplicationsController::class, 'applications'])->middleware(['api.ability:read']);
     Route::post('/applications/public', [ApplicationsController::class, 'create_public_application'])->middleware(['api.ability:write']);
@@ -130,6 +150,11 @@ Route::group([
     Route::patch('/applications/{uuid}/storages', [ApplicationsController::class, 'update_storage'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/storages/{storage_uuid}', [ApplicationsController::class, 'delete_storage'])->middleware(['api.ability:write']);
 
+    Route::get('/applications/{uuid}/tags', [ApplicationsController::class, 'tags'])->middleware(['api.ability:read']);
+    Route::post('/applications/{uuid}/tags', [ApplicationsController::class, 'create_tag'])->middleware(['api.ability:write']);
+    Route::delete('/applications/{uuid}/tags/{tag_uuid}', [ApplicationsController::class, 'delete_tag'])->middleware(['api.ability:write']);
+
+    Route::post('/applications/{uuid}/move', [ApplicationsController::class, 'move_by_uuid'])->middleware(['api.ability:write']);
     Route::match(['get', 'post'], '/applications/{uuid}/start', [ApplicationsController::class, 'action_deploy'])->middleware(['api.ability:deploy']);
     Route::match(['get', 'post'], '/applications/{uuid}/restart', [ApplicationsController::class, 'action_restart'])->middleware(['api.ability:deploy']);
     Route::match(['get', 'post'], '/applications/{uuid}/stop', [ApplicationsController::class, 'action_stop'])->middleware(['api.ability:deploy']);
@@ -175,6 +200,11 @@ Route::group([
     Route::patch('/databases/{uuid}/envs', [DatabasesController::class, 'update_env_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/databases/{uuid}/envs/{env_uuid}', [DatabasesController::class, 'delete_env_by_uuid'])->middleware(['api.ability:write']);
 
+    Route::get('/databases/{uuid}/tags', [DatabasesController::class, 'tags'])->middleware(['api.ability:read']);
+    Route::post('/databases/{uuid}/tags', [DatabasesController::class, 'create_tag'])->middleware(['api.ability:write']);
+    Route::delete('/databases/{uuid}/tags/{tag_uuid}', [DatabasesController::class, 'delete_tag'])->middleware(['api.ability:write']);
+
+    Route::post('/databases/{uuid}/move', [DatabasesController::class, 'move_by_uuid'])->middleware(['api.ability:write']);
     Route::match(['get', 'post'], '/databases/{uuid}/start', [DatabasesController::class, 'action_deploy'])->middleware(['api.ability:deploy']);
     Route::match(['get', 'post'], '/databases/{uuid}/restart', [DatabasesController::class, 'action_restart'])->middleware(['api.ability:deploy']);
     Route::match(['get', 'post'], '/databases/{uuid}/stop', [DatabasesController::class, 'action_stop'])->middleware(['api.ability:deploy']);
@@ -198,9 +228,22 @@ Route::group([
     Route::delete('/services/{uuid}/envs/{env_uuid}', [ServicesController::class, 'delete_env_by_uuid'])->middleware(['api.ability:write']);
     Route::get('/services/{uuid}/logs', [ServicesController::class, 'logs_by_uuid'])->middleware(['api.ability:read']);
 
+    Route::get('/services/{uuid}/tags', [ServicesController::class, 'tags'])->middleware(['api.ability:read']);
+    Route::post('/services/{uuid}/tags', [ServicesController::class, 'create_tag'])->middleware(['api.ability:write']);
+    Route::delete('/services/{uuid}/tags/{tag_uuid}', [ServicesController::class, 'delete_tag'])->middleware(['api.ability:write']);
+
+    Route::post('/services/{uuid}/move', [ServicesController::class, 'move_by_uuid'])->middleware(['api.ability:write']);
     Route::match(['get', 'post'], '/services/{uuid}/start', [ServicesController::class, 'action_deploy'])->middleware(['api.ability:deploy']);
     Route::match(['get', 'post'], '/services/{uuid}/restart', [ServicesController::class, 'action_restart'])->middleware(['api.ability:deploy']);
     Route::match(['get', 'post'], '/services/{uuid}/stop', [ServicesController::class, 'action_stop'])->middleware(['api.ability:deploy']);
+
+    Route::get('/services/{uuid}/applications', [ServiceApplicationsController::class, 'index'])->middleware(['api.ability:read']);
+    Route::get('/services/{uuid}/applications/{app_uuid}', [ServiceApplicationsController::class, 'show'])->middleware(['api.ability:read']);
+    Route::patch('/services/{uuid}/applications/{app_uuid}', [ServiceApplicationsController::class, 'update'])->middleware(['api.ability:write']);
+    Route::match(['get', 'post'], '/services/{uuid}/applications/{app_uuid}/logs', [ServiceApplicationsController::class, 'logs_by_uuid'])->middleware(['api.ability:read']);
+    Route::match(['get', 'post'], '/services/{uuid}/applications/{app_uuid}/start', [ServiceApplicationsController::class, 'action_start'])->middleware(['api.ability:deploy']);
+    Route::match(['get', 'post'], '/services/{uuid}/applications/{app_uuid}/restart', [ServiceApplicationsController::class, 'action_restart'])->middleware(['api.ability:deploy']);
+    Route::match(['get', 'post'], '/services/{uuid}/applications/{app_uuid}/stop', [ServiceApplicationsController::class, 'action_stop'])->middleware(['api.ability:deploy']);
 
     Route::get('/applications/{uuid}/scheduled-tasks', [ScheduledTasksController::class, 'scheduled_tasks_by_application_uuid'])->middleware(['api.ability:read']);
     Route::post('/applications/{uuid}/scheduled-tasks', [ScheduledTasksController::class, 'create_scheduled_task_by_application_uuid'])->middleware(['api.ability:write']);

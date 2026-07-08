@@ -178,13 +178,18 @@ function executeInDocker(string $containerId, string $command)
     return "docker exec {$containerId} bash -c '{$escapedCommand}'";
 }
 
-function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
+function buildContainerStatusCommand(Server $server, string $container_id): string
 {
     if ($server->isSwarm()) {
-        $container = instant_remote_process(["docker service ls --filter 'name={$container_id}' --format '{{json .}}' "], $server, $throwError);
-    } else {
-        $container = instant_remote_process(["docker inspect --format '{{json .}}' {$container_id}"], $server, $throwError);
+        return 'docker service ls --filter '.escapeshellarg("name={$container_id}")." --format '{{json .}}' ";
     }
+
+    return "docker inspect --format '{{json .}}' ".escapeshellarg($container_id);
+}
+
+function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
+{
+    $container = instant_remote_process([buildContainerStatusCommand($server, $container_id)], $server, $throwError);
     if (! $container) {
         return 'exited';
     }

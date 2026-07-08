@@ -30,6 +30,11 @@ class Test extends Notification implements ShouldQueue
         $this->onQueue('high');
     }
 
+    public function shouldDeduplicate(): bool
+    {
+        return false;
+    }
+
     public function via(object $notifiable): array
     {
         if ($this->channel) {

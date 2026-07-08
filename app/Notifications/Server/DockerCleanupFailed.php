@@ -21,6 +21,16 @@ class DockerCleanupFailed extends CustomEmailNotification
         return $notifiable->getEnabledChannels('docker_cleanup_failure');
     }
 
+    public function deduplicationKey(object $notifiable, string $channel): ?string
+    {
+        return "docker-cleanup-failed:server:{$this->server->uuid}:message:".hash('sha256', $this->message);
+    }
+
+    public function deduplicateFor(): int
+    {
+        return 21600;
+    }
+
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;

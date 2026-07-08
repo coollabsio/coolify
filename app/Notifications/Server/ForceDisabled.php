@@ -21,6 +21,16 @@ class ForceDisabled extends CustomEmailNotification
         return $notifiable->getEnabledChannels('server_force_disabled');
     }
 
+    public function deduplicationKey(object $notifiable, string $channel): ?string
+    {
+        return "server-force-disabled:{$this->server->uuid}";
+    }
+
+    public function deduplicateFor(): int
+    {
+        return 86400;
+    }
+
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;

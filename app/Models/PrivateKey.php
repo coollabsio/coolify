@@ -42,6 +42,10 @@ class PrivateKey extends BaseModel
         'fingerprint',
     ];
 
+    protected $hidden = [
+        'private_key',
+    ];
+
     protected $casts = [
         'private_key' => 'encrypted',
     ];
@@ -287,7 +291,7 @@ class PrivateKey extends BaseModel
 
     public function getKeyLocation()
     {
-        return "/var/www/html/storage/app/ssh/keys/ssh_key@{$this->uuid}";
+        return Storage::disk('ssh-keys')->path("ssh_key@{$this->uuid}");
     }
 
     public function updatePrivateKey(array $data)

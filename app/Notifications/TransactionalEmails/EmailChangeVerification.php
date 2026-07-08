@@ -25,6 +25,16 @@ class EmailChangeVerification extends CustomEmailNotification
         $this->onQueue('high');
     }
 
+    public function deduplicationKey(object $notifiable, string $channel): ?string
+    {
+        return "email-change-verification:user:{$this->user->id}:email:{$this->newEmail}:code:{$this->verificationCode}";
+    }
+
+    public function deduplicateFor(): int
+    {
+        return (int) max(1, now()->diffInSeconds($this->expiresAt, false));
+    }
+
     public function toMail(): MailMessage
     {
         // Use the configured expiry minutes value
