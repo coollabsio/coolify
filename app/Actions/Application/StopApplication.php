@@ -39,6 +39,18 @@ class StopApplication
                 $timeout = $application->settings->stopGracePeriodSeconds();
 
                 foreach ($containersToStop as $containerName) {
+                    if (! $resetRestartCount) {
+                        $crashLog = instant_remote_process(["docker logs -n 500 -t $containerName"], $server, throwError: false);
+                        if ($crashLog !== null) {
+                            $snapshot = $application->last_crash_logs ?? [];
+                            $snapshot[$containerName] = removeAnsiColors($crashLog);
+                            $application->update([
+                                'last_crash_logs' => $snapshot,
+                                'last_crash_logs_captured_at' => now(),
+                            ]);
+                        }
+                    }
+
                     instant_remote_process(command: [
                         "docker stop --time=$timeout $containerName",
                         "docker rm -f $containerName",
@@ -62,6 +74,8 @@ class StopApplication
                 'restart_count' => 0,
                 'last_restart_at' => null,
                 'last_restart_type' => null,
+                'last_crash_logs' => null,
+                'last_crash_logs_captured_at' => null,
             ]);
         } else {
             $application->update([

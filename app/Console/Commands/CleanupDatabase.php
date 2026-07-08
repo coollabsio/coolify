@@ -64,5 +64,13 @@ class CleanupDatabase extends Command
         if ($this->option('yes')) {
             $scheduled_task_executions->delete();
         }
+
+        // Prune stale crash-log snapshots from the applications table
+        $stale_crash_logs = DB::table('applications')->whereNotNull('last_crash_logs')->where('last_crash_logs_captured_at', '<', now()->subDays($keep_days));
+        $count = $stale_crash_logs->count();
+        echo "Clear $count stale last_crash_logs entries from applications.\n";
+        if ($this->option('yes')) {
+            $stale_crash_logs->update(['last_crash_logs' => null, 'last_crash_logs_captured_at' => null]);
+        }
     }
 }

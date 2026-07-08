@@ -198,6 +198,12 @@ class GetLogs extends Component
                 })->join("\n");
             }
 
+            if (trim($newOutputs) === '' && $this->resource instanceof Application && ! empty($this->resource->last_crash_logs[$this->container])) {
+                $capturedAt = $this->resource->last_crash_logs_captured_at?->toDayDateTimeString() ?? 'unknown time';
+                $newOutputs = "[No live container found. Showing the last captured logs from {$capturedAt}, right before this container was automatically stopped for exceeding its restart limit.]\n\n"
+                    .$this->resource->last_crash_logs[$this->container];
+            }
+
             // Only update outputs after new data is ready (atomic update prevents flicker)
             $this->outputs = $newOutputs;
         }
