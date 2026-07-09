@@ -45,10 +45,50 @@ beforeEach(function () {
         ],
     ]);
 
+    Server::create([
+        'uuid' => 'production-1',
+        'name' => 'production-web',
+        'description' => 'Production web server cluster',
+        'ip' => '10.0.0.1',
+        'team_id' => 0,
+        'private_key_id' => 1,
+        'proxy' => [
+            'type' => ProxyTypes::TRAEFIK->value,
+            'status' => ProxyStatus::EXITED->value,
+        ],
+    ]);
+
+    Server::create([
+        'uuid' => 'staging-1',
+        'name' => 'staging-server',
+        'description' => 'Staging environment server',
+        'ip' => '10.0.0.2',
+        'team_id' => 0,
+        'private_key_id' => 1,
+        'proxy' => [
+            'type' => ProxyTypes::TRAEFIK->value,
+            'status' => ProxyStatus::EXITED->value,
+        ],
+    ]);
+
     Project::create([
         'uuid' => 'project-1',
         'name' => 'My first project',
         'description' => 'This is a test project in development',
+        'team_id' => 0,
+    ]);
+
+    Project::create([
+        'uuid' => 'project-2',
+        'name' => 'Production API',
+        'description' => 'Backend services for production',
+        'team_id' => 0,
+    ]);
+
+    Project::create([
+        'uuid' => 'project-3',
+        'name' => 'Staging Environment',
+        'description' => 'Staging and QA testing',
         'team_id' => 0,
     ]);
 });
@@ -62,6 +102,33 @@ function loginAndSkipOnboarding(): mixed
         ->click('Skip Setup');
 }
 
+it('redirects to login when not authenticated', function () {
+    $page = visit('/');
+
+    $page->assertPathIs('/login')
+        ->screenshot();
+});
+
+it('shows onboarding after first login', function () {
+    $page = visit('/login');
+
+    $page->fill('email', 'test@example.com')
+        ->fill('password', 'password')
+        ->click('Login')
+        ->assertSee('Welcome to Coolify')
+        ->assertSee("Let's go!")
+        ->assertSee('Skip Setup')
+        ->screenshot();
+});
+
+it('shows dashboard after skipping onboarding', function () {
+    $page = loginAndSkipOnboarding();
+
+    $page->assertSee('Dashboard')
+        ->assertSee('Your self-hosted infrastructure.')
+        ->screenshot();
+});
+
 it('shows project and server kpis on dashboard', function () {
     $page = loginAndSkipOnboarding();
 
@@ -70,12 +137,14 @@ it('shows project and server kpis on dashboard', function () {
         ->assertSee('Applications')
         ->assertSee('Services')
         ->assertSee('Databases')
-        ->assertSee('Active / Inactive');
+        ->assertSee('Active / Inactive')
+        ->screenshot();
 });
 
 it('shows latest deployments section on dashboard', function () {
     $page = loginAndSkipOnboarding();
 
     $page->assertSee('Latest Deployments')
-        ->assertSee('Connected Servers');
+        ->assertSee('Connected Servers')
+        ->screenshot();
 });
