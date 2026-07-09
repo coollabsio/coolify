@@ -57,7 +57,18 @@ beforeEach(function () {
 |
 */
 
-// function something()
-// {
-//     // ..
-// }
+function createTestPrivateKey(int $teamId, string $name = 'Test Key'): \App\Models\PrivateKey
+{
+    return \App\Models\PrivateKey::withoutEvents(function () use ($teamId, $name) {
+        $key = new \App\Models\PrivateKey([
+            'name' => $name,
+            'description' => 'Test SSH key',
+            'private_key' => 'test-private-key-material',
+            'team_id' => $teamId,
+        ]);
+        $key->uuid = (string) new \Visus\Cuid2\Cuid2;
+        $key->save();
+
+        return $key;
+    });
+}
