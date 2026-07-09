@@ -1,0 +1,85 @@
+# documentation: https://appboard.dev/docs/self-hosting
+# slogan: Open-source, self-hostable ASO tool — manage App Store & Google Play listings, keyword rank tracking, screenshots and publishing from one panel.
+# category: productivity
+# tags: aso, app-store, google-play, marketing, self-hosted, seo
+# logo: svgs/appboard.svg
+# port: 6600
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    volumes:
+      - appboard-postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-appboard}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  backend:
+    image: ghcr.io/erykkruk/appboard-backend:latest
+    volumes:
+      # Persists the auto-generated ENCRYPTION_KEY across restarts.
+      - appboard-backend-data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=6680
+      - DB_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-appboard}
+      - BETTER_AUTH_SECRET=${SERVICE_BASE64_64_AUTH}
+      - BETTER_AUTH_URL=${SERVICE_URL_WEB}
+      - ALLOWED_ORIGINS=${SERVICE_URL_WEB}
+      # Leave blank — the container generates and persists a 64-hex key on first boot.
+      - ENCRYPTION_KEY=
+      # First-boot admin: log in with this email + the generated password below,
+      # no SMTP required. Set ADMIN_EMAIL to your own email.
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      # Optional — set SMTP_* to enable email OTP login instead of the admin
+      # account, and OPENROUTER_API_KEY to enable the AI features.
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_FROM=${SMTP_FROM}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - bun
+        - -e
+        - "fetch('http://127.0.0.1:6680/api/system/health').then(()=>process.exit(0)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 10s
+      retries: 15
+
+  web:
+    image: ghcr.io/erykkruk/appboard-web:latest
+    environment:
+      - SERVICE_FQDN_WEB_6600
+      - NODE_ENV=production
+      - PORT=6600
+      - HOSTNAME=0.0.0.0
+      - BACKEND_URL=http://backend:6680
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - bun
+        - -e
+        - "fetch('http://127.0.0.1:6600/').then(()=>process.exit(0)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 10s
+      retries: 15
+
+volumes:
+  appboard-postgres-data:
+  appboard-backend-data:
