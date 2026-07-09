@@ -58,10 +58,8 @@ class InstanceSettings extends Model
         'smtp_username' => 'encrypted',
         'smtp_password' => 'encrypted',
         'smtp_timeout' => 'integer',
-
         'resend_enabled' => 'boolean',
         'resend_api_key' => 'encrypted',
-
         'allowed_ip_ranges' => 'array',
         'is_auto_update_enabled' => 'boolean',
         'auto_update_frequency' => 'string',
@@ -74,10 +72,8 @@ class InstanceSettings extends Model
     protected static function booted(): void
     {
         static::updated(function ($settings) {
-            // Clear once() cache so subsequent calls get fresh data
             Once::flush();
 
-            // Clear trusted hosts cache when FQDN changes
             if ($settings->wasChanged('fqdn')) {
                 \Cache::forget('instance_settings_fqdn_host');
             }
@@ -124,18 +120,18 @@ class InstanceSettings extends Model
 
     public static function get()
     {
-        return once(fn () => InstanceSettings::findOrFail(0));
+        return once(function () {
+            $settings = InstanceSettings::find(0);
+
+            if ($settings) {
+                return $settings;
+            }
+
+            InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
+
+            return InstanceSettings::findOrFail(0);
+        });
     }
-
-    // public function getRecipients($notification)
-    // {
-    //     $recipients = data_get($notification, 'emails', null);
-    //     if (is_null($recipients) || $recipients === '') {
-    //         return [];
-    //     }
-
-    //     return explode(',', $recipients);
-    // }
 
     public function getTitleDisplayName(): string
     {
@@ -146,17 +142,4 @@ class InstanceSettings extends Model
 
         return "[{$instanceName}]";
     }
-
-    // public function helperVersion(): Attribute
-    // {
-    //     return Attribute::make(
-    //         get: function ($value) {
-    //             if (isDev()) {
-    //                 return 'latest';
-    //             }
-
-    //             return $value;
-    //         }
-    //     );
-    // }
 }
