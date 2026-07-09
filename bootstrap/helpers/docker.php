@@ -456,6 +456,146 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             ->filter()
             ->unique();
     }
+
+    if ($domains->count() > 1 && ! $generate_unique_uuid && ! str($image)->contains('ghost')) {
+        $domainGroups = collect([]);
+        $redirectMiddlewares = collect([]);
+
+        foreach ($domains as $domain) {
+            try {
+                $url = Url::fromString($domain);
+                $host = $url->getHost();
+                $path = $url->getPath();
+                $schema = $url->getScheme();
+                $port = $url->getPort();
+                if (is_null($port) && ! is_null($onlyPort)) {
+                    $port = $onlyPort;
+                }
+
+                $redirect_middleware = null;
+                $redirect_label_base = $service_name ? "{$uuid}-{$service_name}" : $uuid;
+                if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
+                    $redirect_middleware = "{$redirect_label_base}-to-non-www";
+                    $redirectMiddlewares->put($redirect_middleware, [
+                        "traefik.http.middlewares.{$redirect_middleware}.redirectregex.regex=^(http|https)://www\.(.+)",
+                        "traefik.http.middlewares.{$redirect_middleware}.redirectregex.replacement=\${1}://\${2}",
+                        "traefik.http.middlewares.{$redirect_middleware}.redirectregex.permanent=false",
+                    ]);
+                }
+                if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
+                    $redirect_middleware = "{$redirect_label_base}-to-www";
+                    $redirectMiddlewares->put($redirect_middleware, [
+                        "traefik.http.middlewares.{$redirect_middleware}.redirectregex.regex=^(http|https)://(?:www\.)?(.+)",
+                        "traefik.http.middlewares.{$redirect_middleware}.redirectregex.replacement=\${1}://www.\${2}",
+                        "traefik.http.middlewares.{$redirect_middleware}.redirectregex.permanent=false",
+                    ]);
+                }
+
+                $groupKey = implode('|', [
+                    $schema,
+                    $path,
+                    $port ?? '',
+                    $redirect_middleware ?? '',
+                ]);
+                $group = $domainGroups->get($groupKey, [
+                    'schema' => $schema,
+                    'path' => $path,
+                    'port' => $port,
+                    'redirect_middleware' => $redirect_middleware,
+                    'hosts' => collect([]),
+                ]);
+                $group['hosts']->push($host);
+                $domainGroups->put($groupKey, $group);
+            } catch (Throwable) {
+                continue;
+            }
+        }
+
+        $redirectMiddlewares->each(function ($middlewareLabels) use ($labels) {
+            collect($middlewareLabels)->each(function ($middlewareLabel) use ($labels) {
+                $labels->push($middlewareLabel);
+            });
+        });
+
+        $groupIndex = 0;
+        $domainGroups->each(function ($group) use ($labels, &$groupIndex, $uuid, $service_name, $is_force_https_enabled, $is_gzip_enabled, $is_stripprefix_enabled, $is_http_basic_auth_enabled, $http_basic_auth_label, $middlewares_from_labels) {
+            $groupIndex++;
+            $label_suffix = "{$groupIndex}-{$uuid}";
+            if ($service_name) {
+                $label_suffix = "{$label_suffix}-{$service_name}";
+            }
+            $hostRule = $group['hosts']->unique()->map(fn ($host) => "Host(`{$host}`)")->join(' || ');
+            $rule = "({$hostRule}) && PathPrefix(`{$group['path']}`)";
+            $service_label = "service-{$label_suffix}";
+
+            $buildMiddlewares = function (string $router_label) use ($labels, $group, $is_gzip_enabled, $is_stripprefix_enabled, $is_http_basic_auth_enabled, $http_basic_auth_label, $middlewares_from_labels) {
+                $middlewares = collect([]);
+                if ($group['path'] !== '/' && $is_stripprefix_enabled) {
+                    $labels->push("traefik.http.middlewares.{$router_label}-stripprefix.stripprefix.prefixes={$group['path']}");
+                    $middlewares->push("{$router_label}-stripprefix");
+                }
+                if ($is_gzip_enabled) {
+                    $middlewares->push('gzip');
+                }
+                if ($group['redirect_middleware']) {
+                    $middlewares->push($group['redirect_middleware']);
+                }
+                if ($is_http_basic_auth_enabled) {
+                    $middlewares->push($http_basic_auth_label);
+                }
+                $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
+                    $middlewares->push($middleware_name);
+                });
+
+                return $middlewares->unique()->join(',');
+            };
+
+            if ($group['port']) {
+                $labels->push("traefik.http.services.{$service_label}.loadbalancer.server.port={$group['port']}");
+            }
+
+            if ($group['schema'] === 'https') {
+                $https_label = "https-{$label_suffix}";
+                $http_label = "http-{$label_suffix}";
+
+                $labels->push("traefik.http.routers.{$https_label}.rule={$rule}");
+                $labels->push("traefik.http.routers.{$https_label}.entryPoints=https");
+                if ($group['port']) {
+                    $labels->push("traefik.http.routers.{$https_label}.service={$service_label}");
+                }
+                $middlewares = $buildMiddlewares($https_label);
+                if ($middlewares !== '') {
+                    $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares}");
+                }
+                $labels->push("traefik.http.routers.{$https_label}.tls=true");
+                $labels->push("traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt");
+
+                $labels->push("traefik.http.routers.{$http_label}.rule={$rule}");
+                $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
+                if ($group['port']) {
+                    $labels->push("traefik.http.routers.{$http_label}.service={$service_label}");
+                }
+                if ($is_force_https_enabled) {
+                    $labels->push("traefik.http.routers.{$http_label}.middlewares=redirect-to-https");
+                }
+            } else {
+                $http_label = "http-{$label_suffix}";
+
+                $labels->push("traefik.http.routers.{$http_label}.rule={$rule}");
+                $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
+                if ($group['port']) {
+                    $labels->push("traefik.http.routers.{$http_label}.service={$service_label}");
+                }
+                $middlewares = $buildMiddlewares($http_label);
+                if ($middlewares !== '') {
+                    $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares}");
+                }
+            }
+        });
+
+        return $labels->sort();
+    }
+
     foreach ($domains as $loop => $domain) {
         try {
             if ($generate_unique_uuid) {
