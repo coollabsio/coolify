@@ -233,3 +233,28 @@ test('ConvertIpAndIp6Together', function () {
         'ip6' => ['2001:db8::1'],
     ]);
 });
+
+test('NameOptionIsIgnoredByConvert', function () {
+    $input = '--name my-container --init';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'init' => true,
+    ]);
+});
+
+test('DetectsNameOptionWithSpace', function () {
+    expect(customDockerRunOptionsContainsName('--name my-container'))->toBeTrue();
+});
+
+test('DetectsNameOptionWithEquals', function () {
+    expect(customDockerRunOptionsContainsName('--init --name=my-container'))->toBeTrue();
+});
+
+test('DoesNotDetectNameInOtherOptions', function () {
+    expect(customDockerRunOptionsContainsName('--network host --hostname myname'))->toBeFalse();
+});
+
+test('DoesNotDetectNameOnNullOrEmpty', function () {
+    expect(customDockerRunOptionsContainsName(null))->toBeFalse()
+        ->and(customDockerRunOptionsContainsName(''))->toBeFalse();
+});

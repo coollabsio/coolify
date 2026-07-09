@@ -766,6 +766,12 @@ class General extends Component
 
             $this->validate();
 
+            if (customDockerRunOptionsContainsName($this->customDockerRunOptions)) {
+                $this->dispatch('error', 'The --name option is not supported in Custom Docker Options.', "It would break Coolify's container lifecycle management. Use the 'Custom Internal Name' setting under Advanced instead.");
+
+                return;
+            }
+
             $oldPortsExposes = $this->application->ports_exposes;
             $oldIsContainerLabelEscapeEnabled = $this->application->settings->is_container_label_escape_enabled;
             $oldDockerComposeLocation = $this->initialDockerComposeLocation;

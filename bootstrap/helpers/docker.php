@@ -987,6 +987,15 @@ function isDatabaseImageWithContext(string $imageName, array $serviceConfig): bo
     return true;
 }
 
+function customDockerRunOptionsContainsName(?string $custom_docker_run_options = null): bool
+{
+    if (blank($custom_docker_run_options)) {
+        return false;
+    }
+
+    return (bool) preg_match('/(^|\s)--name(=|\s|$)/', $custom_docker_run_options);
+}
+
 function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 {
     $options = [];

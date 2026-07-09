@@ -3287,6 +3287,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         if ($this->pull_request_id === 0) {
+            if (customDockerRunOptionsContainsName($this->application->custom_docker_run_options)) {
+                $this->application_deployment_queue->addLogEntry("WARNING: The '--name' option in Custom Docker Options is not supported and will be ignored. Use the 'Custom Internal Name' setting (Advanced) to set a custom container name.", 'stderr');
+            }
             $custom_compose = convertDockerRunToCompose($this->application->custom_docker_run_options);
             if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
                 if (! $this->application->settings->custom_internal_name) {
@@ -3838,7 +3841,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('Building docker image completed.');
     }
 
-    private function graceful_shutdown_container(string $containerName, bool $skipRemove = false)
+    protected function graceful_shutdown_container(string $containerName, bool $skipRemove = false)
     {
         try {
             $timeout = $this->application->settings->deploymentStopGracePeriodSeconds();
@@ -3858,6 +3861,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
     }
 
+    protected function get_current_application_containers(): Collection
+    {
+        return getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+    }
+
     private function stop_running_container(bool $force = false)
     {
         try {
@@ -3865,8 +3873,14 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if ($this->newVersionIsHealthy || $force) {
                 if ($this->application->settings->is_consistent_container_name_enabled || str($this->application->settings->custom_internal_name)->isNotEmpty()) {
                     $this->graceful_shutdown_container($this->container_name);
+                    // Clean up orphaned containers left behind by a previous naming scheme
+                    // (e.g. timestamped names from before the consistent/custom name setting
+                    // was enabled, or an older custom name) — matched by label, not by name.
+                    $this->get_current_application_containers()
+                        ->filter(fn ($container) => data_get($container, 'Names') !== $this->container_name)
+                        ->each(fn ($container) => $this->graceful_shutdown_container(data_get($container, 'Names')));
                 } else {
-                    $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+                    $containers = $this->get_current_application_containers();
                     if ($this->pull_request_id === 0) {
                         $containers = $containers->filter(function ($container) {
                             return data_get($container, 'Names') !== $this->container_name && data_get($container, 'Names') !== addPreviewDeploymentSuffix($this->container_name, $this->pull_request_id);
