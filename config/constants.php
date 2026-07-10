@@ -16,7 +16,7 @@ return [
         'cdn_url' => env('CDN_URL', 'https://cdn.coollabs.io'),
         'versions_url' => env('VERSIONS_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/versions.json'),
         'upgrade_script_url' => env('UPGRADE_SCRIPT_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/upgrade.sh'),
-        'releases_url' => env('RELEASES_URL', 'https://raw.githubusercontent.com/coollabsio/coolify-cdn/main/json/releases.json'),
+        'releases_url' => env('RELEASES_URL', 'https://cdn.coollabs.io/coolify/releases.json'),
     ],
 
     'urls' => [

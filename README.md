@@ -105,7 +105,7 @@ Thank you so much!
 
 ### Small Sponsors
 
-<a href="https://www.movavi.com/mac.html?utm_source=coolify.io"><img width="60px" alt="Movavi" src="https://raw.githubusercontent.com/coollabsio/coollabs-cdn/main/images/sponsors/movavi.png"/></a>
+<a href="https://www.movavi.com/mac.html?utm_source=coolify.io"><img width="60px" alt="Movavi" src="https://cdn.coollabs.io/sponsors/movavi.png"/></a>
 <a href="https://usefoil.com/"><img width="60px" alt="ABXY" src="https://usefoil.com/favicon.svg"/></a>
 <a href="https://www.launchfa.st/?utm_source=coolify.io"><img width="60px" alt="LaunchFast Boilerplates" src="https://github.com/LaunchFast-Boilerplates.png"/></a>
 <a href="https://vanaways.co.uk/?utm_source=coolify.io"><img width="60px" alt="Vanaways" src="https://github.com/Vanaways.png"/></a>
@@ -113,39 +113,39 @@ Thank you so much!
 <a href="https://github.com/mindedtech"><img width="60px" alt="MindEd Tech" src="https://github.com/mindedtech.png"/></a>
 <a href="https://youstable.com/?utm_source=coolify.io"><img width="60px" alt="YouStable" src="https://github.com/youstable.png"/></a>
 <a href="https://transcript.lol/?utm_source=coolify.io"><img width="60px" alt="Transcript LOL" src="https://transcript.lol/logo.png"/></a>
-<a href="https://www.autom.dev/?utm_source=coolify.io"><img width="60px" alt="Autom" src="https://raw.githubusercontent.com/coollabsio/coollabs-cdn/main/images/sponsors/autom.png"/></a>
-<a href="https://www.huntapi.com/?utm_source=coolify.io"><img width="60px" alt="HuntAPI" src="https://raw.githubusercontent.com/coollabsio/coollabs-cdn/main/images/sponsors/huntapi.png"/></a>
+<a href="https://www.autom.dev/?utm_source=coolify.io"><img width="60px" alt="Autom" src="https://cdn.coollabs.io/sponsors/autom.png"/></a>
+<a href="https://www.huntapi.com/?utm_source=coolify.io"><img width="60px" alt="HuntAPI" src="https://cdn.coollabs.io/sponsors/huntapi.png"/></a>
 <a href="https://ultraservers.com/?utm_source=coolify.io"><img width="60px" alt="ULTRASERVERS" src="https://github.com/ULTRASERVERS.png"/></a>
 <a href="https://vibetone.com/?utm_source=coolify.io"><img width="60px" alt="VibeTone" src="https://github.com/vibetonefm.png"/></a>
-<a href="https://www.piloterr.com/?utm_source=coolify.io"><img width="60px" alt="Piloterr" src="https://raw.githubusercontent.com/coollabsio/coollabs-cdn/main/images/sponsors/piloterr.svg"/></a>
+<a href="https://www.piloterr.com/?utm_source=coolify.io"><img width="60px" alt="Piloterr" src="https://cdn.coollabs.io/sponsors/piloterr.svg"/></a>
 <a href="https://yoxel.com/?utm_source=coolify.io"><img width="60px" alt="Alexey Panteleev" src="https://github.com/aspantel.png"/></a>
 <a href="https://summyt.app?utm_source=coolify.io"><img width="60px" alt="SummYT - YouTube Summarizer" src="https://summyt.app/logo.svg"/></a>
 <a href="https://open-elements.com/?utm_source=coolify.io"><img width="60px" alt="OpenElements" src="https://github.com/OpenElements.png"/></a>
 <a href="https://xaman.app/?utm_source=coolify.io"><img width="60px" alt="Xaman" src="https://github.com/XamanApp.png"/></a>
 <a href="https://monadical.com/?utm_source=coolify.io"><img width="60px" alt="Monadical" src="https://github.com/Monadical-SAS.png"/></a>
 <a href="https://maas.engineering/?utm_source=coolify.io"><img width="60px" alt="Magic as a Service" src="https://github.com/magicasaservice.png"/></a>
-<a href="https://fivemanage.com?utm_source=coolify.io"><img width="60px" alt="FiveManage" src="https://raw.githubusercontent.com/coollabsio/coollabs-cdn/main/images/sponsors/fivemanage.jpg"/></a>
+<a href="https://fivemanage.com?utm_source=coolify.io"><img width="60px" alt="FiveManage" src="https://cdn.coollabs.io/sponsors/fivemanage.jpg"/></a>
 <a href="https://cryptojobslist.com/?utm_source=coolify.io"><img width="60px" alt="Crypto Jobs List" src="https://github.com/cryptojobslist.png"/></a>
 <a href="https://serpapi.com/?utm_source=coolify.io"><img width="60px" alt="SerpAPI" src="https://github.com/serpapi.png"/></a>
 <a href="https://typebot.io/?utm_source=coolify.io"><img width="60px" alt="typebot" src="https://cdn.bsky.app/img/avatar/plain/did:plc:gwxcta3pccyim4z5vuultdqx/bafkreig23hci7e2qpdxicsshnuzujbcbcgmydxhbybkewszdezhdodv42m@jpeg"/></a>
 <a href="https://360creators.com/?utm_source=coolify.io"><img width="60px" alt="360Creators" src="https://opencollective-production.s3.us-west-1.amazonaws.com/account-avatar/503e0953-bff7-4296-b4cc-5e36d40eecc0/icon-360creators.png"/></a>
 <a href="https://capgo.app/?utm_source=coolify.io"><img width="60px" alt="Cap-go" src="https://github.com/cap-go.png"/></a>
-<a href="https://cirun.io/?utm_source=coolify.io"><img width="60px" alt="Cirun" src="https://raw.githubusercontent.com/coollabsio/coollabs-cdn/main/images/sponsors/cirun-logo.png"/></a>
+<a href="https://cirun.io/?utm_source=coolify.io"><img width="60px" alt="Cirun" src="https://cdn.coollabs.io/sponsors/cirun-logo.png"/></a>
 <a href="https://github.com/puls-digital-group"><img width="60px" alt="Puls Digital Group" src="https://github.com/puls-digital-group.png"/></a>
 <a href="https://github.com/jonathanprl"><img width="60px" alt="Jonathan Pereira" src="https://github.com/jonathanprl.png"/></a>
-<a href="https://internetgarden.co/?utm_source=coolify.io"><img width="60px" alt="Internet Garden" src="https://raw.githubusercontent.com/coollabsio/coollabs-cdn/main/images/sponsors/internetgarden.ico"/></a>
+<a href="https://internetgarden.co/?utm_source=coolify.io"><img width="60px" alt="Internet Garden" src="https://cdn.coollabs.io/sponsors/internetgarden.ico"/></a>
 <a href="https://evercam.io/?utm_source=coolify.io"><img width="60px" alt="Evercam" src="https://github.com/evercam.png"/></a>
-<a href="https://web3.career/?utm_source=coolify.io"><img width="60px" alt="Web3 Jobs" src="https://raw.githubusercontent.com/coollabsio/coollabs-cdn/main/images/sponsors/web3jobs.png"/></a>
-<a href="https://linkdr.com?utm_source=coolify.io"><img width="60px" alt="LinkDr" src="https://raw.githubusercontent.com/coollabsio/coollabs-cdn/main/images/sponsors/linkdr.svg"/></a>
-<a href="https://arvensis.systems/?utm_source=coolify.io"><img width="60px" alt="Arvensis Systems" src="https://raw.githubusercontent.com/coollabsio/coollabs-cdn/main/images/sponsors/arvensis.png"/></a>
-<a href="https://www.reshot.ai/?utm_source=coolify.io"><img width="60px" alt="Reshot" src="https://raw.githubusercontent.com/coollabsio/coollabs-cdn/main/images/sponsors/reshotai.png"/></a>
-<a href="https://www.runpod.io/?utm_source=coolify.io"><img width="60px" alt="RunPod" src="https://raw.githubusercontent.com/coollabsio/coollabs-cdn/main/images/sponsors/runpod.svg"/></a>
+<a href="https://web3.career/?utm_source=coolify.io"><img width="60px" alt="Web3 Jobs" src="https://cdn.coollabs.io/sponsors/web3jobs.png"/></a>
+<a href="https://linkdr.com?utm_source=coolify.io"><img width="60px" alt="LinkDr" src="https://cdn.coollabs.io/sponsors/linkdr.svg"/></a>
+<a href="https://arvensis.systems/?utm_source=coolify.io"><img width="60px" alt="Arvensis Systems" src="https://cdn.coollabs.io/sponsors/arvensis.png"/></a>
+<a href="https://www.reshot.ai/?utm_source=coolify.io"><img width="60px" alt="Reshot" src="https://cdn.coollabs.io/sponsors/reshotai.png"/></a>
+<a href="https://www.runpod.io/?utm_source=coolify.io"><img width="60px" alt="RunPod" src="https://cdn.coollabs.io/sponsors/runpod.svg"/></a>
 <a href="http://gravitywiz.com/?utm_source=coolify.io"><img width="60px" alt="Gravity Wiz" src="https://github.com/gravitywiz.png"/></a>
 <a href="https://www.uxwizz.com/?utm_source=coolify.io"><img width="60px" alt="UXWizz" src="https://github.com/UXWizz.png"/></a>
-<a href="https://codext.link/coolify-io?utm_source=coolify.io"><img width="60px" alt="Codext" src="https://raw.githubusercontent.com/coollabsio/coollabs-cdn/main/images/sponsors/codext.jpg"/></a>
-<a href="https://interviewpal.com"><img width="60px" alt="InterviewPal" src="https://raw.githubusercontent.com/coollabsio/coollabs-cdn/main/images/sponsors/interviewpal.svg"/></a>
+<a href="https://codext.link/coolify-io?utm_source=coolify.io"><img width="60px" alt="Codext" src="https://cdn.coollabs.io/sponsors/codext.jpg"/></a>
+<a href="https://interviewpal.com"><img width="60px" alt="InterviewPal" src="https://cdn.coollabs.io/sponsors/interviewpal.svg"/></a>
 <a href="https://decidable.no?utm_source=coolify.io"><img width="60px" alt="Decidable" src="https://github.com/Decidable-AS.png"/></a>
-<a href="https://hosthavoc.com"><img width="60px" alt="Host Havoc" src="https://raw.githubusercontent.com/coollabsio/coollabs-cdn/main/images/sponsors/hosthavoc.png"/></a>
+<a href="https://hosthavoc.com"><img width="60px" alt="Host Havoc" src="https://cdn.coollabs.io/sponsors/hosthavoc.png"/></a>
 
 ...and many more at [GitHub Sponsors](https://github.com/sponsors/coollabsio)
 
