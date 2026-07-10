@@ -373,7 +373,8 @@
                         baseUrl = devWebhook;
                     }
                     const webhookBaseUrl = `${baseUrl}/webhooks`;
-                    const path = organization ? `organizations/${organization}/settings/apps/new` : 'settings/apps/new';
+                    const organizationPath = organization ? encodeURIComponent(organization.replace(/^\/+|\/+$/g, '')) : '';
+                    const path = organizationPath ? `organizations/${organizationPath}/settings/apps/new` : 'settings/apps/new';
                     const default_permissions = {
                         contents: 'read',
                         metadata: 'read',

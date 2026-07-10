@@ -55,6 +55,13 @@ class CloudProviderTokens extends Component
                 } else {
                     $this->dispatch('error', 'DigitalOcean token validation failed. Please check the token.');
                 }
+            } elseif ($token->provider === 'vultr') {
+                $isValid = $this->validateVultrToken($token->token);
+                if ($isValid) {
+                    $this->dispatch('success', 'Vultr token is valid.');
+                } else {
+                    $this->dispatch('error', 'Vultr token validation failed. Please check the token.');
+                }
             } else {
                 $this->dispatch('error', 'Unknown provider.');
             }
@@ -90,6 +97,19 @@ class CloudProviderTokens extends Component
             $response = Http::withToken($token)
                 ->timeout(10)
                 ->get('https://api.digitalocean.com/v2/account');
+
+            return $response->successful();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function validateVultrToken(string $token): bool
+    {
+        try {
+            $response = Http::withToken($token)
+                ->timeout(10)
+                ->get('https://api.vultr.com/v2/account');
 
             return $response->successful();
         } catch (\Throwable $e) {

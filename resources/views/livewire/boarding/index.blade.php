@@ -193,6 +193,30 @@
                                         </x-slot:content>
                                         <livewire:server.new.by-hetzner :limit_reached="false" :from_onboarding="true" />
                                     </x-modal-input>
+                                    <x-modal-input title="Connect a Vultr Server" isFullWidth>
+                                        <x-slot:content>
+                                            <div
+                                                class="group relative box-without-bg cursor-pointer hover:border-coollabs transition-all duration-200 p-6 h-full min-h-[210px]">
+                                                <div class="flex flex-col gap-4 text-left">
+                                                    <div class="flex items-center justify-between">
+                                                        <svg class="size-10" viewBox="0 0 200 200"
+                                                            xmlns="http://www.w3.org/2000/svg">
+                                                            <rect width="200" height="200" fill="#007BFC" rx="8" />
+                                                            <path d="M42 46 H73 L100 127 L127 46 H158 L114 154 H86 Z"
+                                                                fill="white" />
+                                                        </svg>
+                                                    </div>
+                                                    <div>
+                                                        <h3 class="text-xl font-bold mb-2">Vultr Cloud</h3>
+                                                        <p class="text-sm dark:text-neutral-400">
+                                                            Deploy servers directly from your Vultr account.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </x-slot:content>
+                                        <livewire:server.new.by-vultr :limit_reached="false" :from_onboarding="true" />
+                                    </x-modal-input>
                                 @endif
                             @endcan
                         </div>

@@ -9,6 +9,7 @@ use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class Change extends Component
@@ -78,11 +79,13 @@ class Change extends Component
 
     public string $activeTab = 'general';
 
+    private bool $shouldDeriveApiUrlAfterHtmlUrlUpdate = false;
+
     protected function rules(): array
     {
         return [
             'name' => 'required|string',
-            'organization' => 'nullable|string',
+            'organization' => ['nullable', 'string', 'regex:/\A[^\s\/?#]+\z/'],
             'apiUrl' => ['required', 'string', 'url', new SafeExternalUrl],
             'htmlUrl' => ['required', 'string', 'url', new SafeExternalUrl],
             'customUser' => 'required|string',
@@ -103,6 +106,19 @@ class Change extends Component
         ];
     }
 
+    public function updatingHtmlUrl(): void
+    {
+        $this->shouldDeriveApiUrlAfterHtmlUrlUpdate = blank($this->apiUrl)
+            || $this->apiUrl === githubApiUrlFromHtmlUrl($this->htmlUrl);
+    }
+
+    public function updatedHtmlUrl(): void
+    {
+        if ($this->shouldDeriveApiUrlAfterHtmlUrlUpdate) {
+            $this->apiUrl = githubApiUrlFromHtmlUrl($this->htmlUrl);
+        }
+    }
+
     public function boot()
     {
         if ($this->github_app) {
@@ -119,6 +135,11 @@ class Change extends Component
     {
         if ($toModel) {
             // Sync TO model (before save)
+            $this->organization = normalizeGithubOrganization($this->organization);
+            $this->apiUrl = filled($this->apiUrl)
+                ? $this->apiUrl
+                : githubApiUrlFromHtmlUrl($this->htmlUrl);
+
             $this->github_app->name = $this->name;
             $this->github_app->organization = $this->organization;
             $this->github_app->api_url = $this->apiUrl;
@@ -294,11 +315,14 @@ class Change extends Component
 
     public function getGithubAppNameUpdatePath()
     {
-        if (str($this->github_app->organization)->isNotEmpty()) {
-            return "{$this->github_app->html_url}/organizations/{$this->github_app->organization}/settings/apps/{$this->github_app->name}";
+        $name = encodeGithubPathSegment($this->github_app->name);
+        $organization = normalizeGithubOrganization($this->github_app->organization);
+
+        if (filled($organization)) {
+            return rtrim($this->github_app->html_url, '/').'/organizations/'.encodeGithubPathSegment($organization)."/settings/apps/{$name}";
         }
 
-        return "{$this->github_app->html_url}/settings/apps/{$this->github_app->name}";
+        return rtrim($this->github_app->html_url, '/')."/settings/apps/{$name}";
     }
 
     public function updateGithubAppName()
@@ -341,11 +365,17 @@ class Change extends Component
             $this->authorize('update', $this->github_app);
 
             $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
+            $this->organization = normalizeGithubOrganization($this->organization);
+            $this->apiUrl = filled($this->apiUrl)
+                ? $this->apiUrl
+                : githubApiUrlFromHtmlUrl($this->htmlUrl);
             $this->validate();
 
             $this->syncData(true);
             $this->github_app->save();
             $this->dispatch('success', 'Github App updated.');
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
