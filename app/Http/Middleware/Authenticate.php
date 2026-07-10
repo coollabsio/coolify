@@ -2,16 +2,41 @@
 
 namespace App\Http\Middleware;
 
-use Illuminate\Auth\Middleware\Authenticate as Middleware;
+use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
-class Authenticate extends Middleware
+class Authenticate
 {
     /**
-     * Get the path the user should be redirected to when they are not authenticated.
+     * Handle an incoming request.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Closure  $next
+     * @param  string|null  $guard
+     * @return mixed
      */
-    protected function redirectTo(Request $request): ?string
+    public function handle(Request $request, Closure $next, $guard = null)
     {
-        return $request->expectsJson() ? null : route('login');
+        if (Auth::guard($guard)->guest()) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response('Unauthorized.', 401);
+            } else {
+                return redirect()->guest('login');
+            }
+        }
+
+        // Check if the user is logging in via OAuth2
+        if (Auth::user()->provider === 'oauth2') {
+            // Allow self-registration for OAuth2 users
+            return $next($request);
+        }
+
+        // Check if self-registration is enabled
+        if (!config('auth.self_registration')) {
+            return redirect()->back()->with('error', 'Self-registration is not allowed.');
+        }
+
+        return $next($request);
     }
 }
