@@ -9,7 +9,7 @@ services:
   postgres:
     image: postgres:18-alpine
     volumes:
-      - appboard-postgres-data:/var/lib/postgresql/data
+      - appboard-postgres-data:/var/lib/postgresql
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
@@ -70,7 +70,7 @@ services:
     healthcheck:
       test:
         - CMD
-        - bun
+        - node
         - -e
         - "fetch('http://127.0.0.1:6600/').then(()=>process.exit(0)).catch(()=>process.exit(1))"
       interval: 10s
