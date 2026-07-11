@@ -4,7 +4,7 @@
     </x-slot>
     <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="$query" />
 
-    <div class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
+    <div class="flex flex-col h-full gap-2 md:gap-8 md:flex-row">
         <div class="sub-menu-wrapper hidden md:flex">
             <a class="sub-menu-item" target="_blank" href="{{ $service->documentation() }}"><span class="menu-item-label">Documentation</span>
                 <x-external-link /></a>

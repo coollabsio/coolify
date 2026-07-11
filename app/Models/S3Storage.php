@@ -32,6 +32,11 @@ class S3Storage extends BaseModel
         'unusable_email_sent',
     ];
 
+    protected $hidden = [
+        'key',
+        'secret',
+    ];
+
     protected $casts = [
         'is_usable' => 'boolean',
         'key' => 'encrypted',

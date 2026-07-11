@@ -34,6 +34,10 @@ class DiscordNotificationSettings extends Model
         'discord_ping_enabled',
     ];
 
+    protected $hidden = [
+        'discord_webhook_url',
+    ];
+
     protected $casts = [
         'discord_enabled' => 'boolean',
         'discord_webhook_url' => 'encrypted',

@@ -127,6 +127,37 @@ describe('shouldSkipDueToBackoff', function () {
 });
 
 describe('ServerConnectionCheckJob unreachable_count', function () {
+    it('marks Vultr servers unreachable when provider status is unavailable', function () {
+        Event::fake([ServerReachabilityChanged::class]);
+
+        $settings = Mockery::mock();
+        $settings->is_reachable = true;
+        $settings->force_disabled = false;
+        $settings->shouldReceive('update')
+            ->with(['is_reachable' => false, 'is_usable' => false])
+            ->once();
+
+        $server = Mockery::mock(Server::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $server->shouldReceive('getAttribute')->andReturnUsing(fn (string $key) => match ($key) {
+            'settings' => $settings,
+            'unreachable_notification_sent' => false,
+            'vultr_instance_id' => 'instance-1',
+            'cloudProviderToken' => (object) ['token' => 'test-token'],
+            'id' => 1,
+            'name' => 'test-server',
+            'unreachable_count' => 1,
+            default => null,
+        });
+        $server->shouldReceive('refreshVultrState')->once()->andReturn('stopped');
+        $server->shouldReceive('increment')->with('unreachable_count')->once();
+        $server->id = 1;
+        $server->name = 'test-server';
+        $server->uuid = 'server-uuid';
+
+        $job = new ServerConnectionCheckJob($server);
+        $job->handle();
+    });
+
     it('increments unreachable_count on timeout', function () {
         Event::fake([ServerReachabilityChanged::class]);
 

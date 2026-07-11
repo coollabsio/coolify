@@ -1,4 +1,4 @@
-@if ($authDisabled)
+@if ($authDisabled || filled($tooltip))
 <span class="relative inline-flex"
     x-data="{ visible: false, _t: null }"
     @mouseenter="_t = setTimeout(() => {
@@ -39,9 +39,9 @@
         @endif
     @endif
 </button>
-@if ($authDisabled)
+@if ($authDisabled || filled($tooltip))
     <div x-ref="tip" x-show="visible" x-cloak class="auth-tooltip">
-        You do not have permission to perform this action.
+        {{ $tooltip ?: 'You do not have permission to perform this action.' }}
     </div>
 </span>
 @endif

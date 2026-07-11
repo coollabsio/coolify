@@ -24,7 +24,7 @@ trait BuildsResponse
         // raw IDs / morph types (uuid is the public identifier)
         'id', 'team_id', 'tokenable_id', 'tokenable_type',
         'server_id', 'private_key_id', 'cloud_provider_token_id',
-        'hetzner_server_id', 'environment_id', 'destination_id',
+        'hetzner_server_id', 'digitalocean_droplet_id', 'environment_id', 'destination_id',
         'source_id', 'repository_project_id', 'application_id',
         'service_id', 'project_id', 'parent_id',
         'resourceable', 'resourceable_id', 'resourceable_type',

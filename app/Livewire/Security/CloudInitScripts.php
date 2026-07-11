@@ -27,6 +27,13 @@ class CloudInitScripts extends Component
 
     public function loadScripts()
     {
+        CloudInitScript::ownedByCurrentTeam()
+            ->whereNull('uuid')
+            ->get()
+            ->each(function (CloudInitScript $script): void {
+                $script->forceFill(['uuid' => new_public_id()])->save();
+            });
+
         $this->scripts = CloudInitScript::ownedByCurrentTeam()->orderBy('created_at', 'desc')->get();
     }
 

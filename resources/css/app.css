@@ -97,6 +97,90 @@
     }
 }
 
+@keyframes coolbox-border-track {
+    0% {
+        background-position: 0 0, 100% 0, 100% 100%, 0 100%;
+        background-size: 35% 2px, 0 0, 0 0, 0 0;
+    }
+
+    33% {
+        background-position: 100% 0, 100% 0, 100% 100%, 0 100%;
+        background-size: 35% 2px, 0 0, 0 0, 0 0;
+    }
+
+    34% {
+        background-position: 100% 0, 100% 0, 100% 100%, 0 100%;
+        background-size: 0 0, 2px 35%, 0 0, 0 0;
+    }
+
+    50% {
+        background-position: 100% 0, 100% 100%, 100% 100%, 0 100%;
+        background-size: 0 0, 2px 35%, 0 0, 0 0;
+    }
+
+    51% {
+        background-position: 0 0, 100% 0, 100% 100%, 0 100%;
+        background-size: 0 0, 0 0, 35% 2px, 0 0;
+    }
+
+    84% {
+        background-position: 0 0, 100% 0, 0 100%, 0 100%;
+        background-size: 0 0, 0 0, 35% 2px, 0 0;
+    }
+
+    85% {
+        background-position: 0 0, 100% 0, 100% 100%, 0 100%;
+        background-size: 0 0, 0 0, 0 0, 2px 35%;
+    }
+
+    100% {
+        background-position: 0 0, 100% 0, 100% 100%, 0 0;
+        background-size: 0 0, 0 0, 0 0, 2px 35%;
+    }
+}
+
+@layer components {
+    .coolbox-loading {
+        @apply overflow-hidden border-transparent;
+        isolation: isolate;
+    }
+
+    .coolbox-loading::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background:
+            linear-gradient(var(--color-warning), var(--color-warning)),
+            linear-gradient(var(--color-warning), var(--color-warning)),
+            linear-gradient(var(--color-warning), var(--color-warning)),
+            linear-gradient(var(--color-warning), var(--color-warning));
+        background-repeat: no-repeat;
+        animation: coolbox-border-track 2400ms linear infinite;
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    .coolbox-loading::after {
+        content: "";
+        position: absolute;
+        inset: 2px;
+        border-radius: calc(0.25rem - 2px);
+        background: white;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .dark .coolbox-loading::after {
+        background: var(--color-coolgray-100);
+    }
+
+    .coolbox-loading > * {
+        position: relative;
+        z-index: 2;
+    }
+}
+
 /*
 * Base styles
 */

@@ -96,7 +96,16 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        if (self::shouldSkipDeployAny([$this->pullRequestTitle])) {
+        $repository_parts = explode('/', $this->fullName);
+        $owner = $repository_parts[0] ?? '';
+        $repo = $repository_parts[1] ?? '';
+        $headCommitMessage = null;
+
+        if ($this->action === 'opened' || $this->action === 'synchronize' || $this->action === 'reopened') {
+            $headCommitMessage = getGithubCommitMessage($githubApp, $owner, $repo, $this->commitSha);
+        }
+
+        if (self::shouldSkipDeployAny([$this->pullRequestTitle, $headCommitMessage])) {
             return;
         }
 
@@ -120,9 +129,6 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
 
         // Get changed files for watch path filtering
         $changed_files = collect();
-        $repository_parts = explode('/', $this->fullName);
-        $owner = $repository_parts[0] ?? '';
-        $repo = $repository_parts[1] ?? '';
 
         if ($this->action === 'synchronize' && $this->beforeSha && $this->afterSha) {
             // For synchronize events, get files changed between before and after commits

@@ -1134,6 +1134,12 @@ class GlobalSearch extends Component
 
     public function navigateToResource($type)
     {
+        if ($type === 'server') {
+            $this->dispatch('closeSearchModal');
+
+            return redirectRoute($this, 'server.create');
+        }
+
         // Find the item by type - check regular items first, then services
         $item = collect($this->creatableItems)->firstWhere('type', $type);
 

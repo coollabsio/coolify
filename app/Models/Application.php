@@ -176,11 +176,8 @@ class Application extends BaseModel
         'manual_webhook_secret_bitbucket',
         'manual_webhook_secret_gitea',
         'docker_compose_location',
-        'docker_compose_pr_location',
         'docker_compose',
-        'docker_compose_pr',
         'docker_compose_raw',
-        'docker_compose_pr_raw',
         'docker_compose_domains',
         'docker_compose_custom_start_command',
         'docker_compose_custom_build_command',
@@ -217,6 +214,24 @@ class Application extends BaseModel
     ];
 
     protected $appends = ['server_status'];
+
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability. Internal serializers (deployment
+     * job, compose generation) must makeVisible explicitly before toArray().
+     */
+    protected $hidden = [
+        'http_basic_auth_password',
+        'manual_webhook_secret_github',
+        'manual_webhook_secret_gitlab',
+        'manual_webhook_secret_bitbucket',
+        'manual_webhook_secret_gitea',
+        'dockerfile',
+        'docker_compose',
+        'docker_compose_raw',
+        'custom_labels',
+    ];
 
     protected function casts(): array
     {
@@ -1266,9 +1281,9 @@ class Application extends BaseModel
     {
         $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->custom_network_aliases.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->settings?->use_build_secrets.$this->settings?->inject_build_args_to_dockerfile.$this->settings?->include_source_commit_in_build);
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
-            $newConfigHash .= json_encode($this->environment_variables()->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
+            $newConfigHash .= json_encode($this->environment_variables()->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->makeVisible('value')->sort());
         } else {
-            $newConfigHash .= json_encode($this->environment_variables_preview()->get(['value', 'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
+            $newConfigHash .= json_encode($this->environment_variables_preview()->get(['value', 'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->makeVisible('value')->sort());
         }
 
         return md5($newConfigHash);

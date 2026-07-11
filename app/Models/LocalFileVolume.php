@@ -25,6 +25,10 @@ class LocalFileVolume extends BaseModel
         'is_preview_suffix_enabled' => 'boolean',
     ];
 
+    protected $hidden = [
+        'content',
+    ];
+
     use HasFactory;
 
     protected $fillable = [
