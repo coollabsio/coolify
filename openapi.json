@@ -165,6 +165,10 @@
                                         "type": "boolean",
                                         "description": "The flag to indicate if HTTPS is forced. Defaults to true."
                                     },
+                                    "is_preview_deployments_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable preview deployments for pull requests."
+                                    },
                                     "static_image": {
                                         "type": "string",
                                         "enum": [
@@ -408,6 +412,13 @@
                                         "default": true,
                                         "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
                                     },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the application."
+                                    },
                                     "is_preserve_repository_enabled": {
                                         "type": "boolean",
                                         "default": false,
@@ -614,6 +625,10 @@
                                     "is_force_https_enabled": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if HTTPS is forced. Defaults to true."
+                                    },
+                                    "is_preview_deployments_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable preview deployments for pull requests."
                                     },
                                     "static_image": {
                                         "type": "string",
@@ -858,6 +873,13 @@
                                         "default": true,
                                         "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
                                     },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the application."
+                                    },
                                     "is_preserve_repository_enabled": {
                                         "type": "boolean",
                                         "default": false,
@@ -1064,6 +1086,10 @@
                                     "is_force_https_enabled": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if HTTPS is forced. Defaults to true."
+                                    },
+                                    "is_preview_deployments_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable preview deployments for pull requests."
                                     },
                                     "static_image": {
                                         "type": "string",
@@ -1307,6 +1333,13 @@
                                         "type": "boolean",
                                         "default": true,
                                         "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the application."
                                     },
                                     "is_preserve_repository_enabled": {
                                         "type": "boolean",
@@ -1626,6 +1659,10 @@
                                         "type": "boolean",
                                         "description": "The flag to indicate if HTTPS is forced. Defaults to true."
                                     },
+                                    "is_preview_deployments_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable preview deployments for pull requests."
+                                    },
                                     "use_build_server": {
                                         "type": "boolean",
                                         "nullable": true,
@@ -1662,6 +1699,13 @@
                                         "type": "boolean",
                                         "default": true,
                                         "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the application."
                                     }
                                 },
                                 "type": "object"
@@ -1961,6 +2005,10 @@
                                         "type": "boolean",
                                         "description": "The flag to indicate if HTTPS is forced. Defaults to true."
                                     },
+                                    "is_preview_deployments_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable preview deployments for pull requests."
+                                    },
                                     "use_build_server": {
                                         "type": "boolean",
                                         "nullable": true,
@@ -1997,6 +2045,13 @@
                                         "type": "boolean",
                                         "default": true,
                                         "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the application."
                                     }
                                 },
                                 "type": "object"
@@ -2333,6 +2388,10 @@
                                         "type": "boolean",
                                         "description": "The flag to indicate if HTTPS is forced. Defaults to true."
                                     },
+                                    "is_preview_deployments_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable preview deployments for pull requests."
+                                    },
                                     "install_command": {
                                         "type": "string",
                                         "description": "The install command."
@@ -2553,6 +2612,10 @@
                                     "is_preserve_repository_enabled": {
                                         "type": "boolean",
                                         "description": "Preserve git repository during application update. If false, the existing repository will be removed and replaced with the new one. If true, the existing repository will be kept and the new one will be ignored. Default is false."
+                                    },
+                                    "include_source_commit_in_build": {
+                                        "type": "boolean",
+                                        "description": "Include source commit information in the build. Default is false."
                                     }
                                 },
                                 "type": "object"
@@ -2674,6 +2737,16 @@
                             "type": "integer",
                             "format": "int32",
                             "default": 100
+                        }
+                    },
+                    {
+                        "name": "show_timestamps",
+                        "in": "query",
+                        "description": "Show timestamps in the logs.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
                         }
                     }
                 ],
@@ -3291,6 +3364,91 @@
                 ]
             }
         },
+        "\/applications\/{uuid}\/move": {
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Move",
+                "description": "Move application to another project\/environment. This is a purely organizational change \u2014 running containers are not affected. Note: after moving, the application will pick up shared environment variables from the new environment on the next deployment.",
+                "operationId": "move-application-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Target environment to move the application to.",
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "environment_uuid"
+                                ],
+                                "properties": {
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the target environment."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Application moved successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Application moved successfully."
+                                        },
+                                        "uuid": {
+                                            "type": "string"
+                                        },
+                                        "project_uuid": {
+                                            "type": "string"
+                                        },
+                                        "environment_uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/applications\/{uuid}\/storages": {
             "get": {
                 "tags": [
@@ -3682,6 +3840,179 @@
                 ]
             }
         },
+        "\/applications\/{uuid}\/tags": {
+            "get": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "List Tags",
+                "description": "List tags for an application by UUID.",
+                "operationId": "list-tags-by-application-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of tags.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/Tag"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Create Tag",
+                "description": "Add tag(s) to an application by UUID.",
+                "operationId": "create-tag-by-application-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "tag_name": {
+                                        "type": "string",
+                                        "description": "The tag name (min 2 characters). Required if tag_names is not provided."
+                                    },
+                                    "tag_names": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Array of tag names (each min 2 characters). Required if tag_name is not provided."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Tags added successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/Tag"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/applications\/{uuid}\/tags\/{tag_uuid}": {
+            "delete": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Delete Tag",
+                "description": "Remove a tag from an application by UUID.",
+                "operationId": "delete-tag-by-application-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "tag_uuid",
+                        "in": "path",
+                        "description": "UUID of the tag.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tag removed."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/cloud-tokens": {
             "get": {
                 "tags": [
@@ -3709,7 +4040,8 @@
                                                 "type": "string",
                                                 "enum": [
                                                     "hetzner",
-                                                    "digitalocean"
+                                                    "digitalocean",
+                                                    "vultr"
                                                 ]
                                             },
                                             "team_id": {
@@ -3767,7 +4099,8 @@
                                         "type": "string",
                                         "enum": [
                                             "hetzner",
-                                            "digitalocean"
+                                            "digitalocean",
+                                            "vultr"
                                         ],
                                         "example": "hetzner",
                                         "description": "The cloud provider."
@@ -4980,6 +5313,13 @@
                                     "instant_deploy": {
                                         "type": "boolean",
                                         "description": "Instant deploy the database"
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the database."
                                     }
                                 },
                                 "type": "object"
@@ -5112,6 +5452,13 @@
                                     "instant_deploy": {
                                         "type": "boolean",
                                         "description": "Instant deploy the database"
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the database."
                                     }
                                 },
                                 "type": "object"
@@ -5240,6 +5587,13 @@
                                     "instant_deploy": {
                                         "type": "boolean",
                                         "description": "Instant deploy the database"
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the database."
                                     }
                                 },
                                 "type": "object"
@@ -5372,6 +5726,13 @@
                                     "instant_deploy": {
                                         "type": "boolean",
                                         "description": "Instant deploy the database"
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the database."
                                     }
                                 },
                                 "type": "object"
@@ -5504,6 +5865,13 @@
                                     "instant_deploy": {
                                         "type": "boolean",
                                         "description": "Instant deploy the database"
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the database."
                                     }
                                 },
                                 "type": "object"
@@ -5648,6 +6016,13 @@
                                     "instant_deploy": {
                                         "type": "boolean",
                                         "description": "Instant deploy the database"
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the database."
                                     }
                                 },
                                 "type": "object"
@@ -5792,6 +6167,13 @@
                                     "instant_deploy": {
                                         "type": "boolean",
                                         "description": "Instant deploy the database"
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the database."
                                     }
                                 },
                                 "type": "object"
@@ -5924,6 +6306,13 @@
                                     "instant_deploy": {
                                         "type": "boolean",
                                         "description": "Instant deploy the database"
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the database."
                                     }
                                 },
                                 "type": "object"
@@ -5943,6 +6332,80 @@
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/logs": {
+            "get": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Get database logs.",
+                "description": "Get database logs by UUID.",
+                "operationId": "get-database-logs-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "lines",
+                        "in": "query",
+                        "description": "Number of lines to show from the end of the logs.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "default": 100
+                        }
+                    },
+                    {
+                        "name": "show_timestamps",
+                        "in": "query",
+                        "description": "Show timestamps in the logs.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get database logs by UUID.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "logs": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
                     }
                 },
                 "security": [
@@ -6109,6 +6572,91 @@
                     },
                     "404": {
                         "description": "Backup configuration not found."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/move": {
+            "post": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Move",
+                "description": "Move database to another project\/environment. This is a purely organizational change \u2014 running containers are not affected. Note: after moving, the database will pick up shared environment variables from the new environment on the next deployment.",
+                "operationId": "move-database-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Target environment to move the database to.",
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "environment_uuid"
+                                ],
+                                "properties": {
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the target environment."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Database moved successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Database moved successfully."
+                                        },
+                                        "uuid": {
+                                            "type": "string"
+                                        },
+                                        "project_uuid": {
+                                            "type": "string"
+                                        },
+                                        "environment_uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -6994,6 +7542,179 @@
                 ]
             }
         },
+        "\/databases\/{uuid}\/tags": {
+            "get": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "List Tags",
+                "description": "List tags for a database by UUID.",
+                "operationId": "list-tags-by-database-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of tags.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/Tag"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Create Tag",
+                "description": "Add tag(s) to a database by UUID.",
+                "operationId": "create-tag-by-database-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "tag_name": {
+                                        "type": "string",
+                                        "description": "The tag name (min 2 characters). Required if tag_names is not provided."
+                                    },
+                                    "tag_names": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Array of tag names (each min 2 characters). Required if tag_name is not provided."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Tags added successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/Tag"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/tags\/{tag_uuid}": {
+            "delete": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Delete Tag",
+                "description": "Remove a tag from a database by UUID.",
+                "operationId": "delete-tag-by-database-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "tag_uuid",
+                        "in": "path",
+                        "description": "UUID of the tag.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tag removed."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/deployments": {
             "get": {
                 "tags": [
@@ -7338,6 +8059,210 @@
                 ]
             }
         },
+        "\/digitalocean\/regions": {
+            "get": {
+                "tags": [
+                    "DigitalOcean"
+                ],
+                "summary": "Get DigitalOcean regions",
+                "operationId": "get-digitalocean-regions",
+                "parameters": [
+                    {
+                        "name": "cloud_provider_token_uuid",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "cloud_provider_token_id",
+                        "in": "query",
+                        "required": false,
+                        "deprecated": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of DigitalOcean regions."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/digitalocean\/sizes": {
+            "get": {
+                "tags": [
+                    "DigitalOcean"
+                ],
+                "summary": "Get DigitalOcean sizes",
+                "operationId": "get-digitalocean-sizes",
+                "parameters": [
+                    {
+                        "name": "cloud_provider_token_uuid",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "cloud_provider_token_id",
+                        "in": "query",
+                        "required": false,
+                        "deprecated": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of DigitalOcean sizes."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/digitalocean\/images": {
+            "get": {
+                "tags": [
+                    "DigitalOcean"
+                ],
+                "summary": "Get DigitalOcean images",
+                "operationId": "get-digitalocean-images",
+                "parameters": [
+                    {
+                        "name": "cloud_provider_token_uuid",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "cloud_provider_token_id",
+                        "in": "query",
+                        "required": false,
+                        "deprecated": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of DigitalOcean images."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/digitalocean\/ssh-keys": {
+            "get": {
+                "tags": [
+                    "DigitalOcean"
+                ],
+                "summary": "Get DigitalOcean SSH keys",
+                "operationId": "get-digitalocean-ssh-keys",
+                "parameters": [
+                    {
+                        "name": "cloud_provider_token_uuid",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "cloud_provider_token_id",
+                        "in": "query",
+                        "required": false,
+                        "deprecated": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of DigitalOcean SSH keys."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/digitalocean": {
+            "post": {
+                "tags": [
+                    "DigitalOcean"
+                ],
+                "summary": "Create a server on DigitalOcean",
+                "operationId": "create-digitalocean-server",
+                "responses": {
+                    "201": {
+                        "description": "DigitalOcean droplet created and linked to a Coolify server."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "DigitalOcean rate limit exceeded."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/github-apps": {
             "get": {
                 "tags": [
@@ -7439,7 +8364,6 @@
                             "schema": {
                                 "required": [
                                     "name",
-                                    "api_url",
                                     "html_url",
                                     "app_id",
                                     "installation_id",
@@ -8236,6 +9160,139 @@
                 ]
             }
         },
+        "\/hetzner\/firewalls": {
+            "get": {
+                "tags": [
+                    "Hetzner"
+                ],
+                "summary": "Get Hetzner Firewalls",
+                "description": "Get all existing Hetzner firewalls for the current project.",
+                "operationId": "get-hetzner-firewalls",
+                "parameters": [
+                    {
+                        "name": "cloud_provider_token_uuid",
+                        "in": "query",
+                        "description": "Cloud provider token UUID. Required if cloud_provider_token_id is not provided.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "cloud_provider_token_id",
+                        "in": "query",
+                        "description": "Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.",
+                        "required": false,
+                        "deprecated": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of Hetzner firewalls.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/hetzner\/networks": {
+            "get": {
+                "tags": [
+                    "Hetzner"
+                ],
+                "summary": "Get Hetzner Networks",
+                "description": "Get all existing Hetzner private networks for the current project.",
+                "operationId": "get-hetzner-networks",
+                "parameters": [
+                    {
+                        "name": "cloud_provider_token_uuid",
+                        "in": "query",
+                        "description": "Cloud provider token UUID. Required if cloud_provider_token_id is not provided.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "cloud_provider_token_id",
+                        "in": "query",
+                        "description": "Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.",
+                        "required": false,
+                        "deprecated": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of Hetzner networks.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            },
+                                            "ip_range": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/servers\/hetzner": {
             "post": {
                 "tags": [
@@ -8303,12 +9360,31 @@
                                         "example": true,
                                         "description": "Enable IPv6 (default: true)"
                                     },
+                                    "enable_backups": {
+                                        "type": "boolean",
+                                        "example": false,
+                                        "description": "Enable Hetzner server backups after creation (adds 20% to the monthly server fee)"
+                                    },
                                     "hetzner_ssh_key_ids": {
                                         "type": "array",
                                         "items": {
                                             "type": "integer"
                                         },
                                         "description": "Additional Hetzner SSH key IDs"
+                                    },
+                                    "hetzner_firewall_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "description": "Existing Hetzner firewall IDs to apply during server creation"
+                                    },
+                                    "hetzner_network_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "description": "Existing Hetzner network IDs to attach during server creation"
                                     },
                                     "cloud_init_script": {
                                         "type": "string",
@@ -10734,6 +11810,511 @@
                 ]
             }
         },
+        "\/services\/{uuid}\/applications": {
+            "get": {
+                "tags": [
+                    "Service applications"
+                ],
+                "summary": "List service applications",
+                "description": "List compose service applications (containers) for a single service.",
+                "operationId": "list-service-applications-by-service-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Service UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Service applications for this service.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/applications\/{app_uuid}": {
+            "get": {
+                "tags": [
+                    "Service applications"
+                ],
+                "summary": "Get service application",
+                "description": "Get a single compose service application by service UUID and application UUID.",
+                "operationId": "get-service-application-by-service-and-app-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Service UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "app_uuid",
+                        "in": "path",
+                        "description": "Service application UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Service application.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Service applications"
+                ],
+                "summary": "Update service application",
+                "description": "Update fields for a compose service application. Use `url` for comma-separated public URLs (same rules as `urls[].url` on PATCH \/services\/{uuid}).",
+                "operationId": "patch-service-application-by-service-and-app-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Service UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "app_uuid",
+                        "in": "path",
+                        "description": "Service application UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "force_domain_override",
+                        "in": "query",
+                        "description": "When true, allow duplicate URLs in the request and proceed despite domain conflicts (same as service PATCH).",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "url": {
+                                        "description": "Comma-separated list of URLs (e.g. \"http:\/\/app.example.com:8080,https:\/\/app2.example.com\"). Stored as fqdn.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "human_name": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "description": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "image": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "exclude_from_status": {
+                                        "type": [
+                                            "boolean",
+                                            "null"
+                                        ]
+                                    },
+                                    "is_log_drain_enabled": {
+                                        "type": [
+                                            "boolean",
+                                            "null"
+                                        ]
+                                    },
+                                    "is_gzip_enabled": {
+                                        "type": [
+                                            "boolean",
+                                            "null"
+                                        ]
+                                    },
+                                    "is_stripprefix_enabled": {
+                                        "type": [
+                                            "boolean",
+                                            "null"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated service application.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "Domain conflicts (unless force_domain_override)."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/applications\/{app_uuid}\/logs": {
+            "get": {
+                "tags": [
+                    "Service applications"
+                ],
+                "summary": "Get service application logs",
+                "description": "Get Docker logs for a single compose service container.",
+                "operationId": "get-service-application-logs-by-service-and-app-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Service UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "app_uuid",
+                        "in": "path",
+                        "description": "Service application UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "lines",
+                        "in": "query",
+                        "description": "Number of lines to show from the end of the logs.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "default": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Logs.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "logs": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "501": {
+                        "description": "Swarm not supported."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/applications\/{app_uuid}\/start": {
+            "get": {
+                "tags": [
+                    "Service applications"
+                ],
+                "summary": "Start or redeploy service application container",
+                "description": "Runs docker compose up for a single compose service (no-deps), optionally pulling the image and rebuilding.",
+                "operationId": "start-service-application-by-service-and-app-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Service UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "app_uuid",
+                        "in": "path",
+                        "description": "Service application UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "force",
+                        "in": "query",
+                        "description": "When true, passes --build to docker compose up.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    },
+                    {
+                        "name": "latest",
+                        "in": "query",
+                        "description": "When true, pulls the image for this compose service before up.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Deploy request queued.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "501": {
+                        "description": "Swarm not supported."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/applications\/{app_uuid}\/restart": {
+            "get": {
+                "tags": [
+                    "Service applications"
+                ],
+                "summary": "Restart service application container",
+                "description": "Restarts a single compose service container (docker restart).",
+                "operationId": "restart-service-application-by-service-and-app-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Service UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "app_uuid",
+                        "in": "path",
+                        "description": "Service application UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Restart queued.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "501": {
+                        "description": "Swarm not supported."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/applications\/{app_uuid}\/stop": {
+            "get": {
+                "tags": [
+                    "Service applications"
+                ],
+                "summary": "Stop service application container",
+                "description": "Stops a single compose service container (docker stop).",
+                "operationId": "stop-service-application-by-service-and-app-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Service UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "app_uuid",
+                        "in": "path",
+                        "description": "Service application UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Stop queued.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "501": {
+                        "description": "Swarm not supported."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/services": {
             "get": {
                 "tags": [
@@ -10857,6 +12438,13 @@
                                         "type": "boolean",
                                         "default": true,
                                         "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off."
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the service."
                                     }
                                 },
                                 "type": "object"
@@ -11293,6 +12881,90 @@
                 ]
             }
         },
+        "\/services\/{uuid}\/logs": {
+            "get": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Get service logs.",
+                "description": "Get logs for a specific service sub-resource by service UUID. The `sub_service_name` query parameter must match the `name` field of one of the service applications or databases returned by `GET \/services\/{uuid}`.",
+                "operationId": "get-service-logs-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "sub_service_name",
+                        "in": "query",
+                        "description": "Sub-service name from `GET \/services\/{uuid}` under `applications[].name` or `databases[].name`. Do not use `human_name` or the Docker container name with the service UUID suffix.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "appwrite-console"
+                        }
+                    },
+                    {
+                        "name": "lines",
+                        "in": "query",
+                        "description": "Number of lines to show from the end of the logs.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "default": 100
+                        }
+                    },
+                    {
+                        "name": "show_timestamps",
+                        "in": "query",
+                        "description": "Show timestamps in the logs.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get service logs by UUID.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "logs": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/services\/{uuid}\/envs": {
             "get": {
                 "tags": [
@@ -11677,6 +13349,91 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/move": {
+            "post": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Move",
+                "description": "Move service to another project\/environment. This is a purely organizational change \u2014 running containers are not affected. Note: after moving, the service will pick up shared environment variables from the new environment on the next deployment.",
+                "operationId": "move-service-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Target environment to move the service to.",
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "environment_uuid"
+                                ],
+                                "properties": {
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the target environment."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Service moved successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Service moved successfully."
+                                        },
+                                        "uuid": {
+                                            "type": "string"
+                                        },
+                                        "project_uuid": {
+                                            "type": "string"
+                                        },
+                                        "environment_uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -12195,6 +13952,215 @@
                 ]
             }
         },
+        "\/services\/{uuid}\/tags": {
+            "get": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "List Tags",
+                "description": "List tags for a service by UUID.",
+                "operationId": "list-tags-by-service-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of tags.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/Tag"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Create Tag",
+                "description": "Add tag(s) to a service by UUID.",
+                "operationId": "create-tag-by-service-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "tag_name": {
+                                        "type": "string",
+                                        "description": "The tag name (min 2 characters). Required if tag_names is not provided."
+                                    },
+                                    "tag_names": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Array of tag names (each min 2 characters). Required if tag_name is not provided."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Tags added successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/Tag"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/tags\/{tag_uuid}": {
+            "delete": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Delete Tag",
+                "description": "Remove a tag from a service by UUID.",
+                "operationId": "delete-tag-by-service-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "tag_uuid",
+                        "in": "path",
+                        "description": "UUID of the tag.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tag removed."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/tags": {
+            "get": {
+                "tags": [
+                    "Tags"
+                ],
+                "summary": "List",
+                "description": "List all tags for the current team.",
+                "operationId": "list-tags",
+                "responses": {
+                    "200": {
+                        "description": "All tags for the current team.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/Tag"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/teams": {
             "get": {
                 "tags": [
@@ -12388,6 +14354,139 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/vultr\/regions": {
+            "get": {
+                "tags": [
+                    "Vultr"
+                ],
+                "summary": "Get Vultr Regions",
+                "description": "Get all available Vultr regions.",
+                "operationId": "get-vultr-regions",
+                "responses": {
+                    "200": {
+                        "description": "List of Vultr regions."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/vultr\/plans": {
+            "get": {
+                "tags": [
+                    "Vultr"
+                ],
+                "summary": "Get Vultr Plans",
+                "description": "Get all available Vultr plans.",
+                "operationId": "get-vultr-plans",
+                "responses": {
+                    "200": {
+                        "description": "List of Vultr plans."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/vultr\/os": {
+            "get": {
+                "tags": [
+                    "Vultr"
+                ],
+                "summary": "Get Vultr Operating Systems",
+                "description": "Get all available Vultr operating systems.",
+                "operationId": "get-vultr-operating-systems",
+                "responses": {
+                    "200": {
+                        "description": "List of Vultr operating systems."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/vultr\/ssh-keys": {
+            "get": {
+                "tags": [
+                    "Vultr"
+                ],
+                "summary": "Get Vultr SSH Keys",
+                "description": "Get all Vultr SSH keys available to the selected token.",
+                "operationId": "get-vultr-ssh-keys",
+                "responses": {
+                    "200": {
+                        "description": "List of Vultr SSH keys."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/vultr": {
+            "post": {
+                "tags": [
+                    "Vultr"
+                ],
+                "summary": "Create Vultr Server",
+                "description": "Create a Vultr instance and link it as a Coolify server.",
+                "operationId": "create-vultr-server",
+                "responses": {
+                    "201": {
+                        "description": "Vultr server created."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Vultr API rate limit exceeded."
                     }
                 },
                 "security": [
@@ -13415,6 +15514,24 @@
                 },
                 "type": "object"
             },
+            "Tag": {
+                "description": "Tag model",
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "Team": {
                 "description": "Team model",
                 "properties": {
@@ -13638,6 +15755,10 @@
             "description": "Deployments"
         },
         {
+            "name": "DigitalOcean",
+            "description": "DigitalOcean"
+        },
+        {
             "name": "GitHub Apps",
             "description": "GitHub Apps"
         },
@@ -13666,12 +15787,24 @@
             "description": "Servers"
         },
         {
+            "name": "Service applications",
+            "description": "Service applications"
+        },
+        {
             "name": "Services",
             "description": "Services"
         },
         {
+            "name": "Tags",
+            "description": "Tags"
+        },
+        {
             "name": "Teams",
             "description": "Teams"
+        },
+        {
+            "name": "Vultr",
+            "description": "Vultr"
         }
     ]
 }

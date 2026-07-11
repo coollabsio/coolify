@@ -8,28 +8,28 @@
                 @forelse ($private_keys as $key)
                     @if ($private_key_id == $key->id)
                         <div class="gap-2 py-4 cursor-pointer group coolbox"
-                            wire:click="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
+                            wire:click="setPrivateKey('{{ $key->id }}')"
+                            wire:loading.class="coolbox-loading"
+                            wire:target="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
                             <div class="flex flex-col mx-6">
                                 <div class="box-title">
                                     {{ $key->name }}
                                 </div>
                                 <div class="box-description">
                                     {{ $key->description }}</div>
-                                <span wire:target="loadRepositories" wire:loading.delay
-                                    class="loading loading-xs dark:text-warning loading-spinner"></span>
                             </div>
                         </div>
                     @else
                         <div class="gap-2 py-4 cursor-pointer group coolbox"
-                            wire:click="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
+                            wire:click="setPrivateKey('{{ $key->id }}')"
+                            wire:loading.class="coolbox-loading"
+                            wire:target="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
                             <div class="flex flex-col mx-6">
                                 <div class="box-title">
                                     {{ $key->name }}
                                 </div>
                                 <div class="box-description">
                                     {{ $key->description }}</div>
-                                <span wire:target="loadRepositories" wire:loading.delay
-                                    class="loading loading-xs dark:text-warning loading-spinner"></span>
                             </div>
                         </div>
                     @endif

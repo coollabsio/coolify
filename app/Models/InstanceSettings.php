@@ -50,6 +50,17 @@ class InstanceSettings extends Model
         'webhook_allow_localhost',
     ];
 
+    protected $hidden = [
+        'smtp_from_address',
+        'smtp_from_name',
+        'smtp_recipients',
+        'smtp_host',
+        'smtp_username',
+        'smtp_password',
+        'resend_api_key',
+        'sentinel_token',
+    ];
+
     protected $casts = [
         'smtp_enabled' => 'boolean',
         'smtp_from_address' => 'encrypted',

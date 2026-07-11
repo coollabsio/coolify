@@ -17,6 +17,8 @@ use App\Livewire\Server\Proxy;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use App\Services\ConfigurationRepository;
+use App\Services\DigitalOceanService;
+use App\Services\VultrService;
 use App\Support\ValidationPatterns;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasMetrics;
@@ -254,6 +256,16 @@ class Server extends BaseModel
         'force_disabled' => 'boolean',
     ];
 
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability.
+     */
+    protected $hidden = [
+        'logdrain_axiom_api_key',
+        'logdrain_newrelic_license_key',
+    ];
+
     protected $schemalessAttributes = [
         'proxy',
     ];
@@ -269,7 +281,12 @@ class Server extends BaseModel
         'team_id',
         'hetzner_server_id',
         'hetzner_server_status',
+        'vultr_instance_id',
+        'vultr_instance_status',
+        'digitalocean_droplet_id',
+        'digitalocean_droplet_status',
         'is_validating',
+        'validation_logs',
         'detected_traefik_version',
         'traefik_outdated_info',
         'server_metadata',
@@ -288,6 +305,96 @@ class Server extends BaseModel
     public function type()
     {
         return 'server';
+    }
+
+    public function refreshVultrState(): ?string
+    {
+        if (! $this->vultr_instance_id || ! $this->cloudProviderToken) {
+            return null;
+        }
+
+        $vultrService = new VultrService($this->cloudProviderToken->token);
+        try {
+            $instance = $vultrService->getInstance($this->vultr_instance_id);
+        } catch (\Throwable $e) {
+            if ((int) $e->getCode() !== 404) {
+                throw $e;
+            }
+
+            if ($this->vultr_instance_status !== 'deleted') {
+                $this->update(['vultr_instance_status' => 'deleted']);
+                $this->forceFill(['vultr_instance_status' => 'deleted']);
+            }
+
+            return 'deleted';
+        }
+
+        $status = ($instance['power_status'] ?? null) === 'stopped'
+            ? 'stopped'
+            : ($instance['status'] ?? null);
+        $publicIp = $vultrService->getPublicIp($instance);
+
+        $updates = [];
+        if ($this->vultr_instance_status !== $status) {
+            $updates['vultr_instance_status'] = $status;
+        }
+
+        $hasPlaceholderIp = blank($this->ip) || in_array($this->ip, ['0.0.0.0', '::'], true);
+        if ($hasPlaceholderIp && $publicIp) {
+            $updates['ip'] = $publicIp;
+        }
+
+        if (! empty($updates)) {
+            $this->update($updates);
+            $this->forceFill($updates);
+        }
+
+        return $status;
+    }
+
+    public function refreshDigitalOceanState(): ?string
+    {
+        if (! $this->digitalocean_droplet_id || ! $this->cloudProviderToken || $this->cloudProviderToken->provider !== 'digitalocean') {
+            return $this->digitalocean_droplet_status;
+        }
+
+        $digitalOceanService = new DigitalOceanService($this->cloudProviderToken->token);
+
+        try {
+            $droplet = $digitalOceanService->getDroplet((int) $this->digitalocean_droplet_id);
+        } catch (RequestException $e) {
+            if ($e->response?->status() === 404) {
+                $this->update(['digitalocean_droplet_status' => 'deleted']);
+
+                return 'deleted';
+            }
+
+            throw $e;
+        } catch (\Throwable $e) {
+            if ((int) $e->getCode() === 404) {
+                $this->update(['digitalocean_droplet_status' => 'deleted']);
+
+                return 'deleted';
+            }
+
+            throw $e;
+        }
+
+        if (empty($droplet)) {
+            return $this->digitalocean_droplet_status;
+        }
+
+        $status = $droplet['status'] ?? null;
+        $ip = $digitalOceanService->getPublicIpAddress($droplet);
+
+        $updates = ['digitalocean_droplet_status' => $status];
+        if ($ip && $ip !== $this->ip) {
+            $updates['ip'] = $ip;
+        }
+
+        $this->update($updates);
+
+        return $status;
     }
 
     protected function isCoolifyHost(): Attribute

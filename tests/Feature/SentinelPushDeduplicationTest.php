@@ -82,18 +82,9 @@ it('skips the job when the second push is identical', function () use ($running)
     Queue::assertPushed(PushServerUpdateJob::class, 1);
 });
 
-it('only audits sentinel pushes that dispatch a state update', function () use ($running) {
-    $auditChannel = Mockery::mock();
-    $auditChannel->shouldReceive('info')
-        ->once()
-        ->with('sentinel.metrics_pushed', Mockery::on(function (array $context) {
-            return $context['server_uuid'] === $this->server->uuid
-                && $context['team_id'] === $this->team->id;
-        }));
+it('does not audit successful sentinel pushes', function () use ($running) {
+    Log::shouldReceive('channel')->with('audit')->never();
 
-    Log::shouldReceive('channel')->with('audit')->andReturn($auditChannel);
-
-    pushSentinel($this->token, sentinelPayload($running()))->assertOk();
     pushSentinel($this->token, sentinelPayload($running()))->assertOk();
 
     Queue::assertPushed(PushServerUpdateJob::class, 1);
