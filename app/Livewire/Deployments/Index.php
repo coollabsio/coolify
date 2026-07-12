@@ -1,0 +1,239 @@
+<?php
+
+namespace App\Livewire\Deployments;
+
+use App\Enums\ApplicationDeploymentStatus;
+use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
+use App\Models\Project;
+use App\Models\Server;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Livewire\Component;
+use Livewire\WithPagination;
+
+class Index extends Component
+{
+    use WithPagination;
+
+    public const PER_PAGE = 20;
+
+    public string $deployment_type = 'all';
+
+    public string $project = 'all';
+
+    public string $server = 'all';
+
+    public string $status = 'all';
+
+    protected $queryString = [
+        'deployment_type' => ['except' => 'all'],
+        'project' => ['except' => 'all'],
+        'server' => ['except' => 'all'],
+        'status' => ['except' => 'all'],
+    ];
+
+    public function mount(): void
+    {
+        $this->sanitizeFilters();
+    }
+
+    public function updatedDeploymentType(): void
+    {
+        $this->sanitizeFilters();
+        $this->resetPage();
+    }
+
+    public function updatedStatus(): void
+    {
+        $this->sanitizeFilters();
+        $this->resetPage();
+    }
+
+    public function updatedProject(): void
+    {
+        $this->sanitizeFilters();
+        $this->resetPage();
+    }
+
+    public function updatedServer(): void
+    {
+        $this->sanitizeFilters();
+        $this->resetPage();
+    }
+
+    public function deploymentTypeOptions(): array
+    {
+        return [
+            'all' => 'All',
+            'production' => 'Production',
+            'preview' => 'Preview PR',
+        ];
+    }
+
+    public function statusOptions(): array
+    {
+        return [
+            'all' => 'All statuses',
+            ApplicationDeploymentStatus::QUEUED->value => 'Queued',
+            ApplicationDeploymentStatus::IN_PROGRESS->value => 'In Progress',
+            ApplicationDeploymentStatus::FINISHED->value => 'Finished',
+            ApplicationDeploymentStatus::FAILED->value => 'Failed',
+            ApplicationDeploymentStatus::CANCELLED_BY_USER->value => 'Cancelled',
+        ];
+    }
+
+    public function projectOptions(): array
+    {
+        $applicationIds = ApplicationDeploymentQueue::query()
+            ->whereIn('application_id', $this->teamApplicationIds())
+            ->distinct()
+            ->pluck('application_id');
+
+        return Project::query()
+            ->where('team_id', currentTeam()?->id)
+            ->whereHas('applications', function ($query) use ($applicationIds) {
+                $query->whereIn('applications.id', $applicationIds);
+            })
+            ->orderByRaw('LOWER(name)')
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
+            ->all();
+    }
+
+    public function serverOptions(): array
+    {
+        $serverIds = ApplicationDeploymentQueue::query()
+            ->whereIn('application_id', $this->teamApplicationIds())
+            ->whereNotNull('server_id')
+            ->distinct()
+            ->pluck('server_id');
+
+        return Server::query()
+            ->where('team_id', currentTeam()?->id)
+            ->whereIn('id', $serverIds)
+            ->orderByRaw('LOWER(name)')
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn ($name, $id) => [(string) $id => $name])
+            ->all();
+    }
+
+    public function deployments(): LengthAwarePaginator
+    {
+        $applicationIds = $this->teamApplicationIds($this->project);
+
+        return ApplicationDeploymentQueue::query()
+            ->select([
+                'id',
+                'deployment_uuid',
+                'application_id',
+                'pull_request_id',
+                'commit',
+                'commit_message',
+                'status',
+                'is_webhook',
+                'is_api',
+                'created_at',
+                'finished_at',
+                'server_id',
+                'application_name',
+                'server_name',
+                'deployment_url',
+                'rollback',
+            ])
+            ->with(['application.environment.project'])
+            ->whereIn('application_id', $applicationIds)
+            ->when($this->deployment_type === 'production', function ($query) {
+                $query->where(function ($query) {
+                    $query->whereNull('pull_request_id')->orWhere('pull_request_id', 0);
+                });
+            })
+            ->when($this->deployment_type === 'preview', function ($query) {
+                $query->where('pull_request_id', '>', 0);
+            })
+            ->when($this->status !== 'all', function ($query) {
+                $query->where('status', $this->status);
+            })
+            ->when($this->server !== 'all', function ($query) {
+                $query->where('server_id', $this->server);
+            })
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->paginate(self::PER_PAGE)
+            ->withQueryString();
+    }
+
+    public function render()
+    {
+        $deployments = $this->deployments();
+        $servers = Server::query()
+            ->with('settings')
+            ->whereIn('id', $deployments->getCollection()->pluck('server_id')->filter()->unique())
+            ->get()
+            ->keyBy('id');
+
+        return view('livewire.deployments.index', [
+            'deployments' => $deployments,
+            'projectOptions' => $this->projectOptions(),
+            'servers' => $servers,
+            'serverOptions' => $this->serverOptions(),
+        ]);
+    }
+
+    public function clearFilters(): void
+    {
+        $this->deployment_type = 'all';
+        $this->project = 'all';
+        $this->server = 'all';
+        $this->status = 'all';
+        $this->resetPage();
+    }
+
+    public function hasActiveFilters(): bool
+    {
+        return $this->deployment_type !== 'all'
+            || $this->project !== 'all'
+            || $this->server !== 'all'
+            || $this->status !== 'all';
+    }
+
+    private function sanitizeFilters(): void
+    {
+        if (! array_key_exists($this->deployment_type, $this->deploymentTypeOptions())) {
+            $this->deployment_type = 'all';
+        }
+
+        if (! array_key_exists($this->status, $this->statusOptions())) {
+            $this->status = 'all';
+        }
+
+        if ($this->project !== 'all' && ! array_key_exists($this->project, $this->projectOptions())) {
+            $this->project = 'all';
+            $this->dispatch('error', 'Selected project is unavailable.');
+            $this->removeFilterFromUrl('project');
+        }
+
+        if ($this->server !== 'all' && ! array_key_exists($this->server, $this->serverOptions())) {
+            $this->server = 'all';
+            $this->dispatch('error', 'Selected server is unavailable.');
+            $this->removeFilterFromUrl('server');
+        }
+    }
+
+    private function removeFilterFromUrl(string $filter): void
+    {
+        $this->js("const url = new URL(window.location.href); url.searchParams.delete('{$filter}'); window.history.replaceState(window.history.state, '', url);");
+    }
+
+    private function teamApplicationIds(string $project = 'all')
+    {
+        $teamId = currentTeam()?->id;
+
+        return Application::query()
+            ->withoutGlobalScope('withRelations')
+            ->selectRaw('CAST(id AS TEXT)')
+            ->whereHas('environment.project', function ($query) use ($teamId, $project) {
+                $query->where('team_id', $teamId)
+                    ->when($project !== 'all', fn ($query) => $query->where('id', $project));
+            });
+    }
+}
