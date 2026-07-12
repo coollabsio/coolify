@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasNoindexDomains;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -9,7 +10,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class ServiceApplication extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasNoindexDomains, SoftDeletes;
 
     protected $fillable = [
         'service_id',
@@ -17,6 +18,7 @@ class ServiceApplication extends BaseModel
         'human_name',
         'description',
         'fqdn',
+        'noindex_domains',
         'ports',
         'exposes',
         'status',
@@ -42,7 +44,17 @@ class ServiceApplication extends BaseModel
             if ($service->isDirty('status')) {
                 $service->last_online_at = now();
             }
+            if ($service->isDirty('fqdn')) {
+                $service->syncNoindexDomains();
+            }
         });
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'noindex_domains' => 'array',
+        ];
     }
 
     public function restart()

@@ -31,11 +31,42 @@ class EditDomain extends Component
     #[Validate]
     public ?string $fqdn = null;
 
+    /** @var array<int, string> Domains served with an X-Robots-Tag: noindex, nofollow header. */
+    public array $noindexDomains = [];
+
     protected function rules(): array
     {
         return [
             'fqdn' => ValidationPatterns::applicationDomainRules(),
+            'noindexDomains' => 'array',
+            'noindexDomains.*' => 'string',
         ];
+    }
+
+    /**
+     * The domains currently saved on the service application, one checkbox each.
+     *
+     * @return array<int, string>
+     */
+    public function getConfiguredDomainsProperty(): array
+    {
+        return ValidationPatterns::applicationDomainList($this->application->fqdn);
+    }
+
+    public function updateNoindexDomains()
+    {
+        try {
+            $this->authorize('update', $this->application);
+            $this->application->setNoindexDomains($this->noindexDomains);
+            $this->application->save();
+            $this->application->refresh();
+            $this->syncData();
+            $this->application->service->parse();
+            $this->dispatch('configurationChanged');
+            $this->dispatch('success', 'Search engine indexing updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function mount()
@@ -53,11 +84,14 @@ class EditDomain extends Component
 
             // Sync to model
             $this->application->fqdn = $this->fqdn;
+            // Must run after fqdn is set: flags are kept only for domains the service still has.
+            $this->application->setNoindexDomains($this->noindexDomains);
 
             $this->application->save();
         } else {
             // Sync from model
             $this->fqdn = $this->application->fqdn;
+            $this->noindexDomains = $this->application->noindexDomains()->all();
         }
     }
 

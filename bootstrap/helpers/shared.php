@@ -2679,6 +2679,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 } else {
                     $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
                 }
+                $noindexDomains = $savedService instanceof ServiceApplication
+                    ? $savedService->noindexDomains()
+                    : collect([]);
                 $defaultLabels = defaultLabels(
                     id: $resource->id,
                     name: $containerName,
@@ -2705,7 +2708,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         is_gzip_enabled: $savedService->isGzipEnabled(),
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                         service_name: $serviceName,
-                                        image: data_get($service, 'image')
+                                        image: data_get($service, 'image'),
+                                        noindex_domains: $noindexDomains
                                     ));
                                     break;
                                 case ProxyTypes::CADDY->value:
@@ -2718,7 +2722,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         is_gzip_enabled: $savedService->isGzipEnabled(),
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                         service_name: $serviceName,
-                                        image: data_get($service, 'image')
+                                        image: data_get($service, 'image'),
+                                        noindex_domains: $noindexDomains
                                     ));
                                     break;
                             }
@@ -2731,7 +2736,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 is_gzip_enabled: $savedService->isGzipEnabled(),
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                 service_name: $serviceName,
-                                image: data_get($service, 'image')
+                                image: data_get($service, 'image'),
+                                noindex_domains: $noindexDomains
                             ));
                             $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                                 network: $resource->destination->network,
@@ -2742,7 +2748,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 is_gzip_enabled: $savedService->isGzipEnabled(),
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                 service_name: $serviceName,
-                                image: data_get($service, 'image')
+                                image: data_get($service, 'image'),
+                                noindex_domains: $noindexDomains
                             ));
                         }
                     }
@@ -3467,6 +3474,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 });
                             }
                         }
+                        // Preview deployments are ephemeral and must never be indexed.
+                        $noindexDomains = $pull_request_id !== 0 ? $fqdns : $resource->noindexDomains();
                         $shouldGenerateLabelsExactly = $server->settings->generate_exact_labels;
                         if ($shouldGenerateLabelsExactly) {
                             switch ($server->proxyType()) {
@@ -3481,6 +3490,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                            noindex_domains: $noindexDomains,
                                         )
                                     );
                                     break;
@@ -3495,6 +3505,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                            noindex_domains: $noindexDomains,
                                         )
                                     );
                                     break;
@@ -3510,6 +3521,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                    noindex_domains: $noindexDomains,
                                 )
                             );
                             $serviceLabels = $serviceLabels->merge(
@@ -3522,6 +3534,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                    noindex_domains: $noindexDomains,
                                 )
                             );
                         }

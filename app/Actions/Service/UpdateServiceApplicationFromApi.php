@@ -59,6 +59,11 @@ class UpdateServiceApplicationFromApi
             $serviceApplication->fqdn = $parsed['normalized'];
         }
 
+        if (array_key_exists('noindex_domains', $payload)) {
+            // Must run after fqdn is set: flags are kept only for domains the service still has.
+            $serviceApplication->setNoindexDomains($payload['noindex_domains'] ?? []);
+        }
+
         if (array_key_exists('human_name', $payload)) {
             $serviceApplication->human_name = $payload['human_name'];
         }

@@ -119,6 +119,8 @@ function sharedDataApplications()
         'is_preview_deployments_enabled' => 'boolean',
         'static_image' => Rule::enum(StaticImageTypes::class),
         'domains' => ValidationPatterns::applicationDomainRules(),
+        'noindex_domains' => 'array|nullable',
+        'noindex_domains.*' => 'string',
         'redirect' => Rule::enum(RedirectTypes::class),
         'git_commit_sha' => ['string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
         'docker_registry_image_name' => ValidationPatterns::dockerImageNameRules(),
