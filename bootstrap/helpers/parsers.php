@@ -1352,6 +1352,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             if ($isPullRequest) {
                 $labelNetwork = "{$resource->destination->network}-{$pullRequestId}";
             }
+            $noindexDomains = $isPullRequest ? $fqdns : $originalResource->noindexDomains();
             if ($shouldGenerateLabelsExactly) {
                 switch ($server->proxyType()) {
                     case ProxyTypes::TRAEFIK->value:
@@ -1363,7 +1364,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
-                            image: $image
+                            image: $image,
+                            noindex_domains: $noindexDomains
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -1377,7 +1379,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
-                            predefinedPort: $predefinedPort
+                            predefinedPort: $predefinedPort,
+                            noindex_domains: $noindexDomains
                         ));
                         break;
                 }
@@ -1390,7 +1393,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
-                    image: $image
+                    image: $image,
+                    noindex_domains: $noindexDomains
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $labelNetwork,
@@ -1402,7 +1406,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
-                    predefinedPort: $predefinedPort
+                    predefinedPort: $predefinedPort,
+                    noindex_domains: $noindexDomains
                 ));
             }
         }
@@ -2546,6 +2551,10 @@ function serviceParser(Service $resource): Collection
         } else {
             $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
         }
+        // Flags live on the ServiceApplication; a ServiceDatabase has no domains.
+        $noindexDomains = $savedService instanceof ServiceApplication
+            ? $savedService->noindexDomains()
+            : collect([]);
 
         $defaultLabels = defaultLabels(
             id: $resource->id,
@@ -2626,7 +2635,8 @@ function serviceParser(Service $resource): Collection
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
-                            image: $image
+                            image: $image,
+                            noindex_domains: $noindexDomains
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -2640,7 +2650,8 @@ function serviceParser(Service $resource): Collection
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
-                            predefinedPort: $predefinedPort
+                            predefinedPort: $predefinedPort,
+                            noindex_domains: $noindexDomains
                         ));
                         break;
                 }
@@ -2653,7 +2664,8 @@ function serviceParser(Service $resource): Collection
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
-                    image: $image
+                    image: $image,
+                    noindex_domains: $noindexDomains
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $network,
@@ -2665,7 +2677,8 @@ function serviceParser(Service $resource): Collection
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
-                    predefinedPort: $predefinedPort
+                    predefinedPort: $predefinedPort,
+                    noindex_domains: $noindexDomains
                 ));
             }
         }

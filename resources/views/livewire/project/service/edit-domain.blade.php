@@ -14,6 +14,26 @@
         <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
     </form>
 
+    @if (count($this->configuredDomains) > 0)
+        <div class="flex flex-col gap-2 pt-4">
+            <div class="flex items-center gap-2">
+                <h4>Search Engine Indexing</h4>
+                <x-helper
+                    helper="Checked domains are served with an <span class='text-helper'>X-Robots-Tag: noindex, nofollow</span> response header, which keeps them out of search engines.<br><br>Useful for auto-generated or staging domains you do not want indexed, while your production domain stays indexable.<br><br>This header overrides any X-Robots-Tag your service sets itself." />
+            </div>
+            @foreach ($this->configuredDomains as $domain)
+                <label
+                    class="form-control flex max-w-full cursor-pointer flex-row items-center gap-4 py-1 pr-2 dark:hover:bg-coolgray-100">
+                    <span class="flex min-w-0 grow gap-2 break-words">{{ $domain }}</span>
+                    <input type="checkbox" value="{{ $domain }}" wire:model="noindexDomains"
+                        wire:change="updateNoindexDomains" wire:loading.attr="disabled"
+                        @cannot('update', $application) disabled @endcannot
+                        class="shrink-0 cursor-pointer rounded-sm text-coolgray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs focus-visible:ring-offset-2 dark:border-neutral-700 dark:bg-coolgray-100 dark:focus-visible:ring-warning dark:focus-visible:ring-offset-base dark:disabled:cursor-not-allowed dark:disabled:bg-base" />
+                </label>
+            @endforeach
+        </div>
+    @endif
+
     <x-domain-conflict-modal :conflicts="$domainConflicts" :showModal="$showDomainConflictModal" confirmAction="confirmDomainUsage">
         <x-slot:consequences>
             <ul class="mt-2 ml-4 list-disc">

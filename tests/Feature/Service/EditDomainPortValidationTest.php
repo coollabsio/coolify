@@ -74,6 +74,17 @@ it('loads the EditDomain component with required port', function () {
         ->assertOk();
 });
 
+it('marks noindex changes as pending configuration', function () {
+    $this->service->isConfigurationChanged(save: true);
+
+    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
+        ->set('noindexDomains', ['http://example.com:8000'])
+        ->call('updateNoindexDomains')
+        ->assertDispatched('configurationChanged');
+
+    expect($this->service->refresh()->isConfigurationChanged())->toBeTrue();
+});
+
 it('shows warning modal when trying to remove required port', function () {
     Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
         ->set('fqdn', 'http://example.com') // Remove port
