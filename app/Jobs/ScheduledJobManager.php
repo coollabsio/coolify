@@ -540,9 +540,19 @@ class ScheduledJobManager implements ShouldQueue
 
     private function serverTimezone(Server $server): string
     {
-        $timezone = data_get($server->settings, 'server_timezone', config('app.timezone'));
+        $timezone = data_get($server->settings, 'server_timezone');
 
-        return validate_timezone($timezone) ? $timezone : config('app.timezone');
+        if ($timezone && validate_timezone($timezone)) {
+            return $timezone;
+        }
+
+        $instanceTimezone = instanceSettings()->instance_timezone;
+
+        if ($instanceTimezone && validate_timezone($instanceTimezone)) {
+            return $instanceTimezone;
+        }
+
+        return config('app.timezone');
     }
 
     private function logBackupSkip(ScheduledDatabaseBackup $backup, string $reason): void
