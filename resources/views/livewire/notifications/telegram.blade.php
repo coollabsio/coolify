@@ -24,12 +24,21 @@
             <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSaveTelegramEnabled" id="telegramEnabled" label="Enabled" />
         </div>
         <div class="flex gap-2">
-            <x-forms.input canGate="update" :canResource="$settings" type="password" autocomplete="new-password"
-                helper="Get it from the <a class='inline-block underline dark:text-white' href='https://t.me/botfather' target='_blank'>BotFather Bot</a> on Telegram."
-                required id="telegramToken" label="Bot API Token" />
-            <x-forms.input canGate="update" :canResource="$settings" type="password" autocomplete="new-password"
-                helper="Add your bot to a group chat and add its Chat ID here." required id="telegramChatId"
-                label="Chat ID" />
+            @can('update', $settings)
+                <x-forms.input type="password" autocomplete="new-password"
+                    helper="Get it from the <a class='inline-block underline dark:text-white' href='https://t.me/botfather' target='_blank'>BotFather Bot</a> on Telegram."
+                    required id="telegramToken" label="Bot API Token" />
+                <x-forms.input type="password" autocomplete="new-password"
+                    helper="Add your bot to a group chat and add its Chat ID here." required id="telegramChatId"
+                    label="Chat ID" />
+            @else
+                <x-forms.input disabled autocomplete="new-password"
+                    helper="Get it from the <a class='inline-block underline dark:text-white' href='https://t.me/botfather' target='_blank'>BotFather Bot</a> on Telegram."
+                    required label="Bot API Token" value="Hidden (only admins can view)" />
+                <x-forms.input disabled autocomplete="new-password"
+                    helper="Add your bot to a group chat and add its Chat ID here." required label="Chat ID"
+                    value="Hidden (only admins can view)" />
+            @endcan
         </div>
     </form>
     <h2 class="mt-4">Notification Settings</h2>
@@ -41,7 +50,7 @@
             <h3 class="text-lg font-medium mb-3">Deployments</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <div class="pl-1 flex gap-2">
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="deploymentSuccessTelegramNotifications"
                             label="Deployment Success" />
                     </div>
@@ -49,7 +58,7 @@
                         id="telegramNotificationsDeploymentSuccessThreadId" />
                 </div>
                 <div class="pl-1 flex gap-2">
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="deploymentFailureTelegramNotifications"
                             label="Deployment Failure" />
                     </div>
@@ -57,7 +66,7 @@
                         id="telegramNotificationsDeploymentFailureThreadId" />
                 </div>
                 <div class="pl-1 flex gap-2">
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="statusChangeTelegramNotifications"
                             label="Container Status Changes"
                             helper="Send a notification when a container status changes. It will send a notification for Stopped and Restarted events of a container." />
@@ -71,7 +80,7 @@
             <h3 class="text-lg font-medium mb-3">Backups</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <div class="pl-1 flex gap-2">
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="backupSuccessTelegramNotifications"
                             label="Backup Success" />
                     </div>
@@ -80,7 +89,7 @@
                 </div>
 
                 <div class="pl-1 flex gap-2">
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="backupFailureTelegramNotifications"
                             label="Backup Failure" />
                     </div>
@@ -94,7 +103,7 @@
             <h3 class="text-lg font-medium mb-3">Scheduled Tasks</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <div class="pl-1 flex gap-2">
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="scheduledTaskSuccessTelegramNotifications"
                             label="Scheduled Task Success" />
                     </div>
@@ -103,7 +112,7 @@
                 </div>
 
                 <div class="pl-1 flex gap-2">
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="scheduledTaskFailureTelegramNotifications"
                             label="Scheduled Task Failure" />
                     </div>
@@ -117,7 +126,7 @@
             <h3 class="text-lg font-medium mb-3">Server</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <div class="pl-1 flex gap-2">
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="dockerCleanupSuccessTelegramNotifications"
                             label="Docker Cleanup Success" />
                     </div>
@@ -126,7 +135,7 @@
                 </div>
 
                 <div class="pl-1 flex gap-2">
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="dockerCleanupFailureTelegramNotifications"
                             label="Docker Cleanup Failure" />
                     </div>
@@ -135,7 +144,7 @@
                 </div>
 
                 <div class="pl-1 flex gap-2">
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverDiskUsageTelegramNotifications"
                             label="Server Disk Usage" />
                     </div>
@@ -144,7 +153,7 @@
                 </div>
 
                 <div class="pl-1 flex gap-2">
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverReachableTelegramNotifications"
                             label="Server Reachable" />
                     </div>
@@ -153,7 +162,7 @@
                 </div>
 
                 <div class="pl-1 flex gap-2">
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverUnreachableTelegramNotifications"
                             label="Server Unreachable" />
                     </div>
@@ -162,7 +171,7 @@
                 </div>
 
                 <div class="pl-1 flex gap-2">
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverPatchTelegramNotifications"
                             label="Server Patching" />
                     </div>
@@ -171,7 +180,7 @@
                 </div>
 
                 <div class="pl-1 flex gap-2">
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="traefikOutdatedTelegramNotifications"
                             label="Traefik Proxy Outdated" />
                     </div>

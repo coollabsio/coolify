@@ -3,7 +3,7 @@
         {{ data_get_str($server, 'name')->limit(10) }} > Destinations | Coolify
     </x-slot>
     <livewire:server.navbar :server="$server" />
-    <div class="flex flex-col h-full gap-8 sm:flex-row">
+    <div class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
         <x-server.sidebar :server="$server" activeMenu="destinations" />
         <div class="w-full">
             @if ($server->isFunctional())
@@ -29,6 +29,9 @@
                             <x-forms.button>{{ data_get($docker, 'network') }} </x-forms.button>
                         </a>
                     @endforeach
+                    @if ($server->standaloneDockers->isEmpty() && $server->swarmDockers->isEmpty())
+                        <div class="text-sm text-neutral-500">No destinations configured for this server yet.</div>
+                    @endif
                 </div>
                 @if ($networks->count() > 0)
                     <div class="pt-2">

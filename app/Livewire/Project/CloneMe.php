@@ -11,11 +11,13 @@ use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class CloneMe extends Component
 {
+    use AuthorizesRequests;
+
     public string $project_uuid;
 
     public string $environment_uuid;
@@ -54,14 +56,14 @@ class CloneMe extends Component
     public function mount($project_uuid)
     {
         $this->project_uuid = $project_uuid;
-        $this->project = Project::where('uuid', $project_uuid)->firstOrFail();
+        $this->project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->firstOrFail();
         $this->environment = $this->project->environments->where('uuid', $this->environment_uuid)->first();
         $this->project_id = $this->project->id;
         $this->servers = currentTeam()
             ->servers()
             ->get()
             ->reject(fn ($server) => $server->isBuildServer());
-        $this->newName = str($this->project->name.'-clone-'.(string) new Cuid2)->slug();
+        $this->newName = str($this->project->name.'-clone-'.new_public_id())->slug();
     }
 
     public function toggleVolumeCloning(bool $value)
@@ -91,6 +93,7 @@ class CloneMe extends Component
     public function clone(string $type)
     {
         try {
+            $this->authorize('create', Project::class);
             $this->validate([
                 'selectedDestination' => 'required',
                 'newName' => ValidationPatterns::nameRules(),
@@ -108,7 +111,7 @@ class CloneMe extends Component
                 if ($this->environment->name !== 'production') {
                     $project->environments()->create([
                         'name' => $this->environment->name,
-                        'uuid' => (string) new Cuid2,
+                        'uuid' => new_public_id(),
                     ]);
                 }
                 $environment = $project->environments->where('name', $this->environment->name)->first();
@@ -120,7 +123,7 @@ class CloneMe extends Component
                 $project = $this->project;
                 $environment = $this->project->environments()->create([
                     'name' => $this->newName,
-                    'uuid' => (string) new Cuid2,
+                    'uuid' => new_public_id(),
                 ]);
             }
             $applications = $this->environment->applications;
@@ -134,7 +137,7 @@ class CloneMe extends Component
             }
 
             foreach ($databases as $database) {
-                $uuid = (string) new Cuid2;
+                $uuid = new_public_id();
                 $newDatabase = $database->replicate([
                     'id',
                     'created_at',
@@ -187,6 +190,7 @@ class CloneMe extends Component
                         'id',
                         'created_at',
                         'updated_at',
+                        'uuid',
                     ])->fill([
                         'name' => $newName,
                         'resource_id' => $newDatabase->id,
@@ -224,7 +228,7 @@ class CloneMe extends Component
 
                 $scheduledBackups = $database->scheduledBackups()->get();
                 foreach ($scheduledBackups as $backup) {
-                    $uuid = (string) new Cuid2;
+                    $uuid = new_public_id();
                     $newBackup = $backup->replicate([
                         'id',
                         'created_at',
@@ -253,7 +257,7 @@ class CloneMe extends Component
             }
 
             foreach ($services as $service) {
-                $uuid = (string) new Cuid2;
+                $uuid = new_public_id();
                 $newService = $service->replicate([
                     'id',
                     'created_at',
@@ -277,7 +281,7 @@ class CloneMe extends Component
                         'created_at',
                         'updated_at',
                     ])->fill([
-                        'uuid' => (string) new Cuid2,
+                        'uuid' => new_public_id(),
                         'service_id' => $newService->id,
                         'team_id' => currentTeam()->id,
                     ]);
@@ -298,9 +302,9 @@ class CloneMe extends Component
                 }
 
                 foreach ($newService->applications() as $application) {
-                    $application->update([
+                    $application->fill([
                         'status' => 'exited',
-                    ]);
+                    ])->save();
 
                     $persistentVolumes = $application->persistentStorages()->get();
                     foreach ($persistentVolumes as $volume) {
@@ -315,6 +319,7 @@ class CloneMe extends Component
                             'id',
                             'created_at',
                             'updated_at',
+                            'uuid',
                         ])->fill([
                             'name' => $newName,
                             'resource_id' => $application->id,
@@ -352,9 +357,9 @@ class CloneMe extends Component
                 }
 
                 foreach ($newService->databases() as $database) {
-                    $database->update([
+                    $database->fill([
                         'status' => 'exited',
-                    ]);
+                    ])->save();
 
                     $persistentVolumes = $database->persistentStorages()->get();
                     foreach ($persistentVolumes as $volume) {
@@ -369,6 +374,7 @@ class CloneMe extends Component
                             'id',
                             'created_at',
                             'updated_at',
+                            'uuid',
                         ])->fill([
                             'name' => $newName,
                             'resource_id' => $database->id,
@@ -406,7 +412,7 @@ class CloneMe extends Component
 
                     $scheduledBackups = $database->scheduledBackups()->get();
                     foreach ($scheduledBackups as $backup) {
-                        $uuid = (string) new Cuid2;
+                        $uuid = new_public_id();
                         $newBackup = $backup->replicate([
                             'id',
                             'created_at',

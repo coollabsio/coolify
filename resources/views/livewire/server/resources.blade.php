@@ -3,7 +3,7 @@
         {{ data_get_str($server, 'name')->limit(10) }} > Server Resources | Coolify
     </x-slot>
     <livewire:server.navbar :server="$server" />
-    <div x-data="{ activeTab: 'managed' }" class="flex flex-col h-full gap-8 md:flex-row">
+    <div x-data="{ activeTab: 'managed' }" class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
         <div class="w-full">
             <div class="flex flex-col">
                 <div class="flex gap-2">
@@ -134,22 +134,22 @@
                                                             {{ data_get($resource, 'State') }}
                                                         </td>
                                                         <td class="flex gap-2 px-5 py-4 text-sm whitespace-nowrap">
-                                                            @if (data_get($resource, 'State') === 'running')
-                                                                <x-forms.button
-                                                                    wire:click="restartUnmanaged('{{ data_get($resource, 'ID') }}')"
-                                                                    wire:key="{{ data_get($resource, 'ID') }}">Restart</x-forms.button>
-                                                                <x-forms.button isError
-                                                                    wire:click="stopUnmanaged('{{ data_get($resource, 'ID') }}')"
-                                                                    wire:key="{{ data_get($resource, 'ID') }}">Stop</x-forms.button>
-                                                            @elseif (data_get($resource, 'State') === 'exited')
-                                                                <x-forms.button
-                                                                    wire:click="startUnmanaged('{{ data_get($resource, 'ID') }}')"
-                                                                    wire:key="{{ data_get($resource, 'ID') }}">Start</x-forms.button>
-                                                            @elseif (data_get($resource, 'State') === 'restarting')
-                                                                <x-forms.button
-                                                                    wire:click="stopUnmanaged('{{ data_get($resource, 'ID') }}')"
-                                                                    wire:key="{{ data_get($resource, 'ID') }}">Stop</x-forms.button>
-                                                            @endif
+                                                                @if (data_get($resource, 'State') === 'running')
+                                                                    <x-forms.button canGate="update" :canResource="$server"
+                                                                        wire:click="restartUnmanaged('{{ data_get($resource, 'ID') }}')"
+                                                                        wire:key="{{ data_get($resource, 'ID') }}">Restart</x-forms.button>
+                                                                    <x-forms.button canGate="update" :canResource="$server" isError
+                                                                        wire:click="stopUnmanaged('{{ data_get($resource, 'ID') }}')"
+                                                                        wire:key="{{ data_get($resource, 'ID') }}">Stop</x-forms.button>
+                                                                @elseif (data_get($resource, 'State') === 'exited')
+                                                                    <x-forms.button canGate="update" :canResource="$server"
+                                                                        wire:click="startUnmanaged('{{ data_get($resource, 'ID') }}')"
+                                                                        wire:key="{{ data_get($resource, 'ID') }}">Start</x-forms.button>
+                                                                @elseif (data_get($resource, 'State') === 'restarting')
+                                                                    <x-forms.button canGate="update" :canResource="$server"
+                                                                        wire:click="stopUnmanaged('{{ data_get($resource, 'ID') }}')"
+                                                                        wire:key="{{ data_get($resource, 'ID') }}">Stop</x-forms.button>
+                                                                @endif
                                                         </td>
                                                     </tr>
                                                 @endforeach

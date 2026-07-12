@@ -28,8 +28,7 @@ class SwarmDockerPolicy
      */
     public function create(User $user): bool
     {
-        // return $user->isAdmin();
-        return true;
+        return $user->isAdmin();
     }
 
     /**
@@ -37,8 +36,7 @@ class SwarmDockerPolicy
      */
     public function update(User $user, SwarmDocker $swarmDocker): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $swarmDocker->server->team_id);
-        return true;
+        return $user->isAdminOfTeam($swarmDocker->server->team_id);
     }
 
     /**
@@ -46,8 +44,7 @@ class SwarmDockerPolicy
      */
     public function delete(User $user, SwarmDocker $swarmDocker): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $swarmDocker->server->team_id);
-        return true;
+        return $user->isAdminOfTeam($swarmDocker->server->team_id);
     }
 
     /**
@@ -55,8 +52,7 @@ class SwarmDockerPolicy
      */
     public function restore(User $user, SwarmDocker $swarmDocker): bool
     {
-        // return false;
-        return true;
+        return false;
     }
 
     /**
@@ -64,7 +60,6 @@ class SwarmDockerPolicy
      */
     public function forceDelete(User $user, SwarmDocker $swarmDocker): bool
     {
-        // return false;
-        return true;
+        return false;
     }
 }

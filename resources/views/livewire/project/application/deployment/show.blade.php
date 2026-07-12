@@ -1,4 +1,4 @@
-<div>
+<div class="flex h-[calc(100vh-10rem)] min-h-[50rem] flex-col overflow-hidden">
     <x-slot:title>
         {{ data_get_str($application, 'name')->limit(10) }} > Deployment | Coolify
         </x-slot>
@@ -9,6 +9,13 @@
         fullscreen: @entangle('fullscreen'),
         alwaysScroll: {{ $isKeepAliveOn ? 'true' : 'false' }},
         rafId: null,
+        scrollTimeout: null,
+        scrollDebounce: null,
+        isScrolling: false,
+        destroyed: false,
+        morphUpdatedCleanup: null,
+        deploymentFinishedCleanup: null,
+        lastTouchY: 0,
         showTimestamps: true,
         searchQuery: '',
         matchCount: 0,
@@ -17,17 +24,76 @@
             this.fullscreen = !this.fullscreen;
         },
         scrollToBottom() {
-            const logsContainer = document.getElementById('logsContainer');
+            if (this.destroyed) return;
+            const logsContainer = this.$root.querySelector('#logsContainer');
             if (logsContainer) {
+                this.isScrolling = true;
                 logsContainer.scrollTop = logsContainer.scrollHeight;
+                requestAnimationFrame(() => { this.isScrolling = false; });
             }
         },
-        scheduleScroll() {
+        cancelScrollLoop() {
+            if (this.rafId) {
+                cancelAnimationFrame(this.rafId);
+                this.rafId = null;
+            }
+            if (this.scrollTimeout) {
+                clearTimeout(this.scrollTimeout);
+                this.scrollTimeout = null;
+            }
+            if (this.scrollDebounce) {
+                clearTimeout(this.scrollDebounce);
+                this.scrollDebounce = null;
+            }
+        },
+        disableFollow() {
             if (!this.alwaysScroll) return;
+            this.alwaysScroll = false;
+            this.cancelScrollLoop();
+        },
+        handleWheel(event) {
+            if (this.alwaysScroll && event.deltaY < 0) {
+                this.disableFollow();
+            }
+        },
+        handleTouchStart(event) {
+            this.lastTouchY = event.touches[0].clientY;
+        },
+        handleTouchMove(event) {
+            if (!this.alwaysScroll) return;
+            const currentY = event.touches[0].clientY;
+            if (currentY > this.lastTouchY) {
+                this.disableFollow();
+            }
+            this.lastTouchY = currentY;
+        },
+        handleKeyScroll(event) {
+            if (!this.alwaysScroll) return;
+            const upKeys = ['ArrowUp', 'PageUp', 'Home'];
+            if (upKeys.includes(event.key)) {
+                this.disableFollow();
+            }
+        },
+        handleScroll(event) {
+            if (this.isScrolling || this.destroyed) return;
+            const el = event.target;
+            clearTimeout(this.scrollDebounce);
+            this.scrollDebounce = setTimeout(() => {
+                if (this.destroyed) return;
+                const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+                if (!this.alwaysScroll && distanceFromBottom <= 10) {
+                    this.alwaysScroll = true;
+                    this.scheduleScroll();
+                }
+            }, 150);
+        },
+        scheduleScroll() {
+            if (!this.alwaysScroll || this.destroyed) return;
             this.rafId = requestAnimationFrame(() => {
+                if (!this.alwaysScroll || this.destroyed) return;
                 this.scrollToBottom();
-                if (this.alwaysScroll) {
-                    setTimeout(() => this.scheduleScroll(), 250);
+                if (this.alwaysScroll && !this.destroyed) {
+                    this.scrollTimeout = setTimeout(() => this.scheduleScroll(), 250);
                 }
             });
         },
@@ -36,10 +102,7 @@
             if (this.alwaysScroll) {
                 this.scheduleScroll();
             } else {
-                if (this.rafId) {
-                    cancelAnimationFrame(this.rafId);
-                    this.rafId = null;
-                }
+                this.cancelScrollLoop();
             }
         },
         hasActiveLogSelection() {
@@ -51,10 +114,6 @@
             if (!logsContainer) return false;
             const range = selection.getRangeAt(0);
             return logsContainer.contains(range.commonAncestorContainer);
-        },
-        decodeHtml(text) {
-            const doc = new DOMParser().parseFromString(text, 'text/html');
-            return doc.documentElement.textContent;
         },
         highlightText(el, text, query) {
             if (this.hasActiveLogSelection()) return;
@@ -96,7 +155,7 @@
                 if (matches && query) count++;
 
                 if (textSpan) {
-                    const originalText = this.decodeHtml(textSpan.dataset.lineText || '');
+                    const originalText = textSpan.dataset.lineText || '';
                     if (!query) {
                         textSpan.textContent = originalText;
                     } else if (matches) {
@@ -107,9 +166,9 @@
 
             this.matchCount = query ? count : 0;
         },
-        downloadLogs() {
+        collectVisibleLogs() {
             const logs = document.getElementById('logs');
-            if (!logs) return;
+            if (!logs) return '';
             const visibleLines = logs.querySelectorAll('[data-log-line]:not(.hidden)');
             let content = '';
             visibleLines.forEach(line => {
@@ -118,6 +177,24 @@
                     content += text + String.fromCharCode(10);
                 }
             });
+            return content;
+        },
+        copyLogs() {
+            const content = this.collectVisibleLogs();
+            if (!content) return;
+            if (!navigator.clipboard?.writeText) {
+                Livewire.dispatch('error', ['Clipboard is not available. Please use HTTPS or localhost.']);
+                return;
+            }
+            navigator.clipboard?.writeText(content).then(() => {
+                Livewire.dispatch('success', ['Logs copied to clipboard.']);
+            }).catch(() => {
+                Livewire.dispatch('error', ['Failed to copy logs to clipboard.']);
+            });
+        },
+        downloadLogs() {
+            const content = this.collectVisibleLogs();
+            if (!content) return;
             const blob = new Blob([content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -130,10 +207,7 @@
         stopScroll() {
             this.scrollToBottom();
             this.alwaysScroll = false;
-            if (this.rafId) {
-                cancelAnimationFrame(this.rafId);
-                this.rafId = null;
-            }
+            this.cancelScrollLoop();
         },
         init() {
             // Watch search query changes
@@ -141,21 +215,26 @@
                 this.applySearch();
             });
 
-            // Apply search after Livewire updates
-            Livewire.hook('morph.updated', ({ el }) => {
-                if (el.id === 'logs') {
-                    this.$nextTick(() => {
-                        this.applySearch();
-                        if (this.alwaysScroll) {
-                            this.scrollToBottom();
-                        }
-                    });
-                }
+            // Apply search after Livewire updates.
+            // Livewire.hook() returns an unregister fn; keep it for destroy().
+            this.morphUpdatedCleanup = Livewire.hook('morph.updated', ({ el }) => {
+                if (this.destroyed) return;
+                if (el.id !== 'logs' || !this.$root.contains(el)) return;
+                this.$nextTick(() => {
+                    if (this.destroyed) return;
+                    this.applySearch();
+                    if (this.alwaysScroll) {
+                        this.scrollToBottom();
+                    }
+                });
             });
 
-            // Stop auto-scroll when deployment finishes
-            Livewire.on('deploymentFinished', () => {
+            // Stop auto-scroll when deployment finishes.
+            // Livewire.on() returns an unregister fn; keep it for destroy().
+            this.deploymentFinishedCleanup = Livewire.on('deploymentFinished', () => {
+                if (this.destroyed) return;
                 setTimeout(() => {
+                    if (this.destroyed) return;
                     this.stopScroll();
                 }, 500);
             });
@@ -164,14 +243,32 @@
             if (this.alwaysScroll) {
                 this.scheduleScroll();
             }
+        },
+        destroy() {
+            // Runs when Alpine tears the component down (wire:navigate away).
+            this.destroyed = true;
+            this.alwaysScroll = false;
+            this.cancelScrollLoop();
+            if (this.scrollDebounce) {
+                clearTimeout(this.scrollDebounce);
+                this.scrollDebounce = null;
+            }
+            if (typeof this.morphUpdatedCleanup === 'function') {
+                this.morphUpdatedCleanup();
+                this.morphUpdatedCleanup = null;
+            }
+            if (typeof this.deploymentFinishedCleanup === 'function') {
+                this.deploymentFinishedCleanup();
+                this.deploymentFinishedCleanup = null;
+            }
         }
-    }">
+    }" class="flex flex-1 min-h-0 flex-col overflow-hidden">
             <livewire:project.application.deployment-navbar
                 :application_deployment_queue="$application_deployment_queue" />
-            <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-4 relative'">
+            <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-4 flex flex-1 min-h-0 flex-col overflow-hidden'">
                 <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
-                    class="flex flex-col w-full bg-white dark:text-white dark:bg-coolgray-100 dark:border-coolgray-300"
-                    :class="fullscreen ? 'h-full' : 'border border-dotted rounded-sm'">
+                    class="flex min-h-0 flex-col w-full overflow-hidden bg-white dark:text-white dark:bg-coolgray-100 dark:border-coolgray-300"
+                    :class="fullscreen ? 'h-full' : 'flex-1 border border-dotted rounded-sm'">
                     <div
                         class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
                         <div class="flex items-center gap-3">
@@ -210,12 +307,7 @@
                             </div>
                             <div class="flex flex-wrap items-center gap-1">
                                 <button
-                                    x-on:click="
-                                    $wire.copyLogs().then(logs => {
-                                        navigator.clipboard.writeText(logs);
-                                        Livewire.dispatch('success', ['Logs copied to clipboard.']);
-                                    });
-                                "
+                                    x-on:click="copyLogs()"
                                 title="Copy Logs"
                                 class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                                 <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -246,6 +338,7 @@
                                             class="block w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-coolgray-300">
                                             Download displayed logs
                                         </button>
+                                        @can('update', $application)
                                         <button x-on:click="
                                             downloadingAllLogs = true;
                                             $wire.downloadAllLogs().then(logs => {
@@ -276,6 +369,7 @@
                                                 Downloading...
                                             </span>
                                         </button>
+                                        @endcan
                                     </div>
                                 </div>
                             </div>
@@ -288,6 +382,7 @@
                                         d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                                 </svg>
                             </button>
+                            @can('update', $application)
                             <button wire:click="toggleDebug"
                                 title="{{ $is_debug_enabled ? 'Hide Debug Logs' : 'Show Debug Logs' }}"
                                 class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 {{ $is_debug_enabled ? '!text-warning' : '' }}">
@@ -297,6 +392,7 @@
                                         d="M12 12.75c1.148 0 2.278.08 3.383.237 1.037.146 1.866.966 1.866 2.013 0 3.728-2.35 6.75-5.25 6.75S6.75 18.728 6.75 15c0-1.046.83-1.867 1.866-2.013A24.204 24.204 0 0 1 12 12.75Zm0 0c2.883 0 5.647.508 8.207 1.44a23.91 23.91 0 0 1-1.152 6.06M12 12.75c-2.883 0-5.647.508-8.208 1.44.125 2.104.52 4.136 1.153 6.06M12 12.75a2.25 2.25 0 0 0 2.248-2.354M12 12.75a2.25 2.25 0 0 1-2.248-2.354M12 8.25c.995 0 1.971-.08 2.922-.236.403-.066.74-.358.795-.762a3.778 3.778 0 0 0-.399-2.25M12 8.25c-.995 0-1.97-.08-2.922-.236-.402-.066-.74-.358-.795-.762a3.734 3.734 0 0 1 .4-2.253M12 8.25a2.25 2.25 0 0 0-2.248 2.146M12 8.25a2.25 2.25 0 0 1 2.248 2.146M8.683 5a6.032 6.032 0 0 1-1.155-1.002c.07-.63.27-1.222.574-1.747m.581 2.749A3.75 3.75 0 0 1 15.318 5m0 0c.427-.283.815-.62 1.155-.999a4.471 4.471 0 0 0-.575-1.752M4.921 6a24.048 24.048 0 0 0-.392 3.314c1.668.546 3.416.914 5.223 1.082M19.08 6c.205 1.08.337 2.187.392 3.314a23.882 23.882 0 0 1-5.223 1.082" />
                                 </svg>
                             </button>
+                            @endcan
                             <button title="Follow Logs" :class="alwaysScroll ? '!text-warning' : ''"
                                 x-on:click="toggleScroll"
                                 class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
@@ -327,10 +423,10 @@
                             </div>
                         </div>
                     </div>
-                    <div id="logsContainer"
-                        class="flex flex-col overflow-y-auto p-2 px-4 min-h-4 scrollbar"
-                        :class="fullscreen ? 'flex-1' : 'max-h-[30rem]'">
-                        <div id="logs" class="flex flex-col font-mono">
+                    <div id="logsContainer" @scroll="handleScroll" @wheel="handleWheel"
+                        @touchstart="handleTouchStart" @touchmove="handleTouchMove" @keydown="handleKeyScroll" tabindex="0"
+                        class="flex min-h-40 flex-1 flex-col overflow-y-auto p-2 px-4 scrollbar">
+                        <div id="logs" class="flex flex-col font-logs">
                             <div x-show="searchQuery.trim() && matchCount === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
                                 No matches found.
@@ -340,14 +436,14 @@
                                     $lineContent = (isset($line['command']) && $line['command'] ? '[CMD]: ' : '') . trim($line['line']);
                                     $searchableContent = $line['timestamp'] . ' ' . $lineContent;
                                 @endphp
-                                <div data-log-line data-log-content="{{ htmlspecialchars($searchableContent) }}"
+                                <div data-log-line data-log-content="{{ $searchableContent }}"
                                     @class([
                                         'mt-2' => isset($line['command']) && $line['command'],
                                         'flex gap-2 log-line',
                                     ])>
                                     <span x-show="showTimestamps"
                                         class="shrink-0 text-gray-500">{{ $line['timestamp'] }}</span>
-                                    <span data-line-text="{{ htmlspecialchars($lineContent) }}"
+                                    <span data-line-text="{{ $lineContent }}"
                                         @class([
                                             'text-success dark:text-warning' => $line['hidden'],
                                             'text-red-500' => $line['stderr'],
@@ -356,7 +452,7 @@
                                         ])>{{ $lineContent }}</span>
                                 </div>
                             @empty
-                                <span class="font-mono text-neutral-400 mb-2">No logs yet.</span>
+                                <span class="font-logs text-neutral-400 mb-2">No logs yet.</span>
                             @endforelse
                         </div>
                     </div>

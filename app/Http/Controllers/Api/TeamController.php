@@ -14,14 +14,6 @@ class TeamController extends Controller
             'custom_server_limit',
             'pivot',
         ]);
-        if (request()->attributes->get('can_read_sensitive', false) === false) {
-            $team->makeHidden([
-                'smtp_username',
-                'smtp_password',
-                'resend_api_key',
-                'telegram_token',
-            ]);
-        }
 
         return serializeApiResponse($team);
     }
@@ -118,6 +110,7 @@ class TeamController extends Controller
         if (is_null($team)) {
             return response()->json(['message' => 'Team not found.'], 404);
         }
+        $this->authorize('view', $team);
         $team = $this->removeSensitiveData($team);
 
         return response()->json(
@@ -176,6 +169,7 @@ class TeamController extends Controller
         if (is_null($team)) {
             return response()->json(['message' => 'Team not found.'], 404);
         }
+        $this->authorize('view', $team);
         $members = $team->members;
         $members->makeHidden([
             'pivot',

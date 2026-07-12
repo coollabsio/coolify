@@ -18,8 +18,10 @@
                 <div class="flex flex-col gap-2">
                     <div class="flex flex-wrap items-end gap-2">
                         <div class="flex gap-2 md:flex-row flex-col w-full">
-                            <x-forms.input canGate="update" :canResource="$settings" id="fqdn" label="Domain"
-                                helper="Enter the full domain name (FQDN) of the instance, including 'https://' if you want to secure the dashboard with HTTPS. Setting this will make the dashboard accessible via this domain, secured by HTTPS, instead of just the IP address."
+                            <x-forms.input canGate="update" :canResource="$settings" id="fqdn" label="URL"
+                                helper="Enter the full URL of the instance (for example, https://dashboard.example.com).<br><br>
+                                <span class='dark:text-warning text-coollabs'>Important: </span>
+                                If you want the dashboard to be accessible over HTTPS, you must include <b>https://</b> at the start of the URL. Without it, the dashboard will use HTTP and won’t be secured."
                                 placeholder="https://coolify.yourdomain.com" />
                             <x-forms.input canGate="update" :canResource="$settings" id="instance_name" label="Name" placeholder="Coolify"
                                 helper="Custom name for your Coolify instance, shown in the URL." />
@@ -79,12 +81,6 @@
                                 placeholder="2001:db8::1" autocomplete="new-password" />
                         </div>
 
-                        @if($buildActivityId)
-                            <div class="w-full mt-4">
-                                <livewire:activity-monitor header="Building Helper Image" :activityId="$buildActivityId"
-                                    :fullHeight="false" />
-                            </div>
-                        @endif
                         @if(isDev())
                             <x-forms.input canGate="update" :canResource="$settings" id="dev_helper_version" label="Dev Helper Version (Development Only)"
                                 helper="Override the default coolify-helper image version. Leave empty to use the default version from config ({{ config('constants.coolify.helper_version') }}). Examples: 1.0.11, latest, dev"

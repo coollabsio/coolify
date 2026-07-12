@@ -4,8 +4,9 @@ namespace App\Models;
 
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Collection;
 use OpenApi\Attributes as OA;
-use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Project model',
@@ -20,9 +21,15 @@ use Visus\Cuid2\Cuid2;
 class Project extends BaseModel
 {
     use ClearsGlobalSearchCache;
+    use HasFactory;
     use HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+        'team_id',
+        'uuid',
+    ];
 
     /**
      * Get query builder for projects owned by current team.
@@ -52,7 +59,7 @@ class Project extends BaseModel
             Environment::create([
                 'name' => 'production',
                 'project_id' => $project->id,
-                'uuid' => (string) new Cuid2,
+                'uuid' => new_public_id(),
             ]);
         });
         static::deleting(function ($project) {
@@ -67,7 +74,7 @@ class Project extends BaseModel
 
     public function environment_variables()
     {
-        return $this->hasMany(SharedEnvironmentVariable::class);
+        return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'project');
     }
 
     public function environments()
@@ -149,9 +156,16 @@ class Project extends BaseModel
             $this->services()->count() == 0;
     }
 
-    public function databases()
+    public function databases(array $with = []): Collection
     {
-        return $this->postgresqls()->get()->merge($this->redis()->get())->merge($this->mongodbs()->get())->merge($this->mysqls()->get())->merge($this->mariadbs()->get())->merge($this->keydbs()->get())->merge($this->dragonflies()->get())->merge($this->clickhouses()->get());
+        return $this->postgresqls()->with($with)->get()
+            ->merge($this->redis()->with($with)->get())
+            ->merge($this->mongodbs()->with($with)->get())
+            ->merge($this->mysqls()->with($with)->get())
+            ->merge($this->mariadbs()->with($with)->get())
+            ->merge($this->keydbs()->with($with)->get())
+            ->merge($this->dragonflies()->with($with)->get())
+            ->merge($this->clickhouses()->with($with)->get());
     }
 
     public function navigateTo()

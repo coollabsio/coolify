@@ -2,13 +2,20 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Models\StandalonePostgresql;
 use Exception;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class InitScript extends Component
 {
+    use AuthorizesRequests;
+
+    #[Locked]
+    public StandalonePostgresql $database;
+
     #[Locked]
     public array $script;
 
@@ -35,6 +42,7 @@ class InitScript extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->database);
             $this->validate();
             $this->script['index'] = $this->index;
             $this->script['content'] = $this->content;
@@ -48,6 +56,7 @@ class InitScript extends Component
     public function delete()
     {
         try {
+            $this->authorize('update', $this->database);
             $this->dispatch('delete_init_script', $this->script);
         } catch (Exception $e) {
             return handleError($e, $this);

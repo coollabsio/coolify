@@ -251,7 +251,6 @@ class GlobalSearch extends Component
         $cacheKey = self::getCacheKey(auth()->user()->currentTeam()->id);
 
         $this->allSearchableItems = Cache::remember($cacheKey, 300, function () {
-            ray()->showQueries();
             $items = collect();
             $team = auth()->user()->currentTeam();
 
@@ -530,7 +529,6 @@ class GlobalSearch extends Component
                         'search_text' => strtolower($server->name.' '.$server->ip.' '.$server->description.' server servers'),
                     ];
                 });
-            ray($servers);
             // Get all projects
             $projects = Project::ownedByCurrentTeam()
                 ->withCount(['environments', 'applications', 'services'])
@@ -1053,6 +1051,7 @@ class GlobalSearch extends Component
                 'quickcommand' => '(type: new postgresql)',
                 'type' => 'postgresql',
                 'category' => 'Databases',
+                'logo' => 'svgs/postgresql.svg',
                 'resourceType' => 'database',
             ]);
 
@@ -1062,6 +1061,7 @@ class GlobalSearch extends Component
                 'quickcommand' => '(type: new mysql)',
                 'type' => 'mysql',
                 'category' => 'Databases',
+                'logo' => 'svgs/mysql.svg',
                 'resourceType' => 'database',
             ]);
 
@@ -1071,6 +1071,7 @@ class GlobalSearch extends Component
                 'quickcommand' => '(type: new mariadb)',
                 'type' => 'mariadb',
                 'category' => 'Databases',
+                'logo' => 'svgs/mariadb.svg',
                 'resourceType' => 'database',
             ]);
 
@@ -1080,6 +1081,7 @@ class GlobalSearch extends Component
                 'quickcommand' => '(type: new redis)',
                 'type' => 'redis',
                 'category' => 'Databases',
+                'logo' => 'svgs/redis.svg',
                 'resourceType' => 'database',
             ]);
 
@@ -1089,6 +1091,7 @@ class GlobalSearch extends Component
                 'quickcommand' => '(type: new keydb)',
                 'type' => 'keydb',
                 'category' => 'Databases',
+                'logo' => 'svgs/keydb.svg',
                 'resourceType' => 'database',
             ]);
 
@@ -1098,6 +1101,7 @@ class GlobalSearch extends Component
                 'quickcommand' => '(type: new dragonfly)',
                 'type' => 'dragonfly',
                 'category' => 'Databases',
+                'logo' => 'svgs/dragonfly.svg',
                 'resourceType' => 'database',
             ]);
 
@@ -1107,6 +1111,7 @@ class GlobalSearch extends Component
                 'quickcommand' => '(type: new mongodb)',
                 'type' => 'mongodb',
                 'category' => 'Databases',
+                'logo' => 'svgs/mongodb.svg',
                 'resourceType' => 'database',
             ]);
 
@@ -1116,6 +1121,7 @@ class GlobalSearch extends Component
                 'quickcommand' => '(type: new clickhouse)',
                 'type' => 'clickhouse',
                 'category' => 'Databases',
+                'logo' => 'svgs/clickhouse-icon.svg',
                 'resourceType' => 'database',
             ]);
         }
@@ -1128,6 +1134,12 @@ class GlobalSearch extends Component
 
     public function navigateToResource($type)
     {
+        if ($type === 'server') {
+            $this->dispatch('closeSearchModal');
+
+            return redirectRoute($this, 'server.create');
+        }
+
         // Find the item by type - check regular items first, then services
         $item = collect($this->creatableItems)->firstWhere('type', $type);
 
@@ -1203,7 +1215,7 @@ class GlobalSearch extends Component
     public function loadDestinations()
     {
         $this->loadingDestinations = true;
-        $server = Server::find($this->selectedServerId);
+        $server = Server::ownedByCurrentTeam()->find($this->selectedServerId);
 
         if (! $server) {
             $this->loadingDestinations = false;
@@ -1280,7 +1292,7 @@ class GlobalSearch extends Component
     public function loadEnvironments()
     {
         $this->loadingEnvironments = true;
-        $project = Project::where('uuid', $this->selectedProjectUuid)->first();
+        $project = Project::ownedByCurrentTeam()->where('uuid', $this->selectedProjectUuid)->first();
 
         if (! $project) {
             $this->loadingEnvironments = false;
@@ -1495,7 +1507,11 @@ class GlobalSearch extends Component
                 'type' => 'one-click-service-'.$serviceKey,
                 'category' => 'Services',
                 'resourceType' => 'service',
-            ]);
+                'logo' => data_get($service, 'logo'),
+            ] + array_filter([
+                'amd_only' => data_get($service, 'amd_only') ? true : null,
+                'arm_only' => data_get($service, 'arm_only') ? true : null,
+            ]));
         }
 
         $cachedServices = $items->toArray();

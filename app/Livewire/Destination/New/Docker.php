@@ -9,7 +9,6 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Docker extends Component
 {
@@ -24,7 +23,7 @@ class Docker extends Component
     #[Validate(['required', 'string'])]
     public string $name;
 
-    #[Validate(['required', 'string'])]
+    #[Validate(['required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/'])]
     public string $network;
 
     #[Validate(['required', 'string'])]
@@ -33,44 +32,49 @@ class Docker extends Component
     #[Validate(['required', 'boolean'])]
     public bool $isSwarm = false;
 
-    public function mount(?string $server_id = null)
+    public function mount(?string $server_id = null): void
     {
-        $this->network = new Cuid2;
+        $this->network = new_public_id();
         $this->servers = Server::isUsable()->get();
-        if ($server_id) {
-            $foundServer = $this->servers->find($server_id) ?: $this->servers->first();
-            if (! $foundServer) {
-                throw new \Exception('Server not found.');
+
+        if (filled($server_id)) {
+            $this->selectedServer = Server::ownedByCurrentTeam()->whereKey($server_id)->firstOrFail();
+
+            if (! $this->servers->contains('id', $this->selectedServer->id)) {
+                $this->servers->push($this->selectedServer);
             }
-            $this->selectedServer = $foundServer;
-            $this->serverId = $this->selectedServer->id;
+
+            $this->serverId = (string) $this->selectedServer->id;
         } else {
             $foundServer = $this->servers->first();
             if (! $foundServer) {
                 throw new \Exception('Server not found.');
             }
             $this->selectedServer = $foundServer;
-            $this->serverId = $this->selectedServer->id;
+            $this->serverId = (string) $this->selectedServer->id;
         }
         $this->generateName();
     }
 
-    public function updatedServerId()
+    public function updatedServerId(): void
     {
         $this->selectedServer = $this->servers->find($this->serverId);
+        if (! $this->selectedServer) {
+            throw new \Exception('Server not found.');
+        }
         $this->generateName();
     }
 
-    public function generateName()
+    public function generateName(): void
     {
-        $name = data_get($this->selectedServer, 'name', new Cuid2);
+        $name = data_get($this->selectedServer, 'name', new_public_id());
         $this->name = str("{$name}-{$this->network}")->kebab();
     }
 
-    public function submit()
+    public function submit(): mixed
     {
         try {
-            $this->authorize('create', StandaloneDocker::class);
+            $this->authorize('create', $this->isSwarm ? SwarmDocker::class : StandaloneDocker::class);
             $this->validate();
             if ($this->isSwarm) {
                 $found = $this->selectedServer->swarmDockers()->where('network', $this->network)->first();

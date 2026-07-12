@@ -6,7 +6,6 @@ use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\Component;
-use Visus\Cuid2\Cuid2;
 
 class EnvVarInput extends Component
 {
@@ -38,6 +37,7 @@ class EnvVarInput extends Component
         public array $availableVars = [],
         public ?string $projectUuid = null,
         public ?string $environmentUuid = null,
+        public ?string $serverUuid = null,
     ) {
         // Handle authorization-based disabling
         if ($this->canGate && $this->canResource && $this->autoDisable) {
@@ -55,7 +55,7 @@ class EnvVarInput extends Component
         $this->modelBinding = $this->id;
 
         if (is_null($this->id)) {
-            $this->id = new Cuid2;
+            $this->id = new_public_id();
             // Don't create wire:model binding for auto-generated IDs
             $this->modelBinding = 'null';
         }
@@ -63,7 +63,7 @@ class EnvVarInput extends Component
         // This prevents duplicate IDs when multiple forms are on the same page
         if ($this->modelBinding && $this->modelBinding !== 'null') {
             // Use original ID with random suffix for uniqueness
-            $uniqueSuffix = new Cuid2;
+            $uniqueSuffix = new_public_id();
             $this->htmlId = $this->modelBinding.'-'.$uniqueSuffix;
         } else {
             $this->htmlId = (string) $this->id;
@@ -86,6 +86,9 @@ class EnvVarInput extends Component
                     'environment_uuid' => $this->environmentUuid,
                 ])
                 : route('shared-variables.environment.index'),
+            'server' => $this->serverUuid
+                ? route('shared-variables.server.show', ['server_uuid' => $this->serverUuid])
+                : route('shared-variables.server.index'),
             'default' => route('shared-variables.index'),
         ];
 

@@ -12,6 +12,9 @@
                     <livewire:project.service.edit-compose serviceId="{{ $service->id }}" />
                 </x-modal-input>
             @endcan
+            <x-modal-input title="Resource Details" buttonTitle="Details">
+                <livewire:project.shared.resource-details :resource="$service" />
+            </x-modal-input>
         </div>
         <div>Configuration</div>
     </div>
@@ -20,7 +23,10 @@
             placeholder="My super WordPress site" />
         <x-forms.input canGate="update" :canResource="$service" id="description" label="Description" />
     </div>
-    <div class="w-96">
+    <div>
+        <h3>Network</h3>
+    </div>
+    <div class="w-full sm:w-96">
         <x-forms.checkbox canGate="update" :canResource="$service" instantSave id="connectToDockerNetwork"
             label="Connect To Predefined Network"
             helper="By default, you do not reach the Coolify defined networks.<br>Starting a docker compose based resource will have an internal network. <br>If you connect to a Coolify defined network, you maybe need to use different internal DNS names to connect to a resource.<br><br>For more information, check <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/knowledge-base/docker/compose#connect-to-predefined-networks'>this</a>." />
@@ -39,10 +45,14 @@
                         <x-helper helper="Variable name: {{ $serviceName }}" />
                     @endif
                 </div>
-                <x-forms.input canGate="update" :canResource="$service"
-                    type="{{ data_get($field, 'isPassword') ? 'password' : 'text' }}"
-                    required="{{ str(data_get($field, 'rules'))?->contains('required') }}"
-                    id="fields.{{ $serviceName }}.value"></x-forms.input>
+                @if ($isPasswordHiddenForMember && data_get($field, 'isPassword'))
+                    <x-forms.input disabled value="Hidden (only admins can view)" />
+                @else
+                    <x-forms.input canGate="update" :canResource="$service"
+                        type="{{ data_get($field, 'isPassword') ? 'password' : 'text' }}"
+                        required="{{ str(data_get($field, 'rules'))?->contains('required') }}"
+                        id="fields.{{ $serviceName }}.value"></x-forms.input>
+                @endif
             @endforeach
         </div>
     @endif

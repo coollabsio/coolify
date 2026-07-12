@@ -5,6 +5,7 @@ namespace App\Livewire\Notifications;
 use App\Models\SlackNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
+use App\Rules\SafeWebhookUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -25,7 +26,7 @@ class Slack extends Component
     #[Validate(['boolean'])]
     public bool $slackEnabled = false;
 
-    #[Validate(['url', 'nullable'])]
+    #[Validate(['nullable', new SafeWebhookUrl])]
     public ?string $slackWebhookUrl = null;
 
     #[Validate(['boolean'])]
@@ -109,7 +110,9 @@ class Slack extends Component
             refreshSession();
         } else {
             $this->slackEnabled = $this->settings->slack_enabled;
-            $this->slackWebhookUrl = $this->settings->slack_webhook_url;
+            $this->slackWebhookUrl = auth()->user()->can('update', $this->settings)
+                ? $this->settings->slack_webhook_url
+                : null;
 
             $this->deploymentSuccessSlackNotifications = $this->settings->deployment_success_slack_notifications;
             $this->deploymentFailureSlackNotifications = $this->settings->deployment_failure_slack_notifications;

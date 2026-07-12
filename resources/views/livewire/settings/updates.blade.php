@@ -44,6 +44,15 @@
                     <x-forms.input required label="Frequency (cron expression)" disabled placeholder="disabled"
                         helper="Frequency (cron expression) (automatically update coolify).<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every day at 00:00" />
                 @endif
+
+                <h4 class="pt-4">Docker Registry</h4>
+                <div class="md:w-96">
+                    <x-forms.select id="docker_registry_url" label="Docker Registry"
+                        helper="The Docker registry used to pull Coolify images during updates.<br>Switch to Docker Hub if you experience rate limiting with GitHub Container Registry.">
+                        <option value="docker.io">Docker Hub (docker.io)</option>
+                        <option value="ghcr.io">GitHub Container Registry (ghcr.io)</option>
+                    </x-forms.select>
+                </div>
             </div>
 
         </form>

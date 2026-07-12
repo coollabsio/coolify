@@ -4,14 +4,15 @@ namespace App\Livewire\Project\New;
 
 use App\Models\Application;
 use App\Models\Project;
-use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
 use App\Services\DockerImageParser;
+use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class DockerImage extends Component
 {
+    use AuthorizesRequests;
+
     public string $imageName = '';
 
     public string $imageTag = '';
@@ -82,9 +83,11 @@ class DockerImage extends Component
 
     public function submit()
     {
+        $this->authorize('create', Application::class);
+
         $this->validate([
-            'imageName' => ['required', 'string'],
-            'imageTag' => ['nullable', 'string', 'regex:/^[a-z0-9][a-z0-9._-]*$/i'],
+            'imageName' => ValidationPatterns::dockerImageNameRules(required: true),
+            'imageTag' => ValidationPatterns::dockerImageTagRules(),
             'imageSha256' => ['nullable', 'string', 'regex:/^[a-f0-9]{64}$/i'],
         ]);
 
@@ -111,18 +114,15 @@ class DockerImage extends Component
         $parser = new DockerImageParser;
         $parser->parse($dockerImage);
 
-        $destination_uuid = $this->query['destination'];
-        $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+        $destination_uuid = $this->query['destination'] ?? null;
+        $destination = find_destination_for_current_team($destination_uuid);
         if (! $destination) {
-            $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
-        }
-        if (! $destination) {
-            throw new \Exception('Destination not found. What?!');
+            throw new \Exception('Destination not found.');
         }
         $destination_class = $destination->getMorphClass();
 
-        $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-        $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
+        $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
+        $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
 
         // Append @sha256 to image name if using digest and not already present
         $imageName = $parser->getFullImageNameWithoutTag();
@@ -134,7 +134,7 @@ class DockerImage extends Component
         $imageTag = $parser->isImageHash() ? 'sha256-'.$parser->getTag() : $parser->getTag();
 
         $application = Application::create([
-            'name' => 'docker-image-'.new Cuid2,
+            'name' => 'docker-image-'.new_public_id(),
             'repository_project_id' => 0,
             'git_repository' => 'coollabsio/coolify',
             'git_branch' => 'main',

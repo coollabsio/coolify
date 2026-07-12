@@ -1,4 +1,4 @@
-<div wire:key="{{ rand() }}" class="coolify-monaco-editor flex-1">
+<div wire:key="{{ random_int(0, PHP_INT_MAX) }}" class="coolify-monaco-editor flex-1">
     <div x-ref="monacoRef" x-data="{
         monacoVersion: '0.52.2',
         monacoContent: @entangle($id),

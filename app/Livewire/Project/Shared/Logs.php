@@ -90,7 +90,6 @@ class Logs extends Component
             }
         } catch (\Exception $e) {
             // Log error but don't fail the entire operation
-            ray("Error loading containers for server {$server->name}: ".$e->getMessage());
 
             return [];
         }
@@ -106,7 +105,7 @@ class Logs extends Component
             $this->query = request()->query();
             if (data_get($this->parameters, 'application_uuid')) {
                 $this->type = 'application';
-                $this->resource = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail();
+                $this->resource = Application::ownedByCurrentTeam()->where('uuid', $this->parameters['application_uuid'])->firstOrFail();
                 $this->status = $this->resource->status;
                 if ($this->resource->destination->server->isFunctional()) {
                     $server = $this->resource->destination->server;
@@ -133,7 +132,7 @@ class Logs extends Component
                 $this->containers->push($this->container);
             } elseif (data_get($this->parameters, 'service_uuid')) {
                 $this->type = 'service';
-                $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
+                $this->resource = Service::ownedByCurrentTeam()->where('uuid', $this->parameters['service_uuid'])->firstOrFail();
                 $this->resource->applications()->get()->each(function ($application) {
                     $this->containers->push(data_get($application, 'name').'-'.data_get($this->resource, 'uuid'));
                 });

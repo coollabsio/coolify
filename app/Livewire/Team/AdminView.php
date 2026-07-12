@@ -25,6 +25,9 @@ class AdminView extends Component
 
     public function submitSearch()
     {
+        if (! isInstanceAdmin()) {
+            return;
+        }
         if ($this->search !== '') {
             $this->users = User::where(function ($query) {
                 $query->where('name', 'like', "%{$this->search}%")
@@ -39,6 +42,9 @@ class AdminView extends Component
 
     public function getUsers()
     {
+        if (! isInstanceAdmin()) {
+            return;
+        }
         $users = User::where('id', '!=', auth()->id())->get();
         if ($users->count() > $this->number_of_users_to_show) {
             $this->lots_of_users = true;
@@ -49,14 +55,14 @@ class AdminView extends Component
         }
     }
 
-    public function delete($id, $password)
+    public function delete($id, $password, $selectedActions = [])
     {
         if (! isInstanceAdmin()) {
             return redirect()->route('dashboard');
         }
 
         if (! verifyPasswordConfirmation($password, $this)) {
-            return;
+            return 'The provided password is incorrect.';
         }
 
         if (! auth()->user()->isInstanceAdmin()) {
@@ -71,6 +77,8 @@ class AdminView extends Component
         try {
             $user->delete();
             $this->getUsers();
+
+            return true;
         } catch (\Exception $e) {
             return $this->dispatch('error', $e->getMessage());
         }

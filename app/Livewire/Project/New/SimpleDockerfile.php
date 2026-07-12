@@ -5,13 +5,13 @@ namespace App\Livewire\Project\New;
 use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\Project;
-use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class SimpleDockerfile extends Component
 {
+    use AuthorizesRequests;
+
     public string $dockerfile = '';
 
     public array $parameters;
@@ -32,28 +32,27 @@ CMD ["nginx", "-g", "daemon off;"]
 
     public function submit()
     {
+        $this->authorize('create', Application::class);
+
         $this->validate([
             'dockerfile' => 'required',
         ]);
-        $destination_uuid = $this->query['destination'];
-        $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+        $destination_uuid = $this->query['destination'] ?? null;
+        $destination = find_destination_for_current_team($destination_uuid);
         if (! $destination) {
-            $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
-        }
-        if (! $destination) {
-            throw new \Exception('Destination not found. What?!');
+            throw new \Exception('Destination not found.');
         }
         $destination_class = $destination->getMorphClass();
 
-        $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-        $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
+        $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
+        $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
 
         $port = get_port_from_dockerfile($this->dockerfile);
         if (! $port) {
             $port = 80;
         }
         $application = Application::create([
-            'name' => 'dockerfile-'.new Cuid2,
+            'name' => 'dockerfile-'.new_public_id(),
             'repository_project_id' => 0,
             'git_repository' => 'coollabsio/coolify',
             'git_branch' => 'main',

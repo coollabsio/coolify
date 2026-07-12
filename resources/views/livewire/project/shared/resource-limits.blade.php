@@ -18,24 +18,20 @@
                 label="CPU Weight" id="limitsCpuShares" />
         </div>
         <h3 class="pt-4">Limit Memory</h3>
-        <div class="flex flex-col gap-2">
-            <div class="flex gap-2">
-                <x-forms.input canGate="update" :canResource="$resource"
-                    helper="Examples: 69b (byte) or 420k (kilobyte) or 1337m (megabyte) or 1g (gigabyte).<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#mem_reservation'>here</a>."
-                    label="Soft Memory Limit" id="limitsMemoryReservation" />
-                <x-forms.input canGate="update" :canResource="$resource"
-                    helper="0-100.<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#mem_swappiness'>here</a>."
-                    type="number" min="0" max="100" label="Swappiness"
-                    id="limitsMemorySwappiness" />
-            </div>
-            <div class="flex gap-2">
-                <x-forms.input canGate="update" :canResource="$resource"
-                    helper="Examples: 69b (byte) or 420k (kilobyte) or 1337m (megabyte) or 1g (gigabyte).<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#mem_limit'>here</a>."
-                    label="Maximum Memory Limit" id="limitsMemory" />
-                <x-forms.input canGate="update" :canResource="$resource"
-                    helper="Examples:69b (byte) or 420k (kilobyte) or 1337m (megabyte) or 1g (gigabyte).<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#memswap_limit'>here</a>."
-                    label="Maximum Swap Limit" id="limitsMemorySwap" />
-            </div>
+        <div class="flex gap-2">
+            <x-forms.input canGate="update" :canResource="$resource"
+                helper="<span class='text-helper'>Examples</span><br>• 69b (byte)<br>• 420k (kilobyte)<br>• 1337m (megabyte)<br>• 1g (gigabyte)<br><br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#mem_reservation'>here</a>."
+                label="Soft Memory Limit" id="limitsMemoryReservation" />
+            <x-forms.input canGate="update" :canResource="$resource"
+                helper="Value between 0-100.<br><br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#mem_swappiness'>here</a>."
+                type="number" min="0" max="100" label="Swappiness"
+                id="limitsMemorySwappiness" />
+            <x-forms.input canGate="update" :canResource="$resource"
+                helper="<span class='text-helper'>Examples</span><br>• 69b (byte)<br>• 420k (kilobyte)<br>• 1337m (megabyte)<br>• 1g (gigabyte)<br><br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#mem_limit'>here</a>."
+                label="Maximum Memory Limit" id="limitsMemory" />
+            <x-forms.input canGate="update" :canResource="$resource"
+                helper="<span class='text-helper'>Examples</span><br>• 69b (byte)<br>• 420k (kilobyte)<br>• 1337m (megabyte)<br>• 1g (gigabyte)<br><br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#memswap_limit'>here</a>."
+                label="Maximum Swap Limit" id="limitsMemorySwap" />
         </div>
     </form>
 </div>

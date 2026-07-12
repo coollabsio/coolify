@@ -11,6 +11,14 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
         'token',
         'abilities',
         'expires_at',
+        'api_token_expiration_warning_sent_at',
         'team_id',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'api_token_expiration_warning_sent_at' => 'datetime',
+        ];
+    }
 }

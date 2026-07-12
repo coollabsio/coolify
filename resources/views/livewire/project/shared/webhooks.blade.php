@@ -2,11 +2,11 @@
     <div class="flex items-center gap-2">
         <h2>Webhooks</h2>
         <x-helper
-            helper="For more details goto our <a class='underline dark:text-white' href='https://coolify.io/docs/api-reference/api/operations/deploy-by-tag-or-uuid' target='_blank'>docs</a>." />
+            helper="For more details goto our <a class='underline dark:text-white' href='https://coolify.io/docs/api-reference/authorization' target='_blank'>docs</a>." />
     </div>
     <div>
         <x-forms.input readonly
-            helper="See details in our <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/api-reference/api/operations/deploy-by-tag-or-uuid'>documentation</a>."
+            helper="See details in our <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/api-reference/authorization'>documentation</a>."
             label="Deploy Webhook (auth required)" id="deploywebhook"></x-forms.input>
     </div>
     @if ($resource->type() === 'application')
@@ -22,9 +22,9 @@
                                 helper="Need to set a secret to be able to use this webhook. It should match with the secret in GitHub."
                                 label="GitHub Webhook Secret" id="githubManualWebhookSecret"></x-forms.input>
                         @else
-                            <x-forms.input disabled type="password"
+                            <x-forms.input disabled
                                 helper="Need to set a secret to be able to use this webhook. It should match with the secret in GitHub."
-                                label="GitHub Webhook Secret" id="githubManualWebhookSecret"></x-forms.input>
+                                label="GitHub Webhook Secret" value="Hidden (only admins can view)"></x-forms.input>
                         @endcan
                     </div>
                     <a target="_blank" class="flex hover:no-underline" href="{{ $resource?->gitWebhook }}">
@@ -39,9 +39,9 @@
                                 helper="Need to set a secret to be able to use this webhook. It should match with the secret in GitLab."
                                 label="GitLab Webhook Secret" id="gitlabManualWebhookSecret"></x-forms.input>
                         @else
-                            <x-forms.input disabled type="password"
+                            <x-forms.input disabled
                                 helper="Need to set a secret to be able to use this webhook. It should match with the secret in GitLab."
-                                label="GitLab Webhook Secret" id="gitlabManualWebhookSecret"></x-forms.input>
+                                label="GitLab Webhook Secret" value="Hidden (only admins can view)"></x-forms.input>
                         @endcan
                     </div>
                     <div class="flex gap-2">
@@ -51,9 +51,9 @@
                                 helper="Need to set a secret to be able to use this webhook. It should match with the secret in Bitbucket."
                                 label="Bitbucket Webhook Secret" id="bitbucketManualWebhookSecret"></x-forms.input>
                         @else
-                            <x-forms.input disabled type="password"
+                            <x-forms.input disabled
                                 helper="Need to set a secret to be able to use this webhook. It should match with the secret in Bitbucket."
-                                label="Bitbucket Webhook Secret" id="bitbucketManualWebhookSecret"></x-forms.input>
+                                label="Bitbucket Webhook Secret" value="Hidden (only admins can view)"></x-forms.input>
                         @endcan
                     </div>
                     <div class="flex gap-2">
@@ -63,9 +63,9 @@
                                 helper="Need to set a secret to be able to use this webhook. It should match with the secret in Gitea."
                                 label="Gitea Webhook Secret" id="giteaManualWebhookSecret"></x-forms.input>
                         @else
-                            <x-forms.input disabled type="password"
+                            <x-forms.input disabled
                                 helper="Need to set a secret to be able to use this webhook. It should match with the secret in Gitea."
-                                label="Gitea Webhook Secret" id="giteaManualWebhookSecret"></x-forms.input>
+                                label="Gitea Webhook Secret" value="Hidden (only admins can view)"></x-forms.input>
                         @endcan
                     </div>
                     @can('update', $resource)

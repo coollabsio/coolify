@@ -3,7 +3,7 @@
         {{ data_get_str($server, 'name')->limit(10) }} > Docker Cleanup | Coolify
     </x-slot>
     <livewire:server.navbar :server="$server" />
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 sm:flex-row">
+    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
         <x-server.sidebar :server="$server" activeMenu="docker-cleanup" />
         <div class="w-full">
             <form wire:submit='submit'>
@@ -26,6 +26,22 @@
                     </div>
                     <div class="mt-1 mb-6">Configure Docker cleanup settings for your server.</div>
                 </div>
+
+                @if (!isCloud() && $this->isCleanupStale)
+                    <div class="mb-4">
+                        <x-callout type="warning" title="Docker Cleanup May Be Stalled">
+                            <p>The last Docker cleanup ran {{ $this->lastExecutionTime ?? 'unknown time' }} ago,
+                                which is longer than expected for the configured frequency.</p>
+                            @if (!$this->isSchedulerHealthy)
+                                <p class="mt-1">The scheduled job manager appears to be inactive. This may indicate
+                                    a stale Redis lock is blocking all scheduled jobs.</p>
+                            @endif
+                            <p class="mt-2">To resolve, run on your Coolify instance:
+                                <code class="bg-black/10 dark:bg-white/10 px-1 rounded">php artisan cleanup:redis --clear-locks</code>
+                            </p>
+                        </x-callout>
+                    </div>
+                @endif
 
                 <div class="flex flex-col gap-2">
                     <div class="flex gap-4">

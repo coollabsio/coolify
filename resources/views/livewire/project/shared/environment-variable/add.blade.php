@@ -1,20 +1,30 @@
-<form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submit'>
+<form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submit'
+    x-data="{ isMultiline: $wire.entangle('is_multiline') }">
     <x-forms.input placeholder="NODE_ENV" id="key" label="Name" required />
-    @if ($is_multiline)
-        <x-forms.textarea id="value" label="Value" required />
-    @else
-        <x-forms.env-var-input placeholder="production" id="value" label="Value" required
-            :availableVars="$shared ? [] : $this->availableSharedVariables"
-            :projectUuid="data_get($parameters, 'project_uuid')"
-            :environmentUuid="data_get($parameters, 'environment_uuid')" />
-    @endif
+    <template x-if="isMultiline">
+        <div wire:key="env-value-textarea">
+            <x-forms.textarea id="value" label="Value" required class="font-sans" spellcheck />
+        </div>
+    </template>
+    <template x-if="!isMultiline">
+        <div wire:key="env-value-input">
+            <x-forms.env-var-input placeholder="production" id="value" label="Value" required
+                :availableVars="$shared ? [] : $this->availableSharedVariables"
+                :projectUuid="data_get($parameters, 'project_uuid')"
+                :environmentUuid="data_get($parameters, 'environment_uuid')"
+                :serverUuid="data_get($parameters, 'server_uuid')" />
+        </div>
+    </template>
 
-    @if (!$shared && !$is_multiline)
-        <div class="text-xs text-neutral-500 dark:text-neutral-400 -mt-1">
+    @if (!$shared)
+        <div x-cloak x-show="!isMultiline" wire:key="env-value-tip" class="text-xs text-neutral-500 dark:text-neutral-400 -mt-1">
             Tip: Type <span class="font-mono dark:text-warning text-coollabs">{{</span> to reference a shared environment
             variable
         </div>
     @endif
+
+    <x-forms.input id="comment" label="Comment"
+        helper="Add a note to document what this environment variable is used for." maxlength="256" />
 
     @if (!$shared)
         <x-forms.checkbox id="is_buildtime"
@@ -30,7 +40,7 @@
             label="Is Literal?" />
     @endif
 
-    <x-forms.checkbox id="is_multiline" label="Is Multiline?" />
+    <x-forms.checkbox id="is_multiline" x-model="isMultiline" label="Is Multiline?" />
     <x-forms.button type="submit" @click="slideOverOpen=false">
         Save
     </x-forms.button>

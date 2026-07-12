@@ -34,10 +34,10 @@
             }
         }" x-init="// Initial scroll
         $nextTick(() => scrollToBottom());
-        
+
         // Add scroll event listener
         $el.addEventListener('scroll', () => handleScroll());
-        
+
         // Set up mutation observer to watch for content changes
         observer = new MutationObserver(() => {
             $nextTick(() => scrollToBottom());
@@ -48,11 +48,11 @@
             characterData: true
         });" x-destroy="observer && observer.disconnect()"
             @class([
-                'flex flex-col w-full px-4 py-2 overflow-y-auto bg-white border border-solid rounded-sm dark:text-white dark:bg-coolgray-100 scrollbar border-neutral-300 dark:border-coolgray-300',
+                'flex flex-col w-full min-w-0 max-w-full px-4 py-2 overflow-y-auto bg-white border border-solid rounded-sm dark:text-white dark:bg-coolgray-100 scrollbar border-neutral-300 dark:border-coolgray-300',
                 'flex-1 min-h-0' => $fullHeight,
                 'max-h-96' => !$fullHeight,
             ])>
-            <pre class="font-mono whitespace-pre-wrap" @if ($isPollingActive) wire:poll.1000ms="polling" @endif>{{ RunRemoteProcess::decodeOutput($activity) }}</pre>
+            <pre class="font-logs min-w-0 max-w-full whitespace-pre-wrap wrap-anywhere" @if ($isPollingActive) wire:poll.1000ms="polling" @endif>{{ RunRemoteProcess::decodeOutput($activity) }}</pre>
         </div>
     @else
         @if ($showWaiting)

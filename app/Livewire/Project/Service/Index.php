@@ -8,11 +8,11 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
-use Spatie\Url\Url;
 
 class Index extends Component
 {
@@ -51,7 +51,9 @@ class Index extends Component
 
     public bool $excludeFromStatus = false;
 
-    public ?int $publicPort = null;
+    public mixed $publicPort = null;
+
+    public mixed $publicPortTimeout = 3600;
 
     public bool $isPublic = false;
 
@@ -89,7 +91,8 @@ class Index extends Component
         'description' => 'nullable',
         'image' => 'required',
         'excludeFromStatus' => 'required|boolean',
-        'publicPort' => 'nullable|integer',
+        'publicPort' => 'nullable|integer|min:1|max:65535',
+        'publicPortTimeout' => 'nullable|integer|min:1',
         'isPublic' => 'required|boolean',
         'isLogDrainEnabled' => 'required|boolean',
         // Application-specific rules
@@ -105,10 +108,16 @@ class Index extends Component
             $this->parameters = get_route_parameters();
             $this->query = request()->query();
             $this->currentRoute = request()->route()->getName();
-            $this->service = Service::whereUuid($this->parameters['service_uuid'])->first();
-            if (! $this->service) {
-                return redirect()->route('dashboard');
-            }
+            $project = currentTeam()
+                ->projects()
+                ->select('id', 'uuid', 'team_id')
+                ->where('uuid', $this->parameters['project_uuid'])
+                ->firstOrFail();
+            $environment = $project->environments()
+                ->select('id', 'uuid', 'name', 'project_id')
+                ->where('uuid', $this->parameters['environment_uuid'])
+                ->firstOrFail();
+            $this->service = $environment->services()->whereUuid($this->parameters['service_uuid'])->firstOrFail();
             $this->authorize('view', $this->service);
             $service = $this->service->applications()->whereUuid($this->parameters['stack_service_uuid'])->first();
             if ($service) {
@@ -157,7 +166,8 @@ class Index extends Component
             $this->serviceDatabase->description = $this->description;
             $this->serviceDatabase->image = $this->image;
             $this->serviceDatabase->exclude_from_status = $this->excludeFromStatus;
-            $this->serviceDatabase->public_port = $this->publicPort;
+            $this->serviceDatabase->public_port = $this->publicPort ?: null;
+            $this->serviceDatabase->public_port_timeout = $this->publicPortTimeout ?: null;
             $this->serviceDatabase->is_public = $this->isPublic;
             $this->serviceDatabase->is_log_drain_enabled = $this->isLogDrainEnabled;
         } else {
@@ -166,6 +176,7 @@ class Index extends Component
             $this->image = $this->serviceDatabase->image;
             $this->excludeFromStatus = $this->serviceDatabase->exclude_from_status ?? false;
             $this->publicPort = $this->serviceDatabase->public_port;
+            $this->publicPortTimeout = $this->serviceDatabase->public_port_timeout;
             $this->isPublic = $this->serviceDatabase->is_public ?? false;
             $this->isLogDrainEnabled = $this->serviceDatabase->is_log_drain_enabled ?? false;
         }
@@ -189,13 +200,13 @@ class Index extends Component
         }
     }
 
-    public function deleteDatabase($password)
+    public function deleteDatabase($password, $selectedActions = [])
     {
         try {
             $this->authorize('delete', $this->serviceDatabase);
 
             if (! verifyPasswordConfirmation($password, $this)) {
-                return;
+                return 'The provided password is incorrect.';
             }
 
             $this->serviceDatabase->delete();
@@ -393,13 +404,13 @@ class Index extends Component
         }
     }
 
-    public function deleteApplication($password)
+    public function deleteApplication($password, $selectedActions = [])
     {
         try {
             $this->authorize('delete', $this->serviceApplication);
 
             if (! verifyPasswordConfirmation($password, $this)) {
-                return;
+                return 'The provided password is incorrect.';
             }
 
             $this->serviceApplication->delete();
@@ -469,15 +480,11 @@ class Index extends Component
     {
         try {
             $this->authorize('update', $this->serviceApplication);
-            $this->fqdn = str($this->fqdn)->replaceEnd(',', '')->trim()->toString();
-            $this->fqdn = str($this->fqdn)->replaceStart(',', '')->trim()->toString();
-            $domains = str($this->fqdn)->trim()->explode(',')->map(function ($domain) {
-                $domain = trim($domain);
-                Url::fromString($domain, ['http', 'https']);
+            $this->validate([
+                'fqdn' => ValidationPatterns::applicationDomainRules(),
+            ]);
 
-                return str($domain)->lower();
-            });
-            $this->fqdn = $domains->unique()->implode(',');
+            $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
             $warning = sslipDomainWarning($this->fqdn);
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));

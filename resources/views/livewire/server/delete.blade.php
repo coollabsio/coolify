@@ -3,7 +3,7 @@
         {{ data_get_str($server, 'name')->limit(10) }} > Delete Server | Coolify
     </x-slot>
     <livewire:server.navbar :server="$server" />
-    <div class="flex flex-col h-full gap-8 sm:flex-row">
+    <div class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
         <x-server.sidebar :server="$server" activeMenu="danger" />
         <div class="w-full">
             @if ($server->id !== 0)
@@ -14,7 +14,7 @@
                     back!
                 </div>
                 @if ($server->definedResources()->count() > 0)
-                    <div class="pb-2 text-red-500">You need to delete all resources before deleting this server.</div>
+                    <div class="pb-2 text-red-500">This server has resources. You can force delete all resources by checking the option below.</div>
                 @endif
 
                 <x-modal-confirmation title="Confirm Server Deletion?" isErrorButton buttonTitle="Delete"

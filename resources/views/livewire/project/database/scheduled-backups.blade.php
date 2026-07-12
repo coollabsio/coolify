@@ -216,7 +216,7 @@
     @if ($type === 'service-database' && $selectedBackup)
         <div class="pt-10">
             <livewire:project.database.backup-edit wire:key="{{ $selectedBackup->id }}" :backup="$selectedBackup"
-                :s3s="$s3s" :status="data_get($database, 'status')" />
+                :available-s3-storages="$s3s" :status="data_get($database, 'status')" />
             <livewire:project.database.backup-executions wire:key="{{ $selectedBackup->uuid }}" :backup="$selectedBackup"
                 :database="$database" />
         </div>

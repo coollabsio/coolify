@@ -3,15 +3,28 @@
 use App\Enums\BuildPackTypes;
 use App\Enums\RedirectTypes;
 use App\Enums\StaticImageTypes;
+use App\Models\Environment;
+use App\Rules\ValidGitBranch;
+use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 function getTeamIdFromToken()
 {
-    $token = auth()->user()->currentAccessToken();
+    $user = auth()->user();
+    $token = $user?->currentAccessToken();
+    $teamId = data_get($token, 'team_id');
 
-    return data_get($token, 'team_id');
+    if (! $user || is_null($teamId) || ! $user->teams()->where('teams.id', $teamId)->exists()) {
+        return null;
+    }
+
+    return $teamId;
 }
 function invalidTokenResponse()
 {
@@ -79,34 +92,54 @@ function serializeApiResponse($data)
     }
 }
 
+/**
+ * Re-expose a model's `$hidden` sensitive fields when the current API request
+ * carries the `read:sensitive` or `root` token ability (set by the
+ * ApiSensitiveData middleware).
+ */
+function exposeSensitiveFields(Model $model): Model
+{
+    if (request()->attributes->get('can_read_sensitive', false) === true && filled($model->getHidden())) {
+        $model->makeVisible($model->getHidden());
+    }
+
+    return $model;
+}
+
 function sharedDataApplications()
 {
     return [
         'git_repository' => 'string',
-        'git_branch' => 'string',
+        'git_branch' => ['string', new ValidGitBranch],
         'build_pack' => Rule::enum(BuildPackTypes::class),
         'is_static' => 'boolean',
+        'is_spa' => 'boolean',
+        'is_auto_deploy_enabled' => 'boolean',
+        'is_force_https_enabled' => 'boolean',
+        'is_preview_deployments_enabled' => 'boolean',
         'static_image' => Rule::enum(StaticImageTypes::class),
-        'domains' => 'string',
+        'domains' => ValidationPatterns::applicationDomainRules(),
         'redirect' => Rule::enum(RedirectTypes::class),
-        'git_commit_sha' => 'string',
-        'docker_registry_image_name' => 'string|nullable',
-        'docker_registry_image_tag' => 'string|nullable',
-        'install_command' => 'string|nullable',
-        'build_command' => 'string|nullable',
-        'start_command' => 'string|nullable',
+        'git_commit_sha' => ['string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
+        'docker_registry_image_name' => ValidationPatterns::dockerImageNameRules(),
+        'docker_registry_image_tag' => ValidationPatterns::dockerImageTagRules(),
+        'install_command' => ValidationPatterns::shellSafeCommandRules(),
+        'build_command' => ValidationPatterns::shellSafeCommandRules(),
+        'start_command' => ValidationPatterns::shellSafeCommandRules(),
         'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/',
         'ports_mappings' => 'string|regex:/^(\d+:\d+)(,\d+:\d+)*$/|nullable',
         'custom_network_aliases' => 'string|nullable',
-        'base_directory' => 'string|nullable',
-        'publish_directory' => 'string|nullable',
+        'base_directory' => ValidationPatterns::directoryPathRules(),
+        'publish_directory' => ValidationPatterns::directoryPathRules(),
         'health_check_enabled' => 'boolean',
-        'health_check_path' => 'string',
-        'health_check_port' => 'string|nullable',
-        'health_check_host' => 'string',
-        'health_check_method' => 'string',
+        'health_check_type' => 'string|in:http,cmd',
+        'health_check_command' => ['nullable', 'string', 'max:1000', 'regex:/^[a-zA-Z0-9 \-_.\/:=@,+]+$/'],
+        'health_check_path' => ['string', 'regex:#^[a-zA-Z0-9/\-_.~%,;]+$#'],
+        'health_check_port' => 'integer|nullable|min:1|max:65535',
+        'health_check_host' => ['string', 'regex:/^[a-zA-Z0-9.\-_]+$/'],
+        'health_check_method' => 'string|in:GET,HEAD,POST,OPTIONS',
         'health_check_return_code' => 'numeric',
-        'health_check_scheme' => 'string',
+        'health_check_scheme' => 'string|in:http,https',
         'health_check_response_text' => 'string|nullable',
         'health_check_interval' => 'numeric',
         'health_check_timeout' => 'numeric',
@@ -120,23 +153,85 @@ function sharedDataApplications()
         'limits_cpuset' => 'string|nullable',
         'limits_cpu_shares' => 'numeric',
         'custom_labels' => 'string|nullable',
-        'custom_docker_run_options' => 'string|nullable',
+        'custom_docker_run_options' => ValidationPatterns::shellSafeCommandRules(2000),
+        // Security: deployment commands are intentionally arbitrary shell (e.g. "php artisan migrate").
+        // Access is gated by API token authentication. Commands run inside the app container, not the host.
         'post_deployment_command' => 'string|nullable',
-        'post_deployment_command_container' => 'string',
+        'post_deployment_command_container' => ValidationPatterns::containerNameRules(),
         'pre_deployment_command' => 'string|nullable',
-        'pre_deployment_command_container' => 'string',
+        'pre_deployment_command_container' => ValidationPatterns::containerNameRules(),
         'manual_webhook_secret_github' => 'string|nullable',
         'manual_webhook_secret_gitlab' => 'string|nullable',
         'manual_webhook_secret_bitbucket' => 'string|nullable',
         'manual_webhook_secret_gitea' => 'string|nullable',
-        'docker_compose_location' => 'string',
+        'dockerfile_location' => ValidationPatterns::filePathRules(),
+        'dockerfile_target_build' => ValidationPatterns::dockerTargetRules(),
+        'docker_compose_location' => ValidationPatterns::filePathRules(),
         'docker_compose' => 'string|nullable',
-        'docker_compose_raw' => 'string|nullable',
         'docker_compose_domains' => 'array|nullable',
-        'docker_compose_custom_start_command' => 'string|nullable',
-        'docker_compose_custom_build_command' => 'string|nullable',
+        'docker_compose_custom_start_command' => ValidationPatterns::shellSafeCommandRules(),
+        'docker_compose_custom_build_command' => ValidationPatterns::shellSafeCommandRules(),
         'is_container_label_escape_enabled' => 'boolean',
+        'is_preserve_repository_enabled' => 'boolean',
     ];
+}
+
+function moveResourceToEnvironment(Request $request, $resource, string $resourceType, int $teamId): JsonResponse
+{
+
+    $validator = Validator::make($request->all(), [
+        'environment_uuid' => 'required|string',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => $validator->errors(),
+        ], 422);
+    }
+
+    $extraFields = array_diff(array_keys($request->all()), ['environment_uuid']);
+    if (! empty($extraFields)) {
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => collect($extraFields)->mapWithKeys(fn ($field) => [$field => 'This field is not allowed.'])->toArray(),
+        ], 422);
+    }
+
+    $newEnvironment = Environment::ownedByCurrentTeamAPI($teamId)
+        ->whereUuid($request->environment_uuid)
+        ->first();
+
+    if (! $newEnvironment) {
+        return response()->json(['message' => 'Target environment not found or not owned by your team.'], 404);
+    }
+
+    Gate::authorize('update', $newEnvironment);
+
+    if ($resource->environment_id === $newEnvironment->id) {
+        return response()->json(['message' => "$resourceType is already in this environment."], 400);
+    }
+
+    $oldEnvironment = $resource->environment()->with('project')->first();
+
+    $resource->update(['environment_id' => $newEnvironment->id]);
+
+    auditLog('api.'.str($resourceType)->lower()->value().'.moved', [
+        'team_id' => $teamId,
+        'resource_uuid' => $resource->uuid,
+        'resource_type' => str($resourceType)->lower()->value(),
+        'from_project_uuid' => $oldEnvironment?->project?->uuid,
+        'from_environment_uuid' => $oldEnvironment?->uuid,
+        'to_project_uuid' => $newEnvironment->project->uuid,
+        'to_environment_uuid' => $newEnvironment->uuid,
+    ]);
+
+    return response()->json([
+        'message' => "$resourceType moved successfully.",
+        'uuid' => $resource->uuid,
+        'project_uuid' => $newEnvironment->project->uuid,
+        'environment_uuid' => $newEnvironment->uuid,
+    ]);
 }
 
 function validateIncomingRequest(Request $request)
@@ -178,7 +273,16 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('private_key_uuid');
     $request->offsetUnset('use_build_server');
     $request->offsetUnset('is_static');
+    $request->offsetUnset('is_spa');
+    $request->offsetUnset('is_auto_deploy_enabled');
+    $request->offsetUnset('is_force_https_enabled');
+    $request->offsetUnset('is_preview_deployments_enabled');
+    $request->offsetUnset('connect_to_docker_network');
     $request->offsetUnset('force_domain_override');
     $request->offsetUnset('autogenerate_domain');
     $request->offsetUnset('is_container_label_escape_enabled');
+    $request->offsetUnset('is_preserve_repository_enabled');
+    $request->offsetUnset('include_source_commit_in_build');
+    $request->offsetUnset('docker_compose_raw');
+    $request->offsetUnset('tags');
 }

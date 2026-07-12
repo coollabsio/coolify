@@ -1,5 +1,6 @@
 # documentation: https://docs.sftpgo.com/2.7/
 # slogan: SFTPGo is an event-driven SFTP, FTP/S, HTTP/S and WebDAV server.
+# category: storage
 # tags: sftpgo,sftp,ftp,file,webdav
 # logo: svgs/sftpgo.png
 # port: 8080
@@ -13,7 +14,7 @@ services:
       - SERVICE_FQDN_SFTPGO_8080
       - SFTPGO_DATA_PROVIDER__DRIVER=postgresql
       - SFTPGO_DATA_PROVIDER__CONNECTION_STRING=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_64_POSTGRES}@postgresql:5432/${POSTGRES_DATABASE:-sftpgo-db}
-      - SFTPGO_SFTPD__BINDINGS__0__PORT=2022
+      - SFTPGO_SFTPD__BINDINGS__0__PORT=${PORT_SFTPGO:-2222}
       - SFTPGO_LOG_LEVEL=${LOG_LEVEL:-info}
     healthcheck:
       test:

@@ -4,6 +4,7 @@ namespace App\Livewire\Project\New;
 
 use App\Models\Project;
 use App\Models\Server;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -65,7 +66,7 @@ class Select extends Component
                 $this->existingPostgresqlUrl = 'postgres://coolify:password@coolify-db:5432';
             }
             $projectUuid = data_get($this->parameters, 'project_uuid');
-            $project = Project::whereUuid($projectUuid)->firstOrFail();
+            $project = Project::ownedByCurrentTeam()->whereUuid($projectUuid)->firstOrFail();
             $this->environments = $project->environments;
             $this->selectedEnvironment = $this->environments->where('uuid', data_get($this->parameters, 'environment_uuid'))->firstOrFail()->name;
 
@@ -79,7 +80,7 @@ class Select extends Component
                 $this->type = $queryType;
                 $this->server_id = $queryServerId;
                 $this->destination_uuid = $queryDestination;
-                $this->server = Server::find($queryServerId);
+                $this->server = Server::ownedByCurrentTeam()->find($queryServerId);
                 $this->current_step = 'select-postgresql-type';
             }
         } catch (\Exception $e) {
@@ -105,17 +106,23 @@ class Select extends Component
     public function loadServices()
     {
         $services = get_service_templates();
-        $services = collect($services)->map(function ($service, $key) {
+        $templateLastUpdatedMap = $this->serviceTemplateLastUpdatedMap($services);
+
+        $services = collect($services)->map(function ($service, $key) use ($templateLastUpdatedMap) {
             $default_logo = 'images/default.webp';
             $logo = data_get($service, 'logo', $default_logo);
             $local_logo_path = public_path($logo);
+            $serviceKey = (string) $key;
 
             return [
-                'name' => str($key)->headline(),
+                'id' => $serviceKey,
+                'name' => str($serviceKey)->headline(),
+                'docsSlug' => str($serviceKey)->lower()->value(),
                 'logo' => asset($logo),
                 'logo_github_url' => file_exists($local_logo_path)
                     ? 'https://raw.githubusercontent.com/coollabsio/coolify/refs/heads/main/public/'.$logo
                     : asset($default_logo),
+                'templateLastUpdated' => $templateLastUpdatedMap[$serviceKey] ?? null,
             ] + (array) $service;
         })->all();
 
@@ -247,6 +254,7 @@ class Select extends Component
         ];
 
         return [
+            'serviceTemplatesLastUpdated' => $this->serviceTemplatesLastUpdated(),
             'services' => $services,
             'categories' => $categories,
             'gitBasedApplications' => $gitBasedApplications,
@@ -268,9 +276,73 @@ class Select extends Component
         }
     }
 
+    private function serviceTemplatesLastUpdated(): ?string
+    {
+        return $this->formatLastModified($this->serviceTemplatesPath());
+    }
+
+    private function serviceTemplateLastUpdatedMap(Collection $services): array
+    {
+        return $services
+            ->mapWithKeys(fn ($service, $serviceName) => [
+                (string) $serviceName => $this->serviceTemplateLastUpdatedFromPayload($service)
+                    ?? $this->serviceTemplateLastUpdated((string) $serviceName),
+            ])
+            ->all();
+    }
+
+    private function serviceTemplateLastUpdatedFromPayload(mixed $service): ?string
+    {
+        $timestamp = data_get($service, 'template_last_updated_at');
+
+        if (! is_string($timestamp) || $timestamp === '') {
+            return null;
+        }
+
+        try {
+            return CarbonImmutable::parse($timestamp)
+                ->timezone(config('app.timezone'))
+                ->format('M j, Y H:i');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function serviceTemplateLastUpdated(string $serviceName): ?string
+    {
+        foreach (['yaml', 'yml'] as $extension) {
+            $templatePath = base_path("templates/compose/{$serviceName}.{$extension}");
+
+            if (file_exists($templatePath)) {
+                return $this->formatLastModified($templatePath);
+            }
+        }
+
+        return null;
+    }
+
+    private function serviceTemplatesPath(): string
+    {
+        return base_path('templates/'.config('constants.services.file_name'));
+    }
+
+    private function formatLastModified(string $path): ?string
+    {
+        if (! file_exists($path)) {
+            return null;
+        }
+
+        return CarbonImmutable::createFromTimestamp(filemtime($path))
+            ->timezone(config('app.timezone'))
+            ->format('M j, Y H:i');
+    }
+
     public function setType(string $type)
     {
-        $type = str($type)->lower()->slug()->value();
+        if (! str($type)->startsWith('one-click-service-')) {
+            $type = str($type)->lower()->slug()->value();
+        }
+
         if ($this->loading) {
             return;
         }

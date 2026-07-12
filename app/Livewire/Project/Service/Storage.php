@@ -2,7 +2,10 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Models\Application;
+use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
+use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -25,6 +28,10 @@ class Storage extends Component
     public string $file_storage_path = '';
 
     public ?string $file_storage_content = null;
+
+    public string $host_file_storage_source = '';
+
+    public string $host_file_storage_destination = '';
 
     public string $file_storage_directory_source = '';
 
@@ -49,7 +56,7 @@ class Storage extends Component
             $this->file_storage_directory_source = application_configuration_dir()."/{$this->resource->uuid}";
         }
 
-        if ($this->resource->getMorphClass() === \App\Models\Application::class) {
+        if ($this->resource->getMorphClass() === Application::class) {
             if ($this->resource->destination->server->isSwarm()) {
                 $this->isSwarm = true;
             }
@@ -66,7 +73,11 @@ class Storage extends Component
 
     public function refreshStorages()
     {
-        $this->fileStorage = $this->resource->fileStorages()->get();
+        $this->fileStorage = $this->resource->fileStorages()->get()->each(function (LocalFileVolume $fs) {
+            if (strlen((string) $fs->content) > LocalFileVolume::MAX_CONTENT_SIZE) {
+                $fs->content = LocalFileVolume::TOO_LARGE_PLACEHOLDER;
+            }
+        });
         $this->resource->load('persistentStorages.resource');
     }
 
@@ -101,10 +112,14 @@ class Storage extends Component
             $this->authorize('update', $this->resource);
 
             $this->validate([
-                'name' => 'required|string',
+                'name' => ValidationPatterns::volumeNameRules(),
                 'mount_path' => 'required|string',
-                'host_path' => $this->isSwarm ? 'required|string' : 'string|nullable',
-            ]);
+                'host_path' => $this->isSwarm
+                    ? ['required', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN]
+                    : ['nullable', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
+            ], array_merge(ValidationPatterns::volumeNameMessages(), [
+                'host_path.regex' => 'Host path must start with / and only contain safe path characters.',
+            ]));
 
             $name = $this->resource->uuid.'-'.$this->name;
 
@@ -135,18 +150,11 @@ class Storage extends Component
                 'file_storage_content' => 'nullable|string',
             ]);
 
-            $this->file_storage_path = trim($this->file_storage_path);
-            $this->file_storage_path = str($this->file_storage_path)->start('/')->value();
+            $this->file_storage_path = validateFileMountPath($this->file_storage_path, 'file storage path');
 
-            if ($this->resource->getMorphClass() === \App\Models\Application::class) {
-                $fs_path = application_configuration_dir().'/'.$this->resource->uuid.$this->file_storage_path;
-            } elseif (str($this->resource->getMorphClass())->contains('Standalone')) {
-                $fs_path = database_configuration_dir().'/'.$this->resource->uuid.$this->file_storage_path;
-            } else {
-                throw new \Exception('No valid resource type for file mount storage type!');
-            }
+            $fs_path = confineFileMountPath($this->fileStorageHostPath(), $this->file_storage_path, 'file storage path');
 
-            \App\Models\LocalFileVolume::create([
+            LocalFileVolume::create([
                 'fs_path' => $fs_path,
                 'mount_path' => $this->file_storage_path,
                 'content' => $this->file_storage_content,
@@ -157,6 +165,38 @@ class Storage extends Component
 
             $this->dispatch('success', 'File mount added successfully');
             $this->dispatch('closeStorageModal', 'file');
+            $this->clearForm();
+            $this->refreshStorages();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function submitHostFileStorage()
+    {
+        try {
+            $this->authorize('update', $this->resource);
+
+            $this->validate([
+                'host_file_storage_source' => 'required|string',
+                'host_file_storage_destination' => 'required|string',
+            ]);
+
+            $this->host_file_storage_source = validateHostFileMountPath($this->host_file_storage_source, 'host file source path');
+            $this->host_file_storage_destination = validateFileMountPath($this->host_file_storage_destination, 'host file destination path');
+
+            LocalFileVolume::create([
+                'fs_path' => $this->host_file_storage_source,
+                'mount_path' => $this->host_file_storage_destination,
+                'content' => null,
+                'is_directory' => false,
+                'is_host_file' => true,
+                'resource_id' => $this->resource->id,
+                'resource_type' => get_class($this->resource),
+            ]);
+
+            $this->dispatch('success', 'Host file mount added successfully');
+            $this->dispatch('closeStorageModal', 'host-file');
             $this->clearForm();
             $this->refreshStorages();
         } catch (\Throwable $e) {
@@ -183,7 +223,7 @@ class Storage extends Component
             validateShellSafePath($this->file_storage_directory_source, 'storage source path');
             validateShellSafePath($this->file_storage_directory_destination, 'storage destination path');
 
-            \App\Models\LocalFileVolume::create([
+            LocalFileVolume::create([
                 'fs_path' => $this->file_storage_directory_source,
                 'mount_path' => $this->file_storage_directory_destination,
                 'is_directory' => true,
@@ -208,12 +248,42 @@ class Storage extends Component
         $this->file_storage_path = '';
         $this->file_storage_content = null;
         $this->file_storage_directory_destination = '';
+        $this->host_file_storage_source = '';
+        $this->host_file_storage_destination = '';
 
         if (str($this->resource->getMorphClass())->contains('Standalone')) {
             $this->file_storage_directory_source = database_configuration_dir()."/{$this->resource->uuid}";
         } else {
             $this->file_storage_directory_source = application_configuration_dir()."/{$this->resource->uuid}";
         }
+    }
+
+    public function fileStorageHostPath(): string
+    {
+        if (method_exists($this->resource, 'workdir')) {
+            return $this->resource->workdir();
+        }
+
+        if ($this->resource->getMorphClass() === Application::class) {
+            return application_configuration_dir().'/'.$this->resource->uuid;
+        }
+
+        if (str($this->resource->getMorphClass())->contains('Standalone')) {
+            return database_configuration_dir().'/'.$this->resource->uuid;
+        }
+
+        throw new \Exception('No valid resource type for file mount storage type!');
+    }
+
+    public function fileStoragePreviewPath(): string
+    {
+        $path = str($this->file_storage_path)->trim();
+
+        if ($path->isEmpty()) {
+            return $this->fileStorageHostPath().'/';
+        }
+
+        return $this->fileStorageHostPath().$path->start('/')->value();
     }
 
     public function render()

@@ -1,5 +1,9 @@
 <?php
 
+use App\Models\Server;
+use Illuminate\Support\Once;
+use Tests\TestCase;
+
 /*
 |--------------------------------------------------------------------------
 | Test Case
@@ -10,7 +14,32 @@
 | need to change it using the "uses()" function to bind a different classes or traits.
 |
 */
-uses(Tests\TestCase::class)->in('Feature');
+uses(TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser');
+
+/*
+|--------------------------------------------------------------------------
+| Test Hooks
+|--------------------------------------------------------------------------
+|
+| Global hooks that run before/after each test.
+|
+*/
+beforeEach(function () {
+    // Flush the Once memoization cache to ensure tests get fresh data
+    Once::flush();
+
+    // Flush the Server identity map cache to ensure tests get fresh data
+    Server::flushIdentityMap();
+});
+
+function loginAndSkipBoarding(string $email = 'test@example.com', string $password = 'password'): mixed
+{
+    return visit('/login')
+        ->fill('email', $email)
+        ->fill('password', $password)
+        ->click('Login')
+        ->click('Skip Setup');
+}
 
 /*
 |--------------------------------------------------------------------------
