@@ -2,12 +2,17 @@
 
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
+use App\Models\Application;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use App\Models\Project;
+use App\Models\Server;
+use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
+use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -56,6 +61,8 @@ class Show extends Component
 
     public bool $is_redis_credential = false;
 
+    public bool $isValueHidden = false;
+
     public array $problematicVariables = [];
 
     protected $listeners = [
@@ -64,23 +71,31 @@ class Show extends Component
         'compose_loaded' => '$refresh',
     ];
 
-    protected $rules = [
-        'key' => 'required|string',
-        'value' => 'nullable',
-        'comment' => 'nullable|string|max:256',
-        'is_multiline' => 'required|boolean',
-        'is_literal' => 'required|boolean',
-        'is_shown_once' => 'required|boolean',
-        'is_runtime' => 'required|boolean',
-        'is_buildtime' => 'required|boolean',
-        'real_value' => 'nullable',
-        'is_required' => 'required|boolean',
-    ];
+    protected function rules(): array
+    {
+        return [
+            'key' => ValidationPatterns::environmentVariableKeyRules(),
+            'value' => 'nullable',
+            'comment' => 'nullable|string|max:256',
+            'is_multiline' => 'required|boolean',
+            'is_literal' => 'required|boolean',
+            'is_shown_once' => 'required|boolean',
+            'is_runtime' => 'required|boolean',
+            'is_buildtime' => 'required|boolean',
+            'real_value' => 'nullable',
+            'is_required' => 'required|boolean',
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return ValidationPatterns::environmentVariableKeyMessages('key');
+    }
 
     public function mount()
     {
         $this->syncData();
-        if ($this->env->getMorphClass() === \App\Models\SharedEnvironmentVariable::class) {
+        if ($this->env->getMorphClass() === SharedEnvironmentVariable::class) {
             $this->isSharedVariable = true;
         }
         $this->parameters = get_route_parameters();
@@ -108,9 +123,11 @@ class Show extends Component
     public function syncData(bool $toModel = false)
     {
         if ($toModel) {
+            $this->key = ValidationPatterns::normalizeEnvironmentVariableKey($this->key);
+
             if ($this->isSharedVariable) {
                 $this->validate([
-                    'key' => 'required|string',
+                    'key' => ValidationPatterns::environmentVariableKeyRules(),
                     'value' => 'nullable',
                     'comment' => 'nullable|string|max:256',
                     'is_multiline' => 'required|boolean',
@@ -145,6 +162,13 @@ class Show extends Component
             $this->is_really_required = $this->env->is_really_required ?? false;
             $this->is_shared = $this->env->is_shared ?? false;
             $this->real_value = $this->env->real_value;
+
+            if ($this->env->is_shown_once || auth()->user()?->isMember()) {
+                $this->value = null;
+                $this->real_value = null;
+            }
+
+            $this->isValueHidden = auth()->user()?->isMember() ?? false;
         }
     }
 
@@ -233,7 +257,7 @@ class Show extends Component
             $result['team'] = $team->environment_variables()
                 ->pluck('key')
                 ->toArray();
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
             // User not authorized to view team variables
         }
 
@@ -264,12 +288,12 @@ class Show extends Component
                                 $result['environment'] = $environment->environment_variables()
                                     ->pluck('key')
                                     ->toArray();
-                            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                            } catch (AuthorizationException $e) {
                                 // User not authorized to view environment variables
                             }
                         }
                     }
-                } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                } catch (AuthorizationException $e) {
                     // User not authorized to view project variables
                 }
             }
@@ -279,7 +303,7 @@ class Show extends Component
         $serverUuid = data_get($this->parameters, 'server_uuid');
         if ($serverUuid) {
             // If we have a specific server_uuid, show variables for that server
-            $server = \App\Models\Server::where('team_id', $team->id)
+            $server = Server::where('team_id', $team->id)
                 ->where('uuid', $serverUuid)
                 ->first();
 
@@ -289,7 +313,7 @@ class Show extends Component
                     $result['server'] = $server->environment_variables()
                         ->pluck('key')
                         ->toArray();
-                } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                } catch (AuthorizationException $e) {
                     // User not authorized to view server variables
                 }
             }
@@ -297,7 +321,7 @@ class Show extends Component
             // For application environment variables, try to use the application's destination server
             $applicationUuid = data_get($this->parameters, 'application_uuid');
             if ($applicationUuid) {
-                $application = \App\Models\Application::whereRelation('environment.project.team', 'id', $team->id)
+                $application = Application::whereRelation('environment.project.team', 'id', $team->id)
                     ->where('uuid', $applicationUuid)
                     ->with('destination.server')
                     ->first();
@@ -308,7 +332,7 @@ class Show extends Component
                         $result['server'] = $application->destination->server->environment_variables()
                             ->pluck('key')
                             ->toArray();
-                    } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                    } catch (AuthorizationException $e) {
                         // User not authorized to view server variables
                     }
                 }
@@ -316,7 +340,7 @@ class Show extends Component
                 // For service environment variables, try to use the service's server
                 $serviceUuid = data_get($this->parameters, 'service_uuid');
                 if ($serviceUuid) {
-                    $service = \App\Models\Service::whereRelation('environment.project.team', 'id', $team->id)
+                    $service = Service::whereRelation('environment.project.team', 'id', $team->id)
                         ->where('uuid', $serviceUuid)
                         ->with('server')
                         ->first();
@@ -327,7 +351,7 @@ class Show extends Component
                             $result['server'] = $service->server->environment_variables()
                                 ->pluck('key')
                                 ->toArray();
-                        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                        } catch (AuthorizationException $e) {
                             // User not authorized to view server variables
                         }
                     }

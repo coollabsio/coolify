@@ -2,8 +2,10 @@
 
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\PrivateKey;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
@@ -12,15 +14,150 @@ use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Rsa\Sha256;
 use Lcobucci\JWT\Token\Builder;
 
-function generateGithubToken(GithubApp $source, string $type)
+/**
+ * Extract and normalize the hostname from a GitHub URL.
+ *
+ * @param  string|null  $url  The URL to parse
+ * @return string|null The lowercase hostname, or null if the URL is blank or has no parseable host
+ */
+function githubUrlHost(?string $url): ?string
 {
-    $response = Http::get("{$source->api_url}/zen");
+    if (blank($url)) {
+        return null;
+    }
+
+    $host = parse_url($url, PHP_URL_HOST);
+
+    if (! is_string($host) || blank($host)) {
+        return null;
+    }
+
+    return strtolower($host);
+}
+
+/**
+ * Build the scheme://host[:port] origin for a GitHub URL.
+ *
+ * This helper fails explicitly for blank, scheme-less, or malformed input when
+ * githubUrlHost() cannot parse a host, because returning the original input
+ * would not be a valid origin. Callers should pass already-validated URLs.
+ *
+ * @param  string  $url  The URL to derive the origin from
+ * @return string The normalized origin
+ *
+ * @throws InvalidArgumentException When the URL does not contain a parseable scheme and host
+ */
+function githubUrlOrigin(string $url): string
+{
+    $scheme = parse_url($url, PHP_URL_SCHEME);
+    $host = githubUrlHost($url);
+    $port = parse_url($url, PHP_URL_PORT);
+
+    if (! is_string($scheme) || blank($scheme) || ! $host) {
+        throw new InvalidArgumentException('GitHub URL must include a valid scheme and host.');
+    }
+
+    return $scheme.'://'.$host.($port ? ":{$port}" : '');
+}
+
+/**
+ * Determine whether the URL points at github.com.
+ *
+ * @param  string|null  $htmlUrl  The GitHub HTML URL to check
+ */
+function isGithubDotComHost(?string $htmlUrl): bool
+{
+    return githubUrlHost($htmlUrl) === 'github.com';
+}
+
+/**
+ * Determine whether the URL points at a *.ghe.com GitHub Enterprise Cloud host.
+ *
+ * @param  string|null  $htmlUrl  The GitHub HTML URL to check
+ */
+function isGheDotComHost(?string $htmlUrl): bool
+{
+    $host = githubUrlHost($htmlUrl);
+
+    return is_string($host)
+        && Str::endsWith($host, '.ghe.com')
+        && ! Str::startsWith($host, 'api.');
+}
+
+/**
+ * Determine whether the URL belongs to GitHub's cloud family (github.com or *.ghe.com).
+ *
+ * @param  string|null  $htmlUrl  The GitHub HTML URL to check
+ */
+function isGithubCloudFamilyHost(?string $htmlUrl): bool
+{
+    return isGithubDotComHost($htmlUrl) || isGheDotComHost($htmlUrl);
+}
+
+/**
+ * Determine whether the URL belongs to a self-hosted GitHub Enterprise Server.
+ *
+ * @param  string|null  $htmlUrl  The GitHub HTML URL to check
+ */
+function isGithubEnterpriseServerHost(?string $htmlUrl): bool
+{
+    return filled($htmlUrl) && ! isGithubCloudFamilyHost($htmlUrl);
+}
+
+/**
+ * Derive the GitHub REST API base URL from a GitHub HTML URL.
+ *
+ * @param  string  $htmlUrl  The GitHub HTML URL
+ * @return string The API base URL (api.github.com, api.<host> for *.ghe.com, or <origin>/api/v3 for GHES)
+ */
+function githubApiUrlFromHtmlUrl(string $htmlUrl): string
+{
+    if (isGithubDotComHost($htmlUrl)) {
+        return 'https://api.github.com';
+    }
+
+    if (isGheDotComHost($htmlUrl)) {
+        return 'https://api.'.githubUrlHost($htmlUrl);
+    }
+
+    return githubUrlOrigin($htmlUrl).'/api/v3';
+}
+
+/**
+ * Normalize a GitHub organization slug by trimming surrounding slashes and whitespace.
+ *
+ * @param  string|null  $organization  The raw organization value
+ * @return string|null The trimmed organization, or null when blank
+ */
+function normalizeGithubOrganization(?string $organization): ?string
+{
+    if (blank($organization)) {
+        return null;
+    }
+
+    return trim((string) $organization, "/ \t\n\r\0\x0B");
+}
+
+/**
+ * URL-encode a single GitHub path segment.
+ *
+ * @param  string  $segment  The raw path segment
+ * @return string The raw-URL-encoded segment
+ */
+function encodeGithubPathSegment(string $segment): string
+{
+    return rawurlencode($segment);
+}
+
+function assertGithubClockInSync(string $apiUrl): void
+{
+    $response = Http::get("{$apiUrl}/zen");
     $serverTime = CarbonImmutable::now()->setTimezone('UTC');
     $githubTime = Carbon::parse($response->header('date'));
     $timeDiff = abs($serverTime->diffInSeconds($githubTime));
 
     if ($timeDiff > 50) {
-        throw new \Exception(
+        throw new Exception(
             'System time is out of sync with GitHub API time:<br>'.
             '- System time: '.$serverTime->format('Y-m-d H:i:s').' UTC<br>'.
             '- GitHub time: '.$githubTime->format('Y-m-d H:i:s').' UTC<br>'.
@@ -28,6 +165,11 @@ function generateGithubToken(GithubApp $source, string $type)
             'Please synchronize your system clock.'
         );
     }
+}
+
+function generateGithubToken(GithubApp $source, string $type)
+{
+    assertGithubClockInSync($source->api_url);
 
     $signingKey = InMemory::plainText($source->privateKey->private_key);
     $algorithm = new Sha256;
@@ -60,7 +202,7 @@ function generateGithubToken(GithubApp $source, string $type)
 
             return $response->json()['token'];
         })(),
-        default => throw new \InvalidArgumentException("Unsupported token type: {$type}")
+        default => throw new InvalidArgumentException("Unsupported token type: {$type}")
     };
 }
 
@@ -77,11 +219,11 @@ function generateGithubJwt(GithubApp $source)
 function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $method = 'get', ?array $data = null, bool $throwError = true)
 {
     if (is_null($source)) {
-        throw new \Exception('Source is required for API calls');
+        throw new Exception('Source is required for API calls');
     }
 
     if ($source->getMorphClass() !== GithubApp::class) {
-        throw new \InvalidArgumentException("Unsupported source type: {$source->getMorphClass()}");
+        throw new InvalidArgumentException("Unsupported source type: {$source->getMorphClass()}");
     }
 
     if ($source->is_public) {
@@ -100,7 +242,7 @@ function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $m
         $errorMessage = data_get($response->json(), 'message', 'no error message found');
         $remainingCalls = $response->header('X-RateLimit-Remaining', '0');
 
-        throw new \Exception(
+        throw new Exception(
             'GitHub API call failed:<br>'.
             "Error: {$errorMessage}<br>".
             'Rate Limit Status:<br>'.
@@ -116,21 +258,106 @@ function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $m
     ];
 }
 
-function getInstallationPath(GithubApp $source)
+function generateGithubAppJwt(string $privateKey, string|int $appId): string
 {
-    $github = GithubApp::where('uuid', $source->uuid)->first();
-    $name = str(Str::kebab($github->name));
-    $installation_path = $github->html_url === 'https://github.com' ? 'apps' : 'github-apps';
+    $algorithm = new Sha256;
+    $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
+    $now = CarbonImmutable::now()->setTimezone('UTC');
+    $now = $now->setTime($now->format('H'), $now->format('i'), $now->format('s'));
 
-    return "$github->html_url/$installation_path/$name/installations/new";
+    return $tokenBuilder
+        ->issuedBy((string) $appId)
+        ->issuedAt($now->modify('-1 minute'))
+        ->expiresAt($now->modify('+8 minutes'))
+        ->getToken($algorithm, InMemory::plainText($privateKey))
+        ->toString();
+}
+
+function syncGithubAppName(GithubApp $source, bool $throw = false): ?string
+{
+    try {
+        if (blank($source->app_id) || blank($source->private_key_id)) {
+            return null;
+        }
+
+        $privateKey = $source->privateKey ?: PrivateKey::find($source->private_key_id);
+
+        if (! $privateKey) {
+            return null;
+        }
+
+        assertGithubClockInSync($source->api_url);
+
+        $jwt = generateGithubAppJwt($privateKey->private_key, $source->app_id);
+
+        $response = Http::withHeaders([
+            'Accept' => 'application/vnd.github+json',
+            'X-GitHub-Api-Version' => '2022-11-28',
+            'Authorization' => "Bearer {$jwt}",
+        ])->get("{$source->api_url}/app");
+
+        if (! $response->successful()) {
+            throw new RuntimeException(data_get($response->json(), 'message', 'Failed to fetch GitHub App information.'));
+        }
+
+        $appSlug = data_get($response->json(), 'slug');
+
+        if (blank($appSlug)) {
+            return null;
+        }
+
+        $source->name = $appSlug;
+
+        if ($source->exists) {
+            $source->save();
+        }
+
+        $privateKey->name = "github-app-{$appSlug}";
+        $privateKey->save();
+
+        return $appSlug;
+    } catch (Throwable $e) {
+        if ($throw) {
+            throw $e;
+        }
+
+        return null;
+    }
+}
+
+function getInstallationPath(GithubApp $source): string
+{
+    $name = encodeGithubPathSegment(Str::kebab($source->name));
+    $state = Str::random(64);
+    $organization = normalizeGithubOrganization($source->organization);
+
+    if (isGithubEnterpriseServerHost($source->html_url)) {
+        $path = "github-apps/{$name}";
+    } elseif (isGheDotComHost($source->html_url) && filled($organization)) {
+        $path = 'apps/'.encodeGithubPathSegment($organization)."/{$name}";
+    } else {
+        $path = "apps/{$name}";
+    }
+
+    Cache::put('github-app-setup-state:'.hash('sha256', $state), [
+        'action' => 'install',
+        'github_app_id' => $source->id,
+        'team_id' => $source->team_id,
+    ], now()->addMinutes(60));
+
+    return rtrim($source->html_url, '/')."/{$path}/installations/new?".http_build_query(['state' => $state]);
 }
 
 function getPermissionsPath(GithubApp $source)
 {
-    $github = GithubApp::where('uuid', $source->uuid)->first();
-    $name = str(Str::kebab($github->name));
+    $name = encodeGithubPathSegment(Str::kebab($source->name));
+    $organization = normalizeGithubOrganization($source->organization);
 
-    return "$github->html_url/settings/apps/$name/permissions";
+    if (filled($organization)) {
+        return rtrim($source->html_url, '/').'/organizations/'.encodeGithubPathSegment($organization)."/settings/apps/{$name}/permissions";
+    }
+
+    return rtrim($source->html_url, '/')."/settings/apps/{$name}/permissions";
 }
 
 function loadRepositoryByPage(GithubApp $source, string $token, int $page)
@@ -182,9 +409,30 @@ function getGithubCommitRangeFiles(?GithubApp $source, string $owner, string $re
 
         return $files->pluck('filename')->filter()->values()->toArray();
     } catch (Exception $e) {
-        ray('Error fetching GitHub commit range files: '.$e->getMessage());
 
         return [];
+    }
+}
+
+function getGithubCommitMessage(?GithubApp $source, string $owner, string $repo, string $commitSha): ?string
+{
+    try {
+        if (! $source) {
+            return null;
+        }
+
+        if (blank($owner) || blank($repo) || blank($commitSha) || $commitSha === 'HEAD') {
+            return null;
+        }
+
+        $endpoint = "/repos/{$owner}/{$repo}/commits/{$commitSha}";
+        $response = githubApi($source, $endpoint, 'get', null, false);
+
+        $message = data_get($response, 'data.commit.message');
+
+        return is_string($message) ? $message : null;
+    } catch (Exception $e) {
+        return null;
     }
 }
 
@@ -208,7 +456,6 @@ function getGithubPullRequestFiles(?GithubApp $source, string $owner, string $re
 
         return $files->pluck('filename')->filter()->values()->toArray();
     } catch (Exception $e) {
-        ray('Error fetching GitHub PR files: '.$e->getMessage());
 
         return [];
     }

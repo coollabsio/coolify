@@ -97,6 +97,7 @@ class ProjectController extends Controller
         if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
+        $this->authorize('view', $project);
 
         $project->load(['environments']);
 
@@ -165,6 +166,9 @@ class ProjectController extends Controller
             return response()->json(['message' => 'Environment not found.'], 404);
         }
         $environment = $environment->load(['applications', 'postgresqls', 'redis', 'mongodbs', 'mysqls', 'mariadbs', 'services']);
+        collect(['applications', 'postgresqls', 'redis', 'mongodbs', 'mysqls', 'mariadbs', 'services'])
+            ->flatMap(fn (string $relation) => $environment->{$relation})
+            ->each(fn ($resource) => exposeSensitiveFields($resource));
 
         return response()->json(serializeApiResponse($environment));
     }
@@ -233,6 +237,7 @@ class ProjectController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
+        $this->authorize('create', [Project::class]);
 
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {
@@ -262,6 +267,12 @@ class ProjectController extends Controller
             'name' => $request->name,
             'description' => $request->description,
             'team_id' => $teamId,
+        ]);
+
+        auditLog('api.project.created', [
+            'team_id' => $teamId,
+            'project_uuid' => $project->uuid,
+            'project_name' => $project->name,
         ]);
 
         return response()->json([
@@ -379,8 +390,16 @@ class ProjectController extends Controller
         if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
+        $this->authorize('update', $project);
 
         $project->update($request->only($allowedFields));
+
+        auditLog('api.project.updated', [
+            'team_id' => $teamId,
+            'project_uuid' => $project->uuid,
+            'project_name' => $project->name,
+            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
+        ]);
 
         return response()->json([
             'uuid' => $project->uuid,
@@ -456,11 +475,20 @@ class ProjectController extends Controller
         if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
+        $this->authorize('delete', $project);
         if (! $project->isEmpty()) {
             return response()->json(['message' => 'Project has resources, so it cannot be deleted.'], 400);
         }
 
+        $projectUuid = $project->uuid;
+        $projectName = $project->name;
         $project->delete();
+
+        auditLog('api.project.deleted', [
+            'team_id' => $teamId,
+            'project_uuid' => $projectUuid,
+            'project_name' => $projectName,
+        ]);
 
         return response()->json(['message' => 'Project deleted.']);
     }
@@ -631,6 +659,7 @@ class ProjectController extends Controller
         if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
+        $this->authorize('update', $project);
 
         $existingEnvironment = $project->environments()->where('name', $request->name)->first();
         if ($existingEnvironment) {
@@ -639,6 +668,13 @@ class ProjectController extends Controller
 
         $environment = $project->environments()->create([
             'name' => $request->name,
+        ]);
+
+        auditLog('api.project.environment_created', [
+            'team_id' => $teamId,
+            'project_uuid' => $project->uuid,
+            'environment_uuid' => $environment->uuid,
+            'environment_name' => $environment->name,
         ]);
 
         return response()->json([
@@ -718,12 +754,22 @@ class ProjectController extends Controller
         if (! $environment) {
             return response()->json(['message' => 'Environment not found.'], 404);
         }
+        $this->authorize('delete', $environment);
 
         if (! $environment->isEmpty()) {
             return response()->json(['message' => 'Environment has resources, so it cannot be deleted.'], 400);
         }
 
+        $envUuid = $environment->uuid;
+        $envName = $environment->name;
         $environment->delete();
+
+        auditLog('api.project.environment_deleted', [
+            'team_id' => $teamId,
+            'project_uuid' => $project->uuid,
+            'environment_uuid' => $envUuid,
+            'environment_name' => $envName,
+        ]);
 
         return response()->json(['message' => 'Environment deleted.']);
     }

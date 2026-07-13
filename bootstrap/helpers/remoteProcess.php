@@ -200,6 +200,12 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
     }
     $application = Application::find(data_get($application_deployment_queue, 'application_id'));
     $is_debug_enabled = data_get($application, 'settings.is_debug_enabled');
+    $serverTimezone = getServerTimezone(data_get($application, 'destination.server'));
+
+    // Members should never see debug logs, even if an admin enabled debug mode
+    if ($is_debug_enabled && auth()->check() && auth()->user()->isMember()) {
+        $is_debug_enabled = false;
+    }
 
     $logs = data_get($application_deployment_queue, 'logs');
     if (empty($logs)) {
@@ -240,8 +246,14 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
 
     return $formatted
         ->sortBy(fn ($i) => data_get($i, 'order'))
-        ->map(function ($i) {
-            data_set($i, 'timestamp', Carbon::parse(data_get($i, 'timestamp'))->format('Y-M-d H:i:s.u'));
+        ->map(function ($i) use ($serverTimezone) {
+            $timestamp = Carbon::parse(data_get($i, 'timestamp'));
+            try {
+                $timestamp->setTimezone($serverTimezone);
+            } catch (Exception) {
+                $timestamp->setTimezone('UTC');
+            }
+            data_set($i, 'timestamp', $timestamp->format('Y-M-d H:i:s.u'));
 
             return $i;
         })

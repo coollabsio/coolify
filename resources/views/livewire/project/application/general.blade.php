@@ -12,6 +12,9 @@
                 <div>{{ $application->compose_parsing_version }}</div>
             @endif
             <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
+            <x-modal-input title="Resource Details" buttonTitle="Details">
+                <livewire:project.shared.resource-details :resource="$application" />
+            </x-modal-input>
             @if ($buildPack === 'dockercompose')
                 <x-forms.button canGate="update" :canResource="$application" wire:target='initLoadingCompose'
                     x-on:click="$wire.dispatch('loadCompose', false)">
@@ -32,6 +35,7 @@
                         <x-forms.select x-bind:disabled="shouldDisable()" wire:model.live="buildPack" label="Build Pack"
                             required>
                             <option value="nixpacks">Nixpacks</option>
+                            <option value="railpack">Railpack (Beta)</option>
                             <option value="static">Static</option>
                             <option value="dockerfile">Dockerfile</option>
                             <option value="dockercompose">Docker Compose</option>
@@ -60,7 +64,7 @@
                                 @if (!isDatabaseImage(data_get($service, 'image')))
                                     <div class="flex items-end gap-2">
                                         <x-forms.input
-                                            helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "
+                                            helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- https://app.coolify.io,https://cloud.coolify.io/dashboard<br>- https://app.coolify.io/api/v3<br>- https://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container.<br>- https://app.coolify.io:8080/api -> app.coolify.io/api will point to port 8080 inside the container."
                                             label="Domains for {{ $serviceName }}"
                                             id="parsedServiceDomains.{{ str($serviceName)->replace('-', '_')->replace('.', '_') }}.domain"
                                             x-bind:disabled="shouldDisable()"></x-forms.input>
@@ -114,7 +118,7 @@
                             x-bind:disabled="!canUpdate" />
                     @else
                         <x-forms.input placeholder="https://coolify.io" wire:model="fqdn" label="Domains"
-                            helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "
+                            helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- https://app.coolify.io,https://cloud.coolify.io/dashboard<br>- https://app.coolify.io/api/v3<br>- https://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container.<br>- https://app.coolify.io:8080/api -> app.coolify.io/api will point to port 8080 inside the container."
                             x-bind:disabled="!canUpdate" />
                         @can('update', $application)
                             <x-forms.button wire:click="getWildcardDomain">Generate Domain
@@ -226,20 +230,24 @@
                         id="customDockerRunOptions" label="Custom Docker Options" x-bind:disabled="!canUpdate" />
                 @else
                     @if ($application->could_set_build_commands())
-                        @if ($buildPack === 'nixpacks')
+                        @if ($buildPack === 'nixpacks' || $buildPack === 'railpack')
                             <div class="flex flex-col gap-2 xl:flex-row">
-                                <x-forms.input helper="If you modify this, you probably need to have a nixpacks.toml"
+                                <x-forms.input helper="If you modify this, you probably need to have a {{ $buildPack === 'railpack' ? 'railpack.json' : 'nixpacks.toml' }}"
                                     id="installCommand" label="Install Command" x-bind:disabled="!canUpdate" />
-                                <x-forms.input helper="If you modify this, you probably need to have a nixpacks.toml"
+                                <x-forms.input helper="If you modify this, you probably need to have a {{ $buildPack === 'railpack' ? 'railpack.json' : 'nixpacks.toml' }}"
                                     id="buildCommand" label="Build Command" x-bind:disabled="!canUpdate" />
-                                <x-forms.input helper="If you modify this, you probably need to have a nixpacks.toml"
+                                <x-forms.input helper="If you modify this, you probably need to have a {{ $buildPack === 'railpack' ? 'railpack.json' : 'nixpacks.toml' }}"
                                     id="startCommand" label="Start Command" x-bind:disabled="!canUpdate" />
                             </div>
-                            <div class="pt-1 text-xs">Nixpacks will detect the required configuration
-                                automatically.
+                                @if ($buildPack === 'nixpacks')
+                            <div class="pt-1 text-xs">
+
+                                    <span class="font-medium">Nixpacks</span>
+                                will detect the required configuration automatically.
                                 <a class="underline" href="https://coolify.io/docs/applications/">Framework
                                     Specific Docs</a>
                             </div>
+                                @endif
                         @endif
 
                     @endif
@@ -276,7 +284,7 @@
                                         helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($baseDirectory . $dockerComposeLocation, '/') }}</span>"
                                         x-model="composeLocation" @blur="normalizeComposeLocation()" />
                                 </div>
-                                <div class="w-96">
+                                <div class="w-full sm:w-96">
                                     <x-forms.checkbox instantSave id="isPreserveRepositoryEnabled"
                                         label="Preserve Repository During Deployment"
                                         helper="Git repository (based on the base directory settings) will be copied to the deployment directory."
@@ -382,7 +390,7 @@
                                 x-bind:disabled="!canUpdate" />
 
                             @if ($buildPack !== 'dockercompose')
-                                <div class="pt-2 w-96">
+                                <div class="pt-2 w-full sm:w-96">
                                     <x-forms.checkbox
                                         helper="Use a build server to build your application. You can configure your build server in the Server settings. For more info, check the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
                                         instantSave id="isBuildServerEnabled" label="Use a Build Server?"
@@ -422,7 +430,7 @@
                                 monacoEditorLanguage="yaml" useMonacoEditor />
                         </div>
                     @endif
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox label="Escape special characters in labels?"
                             helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
                             id="isContainerLabelEscapeEnabled" instantSave
@@ -492,6 +500,13 @@
                         </div>
                     @endif
                 @endif
+                @if ((empty($portsExposes) || $portsExposes === '0') && !empty($fqdn))
+                    <x-callout type="info" title="No ports exposed" class="mb-4">
+                        This application does not expose any ports and will not be reachable through the proxy or your domains.
+                        This behavior is normal for background workers, bots, or scheduled tasks.
+                        If your application needs to handle HTTP traffic, please specify the port(s) it listens on.
+                    </x-callout>
+                @endif
                 <div class="flex flex-col gap-2 xl:flex-row">
                     @if ($isStatic || $buildPack === 'static')
                         <x-forms.input id="portsExposes" label="Ports Exposes" readonly
@@ -502,7 +517,7 @@
                                 helper="Readonly labels are disabled. You can set the ports manually in the labels section."
                                 x-bind:disabled="!canUpdate" />
                         @else
-                            <x-forms.input placeholder="3000,3001" id="portsExposes" label="Ports Exposes" required
+                            <x-forms.input placeholder="3000,3001" id="portsExposes" label="Ports Exposes"
                                 helper="A comma separated list of ports your application uses. The first port will be used as default healthcheck port if nothing defined in the Healthcheck menu. Be sure to set this correctly."
                                 x-bind:disabled="!canUpdate" />
                         @endif
@@ -521,7 +536,7 @@
 
                 <h3 class="pt-8">HTTP Basic Authentication</h3>
                 <div>
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox helper="This will add the proper proxy labels to the container." instantSave
                             label="Enable" id="isHttpBasicAuthEnabled" x-bind:disabled="!canUpdate" />
                     </div>
@@ -543,7 +558,7 @@
                     <x-forms.textarea label="Container Labels" rows="15" id="customLabels"
                         monacoEditorLanguage="ini" useMonacoEditor x-bind:disabled="!canUpdate"></x-forms.textarea>
                 @endif
-                <div class="w-96">
+                <div class="w-full sm:w-96">
                     <x-forms.checkbox label="Readonly labels"
                         helper="Labels are readonly by default. Readonly means that edits you do to the labels could be lost and Coolify will autogenerate the labels for you. If you want to edit the labels directly, disable this option. <br><br>Be careful, it could break the proxy configuration after you restart the container as Coolify will now NOT autogenerate the labels for you (ofc you can always reset the labels to the coolify defaults manually)."
                         id="isContainerLabelReadonlyEnabled" instantSave

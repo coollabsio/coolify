@@ -1,5 +1,6 @@
 # documentation: https://github.com/rahulhaque/soketi-app-manager-filament
 # slogan: Manage soketi websocket server and apps with ease.
+# category: devtools
 # tags: soketi,websockets,app-manager,dashboard
 # logo: svgs/soketi-app-manager.svg
 # port: 8080

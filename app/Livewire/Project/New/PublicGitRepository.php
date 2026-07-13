@@ -6,18 +6,18 @@ use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\Project;
-use App\Models\Service;
-use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Support\ValidationPatterns;
 use Carbon\Carbon;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Spatie\Url\Url;
 
 class PublicGitRepository extends Component
 {
+    use AuthorizesRequests;
+
     public string $repository_url;
 
     public int $port = 3000;
@@ -33,8 +33,6 @@ class PublicGitRepository extends Component
     public string $selectedBranch = 'main';
 
     public bool $isStatic = false;
-
-    public bool $checkCoolifyConfig = true;
 
     public ?string $publish_directory = null;
 
@@ -100,9 +98,11 @@ class PublicGitRepository extends Component
 
     public function updatedBuildPack()
     {
-        if ($this->build_pack === 'nixpacks') {
+        if ($this->build_pack === 'nixpacks' || $this->build_pack === 'railpack') {
             $this->show_is_static = true;
-            $this->port = 3000;
+            if (! $this->isStatic) {
+                $this->port = 3000;
+            }
         } elseif ($this->build_pack === 'static') {
             $this->show_is_static = false;
             $this->isStatic = false;
@@ -262,6 +262,8 @@ class PublicGitRepository extends Component
     public function submit()
     {
         try {
+            $this->authorize('create', Application::class);
+
             $this->validate();
 
             // Additional validation for git repository and branch
@@ -284,49 +286,19 @@ class PublicGitRepository extends Component
                 throw new \RuntimeException('Invalid branch: '.$branchValidator->errors()->first('git_branch'));
             }
 
-            $destination_uuid = $this->query['destination'];
+            $destination_uuid = $this->query['destination'] ?? null;
             $project_uuid = $this->parameters['project_uuid'];
             $environment_uuid = $this->parameters['environment_uuid'];
 
-            $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+            $destination = find_destination_for_current_team($destination_uuid);
             if (! $destination) {
-                $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
-            }
-            if (! $destination) {
-                throw new \Exception('Destination not found. What?!');
+                throw new \Exception('Destination not found.');
             }
             $destination_class = $destination->getMorphClass();
 
             $project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->firstOrFail();
             $environment = $project->environments()->where('uuid', $environment_uuid)->firstOrFail();
 
-            if ($this->build_pack === 'dockercompose' && isDev() && $this->new_compose_services) {
-                $server = $destination->server;
-                $new_service = [
-                    'name' => 'service'.str()->random(10),
-                    'docker_compose_raw' => 'coolify',
-                    'environment_id' => $environment->id,
-                    'server_id' => $server->id,
-                ];
-                if ($this->git_source === 'other') {
-                    $new_service['git_repository'] = $this->git_repository;
-                    $new_service['git_branch'] = $this->git_branch;
-                } else {
-                    $new_service['git_repository'] = $this->git_repository;
-                    $new_service['git_branch'] = $this->git_branch;
-                    $new_service['source_id'] = $this->git_source->id;
-                    $new_service['source_type'] = $this->git_source->getMorphClass();
-                }
-                $service = Service::create($new_service);
-
-                return redirect()->route('project.service.configuration', [
-                    'service_uuid' => $service->uuid,
-                    'environment_uuid' => $environment->uuid,
-                    'project_uuid' => $project->uuid,
-                ]);
-
-                return;
-            }
             if ($this->git_source === 'other') {
                 $application_init = [
                     'name' => generate_random_name(),
@@ -371,12 +343,6 @@ class PublicGitRepository extends Component
             $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
             $application->fqdn = $fqdn;
             $application->save();
-            if ($this->checkCoolifyConfig) {
-                // $config = loadConfigFromGit($this->repository_url, $this->git_branch, $this->base_directory, $this->query['server_id'], auth()->user()->currentTeam()->id);
-                // if ($config) {
-                //     $application->setConfig($config);
-                // }
-            }
 
             return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,

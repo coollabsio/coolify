@@ -1,7 +1,7 @@
 name: 🐞 Bug Report
 description: "File a new bug report."
 title: "[Bug]: "
-labels: ["🐛 Bug", "🔍 Triage"]
+labels: ["🔍 Triage"]
 body:
   - type: markdown
     attributes:
@@ -11,8 +11,20 @@ body:
 
   - type: textarea
     attributes:
-      label: Error Message and Logs
+      label: Description and Error Message
       description: Provide a detailed description of the error or exception you encountered, along with any relevant log output.
+    validations:
+      required: true
+      
+  - type: textarea
+    attributes:
+      label: Expected Behavior
+      description: Please describe what you expected to happen instead of the issue. Be as detailed as possible.
+      value: |
+        1.
+        2.
+        3.
+        4.
     validations:
       required: true
 
@@ -37,7 +49,7 @@ body:
     attributes:
       label: Coolify Version
       description: Please provide the Coolify version you are using. This can be found in the top left corner of your Coolify dashboard.
-      placeholder: "v4.0.0-beta.335"
+      placeholder: "v4.1.2"
     validations:
       required: true
 
@@ -55,6 +67,12 @@ body:
       label: Operating System and Version (self-hosted)
       description: Run `cat /etc/os-release` or `lsb_release -a` in your terminal and provide the operating system and version.
       placeholder: "Ubuntu 22.04"
+      
+  - type: textarea
+    attributes:
+      label: Screenshots / Visuals
+      description: If possible, provide screenshots, screen recordings, or diagrams to help illustrate the issue.
+      placeholder: "Attach images or provide links to recordings demonstrating the problem."
 
   - type: textarea
     attributes:

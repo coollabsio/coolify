@@ -28,6 +28,38 @@
             }
         },
         isScrolling: false,
+        lastTouchY: 0,
+        disableFollow() {
+            if (!this.alwaysScroll) return;
+            this.alwaysScroll = false;
+            if (this.rafId) {
+                cancelAnimationFrame(this.rafId);
+                this.rafId = null;
+            }
+        },
+        handleWheel(event) {
+            if (this.alwaysScroll && event.deltaY < 0) {
+                this.disableFollow();
+            }
+        },
+        handleTouchStart(event) {
+            this.lastTouchY = event.touches[0].clientY;
+        },
+        handleTouchMove(event) {
+            if (!this.alwaysScroll) return;
+            const currentY = event.touches[0].clientY;
+            if (currentY > this.lastTouchY) {
+                this.disableFollow();
+            }
+            this.lastTouchY = currentY;
+        },
+        handleKeyScroll(event) {
+            if (!this.alwaysScroll) return;
+            const upKeys = ['ArrowUp', 'PageUp', 'Home'];
+            if (upKeys.includes(event.key)) {
+                this.disableFollow();
+            }
+        },
         scrollToBottom() {
             const logsContainer = document.getElementById('logsContainer');
             if (logsContainer) {
@@ -57,17 +89,14 @@
             }
         },
         handleScroll(event) {
-            if (!this.alwaysScroll || this.isScrolling) return;
+            if (this.isScrolling) return;
             clearTimeout(this.scrollDebounce);
             this.scrollDebounce = setTimeout(() => {
                 const el = event.target;
                 const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-                if (distanceFromBottom > 100) {
-                    this.alwaysScroll = false;
-                    if (this.rafId) {
-                        cancelAnimationFrame(this.rafId);
-                        this.rafId = null;
-                    }
+                if (!this.alwaysScroll && distanceFromBottom <= 10) {
+                    this.alwaysScroll = true;
+                    this.scheduleScroll();
                 }
             }, 150);
         },
@@ -110,10 +139,6 @@
             const range = selection.getRangeAt(0);
             return logsContainer.contains(range.commonAncestorContainer);
         },
-        decodeHtml(text) {
-            const doc = new DOMParser().parseFromString(text, 'text/html');
-            return doc.documentElement.textContent;
-        },
         applySearch() {
             const logs = document.getElementById('logs');
             if (!logs) return;
@@ -134,7 +159,7 @@
 
                 // Update highlighting
                 if (textSpan) {
-                    const originalText = this.decodeHtml(textSpan.dataset.lineText || '');
+                    const originalText = textSpan.dataset.lineText || '';
                     if (!query) {
                         textSpan.textContent = originalText;
                     } else if (matches) {
@@ -245,9 +270,12 @@
                     <div>({{ $pull_request }})</div>
                 @endif
                 @if ($streamLogs)
-                    <x-loading wire:poll.2000ms='getLogs(true)' />
+                    <x-loading />
                 @endif
             </div>
+        @endif
+        @if ($streamLogs)
+            <div class="sr-only" wire:poll.2000ms="getLogs(true)" aria-hidden="true"></div>
         @endif
         <div x-show="expanded" {{ $collapsible ? 'x-collapse' : '' }}
             :class="fullscreen ? 'fullscreen flex flex-col !overflow-visible' : 'relative w-full {{ $collapsible ? 'py-4' : '' }} mx-auto'"
@@ -314,8 +342,17 @@
                         <button
                             x-on:click="
                                 $wire.copyLogs().then(logs => {
-                                    navigator.clipboard.writeText(logs);
-                                    Livewire.dispatch('success', ['Logs copied to clipboard.']);
+                                    if (!navigator.clipboard?.writeText) {
+                                        Livewire.dispatch('error', ['Clipboard is not available. Please use HTTPS or localhost.']);
+                                        return;
+                                    }
+                                    navigator.clipboard.writeText(logs).then(() => {
+                                        Livewire.dispatch('success', ['Logs copied to clipboard.']);
+                                    }).catch(() => {
+                                        Livewire.dispatch('error', ['Failed to copy logs to clipboard.']);
+                                    });
+                                }).catch(() => {
+                                    Livewire.dispatch('error', ['Failed to prepare logs for clipboard.']);
                                 });
                             "
                             title="Copy Logs"
@@ -473,7 +510,8 @@
                         </div>
                     </div>
                 </div>
-                <div id="logsContainer" @scroll="handleScroll"
+                <div id="logsContainer" @scroll="handleScroll" @wheel="handleWheel"
+                    @touchstart="handleTouchStart" @touchmove="handleTouchMove" @keydown="handleKeyScroll" tabindex="0"
                     class="flex overflow-y-auto overflow-x-hidden flex-col px-4 py-2 w-full min-w-0 scrollbar"
                     :class="fullscreen ? 'flex-1' : 'max-h-[40rem]'">
                     @if ($outputs)
@@ -490,20 +528,19 @@
                                     // Parse timestamp from log line (ISO 8601 format: 2025-12-04T11:48:39.136764033Z)
                                     $timestamp = '';
                                     $logContent = $line;
-                                    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z?\s(.*)$/', $line, $matches)) {
-                                        $year = $matches[1];
-                                        $month = $matches[2];
-                                        $day = $matches[3];
-                                        $time = $matches[4];
-                                        $microseconds = isset($matches[5]) ? substr($matches[5], 0, 6) : '000000';
-                                        $logContent = $matches[6];
+                                    if (preg_match('/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z?\s(.*)$/', $line, $matches)) {
+                                        $microseconds = isset($matches[2]) ? substr($matches[2], 0, 6) : '000000';
+                                        $logContent = $matches[3];
 
-                                        // Convert month number to abbreviated name
-                                        $monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                                        $monthName = $monthNames[(int)$month - 1] ?? $month;
-
-                                        // Format for display: 2025-Dec-04 09:44:58
-                                        $timestamp = "{$year}-{$monthName}-{$day} {$time}";
+                                        // Convert UTC Docker timestamp to server timezone for display
+                                        $carbonTs = \Carbon\Carbon::parse($matches[1], 'UTC');
+                                        $serverTz = getServerTimezone($server);
+                                        try {
+                                            $carbonTs->setTimezone($serverTz);
+                                        } catch (\Exception) {
+                                            // keep UTC
+                                        }
+                                        $timestamp = $carbonTs->format('Y-M-d H:i:s');
                                         // Include microseconds in key for uniqueness
                                         $lineKey = "{$timestamp}.{$microseconds}";
                                     }

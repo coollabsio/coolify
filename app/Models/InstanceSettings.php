@@ -45,6 +45,20 @@ class InstanceSettings extends Model
         'is_sponsorship_popup_enabled',
         'dev_helper_version',
         'is_wire_navigate_enabled',
+        'is_mcp_server_enabled',
+        'webhook_allowed_internal_hosts',
+        'webhook_allow_localhost',
+    ];
+
+    protected $hidden = [
+        'smtp_from_address',
+        'smtp_from_name',
+        'smtp_recipients',
+        'smtp_host',
+        'smtp_username',
+        'smtp_password',
+        'resend_api_key',
+        'sentinel_token',
     ];
 
     protected $casts = [
@@ -67,10 +81,17 @@ class InstanceSettings extends Model
         'update_check_frequency' => 'string',
         'sentinel_token' => 'encrypted',
         'is_wire_navigate_enabled' => 'boolean',
+        'is_mcp_server_enabled' => 'boolean',
+        'webhook_allowed_internal_hosts' => 'array',
+        'webhook_allow_localhost' => 'boolean',
     ];
 
     protected static function booted(): void
     {
+        static::created(function () {
+            Once::flush();
+        });
+
         static::updated(function ($settings) {
             // Clear once() cache so subsequent calls get fresh data
             Once::flush();

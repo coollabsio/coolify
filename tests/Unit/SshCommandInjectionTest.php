@@ -1,6 +1,7 @@
 <?php
 
 use App\Helpers\SshMultiplexingHelper;
+use App\Models\Server;
 use App\Rules\ValidHostname;
 use App\Rules\ValidServerIp;
 
@@ -57,20 +58,20 @@ it('rejects injection payloads in server ip', function (string $payload) {
 // -------------------------------------------------------------------------
 
 it('strips dangerous characters from server ip on write', function () {
-    $server = new App\Models\Server;
+    $server = new Server;
     $server->ip = '192.168.1.1;rm -rf /';
     // Regex [^0-9a-zA-Z.:%-] removes ; space and /; hyphen is allowed
     expect($server->ip)->toBe('192.168.1.1rm-rf');
 });
 
 it('strips dangerous characters from server user on write', function () {
-    $server = new App\Models\Server;
+    $server = new Server;
     $server->user = 'root$(id)';
     expect($server->user)->toBe('rootid');
 });
 
 it('strips non-numeric characters from server port on write', function () {
-    $server = new App\Models\Server;
+    $server = new Server;
     $server->port = '22; evil';
     expect($server->port)->toBe(22);
 });
@@ -100,6 +101,17 @@ it('has no raw user@ip string interpolation in SshMultiplexingHelper', function 
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->not->toContain('{$server->user}@{$server->ip}');
+});
+
+it('escapes scp source and destination operands', function () {
+    $reflection = new ReflectionClass(SshMultiplexingHelper::class);
+    $source = file_get_contents($reflection->getFileName());
+
+    expect($source)
+        ->toContain('escapeshellarg($source)')
+        ->toContain('escapeshellarg($dest)')
+        ->not->toContain('"{$source} "')
+        ->not->toContain('":{$dest}"');
 });
 
 // -------------------------------------------------------------------------

@@ -3,10 +3,10 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\ApplicationPreview;
+use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Spatie\Url\Url;
-use Visus\Cuid2\Cuid2;
 
 class PreviewsCompose extends Component
 {
@@ -34,6 +34,11 @@ class PreviewsCompose extends Component
     {
         try {
             $this->authorize('update', $this->preview->application);
+            $this->validate([
+                'domain' => ValidationPatterns::applicationDomainRules(),
+            ]);
+
+            $this->domain = ValidationPatterns::normalizeApplicationDomains($this->domain);
 
             $docker_compose_domains = data_get($this->preview, 'docker_compose_domains');
             $docker_compose_domains = json_decode($docker_compose_domains, true) ?: [];
@@ -64,7 +69,7 @@ class PreviewsCompose extends Component
             if (empty($domain_string)) {
                 $server = $this->preview->application->destination->server;
                 $template = $this->preview->application->preview_url_template;
-                $random = new Cuid2;
+                $random = new_public_id();
 
                 // Generate a unique domain like main app services do
                 $generated_fqdn = generateUrl(server: $server, random: $random);
@@ -74,12 +79,16 @@ class PreviewsCompose extends Component
                 $preview_fqdn = str_replace('{{pr_id}}', $this->preview->pull_request_id, $preview_fqdn);
                 $preview_fqdn = str($generated_fqdn)->before('://').'://'.$preview_fqdn;
             } else {
+                foreach (ValidationPatterns::validateApplicationDomains($domain_string) as $error) {
+                    throw new \InvalidArgumentException($error);
+                }
+
                 // Use the existing domain from the main application
                 // Handle multiple domains separated by commas
-                $domain_list = explode(',', $domain_string);
+                $domain_list = ValidationPatterns::applicationDomainList($domain_string);
                 $preview_fqdns = [];
                 $template = $this->preview->application->preview_url_template;
-                $random = new Cuid2;
+                $random = new_public_id();
 
                 foreach ($domain_list as $single_domain) {
                     $single_domain = trim($single_domain);

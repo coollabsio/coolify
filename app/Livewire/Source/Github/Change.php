@@ -7,10 +7,9 @@ use App\Models\GithubApp;
 use App\Models\PrivateKey;
 use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Http;
-use Lcobucci\JWT\Configuration;
-use Lcobucci\JWT\Signer\Key\InMemory;
-use Lcobucci\JWT\Signer\Rsa\Sha256;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class Change extends Component
@@ -18,6 +17,10 @@ class Change extends Component
     use AuthorizesRequests;
 
     public string $webhook_endpoint = '';
+
+    public string $custom_webhook_endpoint = '';
+
+    public bool $use_custom_webhook_endpoint = false;
 
     public ?string $ipv4 = null;
 
@@ -72,11 +75,17 @@ class Change extends Component
 
     public $privateKeys;
 
+    public string $manifestState = '';
+
+    public string $activeTab = 'general';
+
+    private bool $shouldDeriveApiUrlAfterHtmlUrlUpdate = false;
+
     protected function rules(): array
     {
         return [
             'name' => 'required|string',
-            'organization' => 'nullable|string',
+            'organization' => ['nullable', 'string', 'regex:/\A[^\s\/?#]+\z/'],
             'apiUrl' => ['required', 'string', 'url', new SafeExternalUrl],
             'htmlUrl' => ['required', 'string', 'url', new SafeExternalUrl],
             'customUser' => 'required|string',
@@ -91,7 +100,23 @@ class Change extends Component
             'metadata' => 'nullable|string',
             'pullRequests' => 'nullable|string',
             'privateKeyId' => 'nullable|int',
+            'webhook_endpoint' => ['required', 'string', 'url'],
+            'custom_webhook_endpoint' => ['nullable', 'string', 'url'],
+            'use_custom_webhook_endpoint' => ['required', 'bool'],
         ];
+    }
+
+    public function updatingHtmlUrl(): void
+    {
+        $this->shouldDeriveApiUrlAfterHtmlUrlUpdate = blank($this->apiUrl)
+            || $this->apiUrl === githubApiUrlFromHtmlUrl($this->htmlUrl);
+    }
+
+    public function updatedHtmlUrl(): void
+    {
+        if ($this->shouldDeriveApiUrlAfterHtmlUrlUpdate) {
+            $this->apiUrl = githubApiUrlFromHtmlUrl($this->htmlUrl);
+        }
     }
 
     public function boot()
@@ -110,6 +135,11 @@ class Change extends Component
     {
         if ($toModel) {
             // Sync TO model (before save)
+            $this->organization = normalizeGithubOrganization($this->organization);
+            $this->apiUrl = filled($this->apiUrl)
+                ? $this->apiUrl
+                : githubApiUrlFromHtmlUrl($this->htmlUrl);
+
             $this->github_app->name = $this->name;
             $this->github_app->organization = $this->organization;
             $this->github_app->api_url = $this->apiUrl;
@@ -147,6 +177,24 @@ class Change extends Component
         }
     }
 
+    private function githubAppSetupStateCacheKey(string $state): string
+    {
+        return 'github-app-setup-state:'.hash('sha256', $state);
+    }
+
+    private function createGithubAppSetupState(string $action): string
+    {
+        $state = Str::random(64);
+
+        Cache::put($this->githubAppSetupStateCacheKey($state), [
+            'action' => $action,
+            'github_app_id' => $this->github_app->id,
+            'team_id' => $this->github_app->team_id,
+        ], now()->addMinutes(60));
+
+        return $state;
+    }
+
     public function checkPermissions()
     {
         try {
@@ -177,8 +225,13 @@ class Change extends Component
                 return;
             }
 
+            syncGithubAppName($this->github_app);
+
             GithubAppPermissionJob::dispatchSync($this->github_app);
             $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
+            $this->syncData(false);
+            $this->name = str($this->github_app->name)->kebab();
+
             $this->dispatch('success', 'Github App permissions updated.');
         } catch (\Throwable $e) {
             // Provide better error message for unsupported key formats
@@ -211,6 +264,7 @@ class Change extends Component
             // Override name with kebab case for display
             $this->name = str($this->github_app->name)->kebab();
             $this->fqdn = $settings->fqdn;
+            $this->manifestState = $this->createGithubAppSetupState('manifest');
 
             if ($settings->public_ipv4) {
                 $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
@@ -240,10 +294,18 @@ class Change extends Component
                 }
             }
             $this->parameters = get_route_parameters();
+            $routeName = request()->route()?->getName();
+            if ($routeName === 'source.github.permissions') {
+                $this->activeTab = 'permissions';
+            } elseif ($routeName === 'source.github.resources') {
+                $this->activeTab = 'resources';
+            } else {
+                $this->activeTab = 'general';
+            }
             if (isCloud() && ! isDev()) {
                 $this->webhook_endpoint = config('app.url');
             } else {
-                $this->webhook_endpoint = $this->fqdn ?? $this->ipv4 ?? '';
+                $this->webhook_endpoint = $this->fqdn ?? $this->ipv4 ?? $this->ipv6 ?? config('app.url') ?? '';
                 $this->is_system_wide = $this->github_app->is_system_wide;
             }
         } catch (\Throwable $e) {
@@ -253,31 +315,14 @@ class Change extends Component
 
     public function getGithubAppNameUpdatePath()
     {
-        if (str($this->github_app->organization)->isNotEmpty()) {
-            return "{$this->github_app->html_url}/organizations/{$this->github_app->organization}/settings/apps/{$this->github_app->name}";
+        $name = encodeGithubPathSegment($this->github_app->name);
+        $organization = normalizeGithubOrganization($this->github_app->organization);
+
+        if (filled($organization)) {
+            return rtrim($this->github_app->html_url, '/').'/organizations/'.encodeGithubPathSegment($organization)."/settings/apps/{$name}";
         }
 
-        return "{$this->github_app->html_url}/settings/apps/{$this->github_app->name}";
-    }
-
-    private function generateGithubJwt($private_key, $app_id): string
-    {
-        $configuration = Configuration::forAsymmetricSigner(
-            new Sha256,
-            InMemory::plainText($private_key),
-            InMemory::plainText($private_key)
-        );
-
-        $now = time();
-
-        return $configuration->builder()
-            ->issuedBy((string) $app_id)
-            ->permittedFor('https://api.github.com')
-            ->identifiedBy((string) $now)
-            ->issuedAt(new \DateTimeImmutable("@{$now}"))
-            ->expiresAt(new \DateTimeImmutable('@'.($now + 600)))
-            ->getToken($configuration->signer(), $configuration->signingKey())
-            ->toString();
+        return rtrim($this->github_app->html_url, '/')."/settings/apps/{$name}";
     }
 
     public function updateGithubAppName()
@@ -285,39 +330,29 @@ class Change extends Component
         try {
             $this->authorize('update', $this->github_app);
 
-            $privateKey = PrivateKey::ownedByCurrentTeam()->find($this->github_app->private_key_id);
+            $this->github_app->app_id = $this->appId;
+            $this->github_app->private_key_id = $this->privateKeyId;
+            $this->github_app->unsetRelation('privateKey');
 
-            if (! $privateKey) {
+            if (! $this->appId) {
+                $this->dispatch('error', 'App ID is required before synchronizing the GitHub App name.');
+
+                return;
+            }
+
+            if (! PrivateKey::ownedByCurrentTeam()->find($this->privateKeyId)) {
                 $this->dispatch('error', 'No private key found for this GitHub App.');
 
                 return;
             }
 
-            $jwt = $this->generateGithubJwt($privateKey->private_key, $this->github_app->app_id);
+            $appSlug = syncGithubAppName($this->github_app, true);
 
-            $response = Http::withHeaders([
-                'Accept' => 'application/vnd.github+json',
-                'X-GitHub-Api-Version' => '2022-11-28',
-                'Authorization' => "Bearer {$jwt}",
-            ])->get("{$this->github_app->api_url}/app");
-
-            if ($response->successful()) {
-                $app_data = $response->json();
-                $app_slug = $app_data['slug'] ?? null;
-
-                if ($app_slug) {
-                    $this->github_app->name = $app_slug;
-                    $this->name = str($app_slug)->kebab();
-                    $privateKey->name = "github-app-{$app_slug}";
-                    $privateKey->save();
-                    $this->github_app->save();
-                    $this->dispatch('success', 'GitHub App name and SSH key name synchronized successfully.');
-                } else {
-                    $this->dispatch('info', 'Could not find App Name (slug) in GitHub response.');
-                }
+            if ($appSlug) {
+                $this->name = str($appSlug)->kebab();
+                $this->dispatch('success', 'GitHub App name and private key name synchronized successfully.');
             } else {
-                $error_message = $response->json()['message'] ?? 'Unknown error';
-                $this->dispatch('error', "Failed to fetch GitHub App information: {$error_message}");
+                $this->dispatch('info', 'Could not find App Name (slug) in GitHub response.');
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -330,11 +365,17 @@ class Change extends Component
             $this->authorize('update', $this->github_app);
 
             $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
+            $this->organization = normalizeGithubOrganization($this->organization);
+            $this->apiUrl = filled($this->apiUrl)
+                ? $this->apiUrl
+                : githubApiUrlFromHtmlUrl($this->htmlUrl);
             $this->validate();
 
             $this->syncData(true);
             $this->github_app->save();
             $this->dispatch('success', 'Github App updated.');
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

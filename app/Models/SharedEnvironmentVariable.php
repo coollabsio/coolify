@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\ValidationPatterns;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 
 class SharedEnvironmentVariable extends Model
@@ -28,10 +30,21 @@ class SharedEnvironmentVariable extends Model
         'version',
     ];
 
+    protected $hidden = [
+        'value',
+    ];
+
     protected $casts = [
         'key' => 'string',
         'value' => 'encrypted',
     ];
+
+    protected function key(): Attribute
+    {
+        return Attribute::make(
+            set: fn (string $value) => ValidationPatterns::validatedEnvironmentVariableKey($value),
+        );
+    }
 
     public function team()
     {

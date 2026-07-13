@@ -25,6 +25,8 @@
                         <div class="flex">
                             <div class="w-full gap-2 py-4 group coolbox"
                                 wire:click.prevent="loadRepositories({{ $ghapp->id }})"
+                                wire:loading.class="coolbox-loading"
+                                wire:target="loadRepositories({{ $ghapp->id }})"
                                 wire:key="{{ $ghapp->id }}">
                                 <div class="flex mr-4">
                                     <div class="flex flex-col mx-6">
@@ -35,9 +37,6 @@
                                             {{ data_get($ghapp, 'html_url') }}</div>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="flex flex-col items-center justify-center">
-                                <x-loading wire:loading wire:target="loadRepositories({{ $ghapp->id }})" />
                             </div>
                         </div>
                     @endforeach
@@ -83,6 +82,7 @@
                                     </x-forms.select>
                                     <x-forms.select wire:model.live="build_pack" label="Build Pack" required>
                                         <option value="nixpacks">Nixpacks</option>
+                                        <option value="railpack">Railpack (Beta)</option>
                                         <option value="static">Static</option>
                                         <option value="dockerfile">Dockerfile</option>
                                         <option value="dockercompose">Docker Compose</option>

@@ -10,6 +10,8 @@ services:
         - GROUP_ID=${GROUPID:-1000}
     ports:
       - "${APP_PORT:-8000}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       AUTORUN_ENABLED: false
       PUSHER_HOST: "${PUSHER_HOST}"
@@ -70,6 +72,8 @@ services:
     ports:
       - "${FORWARD_SOKETI_PORT:-6001}:6001"
       - "6002:6002"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./storage:/var/www/html/storage
       - ./docker/coolify-realtime/terminal-server.js:/terminal/terminal-server.js
@@ -112,6 +116,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - dev_coolify_data:/data/coolify
+      - dev_coolify_data:/var/lib/docker/volumes/coolify_dev_coolify_data/_data
       - dev_backups_data:/data/coolify/backups
       - dev_postgres_data:/data/coolify/_volumes/database
       - dev_redis_data:/data/coolify/_volumes/redis
@@ -128,10 +133,9 @@ services:
     networks:
       - coolify
   minio:
-    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
+    image: coollabsio/maxio:latest
     pull_policy: always
     container_name: coolify-minio
-    command: server /data --console-address ":9001"
     ports:
       - "${FORWARD_MINIO_PORT:-9000}:9000"
       - "${FORWARD_MINIO_PORT_CONSOLE:-9001}:9001"

@@ -105,7 +105,9 @@ class Webhook extends Component
             refreshSession();
         } else {
             $this->webhookEnabled = $this->settings->webhook_enabled;
-            $this->webhookUrl = $this->settings->webhook_url;
+            $this->webhookUrl = auth()->user()->can('update', $this->settings)
+                ? $this->settings->webhook_url
+                : null;
 
             $this->deploymentSuccessWebhookNotifications = $this->settings->deployment_success_webhook_notifications;
             $this->deploymentFailureWebhookNotifications = $this->settings->deployment_failure_webhook_notifications;
@@ -166,13 +168,6 @@ class Webhook extends Component
         $this->syncData(true);
         refreshSession();
 
-        if (isDev()) {
-            ray('Webhook settings saved', [
-                'webhook_enabled' => $this->settings->webhook_enabled,
-                'webhook_url' => $this->settings->webhook_url,
-            ]);
-        }
-
         $this->dispatch('success', 'Settings saved.');
     }
 
@@ -180,13 +175,6 @@ class Webhook extends Component
     {
         try {
             $this->authorize('sendTest', $this->settings);
-
-            if (isDev()) {
-                ray('Sending test webhook notification', [
-                    'team_id' => $this->team->id,
-                    'webhook_url' => $this->settings->webhook_url,
-                ]);
-            }
 
             $this->team->notify(new Test(channel: 'webhook'));
             $this->dispatch('success', 'Test notification sent.');

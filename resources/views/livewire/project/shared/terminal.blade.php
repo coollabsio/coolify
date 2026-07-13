@@ -1,4 +1,7 @@
 <div id="terminal-container" x-data="terminalData()">
+    @if ($isTerminalConnected)
+        <div class="hidden" aria-hidden="true" wire:poll.keep-alive.30s="keepTerminalPageAlive"></div>
+    @endif
     @if (!$hasShell)
         <div class="flex pt-4 items-center justify-center w-full py-4 mx-auto">
             <div class="p-4 w-full rounded-sm border dark:bg-coolgray-100 dark:border-coolgray-300">
@@ -18,10 +21,37 @@
         </div>
     @endif
     <div x-ref="terminalWrapper"
-        :class="fullscreen ? 'fullscreen !bg-black' : 'relative w-full h-full py-4 mx-auto max-h-[510px]'">
+        :class="fullscreen ? 'fixed inset-0 z-[9999] m-0 h-[100dvh] w-screen max-w-none overflow-hidden rounded-none !bg-black p-0' : 'relative w-full h-full py-4 mx-auto max-h-[510px]'">
         <!-- Terminal container -->
+        <div x-show="terminalActive" x-cloak class="mb-2 flex justify-start">
+            <div class="inline-flex rounded-sm border px-2 py-1 text-xs font-medium"
+                :class="terminalSessionTimerClass()" x-text="terminalSessionRemainingLabel()">
+            </div>
+        </div>
         <div id="terminal" wire:ignore
-            :class="fullscreen ? 'px-2 py-1 h-full bg-black' : 'px-2 py-1 rounded-sm bg-black'" x-show="terminalActive">
+            :class="fullscreen ? (mobileToolbarCollapsed ? 'h-[calc(100dvh-3.5rem)] mb-14 px-2 py-1 bg-black' : 'h-[calc(100dvh-6rem)] mb-[6rem] px-2 py-1 bg-black') : 'h-[510px] max-h-[calc(100dvh-10rem)] overflow-hidden px-2 py-1 rounded-sm bg-black'"
+            x-show="terminalActive">
+        </div>
+        <div x-show="terminalActive" x-cloak
+            :class="fullscreen ? 'absolute inset-x-0 bottom-0 z-[9999] px-2 pb-2' : 'relative mt-2'"
+            class="sm:hidden" data-terminal-mobile-toolbar>
+            <div class="mx-auto max-w-3xl rounded-lg border border-white/10 bg-black/90 p-1.5 text-white shadow-lg backdrop-blur">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="px-2 text-[11px] font-medium uppercase tracking-wide text-neutral-400">Terminal keys</span>
+                    <button type="button" class="rounded px-2 py-1 text-xs text-neutral-300 hover:bg-white/10 hover:text-white"
+                        x-on:click="mobileToolbarCollapsed = !mobileToolbarCollapsed; $nextTick(() => resizeTerminal())"
+                        x-text="mobileToolbarCollapsed ? 'Show' : 'Hide'"
+                        aria-label="Toggle mobile terminal toolbar"></button>
+                </div>
+                <div x-show="!mobileToolbarCollapsed" class="mt-1 grid grid-cols-6 gap-1">
+                    <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('arrowUp')" aria-label="Previous command">↑</button>
+                    <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('arrowDown')" aria-label="Next command">↓</button>
+                    <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('arrowLeft')" aria-label="Move cursor left">←</button>
+                    <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('arrowRight')" aria-label="Move cursor right">→</button>
+                    <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('tab')">Tab</button>
+                    <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('escape')">Esc</button>
+                </div>
+            </div>
         </div>
         <button title="Minimize" x-show="fullscreen" class="fixed bg-black/40 top-4 right-6 text-white"
             x-on:click="makeFullscreen"><svg class="w-5 h-5 text-gray-500 hover:text-white bg-black/80"

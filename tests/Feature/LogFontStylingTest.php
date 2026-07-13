@@ -36,10 +36,25 @@ it('uses geist mono for shared logs and terminal rendering', function () {
         ->toContain('class="flex flex-col font-logs"')
         ->toContain('class="font-logs text-neutral-400 mb-2"')
         ->and($activityMonitorView)
-        ->toContain('<pre class="font-logs whitespace-pre-wrap"')
+        ->toContain('<pre class="font-logs min-w-0 max-w-full whitespace-pre-wrap wrap-anywhere"')
         ->and($dockerCleanupView)
         ->toContain('class="flex-1 text-sm font-logs text-gray-700 dark:text-gray-300"')
         ->toContain('class="font-logs text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap"')
         ->and($terminalClient)
         ->toContain('"Geist Mono"');
+});
+
+it('constrains activity monitor logs inside the available viewport', function () {
+    $activityMonitorView = file_get_contents(resource_path('views/livewire/activity-monitor.blade.php'));
+
+    expect($activityMonitorView)
+        ->toContain('flex flex-col w-full min-w-0 max-w-full')
+        ->toContain('<pre class="font-logs min-w-0 max-w-full whitespace-pre-wrap wrap-anywhere"');
+});
+
+it('bounds database startup activity monitor to the slide over height', function () {
+    $databaseHeadingView = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));
+
+    expect($databaseHeadingView)
+        ->toContain('<div wire:ignore class="h-full min-h-0 min-w-0 max-w-full">');
 });

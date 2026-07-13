@@ -15,7 +15,6 @@ use App\Models\Tag;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
-use Visus\Cuid2\Cuid2;
 
 class DeployController extends Controller
 {
@@ -23,6 +22,10 @@ class DeployController extends Controller
     {
         if (request()->attributes->get('can_read_sensitive', false) === false) {
             $deployment->makeHidden([
+                'logs',
+            ]);
+        } else {
+            $deployment->makeVisible([
                 'logs',
             ]);
         }
@@ -281,6 +284,14 @@ class DeployController extends Controller
                 }
             }
 
+            auditLog('api.deployment.cancelled', [
+                'team_id' => $teamId,
+                'deployment_uuid' => $deployment->deployment_uuid,
+                'application_id' => $application?->id,
+                'application_uuid' => $application?->uuid,
+                'server_id' => $deployment->server_id,
+            ]);
+
             return response()->json([
                 'message' => 'Deployment cancelled successfully.',
                 'deployment_uuid' => $deployment->deployment_uuid,
@@ -358,7 +369,7 @@ class DeployController extends Controller
 
         $uuids = $request->input('uuid');
         $tags = $request->input('tag');
-        $force = $request->input('force') ?? false;
+        $force = $request->boolean('force');
         $pullRequestId = $request->input('pull_request_id', $request->input('pr'));
         $pr = $pullRequestId ? max((int) $pullRequestId, 0) : 0;
         $dockerTag = $request->string('docker_tag')->trim()->value() ?: null;
@@ -418,7 +429,7 @@ class DeployController extends Controller
                 }
                 ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $result;
                 if ($deployment_uuid) {
-                    $deployments->push(['message' => $return_message, 'resource_uuid' => $uuid, 'deployment_uuid' => $deployment_uuid->toString()]);
+                    $deployments->push(['message' => $return_message, 'resource_uuid' => $uuid, 'deployment_uuid' => $deployment_uuid]);
                 } else {
                     $deployments->push(['message' => $return_message, 'resource_uuid' => $uuid]);
                 }
@@ -464,7 +475,7 @@ class DeployController extends Controller
                 }
                 ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $result;
                 if ($deployment_uuid) {
-                    $deployments->push(['resource_uuid' => $resource->uuid, 'deployment_uuid' => $deployment_uuid->toString()]);
+                    $deployments->push(['resource_uuid' => $resource->uuid, 'deployment_uuid' => $deployment_uuid]);
                 }
                 $message = $message->merge($return_message);
             }
@@ -503,7 +514,7 @@ class DeployController extends Controller
                 if ($dockerTag !== null && $resource->build_pack !== 'dockerimage') {
                     return ['message' => 'docker_tag can only be used with Docker Image applications.', 'deployment_uuid' => null];
                 }
-                $deployment_uuid = new Cuid2;
+                $deployment_uuid = new_public_id();
                 $result = queue_application_deployment(
                     application: $resource,
                     deployment_uuid: $deployment_uuid,
@@ -518,6 +529,14 @@ class DeployController extends Controller
                     $message = $result['message'];
                 } else {
                     $message = "Application {$resource->name} deployment queued.";
+                    auditLog('api.deployment.triggered', [
+                        'resource_type' => 'application',
+                        'application_uuid' => $resource->uuid,
+                        'application_name' => $resource->name,
+                        'deployment_uuid' => $deployment_uuid,
+                        'force_rebuild' => $force,
+                        'pull_request_id' => $pr,
+                    ]);
                 }
                 break;
             case Service::class:
@@ -529,6 +548,10 @@ class DeployController extends Controller
                 }
                 StartService::run($resource);
                 $message = "Service {$resource->name} started. It could take a while, be patient.";
+                auditLog('api.service.deployed', [
+                    'service_uuid' => $resource->uuid,
+                    'service_name' => $resource->name,
+                ]);
                 break;
             default:
                 // Database resource - check authorization
@@ -543,6 +566,11 @@ class DeployController extends Controller
                 $resource->save();
 
                 $message = "Database {$resource->name} started.";
+                auditLog('api.database.started', [
+                    'database_uuid' => $resource->uuid,
+                    'database_name' => $resource->name,
+                    'database_type' => $resource->getMorphClass(),
+                ]);
                 break;
         }
 
@@ -674,6 +702,9 @@ class DeployController extends Controller
         $this->authorize('view', $application);
 
         $deployments = $application->deployments($skip, $take);
+        if ($request->attributes->get('can_read_sensitive', false) === true) {
+            $deployments['deployments']->each->makeVisible(['logs']);
+        }
 
         return response()->json($deployments);
     }

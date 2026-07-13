@@ -18,8 +18,7 @@ function send_internal_notification(string $message): void
     try {
         $team = Team::find(0);
         $team?->notify(new GeneralNotification($message));
-    } catch (\Throwable $e) {
-        ray($e->getMessage());
+    } catch (Throwable) {
     }
 }
 

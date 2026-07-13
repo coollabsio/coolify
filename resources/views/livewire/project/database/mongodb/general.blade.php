@@ -5,6 +5,9 @@
             <x-forms.button type="submit" canGate="update" :canResource="$database">
                 Save
             </x-forms.button>
+            <x-modal-input title="Resource Details" buttonTitle="Details">
+                <livewire:project.shared.resource-details :resource="$database" />
+            </x-modal-input>
         </div>
         <div class="flex gap-2">
             <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
@@ -21,10 +24,14 @@
                     placeholder="If empty: postgres"
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work."
                     canGate="update" :canResource="$database" />
-                <x-forms.input label="Initial Password" id="mongoInitdbRootPassword" type="password"
-                    required
-                    helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work."
-                    canGate="update" :canResource="$database" />
+                @if ($isPasswordHiddenForMember)
+                    <x-forms.input label="Initial Password" disabled value="Hidden (only admins can view)" />
+                @else
+                    <x-forms.input label="Initial Password" id="mongoInitdbRootPassword" type="password"
+                        required
+                        helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work."
+                        canGate="update" :canResource="$database" />
+                @endif
                 <x-forms.input label="Initial Database" id="mongoInitdbDatabase"
                     placeholder="If empty, it will be the same as Username." readonly
                     helper="You can only change this in the database." canGate="update" :canResource="$database" />
@@ -33,8 +40,12 @@
             <div class="flex xl:flex-row flex-col gap-2 pb-2">
                 <x-forms.input required label="Username" id="mongoInitdbRootUsername"
                     placeholder="If empty: postgres" canGate="update" :canResource="$database" />
-                <x-forms.input label="Password" id="mongoInitdbRootPassword" type="password" required
-                    canGate="update" :canResource="$database" />
+                @if ($isPasswordHiddenForMember)
+                    <x-forms.input label="Password" disabled value="Hidden (only admins can view)" />
+                @else
+                    <x-forms.input label="Password" id="mongoInitdbRootPassword" type="password" required
+                        canGate="update" :canResource="$database" />
+                @endif
                 <x-forms.input required label="Database" id="mongoInitdbDatabase"
                     placeholder="If empty, it will be the same as Username." canGate="update" :canResource="$database" />
             </div>
@@ -50,85 +61,10 @@
                     helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433"
                     canGate="update" :canResource="$database" />
             </div>
-            <x-forms.input label="Mongo URL (internal)"
-                helper="If you change the user/password/port, this could be different. This is with the default values."
-                type="password" readonly wire:model="db_url" canGate="update" :canResource="$database" />
-            @if ($db_url_public)
-                <x-forms.input label="Mongo URL (public)"
-                    helper="If you change the user/password/port, this could be different. This is with the default values."
-                    type="password" readonly wire:model="db_url_public" canGate="update" :canResource="$database" />
-            @endif
         </div>
 
+        <livewire:project.database.mongodb.status-info :database="$database" />
         <div class="flex flex-col gap-2">
-            <div class="flex items-center justify-between py-2">
-                <div class="flex items-center justify-between w-full">
-                    <h3>SSL Configuration</h3>
-                    @if ($enableSsl)
-                        <x-modal-confirmation title="Regenerate SSL Certificates"
-                            buttonTitle="Regenerate SSL Certificates" :actions="[
-                                'The SSL certificate of this database will be regenerated.',
-                                'You must restart the database after regenerating the certificate to start using the new certificate.',
-                            ]"
-                            submitAction="regenerateSslCertificate" :confirmWithText="false" :confirmWithPassword="false" />
-                    @endif
-                </div>
-            </div>
-            @if ($enableSsl && $certificateValidUntil)
-                <span class="text-sm">Valid until:
-                    @if (now()->gt($certificateValidUntil))
-                        <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} - Expired</span>
-                    @elseif(now()->addDays(30)->gt($certificateValidUntil))
-                        <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} - Expiring
-                            soon</span>
-                    @else
-                        <span>{{ $certificateValidUntil->format('d.m.Y H:i:s') }}</span>
-                    @endif
-                </span>
-            @endif
-        </div>
-        <div class="flex flex-col gap-2">
-            <div class="flex flex-col gap-2">
-                <div class="w-64">
-                    @if (str($database->status)->contains('exited'))
-                        <x-forms.checkbox id="enableSsl" label="Enable SSL"
-                            wire:model.live="enableSsl" instantSave="instantSaveSSL" canGate="update"
-                            :canResource="$database" />
-                    @else
-                        <x-forms.checkbox id="enableSsl" label="Enable SSL"
-                            wire:model.live="enableSsl" instantSave="instantSaveSSL" disabled
-                            helper="Database should be stopped to change this settings." canGate="update"
-                            :canResource="$database" />
-                    @endif
-                </div>
-                @if ($enableSsl)
-                    <div class="mx-2">
-                        @if (str($database->status)->contains('exited'))
-                            <x-forms.select id="sslMode" label="SSL Mode" wire:model.live="sslMode"
-                                instantSave="instantSaveSSL"
-                                helper="Choose the SSL verification mode for MongoDB connections" canGate="update"
-                                :canResource="$database">
-                                <option value="allow" title="Allow insecure connections">allow (insecure)</option>
-                                <option value="prefer" title="Prefer secure connections">prefer (secure)</option>
-                                <option value="require" title="Require secure connections">require (secure)</option>
-                                <option value="verify-full" title="Verify full certificate">verify-full (secure)
-                                </option>
-                            </x-forms.select>
-                        @else
-                            <x-forms.select id="sslMode" label="SSL Mode" instantSave="instantSaveSSL"
-                                disabled helper="Database should be stopped to change this settings." canGate="update"
-                                :canResource="$database">
-                                <option value="allow" title="Allow insecure connections">allow (insecure)</option>
-                                <option value="prefer" title="Prefer secure connections">prefer (secure)</option>
-                                <option value="require" title="Require secure connections">require (secure)</option>
-                                <option value="verify-full" title="Verify full certificate">verify-full (secure)
-                                </option>
-                            </x-forms.select>
-                        @endif
-                    </div>
-                @endif
-            </div>
-
             <div>
                 <div class="flex flex-col py-2 w-64">
                     <div class="flex items-center gap-2 pb-2">
@@ -151,10 +87,12 @@
                     <x-forms.checkbox instantSave id="isPublic" label="Make it publicly available"
                         canGate="update" :canResource="$database" />
                 </div>
+                <div class="flex flex-col gap-2">
                 <x-forms.input type="number" placeholder="5432" disabled="{{ $isPublic }}"
                     id="publicPort" label="Public Port" canGate="update" :canResource="$database" />
                 <x-forms.input type="number" placeholder="3600" disabled="{{ $isPublic }}" id="publicPortTimeout"
                     label="Proxy Timeout (seconds)" helper="Timeout for the public TCP proxy connection in seconds. Default: 3600 (1 hour)." canGate="update" :canResource="$database" />
+                </div>
             </div>
             <x-forms.textarea label="Custom MongoDB Configuration" rows="10" id="mongoConf"
                 canGate="update" :canResource="$database" />

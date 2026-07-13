@@ -3,9 +3,67 @@
 namespace App\Providers;
 
 // use Illuminate\Support\Facades\Gate;
+use App\Models\Application;
+use App\Models\ApplicationPreview;
+use App\Models\ApplicationSetting;
+use App\Models\CloudInitScript;
+use App\Models\CloudProviderToken;
+use App\Models\DiscordNotificationSettings;
+use App\Models\EmailNotificationSettings;
+use App\Models\Environment;
+use App\Models\EnvironmentVariable;
+use App\Models\GithubApp;
+use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
+use App\Models\Project;
+use App\Models\PushoverNotificationSettings;
+use App\Models\S3Storage;
+use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
+use App\Models\SharedEnvironmentVariable;
+use App\Models\SlackNotificationSettings;
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDocker;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
+use App\Models\SwarmDocker;
+use App\Models\Team;
+use App\Models\TelegramNotificationSettings;
+use App\Models\WebhookNotificationSettings;
+use App\Policies\ApiTokenPolicy;
+use App\Policies\ApplicationPolicy;
+use App\Policies\ApplicationPreviewPolicy;
+use App\Policies\ApplicationSettingPolicy;
+use App\Policies\CloudInitScriptPolicy;
+use App\Policies\CloudProviderTokenPolicy;
+use App\Policies\DatabasePolicy;
+use App\Policies\EnvironmentPolicy;
+use App\Policies\EnvironmentVariablePolicy;
+use App\Policies\GithubAppPolicy;
+use App\Policies\InstanceSettingsPolicy;
+use App\Policies\NotificationPolicy;
+use App\Policies\PrivateKeyPolicy;
+use App\Policies\ProjectPolicy;
 use App\Policies\ResourceCreatePolicy;
+use App\Policies\S3StoragePolicy;
+use App\Policies\ServerPolicy;
+use App\Policies\ServiceApplicationPolicy;
+use App\Policies\ServiceDatabasePolicy;
+use App\Policies\ServicePolicy;
+use App\Policies\SharedEnvironmentVariablePolicy;
+use App\Policies\StandaloneDockerPolicy;
+use App\Policies\SwarmDockerPolicy;
+use App\Policies\TeamPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -15,49 +73,54 @@ class AuthServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     protected $policies = [
-        \App\Models\Server::class => \App\Policies\ServerPolicy::class,
-        \App\Models\PrivateKey::class => \App\Policies\PrivateKeyPolicy::class,
-        \App\Models\StandaloneDocker::class => \App\Policies\StandaloneDockerPolicy::class,
-        \App\Models\SwarmDocker::class => \App\Policies\SwarmDockerPolicy::class,
-        \App\Models\Application::class => \App\Policies\ApplicationPolicy::class,
-        \App\Models\ApplicationPreview::class => \App\Policies\ApplicationPreviewPolicy::class,
-        \App\Models\ApplicationSetting::class => \App\Policies\ApplicationSettingPolicy::class,
-        \App\Models\Service::class => \App\Policies\ServicePolicy::class,
-        \App\Models\ServiceApplication::class => \App\Policies\ServiceApplicationPolicy::class,
-        \App\Models\ServiceDatabase::class => \App\Policies\ServiceDatabasePolicy::class,
-        \App\Models\Project::class => \App\Policies\ProjectPolicy::class,
-        \App\Models\Environment::class => \App\Policies\EnvironmentPolicy::class,
-        \App\Models\EnvironmentVariable::class => \App\Policies\EnvironmentVariablePolicy::class,
-        \App\Models\SharedEnvironmentVariable::class => \App\Policies\SharedEnvironmentVariablePolicy::class,
+        Server::class => ServerPolicy::class,
+        PrivateKey::class => PrivateKeyPolicy::class,
+        StandaloneDocker::class => StandaloneDockerPolicy::class,
+        SwarmDocker::class => SwarmDockerPolicy::class,
+        Application::class => ApplicationPolicy::class,
+        ApplicationPreview::class => ApplicationPreviewPolicy::class,
+        ApplicationSetting::class => ApplicationSettingPolicy::class,
+        Service::class => ServicePolicy::class,
+        ServiceApplication::class => ServiceApplicationPolicy::class,
+        ServiceDatabase::class => ServiceDatabasePolicy::class,
+        Project::class => ProjectPolicy::class,
+        Environment::class => EnvironmentPolicy::class,
+        EnvironmentVariable::class => EnvironmentVariablePolicy::class,
+        SharedEnvironmentVariable::class => SharedEnvironmentVariablePolicy::class,
         // Database policies - all use the shared DatabasePolicy
-        \App\Models\StandalonePostgresql::class => \App\Policies\DatabasePolicy::class,
-        \App\Models\StandaloneMysql::class => \App\Policies\DatabasePolicy::class,
-        \App\Models\StandaloneMariadb::class => \App\Policies\DatabasePolicy::class,
-        \App\Models\StandaloneMongodb::class => \App\Policies\DatabasePolicy::class,
-        \App\Models\StandaloneRedis::class => \App\Policies\DatabasePolicy::class,
-        \App\Models\StandaloneKeydb::class => \App\Policies\DatabasePolicy::class,
-        \App\Models\StandaloneDragonfly::class => \App\Policies\DatabasePolicy::class,
-        \App\Models\StandaloneClickhouse::class => \App\Policies\DatabasePolicy::class,
+        StandalonePostgresql::class => DatabasePolicy::class,
+        StandaloneMysql::class => DatabasePolicy::class,
+        StandaloneMariadb::class => DatabasePolicy::class,
+        StandaloneMongodb::class => DatabasePolicy::class,
+        StandaloneRedis::class => DatabasePolicy::class,
+        StandaloneKeydb::class => DatabasePolicy::class,
+        StandaloneDragonfly::class => DatabasePolicy::class,
+        StandaloneClickhouse::class => DatabasePolicy::class,
 
         // Notification policies - all use the shared NotificationPolicy
-        \App\Models\EmailNotificationSettings::class => \App\Policies\NotificationPolicy::class,
-        \App\Models\DiscordNotificationSettings::class => \App\Policies\NotificationPolicy::class,
-        \App\Models\TelegramNotificationSettings::class => \App\Policies\NotificationPolicy::class,
-        \App\Models\SlackNotificationSettings::class => \App\Policies\NotificationPolicy::class,
-        \App\Models\PushoverNotificationSettings::class => \App\Policies\NotificationPolicy::class,
-        \App\Models\WebhookNotificationSettings::class => \App\Policies\NotificationPolicy::class,
+        EmailNotificationSettings::class => NotificationPolicy::class,
+        DiscordNotificationSettings::class => NotificationPolicy::class,
+        TelegramNotificationSettings::class => NotificationPolicy::class,
+        SlackNotificationSettings::class => NotificationPolicy::class,
+        PushoverNotificationSettings::class => NotificationPolicy::class,
+        WebhookNotificationSettings::class => NotificationPolicy::class,
 
         // API Token policy
-        \Laravel\Sanctum\PersonalAccessToken::class => \App\Policies\ApiTokenPolicy::class,
+        PersonalAccessToken::class => ApiTokenPolicy::class,
 
         // Instance settings policy
-        \App\Models\InstanceSettings::class => \App\Policies\InstanceSettingsPolicy::class,
+        InstanceSettings::class => InstanceSettingsPolicy::class,
+
+        // S3 storage policy
+        S3Storage::class => S3StoragePolicy::class,
 
         // Team policy
-        \App\Models\Team::class => \App\Policies\TeamPolicy::class,
+        Team::class => TeamPolicy::class,
 
         // Git source policies
-        \App\Models\GithubApp::class => \App\Policies\GithubAppPolicy::class,
+        GithubApp::class => GithubAppPolicy::class,
+        CloudProviderToken::class => CloudProviderTokenPolicy::class,
+        CloudInitScript::class => CloudInitScriptPolicy::class,
 
     ];
 

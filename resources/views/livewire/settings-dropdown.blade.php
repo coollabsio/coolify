@@ -103,142 +103,102 @@
             return new Date(b.published_at) - new Date(a.published_at);
         });
     }
-}" @click.outside="dropdownOpen = false">
-    <!-- Custom Dropdown without arrow -->
-    <div class="relative">
-        <button @click="dropdownOpen = !dropdownOpen"
-            class="relative p-2 dark:text-neutral-400 hover:dark:text-white transition-colors cursor-pointer"
-            title="Preferences">
-            <!-- Sliders Icon -->
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Preferences">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+}" @click.outside="dropdownOpen = false" class="{{ $trigger === 'changelog-sidebar' ? 'w-full' : '' }}">
+    @if ($trigger === 'changelog-sidebar')
+        <button wire:click="openWhatsNewModal" type="button" title="What's New" aria-label="What's New"
+            class="relative text-left menu-item">
+            <svg class="menu-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                    d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.091-3.091L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.091-3.091L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.091 3.091L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.091 3.091ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.456-2.456L14.25 6l1.035-.259a3.375 3.375 0 0 0 2.456-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
             </svg>
-
-            <!-- Unread Count Badge -->
+            <span class="text-left menu-item-label" :class="collapsed && 'lg:hidden'">What's New</span>
             @if ($unreadCount > 0)
                 <span
-                    class="absolute -top-1 -right-1 bg-error text-white text-xs rounded-full w-4.5 h-4.5 flex items-center justify-center">
+                    class="absolute right-2 top-1/2 -translate-y-1/2 bg-error text-white text-[10px] rounded-full min-w-4 h-4 px-1 flex items-center justify-center"
+                    aria-label="{{ $unreadCount }} unread changelog {{ Str::plural('entry', $unreadCount) }}">
                     {{ $unreadCount > 9 ? '9+' : $unreadCount }}
                 </span>
             @endif
         </button>
+    @else
+        <!-- Custom Dropdown without arrow -->
+        <div class="relative">
+            <button @click="dropdownOpen = !dropdownOpen"
+                class="relative p-2 dark:text-neutral-400 hover:dark:text-white transition-colors cursor-pointer"
+                title="Preferences">
+                <!-- Sliders Icon -->
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Preferences">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                </svg>
 
-        <!-- Dropdown Menu -->
-        <div x-show="dropdownOpen" x-transition:enter="ease-out duration-200"
-            x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
-            x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
-            x-transition:leave-end="opacity-0 -translate-y-2" class="absolute right-0 top-full mt-1 z-50 w-48" x-cloak>
-            <div
-                class="p-1 bg-white border rounded-sm shadow-lg dark:bg-coolgray-200 dark:border-coolgray-300 border-neutral-300">
-                <div class="flex flex-col gap-1">
-                    <!-- What's New Section -->
-                    @if ($unreadCount > 0)
-                        <button wire:click="openWhatsNewModal" @click="dropdownOpen = false"
-                            class="px-1 dropdown-item-no-padding flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span>What's New</span>
-                            </div>
-                            <span
-                                class="bg-error text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                                {{ $unreadCount > 9 ? '9+' : $unreadCount }}
-                            </span>
+                <!-- Unread Count Badge -->
+                @if ($unreadCount > 0)
+                    <span
+                        class="absolute -top-1 -right-1 bg-error text-white text-xs rounded-full w-4.5 h-4.5 flex items-center justify-center">
+                        {{ $unreadCount > 9 ? '9+' : $unreadCount }}
+                    </span>
+                @endif
+            </button>
+
+            <!-- Dropdown Menu -->
+            <div x-show="dropdownOpen" x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+                x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
+                x-transition:leave-end="opacity-0 -translate-y-2" class="absolute right-0 top-full mt-1 z-50 w-48" x-cloak>
+                <div
+                    class="p-1 bg-white border rounded-sm shadow-lg dark:bg-coolgray-200 dark:border-coolgray-300 border-neutral-300">
+                    <div class="flex flex-col gap-1">
+                        <!-- Width Section -->
+                        <div
+                            class="my-1 font-bold border-b dark:border-coolgray-500 border-neutral-300 dark:text-white text-md">
+                            Width</div>
+                        <button @click="switchWidth(); dropdownOpen = false"
+                            class="px-1 dropdown-item-no-padding flex items-center gap-2" x-show="full === 'full'">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 6h16M4 12h16M4 18h7" />
+                            </svg>
+                            <span>Center</span>
                         </button>
-                    @else
-                        <button wire:click="openWhatsNewModal" @click="dropdownOpen = false"
+                        <button @click="switchWidth(); dropdownOpen = false"
+                            class="px-1 dropdown-item-no-padding flex items-center gap-2" x-show="full === 'center'">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                            <span>Full</span>
+                        </button>
+
+                        <!-- Zoom Section -->
+                        <div
+                            class="my-1 font-bold border-b dark:border-coolgray-500 border-neutral-300 dark:text-white text-md">
+                            Zoom</div>
+                        <button @click="setZoom(100); dropdownOpen = false"
                             class="px-1 dropdown-item-no-padding flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
-                            <span>Changelog</span>
+                            <span>100%</span>
                         </button>
-                    @endif
-
-                    <!-- Divider -->
-                    <div class="border-b dark:border-coolgray-500 border-neutral-300"></div>
-
-                    <!-- Theme Section -->
-                    <div class="font-bold border-b dark:border-coolgray-500 border-neutral-300 dark:text-white pb-1">
-                        Appearance</div>
-                    <button @click="setTheme('dark'); dropdownOpen = false"
-                        class="px-1 dropdown-item-no-padding flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                        </svg>
-                        <span>Dark</span>
-                    </button>
-                    <button @click="setTheme('light'); dropdownOpen = false"
-                        class="px-1 dropdown-item-no-padding flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                        </svg>
-                        <span>Light</span>
-                    </button>
-                    <button @click="setTheme('system'); dropdownOpen = false"
-                        class="px-1 dropdown-item-no-padding flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
-                        <span>System</span>
-                    </button>
-
-                    <!-- Width Section -->
-                    <div
-                        class="my-1 font-bold border-b dark:border-coolgray-500 border-neutral-300 dark:text-white text-md">
-                        Width</div>
-                    <button @click="switchWidth(); dropdownOpen = false"
-                        class="px-1 dropdown-item-no-padding flex items-center gap-2" x-show="full === 'full'">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h7" />
-                        </svg>
-                        <span>Center</span>
-                    </button>
-                    <button @click="switchWidth(); dropdownOpen = false"
-                        class="px-1 dropdown-item-no-padding flex items-center gap-2" x-show="full === 'center'">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                        <span>Full</span>
-                    </button>
-
-                    <!-- Zoom Section -->
-                    <div
-                        class="my-1 font-bold border-b dark:border-coolgray-500 border-neutral-300 dark:text-white text-md">
-                        Zoom</div>
-                    <button @click="setZoom(100); dropdownOpen = false"
-                        class="px-1 dropdown-item-no-padding flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                        <span>100%</span>
-                    </button>
-                    <button @click="setZoom(90); dropdownOpen = false"
-                        class="px-1 dropdown-item-no-padding flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 10h4v4h-4v-4z" />
-                        </svg>
-                        <span>90%</span>
-                    </button>
+                        <button @click="setZoom(90); dropdownOpen = false"
+                            class="px-1 dropdown-item-no-padding flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 10h4v4h-4v-4z" />
+                            </svg>
+                            <span>90%</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
+    @endif
 
     <!-- What's New Modal -->
     @if ($showWhatsNewModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center py-6 px-4"
+        <div class="fixed inset-0 z-[60] flex items-center justify-center py-6 px-4"
             @keydown.escape.window="$wire.closeWhatsNewModal()">
             <!-- Background overlay -->
             <div class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs" wire:click="closeWhatsNewModal">
@@ -262,8 +222,7 @@
                     </div>
                     <div class="flex items-center gap-2">
                         @if (isDev())
-                            <x-forms.button wire:click="manualFetchChangelog"
-                                class="bg-coolgray-200 hover:bg-coolgray-300">
+                            <x-forms.button wire:click="manualFetchChangelog">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

@@ -18,6 +18,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
@@ -25,6 +26,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -62,7 +64,6 @@ use PurplePixie\PhpDns\DNSQuery;
 use PurplePixie\PhpDns\DNSTypes;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 function base_configuration_dir(): string
 {
@@ -113,6 +114,13 @@ function sanitize_string(?string $input = null): ?string
     return $sanitized;
 }
 
+function new_public_id(int $length = 24): string
+{
+    $length = max(1, $length);
+
+    return Str::lower(Str::random($length));
+}
+
 /**
  * Validate that a path or identifier is safe for use in shell commands.
  *
@@ -153,6 +161,264 @@ function validateShellSafePath(string $input, string $context = 'path'): string
     }
 
     return $input;
+}
+
+/**
+ * Validate that a filename is safe for use as a plain file name (no path components).
+ *
+ * Prevents unsafe parent directory paths by rejecting directory separators, parent directory
+ * sequences, and null bytes, in addition to all shell metacharacters blocked by
+ * validateShellSafePath(). Intended for user-supplied filenames such as PostgreSQL
+ * init script names that are later written to a specific directory on the host.
+ *
+ * @param  string  $input  The filename to validate
+ * @param  string  $context  Descriptive name for error messages (e.g., 'init script filename')
+ * @return string The validated input (unchanged if valid)
+ *
+ * @throws Exception If dangerous characters or parent directory sequences are detected
+ */
+function validateFilenameSafe(string $input, string $context = 'filename'): string
+{
+    // First apply shell-metachar checks
+    validateShellSafePath($input, $context);
+
+    // Reject NUL bytes (can be used to truncate path strings in some contexts)
+    if (str_contains($input, "\0")) {
+        throw new Exception(
+            "Invalid {$context}: contains null byte. ".
+            'Null bytes are not allowed in filenames for security reasons.'
+        );
+    }
+
+    // Reject directory separators — filename must be a single path component
+    if (str_contains($input, '/') || str_contains($input, '\\')) {
+        throw new Exception(
+            "Invalid {$context}: directory separators ('/' or '\\') are not allowed. ".
+            'Provide a plain filename without path components.'
+        );
+    }
+
+    // Reject parent directory sequences (catches encoded or unusual forms)
+    if (str_contains($input, '..')) {
+        throw new Exception(
+            "Invalid {$context}: parent directory sequence ('..') is not allowed."
+        );
+    }
+
+    // Reject shell globbing / expansion metacharacters and whitespace that would
+    // split the filename into additional shell arguments if ever interpolated
+    // unquoted (defence in depth on top of escapeshellarg() at call sites).
+    $shellExpansionChars = [
+        ' ' => 'whitespace',
+        '*' => 'glob wildcard',
+        '?' => 'glob wildcard',
+        '[' => 'glob character class',
+        ']' => 'glob character class',
+        '~' => 'tilde expansion',
+        '"' => 'double quote',
+        "'" => 'single quote',
+    ];
+
+    foreach ($shellExpansionChars as $char => $description) {
+        if (str_contains($input, $char)) {
+            throw new Exception(
+                "Invalid {$context}: contains forbidden character '{$char}' ({$description})."
+            );
+        }
+    }
+
+    return $input;
+}
+
+/**
+ * Validate and normalize a user supplied file mount path.
+ *
+ * File mount paths are container paths supplied by tenants. They may look like
+ * absolute paths (for example /etc/nginx/nginx.conf), but are later joined to a
+ * Coolify-managed configuration directory on the host. Therefore shell safety is
+ * not enough: every path segment must also be unable to traverse out of that
+ * managed directory.
+ *
+ * @throws Exception
+ */
+function validateFileMountPath(string $input, string $context = 'file mount path'): string
+{
+    validateShellSafePath($input, $context);
+
+    if (str_contains($input, "\0")) {
+        throw new Exception(
+            "Invalid {$context}: contains null byte. ".
+            'Null bytes are not allowed in file mount paths for security reasons.'
+        );
+    }
+
+    if (str_contains($input, '\\')) {
+        throw new Exception(
+            "Invalid {$context}: backslash directory separators are not allowed."
+        );
+    }
+
+    $path = str($input)->trim()->start('/')->replaceMatches('#/+#', '/')->value();
+
+    foreach (explode('/', trim($path, '/')) as $segment) {
+        if ($segment === '' || ($segment !== '.' && $segment !== '..')) {
+            continue;
+        }
+
+        throw new Exception(
+            "Invalid {$context}: relative path segments ('.' or '..') are not allowed."
+        );
+    }
+
+    return $path;
+}
+
+/**
+ * Validate a host file path used as a bind-only source.
+ *
+ * Unlike managed file mounts, this path is not re-based under the Coolify
+ * configuration directory and must never be written by Coolify. It still needs
+ * to be shell-safe because other storage code may pass paths through remote
+ * shell commands.
+ *
+ * @throws Exception
+ */
+function validateHostFileMountPath(string $input, string $context = 'host file path'): string
+{
+    validateShellSafePath($input, $context);
+
+    if (str_contains($input, "\0")) {
+        throw new Exception("Invalid {$context}: contains null byte.");
+    }
+
+    if (str_contains($input, '\\')) {
+        throw new Exception("Invalid {$context}: backslash directory separators are not allowed.");
+    }
+
+    $path = str($input)->trim()->replaceMatches('#/+#', '/')->value();
+
+    if ($path === '' || ! str_starts_with($path, '/')) {
+        throw new Exception("Invalid {$context}: must be an absolute path.");
+    }
+
+    if ($path === '/' || str_ends_with($path, '/')) {
+        throw new Exception("Invalid {$context}: must point to a file, not a directory.");
+    }
+
+    foreach (explode('/', trim($path, '/')) as $segment) {
+        if ($segment === '' || ($segment !== '.' && $segment !== '..')) {
+            continue;
+        }
+
+        throw new Exception("Invalid {$context}: relative path segments ('.' or '..') are not allowed.");
+    }
+
+    return normalizeUnixPath($path);
+}
+
+/**
+ * Resolve a tenant file mount path under a Coolify-managed base directory.
+ *
+ * This performs lexical normalization only; the target file does not need to
+ * exist yet. The normalized result must remain inside the given base directory.
+ *
+ * @throws Exception
+ */
+function confineFileMountPath(string $baseDirectory, string $path, string $context = 'file mount path'): string
+{
+    $baseDirectory = normalizeUnixPath($baseDirectory);
+    $mountPath = validateFileMountPath($path, $context);
+    $resolvedPath = normalizeUnixPath($baseDirectory.'/'.$mountPath);
+
+    if ($resolvedPath !== $baseDirectory && ! str_starts_with($resolvedPath, $baseDirectory.'/')) {
+        throw new Exception(
+            "Invalid {$context}: resolved path must stay inside the resource configuration directory."
+        );
+    }
+
+    return $resolvedPath;
+}
+
+/**
+ * Normalize an existing host path and assert it remains inside a base directory.
+ *
+ * Dot-relative paths are resolved against the base directory for legacy
+ * LocalFileVolume rows. Absolute paths must already point inside the base.
+ *
+ * @throws Exception
+ */
+function confinePathToBase(string $baseDirectory, string $path, string $context = 'path'): string
+{
+    $baseDirectory = normalizeUnixPath($baseDirectory);
+    $path = trim($path);
+
+    if (str_starts_with($path, '.')) {
+        $path = $baseDirectory.'/'.str($path)->after('.')->value();
+    } elseif (! str_starts_with($path, '/')) {
+        $path = $baseDirectory.'/'.$path;
+    }
+
+    $resolvedPath = normalizeUnixPath($path);
+
+    if ($resolvedPath !== $baseDirectory && ! str_starts_with($resolvedPath, $baseDirectory.'/')) {
+        throw new Exception(
+            "Invalid {$context}: resolved path must stay inside the resource configuration directory."
+        );
+    }
+
+    return $resolvedPath;
+}
+
+/**
+ * Normalize a Unix path lexically without consulting the remote filesystem.
+ *
+ * @throws Exception
+ */
+function normalizeUnixPath(string $path): string
+{
+    validateShellSafePath($path, 'path');
+
+    if (str_contains($path, "\0")) {
+        throw new Exception('Invalid path: contains null byte.');
+    }
+
+    if (str_contains($path, '\\')) {
+        throw new Exception('Invalid path: backslash directory separators are not allowed.');
+    }
+
+    $isAbsolute = str_starts_with($path, '/');
+    $segments = [];
+
+    foreach (explode('/', $path) as $segment) {
+        if ($segment === '' || $segment === '.') {
+            continue;
+        }
+
+        if ($segment === '..') {
+            if ($segments === [] || end($segments) === '..') {
+                if ($isAbsolute) {
+                    throw new Exception('Invalid path: resolved path escapes the base directory.');
+                }
+                $segments[] = $segment;
+
+                continue;
+            }
+
+            array_pop($segments);
+
+            continue;
+        }
+
+        $segments[] = $segment;
+    }
+
+    $normalized = implode('/', $segments);
+
+    if ($isAbsolute) {
+        return $normalized === '' ? '/' : '/'.$normalized;
+    }
+
+    return $normalized === '' ? '.' : $normalized;
 }
 
 /**
@@ -259,6 +525,16 @@ function currentTeam()
     return Auth::user()?->currentTeam() ?? null;
 }
 
+function find_destination_for_current_team(?string $uuid): StandaloneDocker|SwarmDocker|null
+{
+    if (blank($uuid) || ! currentTeam()) {
+        return null;
+    }
+
+    return StandaloneDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first()
+        ?? SwarmDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first();
+}
+
 function showBoarding(): bool
 {
     if (isDev()) {
@@ -274,14 +550,30 @@ function showBoarding(): bool
 function refreshSession(?Team $team = null): void
 {
     if (! $team) {
-        if (Auth::user()->currentTeam()) {
-            $team = Team::find(Auth::user()->currentTeam()->id);
-        } else {
-            $team = User::find(Auth::id())->teams->first();
+        $currentTeam = Auth::user()->currentTeam();
+        if ($currentTeam) {
+            // currentTeam() can resolve a stale (just-deleted) team from the
+            // session/cache, so Team::find() may still return null here.
+            $team = Team::find($currentTeam->id);
+        }
+        if (! $team) {
+            // Fall back to any team the user still belongs to.
+            $team = User::query()->find(Auth::id())?->teams()->first();
         }
     }
+
     // Clear old cache key format for backwards compatibility
     Cache::forget('team:'.Auth::id());
+
+    if (! $team) {
+        // The user has no team left (e.g. just deleted their current team and
+        // belongs to no other): clear the stale session reference instead of
+        // dereferencing null.
+        session()->forget('currentTeam');
+
+        return;
+    }
+
     // Use new cache key format that includes team ID
     Cache::forget('user:'.Auth::id().':team:'.$team->id);
     Cache::remember('user:'.Auth::id().':team:'.$team->id, 3600, function () use ($team) {
@@ -360,7 +652,7 @@ function generate_random_name(?string $cuid = null): string
         ]
     );
     if (is_null($cuid)) {
-        $cuid = new Cuid2;
+        $cuid = new_public_id();
     }
 
     return Str::kebab("{$generator->getName()}-$cuid");
@@ -396,7 +688,7 @@ function formatPrivateKey(string $privateKey)
 function generate_application_name(string $git_repository, string $git_branch, ?string $cuid = null): string
 {
     if (is_null($cuid)) {
-        $cuid = new Cuid2;
+        $cuid = new_public_id();
     }
 
     $repo_name = str_contains($git_repository, '/') ? last(explode('/', $git_repository)) : $git_repository;
@@ -511,6 +803,39 @@ function isDev(): bool
 function isCloud(): bool
 {
     return ! config('constants.coolify.self_hosted');
+}
+
+/**
+ * Resolve the queue used for application deployments, database starts and service starts.
+ *
+ * On cloud these jobs run on a dedicated `deployments` queue so they can be drained by an
+ * isolated Horizon worker pool; self-hosted keeps them on the shared `high` queue. Routing
+ * is decided by `isCloud()` (config-based) rather than `HORIZON_QUEUES`, so the dispatching
+ * process needs no special env — only the worker must be configured to drain `deployments`.
+ *
+ * IMPORTANT: on cloud a worker MUST include `deployments` in its `HORIZON_QUEUES`, otherwise
+ * these jobs are never processed.
+ */
+function deployment_queue(): string
+{
+    return isCloud() ? 'deployments' : 'high';
+}
+
+/**
+ * Resolve the queue used for scheduled jobs — the scheduler dispatcher, scheduled tasks and
+ * scheduled database backups, whether triggered automatically or manually.
+ *
+ * On cloud these jobs run on a dedicated `crons` queue so they can be drained by an isolated
+ * Horizon worker pool; self-hosted keeps them on the shared `high` queue. Routing is decided
+ * by `isCloud()` (config-based), so the dispatching process needs no special env — only the
+ * worker must be configured to drain `crons`.
+ *
+ * IMPORTANT: on cloud a worker MUST include `crons` in its `HORIZON_QUEUES`, otherwise these
+ * jobs are never processed.
+ */
+function crons_queue(): string
+{
+    return isCloud() ? 'crons' : 'high';
 }
 
 function translate_cron_expression($expression_to_validate): string
@@ -929,7 +1254,6 @@ function sslip(Server $server)
 
 function get_service_templates(bool $force = false): Collection
 {
-
     if ($force) {
         try {
             $response = Http::retry(3, 1000)->get(config('constants.services.official'));
@@ -940,15 +1264,16 @@ function get_service_templates(bool $force = false): Collection
 
             return collect($services);
         } catch (Throwable) {
-            $services = File::get(base_path('templates/'.config('constants.services.file_name')));
-
-            return collect(json_decode($services))->sortKeys();
+            return get_service_templates();
         }
-    } else {
-        $services = File::get(base_path('templates/'.config('constants.services.file_name')));
-
-        return collect(json_decode($services))->sortKeys();
     }
+
+    $path = base_path('templates/'.config('constants.services.file_name'));
+    $mtime = filemtime($path) ?: 0;
+
+    return Cache::remember("service-templates:{$mtime}", now()->addDay(), function () use ($path) {
+        return collect(json_decode(File::get($path)))->sortKeys();
+    });
 }
 
 function getResourceByUuid(string $uuid, ?int $teamId = null)
@@ -979,44 +1304,17 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
 }
 function queryDatabaseByUuidWithinTeam(string $uuid, string $teamId)
 {
-    $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
-    if ($postgresql && $postgresql->team()->id == $teamId) {
-        return $postgresql->unsetRelation('environment');
-    }
-    $redis = StandaloneRedis::whereUuid($uuid)->first();
-    if ($redis && $redis->team()->id == $teamId) {
-        return $redis->unsetRelation('environment');
-    }
-    $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
-    if ($mongodb && $mongodb->team()->id == $teamId) {
-        return $mongodb->unsetRelation('environment');
-    }
-    $mysql = StandaloneMysql::whereUuid($uuid)->first();
-    if ($mysql && $mysql->team()->id == $teamId) {
-        return $mysql->unsetRelation('environment');
-    }
-    $mariadb = StandaloneMariadb::whereUuid($uuid)->first();
-    if ($mariadb && $mariadb->team()->id == $teamId) {
-        return $mariadb->unsetRelation('environment');
-    }
-    $keydb = StandaloneKeydb::whereUuid($uuid)->first();
-    if ($keydb && $keydb->team()->id == $teamId) {
-        return $keydb->unsetRelation('environment');
-    }
-    $dragonfly = StandaloneDragonfly::whereUuid($uuid)->first();
-    if ($dragonfly && $dragonfly->team()->id == $teamId) {
-        return $dragonfly->unsetRelation('environment');
-    }
-    $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
-    if ($clickhouse && $clickhouse->team()->id == $teamId) {
-        return $clickhouse->unsetRelation('environment');
+    foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
+        $database = $modelClass::whereUuid($uuid)->first();
+        if ($database && $database->team()->id == $teamId) {
+            return $database->unsetRelation('environment');
+        }
     }
 
     return null;
 }
 function queryResourcesByUuid(string $uuid)
 {
-    $resource = null;
     $application = Application::whereUuid($uuid)->first();
     if ($application) {
         return $application;
@@ -1025,37 +1323,11 @@ function queryResourcesByUuid(string $uuid)
     if ($service) {
         return $service;
     }
-    $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
-    if ($postgresql) {
-        return $postgresql;
-    }
-    $redis = StandaloneRedis::whereUuid($uuid)->first();
-    if ($redis) {
-        return $redis;
-    }
-    $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
-    if ($mongodb) {
-        return $mongodb;
-    }
-    $mysql = StandaloneMysql::whereUuid($uuid)->first();
-    if ($mysql) {
-        return $mysql;
-    }
-    $mariadb = StandaloneMariadb::whereUuid($uuid)->first();
-    if ($mariadb) {
-        return $mariadb;
-    }
-    $keydb = StandaloneKeydb::whereUuid($uuid)->first();
-    if ($keydb) {
-        return $keydb;
-    }
-    $dragonfly = StandaloneDragonfly::whereUuid($uuid)->first();
-    if ($dragonfly) {
-        return $dragonfly;
-    }
-    $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
-    if ($clickhouse) {
-        return $clickhouse;
+    foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
+        $database = $modelClass::whereUuid($uuid)->first();
+        if ($database) {
+            return $database;
+        }
     }
 
     // Check for ServiceDatabase by its own UUID
@@ -1064,7 +1336,7 @@ function queryResourcesByUuid(string $uuid)
         return $serviceDatabase;
     }
 
-    return $resource;
+    return null;
 }
 function generateTagDeployWebhook($tag_name)
 {
@@ -1374,23 +1646,23 @@ function generateEnvValue(string $command, Service|Application|null $service = n
             break;
             // This is base64,
         case 'REALBASE64_64':
-            $generatedValue = base64_encode(Str::random(64));
+            $generatedValue = base64_encode(random_bytes(64));
             break;
         case 'REALBASE64_128':
-            $generatedValue = base64_encode(Str::random(128));
+            $generatedValue = base64_encode(random_bytes(128));
             break;
         case 'REALBASE64':
         case 'REALBASE64_32':
-            $generatedValue = base64_encode(Str::random(32));
+            $generatedValue = base64_encode(random_bytes(32));
             break;
         case 'HEX_32':
-            $generatedValue = bin2hex(Str::random(32));
+            $generatedValue = bin2hex(random_bytes(16));
             break;
         case 'HEX_64':
-            $generatedValue = bin2hex(Str::random(64));
+            $generatedValue = bin2hex(random_bytes(32));
             break;
         case 'HEX_128':
-            $generatedValue = bin2hex(Str::random(128));
+            $generatedValue = bin2hex(random_bytes(64));
             break;
         case 'USER':
             $generatedValue = Str::random(16);
@@ -1492,7 +1764,6 @@ function validateDNSEntry(string $fqdn, Server $server)
             $query = new DNSQuery($dns_server);
             $results = $query->query($host, $type);
             if ($results === false || $query->hasError()) {
-                ray('Error: '.$query->getLasterror());
             } else {
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
@@ -1790,15 +2061,15 @@ function isBase64Encoded($strValue)
 {
     return base64_encode(base64_decode($strValue, true)) === $strValue;
 }
-function customApiValidator(Collection|array $item, array $rules)
+function customApiValidator(Collection|array $item, array $rules, array $messages = [])
 {
     if (is_array($item)) {
         $item = collect($item);
     }
 
-    return Validator::make($item->toArray(), $rules, [
+    return Validator::make($item->toArray(), $rules, array_merge([
         'required' => 'This field is required.',
-    ]);
+    ], $messages));
 }
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, ?int $preview_id = null)
 {
@@ -3184,7 +3455,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     $template = $resource->preview_url_template;
                                     $host = $url->getHost();
                                     $schema = $url->getScheme();
-                                    $random = new Cuid2;
+                                    $random = new_public_id();
                                     $preview_fqdn = str_replace('{{random}}', $random, $template);
                                     $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
                                     $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);
@@ -3453,10 +3724,10 @@ function wireNavigate(): string
     try {
         $settings = instanceSettings();
 
-        // Return wire:navigate.hover for SPA navigation with prefetching, or empty string if disabled
-        return ($settings->is_wire_navigate_enabled ?? true) ? 'wire:navigate.hover' : '';
+        // Return wire:navigate for SPA navigation with prefetching, or empty string if disabled
+        return ($settings->is_wire_navigate_enabled ?? true) ? 'wire:navigate' : '';
     } catch (Exception $e) {
-        return 'wire:navigate.hover';
+        return 'wire:navigate';
     }
 }
 
@@ -3477,6 +3748,27 @@ function redirectRoute(Component $component, string $name, array $parameters = [
     return $component->redirectRoute($name, $parameters, navigate: $navigate);
 }
 
+function coolifyRegistryUrl(): string
+{
+    try {
+        return instanceSettings()->docker_registry_url ?: 'docker.io';
+    } catch (Throwable) {
+        return config('constants.coolify.registry_url', 'docker.io');
+    }
+}
+
+function coolifyHelperImage(): string
+{
+    $configuredHelperImage = config('constants.coolify.helper_image');
+    $configuredDefaultHelperImage = config('constants.coolify.registry_url', 'docker.io').'/coollabsio/coolify-helper';
+
+    if ($configuredHelperImage !== $configuredDefaultHelperImage) {
+        return $configuredHelperImage;
+    }
+
+    return coolifyRegistryUrl().'/coollabsio/coolify-helper';
+}
+
 function getHelperVersion(): string
 {
     $settings = instanceSettings();
@@ -3489,41 +3781,10 @@ function getHelperVersion(): string
     return config('constants.coolify.helper_version');
 }
 
-function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id)
-{
-    $server = Server::find($server_id)->where('team_id', $team_id)->first();
-    if (! $server) {
-        return;
-    }
-    $uuid = new Cuid2;
-    $cloneCommand = "git clone --no-checkout -b $branch $repository .";
-    $workdir = rtrim($base_directory, '/');
-    $fileList = collect([".$workdir/coolify.json"]);
-    $commands = collect([
-        "rm -rf /tmp/{$uuid}",
-        "mkdir -p /tmp/{$uuid}",
-        "cd /tmp/{$uuid}",
-        $cloneCommand,
-        'git sparse-checkout init --cone',
-        "git sparse-checkout set {$fileList->implode(' ')}",
-        'git read-tree -mu HEAD',
-        "cat .$workdir/coolify.json",
-        'rm -rf /tmp/{$uuid}',
-    ]);
-    try {
-        return instant_remote_process($commands, $server);
-    } catch (Exception) {
-        // continue
-    }
-}
-
 function loggy($message = null, array $context = [])
 {
     if (! isDev()) {
         return;
-    }
-    if (function_exists('ray') && config('app.debug')) {
-        ray($message, $context);
     }
     if (is_null($message)) {
         return app('log');
@@ -3660,13 +3921,21 @@ function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|
         }
     }
 
-    preg_match('/(?<=:)\d+(?=\/)/', $gitRepository, $matches);
+    $normalizedRepository = $repository;
 
-    if (count($matches) === 1) {
-        $providerInfo['port'] = $matches[0];
-        $gitHost = str($gitRepository)->before(':');
-        $gitRepo = str($gitRepository)->after('/');
-        $repository = "$gitHost:$gitRepo";
+    if (str($normalizedRepository)->contains('://')) {
+        $parsedRepository = parse_url($normalizedRepository);
+
+        if ($parsedRepository !== false && array_key_exists('port', $parsedRepository)) {
+            $providerInfo['port'] = (string) $parsedRepository['port'];
+        }
+    } else {
+        preg_match('/^(?<host>[^:]+):(?<port>\d+)\/(?<path>.+)$/', $normalizedRepository, $matches);
+
+        if (! empty($matches['port'])) {
+            $providerInfo['port'] = $matches['port'];
+            $repository = "{$matches['host']}:{$matches['path']}";
+        }
     }
 
     return [
@@ -3758,7 +4027,7 @@ function formatBytes(?int $bytes, int $precision = 2): string
 
 /**
  * Validates that a file path is safely within the /tmp/ directory.
- * Protects against path traversal attacks by resolving the real path
+ * Protects against unsafe parent directory paths by resolving the real path
  * and verifying it stays within /tmp/.
  *
  * Note: On macOS, /tmp is often a symlink to /private/tmp, which is handled.

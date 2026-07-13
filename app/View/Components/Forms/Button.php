@@ -14,6 +14,7 @@ class Button extends Component
      */
     public function __construct(
         public bool $disabled = false,
+        public bool $authDisabled = false,
         public bool $noStyle = false,
         public ?string $modalId = null,
         public string $defaultClass = 'button',
@@ -21,6 +22,7 @@ class Button extends Component
         public ?string $canGate = null,
         public mixed $canResource = null,
         public bool $autoDisable = true,
+        public ?string $tooltip = null,
     ) {
         // Handle authorization-based disabling
         if ($this->canGate && $this->canResource && $this->autoDisable) {
@@ -28,6 +30,7 @@ class Button extends Component
 
             if (! $hasPermission) {
                 $this->disabled = true;
+                $this->authDisabled = true;
             }
         }
 

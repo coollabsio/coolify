@@ -3,13 +3,17 @@
         {{ data_get_str($server, 'name')->limit(10) }} > Swarm | Coolify
     </x-slot>
     <livewire:server.navbar :server="$server" />
-    <div class="flex flex-col h-full gap-8 sm:flex-row">
+    <div class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
         <x-server.sidebar :server="$server" activeMenu="swarm" />
         <div class="w-full">
             <div>
                 <div class="flex items-center gap-2">
-                    <h2>Swarm <span class="text-xs text-neutral-500">(experimental)</span></h2>
+                    <h2>Swarm</h2>
+                    <x-deprecated-badge />
                 </div>
+                <x-callout type="warning" title="Deprecated" class="my-4">
+                    {{ config('deprecations.swarm') }}
+                </x-callout>
                 <div class="pb-4">Read the docs <a class='underline dark:text-white'
                         href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>.
                 </div>
