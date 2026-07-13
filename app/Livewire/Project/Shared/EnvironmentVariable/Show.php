@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
+use App\Models\LocalFileVolume;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -227,6 +228,13 @@ class Show extends Component
             $this->serialize();
             $this->syncData(true);
             $this->syncData(false);
+
+            // Re-resolve volume paths that reference env vars (e.g., ${VAR:-./path})
+            $resourceable = $this->env->resourceable ?? null;
+            if ($resourceable) {
+                LocalFileVolume::reResolveVolumePaths($resourceable);
+            }
+
             $this->dispatch('success', 'Environment variable updated.');
             $this->dispatch('envsUpdated');
             $this->dispatch('configurationChanged');
@@ -378,7 +386,14 @@ class Show extends Component
                 }
             }
 
+            $resourceable = $this->env->resourceable ?? null;
             $this->env->delete();
+
+            // Re-resolve volume paths that reference env vars (e.g., ${VAR:-./path})
+            if ($resourceable) {
+                LocalFileVolume::reResolveVolumePaths($resourceable);
+            }
+
             $this->dispatch('environmentVariableDeleted');
             $this->dispatch('success', 'Environment variable deleted successfully.');
         } catch (\Exception $e) {

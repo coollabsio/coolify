@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\LocalFileVolume;
 use Symfony\Component\Yaml\Yaml;
 
 test('demonstrates array-format volumes from YAML parsing', function () {
@@ -297,4 +298,157 @@ YAML;
     // Target paths should also be validated
     expect(fn () => validateShellSafePath($target, 'volume target'))
         ->toThrow(Exception::class, 'backtick');
+});
+
+// Issue #8854: resolveEnvVarDefault tests — without env vars (backward compat)
+
+test('resolveEnvVarDefault resolves variable with default path', function () {
+    $result = resolveEnvVarDefault(str('${CONFIG_FILE:-./default-config.yaml}'));
+    expect($result->value())->toBe('./default-config.yaml');
+});
+
+test('resolveEnvVarDefault resolves variable with absolute default path', function () {
+    $result = resolveEnvVarDefault(str('${DATA_PATH:-/var/lib/data}'));
+    expect($result->value())->toBe('/var/lib/data');
+});
+
+test('resolveEnvVarDefault returns original string when no default and no env vars', function () {
+    $result = resolveEnvVarDefault(str('${DATA_PATH}'));
+    expect($result->value())->toBe('${DATA_PATH}');
+});
+
+test('resolveEnvVarDefault returns original string when empty default and no env vars', function () {
+    $result = resolveEnvVarDefault(str('${DATA_PATH:-}'));
+    expect($result->value())->toBe('${DATA_PATH:-}');
+});
+
+test('resolveEnvVarDefault keeps non-env-var string unchanged', function () {
+    $result = resolveEnvVarDefault(str('./data'));
+    expect($result->value())->toBe('./data');
+});
+
+test('resolveEnvVarDefault resolved path passes validateShellSafePath', function () {
+    $source = str('${CONFIG_FILE:-./default-config.yaml}');
+    $resolved = resolveEnvVarDefault($source);
+
+    expect(fn () => validateShellSafePath($resolved->value(), 'storage path'))
+        ->not->toThrow(Exception::class);
+});
+
+test('resolveEnvVarDefault with malicious default still fails validation', function () {
+    $source = str('${VAR:-/tmp/evil`whoami`}');
+    $resolved = resolveEnvVarDefault($source);
+
+    expect(fn () => validateShellSafePath($resolved->value(), 'storage path'))
+        ->toThrow(Exception::class, 'backtick');
+});
+
+// Issue #8854: resolveEnvVarDefault tests — with env vars
+
+test('resolveEnvVarDefault uses env var value when set', function () {
+    $envVars = collect(['CONFIG_FILE' => '/custom/config.yaml']);
+    $result = resolveEnvVarDefault(str('${CONFIG_FILE:-./default-config.yaml}'), $envVars);
+    expect($result->value())->toBe('/custom/config.yaml');
+});
+
+test('resolveEnvVarDefault uses env var for simple variable reference', function () {
+    $envVars = collect(['DATA_PATH' => '/custom/data']);
+    $result = resolveEnvVarDefault(str('${DATA_PATH}'), $envVars);
+    expect($result->value())->toBe('/custom/data');
+});
+
+test('resolveEnvVarDefault falls back to default when env var not in collection', function () {
+    $envVars = collect(['OTHER_VAR' => '/other/path']);
+    $result = resolveEnvVarDefault(str('${CONFIG_FILE:-./default-config.yaml}'), $envVars);
+    expect($result->value())->toBe('./default-config.yaml');
+});
+
+test('resolveEnvVarDefault falls back to default when env var is empty string', function () {
+    $envVars = collect(['CONFIG_FILE' => '']);
+    $result = resolveEnvVarDefault(str('${CONFIG_FILE:-./default-config.yaml}'), $envVars);
+    expect($result->value())->toBe('./default-config.yaml');
+});
+
+test('resolveEnvVarDefault returns original string when env var not set and no default', function () {
+    $envVars = collect(['OTHER_VAR' => '/other/path']);
+    $result = resolveEnvVarDefault(str('${DATA_PATH}'), $envVars);
+    expect($result->value())->toBe('${DATA_PATH}');
+});
+
+test('resolveEnvVarDefault preview env var overrides normal env var', function () {
+    // Simulate merged collection where preview overrides normal
+    $normalEnvs = collect(['CONFIG_FILE' => '/normal/config.yaml']);
+    $previewEnvs = collect(['CONFIG_FILE' => '/preview/config.yaml']);
+    $merged = $normalEnvs->merge($previewEnvs);
+
+    $result = resolveEnvVarDefault(str('${CONFIG_FILE:-./default.yaml}'), $merged);
+    expect($result->value())->toBe('/preview/config.yaml');
+});
+
+test('resolveEnvVarDefault with malicious env var value still fails validation', function () {
+    $envVars = collect(['CONFIG_FILE' => '/tmp/evil`whoami`']);
+    $resolved = resolveEnvVarDefault(str('${CONFIG_FILE:-./safe.yaml}'), $envVars);
+
+    // Env var value is used, but it contains backticks so validation catches it
+    expect($resolved->value())->toBe('/tmp/evil`whoami`');
+    expect(fn () => validateShellSafePath($resolved->value(), 'storage path'))
+        ->toThrow(Exception::class, 'backtick');
+});
+
+// Issue #8854: LocalFileVolume::resolvedFsPath tests
+
+test('LocalFileVolume resolvedFsPath resolves env var with default path', function () {
+    $volume = new LocalFileVolume;
+    $volume->fs_path = '${AO_CONFIG_FILE:-./agent-orchestrator.yaml}';
+
+    expect($volume->resolvedFsPath())->toBe('./agent-orchestrator.yaml');
+});
+
+test('LocalFileVolume resolvedFsPath passes through normal paths unchanged', function () {
+    $volume = new LocalFileVolume;
+    $volume->fs_path = '/data/coolify/services/abc123/config.yaml';
+
+    expect($volume->resolvedFsPath())->toBe('/data/coolify/services/abc123/config.yaml');
+});
+
+test('LocalFileVolume resolvedFsPath with relative path unchanged', function () {
+    $volume = new LocalFileVolume;
+    $volume->fs_path = './data/config.yaml';
+
+    expect($volume->resolvedFsPath())->toBe('./data/config.yaml');
+});
+
+test('LocalFileVolume resolvedFsPath resolved value passes validateShellSafePath', function () {
+    $volume = new LocalFileVolume;
+    $volume->fs_path = '${AO_CONFIG_FILE:-./agent-orchestrator.yaml}';
+
+    $resolved = $volume->resolvedFsPath();
+
+    // This should NOT throw — the resolved path is safe
+    expect(fn () => validateShellSafePath($resolved, 'storage path'))
+        ->not->toThrow(Exception::class);
+});
+
+test('LocalFileVolume resolvedFsPath with unresolvable env var throws RuntimeException', function () {
+    $volume = new LocalFileVolume;
+    $volume->fs_path = '${DATA_PATH}';
+
+    expect(fn () => $volume->resolvedFsPath())
+        ->toThrow(RuntimeException::class, 'Cannot resolve storage path');
+});
+
+// Regression: bare ${VAR} must NOT be misclassified as a local bind mount
+test('bare unresolved env var is not treated as local path by sourceIsLocal', function () {
+    $result = resolveEnvVarDefault(str('${DATA_VOLUME}'));
+    expect(sourceIsLocal($result))->toBeFalse();
+});
+
+test('bare unresolved env var with empty default is not treated as local path', function () {
+    $result = resolveEnvVarDefault(str('${DATA_VOLUME:-}'));
+    expect(sourceIsLocal($result))->toBeFalse();
+});
+
+test('env var with local default IS treated as local path by sourceIsLocal', function () {
+    $result = resolveEnvVarDefault(str('${CONFIG_FILE:-./config.yaml}'));
+    expect(sourceIsLocal($result))->toBeTrue();
 });

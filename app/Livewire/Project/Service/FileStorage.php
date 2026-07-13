@@ -17,6 +17,7 @@ use App\Models\StandaloneRedis;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Symfony\Component\Yaml\Yaml;
 
 class FileStorage extends Component
 {
@@ -29,6 +30,8 @@ class FileStorage extends Component
     public string $fs_path;
 
     public ?string $workdir = null;
+
+    public ?string $resolvedFromEnvVar = null;
 
     public bool $permanently_delete = true;
 
@@ -64,6 +67,7 @@ class FileStorage extends Component
         }
 
         $this->isReadOnly = $this->fileStorage->shouldBeReadOnlyInUI() || $this->fileStorage->is_too_large;
+        $this->resolvedFromEnvVar = $this->isV6Parser() ? $this->detectEnvVarSource() : null;
         $this->syncData();
     }
 
@@ -87,6 +91,69 @@ class FileStorage extends Component
             $this->isBasedOnGit = $this->fileStorage->is_based_on_git;
             $this->isPreviewSuffixEnabled = $this->fileStorage->is_preview_suffix_enabled ?? true;
         }
+    }
+
+    private function isV6Parser(): bool
+    {
+        $version = $this->resource instanceof Application
+            ? $this->resource->compose_parsing_version
+            : ($this->resource->service->compose_parsing_version ?? null);
+
+        return (int) $version >= 6;
+    }
+
+    /**
+     * Check the raw docker-compose for env var references in this volume's source.
+     * Returns the variable name if found, null otherwise.
+     */
+    private function detectEnvVarSource(): ?string
+    {
+        try {
+            $resource = $this->resource;
+            $dockerComposeRaw = $resource->service?->docker_compose_raw
+                ?? $resource->docker_compose_raw
+                ?? null;
+
+            if (! $dockerComposeRaw) {
+                return null;
+            }
+
+            $compose = Yaml::parse($dockerComposeRaw);
+
+            if (! isset($compose['services'])) {
+                return null;
+            }
+
+            $mountPath = $this->fileStorage->mount_path;
+
+            // Search all services in the compose for a volume matching this mount path
+            foreach ($compose['services'] as $serviceVolumes) {
+                $volumes = data_get($serviceVolumes, 'volumes', []);
+                foreach ($volumes as $volume) {
+                    $source = null;
+                    $target = null;
+
+                    if (is_string($volume)) {
+                        $parts = explode(':', $volume);
+                        if (count($parts) >= 2) {
+                            $source = $parts[0];
+                            $target = $parts[1];
+                        }
+                    } elseif (is_array($volume)) {
+                        $source = data_get($volume, 'source');
+                        $target = data_get($volume, 'target');
+                    }
+
+                    if ($target === $mountPath && $source && preg_match('/\$\{([a-zA-Z_][a-zA-Z0-9_]*)/', $source, $matches)) {
+                        return $matches[1];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Silently fail — this is just a UI hint
+        }
+
+        return null;
     }
 
     public function convertToDirectory()

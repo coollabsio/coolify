@@ -118,7 +118,7 @@ class Application extends BaseModel
 {
     use ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
 
-    private static $parserVersion = '5';
+    private static $parserVersion = '6';
 
     protected $fillable = [
         'name',

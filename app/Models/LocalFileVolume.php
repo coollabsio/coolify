@@ -6,6 +6,9 @@ use App\Events\FileStorageChanged;
 use App\Jobs\ServerStorageSaveJob;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
+use Illuminate\Support\Stringable;
 use Symfony\Component\Yaml\Yaml;
 
 class LocalFileVolume extends BaseModel
@@ -59,6 +62,63 @@ class LocalFileVolume extends BaseModel
         });
     }
 
+    /**
+     * Resolve env var default syntax from fs_path (e.g., ${VAR:-./path} -> ./path).
+     * Resolves against the owning resource's environment variables so that
+     * Coolify-defined values take precedence over defaults.
+     *
+     * @throws \RuntimeException if the resolved path is bare '.' or empty (unresolvable variable with no default)
+     */
+    public function resolvedFsPath(): string
+    {
+        $envVars = $this->getResourceEnvironmentVariables();
+        $resolved = resolveEnvVarDefault(str($this->fs_path), $envVars);
+        $value = $resolved->value();
+
+        if ($value === '.' || $value === '' || str_contains($value, '${')) {
+            throw new \RuntimeException(
+                'Cannot resolve storage path: environment variable has no value and no default was provided. '
+                .'Original path: '.$this->fs_path
+            );
+        }
+
+        return $value;
+    }
+
+    /**
+     * Gather environment variables from the owning resource (and its parent
+     * service when the resource is a ServiceApplication or ServiceDatabase).
+     */
+    private function getResourceEnvironmentVariables(): Collection
+    {
+        if ($this->exists) {
+            $this->loadMissing(['service']);
+        }
+        $resource = $this->resource;
+
+        if (! $resource) {
+            return collect();
+        }
+
+        $envVars = collect();
+
+        // Service children (ServiceApplication / ServiceDatabase) — merge parent service env vars
+        $parentService = data_get($resource, 'service');
+        if ($parentService && method_exists($parentService, 'environment_variables')) {
+            $envVars = $parentService->environment_variables()->get(['key', 'value'])
+                ->mapWithKeys(fn ($item) => [$item['key'] => $item['value']]);
+        }
+
+        // Resource's own env vars (overrides parent service vars)
+        if (method_exists($resource, 'environment_variables')) {
+            $resourceEnvVars = $resource->environment_variables()->get(['key', 'value'])
+                ->mapWithKeys(fn ($item) => [$item['key'] => $item['value']]);
+            $envVars = $envVars->merge($resourceEnvVars);
+        }
+
+        return $envVars;
+    }
+
     protected function isBinary(): Attribute
     {
         return Attribute::make(
@@ -78,6 +138,194 @@ class LocalFileVolume extends BaseModel
         return $this->morphTo('resource');
     }
 
+    /**
+     * Re-resolve fs_path for file volumes whose raw compose source references
+     * environment variables. Call this after env vars are updated.
+     *
+     * Works for Application and Service resources.
+     */
+    public static function reResolveVolumePaths($resource): void
+    {
+        try {
+            if ($resource instanceof Application) {
+                static::reResolveForApplication($resource);
+            } elseif ($resource instanceof Service) {
+                static::reResolveForService($resource);
+            }
+        } catch (\Throwable) {
+            // Best-effort — don't break env var saves
+        }
+    }
+
+    private static function reResolveForApplication(Application $application): void
+    {
+        if ((int) $application->compose_parsing_version < 6) {
+            return;
+        }
+
+        $dockerComposeRaw = $application->docker_compose_raw;
+        if (! $dockerComposeRaw) {
+            return;
+        }
+
+        $compose = Yaml::parse($dockerComposeRaw);
+        if (! isset($compose['services'])) {
+            return;
+        }
+
+        $envVars = $application->environment_variables()->get(['key', 'value'])
+            ->mapWithKeys(fn ($item) => [$item['key'] => $item['value']]);
+
+        $mainDirectory = str(base_configuration_dir().'/applications/'.$application->uuid);
+
+        // Build raw source map from ALL compose services (Application owns all volumes)
+        $rawSources = [];
+        foreach ($compose['services'] as $service) {
+            $volumes = data_get($service, 'volumes', []);
+            foreach ($volumes as $volume) {
+                $source = null;
+                $target = null;
+                if (is_string($volume)) {
+                    $parsed = parseDockerVolumeString($volume);
+                    $source = $parsed['source'];
+                    $target = $parsed['target'];
+                } elseif (is_array($volume)) {
+                    $source = data_get_str($volume, 'source');
+                    $target = data_get_str($volume, 'target');
+                }
+                if ($source && $target) {
+                    $targetValue = $target instanceof Stringable ? $target->value() : (string) $target;
+                    $rawSources[$targetValue] = $source;
+                }
+            }
+        }
+
+        static::updateFileVolumePaths($application, $rawSources, $envVars, $mainDirectory);
+    }
+
+    private static function reResolveForService(Service $service): void
+    {
+        if ((int) $service->compose_parsing_version < 6) {
+            return;
+        }
+
+        $dockerComposeRaw = $service->docker_compose_raw;
+        if (! $dockerComposeRaw) {
+            return;
+        }
+
+        $compose = Yaml::parse($dockerComposeRaw);
+        if (! isset($compose['services'])) {
+            return;
+        }
+
+        $serviceEnvVars = $service->environment_variables()->get(['key', 'value'])
+            ->mapWithKeys(fn ($item) => [$item['key'] => $item['value']]);
+
+        $mainDirectory = str(base_configuration_dir().'/services/'.$service->uuid);
+
+        $volumeOwners = collect()
+            ->merge($service->applications ?? collect())
+            ->merge($service->databases ?? collect());
+
+        foreach ($volumeOwners as $owner) {
+            $childEnvVars = $owner->environment_variables()->get(['key', 'value'])
+                ->mapWithKeys(fn ($item) => [$item['key'] => $item['value']]);
+            $mergedEnvVars = $serviceEnvVars->merge($childEnvVars);
+
+            $serviceName = $owner->name ?? null;
+            if (! $serviceName) {
+                continue;
+            }
+
+            $rawSources = [];
+            $volumes = data_get($compose, "services.{$serviceName}.volumes", []);
+            foreach ($volumes as $volume) {
+                $source = null;
+                $target = null;
+                if (is_string($volume)) {
+                    $parsed = parseDockerVolumeString($volume);
+                    $source = $parsed['source'];
+                    $target = $parsed['target'];
+                } elseif (is_array($volume)) {
+                    $source = data_get_str($volume, 'source');
+                    $target = data_get_str($volume, 'target');
+                }
+                if ($source && $target) {
+                    $targetValue = $target instanceof Stringable ? $target->value() : (string) $target;
+                    $rawSources[$targetValue] = $source;
+                }
+            }
+
+            static::updateFileVolumePaths($owner, $rawSources, $mergedEnvVars, $mainDirectory);
+        }
+    }
+
+    private static function updateFileVolumePaths($resource, array $rawSources, $envVars, Stringable $mainDirectory): void
+    {
+        foreach ($resource->fileStorages()->get() as $fileVolume) {
+            $rawSource = $rawSources[$fileVolume->mount_path] ?? null;
+            if (! $rawSource) {
+                continue;
+            }
+
+            $sourceStr = $rawSource instanceof Stringable ? $rawSource : str($rawSource);
+            if (! str_contains($sourceStr->value(), '${')) {
+                continue;
+            }
+
+            $resolved = resolveEnvVarDefault($sourceStr, $envVars);
+            if (sourceIsLocal($resolved)) {
+                $resolved = replaceLocalSource($resolved, $mainDirectory);
+                if ($fileVolume->fs_path !== $resolved->value()) {
+                    $fileVolume->update(['fs_path' => $resolved->value()]);
+                }
+            } else {
+                // Env var removed or no longer resolves to local path — convert back to named volume
+                $slugWithoutUuid = Str::slug($resolved, '-');
+                $name = $resource->uuid.'_'.$slugWithoutUuid;
+                LocalPersistentVolume::updateOrCreate(
+                    [
+                        'mount_path' => $fileVolume->mount_path,
+                        'resource_id' => $resource->id,
+                        'resource_type' => get_class($resource),
+                    ],
+                    [
+                        'name' => $name,
+                    ]
+                );
+                $fileVolume->delete();
+            }
+        }
+
+        // Reclassify: when env var now resolves to a local path, create LocalFileVolume
+        // and remove stale LocalPersistentVolume
+        foreach ($rawSources as $mountPath => $rawSource) {
+            $sourceStr = $rawSource instanceof Stringable ? $rawSource : str($rawSource);
+            if (! str_contains($sourceStr->value(), '${')) {
+                continue;
+            }
+
+            $resolved = resolveEnvVarDefault($sourceStr, $envVars);
+            if (! sourceIsLocal($resolved)) {
+                continue;
+            }
+
+            if (! $resource->fileStorages()->where('mount_path', $mountPath)->exists()) {
+                $fsPath = replaceLocalSource($resolved, $mainDirectory);
+                LocalFileVolume::create([
+                    'mount_path' => $mountPath,
+                    'fs_path' => $fsPath,
+                    'is_directory' => true,
+                    'resource_id' => $resource->id,
+                    'resource_type' => get_class($resource),
+                ]);
+            }
+
+            $resource->persistentStorages()->where('mount_path', $mountPath)->delete();
+        }
+    }
+
     public function loadStorageOnServer()
     {
         if ($this->is_host_file) {
@@ -94,7 +342,7 @@ class LocalFileVolume extends BaseModel
             $server = $this->resource->destination->server;
         }
         $commands = collect([]);
-        $path = data_get_str($this, 'fs_path');
+        $path = str($this->resolvedFsPath());
         if ($path->startsWith('.')) {
             $path = $path->after('.');
             $path = $workdir.$path;
@@ -152,7 +400,7 @@ class LocalFileVolume extends BaseModel
             $server = $this->resource->destination->server;
         }
         $commands = collect([]);
-        $path = data_get_str($this, 'fs_path');
+        $path = str($this->resolvedFsPath());
         if ($path->startsWith('.')) {
             $path = $path->after('.');
             $path = $workdir.$path;
@@ -193,19 +441,28 @@ class LocalFileVolume extends BaseModel
             $server = $this->resource->destination->server;
         }
         $commands = collect([]);
+
+        // Resolve env var syntax (e.g., ${VAR:-./path} -> ./path) for legacy records.
+        $fsPath = $this->resolvedFsPath();
+        $path = str($fsPath);
+        if ($path->startsWith('.')) {
+            $path = $path->after('.');
+            $path = $workdir.$path;
+        }
+
+        // Validate and escape resolved path before any shell interpolation.
+        $pathValue = $path->value();
+        validateShellSafePath($pathValue, 'storage path');
+        $escapedPath = escapeshellarg($pathValue);
         $escapedWorkdir = escapeshellarg($workdir);
 
         if ($this->is_directory) {
-            // Validate fs_path early before any shell interpolation
-            validateShellSafePath($this->fs_path, 'storage path');
-            $escapedFsPath = escapeshellarg($this->fs_path);
-            $commands->push("mkdir -p {$escapedFsPath} > /dev/null 2>&1 || true");
+            $commands->push("mkdir -p {$escapedPath} > /dev/null 2>&1 || true");
             $commands->push("mkdir -p {$escapedWorkdir} > /dev/null 2>&1 || true");
             $commands->push("cd {$escapedWorkdir}");
         }
-        $path = data_get_str($this, 'fs_path');
-        $content = data_get($this, 'content');
-        $pathForParentDirectory = str($this->fs_path);
+
+        $pathForParentDirectory = str($pathValue);
         if ($pathForParentDirectory->startsWith('.') || $pathForParentDirectory->startsWith('/') || $pathForParentDirectory->startsWith('~')) {
             $parent_dir = $pathForParentDirectory->beforeLast('/');
             if ($parent_dir != '') {
@@ -213,14 +470,8 @@ class LocalFileVolume extends BaseModel
                 $commands->push("mkdir -p {$escapedParentDir} > /dev/null 2>&1 || true");
             }
         }
-        if ($path->startsWith('.')) {
-            $path = $path->after('.');
-            $path = $workdir.$path;
-        }
 
-        // Validate and escape resolved path (may differ from fs_path if relative)
-        validateShellSafePath($path, 'storage path');
-        $escapedPath = escapeshellarg($path);
+        $content = data_get($this, 'content');
 
         $isFile = instant_remote_process(["test -f {$escapedPath} && echo OK || echo NOK"], $server);
         $isDir = instant_remote_process(["test -d {$escapedPath} && echo OK || echo NOK"], $server);
@@ -235,7 +486,7 @@ class LocalFileVolume extends BaseModel
             FileStorageChanged::dispatch(data_get($server, 'team_id'));
             throw new \Exception('The following file is a file on the server, but you are trying to mark it as a directory. Please delete the file on the server or mark it as directory.');
         } elseif ($isDir === 'OK' && ! $this->is_directory) {
-            if ($path === '/' || $path === '.' || $path === '..' || $path === '' || str($path)->isEmpty() || is_null($path)) {
+            if ($pathValue === '/' || $pathValue === '.' || $pathValue === '..' || $pathValue === '' || str($pathValue)->isEmpty()) {
                 $this->is_directory = true;
                 $this->save();
                 throw new \Exception('The following file is a directory on the server, but you are trying to mark it as a file. <br><br>Please delete the directory on the server or mark it as directory.');

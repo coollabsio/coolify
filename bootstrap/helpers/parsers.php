@@ -112,7 +112,7 @@ function validateVolumeStringForInjection(string $volumeString): void
     parseDockerVolumeString($volumeString);
 }
 
-function parseDockerVolumeString(string $volumeString): array
+function parseDockerVolumeString(string $volumeString, bool $preserveEnvDefaults = false): array
 {
     $volumeString = trim($volumeString);
     $source = null;
@@ -287,25 +287,24 @@ function parseDockerVolumeString(string $volumeString): array
     }
 
     // Handle environment variable expansion in source
-    // Example: ${VOLUME_DB_PATH:-db} should extract default value if present
     if ($source && preg_match('/^\$\{([^}]+)\}$/', $source, $matches)) {
         $varContent = $matches[1];
-
-        // Check if there's a default value with :-
         if (strpos($varContent, ':-') !== false) {
             $parts = explode(':-', $varContent, 2);
             $varName = $parts[0];
-            $defaultValue = isset($parts[1]) ? $parts[1] : '';
-
-            // If there's a non-empty default value, use it for source
+            $defaultValue = $parts[1] ?? '';
             if ($defaultValue !== '') {
-                $source = $defaultValue;
+                if ($preserveEnvDefaults) {
+                    // v6+: keep ${VAR:-default} so resolveEnvVarDefault() can apply env overrides
+                } else {
+                    // v5 and below: strip to just the default value (v4.x behavior)
+                    $source = $defaultValue;
+                }
             } else {
-                // Empty default value, keep the variable reference for env resolution
+                // Empty default — clean up to simple variable reference
                 $source = '${'.$varName.'}';
             }
         }
-        // Otherwise keep the variable as-is for later expansion (no default value)
     }
 
     // Validate source path for command injection attempts
@@ -315,11 +314,11 @@ function parseDockerVolumeString(string $volumeString): array
         // Also allow env vars followed by safe path concatenation (e.g., ${VAR}/path)
         $sourceStr = is_string($source) ? $source : $source;
 
-        // Skip validation for simple environment variable references
-        // Pattern 1: ${WORD_CHARS} with no special characters inside
-        // Pattern 2: ${WORD_CHARS}/path/to/file (env var with path concatenation)
-        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceStr);
-        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceStr);
+        // Skip validation for environment variable references (with or without defaults)
+        // Pattern 1: ${VAR} or ${VAR:-safe_default}
+        // Pattern 2: ${VAR}/path or ${VAR:-safe_default}/path
+        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*(:-[a-zA-Z0-9_.\/~\-]*)?\}$/', $sourceStr);
+        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*(:-[a-zA-Z0-9_.\/~\-]*)?\}[\/\w\.\-]*$/', $sourceStr);
 
         if (! $isSimpleEnvVar && ! $isEnvVarWithPath) {
             try {
@@ -432,6 +431,12 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         $allEnvironments = $allEnvironments->mapWithKeys(function ($item) {
             return [$item['key'] => $item['value']];
         });
+        // For preview deployments, merge preview env vars (they override normal ones)
+        if ($isPullRequest) {
+            $previewEnvironments = $resource->environment_variables_preview()->get(['key', 'value'])
+                ->mapWithKeys(fn ($item) => [$item['key'] => $item['value']]);
+            $allEnvironments = $allEnvironments->merge($previewEnvironments);
+        }
         // filter and add magic environments
         foreach ($environment as $key => $value) {
             // Get all SERVICE_ variables from keys and values
@@ -722,6 +727,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         $predefinedPort = null;
 
         $originalResource = $resource;
+        $isV6 = (int) $resource->compose_parsing_version >= 6;
 
         if ($volumes->count() > 0) {
             foreach ($volumes as $index => $volume) {
@@ -731,9 +737,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $content = null;
                 $isDirectory = false;
                 if (is_string($volume)) {
-                    $parsed = parseDockerVolumeString($volume);
+                    $parsed = parseDockerVolumeString($volume, $isV6);
                     $source = $parsed['source'];
                     $target = $parsed['target'];
+                    // v6+: resolve env vars in source (e.g., ${VAR} -> value from Coolify env vars)
+                    if ($isV6) {
+                        $source = resolveEnvVarDefault($source, $allEnvironments);
+                    }
                     // Mode is available in $parsed['mode'] if needed
                     $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
@@ -755,15 +765,19 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $content = data_get($volume, 'content');
                     $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
 
+                    // v6+: resolve environment variable defaults (e.g., ${VAR:-./path} -> ./path)
+                    if ($isV6 && $source !== null && ! empty($source->value())) {
+                        $source = resolveEnvVarDefault($source, $allEnvironments);
+                    }
+
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
                         $sourceValue = $source->value();
-                        // Allow environment variable references and env vars with path concatenation
-                        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceValue);
-                        $isEnvVarWithDefault = preg_match('/^\$\{[^}]+:-[^}]*\}$/', $sourceValue);
-                        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceValue);
+                        // Allow environment variable references (with or without defaults) and path concatenation
+                        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*(:-[a-zA-Z0-9_.\/~\-]*)?\}$/', $sourceValue);
+                        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*(:-[a-zA-Z0-9_.\/~\-]*)?\}[\/\w\.\-]*$/', $sourceValue);
 
-                        if (! $isSimpleEnvVar && ! $isEnvVarWithDefault && ! $isEnvVarWithPath) {
+                        if (! $isSimpleEnvVar && ! $isEnvVarWithPath) {
                             try {
                                 validateShellSafePath($sourceValue, 'volume source');
                             } catch (Exception $e) {
@@ -2101,6 +2115,7 @@ function serviceParser(Service $resource): Collection
         }
 
         $originalResource = $savedService;
+        $isV6 = (int) $resource->compose_parsing_version >= 6;
 
         if ($volumes->count() > 0) {
             foreach ($volumes as $index => $volume) {
@@ -2110,9 +2125,13 @@ function serviceParser(Service $resource): Collection
                 $content = null;
                 $isDirectory = false;
                 if (is_string($volume)) {
-                    $parsed = parseDockerVolumeString($volume);
+                    $parsed = parseDockerVolumeString($volume, $isV6);
                     $source = $parsed['source'];
                     $target = $parsed['target'];
+                    // v6+: resolve env vars in source (e.g., ${VAR} -> value from Coolify env vars)
+                    if ($isV6) {
+                        $source = resolveEnvVarDefault($source, $allEnvironments);
+                    }
                     // Mode is available in $parsed['mode'] if needed
                     $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
@@ -2134,15 +2153,19 @@ function serviceParser(Service $resource): Collection
                     $content = data_get($volume, 'content');
                     $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
 
+                    // v6+: resolve environment variable defaults (e.g., ${VAR:-./path} -> ./path)
+                    if ($isV6 && $source !== null && ! empty($source->value())) {
+                        $source = resolveEnvVarDefault($source, $allEnvironments);
+                    }
+
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
                         $sourceValue = $source->value();
-                        // Allow environment variable references and env vars with path concatenation
-                        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceValue);
-                        $isEnvVarWithDefault = preg_match('/^\$\{[^}]+:-[^}]*\}$/', $sourceValue);
-                        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceValue);
+                        // Allow environment variable references (with or without defaults) and path concatenation
+                        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*(:-[a-zA-Z0-9_.\/~\-]*)?\}$/', $sourceValue);
+                        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*(:-[a-zA-Z0-9_.\/~\-]*)?\}[\/\w\.\-]*$/', $sourceValue);
 
-                        if (! $isSimpleEnvVar && ! $isEnvVarWithDefault && ! $isEnvVarWithPath) {
+                        if (! $isSimpleEnvVar && ! $isEnvVarWithPath) {
                             try {
                                 validateShellSafePath($sourceValue, 'volume source');
                             } catch (Exception $e) {

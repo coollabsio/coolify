@@ -1506,9 +1506,45 @@ function getTopLevelNetworks(Service|Application $resource)
         return $topLevelNetworks->keys();
     }
 }
+function resolveEnvVarDefault(Stringable $source, ?Collection $environmentVariables = null): Stringable
+{
+    $value = $source->value();
+    if (preg_match('/^\$\{([^}]+)\}$/', $value, $matches)) {
+        $varContent = $matches[1];
+
+        // Extract variable name and optional default from ${VAR:-default} or ${VAR}
+        $varName = $varContent;
+        $defaultValue = null;
+        if (strpos($varContent, ':-') !== false) {
+            $parts = explode(':-', $varContent, 2);
+            $varName = $parts[0];
+            $defaultValue = $parts[1] ?? '';
+        }
+
+        // 1. If env var is set in Coolify, use its value
+        if ($environmentVariables !== null && $environmentVariables->has($varName)) {
+            $envValue = $environmentVariables->get($varName);
+            if ($envValue !== null && $envValue !== '') {
+                return str($envValue);
+            }
+        }
+
+        // 2. If a non-empty default exists, use it
+        if ($defaultValue !== null && $defaultValue !== '') {
+            return str($defaultValue);
+        }
+
+        // 3. No env var and no default — return original reference unchanged so callers
+        // (e.g. sourceIsLocal()) don't misclassify it as a local bind mount.
+        return $source;
+    }
+
+    return $source;
+}
+
 function sourceIsLocal(Stringable $source)
 {
-    if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~') || $source->startsWith('..') || $source->startsWith('~/') || $source->startsWith('../')) {
+    if ($source->value() === '.' || $source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~') || $source->startsWith('..') || $source->startsWith('~/') || $source->startsWith('../')) {
         return true;
     }
 
@@ -3724,7 +3760,7 @@ function wireNavigate(): string
     try {
         $settings = instanceSettings();
 
-        // Return wire:navigate for SPA navigation with prefetching, or empty string if disabled
+        // Return wire:navigate for SPA navigation without hover-prefetching, or empty string if disabled
         return ($settings->is_wire_navigate_enabled ?? true) ? 'wire:navigate' : '';
     } catch (Exception $e) {
         return 'wire:navigate';
