@@ -1,0 +1,23 @@
+# documentation: https://openhabittracker.net
+# slogan: Habit tracker, to-do list and Markdown notes - free, open source, no account. Native apps for all platforms sync to it.
+# category: productivity
+# tags: habit-tracker,todo,tasks,notes,markdown,productivity,selfhosted
+# logo: svgs/openhabittracker.svg
+# port: 8080
+
+services:
+  openhabittracker:
+    image: jinjinov/openhabittracker:latest
+    environment:
+      - SERVICE_URL_OPENHABITTRACKER
+      - AppSettings__UserName=admin
+      - AppSettings__Email=admin@example.com
+      - AppSettings__Password=$SERVICE_PASSWORD_ADMIN
+      - AppSettings__JwtSecret=$SERVICE_PASSWORD_64_JWTSECRET
+    volumes:
+      - openhabittracker-data:/app/.OpenHabitTracker
+    healthcheck:
+      test: ["CMD", "bash", "-c", "cat < /dev/null > /dev/tcp/127.0.0.1/8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
