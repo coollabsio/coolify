@@ -31,7 +31,7 @@
                     <div class="flex gap-1.5 flex-wrap">
                         @foreach ($permissions as $permission)
                             <span
-                                class="px-2 py-0.5 text-xs rounded-sm font-medium {{ $permission === 'root' ? 'bg-red-500/20 text-red-400' : ($permission === 'write' || $permission === 'write:sensitive' ? 'bg-amber-500/20 text-amber-400' : ($permission === 'deploy' ? 'bg-blue-500/20 text-blue-400' : 'bg-neutral-500/20 text-neutral-300')) }}">
+                                class="px-2 py-0.5 text-xs rounded-sm font-medium {{ $permission === 'root' ? 'bg-red-500/20 text-red-400' : ($permission === 'write' || $permission === 'write:sensitive' ? 'bg-amber-500/20 text-amber-400' : (in_array($permission, ['deploy', 'terminal'], true) ? 'bg-blue-500/20 text-blue-400' : 'bg-neutral-500/20 text-neutral-300')) }}">
                                 {{ $permission }}
                             </span>
                         @endforeach
@@ -64,6 +64,13 @@
                     @else
                         <x-forms.checkbox label="deploy (admin/owner only)" disabled domValue="deploy"
                             helper="Deploy access requires admin or owner role" :checked="false"></x-forms.checkbox>
+                    @endif
+                    @if ($canUseTerminalPermissions)
+                        <x-forms.checkbox label="terminal" wire:model.live="permissions" domValue="terminal"
+                            helper="Can execute one-shot terminal commands through the API." :checked="in_array('terminal', $permissions)"></x-forms.checkbox>
+                    @else
+                        <x-forms.checkbox label="terminal (admin/owner only)" disabled domValue="terminal"
+                            helper="Terminal access requires admin or owner role" :checked="false"></x-forms.checkbox>
                     @endif
                     <x-forms.checkbox label="read" wire:model.live="permissions" domValue="read"
                         :checked="in_array('read', $permissions)"></x-forms.checkbox>
@@ -138,7 +145,7 @@
                                                 <div class="flex gap-1.5 flex-wrap">
                                                     @foreach ($token->abilities as $ability)
                                                         <span
-                                                            class="px-2 py-0.5 text-xs rounded-sm font-medium {{ $ability === 'root' ? 'bg-red-500/20 text-red-400' : ($ability === 'write' || $ability === 'write:sensitive' ? 'bg-amber-500/20 text-amber-400' : ($ability === 'deploy' ? 'bg-blue-500/20 text-blue-400' : 'bg-neutral-500/20 text-neutral-300')) }}">
+                                                            class="px-2 py-0.5 text-xs rounded-sm font-medium {{ $ability === 'root' ? 'bg-red-500/20 text-red-400' : ($ability === 'write' || $ability === 'write:sensitive' ? 'bg-amber-500/20 text-amber-400' : (in_array($ability, ['deploy', 'terminal'], true) ? 'bg-blue-500/20 text-blue-400' : 'bg-neutral-500/20 text-neutral-300')) }}">
                                                             {{ $ability }}
                                                         </span>
                                                     @endforeach

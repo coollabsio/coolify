@@ -72,6 +72,11 @@ class PersonalAccessTokenSeeder extends Seeder
                 'token' => 'deploy',
                 'abilities' => ['deploy'],
             ],
+            [
+                'name' => 'Development Terminal Token',
+                'token' => 'terminal',
+                'abilities' => ['terminal'],
+            ],
         ];
 
         // First, remove all existing development tokens for this user
@@ -111,5 +116,6 @@ class PersonalAccessTokenSeeder extends Seeder
         $this->command->info('  Bearer write          - Write access');
         $this->command->info('  Bearer write-sensitive - Write with sensitive data access');
         $this->command->info('  Bearer deploy         - Deploy access');
+        $this->command->info('  Bearer terminal       - Terminal access');
     }
 }

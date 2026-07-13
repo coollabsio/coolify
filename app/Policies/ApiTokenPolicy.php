@@ -80,6 +80,14 @@ class ApiTokenPolicy
     }
 
     /**
+     * Determine whether the user can use terminal permissions for API tokens.
+     */
+    public function useTerminalPermissions(User $user): bool
+    {
+        return $user->isAdmin() || $user->isOwner();
+    }
+
+    /**
      * Determine whether the user can use read:sensitive permissions for API tokens.
      */
     public function useSensitivePermissions(User $user): bool

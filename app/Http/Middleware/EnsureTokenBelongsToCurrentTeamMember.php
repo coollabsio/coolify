@@ -27,7 +27,7 @@ class EnsureTokenBelongsToCurrentTeamMember
         }
 
         $role = $team->pivot?->role;
-        if (($token->can('root') || $token->can('write') || $token->can('write:sensitive'))
+        if (($token->can('root') || $token->can('write') || $token->can('write:sensitive') || $token->can('terminal'))
             && ! in_array($role, ['admin', 'owner'], true)) {
             return response()->json(['message' => 'Missing required team role.'], 403);
         }

@@ -27,6 +27,7 @@ test('api token permission flags are locked', function (string $property) {
 })->with([
     'root permission flag' => 'canUseRootPermissions',
     'write permission flag' => 'canUseWritePermissions',
+    'terminal permission flag' => 'canUseTerminalPermissions',
 ]);
 
 test('member cannot tamper with root permission flag', function () {
