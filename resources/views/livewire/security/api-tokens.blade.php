@@ -20,7 +20,6 @@
                     @foreach ($expirationOptions as $days => $label)
                         <option value="{{ $days }}">{{ $label }}</option>
                     @endforeach
-                    <option value="">Never</option>
                 </x-forms.select>
                 <x-forms.button type="submit">Create</x-forms.button>
             </div>
