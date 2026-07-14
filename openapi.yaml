@@ -97,6 +97,10 @@ paths:
                 domains:
                   type: string
                   description: 'The application URLs in a comma-separated list.'
+                noindex_domains:
+                  type: array
+                  items: { type: string }
+                  description: 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'
                 git_commit_sha:
                   type: string
                   description: 'The git commit SHA.'
@@ -268,6 +272,54 @@ paths:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                use_build_secrets:
+                  type: boolean
+                  default: false
+                  description: 'Use Docker Build Secrets for build-time environment variables.'
+                is_git_submodules_enabled:
+                  type: boolean
+                  description: 'Clone Git submodules.'
+                is_git_lfs_enabled:
+                  type: boolean
+                  description: 'Enable Git LFS.'
+                is_git_shallow_clone_enabled:
+                  type: boolean
+                  description: 'Use a shallow Git clone.'
+                disable_build_cache:
+                  type: boolean
+                  description: 'Disable the build cache.'
+                inject_build_args_to_dockerfile:
+                  type: boolean
+                  description: 'Inject build arguments into the Dockerfile build.'
+                include_source_commit_in_build:
+                  type: boolean
+                  description: 'Include the source commit in the build.'
+                is_env_sorting_enabled:
+                  type: boolean
+                  description: 'Sort environment variables.'
+                is_pr_deployments_public_enabled:
+                  type: boolean
+                  description: 'Make pull request deployments public.'
+                stop_grace_period:
+                  type: integer
+                  nullable: true
+                  minimum: 1
+                  maximum: 3600
+                  description: 'Container stop grace period in seconds.'
+                docker_images_to_keep:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  description: 'Number of Docker images to retain.'
+                is_gzip_enabled:
+                  type: boolean
+                  description: 'Enable gzip compression.'
+                is_stripprefix_enabled:
+                  type: boolean
+                  description: 'Enable path prefix stripping.'
+                is_raw_compose_deployment_enabled:
+                  type: boolean
+                  description: 'Deploy the raw Docker Compose definition.'
                 is_http_basic_auth_enabled:
                   type: boolean
                   description: 'HTTP Basic Authentication enabled.'
@@ -391,6 +443,10 @@ paths:
                 domains:
                   type: string
                   description: 'The application URLs in a comma-separated list.'
+                noindex_domains:
+                  type: array
+                  items: { type: string }
+                  description: 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'
                 git_commit_sha:
                   type: string
                   description: 'The git commit SHA.'
@@ -562,6 +618,54 @@ paths:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                use_build_secrets:
+                  type: boolean
+                  default: false
+                  description: 'Use Docker Build Secrets for build-time environment variables.'
+                is_git_submodules_enabled:
+                  type: boolean
+                  description: 'Clone Git submodules.'
+                is_git_lfs_enabled:
+                  type: boolean
+                  description: 'Enable Git LFS.'
+                is_git_shallow_clone_enabled:
+                  type: boolean
+                  description: 'Use a shallow Git clone.'
+                disable_build_cache:
+                  type: boolean
+                  description: 'Disable the build cache.'
+                inject_build_args_to_dockerfile:
+                  type: boolean
+                  description: 'Inject build arguments into the Dockerfile build.'
+                include_source_commit_in_build:
+                  type: boolean
+                  description: 'Include the source commit in the build.'
+                is_env_sorting_enabled:
+                  type: boolean
+                  description: 'Sort environment variables.'
+                is_pr_deployments_public_enabled:
+                  type: boolean
+                  description: 'Make pull request deployments public.'
+                stop_grace_period:
+                  type: integer
+                  nullable: true
+                  minimum: 1
+                  maximum: 3600
+                  description: 'Container stop grace period in seconds.'
+                docker_images_to_keep:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  description: 'Number of Docker images to retain.'
+                is_gzip_enabled:
+                  type: boolean
+                  description: 'Enable gzip compression.'
+                is_stripprefix_enabled:
+                  type: boolean
+                  description: 'Enable path prefix stripping.'
+                is_raw_compose_deployment_enabled:
+                  type: boolean
+                  description: 'Deploy the raw Docker Compose definition.'
                 is_http_basic_auth_enabled:
                   type: boolean
                   description: 'HTTP Basic Authentication enabled.'
@@ -685,6 +789,10 @@ paths:
                 domains:
                   type: string
                   description: 'The application URLs in a comma-separated list.'
+                noindex_domains:
+                  type: array
+                  items: { type: string }
+                  description: 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'
                 git_commit_sha:
                   type: string
                   description: 'The git commit SHA.'
@@ -856,6 +964,54 @@ paths:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                use_build_secrets:
+                  type: boolean
+                  default: false
+                  description: 'Use Docker Build Secrets for build-time environment variables.'
+                is_git_submodules_enabled:
+                  type: boolean
+                  description: 'Clone Git submodules.'
+                is_git_lfs_enabled:
+                  type: boolean
+                  description: 'Enable Git LFS.'
+                is_git_shallow_clone_enabled:
+                  type: boolean
+                  description: 'Use a shallow Git clone.'
+                disable_build_cache:
+                  type: boolean
+                  description: 'Disable the build cache.'
+                inject_build_args_to_dockerfile:
+                  type: boolean
+                  description: 'Inject build arguments into the Dockerfile build.'
+                include_source_commit_in_build:
+                  type: boolean
+                  description: 'Include the source commit in the build.'
+                is_env_sorting_enabled:
+                  type: boolean
+                  description: 'Sort environment variables.'
+                is_pr_deployments_public_enabled:
+                  type: boolean
+                  description: 'Make pull request deployments public.'
+                stop_grace_period:
+                  type: integer
+                  nullable: true
+                  minimum: 1
+                  maximum: 3600
+                  description: 'Container stop grace period in seconds.'
+                docker_images_to_keep:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  description: 'Number of Docker images to retain.'
+                is_gzip_enabled:
+                  type: boolean
+                  description: 'Enable gzip compression.'
+                is_stripprefix_enabled:
+                  type: boolean
+                  description: 'Enable path prefix stripping.'
+                is_raw_compose_deployment_enabled:
+                  type: boolean
+                  description: 'Deploy the raw Docker Compose definition.'
                 is_http_basic_auth_enabled:
                   type: boolean
                   description: 'HTTP Basic Authentication enabled.'
@@ -970,6 +1126,10 @@ paths:
                 domains:
                   type: string
                   description: 'The application URLs in a comma-separated list.'
+                noindex_domains:
+                  type: array
+                  items: { type: string }
+                  description: 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'
                 docker_registry_image_name:
                   type: string
                   description: 'The docker registry image name.'
@@ -1091,6 +1251,54 @@ paths:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                use_build_secrets:
+                  type: boolean
+                  default: false
+                  description: 'Use Docker Build Secrets for build-time environment variables.'
+                is_git_submodules_enabled:
+                  type: boolean
+                  description: 'Clone Git submodules.'
+                is_git_lfs_enabled:
+                  type: boolean
+                  description: 'Enable Git LFS.'
+                is_git_shallow_clone_enabled:
+                  type: boolean
+                  description: 'Use a shallow Git clone.'
+                disable_build_cache:
+                  type: boolean
+                  description: 'Disable the build cache.'
+                inject_build_args_to_dockerfile:
+                  type: boolean
+                  description: 'Inject build arguments into the Dockerfile build.'
+                include_source_commit_in_build:
+                  type: boolean
+                  description: 'Include the source commit in the build.'
+                is_env_sorting_enabled:
+                  type: boolean
+                  description: 'Sort environment variables.'
+                is_pr_deployments_public_enabled:
+                  type: boolean
+                  description: 'Make pull request deployments public.'
+                stop_grace_period:
+                  type: integer
+                  nullable: true
+                  minimum: 1
+                  maximum: 3600
+                  description: 'Container stop grace period in seconds.'
+                docker_images_to_keep:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  description: 'Number of Docker images to retain.'
+                is_gzip_enabled:
+                  type: boolean
+                  description: 'Enable gzip compression.'
+                is_stripprefix_enabled:
+                  type: boolean
+                  description: 'Enable path prefix stripping.'
+                is_raw_compose_deployment_enabled:
+                  type: boolean
+                  description: 'Deploy the raw Docker Compose definition.'
                 is_http_basic_auth_enabled:
                   type: boolean
                   description: 'HTTP Basic Authentication enabled.'
@@ -1200,6 +1408,10 @@ paths:
                 domains:
                   type: string
                   description: 'The application URLs in a comma-separated list.'
+                noindex_domains:
+                  type: array
+                  items: { type: string }
+                  description: 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'
                 ports_mappings:
                   type: string
                   description: 'The ports mappings.'
@@ -1312,6 +1524,54 @@ paths:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                use_build_secrets:
+                  type: boolean
+                  default: false
+                  description: 'Use Docker Build Secrets for build-time environment variables.'
+                is_git_submodules_enabled:
+                  type: boolean
+                  description: 'Clone Git submodules.'
+                is_git_lfs_enabled:
+                  type: boolean
+                  description: 'Enable Git LFS.'
+                is_git_shallow_clone_enabled:
+                  type: boolean
+                  description: 'Use a shallow Git clone.'
+                disable_build_cache:
+                  type: boolean
+                  description: 'Disable the build cache.'
+                inject_build_args_to_dockerfile:
+                  type: boolean
+                  description: 'Inject build arguments into the Dockerfile build.'
+                include_source_commit_in_build:
+                  type: boolean
+                  description: 'Include the source commit in the build.'
+                is_env_sorting_enabled:
+                  type: boolean
+                  description: 'Sort environment variables.'
+                is_pr_deployments_public_enabled:
+                  type: boolean
+                  description: 'Make pull request deployments public.'
+                stop_grace_period:
+                  type: integer
+                  nullable: true
+                  minimum: 1
+                  maximum: 3600
+                  description: 'Container stop grace period in seconds.'
+                docker_images_to_keep:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  description: 'Number of Docker images to retain.'
+                is_gzip_enabled:
+                  type: boolean
+                  description: 'Enable gzip compression.'
+                is_stripprefix_enabled:
+                  type: boolean
+                  description: 'Enable path prefix stripping.'
+                is_raw_compose_deployment_enabled:
+                  type: boolean
+                  description: 'Deploy the raw Docker Compose definition.'
                 is_http_basic_auth_enabled:
                   type: boolean
                   description: 'HTTP Basic Authentication enabled.'
@@ -1521,6 +1781,10 @@ paths:
                 domains:
                   type: string
                   description: 'The application URLs in a comma-separated list.'
+                noindex_domains:
+                  type: array
+                  items: { type: string }
+                  description: 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'
                 git_commit_sha:
                   type: string
                   description: 'The git commit SHA.'
@@ -1688,6 +1952,53 @@ paths:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                use_build_secrets:
+                  type: boolean
+                  description: 'Use Docker Build Secrets for build-time environment variables.'
+                is_git_submodules_enabled:
+                  type: boolean
+                  description: 'Clone Git submodules.'
+                is_git_lfs_enabled:
+                  type: boolean
+                  description: 'Enable Git LFS.'
+                is_git_shallow_clone_enabled:
+                  type: boolean
+                  description: 'Use a shallow Git clone.'
+                disable_build_cache:
+                  type: boolean
+                  description: 'Disable the build cache.'
+                inject_build_args_to_dockerfile:
+                  type: boolean
+                  description: 'Inject build arguments into the Dockerfile build.'
+                include_source_commit_in_build:
+                  type: boolean
+                  description: 'Include the source commit in the build.'
+                is_env_sorting_enabled:
+                  type: boolean
+                  description: 'Sort environment variables.'
+                is_pr_deployments_public_enabled:
+                  type: boolean
+                  description: 'Make pull request deployments public.'
+                stop_grace_period:
+                  type: integer
+                  nullable: true
+                  minimum: 1
+                  maximum: 3600
+                  description: 'Container stop grace period in seconds.'
+                docker_images_to_keep:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  description: 'Number of Docker images to retain.'
+                is_gzip_enabled:
+                  type: boolean
+                  description: 'Enable gzip compression.'
+                is_stripprefix_enabled:
+                  type: boolean
+                  description: 'Enable path prefix stripping.'
+                is_raw_compose_deployment_enabled:
+                  type: boolean
+                  description: 'Deploy the raw Docker Compose definition.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -1701,9 +2012,6 @@ paths:
                 is_preserve_repository_enabled:
                   type: boolean
                   description: 'Preserve git repository during application update. If false, the existing repository will be removed and replaced with the new one. If true, the existing repository will be kept and the new one will be ignored. Default is false.'
-                include_source_commit_in_build:
-                  type: boolean
-                  description: 'Include source commit information in the build. Default is false.'
               type: object
       responses:
         '200':
@@ -7805,6 +8113,10 @@ paths:
                 url:
                   description: 'Comma-separated list of URLs (e.g. "http://app.example.com:8080,https://app2.example.com"). Stored as fqdn.'
                   type: [string, 'null']
+                noindex_domains:
+                  description: 'The subset of the service application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the domains are ignored.'
+                  type: [array, 'null']
+                  items: { type: string }
                 human_name:
                   type: [string, 'null']
                 description:
@@ -9399,6 +9711,12 @@ components:
           type: string
           nullable: true
           description: 'The application domains.'
+        noindex_domains:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header.'
         config_hash:
           type: string
           description: 'Configuration hash.'
@@ -9683,6 +10001,8 @@ components:
           type: string
           nullable: true
           description: 'Password for HTTP Basic Authentication'
+        '':
+          $ref: '#/components/schemas/ApplicationSetting'
       type: object
     ApplicationDeploymentQueue:
       description: 'Project model'
@@ -9745,6 +10065,86 @@ components:
           type: boolean
         commit_message:
           type: string
+      type: object
+    ApplicationSetting:
+      description: 'Application settings.'
+      properties:
+        is_static:
+          type: boolean
+        is_git_submodules_enabled:
+          type: boolean
+        is_git_lfs_enabled:
+          type: boolean
+        is_auto_deploy_enabled:
+          type: boolean
+        is_force_https_enabled:
+          type: boolean
+        is_debug_enabled:
+          type: boolean
+        is_preview_deployments_enabled:
+          type: boolean
+        is_log_drain_enabled:
+          type: boolean
+        is_gpu_enabled:
+          type: boolean
+        gpu_driver:
+          type: string
+          nullable: true
+        gpu_count:
+          type: string
+          nullable: true
+        gpu_device_ids:
+          type: string
+          nullable: true
+        gpu_options:
+          type: string
+          nullable: true
+        is_include_timestamps:
+          type: boolean
+        is_swarm_only_worker_nodes:
+          type: boolean
+        is_raw_compose_deployment_enabled:
+          type: boolean
+        is_build_server_enabled:
+          type: boolean
+        is_consistent_container_name_enabled:
+          type: boolean
+        is_gzip_enabled:
+          type: boolean
+        is_stripprefix_enabled:
+          type: boolean
+        connect_to_docker_network:
+          type: boolean
+        custom_internal_name:
+          type: string
+          nullable: true
+        is_container_label_escape_enabled:
+          type: boolean
+        is_env_sorting_enabled:
+          type: boolean
+        is_container_label_readonly_enabled:
+          type: boolean
+        is_preserve_repository_enabled:
+          type: boolean
+        disable_build_cache:
+          type: boolean
+        is_spa:
+          type: boolean
+        is_git_shallow_clone_enabled:
+          type: boolean
+        is_pr_deployments_public_enabled:
+          type: boolean
+        use_build_secrets:
+          type: boolean
+        inject_build_args_to_dockerfile:
+          type: boolean
+        include_source_commit_in_build:
+          type: boolean
+        docker_images_to_keep:
+          type: integer
+        stop_grace_period:
+          type: integer
+          nullable: true
       type: object
     Environment:
       description: 'Environment model'

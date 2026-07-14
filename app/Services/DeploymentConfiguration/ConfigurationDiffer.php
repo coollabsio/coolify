@@ -18,6 +18,28 @@ class ConfigurationDiffer
     private const IGNORED_KEYS = ['build.docker_compose'];
 
     /**
+     * Defaults for fields introduced after configuration snapshots were first
+     * stored. Older snapshots omitted these keys, which should not make an
+     * unchanged default look like a pending configuration change.
+     *
+     * @var array<string, bool|array<int, bool>>
+     */
+    private const INTRODUCED_DEFAULTS = [
+        'build.is_static' => false,
+        'build.is_spa' => false,
+        'build.is_git_submodules_enabled' => true,
+        'build.is_git_lfs_enabled' => true,
+        'build.is_git_shallow_clone_enabled' => true,
+        'build.is_env_sorting_enabled' => [false, true],
+        'runtime.is_consistent_container_name_enabled' => false,
+        'runtime.is_container_label_escape_enabled' => true,
+        'runtime.is_container_label_readonly_enabled' => true,
+        'runtime.is_log_drain_enabled' => false,
+        'runtime.is_swarm_only_worker_nodes' => true,
+        'runtime.is_preserve_repository_enabled' => false,
+    ];
+
+    /**
      * @param  array<string, mixed>  $previousSnapshot
      * @param  array<string, mixed>  $currentSnapshot
      */
@@ -35,6 +57,14 @@ class ConfigurationDiffer
 
             $previous = $previousItems[$key] ?? null;
             $current = $currentItems[$key] ?? null;
+
+            if (
+                $previous === null
+                && array_key_exists($key, self::INTRODUCED_DEFAULTS)
+                && in_array((bool) data_get($current, 'compare_value'), (array) self::INTRODUCED_DEFAULTS[$key], true)
+            ) {
+                continue;
+            }
 
             if (($previous['compare_value'] ?? null) === ($current['compare_value'] ?? null)) {
                 continue;
