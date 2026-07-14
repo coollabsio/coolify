@@ -11,6 +11,7 @@
     'certificateValidUntil' => null,
     'isExited' => false,
     'showPublicUrlPlaceholder' => false,
+    'isPasswordHiddenForMember' => false,
 ])
 
 @php
@@ -18,14 +19,19 @@
 @endphp
 
 <div class="flex flex-col gap-2">
-    <x-forms.input :label="$label . ' URL (internal)'" :helper="$urlHelper" type="password" readonly
-        wire:model="dbUrl" canGate="update" :canResource="$database" />
-    @if ($dbUrlPublic)
-        <x-forms.input :label="$label . ' URL (public)'" :helper="$urlHelper" type="password" readonly
-            wire:model="dbUrlPublic" canGate="update" :canResource="$database" />
-    @elseif ($showPublicUrlPlaceholder)
-        <x-forms.input :label="$label . ' URL (public)'" :helper="$urlHelper" readonly
-            value="Starting the database will generate this." canGate="update" :canResource="$database" />
+    @if ($isPasswordHiddenForMember)
+        <x-forms.input :label="$label . ' URL (internal)'" disabled value="Hidden (only admins can view)" />
+        <x-forms.input :label="$label . ' URL (public)'" disabled value="Hidden (only admins can view)" />
+    @else
+        <x-forms.input :label="$label . ' URL (internal)'" :helper="$urlHelper" type="password" readonly
+            wire:model="dbUrl" canGate="update" :canResource="$database" />
+        @if ($dbUrlPublic)
+            <x-forms.input :label="$label . ' URL (public)'" :helper="$urlHelper" type="password" readonly
+                wire:model="dbUrlPublic" canGate="update" :canResource="$database" />
+        @elseif ($showPublicUrlPlaceholder)
+            <x-forms.input :label="$label . ' URL (public)'" :helper="$urlHelper" readonly
+                value="Starting the database will generate this." canGate="update" :canResource="$database" />
+        @endif
     @endif
 
     @if ($supportsSsl)

@@ -187,7 +187,6 @@ class LocalPersistentVolume extends BaseModel
 
             return false;
         } catch (\Throwable $e) {
-            ray($e->getMessage(), 'Error checking read-only persistent volume');
 
             return false;
         }

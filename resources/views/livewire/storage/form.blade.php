@@ -10,10 +10,15 @@
             <x-forms.input canGate="update" :canResource="$storage" required label="Region" id="region" />
         </div>
         <div class="flex gap-2">
-            <x-forms.input canGate="update" :canResource="$storage" required type="password" label="Access Key"
-                id="key" />
-            <x-forms.input canGate="update" :canResource="$storage" required type="password" label="Secret Key"
-                id="secret" />
+            @if ($isPasswordHiddenForMember)
+                <x-forms.input label="Access Key" disabled value="Hidden (only admins can view)" />
+                <x-forms.input label="Secret Key" disabled value="Hidden (only admins can view)" />
+            @else
+                <x-forms.input canGate="update" :canResource="$storage" required type="password" label="Access Key"
+                    id="key" />
+                <x-forms.input canGate="update" :canResource="$storage" required type="password" label="Secret Key"
+                    id="secret" />
+            @endif
         </div>
         @can('validateConnection', $storage)
             <x-forms.button class="mt-4" isHighlighted wire:click="testConnection">

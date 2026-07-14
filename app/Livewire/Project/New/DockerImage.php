@@ -7,12 +7,14 @@ use App\Models\DockerRegistry;
 use App\Models\Project;
 use App\Services\DockerImageParser;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class DockerImage extends Component
 {
+    use AuthorizesRequests;
+
     public string $imageName = '';
 
     public string $imageTag = '';
@@ -88,6 +90,8 @@ class DockerImage extends Component
 
     public function submit()
     {
+        $this->authorize('create', Application::class);
+
         $this->validate([
             'imageName' => ValidationPatterns::dockerImageNameRules(required: true),
             'imageTag' => ValidationPatterns::dockerImageTagRules(),
@@ -138,7 +142,7 @@ class DockerImage extends Component
         $imageTag = $parser->isImageHash() ? 'sha256-'.$parser->getTag() : $parser->getTag();
 
         $application = Application::create([
-            'name' => 'docker-image-'.new Cuid2,
+            'name' => 'docker-image-'.new_public_id(),
             'repository_project_id' => 0,
             'git_repository' => 'coollabsio/coolify',
             'git_branch' => 'main',

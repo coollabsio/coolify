@@ -10,12 +10,15 @@ use App\Models\Project;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Spatie\Url\Url;
 
 class GithubPrivateRepositoryDeployKey extends Component
 {
+    use AuthorizesRequests;
+
     public $current_step = 'private_keys';
 
     public $parameters;
@@ -128,6 +131,8 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public function submit()
     {
+        $this->authorize('create', Application::class);
+
         $this->validate();
         try {
             $destination_uuid = $this->query['destination'] ?? null;

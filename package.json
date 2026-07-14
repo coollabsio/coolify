@@ -8,11 +8,11 @@
     },
     "devDependencies": {
         "@tailwindcss/postcss": "4.1.18",
-        "laravel-vite-plugin": "2.0.1",
+        "laravel-vite-plugin": "3.1.0",
         "postcss": "8.5.15",
         "tailwind-scrollbar": "4.0.2",
         "tailwindcss": "4.1.18",
-        "vite": "7.3.2"
+        "vite": "8.0.16"
     },
     "dependencies": {
         "@tailwindcss/forms": "0.5.10",

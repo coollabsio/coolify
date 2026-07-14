@@ -14,7 +14,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Visus\Cuid2\Cuid2;
+use Throwable;
 
 class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
 {
@@ -71,14 +71,23 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
             ->first();
 
         if ($found) {
-            ApplicationPullRequestUpdateJob::dispatchSync(
-                application: $application,
-                preview: $found,
-                status: ProcessStatus::CLOSED
-            );
-
-            CleanupPreviewDeployment::run($application, $this->pullRequestId, $found);
+            try {
+                $this->dispatchPullRequestClosedUpdate($application, $found);
+            } catch (Throwable $e) {
+                report($e);
+            } finally {
+                CleanupPreviewDeployment::run($application, $this->pullRequestId, $found);
+            }
         }
+    }
+
+    protected function dispatchPullRequestClosedUpdate(Application $application, ApplicationPreview $preview): void
+    {
+        ApplicationPullRequestUpdateJob::dispatchSync(
+            application: $application,
+            preview: $preview,
+            status: ProcessStatus::CLOSED
+        );
     }
 
     private function handleOpenAction(Application $application, ?GithubApp $githubApp): void
@@ -87,7 +96,16 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        if (self::shouldSkipDeployAny([$this->pullRequestTitle])) {
+        $repository_parts = explode('/', $this->fullName);
+        $owner = $repository_parts[0] ?? '';
+        $repo = $repository_parts[1] ?? '';
+        $headCommitMessage = null;
+
+        if ($this->action === 'opened' || $this->action === 'synchronize' || $this->action === 'reopened') {
+            $headCommitMessage = getGithubCommitMessage($githubApp, $owner, $repo, $this->commitSha);
+        }
+
+        if (self::shouldSkipDeployAny([$this->pullRequestTitle, $headCommitMessage])) {
             return;
         }
 
@@ -111,9 +129,6 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
 
         // Get changed files for watch path filtering
         $changed_files = collect();
-        $repository_parts = explode('/', $this->fullName);
-        $owner = $repository_parts[0] ?? '';
-        $repo = $repository_parts[1] ?? '';
 
         if ($this->action === 'synchronize' && $this->beforeSha && $this->afterSha) {
             // For synchronize events, get files changed between before and after commits
@@ -156,7 +171,7 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
         }
 
         // Queue the deployment
-        $deployment_uuid = new Cuid2;
+        $deployment_uuid = new_public_id();
         queue_application_deployment(
             application: $application,
             pull_request_id: $this->pullRequestId,

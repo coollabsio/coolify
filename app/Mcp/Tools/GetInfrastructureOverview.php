@@ -9,26 +9,26 @@ use App\Models\Server;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
-use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
 
-#[Name('get_infrastructure_overview')]
-#[Description('High-level overview of the authenticated team: Coolify version, all servers, projects with resource counts, and aggregate counts. Start here to understand the setup.')]
 class GetInfrastructureOverview extends Tool
 {
+    protected string $name = 'get_infrastructure_overview';
+
+    protected string $description = 'High-level overview of the authenticated team: Coolify version, all servers, projects with resource counts, and aggregate counts. Start here to understand the setup.';
+
     use BuildsResponse;
     use ResolvesTeam;
 
     public function handle(Request $request): Response
     {
-        if ($error = $this->ensureAbility($request, 'read')) {
+        if ($error = $this->ensureAbility($request, 'read', $this->name)) {
             return $error;
         }
 
         $teamId = $this->resolveTeamId($request);
         if (is_null($teamId)) {
-            return Response::error('Invalid token.');
+            return $this->mcpError($request, 'Invalid token.');
         }
 
         $servers = Server::whereTeamId($teamId)
@@ -72,7 +72,7 @@ class GetInfrastructureOverview extends Tool
             ];
         }
 
-        return $this->respond([
+        return $this->mcpSuccess($request, $this->respond([
             'coolify_version' => config('constants.coolify.version'),
             'servers' => $servers,
             'projects' => $projectSummaries,
@@ -83,7 +83,7 @@ class GetInfrastructureOverview extends Tool
                 'services' => $serviceCount,
                 'databases' => $databaseCount,
             ],
-        ]);
+        ]));
     }
 
     public function schema(JsonSchema $schema): array

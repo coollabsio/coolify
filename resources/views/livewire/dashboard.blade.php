@@ -11,20 +11,23 @@
     <section class="-mt-2">
         <div class="flex items-center gap-2 pb-2">
             <h3>Projects</h3>
-            @if ($projects->count() > 0)
-                <x-modal-input buttonTitle="Add" title="New Project">
-                    <x-slot:content>
-                        <button
-                            class="flex items-center justify-center size-4 text-black dark:text-white rounded hover:bg-coolgray-400 dark:hover:bg-coolgray-300 cursor-pointer">
-                            <svg class="size-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="2" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                            </svg>
-                        </button>
-                    </x-slot:content>
-                    <livewire:project.add-empty />
-                </x-modal-input>
-            @endif
+@can('create', App\Models\Project::class)
+                @if ($projects->count() > 0)
+                    <x-modal-input buttonTitle="Add" title="New Project">
+                        <x-slot:content>
+                            <button
+                                class="flex items-center justify-center size-4 text-black dark:text-white rounded hover:bg-coolgray-400 dark:hover:bg-coolgray-300 cursor-pointer">
+                                <svg class="size-3" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                    viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 4.5v15m7.5-7.5h-15" />
+                                </svg>
+                            </button>
+                        </x-slot:content>
+                        <livewire:project.add-empty />
+                    </x-modal-input>
+                @endif
+            @endcan
         </div>
         @if ($projects->count() > 0)
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -64,12 +67,15 @@
         @else
             <div class="flex flex-col gap-1">
                 <div class='font-bold dark:text-warning'>No projects found.</div>
-                <div class="flex items-center gap-1">
-                    <x-modal-input buttonTitle="Add" title="New Project">
-                        <livewire:project.add-empty />
-                    </x-modal-input> your first project or
-                    go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}" {{ wireNavigate() }}>onboarding</a> page.
-                </div>
+                @can('create', App\Models\Project::class)
+                    <div class="flex items-center gap-1">
+                        <x-modal-input buttonTitle="Add" title="New Project">
+                            <livewire:project.add-empty />
+                        </x-modal-input> your first project or
+                        go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}"
+                            {{ wireNavigate() }}>onboarding</a> page.
+                    </div>
+                @endcan
             </div>
         @endif
     </section>
@@ -77,20 +83,18 @@
     <section>
         <div class="flex items-center gap-2 pb-2">
             <h3>Servers</h3>
-            @if ($servers->count() > 0 && $privateKeys->count() > 0)
-                <x-modal-input buttonTitle="Add" title="New Server" :closeOutside="false">
-                    <x-slot:content>
-                        <button
-                            class="flex items-center justify-center size-4 text-black dark:text-white rounded hover:bg-coolgray-400 dark:hover:bg-coolgray-300 cursor-pointer">
-                            <svg class="size-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="2" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                            </svg>
-                        </button>
-                    </x-slot:content>
-                    <livewire:server.create />
-                </x-modal-input>
-            @endif
+@can('create', App\Models\Server::class)
+                @if ($servers->count() > 0 && $privateKeys->count() > 0)
+                    <a href="{{ route('server.create') }}" {{ wireNavigate() }}
+                        class="flex items-center justify-center size-4 text-black dark:text-white rounded hover:bg-coolgray-400 dark:hover:bg-coolgray-300 cursor-pointer">
+                        <svg class="size-3" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                    </a>
+                @endif
+            @endcan
         </div>
         @if ($servers->count() > 0)
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -127,26 +131,34 @@
             @if ($privateKeys->count() === 0)
                 <div class="flex flex-col gap-1">
                     <div class='font-bold dark:text-warning'>No private keys found.</div>
-                    <div class="flex items-center gap-1">Before you can add your server, first <x-modal-input
-                            buttonTitle="add" title="New Private Key">
-                            <livewire:security.private-key.create from="server" />
-                        </x-modal-input> a private key
-                        or
-                        go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}" {{ wireNavigate() }}>onboarding</a>
-                        page.
-                    </div>
+                    @can('create', App\Models\Server::class)
+                        <div class="flex items-center gap-1">Before you can add your server, first <x-modal-input
+                                buttonTitle="add" title="New Private Key">
+                                <livewire:security.private-key.create from="server" />
+                            </x-modal-input> a private key
+                            or
+                            go to the <a class="underline dark:text-white"
+                                href="{{ route('onboarding') }}"
+                                {{ wireNavigate() }}>onboarding</a>
+                            page.
+                        </div>
+                    @endcan
                 </div>
             @else
                 <div class="flex flex-col gap-1">
                     <div class='font-bold dark:text-warning'>No servers found.</div>
-                    <div class="flex items-center gap-1">
-                        <x-modal-input buttonTitle="Add" title="New Server" :closeOutside="false">
-                            <livewire:server.create />
-                        </x-modal-input> your first server
-                        or
-                        go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}" {{ wireNavigate() }}>onboarding</a>
-                        page.
-                    </div>
+                    @can('create', App\Models\Server::class)
+                        <div class="flex items-center gap-1">
+                            <a href="{{ route('server.create') }}" {{ wireNavigate() }}>
+                                <x-forms.button>Add</x-forms.button>
+                            </a> your first server
+                            or
+                            go to the <a class="underline dark:text-white"
+                                href="{{ route('onboarding') }}"
+                                {{ wireNavigate() }}>onboarding</a>
+                            page.
+                        </div>
+                    @endcan
                 </div>
             @endif
         @endif

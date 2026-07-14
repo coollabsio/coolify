@@ -22,11 +22,13 @@
                             dropdownOpen: false,
                             volumeModalOpen: false,
                             fileModalOpen: false,
+                            hostFileModalOpen: false,
                             directoryModalOpen: false
                         }"
                             @close-storage-modal.window="
                             if ($event.detail === 'volume') volumeModalOpen = false;
                             if ($event.detail === 'file') fileModalOpen = false;
+                            if ($event.detail === 'host-file') hostFileModalOpen = false;
                             if ($event.detail === 'directory') directoryModalOpen = false;
                         ">
                             <div class="relative" @click.outside="dropdownOpen = false">
@@ -61,6 +63,15 @@
                                                         d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                                 </svg>
                                                 File Mount
+                                            </a>
+                                            <a class="dropdown-item"
+                                                @click="hostFileModalOpen = true; dropdownOpen = false">
+                                                <svg class="size-4" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                                </svg>
+                                                Host File Mount
                                             </a>
                                             <a class="dropdown-item"
                                                 @click="directoryModalOpen = true; dropdownOpen = false">
@@ -188,17 +199,92 @@
                                                 }
                                             })">
                                             <form class="flex flex-col w-full gap-2 rounded-sm"
+                                                x-data="{
+                                                    hostPath: @js($this->fileStorageHostPath()),
+                                                    filePath: @entangle('file_storage_path'),
+                                                    previewPath() {
+                                                        const path = (this.filePath || '').trim();
+
+                                                        return this.hostPath + (path === '' ? '/' : (path.startsWith('/') ? path : `/${path}`));
+                                                    },
+                                                }"
                                                 wire:submit='submitFileStorage'>
                                                 <div class="flex flex-col">
-                                                    <div>Actual file mounted from the host system to the container.</div>
+                                                    <div>This file will be created on the host, then mounted into the container.</div>
                                                 </div>
                                                 <div class="flex flex-col gap-2">
+                                                    <div class="p-2 text-xs rounded-sm bg-neutral-100 dark:bg-coolgray-200">
+                                                        <div class="mb-1 font-medium">Host file path</div>
+                                                        <code class="break-all" x-text="previewPath()">{{ $this->fileStoragePreviewPath() }}</code>
+                                                    </div>
                                                     <x-forms.input canGate="update" :canResource="$resource"
                                                         placeholder="/etc/nginx/nginx.conf" id="file_storage_path"
                                                         label="Destination Path" required
+                                                        x-on:input="filePath = $event.target.value"
                                                         helper="File location inside the container" />
                                                     <x-forms.textarea canGate="update" :canResource="$resource" label="Content"
                                                         id="file_storage_content"></x-forms.textarea>
+                                                    <x-forms.button canGate="update" :canResource="$resource" type="submit">
+                                                        Add
+                                                    </x-forms.button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            {{-- Host File Modal --}}
+                            <template x-teleport="body">
+                                <div x-show="hostFileModalOpen" @keydown.window.escape="hostFileModalOpen=false"
+                                    class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
+                                    <div x-show="hostFileModalOpen" x-transition:enter="ease-out duration-100"
+                                        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                                        x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                                        x-transition:leave-end="opacity-0" @click="hostFileModalOpen=false"
+                                        class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
+                                    <div x-show="hostFileModalOpen" x-trap.inert.noscroll="hostFileModalOpen"
+                                        x-transition:enter="ease-out duration-100"
+                                        x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
+                                        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                                        x-transition:leave="ease-in duration-100"
+                                        x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                                        x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
+                                        class="relative w-full py-6 border rounded-sm drop-shadow-sm min-w-full lg:min-w-[36rem] max-w-fit bg-white border-neutral-200 dark:bg-base px-6 dark:border-coolgray-300">
+                                        <div class="flex items-center justify-between pb-3">
+                                            <h3 class="text-2xl font-bold">Add Host File Mount</h3>
+                                            <button @click="hostFileModalOpen=false"
+                                                class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning">
+                                                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <div class="relative flex items-center justify-center w-auto"
+                                            x-init="$watch('hostFileModalOpen', value => {
+                                                if (value) {
+                                                    $nextTick(() => {
+                                                        const input = $el.querySelector('input');
+                                                        input?.focus();
+                                                    })
+                                                }
+                                            })">
+                                            <form class="flex flex-col w-full gap-2 rounded-sm"
+                                                wire:submit='submitHostFileStorage'>
+                                                <div class="flex flex-col">
+                                                    <div>Bind an existing host file into the container. Coolify will not create, edit, load, chmod, or delete the source file.</div>
+                                                </div>
+                                                <div class="flex flex-col gap-2">
+                                                    <x-forms.input canGate="update" :canResource="$resource"
+                                                        placeholder="/etc/nginx/nginx.conf"
+                                                        id="host_file_storage_source" label="Host File Path" required
+                                                        helper="Existing file on the host system." />
+                                                    <x-forms.input canGate="update" :canResource="$resource"
+                                                        placeholder="/etc/nginx/nginx.conf"
+                                                        id="host_file_storage_destination" label="Destination Path"
+                                                        required helper="File location inside the container." />
                                                     <x-forms.button canGate="update" :canResource="$resource" type="submit">
                                                         Add
                                                     </x-forms.button>

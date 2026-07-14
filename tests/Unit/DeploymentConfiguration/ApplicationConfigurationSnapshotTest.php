@@ -66,12 +66,16 @@ it('detects redeploy-only domain changes', function () {
     $application = snapshotTestApplication();
     markSnapshotTestApplicationDeployed($application);
 
-    $application->update(['fqdn' => 'https://new.example.com']);
+    $domains = 'https://new.example.com,https://another.example.com';
+    $application->update(['fqdn' => $domains]);
     $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
+    $change = collect($diff->changes())->firstWhere('label', 'Domains');
 
     expect($diff->isChanged())->toBeTrue()
         ->and($diff->requiresBuild())->toBeFalse()
-        ->and(collect($diff->changes())->pluck('label'))->toContain('Domains');
+        ->and($change)->not->toBeNull()
+        ->and($change['expandable'])->toBeTrue()
+        ->and($change['new_full_value'])->toBe($domains);
 });
 
 it('detects environment variable value changes without exposing secret values', function () {
@@ -82,6 +86,7 @@ it('detects environment variable value changes without exposing secret values', 
         'is_buildtime' => false,
         'is_runtime' => true,
         'is_preview' => false,
+        'is_shown_once' => true,
         'resourceable_type' => Application::class,
         'resourceable_id' => $application->id,
     ]);
@@ -108,6 +113,7 @@ it('describes added environment variables as set without exposing secret values'
         'is_buildtime' => false,
         'is_runtime' => true,
         'is_preview' => false,
+        'is_shown_once' => true,
         'resourceable_type' => Application::class,
         'resourceable_id' => $application->id,
     ]);
