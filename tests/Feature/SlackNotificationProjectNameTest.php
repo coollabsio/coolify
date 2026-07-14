@@ -3,6 +3,7 @@
 use App\Jobs\SendMessageToSlackJob;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Team;
 use App\Notifications\Application\DeploymentFailed;
@@ -12,6 +13,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
+});
 
 it('prefixes a Slack title with the project name when enabled', function () {
     Queue::fake();
@@ -23,6 +28,9 @@ it('prefixes a Slack title with the project name when enabled', function () {
     ]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
     $application = Application::factory()->create(['environment_id' => $environment->id]);
+
+    expect($team->slackNotificationSettings->include_project_name_in_title)->toBeFalse();
+
     $team->slackNotificationSettings->update([
         'slack_enabled' => true,
         'slack_webhook_url' => 'https://hooks.slack.com/services/test',
