@@ -109,7 +109,7 @@ class ProductionSeeder extends Seeder
             }
         }
 
-        if (! isCloud()) {
+        if (! isCloud() && config('constants.coolify.is_windows_docker_desktop') == false) {
             if (Server::find(0) == null) {
                 $server_details = [
                     'id' => 0,
