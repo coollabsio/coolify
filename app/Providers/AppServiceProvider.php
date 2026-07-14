@@ -102,5 +102,16 @@ class AppServiceProvider extends ServiceProvider
                 ])->baseUrl($api_url);
             }
         });
+
+        Http::macro('GitLab', function (string $api_url, ?string $access_token = null) {
+            $client = Http::withHeaders([
+                'Accept' => 'application/json',
+            ])->baseUrl($api_url);
+            if ($access_token) {
+                $client = $client->withToken($access_token);
+            }
+
+            return $client;
+        });
     }
 }
