@@ -45,6 +45,9 @@
                     label="Deployment Success" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="deploymentFailureSlackNotifications"
                     label="Deployment Failure" />
+                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="includeProjectNameInTitle"
+                    helper="Prefix deployment notification titles with the project name, for example: My Project: Deployment failed."
+                    label="Show Project Name in Title" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel"
                     helper="Send a notification when a container status changes. It will notify for Stopped and Restarted events of a container."
                     id="statusChangeSlackNotifications" label="Container Status Changes" />

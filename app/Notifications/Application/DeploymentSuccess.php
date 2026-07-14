@@ -202,7 +202,8 @@ class DeploymentSuccess extends CustomEmailNotification
         return new SlackMessage(
             title: $title,
             description: $description,
-            color: SlackMessage::successColor()
+            color: SlackMessage::successColor(),
+            projectName: data_get($this->application, 'environment.project.name'),
         );
     }
 

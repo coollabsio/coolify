@@ -182,7 +182,8 @@ class DeploymentFailed extends CustomEmailNotification
         return new SlackMessage(
             title: $title,
             description: $description,
-            color: SlackMessage::errorColor()
+            color: SlackMessage::errorColor(),
+            projectName: data_get($this->application, 'environment.project.name'),
         );
     }
 

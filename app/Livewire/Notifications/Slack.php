@@ -30,6 +30,9 @@ class Slack extends Component
     public ?string $slackWebhookUrl = null;
 
     #[Validate(['boolean'])]
+    public bool $includeProjectNameInTitle = false;
+
+    #[Validate(['boolean'])]
     public bool $deploymentSuccessSlackNotifications = false;
 
     #[Validate(['boolean'])]
@@ -90,6 +93,7 @@ class Slack extends Component
             $this->authorize('update', $this->settings);
             $this->settings->slack_enabled = $this->slackEnabled;
             $this->settings->slack_webhook_url = $this->slackWebhookUrl;
+            $this->settings->include_project_name_in_title = $this->includeProjectNameInTitle;
 
             $this->settings->deployment_success_slack_notifications = $this->deploymentSuccessSlackNotifications;
             $this->settings->deployment_failure_slack_notifications = $this->deploymentFailureSlackNotifications;
@@ -113,6 +117,7 @@ class Slack extends Component
             $this->slackWebhookUrl = auth()->user()->can('update', $this->settings)
                 ? $this->settings->slack_webhook_url
                 : null;
+            $this->includeProjectNameInTitle = $this->settings->include_project_name_in_title;
 
             $this->deploymentSuccessSlackNotifications = $this->settings->deployment_success_slack_notifications;
             $this->deploymentFailureSlackNotifications = $this->settings->deployment_failure_slack_notifications;

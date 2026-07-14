@@ -7,8 +7,18 @@ class SlackMessage
     public function __construct(
         public string $title,
         public string $description,
-        public string $color = '#0099ff'
+        public string $color = '#0099ff',
+        public ?string $projectName = null,
     ) {}
+
+    public function prependProjectNameToTitle(): void
+    {
+        if ($this->projectName === null || $this->projectName === '') {
+            return;
+        }
+
+        $this->title = "{$this->projectName}: {$this->title}";
+    }
 
     public static function infoColor(): string
     {

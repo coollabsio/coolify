@@ -16,6 +16,7 @@ class SlackNotificationSettings extends Model
 
         'slack_enabled',
         'slack_webhook_url',
+        'include_project_name_in_title',
 
         'deployment_success_slack_notifications',
         'deployment_failure_slack_notifications',
@@ -40,6 +41,7 @@ class SlackNotificationSettings extends Model
     protected $casts = [
         'slack_enabled' => 'boolean',
         'slack_webhook_url' => 'encrypted',
+        'include_project_name_in_title' => 'boolean',
 
         'deployment_success_slack_notifications' => 'boolean',
         'deployment_failure_slack_notifications' => 'boolean',

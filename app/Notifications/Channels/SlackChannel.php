@@ -19,6 +19,10 @@ class SlackChannel
             return;
         }
 
+        if ($slackSettings->include_project_name_in_title) {
+            $message->prependProjectNameToTitle();
+        }
+
         SendMessageToSlackJob::dispatch($message, $slackSettings->slack_webhook_url);
     }
 }
