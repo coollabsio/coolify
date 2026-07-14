@@ -127,6 +127,9 @@ it('defaults the public Pusher websocket port to Reverb instead of the HTTP app 
 });
 
 it('stops publishing or preserving the obsolete realtime image', function () {
+    $productionInstallScript = file_get_contents(base_path('scripts/install.sh'));
+    $nightlyInstallScript = file_get_contents(base_path('other/nightly/install.sh'));
+
     expect(file_get_contents(config_path('constants.php')))
         ->not->toContain('realtime_version')
         ->not->toContain('realtime_image')
@@ -137,5 +140,9 @@ it('stops publishing or preserving the obsolete realtime image', function () {
         ->not->toContain('"realtime"')
         ->and(is_dir(base_path('docker/coolify-realtime')))->toBeFalse()
         ->and(file_exists(base_path('.github/workflows/coolify-realtime.yml')))->toBeFalse()
-        ->and(file_exists(base_path('.github/workflows/coolify-realtime-next.yml')))->toBeFalse();
+        ->and(file_exists(base_path('.github/workflows/coolify-realtime-next.yml')))->toBeFalse()
+        ->and($productionInstallScript)->not->toContain('LATEST_REALTIME_VERSION')
+        ->not->toContain('| Realtime')
+        ->and($nightlyInstallScript)->not->toContain('LATEST_REALTIME_VERSION')
+        ->not->toContain('| Realtime');
 });
