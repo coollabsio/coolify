@@ -22,13 +22,13 @@
     <meta name="twitter:site" content="@coolifyio" />
     <meta name="twitter:title" content="Coolify" />
     <meta name="twitter:description" content="An open-source & self-hostable Heroku / Netlify / Vercel alternative." />
-    <meta name="twitter:image" content="https://cdn.coollabs.io/assets/coolify/og-image.png" />
+    <meta name="twitter:image" content="https://cdn.coollabs.io/og-images/coolify.png" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://coolify.io" />
     <meta property="og:title" content="Coolify" />
     <meta property="og:description" content="An open-source & self-hostable Heroku / Netlify / Vercel alternative." />
     <meta property="og:site_name" content="Coolify" />
-    <meta property="og:image" content="https://cdn.coollabs.io/assets/coolify/og-image.png" />
+    <meta property="og:image" content="https://cdn.coollabs.io/og-images/coolify.png" />
     @use('App\Models\InstanceSettings')
     @php
 

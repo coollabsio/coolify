@@ -111,8 +111,8 @@ it('uses Pusher environment keys for self-hosted Reverb compatibility', function
 
 it('defaults the public Pusher websocket port to Reverb instead of the HTTP app port', function () {
     expect(file_get_contents(base_path('.env.production')))
-        ->toContain('PUSHER_PORT=6001')
-        ->toContain('PUSHER_BACKEND_PORT=6001')
+        ->not->toContain('PUSHER_PORT=')
+        ->not->toContain('PUSHER_BACKEND_PORT=')
         ->and(file_get_contents(base_path('.env.windows-docker-desktop.example')))
         ->toContain('PUSHER_PORT=6001')
         ->toContain('PUSHER_BACKEND_PORT=6001')

@@ -1,6 +1,146 @@
+# AGENTS.md
+
+This file provides guidance to agentic coding tools when working with code in this repository.
+
+## Project Overview
+
+Coolify is an open-source, self-hostable PaaS (alternative to Heroku/Netlify/Vercel). It manages servers, applications, databases, and services via SSH. Built with Laravel 12 (using Laravel 10 file structure), Livewire 3, and Tailwind CSS v4.
+
 ## Design Reference
 
 For UI/UX design specifications, principles, and visual standards, consult `DESIGN.md` in the [coollabsio/architecture](https://github.com/coollabsio/architecture) repo.
+
+## Development Environment
+
+Docker Compose-based dev setup with services: coolify (app), postgres, redis, soketi (WebSockets), vite, testing-host, mailpit, minio.
+
+```bash
+# Start dev environment (uses docker-compose.dev.yml)
+spin up                          # or: docker compose -f docker-compose.dev.yml up -d
+spin down                        # stop services
+```
+
+The app runs at `localhost:8000` by default. Vite dev server on port 5173.
+
+## Common Commands
+
+```bash
+# Tests (Pest 4)
+php artisan test --compact                          # all tests
+php artisan test --compact --filter=testName         # single test
+php artisan test --compact tests/Feature/SomeTest.php  # specific file
+
+# Code formatting (Pint, Laravel preset)
+vendor/bin/pint --dirty --format agent              # format changed files
+
+# Frontend
+npm run dev                     # vite dev server
+npm run build                   # production build
+```
+
+## Browser Tests (Pest Browser Plugin)
+
+Uses `pestphp/pest-plugin-browser` with Laravel Dusk 8. New browser tests go in `tests/v4/Browser/`.
+
+```bash
+# Run all browser tests
+php artisan test --compact tests/v4/Browser/
+
+# Run a specific browser test file
+php artisan test --compact tests/v4/Browser/LoginTest.php
+
+# Run a specific test by name
+php artisan test --compact --filter='can login with valid credentials'
+```
+
+### Writing Browser Tests
+
+- Place new tests in `tests/v4/Browser/` — legacy Dusk tests in `tests/Browser/` should not be used as reference.
+- Use `RefreshDatabase` and seed required data (at minimum `InstanceSettings::create(['id' => 0])`) in `beforeEach`.
+- Key API: `visit()`, `fill(field, value)`, `click(text)`, `assertSee()`, `assertDontSee()`, `assertPathIs()`, `screenshot()`.
+- Always call `screenshot()` at the end of each test for debugging.
+- For authenticated tests, create a helper function that logs in via the UI:
+
+```php
+function loginAsRoot(): mixed
+{
+    return visit('/login')
+        ->fill('email', 'test@example.com')
+        ->fill('password', 'password')
+        ->click('Login');
+}
+```
+
+- See `tests/v4/Browser/LoginTest.php`, `tests/v4/Browser/DashboardTest.php`, and `tests/v4/Browser/RegistrationTest.php` for conventions.
+- Chrome driver runs on `localhost:4444`, app on `localhost:8000` (configured in `tests/DuskTestCase.php`).
+- Legacy Dusk macros in `app/Providers/DuskServiceProvider.php` use the old `type()`/`press()` API — do not mix with Pest Browser Plugin's `fill()`/`click()` API.
+
+## Architecture
+
+### Backend Structure (app/)
+- **Actions/** — Domain actions organized by area (Application, Database, Docker, Proxy, Server, Service, Shared, Stripe, User, CoolifyTask, Fortify). Uses `lorisleiva/laravel-actions` with `AsAction` trait — actions can be called as objects, dispatched as jobs, or used as controllers.
+- **Livewire/** — All UI components (Livewire 3). Pages organized by domain: Server, Project, Settings, Security, Notifications, Terminal, Subscription, SharedVariables. This is the primary UI layer — no traditional Blade controllers. Components listen to private team channels for real-time status updates via Soketi.
+- **Jobs/** — Queue jobs for deployments (`ApplicationDeploymentJob`), backups, Docker cleanup, server management, proxy configuration. Uses Redis queue with Horizon for monitoring.
+- **Models/** — Eloquent models extending `BaseModel` which provides auto-CUID2 UUID generation. Key models: `Server`, `Application`, `Service`, `Project`, `Environment`, `Team`, plus standalone database models (`StandalonePostgresql`, `StandaloneMysql`, etc.). Common traits: `HasConfiguration`, `HasMetrics`, `HasSafeStringAttribute`, `ClearsGlobalSearchCache`.
+- **Services/** — Business logic services (ConfigurationGenerator, DockerImageParser, ContainerStatusAggregator, HetznerService, etc.). Use Services for complex orchestration; use Actions for single-purpose domain operations.
+- **Helpers/** — Global helpers loaded via `bootstrap/includeHelpers.php` from `bootstrap/helpers/` — organized into `shared.php`, `constants.php`, `versions.php`, `subscriptions.php`, `domains.php`, `docker.php`, `services.php`, `github.php`, `proxy.php`, `notifications.php`.
+- **Data/** — Spatie Laravel Data DTOs (e.g., `ServerMetadata`).
+- **Enums/** — PHP enums (TitleCase keys). Key enums: `ProcessStatus`, `Role` (MEMBER/ADMIN/OWNER with rank comparison), `BuildPackTypes`, `ProxyTypes`, `ContainerStatusTypes`.
+- **Rules/** — Custom validation rules (`ValidGitRepositoryUrl`, `ValidServerIp`, `ValidHostname`, `DockerImageFormat`, etc.).
+
+### API Layer
+- REST API at `/api/v1/` with OpenAPI 3.0 attributes (`use OpenApi\Attributes as OA`) for auto-generated docs
+- Authentication via Laravel Sanctum with custom `ApiAbility` middleware for token abilities (read, write, deploy)
+- `ApiSensitiveData` middleware masks sensitive fields (IDs, credentials) in responses
+- API controllers in `app/Http/Controllers/Api/` use inline `Validator` (not Form Request classes)
+- Response serialization via `serializeApiResponse()` helper
+
+### Authorization
+- Policy-based authorization with ~15 model-to-policy mappings in `AuthServiceProvider`
+- Custom gates: `createAnyResource`, `canAccessTerminal`
+- Role hierarchy: `Role::MEMBER` (1) < `Role::ADMIN` (2) < `Role::OWNER` (3) with `lt()`/`gt()` comparison methods
+- Multi-tenancy via Teams — team auto-initializes notification settings on creation
+
+### Event Broadcasting
+- Soketi WebSocket server for real-time updates (ports 6001-6002 in dev)
+- Status change events: `ApplicationStatusChanged`, `ServiceStatusChanged`, `DatabaseStatusChanged`, `ProxyStatusChanged`
+- Livewire components subscribe to private team channels via `getListeners()`
+
+### Key Domain Concepts
+- **Server** — A managed host connected via SSH. Has settings, proxy config, and destinations.
+- **Application** — A deployed app (from Git or Docker image) with environment variables, previews, deployment queue.
+- **Service** — A pre-configured service stack from templates (`templates/service-templates-latest.json`).
+- **Standalone Databases** — Individual database instances (Postgres, MySQL, MariaDB, MongoDB, Redis, Clickhouse, KeyDB, Dragonfly).
+- **Project/Environment** — Organizational hierarchy: Team → Project → Environment → Resources.
+- **Proxy** — Traefik reverse proxy managed per server.
+
+### Frontend
+- Livewire 3 components with Alpine.js for client-side interactivity
+- Blade templates in `resources/views/livewire/`
+- Tailwind CSS v4 with `@tailwindcss/forms` and `@tailwindcss/typography`
+- Vite for asset bundling
+
+### Laravel 10 Structure (NOT Laravel 11+ slim structure)
+- Middleware in `app/Http/Middleware/` — custom middleware includes `CheckForcePasswordReset`, `DecideWhatToDoWithUser`, `ApiAbility`, `ApiSensitiveData`
+- Kernels: `app/Http/Kernel.php`, `app/Console/Kernel.php`
+- Exception handler: `app/Exceptions/Handler.php`
+- Service providers in `app/Providers/`
+
+## Key Conventions
+
+- Use `php artisan make:*` commands with `--no-interaction` to create files
+- Use Eloquent relationships, avoid `DB::` facade — prefer `Model::query()`
+- PHP 8.5: constructor property promotion, explicit return types, type hints
+- Validation uses inline `Validator` facade in controllers/Livewire components and custom rules in `app/Rules/` — not Form Request classes
+- Run `vendor/bin/pint --dirty --format agent` before finalizing changes
+- Every change must have tests — write or update tests, then run them. For bug fixes, follow TDD: write a failing test first, then fix the bug (see Test Enforcement below)
+- Check sibling files for conventions before creating new files
+
+## Git Workflow
+
+- Main branch: `v4.x`
+- Development branch: `next`
+- PRs should target `v4.x`
 
 <laravel-boost-guidelines>
 === foundation rules ===

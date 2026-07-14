@@ -55,6 +55,8 @@ class General extends Component
 
     public string $new_content;
 
+    public bool $isPasswordHiddenForMember = false;
+
     protected $listeners = [
         'save_init_script',
         'delete_init_script',
@@ -139,6 +141,11 @@ class General extends Component
             }
         } catch (Exception $e) {
             return handleError($e, $this);
+        }
+
+        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
+        if ($this->isPasswordHiddenForMember) {
+            $this->postgresPassword = '';
         }
     }
 

@@ -81,12 +81,6 @@
                                 placeholder="2001:db8::1" autocomplete="new-password" />
                         </div>
 
-                        @if($buildActivityId)
-                            <div class="w-full mt-4">
-                                <livewire:activity-monitor header="Building Helper Image" :activityId="$buildActivityId"
-                                    :fullHeight="false" />
-                            </div>
-                        @endif
                         @if(isDev())
                             <x-forms.input canGate="update" :canResource="$settings" id="dev_helper_version" label="Dev Helper Version (Development Only)"
                                 helper="Override the default coolify-helper image version. Leave empty to use the default version from config ({{ config('constants.coolify.helper_version') }}). Examples: 1.0.11, latest, dev"

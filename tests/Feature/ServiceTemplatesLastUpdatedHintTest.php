@@ -75,6 +75,19 @@ it('caches parsed local service templates by bundle mtime', function () {
     expect($first->keys()->all())->toBe($second->keys()->all());
 });
 
+it('renders the shared loading indicator while resource choices load', function () {
+    View::share('errors', new ViewErrorBag);
+
+    $view = $this->view('livewire.project.new.select', [
+        'current_step' => 'type',
+        'environments' => collect(),
+    ]);
+
+    $view->assertSee('Loading resources...', false);
+    $view->assertSee('text-coollabs dark:text-warning animate-spin', false);
+    $view->assertDontSee('<div x-show="loading">Loading...</div>', false);
+});
+
 it('renders the service templates last updated hint placeholder', function () {
     View::share('errors', new ViewErrorBag);
 
@@ -86,4 +99,33 @@ it('renders the service templates last updated hint placeholder', function () {
     $view->assertSee('Last Updated on Service Templates:');
     $view->assertSee('serviceTemplatesLastUpdated');
     $view->assertSee('service.templateLastUpdated');
+});
+
+it('keeps service template keys for service selection and docs links', function () {
+    $services = collect((new Select)->loadServices()['services']);
+    $denoKv = $services->firstWhere('id', 'denoKV');
+
+    expect($denoKv)
+        ->not->toBeNull()
+        ->and($denoKv['docsSlug'])->toBe('denokv');
+
+    View::share('errors', new ViewErrorBag);
+
+    $view = $this->view('livewire.project.new.select', [
+        'current_step' => 'type',
+        'environments' => collect(),
+    ]);
+
+    $view->assertSee("setType('one-click-service-' + service.id)", false);
+    $view->assertSee('service.docsSlug || this.extractBaseServiceName(service.name)', false);
+});
+
+it('preserves one click service key casing when selecting a service template', function () {
+    $component = new Select;
+    $component->servers = collect();
+    $component->allServers = collect();
+
+    $component->setType('one-click-service-denoKV');
+
+    expect($component->type)->toBe('one-click-service-denoKV');
 });

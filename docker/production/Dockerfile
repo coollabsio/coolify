@@ -9,7 +9,7 @@ ARG CLOUDFLARED_VERSION=2025.7.0
 # Note: We are using version 18 of the postgres client (while still using postgres 15 for the postgres server) as version 15 has been removed from Alpine 3.23+ https://pkgs.alpinelinux.org/packages?name=postgresql*-client&branch=v3.23&repo=&arch=x86_64&origin=&flagged=&maintainer=
 ARG POSTGRES_VERSION=18
 # https://nginx.org/en/linux_packages.html
-ARG NGINX_VERSION=1.31.0-r1
+ARG NGINX_VERSION=1.31.2-r1
 
 # Add user/group
 ARG USER_ID=9999

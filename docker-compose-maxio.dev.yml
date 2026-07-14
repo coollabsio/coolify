@@ -12,6 +12,8 @@ services:
       - "${APP_PORT:-8000}:8080"
       - "${FORWARD_PUSHER_PORT:-6001}:6001"
       - "6002:6002"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       AUTORUN_ENABLED: false
       PUSHER_HOST: "${PUSHER_HOST:-coolify}"
@@ -64,7 +66,6 @@ services:
       timeout: 2s
     volumes:
       - dev_redis_data:/data
-
   vite:
     image: node:24-alpine
     pull_policy: always

@@ -260,7 +260,10 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                     $comment = data_get($data, 'cancellation_details.comment');
                     $lookup_key = data_get($data, 'items.data.0.price.lookup_key');
                     if (str($lookup_key)->contains('dynamic')) {
-                        $quantity = min((int) data_get($data, 'items.data.0.quantity', 2), UpdateSubscriptionQuantity::MAX_SERVER_LIMIT);
+                        $quantity = max(
+                            UpdateSubscriptionQuantity::MIN_SERVER_LIMIT,
+                            min((int) data_get($data, 'items.data.0.quantity', 2), UpdateSubscriptionQuantity::MAX_SERVER_LIMIT)
+                        );
                         $team = data_get($subscription, 'team');
                         if ($team) {
                             $team->update([

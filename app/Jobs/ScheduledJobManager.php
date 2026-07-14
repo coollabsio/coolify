@@ -457,7 +457,9 @@ class ScheduledJobManager implements ShouldQueue
     private function getServersForCleanupQuery(): Builder
     {
         $query = Server::with('settings')
-            ->where('ip', '!=', '1.2.3.4');
+            ->whereNotNull('ip')
+            ->where('ip', '!=', '')
+            ->whereNotIn('ip', Server::PLACEHOLDER_IPS);
 
         if (isCloud()) {
             $query

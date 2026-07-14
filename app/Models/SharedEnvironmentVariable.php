@@ -30,6 +30,10 @@ class SharedEnvironmentVariable extends Model
         'version',
     ];
 
+    protected $hidden = [
+        'value',
+    ];
+
     protected $casts = [
         'key' => 'string',
         'value' => 'encrypted',

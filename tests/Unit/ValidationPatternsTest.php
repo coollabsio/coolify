@@ -132,24 +132,31 @@ it('generates nullable dockerNetworkRules when not required', function () {
         ->not->toContain('required');
 });
 
-it('accepts Docker-compatible environment variable keys', function (string $key) {
+it('accepts shell-safe environment variable keys', function (string $key) {
     expect(ValidationPatterns::isValidEnvironmentVariableKey($key))->toBeTrue();
 })->with([
     'letters' => 'APP_ENV',
     'leading underscore' => '_TOKEN',
     'railpack control variable' => 'RAILPACK_NODE_VERSION',
     'digits after first character' => 'NODE_VERSION_20',
-    'starts with digit' => '1BAD',
-    'hyphen' => 'BAD-KEY',
-    'dot' => 'node.name',
+    'lowercase' => 'node_version',
+    'dot notation' => 'node.name',
     'uppercase dots' => 'XPACK.SECURITY.ENABLED',
-    'semicolon' => 'BAD;KEY',
-    'space' => 'BAD KEY',
 ]);
 
-it('rejects environment variable keys Docker cannot represent', function (string $key) {
+it('rejects invalid environment variable keys', function (string $key) {
     expect(ValidationPatterns::isValidEnvironmentVariableKey($key))->toBeFalse();
 })->with([
+    'starts with digit' => '1BAD',
+    'hyphen' => 'BAD-KEY',
+    'semicolon' => 'BAD;KEY',
+    'space' => 'BAD KEY',
+    'command substitution' => 'BAD$(id)',
+    'backticks' => 'BAD`id`',
+    'pipe' => 'BAD|id',
+    'ampersand' => 'BAD&id',
+    'newline' => 'BAD
+KEY',
     'equals' => 'BAD=KEY',
     'empty' => '',
 ]);
@@ -164,7 +171,7 @@ it('generates environment variable key rules with correct defaults', function ()
 });
 
 it('normalizes environment variable keys by trimming surrounding whitespace', function () {
-    expect(ValidationPatterns::normalizeEnvironmentVariableKey(' node.name '))->toBe('node.name');
+    expect(ValidationPatterns::normalizeEnvironmentVariableKey(' APP_ENV '))->toBe('APP_ENV');
 });
 
 it('normalizes environment variable keys before model validation', function () {
@@ -172,4 +179,15 @@ it('normalizes environment variable keys before model validation', function () {
     $environmentVariable->key = ' APP_ENV ';
 
     expect($environmentVariable->key)->toBe('APP_ENV');
+});
+
+it('normalizes application domain scheme and host without lowercasing path query or fragment', function () {
+    $domains = ' HTTPS://EXAMPLE.COM/MixedCase/Path?Token=ABC#Fragment, http://Sub.EXAMPLE.com/Api/V1 ';
+
+    expect(ValidationPatterns::normalizeApplicationDomains($domains))
+        ->toBe('https://example.com/MixedCase/Path?Token=ABC#Fragment,http://sub.example.com/Api/V1');
+});
+
+it('validates application domains with underscores in the hostname', function () {
+    expect(ValidationPatterns::validateApplicationDomains('https://myapp_service.example.com'))->toBeEmpty();
 });

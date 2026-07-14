@@ -14,7 +14,7 @@ class CleanupDocker
     public function handle(Server $server, bool $deleteUnusedVolumes = false, bool $deleteUnusedNetworks = false)
     {
         $helperImageVersion = getHelperVersion();
-        $helperImage = config('constants.coolify.helper_image');
+        $helperImage = coolifyHelperImage();
         $helperImageWithVersion = "$helperImage:$helperImageVersion";
         $helperImageWithoutPrefix = 'coollabsio/coolify-helper';
         $helperImageWithoutPrefixVersion = "coollabsio/coolify-helper:$helperImageVersion";

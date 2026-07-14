@@ -1,6 +1,6 @@
 services:
   coolify:
-    image: "${REGISTRY_URL:-ghcr.io}/coollabsio/coolify:${LATEST_IMAGE:-latest}"
+    image: "${REGISTRY_URL:-docker.io}/coollabsio/coolify:${LATEST_IMAGE:-latest}"
     volumes:
       - type: bind
         source: /data/coolify/source/.env

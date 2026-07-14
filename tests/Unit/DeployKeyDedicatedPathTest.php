@@ -4,10 +4,49 @@ use App\Models\Application;
 use App\Models\ApplicationSetting;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
+use Illuminate\Support\Collection;
 
 afterEach(function () {
     Mockery::close();
 });
+
+function commandStrings(array|Collection|string $commands): Collection
+{
+    if (is_string($commands)) {
+        return collect([$commands]);
+    }
+
+    return collect($commands)->map(fn ($command) => data_get($command, 'command') ?? $command[0] ?? $command);
+}
+
+function privateKeyMaterializationCommands(array|Collection|string $commands): Collection
+{
+    if (is_string($commands)) {
+        $commands = [$commands];
+    }
+
+    return collect($commands)->filter(fn ($command) => str(commandStrings([$command])->first())->contains('base64 -d | tee /root/.ssh/id_rsa_coolify_'));
+}
+
+function expectCommandListToContain(array|Collection|string $commands, string $expected): void
+{
+    expect(commandStrings($commands)->implode(' && '))->toContain($expected);
+}
+
+function expectCommandListNotToContain(array|Collection|string $commands, string $expected): void
+{
+    expect(commandStrings($commands)->implode(' && '))->not->toContain($expected);
+}
+
+function expectPrivateKeyMaterializationCommandsSkipLogging(array|Collection|string $commands): void
+{
+    $keyCommands = privateKeyMaterializationCommands($commands);
+
+    expect($keyCommands)->not->toBeEmpty();
+    $keyCommands->each(function ($command): void {
+        expect(data_get($command, 'skip_command_log'))->toBeTrue();
+    });
+}
 
 /**
  * Git operations authenticate with the SSH key assigned in the UI. Coolify writes that key to a
@@ -18,6 +57,24 @@ afterEach(function () {
  * ephemeral container, so it needs no cleanup.
  */
 $keyPath = '/root/.ssh/id_rsa_coolify_test-deployment-uuid';
+
+it('skips logging the docker deploy key materialization command before ls-remote', function () {
+    $source = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
+    $commandPosition = strpos($source, 'base64 -d | tee {$customSshKeyLocation}');
+
+    expect($commandPosition)->not->toBeFalse()
+        ->and(substr($source, $commandPosition, 200))->toContain("'skip_command_log' => true");
+});
+
+it('supports skipping command log entries without adding a hidden command entry', function () {
+    $source = file_get_contents(__DIR__.'/../../app/Traits/ExecuteRemoteCommand.php');
+
+    expect($source)
+        ->toContain('$skip_command_log = data_get($single_command, \'skip_command_log\', false);')
+        ->toContain('if ($command_hidden && ! $skip_command_log && isset($this->application_deployment_queue))')
+        ->toContain('use ($command, $hidden, $customType, $append, $command_hidden, $skip_command_log)')
+        ->toContain('\'command\' => $skip_command_log || $command_hidden ? null : $this->redact_sensitive_info($command),');
+});
 
 it('writes a deploy key to a per-deployment path and cleans it up for ls-remote on the host', function () use ($keyPath) {
     $privateKey = Mockery::mock(PrivateKey::class)->makePartial();
@@ -31,11 +88,11 @@ it('writes a deploy key to a per-deployment path and cleans it up for ls-remote 
 
     $result = $application->generateGitLsRemoteCommands('test-deployment-uuid', false);
 
-    expect($result['commands'])
-        ->toContain("tee {$keyPath}")
-        ->toContain("-i {$keyPath} -o IdentitiesOnly=yes")
-        ->toContain("trap 'rm -f {$keyPath}' EXIT") // removed when the shell exits
-        ->not->toContain('tee /root/.ssh/id_rsa >'); // never overwrites the host root's own key
+    expectCommandListToContain($result['commands'], "tee {$keyPath}");
+    expectCommandListToContain($result['commands'], "-i {$keyPath} -o IdentitiesOnly=yes");
+    expectCommandListToContain($result['commands'], "trap 'rm -f {$keyPath}' EXIT"); // removed when the shell exits
+    expectCommandListNotToContain($result['commands'], 'tee /root/.ssh/id_rsa >'); // never overwrites the host root's own key
+    expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
 });
 
 it('writes a deploy key to a per-deployment path for ls-remote inside docker without a trap', function () use ($keyPath) {
@@ -50,11 +107,11 @@ it('writes a deploy key to a per-deployment path for ls-remote inside docker wit
 
     $result = $application->generateGitLsRemoteCommands('test-deployment-uuid', true);
 
-    expect($result['commands'])
-        ->toContain("tee {$keyPath}")
-        ->toContain("-i {$keyPath} -o IdentitiesOnly=yes")
-        ->not->toContain('trap ') // ephemeral container, no cleanup needed
-        ->not->toContain('tee /root/.ssh/id_rsa >');
+    expectCommandListToContain($result['commands'], "tee {$keyPath}");
+    expectCommandListToContain($result['commands'], "-i {$keyPath} -o IdentitiesOnly=yes");
+    expectCommandListNotToContain($result['commands'], 'trap '); // ephemeral container, no cleanup needed
+    expectCommandListNotToContain($result['commands'], 'tee /root/.ssh/id_rsa >');
+    expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
 });
 
 it('writes a GitLab source private key to a per-deployment path with cleanup on the host', function () use ($keyPath) {
@@ -77,11 +134,11 @@ it('writes a GitLab source private key to a per-deployment path with cleanup on 
 
     $result = $application->generateGitLsRemoteCommands('test-deployment-uuid', false);
 
-    expect($result['commands'])
-        ->toContain("tee {$keyPath}")
-        ->toContain("-i {$keyPath} -o IdentitiesOnly=yes")
-        ->toContain("trap 'rm -f {$keyPath}' EXIT")
-        ->not->toContain('tee /root/.ssh/id_rsa >');
+    expectCommandListToContain($result['commands'], "tee {$keyPath}");
+    expectCommandListToContain($result['commands'], "-i {$keyPath} -o IdentitiesOnly=yes");
+    expectCommandListToContain($result['commands'], "trap 'rm -f {$keyPath}' EXIT");
+    expectCommandListNotToContain($result['commands'], 'tee /root/.ssh/id_rsa >');
+    expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
 });
 
 it('writes a deploy key to a per-deployment path and cleans it up when cloning on the host', function () use ($keyPath) {
@@ -104,11 +161,11 @@ it('writes a deploy key to a per-deployment path and cleans it up when cloning o
     // exec_in_docker = false → the loadComposeFile / host clone path
     $result = $application->generateGitImportCommands('test-deployment-uuid', 0, null, false);
 
-    expect($result['commands'])
-        ->toContain("tee {$keyPath}")
-        ->toContain("-i {$keyPath} -o IdentitiesOnly=yes")
-        ->toContain("trap 'rm -f {$keyPath}' EXIT")
-        ->not->toContain('tee /root/.ssh/id_rsa >');
+    expectCommandListToContain($result['commands'], "tee {$keyPath}");
+    expectCommandListToContain($result['commands'], "-i {$keyPath} -o IdentitiesOnly=yes");
+    expectCommandListToContain($result['commands'], "trap 'rm -f {$keyPath}' EXIT");
+    expectCommandListNotToContain($result['commands'], 'tee /root/.ssh/id_rsa >');
+    expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
 });
 
 it('writes a GitLab source private key to a per-deployment path and cleans it up when cloning on the host', function () use ($keyPath) {
@@ -137,11 +194,11 @@ it('writes a GitLab source private key to a per-deployment path and cleans it up
 
     $result = $application->generateGitImportCommands('test-deployment-uuid', 0, null, false);
 
-    expect($result['commands'])
-        ->toContain("tee {$keyPath}")
-        ->toContain("-i {$keyPath} -o IdentitiesOnly=yes")
-        ->toContain("trap 'rm -f {$keyPath}' EXIT")
-        ->not->toContain('tee /root/.ssh/id_rsa >');
+    expectCommandListToContain($result['commands'], "tee {$keyPath}");
+    expectCommandListToContain($result['commands'], "-i {$keyPath} -o IdentitiesOnly=yes");
+    expectCommandListToContain($result['commands'], "trap 'rm -f {$keyPath}' EXIT");
+    expectCommandListNotToContain($result['commands'], 'tee /root/.ssh/id_rsa >');
+    expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
 });
 
 it('uses the per-deployment deploy key for pull request fetches', function () use ($keyPath) {
@@ -163,9 +220,9 @@ it('uses the per-deployment deploy key for pull request fetches', function () us
 
     $result = $application->generateGitImportCommands('test-deployment-uuid', 123, 'github', false);
 
-    expect($result['commands'])
-        ->toContain("GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$keyPath} -o IdentitiesOnly=yes\" git fetch origin pull/123/head:pr-123-coolify")
-        ->not->toContain('GIT_SSH_COMMAND="ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa" git fetch origin pull/123/head:pr-123-coolify');
+    expectCommandListToContain($result['commands'], "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$keyPath} -o IdentitiesOnly=yes\" git fetch origin pull/123/head:pr-123-coolify");
+    expectCommandListNotToContain($result['commands'], 'GIT_SSH_COMMAND="ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa" git fetch origin pull/123/head:pr-123-coolify');
+    expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
 });
 
 it('does not force a missing per-deployment key for other repository pull request fetches', function () use ($keyPath) {
@@ -183,7 +240,6 @@ it('does not force a missing per-deployment key for other repository pull reques
 
     $result = $application->generateGitImportCommands('test-deployment-uuid', 123, 'github', false);
 
-    expect($result['commands'])
-        ->toContain('GIT_SSH_COMMAND="ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa" git fetch origin pull/123/head:pr-123-coolify')
-        ->not->toContain($keyPath);
+    expectCommandListToContain($result['commands'], 'GIT_SSH_COMMAND="ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa" git fetch origin pull/123/head:pr-123-coolify');
+    expectCommandListNotToContain($result['commands'], $keyPath);
 });

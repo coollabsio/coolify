@@ -32,9 +32,9 @@ afterEach(function () {
     File::delete(base_path('changelogs/1999-01.json'));
 });
 
-test('releases_url config defaults to the GitHub raw source', function () {
+test('releases_url config defaults to the Coollabs CDN', function () {
     expect(config('constants.coolify.releases_url'))
-        ->toBe('https://raw.githubusercontent.com/coollabsio/coolify-cdn/main/json/releases.json');
+        ->toBe('https://cdn.coollabs.io/coolify/releases.json');
 });
 
 test('PullChangelog fetches from the configured releases_url and writes the changelog', function () {

@@ -13,6 +13,10 @@ class OauthSetting extends Model
 
     protected $fillable = ['provider', 'client_id', 'client_secret', 'redirect_uri', 'tenant', 'base_url', 'enabled'];
 
+    protected $hidden = [
+        'client_secret',
+    ];
+
     protected function clientSecret(): Attribute
     {
         return Attribute::make(
