@@ -380,6 +380,68 @@
                                         "nullable": true,
                                         "description": "Use build server."
                                     },
+                                    "use_build_secrets": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Use Docker Build Secrets for build-time environment variables."
+                                    },
+                                    "is_git_submodules_enabled": {
+                                        "type": "boolean",
+                                        "description": "Clone Git submodules."
+                                    },
+                                    "is_git_lfs_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable Git LFS."
+                                    },
+                                    "is_git_shallow_clone_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use a shallow Git clone."
+                                    },
+                                    "disable_build_cache": {
+                                        "type": "boolean",
+                                        "description": "Disable the build cache."
+                                    },
+                                    "inject_build_args_to_dockerfile": {
+                                        "type": "boolean",
+                                        "description": "Inject build arguments into the Dockerfile build."
+                                    },
+                                    "include_source_commit_in_build": {
+                                        "type": "boolean",
+                                        "description": "Include the source commit in the build."
+                                    },
+                                    "is_env_sorting_enabled": {
+                                        "type": "boolean",
+                                        "description": "Sort environment variables."
+                                    },
+                                    "is_pr_deployments_public_enabled": {
+                                        "type": "boolean",
+                                        "description": "Make pull request deployments public."
+                                    },
+                                    "stop_grace_period": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 3600,
+                                        "description": "Container stop grace period in seconds."
+                                    },
+                                    "docker_images_to_keep": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 100,
+                                        "description": "Number of Docker images to retain."
+                                    },
+                                    "is_gzip_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable gzip compression."
+                                    },
+                                    "is_stripprefix_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable path prefix stripping."
+                                    },
+                                    "is_raw_compose_deployment_enabled": {
+                                        "type": "boolean",
+                                        "description": "Deploy the raw Docker Compose definition."
+                                    },
                                     "is_http_basic_auth_enabled": {
                                         "type": "boolean",
                                         "description": "HTTP Basic Authentication enabled."
@@ -840,6 +902,68 @@
                                         "type": "boolean",
                                         "nullable": true,
                                         "description": "Use build server."
+                                    },
+                                    "use_build_secrets": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Use Docker Build Secrets for build-time environment variables."
+                                    },
+                                    "is_git_submodules_enabled": {
+                                        "type": "boolean",
+                                        "description": "Clone Git submodules."
+                                    },
+                                    "is_git_lfs_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable Git LFS."
+                                    },
+                                    "is_git_shallow_clone_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use a shallow Git clone."
+                                    },
+                                    "disable_build_cache": {
+                                        "type": "boolean",
+                                        "description": "Disable the build cache."
+                                    },
+                                    "inject_build_args_to_dockerfile": {
+                                        "type": "boolean",
+                                        "description": "Inject build arguments into the Dockerfile build."
+                                    },
+                                    "include_source_commit_in_build": {
+                                        "type": "boolean",
+                                        "description": "Include the source commit in the build."
+                                    },
+                                    "is_env_sorting_enabled": {
+                                        "type": "boolean",
+                                        "description": "Sort environment variables."
+                                    },
+                                    "is_pr_deployments_public_enabled": {
+                                        "type": "boolean",
+                                        "description": "Make pull request deployments public."
+                                    },
+                                    "stop_grace_period": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 3600,
+                                        "description": "Container stop grace period in seconds."
+                                    },
+                                    "docker_images_to_keep": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 100,
+                                        "description": "Number of Docker images to retain."
+                                    },
+                                    "is_gzip_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable gzip compression."
+                                    },
+                                    "is_stripprefix_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable path prefix stripping."
+                                    },
+                                    "is_raw_compose_deployment_enabled": {
+                                        "type": "boolean",
+                                        "description": "Deploy the raw Docker Compose definition."
                                     },
                                     "is_http_basic_auth_enabled": {
                                         "type": "boolean",
@@ -1302,6 +1426,68 @@
                                         "nullable": true,
                                         "description": "Use build server."
                                     },
+                                    "use_build_secrets": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Use Docker Build Secrets for build-time environment variables."
+                                    },
+                                    "is_git_submodules_enabled": {
+                                        "type": "boolean",
+                                        "description": "Clone Git submodules."
+                                    },
+                                    "is_git_lfs_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable Git LFS."
+                                    },
+                                    "is_git_shallow_clone_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use a shallow Git clone."
+                                    },
+                                    "disable_build_cache": {
+                                        "type": "boolean",
+                                        "description": "Disable the build cache."
+                                    },
+                                    "inject_build_args_to_dockerfile": {
+                                        "type": "boolean",
+                                        "description": "Inject build arguments into the Dockerfile build."
+                                    },
+                                    "include_source_commit_in_build": {
+                                        "type": "boolean",
+                                        "description": "Include the source commit in the build."
+                                    },
+                                    "is_env_sorting_enabled": {
+                                        "type": "boolean",
+                                        "description": "Sort environment variables."
+                                    },
+                                    "is_pr_deployments_public_enabled": {
+                                        "type": "boolean",
+                                        "description": "Make pull request deployments public."
+                                    },
+                                    "stop_grace_period": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 3600,
+                                        "description": "Container stop grace period in seconds."
+                                    },
+                                    "docker_images_to_keep": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 100,
+                                        "description": "Number of Docker images to retain."
+                                    },
+                                    "is_gzip_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable gzip compression."
+                                    },
+                                    "is_stripprefix_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable path prefix stripping."
+                                    },
+                                    "is_raw_compose_deployment_enabled": {
+                                        "type": "boolean",
+                                        "description": "Deploy the raw Docker Compose definition."
+                                    },
                                     "is_http_basic_auth_enabled": {
                                         "type": "boolean",
                                         "description": "HTTP Basic Authentication enabled."
@@ -1668,6 +1854,68 @@
                                         "nullable": true,
                                         "description": "Use build server."
                                     },
+                                    "use_build_secrets": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Use Docker Build Secrets for build-time environment variables."
+                                    },
+                                    "is_git_submodules_enabled": {
+                                        "type": "boolean",
+                                        "description": "Clone Git submodules."
+                                    },
+                                    "is_git_lfs_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable Git LFS."
+                                    },
+                                    "is_git_shallow_clone_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use a shallow Git clone."
+                                    },
+                                    "disable_build_cache": {
+                                        "type": "boolean",
+                                        "description": "Disable the build cache."
+                                    },
+                                    "inject_build_args_to_dockerfile": {
+                                        "type": "boolean",
+                                        "description": "Inject build arguments into the Dockerfile build."
+                                    },
+                                    "include_source_commit_in_build": {
+                                        "type": "boolean",
+                                        "description": "Include the source commit in the build."
+                                    },
+                                    "is_env_sorting_enabled": {
+                                        "type": "boolean",
+                                        "description": "Sort environment variables."
+                                    },
+                                    "is_pr_deployments_public_enabled": {
+                                        "type": "boolean",
+                                        "description": "Make pull request deployments public."
+                                    },
+                                    "stop_grace_period": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 3600,
+                                        "description": "Container stop grace period in seconds."
+                                    },
+                                    "docker_images_to_keep": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 100,
+                                        "description": "Number of Docker images to retain."
+                                    },
+                                    "is_gzip_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable gzip compression."
+                                    },
+                                    "is_stripprefix_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable path prefix stripping."
+                                    },
+                                    "is_raw_compose_deployment_enabled": {
+                                        "type": "boolean",
+                                        "description": "Deploy the raw Docker Compose definition."
+                                    },
                                     "is_http_basic_auth_enabled": {
                                         "type": "boolean",
                                         "description": "HTTP Basic Authentication enabled."
@@ -2013,6 +2261,68 @@
                                         "type": "boolean",
                                         "nullable": true,
                                         "description": "Use build server."
+                                    },
+                                    "use_build_secrets": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Use Docker Build Secrets for build-time environment variables."
+                                    },
+                                    "is_git_submodules_enabled": {
+                                        "type": "boolean",
+                                        "description": "Clone Git submodules."
+                                    },
+                                    "is_git_lfs_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable Git LFS."
+                                    },
+                                    "is_git_shallow_clone_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use a shallow Git clone."
+                                    },
+                                    "disable_build_cache": {
+                                        "type": "boolean",
+                                        "description": "Disable the build cache."
+                                    },
+                                    "inject_build_args_to_dockerfile": {
+                                        "type": "boolean",
+                                        "description": "Inject build arguments into the Dockerfile build."
+                                    },
+                                    "include_source_commit_in_build": {
+                                        "type": "boolean",
+                                        "description": "Include the source commit in the build."
+                                    },
+                                    "is_env_sorting_enabled": {
+                                        "type": "boolean",
+                                        "description": "Sort environment variables."
+                                    },
+                                    "is_pr_deployments_public_enabled": {
+                                        "type": "boolean",
+                                        "description": "Make pull request deployments public."
+                                    },
+                                    "stop_grace_period": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 3600,
+                                        "description": "Container stop grace period in seconds."
+                                    },
+                                    "docker_images_to_keep": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 100,
+                                        "description": "Number of Docker images to retain."
+                                    },
+                                    "is_gzip_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable gzip compression."
+                                    },
+                                    "is_stripprefix_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable path prefix stripping."
+                                    },
+                                    "is_raw_compose_deployment_enabled": {
+                                        "type": "boolean",
+                                        "description": "Deploy the raw Docker Compose definition."
                                     },
                                     "is_http_basic_auth_enabled": {
                                         "type": "boolean",
@@ -2596,6 +2906,67 @@
                                         "nullable": true,
                                         "description": "Use build server."
                                     },
+                                    "use_build_secrets": {
+                                        "type": "boolean",
+                                        "description": "Use Docker Build Secrets for build-time environment variables."
+                                    },
+                                    "is_git_submodules_enabled": {
+                                        "type": "boolean",
+                                        "description": "Clone Git submodules."
+                                    },
+                                    "is_git_lfs_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable Git LFS."
+                                    },
+                                    "is_git_shallow_clone_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use a shallow Git clone."
+                                    },
+                                    "disable_build_cache": {
+                                        "type": "boolean",
+                                        "description": "Disable the build cache."
+                                    },
+                                    "inject_build_args_to_dockerfile": {
+                                        "type": "boolean",
+                                        "description": "Inject build arguments into the Dockerfile build."
+                                    },
+                                    "include_source_commit_in_build": {
+                                        "type": "boolean",
+                                        "description": "Include the source commit in the build."
+                                    },
+                                    "is_env_sorting_enabled": {
+                                        "type": "boolean",
+                                        "description": "Sort environment variables."
+                                    },
+                                    "is_pr_deployments_public_enabled": {
+                                        "type": "boolean",
+                                        "description": "Make pull request deployments public."
+                                    },
+                                    "stop_grace_period": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 3600,
+                                        "description": "Container stop grace period in seconds."
+                                    },
+                                    "docker_images_to_keep": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 100,
+                                        "description": "Number of Docker images to retain."
+                                    },
+                                    "is_gzip_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable gzip compression."
+                                    },
+                                    "is_stripprefix_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable path prefix stripping."
+                                    },
+                                    "is_raw_compose_deployment_enabled": {
+                                        "type": "boolean",
+                                        "description": "Deploy the raw Docker Compose definition."
+                                    },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
@@ -2612,10 +2983,6 @@
                                     "is_preserve_repository_enabled": {
                                         "type": "boolean",
                                         "description": "Preserve git repository during application update. If false, the existing repository will be removed and replaced with the new one. If true, the existing repository will be kept and the new one will be ignored. Default is false."
-                                    },
-                                    "include_source_commit_in_build": {
-                                        "type": "boolean",
-                                        "description": "Include source commit information in the build. Default is false."
                                     }
                                 },
                                 "type": "object"
@@ -8050,6 +8417,260 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/destinations": {
+            "get": {
+                "tags": [
+                    "Destinations"
+                ],
+                "summary": "List destinations",
+                "description": "List all Docker network destinations for the authenticated team.",
+                "operationId": "list-destinations",
+                "responses": {
+                    "200": {
+                        "description": "Destinations for the authenticated team.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/Destination"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/{server_uuid}\/destinations": {
+            "get": {
+                "tags": [
+                    "Destinations"
+                ],
+                "summary": "List destinations by server",
+                "description": "List Docker network destinations attached to a server owned by the authenticated team.",
+                "operationId": "list-server-destinations",
+                "parameters": [
+                    {
+                        "name": "server_uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Destinations attached to the server.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/Destination"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Destinations"
+                ],
+                "summary": "Create destination",
+                "description": "Create a Docker network destination on a server owned by the authenticated team.",
+                "operationId": "create-server-destination",
+                "parameters": [
+                    {
+                        "name": "server_uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "network"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "network": {
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+                                    },
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "standalone",
+                                            "swarm"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Destination created.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/Destination"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "A destination with this network already exists."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/destinations\/{uuid}": {
+            "get": {
+                "tags": [
+                    "Destinations"
+                ],
+                "summary": "Get destination",
+                "description": "Get a Docker network destination by UUID.",
+                "operationId": "get-destination-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Destination UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Destination details.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/Destination"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Destinations"
+                ],
+                "summary": "Delete destination",
+                "description": "Delete an unused Docker network destination.",
+                "operationId": "delete-destination-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Destination UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Destination deleted.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Deleted."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "Destination has attached resources."
                     }
                 },
                 "security": [
@@ -14892,6 +15513,9 @@
                         "type": "string",
                         "nullable": true,
                         "description": "Password for HTTP Basic Authentication"
+                    },
+                    "": {
+                        "$ref": "#\/components\/schemas\/ApplicationSetting"
                     }
                 },
                 "type": "object"
@@ -14983,6 +15607,123 @@
                     },
                     "commit_message": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "ApplicationSetting": {
+                "description": "Application settings.",
+                "properties": {
+                    "is_static": {
+                        "type": "boolean"
+                    },
+                    "is_git_submodules_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_git_lfs_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_auto_deploy_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_force_https_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_debug_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_preview_deployments_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_log_drain_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_gpu_enabled": {
+                        "type": "boolean"
+                    },
+                    "gpu_driver": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "gpu_count": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "gpu_device_ids": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "gpu_options": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "is_include_timestamps": {
+                        "type": "boolean"
+                    },
+                    "is_swarm_only_worker_nodes": {
+                        "type": "boolean"
+                    },
+                    "is_raw_compose_deployment_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_build_server_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_consistent_container_name_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_gzip_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_stripprefix_enabled": {
+                        "type": "boolean"
+                    },
+                    "connect_to_docker_network": {
+                        "type": "boolean"
+                    },
+                    "custom_internal_name": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "is_container_label_escape_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_env_sorting_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_container_label_readonly_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_preserve_repository_enabled": {
+                        "type": "boolean"
+                    },
+                    "disable_build_cache": {
+                        "type": "boolean"
+                    },
+                    "is_spa": {
+                        "type": "boolean"
+                    },
+                    "is_git_shallow_clone_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_pr_deployments_public_enabled": {
+                        "type": "boolean"
+                    },
+                    "use_build_secrets": {
+                        "type": "boolean"
+                    },
+                    "inject_build_args_to_dockerfile": {
+                        "type": "boolean"
+                    },
+                    "include_source_commit_in_build": {
+                        "type": "boolean"
+                    },
+                    "docker_images_to_keep": {
+                        "type": "integer"
+                    },
+                    "stop_grace_period": {
+                        "type": "integer",
+                        "nullable": true
                     }
                 },
                 "type": "object"
@@ -15514,6 +16255,39 @@
                 },
                 "type": "object"
             },
+            "Destination": {
+                "description": "A Docker network destination attached to a server.",
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "network": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "standalone",
+                            "swarm"
+                        ]
+                    },
+                    "server_uuid": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
             "Tag": {
                 "description": "Tag model",
                 "properties": {
@@ -15753,6 +16527,10 @@
         {
             "name": "Deployments",
             "description": "Deployments"
+        },
+        {
+            "name": "Destinations",
+            "description": "Destinations"
         },
         {
             "name": "DigitalOcean",

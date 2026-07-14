@@ -15,19 +15,4 @@ class CustomEmailNotification extends Notification implements ShouldQueue
     public $tries = 5;
 
     public $maxExceptions = 5;
-
-    public function shouldDeduplicate(): bool
-    {
-        return true;
-    }
-
-    public function deduplicateFor(): int
-    {
-        return 900;
-    }
-
-    public function deduplicationKey(object $notifiable, string $channel): ?string
-    {
-        return null;
-    }
 }

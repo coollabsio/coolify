@@ -30,16 +30,6 @@ class Reachable extends CustomEmailNotification
         return $notifiable->getEnabledChannels('server_reachable');
     }
 
-    public function deduplicationKey(object $notifiable, string $channel): ?string
-    {
-        return "server-reachable:{$this->server->uuid}";
-    }
-
-    public function deduplicateFor(): int
-    {
-        return 1800;
-    }
-
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;

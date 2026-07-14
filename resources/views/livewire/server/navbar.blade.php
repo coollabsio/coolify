@@ -15,7 +15,7 @@
         <h1>Server</h1>
     <div class="pt-2 pb-4 md:pb-10">
         <div class="flex-col md:flex-row flex gap-2">
-            <div data-testid="server-subtitle" class="text-xs lg:text-sm min-w-0 truncate">
+            <div data-testid="server-subtitle" class="text-xs lg:text-sm min-w-0 truncate text-neutral-600 dark:text-neutral-400">
                 {{ data_get($server, 'name') }}
             </div>
             @php

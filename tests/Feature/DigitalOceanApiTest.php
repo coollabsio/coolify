@@ -3,6 +3,7 @@
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
+use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -131,6 +132,109 @@ describe('POST /api/v1/servers/digitalocean', function () {
             && $request['ipv6'] === true
             && $request['monitoring'] === true
             && $request['user_data'] === '#cloud-config');
+    });
+
+    test('tracks the droplet with a placeholder IP when waiting for its IP fails', function () {
+        Http::fake([
+            'https://api.digitalocean.com/v2/account/keys' => Http::response([
+                'ssh_key' => ['id' => 123, 'fingerprint' => 'aa:bb:cc:dd'],
+            ], 201),
+            'https://api.digitalocean.com/v2/account/keys*' => Http::response([
+                'ssh_keys' => [],
+                'links' => ['pages' => []],
+            ], 200),
+            'https://api.digitalocean.com/v2/droplets' => Http::response([
+                'droplet' => [
+                    'id' => 987,
+                    'name' => 'waiting-for-ip',
+                    'status' => 'new',
+                    'networks' => ['v4' => [], 'v6' => []],
+                ],
+            ], 202),
+            'https://api.digitalocean.com/v2/droplets/987' => Http::response([
+                'message' => 'temporary provider failure',
+            ], 500),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson('/api/v1/servers/digitalocean', [
+            'cloud_provider_token_id' => $this->digitalOceanToken->uuid,
+            'region' => 'nyc1',
+            'size' => 's-1vcpu-1gb',
+            'image' => 'ubuntu-24-04-x64',
+            'name' => 'waiting-for-ip',
+            'private_key_uuid' => $this->privateKey->uuid,
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonFragment([
+            'digitalocean_droplet_id' => 987,
+            'ip' => Server::PLACEHOLDER_IP,
+        ]);
+
+        $this->assertDatabaseHas('servers', [
+            'name' => 'waiting-for-ip',
+            'ip' => Server::PLACEHOLDER_IP,
+            'team_id' => $this->team->id,
+            'digitalocean_droplet_id' => 987,
+            'digitalocean_droplet_status' => 'new',
+        ]);
+    });
+
+    test('deletes the droplet when local server persistence fails', function () {
+        Http::fake([
+            'https://api.digitalocean.com/v2/account/keys' => Http::response([
+                'ssh_key' => ['id' => 123, 'fingerprint' => 'aa:bb:cc:dd'],
+            ], 201),
+            'https://api.digitalocean.com/v2/account/keys*' => Http::response([
+                'ssh_keys' => [],
+                'links' => ['pages' => []],
+            ], 200),
+            'https://api.digitalocean.com/v2/droplets' => Http::response([
+                'droplet' => [
+                    'id' => 987,
+                    'name' => 'persistence-fails',
+                    'status' => 'active',
+                    'networks' => [
+                        'v4' => [
+                            ['ip_address' => '203.0.113.10', 'type' => 'public'],
+                        ],
+                    ],
+                ],
+            ], 202),
+            'https://api.digitalocean.com/v2/droplets/987' => Http::response(null, 204),
+        ]);
+
+        $eventDispatcher = Server::getEventDispatcher();
+        Server::setEventDispatcher(clone $eventDispatcher);
+        Server::created(function (): void {
+            throw new RuntimeException('local persistence failed');
+        });
+
+        try {
+            $response = $this->withHeaders([
+                'Authorization' => 'Bearer '.$this->bearerToken,
+                'Content-Type' => 'application/json',
+            ])->postJson('/api/v1/servers/digitalocean', [
+                'cloud_provider_token_id' => $this->digitalOceanToken->uuid,
+                'region' => 'nyc1',
+                'size' => 's-1vcpu-1gb',
+                'image' => 'ubuntu-24-04-x64',
+                'name' => 'persistence-fails',
+                'private_key_uuid' => $this->privateKey->uuid,
+            ]);
+        } finally {
+            Server::setEventDispatcher($eventDispatcher);
+        }
+
+        $response->assertServerError();
+        $this->assertDatabaseMissing('servers', [
+            'digitalocean_droplet_id' => 987,
+        ]);
+        Http::assertSent(fn ($request) => $request->method() === 'DELETE'
+            && $request->url() === 'https://api.digitalocean.com/v2/droplets/987');
     });
 
     test('validates required fields', function () {

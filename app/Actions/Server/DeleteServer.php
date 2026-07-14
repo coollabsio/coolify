@@ -122,12 +122,7 @@ class DeleteServer
             }
 
             if (! $token) {
-                logger()->debug('No Vultr token found for team, skipping Vultr deletion', [
-                    'team_id' => $teamId,
-                    'vultr_instance_id' => $vultrInstanceId,
-                ]);
-
-                return;
+                throw new \RuntimeException('No Vultr token found for the server team.');
             }
 
             $vultrService = new VultrService($token->token);
@@ -143,6 +138,8 @@ class DeleteServer
                 'vultr_instance_id' => $vultrInstanceId,
                 'team_id' => $teamId,
             ]);
+
+            throw $e;
         }
     }
 
@@ -165,12 +162,7 @@ class DeleteServer
             }
 
             if (! $token) {
-                logger()->debug('No DigitalOcean token found for team, skipping droplet deletion', [
-                    'team_id' => $teamId,
-                    'digitalocean_droplet_id' => $digitalOceanDropletId,
-                ]);
-
-                return;
+                throw new \RuntimeException('No DigitalOcean token found for the server team.');
             }
 
             $digitalOceanService = new DigitalOceanService($token->token);
@@ -186,6 +178,8 @@ class DeleteServer
                 'digitalocean_droplet_id' => $digitalOceanDropletId,
                 'team_id' => $teamId,
             ]);
+
+            throw $e;
         }
     }
 }

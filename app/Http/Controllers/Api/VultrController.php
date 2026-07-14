@@ -52,6 +52,8 @@ class VultrController extends Controller
             return response()->json(['message' => 'Vultr cloud provider token not found.'], 404);
         }
 
+        $this->authorize('view', $token);
+
         return $token;
     }
 
@@ -277,6 +279,8 @@ class VultrController extends Controller
             return response()->json(['message' => 'Vultr cloud provider token not found.'], 404);
         }
 
+        $this->authorize('view', $token);
+
         $privateKey = PrivateKey::whereTeamId($teamId)->whereUuid($request->private_key_uuid)->first();
         if (! $privateKey) {
             return response()->json(['message' => 'Private key not found.'], 404);
@@ -313,7 +317,7 @@ class VultrController extends Controller
             }
 
             $vultrInstance = $vultrService->createInstance($params);
-            $ipAddress = $vultrService->getPublicIp($vultrInstance, $request->disable_public_ipv4, $request->enable_ipv6) ?? '0.0.0.0';
+            $ipAddress = $vultrService->getPublicIp($vultrInstance, $request->disable_public_ipv4, $request->enable_ipv6) ?? Server::PLACEHOLDER_IP;
 
             $server = Server::create([
                 'name' => $normalizedServerName,

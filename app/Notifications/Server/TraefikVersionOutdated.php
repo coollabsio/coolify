@@ -38,18 +38,6 @@ class TraefikVersionOutdated extends CustomEmailNotification
         return $this->formatVersion($info['latest'] ?? 'unknown');
     }
 
-    public function deduplicationKey(object $notifiable, string $channel): ?string
-    {
-        $serverUuids = $this->servers->pluck('uuid')->sort()->values()->join('|');
-
-        return 'traefik-version-outdated:servers:'.hash('sha256', $serverUuids);
-    }
-
-    public function deduplicateFor(): int
-    {
-        return 86400;
-    }
-
     public function toMail($notifiable = null): MailMessage
     {
         $mail = new MailMessage;

@@ -100,6 +100,17 @@ test('MCP endpoint returns 403 when the token team has MCP disabled', function (
     $response->assertJson(['message' => 'MCP server is disabled for this team.']);
 });
 
+test('MCP endpoint is enabled for teams by default', function () {
+    $defaultTeam = Team::factory()->create();
+    $this->user->teams()->attach($defaultTeam->id, ['role' => 'owner']);
+    session(['currentTeam' => $defaultTeam]);
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    $response = mcpListTools($token);
+
+    $response->assertOk();
+});
+
 test('MCP endpoint rejects unauthenticated requests', function () {
     $response = mcpPost(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list']);
     $response->assertStatus(401);

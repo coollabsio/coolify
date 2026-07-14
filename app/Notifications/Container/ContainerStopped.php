@@ -21,16 +21,6 @@ class ContainerStopped extends CustomEmailNotification
         return $notifiable->getEnabledChannels('status_change');
     }
 
-    public function deduplicationKey(object $notifiable, string $channel): ?string
-    {
-        return "container-stopped:server:{$this->server->uuid}:container:{$this->name}";
-    }
-
-    public function deduplicateFor(): int
-    {
-        return 3600;
-    }
-
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;

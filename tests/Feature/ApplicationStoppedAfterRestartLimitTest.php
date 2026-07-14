@@ -48,24 +48,6 @@ it('does not show the restart limit warning for a normal manual stop', function 
     expect($html)->not->toContain('Stopped after reaching restart limit');
 });
 
-it('uses a semantic dedupe key for restart limit notifications', function () {
-    $application = applicationWithRestartState();
-    $application->forceFill([
-        'name' => 'crashy-app',
-        'uuid' => 'application-uuid',
-    ]);
-    $application->setRelation('environment', (object) [
-        'uuid' => 'environment-uuid',
-        'name' => 'production',
-        'project' => (object) ['uuid' => 'project-uuid'],
-    ]);
-
-    $notification = new RestartLimitReached($application);
-
-    expect($notification->deduplicationKey((object) ['id' => 1], 'mail'))->toBe('restart-limit-reached:application:application-uuid:count:2')
-        ->and($notification->deduplicateFor())->toBe(86400);
-});
-
 it('keeps restart tracking configurable when stopping an application', function () {
     $method = new ReflectionMethod(StopApplication::class, 'handle');
     $resetRestartCount = collect($method->getParameters())->firstWhere('name', 'resetRestartCount');

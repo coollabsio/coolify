@@ -11,8 +11,6 @@ use Illuminate\Notifications\Messages\MailMessage;
 
 class BackupFailed extends CustomEmailNotification
 {
-    public int|string|null $backupId = null;
-
     public string $name;
 
     public string $frequency;
@@ -20,7 +18,6 @@ class BackupFailed extends CustomEmailNotification
     public function __construct(ScheduledDatabaseBackup $backup, public $database, public $output, public $database_name)
     {
         $this->onQueue('high');
-        $this->backupId = data_get($backup, 'uuid') ?? data_get($backup, 'id');
         $this->name = $database->name;
         $this->frequency = $backup->frequency;
     }
@@ -28,16 +25,6 @@ class BackupFailed extends CustomEmailNotification
     public function via(object $notifiable): array
     {
         return $notifiable->getEnabledChannels('backup_failure');
-    }
-
-    public function deduplicationKey(object $notifiable, string $channel): ?string
-    {
-        return "backup-failed:backup:{$this->backupId}:database:{$this->database->uuid}:output:".hash('sha256', (string) $this->output);
-    }
-
-    public function deduplicateFor(): int
-    {
-        return 21600;
     }
 
     public function toMail(): MailMessage

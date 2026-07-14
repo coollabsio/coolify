@@ -4,6 +4,7 @@ use App\Livewire\Server\New\ByVultr;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
+use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -95,7 +96,7 @@ it('creates a Vultr server through the Livewire flow', function () {
             'instance' => [
                 'id' => 'instance-1',
                 'label' => 'test-vultr-server',
-                'main_ip' => '1.2.3.4',
+                'main_ip' => '192.0.2.10',
                 'v6_main_ip' => '2001:db8::1',
                 'status' => 'pending',
             ],
@@ -115,7 +116,7 @@ it('creates a Vultr server through the Livewire flow', function () {
 
     $this->assertDatabaseHas('servers', [
         'name' => 'test-vultr-server',
-        'ip' => '1.2.3.4',
+        'ip' => '192.0.2.10',
         'team_id' => $this->team->id,
         'cloud_provider_token_id' => $this->vultrToken->id,
         'vultr_instance_id' => 'instance-1',
@@ -130,6 +131,45 @@ it('creates a Vultr server through the Livewire flow', function () {
             && $request['sshkey_id'] === ['key-1']
             && $request['user_data'] === base64_encode("#cloud-config\npackages:\n  - curl");
     });
+});
+
+it('persists the server with a placeholder IP when Vultr has not assigned one yet', function () {
+    Http::fake([
+        'https://api.vultr.com/v2/ssh-keys' => Http::response([
+            'ssh_key' => ['id' => 'key-1', 'ssh_key' => vultrLivewireTestPublicKey()],
+        ], 201),
+        'https://api.vultr.com/v2/ssh-keys*' => Http::response([
+            'ssh_keys' => [],
+            'meta' => ['links' => ['next' => null]],
+        ], 200),
+        'https://api.vultr.com/v2/instances/instance-1' => Http::response(['error' => 'temporary error'], 500),
+        'https://api.vultr.com/v2/instances' => Http::response([
+            'instance' => [
+                'id' => 'instance-1',
+                'label' => 'test-vultr-server',
+                'main_ip' => '0.0.0.0',
+                'v6_main_ip' => '::',
+                'status' => 'pending',
+            ],
+        ], 202),
+    ]);
+
+    Livewire::test(ByVultr::class, ['selectedTokenUuid' => $this->vultrToken->uuid])
+        ->set('server_name', 'test-vultr-server')
+        ->set('selected_region', 'ewr')
+        ->set('selected_plan', 'vc2-1c-1gb')
+        ->set('selected_os_id', 2284)
+        ->set('private_key_id', $this->privateKey->id)
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    $this->assertDatabaseHas('servers', [
+        'name' => 'test-vultr-server',
+        'ip' => Server::PLACEHOLDER_IP,
+        'team_id' => $this->team->id,
+        'vultr_instance_id' => 'instance-1',
+        'vultr_instance_status' => 'pending',
+    ]);
 });
 
 it('requires IPv6 when public IPv4 is disabled', function () {

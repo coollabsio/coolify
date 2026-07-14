@@ -35,6 +35,36 @@ class ApplicationsController extends Controller
 {
     use Concerns\HandlesTagsApi;
 
+    private const APPLICATION_SETTING_FIELDS = [
+        'is_git_submodules_enabled',
+        'is_git_lfs_enabled',
+        'is_git_shallow_clone_enabled',
+        'disable_build_cache',
+        'inject_build_args_to_dockerfile',
+        'include_source_commit_in_build',
+        'is_env_sorting_enabled',
+        'is_pr_deployments_public_enabled',
+        'stop_grace_period',
+        'docker_images_to_keep',
+        'is_gzip_enabled',
+        'is_stripprefix_enabled',
+        'is_raw_compose_deployment_enabled',
+    ];
+
+    private const BOOLEAN_APPLICATION_SETTING_FIELDS = [
+        'is_git_submodules_enabled',
+        'is_git_lfs_enabled',
+        'is_git_shallow_clone_enabled',
+        'disable_build_cache',
+        'inject_build_args_to_dockerfile',
+        'include_source_commit_in_build',
+        'is_env_sorting_enabled',
+        'is_pr_deployments_public_enabled',
+        'is_gzip_enabled',
+        'is_stripprefix_enabled',
+        'is_raw_compose_deployment_enabled',
+    ];
+
     protected function findTaggableResource(string $uuid, int|string $teamId): mixed
     {
         return Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $uuid)->first();
@@ -87,7 +117,46 @@ class ApplicationsController extends Controller
             $application->makeHidden(['value', 'real_value']);
         }
 
+        if ($application->relationLoaded('settings')) {
+            $application->settings?->makeHidden(['id', 'application_id', 'created_at', 'updated_at']);
+        }
+
         return serializeApiResponse($application);
+    }
+
+    private function applicationSettingsFromRequest(Request $request): array
+    {
+        $settings = [];
+
+        foreach (self::APPLICATION_SETTING_FIELDS as $field) {
+            if (! array_key_exists($field, $request->all())) {
+                continue;
+            }
+
+            $settings[$field] = in_array($field, self::BOOLEAN_APPLICATION_SETTING_FIELDS, true)
+                ? $request->boolean($field)
+                : $request->input($field);
+        }
+
+        return $settings;
+    }
+
+    private function applyApplicationSettings(Application $application, array $settings): void
+    {
+        if ($settings === []) {
+            return;
+        }
+
+        $regenerateLabels = ! $application->wasRecentlyCreated
+            && $application->settings->is_container_label_readonly_enabled
+            && (array_key_exists('is_gzip_enabled', $settings) || array_key_exists('is_stripprefix_enabled', $settings));
+
+        $application->settings->fill($settings)->save();
+
+        if ($regenerateLabels) {
+            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+            $application->save();
+        }
     }
 
     /**
@@ -285,6 +354,20 @@ class ApplicationsController extends Controller
                             ],
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'default' => false, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
+                            'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
+                            'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
+                            'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
+                            'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
+                            'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
+                            'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
+                            'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
+                            'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
@@ -453,6 +536,20 @@ class ApplicationsController extends Controller
                             ],
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'default' => false, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
+                            'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
+                            'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
+                            'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
+                            'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
+                            'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
+                            'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
+                            'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
+                            'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
@@ -621,6 +718,20 @@ class ApplicationsController extends Controller
                             ],
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'default' => false, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
+                            'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
+                            'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
+                            'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
+                            'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
+                            'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
+                            'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
+                            'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
+                            'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
@@ -761,6 +872,20 @@ class ApplicationsController extends Controller
                             'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
                             'is_preview_deployments_enabled' => ['type' => 'boolean', 'description' => 'Enable preview deployments for pull requests.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'default' => false, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
+                            'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
+                            'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
+                            'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
+                            'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
+                            'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
+                            'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
+                            'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
+                            'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
@@ -897,6 +1022,20 @@ class ApplicationsController extends Controller
                             'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
                             'is_preview_deployments_enabled' => ['type' => 'boolean', 'description' => 'Enable preview deployments for pull requests.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'default' => false, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
+                            'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
+                            'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
+                            'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
+                            'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
+                            'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
+                            'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
+                            'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
+                            'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
@@ -981,7 +1120,7 @@ class ApplicationsController extends Controller
         if ($return instanceof JsonResponse) {
             return $return;
         }
-        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled', 'tags', 'is_preserve_repository_enabled'];
+        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'use_build_secrets', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled', 'tags', 'is_preserve_repository_enabled', ...self::APPLICATION_SETTING_FIELDS];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
@@ -1036,6 +1175,7 @@ class ApplicationsController extends Controller
         $instantDeploy = $request->instant_deploy;
         $githubAppUuid = $request->github_app_uuid;
         $useBuildServer = $request->use_build_server;
+        $useBuildSecrets = $request->use_build_secrets;
         $isStatic = $request->is_static;
         $isSpa = $request->is_spa;
         $isAutoDeployEnabled = $request->is_auto_deploy_enabled;
@@ -1045,6 +1185,19 @@ class ApplicationsController extends Controller
         $customNginxConfiguration = $request->custom_nginx_configuration;
         $isContainerLabelEscapeEnabled = $request->boolean('is_container_label_escape_enabled', true);
         $isPreserveRepositoryEnabled = $request->boolean('is_preserve_repository_enabled', false);
+        $applicationSettings = $this->applicationSettingsFromRequest($request);
+
+        $requestedBuildPack = in_array($type, ['public', 'private-gh-app', 'private-deploy-key'], true)
+            ? $request->input('build_pack')
+            : $type;
+        if (($applicationSettings['is_raw_compose_deployment_enabled'] ?? false) && $requestedBuildPack !== 'dockercompose') {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    'is_raw_compose_deployment_enabled' => 'Raw compose deployment can only be enabled for Docker Compose applications.',
+                ],
+            ], 422);
+        }
 
         if (! is_null($customNginxConfiguration)) {
             if (! isBase64Encoded($customNginxConfiguration)) {
@@ -1232,6 +1385,7 @@ class ApplicationsController extends Controller
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
             $application->save();
+            $this->applyApplicationSettings($application, $applicationSettings);
             if (isset($isStatic)) {
                 $application->settings->is_static = $isStatic;
                 $application->settings->save();
@@ -1258,6 +1412,10 @@ class ApplicationsController extends Controller
             }
             if (isset($useBuildServer)) {
                 $application->settings->is_build_server_enabled = $useBuildServer;
+                $application->settings->save();
+            }
+            if (isset($useBuildSecrets)) {
+                $application->settings->use_build_secrets = $useBuildSecrets;
                 $application->settings->save();
             }
             if (isset($isContainerLabelEscapeEnabled)) {
@@ -1478,6 +1636,7 @@ class ApplicationsController extends Controller
             $application->repository_project_id = $repository_project_id;
 
             $application->save();
+            $this->applyApplicationSettings($application, $applicationSettings);
             $application->refresh();
             // Auto-generate domain if requested and no custom domain provided
             if ($autogenerateDomain && blank($fqdn)) {
@@ -1510,6 +1669,10 @@ class ApplicationsController extends Controller
             }
             if (isset($useBuildServer)) {
                 $application->settings->is_build_server_enabled = $useBuildServer;
+                $application->settings->save();
+            }
+            if (isset($useBuildSecrets)) {
+                $application->settings->use_build_secrets = $useBuildSecrets;
                 $application->settings->save();
             }
             if (isset($isContainerLabelEscapeEnabled)) {
@@ -1694,6 +1857,7 @@ class ApplicationsController extends Controller
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
             $application->save();
+            $this->applyApplicationSettings($application, $applicationSettings);
             $application->refresh();
             // Auto-generate domain if requested and no custom domain provided
             if ($autogenerateDomain && blank($fqdn)) {
@@ -1726,6 +1890,10 @@ class ApplicationsController extends Controller
             }
             if (isset($useBuildServer)) {
                 $application->settings->is_build_server_enabled = $useBuildServer;
+                $application->settings->save();
+            }
+            if (isset($useBuildSecrets)) {
+                $application->settings->use_build_secrets = $useBuildSecrets;
                 $application->settings->save();
             }
             if (isset($isContainerLabelEscapeEnabled)) {
@@ -1837,6 +2005,7 @@ class ApplicationsController extends Controller
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
             $application->save();
+            $this->applyApplicationSettings($application, $applicationSettings);
             $application->refresh();
             // Auto-generate domain if requested and no custom domain provided
             if ($autogenerateDomain && blank($fqdn)) {
@@ -1857,6 +2026,10 @@ class ApplicationsController extends Controller
             }
             if (isset($useBuildServer)) {
                 $application->settings->is_build_server_enabled = $useBuildServer;
+                $application->settings->save();
+            }
+            if (isset($useBuildSecrets)) {
+                $application->settings->use_build_secrets = $useBuildSecrets;
                 $application->settings->save();
             }
             if (isset($isContainerLabelEscapeEnabled)) {
@@ -1963,6 +2136,7 @@ class ApplicationsController extends Controller
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
             $application->save();
+            $this->applyApplicationSettings($application, $applicationSettings);
             $application->refresh();
             // Auto-generate domain if requested and no custom domain provided
             if ($autogenerateDomain && blank($fqdn)) {
@@ -1983,6 +2157,10 @@ class ApplicationsController extends Controller
             }
             if (isset($useBuildServer)) {
                 $application->settings->is_build_server_enabled = $useBuildServer;
+                $application->settings->save();
+            }
+            if (isset($useBuildSecrets)) {
+                $application->settings->use_build_secrets = $useBuildSecrets;
                 $application->settings->save();
             }
             if (isset($isContainerLabelEscapeEnabled)) {
@@ -2090,7 +2268,7 @@ class ApplicationsController extends Controller
         if (! $uuid) {
             return response()->json(['message' => 'UUID is required.'], 400);
         }
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->with('settings')->where('uuid', $request->route('uuid'))->first();
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
@@ -2405,11 +2583,24 @@ class ApplicationsController extends Controller
                             ],
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
+                            'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
+                            'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
+                            'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
+                            'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
+                            'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
+                            'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
+                            'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
+                            'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
                             'is_preserve_repository_enabled' => ['type' => 'boolean', 'description' => 'Preserve git repository during application update. If false, the existing repository will be removed and replaced with the new one. If true, the existing repository will be kept and the new one will be ignored. Default is false.'],
-                            'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include source commit information in the build. Default is false.'],
                         ],
                     )
                 ),
@@ -2495,7 +2686,7 @@ class ApplicationsController extends Controller
         $this->authorize('update', $application);
 
         $server = $application->destination->server;
-        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled', 'include_source_commit_in_build'];
+        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'use_build_secrets', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled', ...self::APPLICATION_SETTING_FIELDS];
 
         $validationRules = [
             'name' => 'string|max:255',
@@ -2571,6 +2762,17 @@ class ApplicationsController extends Controller
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => $errors,
+            ], 422);
+        }
+
+        $applicationSettings = $this->applicationSettingsFromRequest($request);
+        $requestedBuildPack = $request->input('build_pack', $application->build_pack);
+        if (($applicationSettings['is_raw_compose_deployment_enabled'] ?? false) && $requestedBuildPack !== 'dockercompose') {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    'is_raw_compose_deployment_enabled' => 'Raw compose deployment can only be enabled for Docker Compose applications.',
+                ],
             ], 422);
         }
 
@@ -2728,11 +2930,16 @@ class ApplicationsController extends Controller
         $isPreviewDeploymentsEnabled = $request->is_preview_deployments_enabled;
         $connectToDockerNetwork = $request->connect_to_docker_network;
         $useBuildServer = $request->use_build_server;
+        $useBuildSecrets = $request->use_build_secrets;
         $isContainerLabelEscapeEnabled = $request->boolean('is_container_label_escape_enabled');
         $isPreserveRepositoryEnabled = $request->boolean('is_preserve_repository_enabled');
         $includeSourceCommitInBuild = $request->boolean('include_source_commit_in_build');
         if (isset($useBuildServer)) {
             $application->settings->is_build_server_enabled = $useBuildServer;
+            $application->settings->save();
+        }
+        if (isset($useBuildSecrets)) {
+            $application->settings->use_build_secrets = $useBuildSecrets;
             $application->settings->save();
         }
 
@@ -2778,6 +2985,7 @@ class ApplicationsController extends Controller
             $application->settings->include_source_commit_in_build = $includeSourceCommitInBuild;
             $application->settings->save();
         }
+        $this->applyApplicationSettings($application, $applicationSettings);
         removeUnnecessaryFieldsFromRequest($request);
 
         $data = $request->only($allowedFields);
@@ -4023,7 +4231,7 @@ class ApplicationsController extends Controller
             ),
         ]
     )]
-    public function move_by_uuid(Request $request): \Illuminate\Http\JsonResponse
+    public function move_by_uuid(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {

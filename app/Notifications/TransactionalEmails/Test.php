@@ -15,11 +15,6 @@ class Test extends CustomEmailNotification
         $this->onQueue('high');
     }
 
-    public function shouldDeduplicate(): bool
-    {
-        return false;
-    }
-
     public function via(): array
     {
         return [EmailChannel::class];

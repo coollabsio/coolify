@@ -111,6 +111,7 @@ use Symfony\Component\Yaml\Yaml;
         'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
         'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
         'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
+        'settings' => new OA\Property(ref: '#/components/schemas/ApplicationSetting'),
     ]
 )]
 

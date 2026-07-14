@@ -438,7 +438,7 @@ class ByVultr extends Component
 
             $vultrService = new VultrService($this->getVultrToken());
             $vultrInstance = $this->createVultrServer($this->getVultrToken());
-            $ipAddress = $vultrService->getPublicIp($vultrInstance, $this->disable_public_ipv4, $this->enable_ipv6) ?? '0.0.0.0';
+            $ipAddress = $vultrService->getPublicIp($vultrInstance, $this->disable_public_ipv4, $this->enable_ipv6) ?? Server::PLACEHOLDER_IP;
 
             $server = Server::create([
                 'name' => strtolower(trim($this->server_name)),
@@ -452,13 +452,18 @@ class ByVultr extends Component
                 'vultr_instance_status' => $vultrInstance['status'] ?? null,
             ]);
 
-            $vultrInstance = $vultrService->waitForPublicIp($vultrInstance, $this->disable_public_ipv4, $this->enable_ipv6);
-            $assignedIpAddress = $vultrService->getPublicIp($vultrInstance, $this->disable_public_ipv4, $this->enable_ipv6);
-            if ($assignedIpAddress && $assignedIpAddress !== $server->ip) {
-                $server->update([
-                    'ip' => $assignedIpAddress,
-                    'vultr_instance_status' => $vultrInstance['status'] ?? $server->vultr_instance_status,
-                ]);
+            try {
+                $vultrInstance = $vultrService->waitForPublicIp($vultrInstance, $this->disable_public_ipv4, $this->enable_ipv6);
+                $assignedIpAddress = $vultrService->getPublicIp($vultrInstance, $this->disable_public_ipv4, $this->enable_ipv6);
+                if ($assignedIpAddress && $assignedIpAddress !== $server->ip) {
+                    $server->update([
+                        'ip' => $assignedIpAddress,
+                        'vultr_instance_status' => $vultrInstance['status'] ?? $server->vultr_instance_status,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                // Non-fatal: the server page polling backfills the IP later.
+                report($e);
             }
 
             $server->proxy->set('status', 'exited');

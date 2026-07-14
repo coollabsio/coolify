@@ -11,6 +11,7 @@ use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Visus\Cuid2\Cuid2;
@@ -115,6 +116,48 @@ test('changeSource rejects an arbitrary class as source_type', function () {
 
     $this->applicationA->refresh();
     expect($this->applicationA->source_type)->not->toBe(Server::class);
+});
+
+test('changeSource dispatches configuration changed for an owned source', function () {
+    Http::fake([
+        'https://api.github.com/repos/*' => Http::response(['id' => 123]),
+    ]);
+    $source = GithubApp::create([
+        'name' => 'own-github-app',
+        'team_id' => $this->teamA->id,
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'is_public' => true,
+    ]);
+    $this->applicationA->update(['git_repository' => 'coollabsio/coolify']);
+
+    Livewire::test(Source::class, ['application' => $this->applicationA->fresh()])
+        ->call('changeSource', $source->id, GithubApp::class)
+        ->assertDispatched('configurationChanged');
+});
+
+test('changeSource dispatches configuration changed when repository metadata lookup fails after persistence', function () {
+    Http::fake([
+        'https://api.github.com/repos/*' => Http::response(
+            ['message' => 'Unavailable'],
+            503,
+            ['X-RateLimit-Reset' => now()->addMinute()->timestamp],
+        ),
+    ]);
+    $source = GithubApp::create([
+        'name' => 'own-unavailable-github-app',
+        'team_id' => $this->teamA->id,
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'is_public' => true,
+    ]);
+    $this->applicationA->update(['git_repository' => 'coollabsio/coolify']);
+
+    Livewire::test(Source::class, ['application' => $this->applicationA->fresh()])
+        ->call('changeSource', $source->id, GithubApp::class)
+        ->assertDispatched('configurationChanged');
+
+    expect($this->applicationA->refresh()->source_id)->toBe($source->id);
 });
 
 test('privateKeyId is locked so submit() cannot persist a client-supplied foreign id', function () {

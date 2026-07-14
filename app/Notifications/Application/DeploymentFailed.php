@@ -52,16 +52,6 @@ class DeploymentFailed extends CustomEmailNotification
         return $notifiable->getEnabledChannels('deployment_failure');
     }
 
-    public function deduplicationKey(object $notifiable, string $channel): ?string
-    {
-        return "deployment-failed:{$this->deployment_uuid}";
-    }
-
-    public function deduplicateFor(): int
-    {
-        return 86400;
-    }
-
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;

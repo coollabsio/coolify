@@ -1,11 +1,15 @@
 <?php
 
+use App\Http\Controllers\Api\VultrController;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
+use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
@@ -165,6 +169,27 @@ describe('GET /api/v1/vultr/ssh-keys', function () {
     });
 });
 
+test('member read token cannot use a stored Vultr token for metadata endpoints', function (string $endpoint) {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    $memberToken = $member->createToken('member-read', ['read'])->plainTextToken;
+
+    Http::fake();
+
+    $response = $this->withHeaders([
+        'Authorization' => 'Bearer '.$memberToken,
+        'Content-Type' => 'application/json',
+    ])->getJson($endpoint.'?cloud_provider_token_uuid='.$this->vultrToken->uuid);
+
+    $response->assertForbidden();
+    Http::assertNothingSent();
+})->with([
+    '/api/v1/vultr/regions',
+    '/api/v1/vultr/plans',
+    '/api/v1/vultr/os',
+    '/api/v1/vultr/ssh-keys',
+]);
+
 describe('POST /api/v1/servers/vultr', function () {
     test('creates a Vultr server', function () {
         Http::fake([
@@ -223,6 +248,11 @@ describe('POST /api/v1/servers/vultr', function () {
     });
 
     test('waits for Vultr to assign a real public IP when creation returns placeholder IP', function () {
+        $createdIp = null;
+        Server::created(function (Server $server) use (&$createdIp): void {
+            $createdIp = (string) $server->ip;
+        });
+
         Http::fake([
             'https://api.vultr.com/v2/ssh-keys' => Http::response([
                 'ssh_key' => ['id' => 'key-1', 'ssh_key' => testPublicKey()],
@@ -262,11 +292,41 @@ describe('POST /api/v1/servers/vultr', function () {
         $response->assertStatus(201);
         $response->assertJsonFragment(['ip' => '1.2.3.4']);
 
+        expect($createdIp)->toBe(Server::PLACEHOLDER_IP);
+
         $this->assertDatabaseHas('servers', [
             'name' => 'test-server',
             'ip' => '1.2.3.4',
             'vultr_instance_status' => 'active',
         ]);
+    });
+
+    test('server creation authorizes access to the stored Vultr token', function () {
+        $member = User::factory()->create();
+        $this->team->members()->attach($member->id, ['role' => 'member']);
+        $this->actingAs($member);
+        $member->withAccessToken($member->createToken('member-all', ['*'])->accessToken);
+
+        $request = Request::create(
+            uri: '/api/v1/servers/vultr',
+            method: 'POST',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode([
+                'cloud_provider_token_uuid' => $this->vultrToken->uuid,
+                'region' => 'ewr',
+                'plan' => 'vc2-1c-1gb',
+                'os_id' => 2284,
+                'name' => 'test-server',
+                'private_key_uuid' => $this->privateKey->uuid,
+            ], JSON_THROW_ON_ERROR),
+        );
+        $request->setUserResolver(fn () => $member);
+
+        Http::fake();
+
+        expect(fn () => app(VultrController::class)->createServer($request))
+            ->toThrow(AuthorizationException::class);
+        Http::assertNothingSent();
     });
 
     test('reuses existing matching Vultr SSH key', function () {

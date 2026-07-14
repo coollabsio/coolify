@@ -24,16 +24,6 @@ class ServerPatchCheck extends CustomEmailNotification
         return $notifiable->getEnabledChannels('server_patch');
     }
 
-    public function deduplicationKey(object $notifiable, string $channel): ?string
-    {
-        return "server-patch-check:server:{$this->server->uuid}:state:".hash('sha256', json_encode($this->patchData));
-    }
-
-    public function deduplicateFor(): int
-    {
-        return 86400;
-    }
-
     public function toMail($notifiable = null): MailMessage
     {
         $mail = new MailMessage;

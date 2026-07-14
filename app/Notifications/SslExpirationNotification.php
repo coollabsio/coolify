@@ -59,22 +59,6 @@ class SslExpirationNotification extends CustomEmailNotification
         return $notifiable->getEnabledChannels('ssl_certificate_renewal');
     }
 
-    public function deduplicationKey(object $notifiable, string $channel): ?string
-    {
-        $resourceKeys = $this->resources
-            ->map(fn ($resource) => data_get($resource, 'uuid') ?? data_get($resource, 'name'))
-            ->sort()
-            ->values()
-            ->join('|');
-
-        return 'ssl-certificate-renewed:resources:'.hash('sha256', $resourceKeys);
-    }
-
-    public function deduplicateFor(): int
-    {
-        return 86400;
-    }
-
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;

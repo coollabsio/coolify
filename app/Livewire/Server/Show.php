@@ -488,6 +488,11 @@ class Show extends Component
                 $this->server->hetzner_server_status = $this->hetznerServerStatus;
                 $this->server->update(['hetzner_server_status' => $this->hetznerServerStatus]);
             }
+
+            $assignedIp = data_get($serverData, 'public_net.ipv4.ip') ?? data_get($serverData, 'public_net.ipv6.ip');
+            if ($this->server->backfillPlaceholderIp($assignedIp)) {
+                $this->ip = $this->server->ip;
+            }
             if ($manual) {
                 $this->dispatch('success', 'Server status refreshed: '.ucfirst($this->hetznerServerStatus ?? 'unknown'));
             }
@@ -606,6 +611,7 @@ class Show extends Component
     public function startVultrInstance()
     {
         try {
+            $this->authorize('update', $this->server);
             if (! $this->server->vultr_instance_id || ! $this->server->cloudProviderToken) {
                 $this->dispatch('error', 'This server is not associated with a Vultr instance or token.');
 

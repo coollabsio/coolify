@@ -28,16 +28,6 @@ class TaskFailed extends CustomEmailNotification
         return $notifiable->getEnabledChannels('scheduled_task_failure');
     }
 
-    public function deduplicationKey(object $notifiable, string $channel): ?string
-    {
-        return "scheduled-task-failed:task:{$this->task->uuid}:output:".hash('sha256', $this->output);
-    }
-
-    public function deduplicateFor(): int
-    {
-        return 3600;
-    }
-
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;

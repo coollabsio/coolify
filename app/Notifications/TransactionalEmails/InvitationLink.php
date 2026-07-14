@@ -21,16 +21,6 @@ class InvitationLink extends CustomEmailNotification
         $this->onQueue('high');
     }
 
-    public function deduplicationKey(object $notifiable, string $channel): ?string
-    {
-        return "invitation-link:user:{$this->user->id}:email:{$this->user->email}";
-    }
-
-    public function deduplicateFor(): int
-    {
-        return 3600;
-    }
-
     public function toMail(): MailMessage
     {
         $invitation = TeamInvitation::whereEmail($this->user->email)->first();

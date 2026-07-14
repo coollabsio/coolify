@@ -29,16 +29,6 @@ class ApiTokenExpiringNotification extends CustomEmailNotification
         return $notifiable->getEnabledChannels('api_token_expiring');
     }
 
-    public function deduplicationKey(object $notifiable, string $channel): ?string
-    {
-        return "api-token-expiring:{$this->token->id}";
-    }
-
-    public function deduplicateFor(): int
-    {
-        return 172800;
-    }
-
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;

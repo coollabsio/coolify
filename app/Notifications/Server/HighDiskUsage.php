@@ -21,16 +21,6 @@ class HighDiskUsage extends CustomEmailNotification
         return $notifiable->getEnabledChannels('server_disk_usage');
     }
 
-    public function deduplicationKey(object $notifiable, string $channel): ?string
-    {
-        return "high-disk-usage:server:{$this->server->uuid}:threshold:{$this->server_disk_usage_notification_threshold}";
-    }
-
-    public function deduplicateFor(): int
-    {
-        return 21600;
-    }
-
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;

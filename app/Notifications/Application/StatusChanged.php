@@ -42,16 +42,6 @@ class StatusChanged extends CustomEmailNotification
         return $notifiable->getEnabledChannels('status_change');
     }
 
-    public function deduplicationKey(object $notifiable, string $channel): ?string
-    {
-        return "application-status-changed:application:{$this->resource->uuid}:stopped";
-    }
-
-    public function deduplicateFor(): int
-    {
-        return 3600;
-    }
-
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;
@@ -60,7 +50,6 @@ class StatusChanged extends CustomEmailNotification
         $mail->view('emails.application-status-changes', [
             'name' => $this->resource_name,
             'fqdn' => $fqdn,
-            'application_url' => $this->resource_url,
             'resource_url' => $this->resource_url,
         ]);
 

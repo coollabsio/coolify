@@ -11,8 +11,6 @@ use Illuminate\Notifications\Messages\MailMessage;
 
 class BackupSuccessWithS3Warning extends CustomEmailNotification
 {
-    public int|string|null $backupId = null;
-
     public string $name;
 
     public string $frequency;
@@ -22,7 +20,6 @@ class BackupSuccessWithS3Warning extends CustomEmailNotification
     public function __construct(ScheduledDatabaseBackup $backup, public $database, public $database_name, public $s3_error)
     {
         $this->onQueue('high');
-        $this->backupId = data_get($backup, 'uuid') ?? data_get($backup, 'id');
 
         $this->name = $database->name;
         $this->frequency = $backup->frequency;
@@ -35,16 +32,6 @@ class BackupSuccessWithS3Warning extends CustomEmailNotification
     public function via(object $notifiable): array
     {
         return $notifiable->getEnabledChannels('backup_failure');
-    }
-
-    public function deduplicationKey(object $notifiable, string $channel): ?string
-    {
-        return "backup-s3-warning:backup:{$this->backupId}:database:{$this->database->uuid}:error:".hash('sha256', (string) $this->s3_error);
-    }
-
-    public function deduplicateFor(): int
-    {
-        return 21600;
     }
 
     public function toMail(): MailMessage

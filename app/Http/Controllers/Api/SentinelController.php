@@ -143,8 +143,9 @@ class SentinelController extends Controller
      * health checks can flap between starting/healthy/unhealthy while the
      * container lifecycle state remains unchanged. Both would otherwise defeat
      * the hash and dispatch DB-heavy PushServerUpdateJob instances too often.
-     * The force window still refreshes full state periodically. Sorted by name
-     * so container ordering from Sentinel does not affect the hash.
+     * The snapshot completeness flag is included so a complete snapshot always
+     * dispatches after a partial snapshot. Sorted by name so container ordering
+     * from Sentinel does not affect the hash.
      */
     private function containerStateHash(array $data): string
     {
@@ -157,6 +158,14 @@ class SentinelController extends Controller
             ->values()
             ->all();
 
-        return hash('xxh128', json_encode($containers));
+        return hash('xxh128', json_encode([
+            'snapshot_complete' => $this->isCompleteSnapshot($data),
+            'containers' => $containers,
+        ]));
+    }
+
+    private function isCompleteSnapshot(array $data): bool
+    {
+        return data_get($data, 'snapshot.complete', true) !== false;
     }
 }
