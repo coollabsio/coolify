@@ -3,7 +3,7 @@
         {{ data_get_str($server, 'name')->limit(10) }} > Log Drains | Coolify
     </x-slot>
     <livewire:server.navbar :server="$server" />
-    <div class="flex flex-col h-full gap-8 sm:flex-row">
+    <div class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
         <x-server.sidebar :server="$server" activeMenu="log-drains" />
         <div class="w-full">
             @if ($server->isFunctional())

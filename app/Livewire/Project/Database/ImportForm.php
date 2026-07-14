@@ -14,6 +14,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Rules\SafeWebhookUrl;
 use App\Support\DatabaseBackupFileValidator;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -598,6 +599,7 @@ EOD;
                 'bucket' => $s3Storage->bucket,
                 'endpoint' => $s3Storage->endpoint,
                 'use_path_style_endpoint' => true,
+                'http' => SafeWebhookUrl::httpClientOptions($s3Storage->endpoint),
             ]);
 
             // Check if file exists
@@ -678,7 +680,7 @@ EOD;
             }
 
             // Get helper image
-            $helperImage = config('constants.coolify.helper_image');
+            $helperImage = coolifyHelperImage();
             $latestVersion = getHelperVersion();
             $fullImageName = "{$helperImage}:{$latestVersion}";
 

@@ -25,6 +25,10 @@ class OauthSetting extends Model
         ];
     }
 
+    protected $hidden = [
+        'client_secret',
+    ];
+
     protected function clientSecret(): Attribute
     {
         return Attribute::make(

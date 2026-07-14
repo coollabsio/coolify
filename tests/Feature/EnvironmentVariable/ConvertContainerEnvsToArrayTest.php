@@ -180,7 +180,7 @@ test('convertContainerEnvsToArray', function () {
               "OpenStdin": false,
               "StdinOnce": false,
               "Env": [
-                  "RAY_ENABLED=true=123",
+                  "FEATURE_FLAG_WITH_EQUALS=true=123",
                   "REGISTRY_URL=docker.io",
                   "SUBSCRIPTION_PROVIDER=stripe",
                   "TELESCOPE_ENABLED=false",
@@ -295,5 +295,5 @@ test('convertContainerEnvsToArray', function () {
       }
   ]';
     $envs = format_docker_envs_to_json($data);
-    $this->assertEquals('true=123', $envs->get('RAY_ENABLED'));
+    $this->assertEquals('true=123', $envs->get('FEATURE_FLAG_WITH_EQUALS'));
 });

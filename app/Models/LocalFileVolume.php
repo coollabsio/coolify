@@ -25,6 +25,10 @@ class LocalFileVolume extends BaseModel
         'is_preview_suffix_enabled' => 'boolean',
     ];
 
+    protected $hidden = [
+        'content',
+    ];
+
     use HasFactory;
 
     protected $fillable = [
@@ -366,7 +370,6 @@ class LocalFileVolume extends BaseModel
 
             return false;
         } catch (\Throwable $e) {
-            ray($e->getMessage(), 'Error checking read-only volume');
 
             return false;
         }

@@ -143,4 +143,107 @@ it('keeps configuration sidebars hidden until desktop breakpoint', function () {
 
     expect(file_get_contents(resource_path('views/components/service-database/sidebar.blade.php')))
         ->toContain('sub-menu-wrapper hidden md:flex');
+
+    $serverSidebar = file_get_contents(resource_path('views/components/server/sidebar.blade.php'));
+
+    expect($serverSidebar)
+        ->toContain('server-mobile-section-label')
+        ->toContain('server-mobile-section')
+        ->toContain('Section')
+        ->toContain('select w-full')
+        ->toContain('aria-label="Server menu"')
+        ->toContain('border-b-2 border-solid border-neutral-200 pb-4 md:hidden dark:border-coolgray-200')
+        ->toContain('<optgroup label="Server">')
+        ->toContain('<optgroup label="Configuration">')
+        ->toContain("'route' => 'server.proxy'")
+        ->toContain("'navigate' => false")
+        ->toContain("value.startsWith('location|')")
+        ->toContain('window.Livewire?.navigate ? window.Livewire.navigate(url) : window.location.href = url')
+        ->toContain('x-on:livewire:navigated.window="syncFromLocation()"')
+        ->toContain('sub-menu-wrapper hidden md:flex')
+        ->not->toContain('sub-menu-wrapper">');
+
+    $serverNavbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
+
+    expect($serverNavbar)
+        ->toContain('server-mobile-actions')
+        ->toContain('Actions')
+        ->toContain('pb-0 md:pb-6')
+        ->toContain('navbar-main')
+        ->toContain('server-mobile-actions" class="mt-2 mb-3')
+        ->toContain('hidden min-h-10')
+        ->toContain('md:flex')
+        ->toContain('md:hidden')
+        ->toContain('flex flex-nowrap gap-2 overflow-x-auto')
+        ->toContain('server-mobile-restart-proxy-trigger')
+        ->toContain('server-mobile-stop-proxy-trigger')
+        ->toContain('class="button shrink-0"')
+        ->toContain('hidden gap-2 md:flex');
+
+    $serverMobileActions = serverMobileActionsMarkup($serverNavbar);
+
+    expect(strpos($serverMobileActions, 'Restart Proxy'))
+        ->toBeLessThan(strpos($serverMobileActions, 'Stop Proxy'))
+        ->toBeLessThan(strpos($serverMobileActions, 'Traefik Dashboard'));
+
+    foreach ([
+        'views/components/server/sidebar-proxy.blade.php' => 'Proxy menu',
+        'views/components/server/sidebar-sentinel.blade.php' => 'Sentinel menu',
+        'views/components/server/sidebar-security.blade.php' => 'Security menu',
+    ] as $view => $label) {
+        $sidebar = file_get_contents(resource_path($view));
+
+        expect($sidebar)
+            ->toContain('server-mobile-section-label')
+            ->toContain('server-mobile-section')
+            ->toContain('Section')
+            ->toContain('select w-full')
+            ->toContain('aria-label="'.$label.'"')
+            ->toContain('border-b-2 border-solid border-neutral-200 pb-4 md:hidden dark:border-coolgray-200')
+            ->toContain('<optgroup label="Server">')
+            ->toContain('window.Livewire?.navigate ? window.Livewire.navigate(url) : window.location.href = url')
+            ->toContain('x-on:livewire:navigated.window="syncFromLocation()"')
+            ->toContain('sub-menu-wrapper hidden md:flex')
+            ->not->toContain('sub-menu-wrapper">');
+    }
+
+    foreach ([
+        'views/livewire/server/show.blade.php',
+        'views/livewire/server/advanced.blade.php',
+        'views/livewire/server/private-key/show.blade.php',
+        'views/livewire/server/ca-certificate/show.blade.php',
+        'views/livewire/server/cloud-provider-token/show.blade.php',
+        'views/livewire/server/cloudflare-tunnel.blade.php',
+        'views/livewire/server/docker-cleanup.blade.php',
+        'views/livewire/server/destinations.blade.php',
+        'views/livewire/server/log-drains.blade.php',
+        'views/livewire/server/charts.blade.php',
+        'views/livewire/server/swarm.blade.php',
+        'views/livewire/server/delete.blade.php',
+        'views/livewire/server/proxy/show.blade.php',
+        'views/livewire/server/proxy/logs.blade.php',
+        'views/livewire/server/proxy/dynamic-configurations.blade.php',
+        'views/livewire/server/sentinel/show.blade.php',
+        'views/livewire/server/sentinel/logs.blade.php',
+        'views/livewire/server/security/patches.blade.php',
+        'views/livewire/server/security/terminal-access.blade.php',
+    ] as $view) {
+        expect(file_get_contents(resource_path($view)))
+            ->toContain('gap-4 md:gap-8 md:flex-row')
+            ->toContain('md:flex-row')
+            ->not->toContain('sm:flex-row')
+            ->not->toContain('class="flex flex-col h-full gap-8 md:flex-row');
+    }
 });
+
+function serverMobileActionsMarkup(string $navbar): string
+{
+    $actionsPosition = strpos($navbar, 'id="server-mobile-actions"');
+    $restartModalPosition = strpos($navbar, '<x-modal-confirmation', $actionsPosition);
+
+    if ($actionsPosition === false || $restartModalPosition === false || $actionsPosition > $restartModalPosition) {
+        return '';
+    }
+
+    return substr($navbar, $actionsPosition, $restartModalPosition - $actionsPosition);
+}

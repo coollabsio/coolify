@@ -82,18 +82,9 @@ it('skips the job when the second push is identical', function () use ($running)
     Queue::assertPushed(PushServerUpdateJob::class, 1);
 });
 
-it('only audits sentinel pushes that dispatch a state update', function () use ($running) {
-    $auditChannel = Mockery::mock();
-    $auditChannel->shouldReceive('info')
-        ->once()
-        ->with('sentinel.metrics_pushed', Mockery::on(function (array $context) {
-            return $context['server_uuid'] === $this->server->uuid
-                && $context['team_id'] === $this->team->id;
-        }));
+it('does not audit successful sentinel pushes', function () use ($running) {
+    Log::shouldReceive('channel')->with('audit')->never();
 
-    Log::shouldReceive('channel')->with('audit')->andReturn($auditChannel);
-
-    pushSentinel($this->token, sentinelPayload($running()))->assertOk();
     pushSentinel($this->token, sentinelPayload($running()))->assertOk();
 
     Queue::assertPushed(PushServerUpdateJob::class, 1);
@@ -204,4 +195,25 @@ it('rejects an invalid token without dispatching', function () use ($running) {
     pushSentinel('not-a-real-token', sentinelPayload($running()))->assertUnauthorized();
 
     Queue::assertNotPushed(PushServerUpdateJob::class);
+});
+
+it('dispatches a complete snapshot after an identical partial snapshot', function () use ($running) {
+    $partialPayload = sentinelPayload($running()) + [
+        'snapshot' => [
+            'version' => 1,
+            'complete' => false,
+        ],
+    ];
+
+    $completePayload = sentinelPayload($running()) + [
+        'snapshot' => [
+            'version' => 1,
+            'complete' => true,
+        ],
+    ];
+
+    pushSentinel($this->token, $partialPayload)->assertOk();
+    pushSentinel($this->token, $completePayload)->assertOk();
+
+    Queue::assertPushed(PushServerUpdateJob::class, 2);
 });

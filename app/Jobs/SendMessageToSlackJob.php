@@ -44,15 +44,26 @@ class SendMessageToSlackJob implements ShouldBeEncrypted, ShouldQueue
 
         if ($validator->fails()) {
             Log::warning('SendMessageToSlackJob: blocked unsafe webhook URL', [
-                'url' => $this->webhookUrl,
+                'url' => SafeWebhookUrl::redactedUrlForLog($this->webhookUrl),
                 'errors' => $validator->errors()->all(),
             ]);
 
             return;
         }
 
+        try {
+            $httpOptions = SafeWebhookUrl::httpClientOptions($this->webhookUrl);
+        } catch (\RuntimeException $e) {
+            Log::warning('SendMessageToSlackJob: blocked unsafe webhook URL at send time', [
+                'url' => SafeWebhookUrl::redactedUrlForLog($this->webhookUrl),
+                'error' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+
         if ($this->isSlackWebhook()) {
-            $this->sendToSlack();
+            $this->sendToSlack($httpOptions);
 
             return;
         }
@@ -62,7 +73,7 @@ class SendMessageToSlackJob implements ShouldBeEncrypted, ShouldQueue
          *
          * @see https://github.com/coollabsio/coolify/pull/6139#issuecomment-3756777708
          */
-        $this->sendToMattermost();
+        $this->sendToMattermost($httpOptions);
     }
 
     private function isSlackWebhook(): bool
@@ -79,9 +90,12 @@ class SendMessageToSlackJob implements ShouldBeEncrypted, ShouldQueue
         return $scheme === 'https' && $host === 'hooks.slack.com';
     }
 
-    private function sendToSlack(): void
+    /**
+     * @param  array<string, mixed>  $httpOptions
+     */
+    private function sendToSlack(array $httpOptions): void
     {
-        Http::withOptions(['allow_redirects' => false])->post($this->webhookUrl, [
+        Http::withOptions($httpOptions)->post($this->webhookUrl, [
             'text' => $this->message->title,
             'blocks' => [
                 [
@@ -119,11 +133,14 @@ class SendMessageToSlackJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * @todo v5 refactor: Extract this into a separate SendMessageToMattermostJob.php triggered via the "mattermost" notification channel type.
      */
-    private function sendToMattermost(): void
+    /**
+     * @param  array<string, mixed>  $httpOptions
+     */
+    private function sendToMattermost(array $httpOptions): void
     {
         $username = config('app.name');
 
-        Http::withOptions(['allow_redirects' => false])->post($this->webhookUrl, [
+        Http::withOptions($httpOptions)->post($this->webhookUrl, [
             'username' => $username,
             'attachments' => [
                 [

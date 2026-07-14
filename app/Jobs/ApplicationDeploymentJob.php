@@ -52,6 +52,21 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private const RAILPACK_GENERATED_CONFIG_PATH = '.coolify/railpack.generated.json';
 
+    private const DOCKER_CLIENT_ENV_KEYS = [
+        'BUILDKIT_HOST',
+        'BUILDX_BUILDER',
+        'BUILDX_CONFIG',
+        'DOCKER_API_VERSION',
+        'DOCKER_BUILDKIT',
+        'DOCKER_CERT_PATH',
+        'DOCKER_CLI_EXPERIMENTAL',
+        'DOCKER_CONFIG',
+        'DOCKER_CONTEXT',
+        'DOCKER_HOST',
+        'DOCKER_TLS',
+        'DOCKER_TLS_VERIFY',
+    ];
+
     public $tries = 1;
 
     public $timeout = 3600;
@@ -1701,6 +1716,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($sorted_environment_variables as $env) {
+                if ($this->build_pack === 'railpack' && $this->is_reserved_docker_client_env_key($env->key)) {
+                    continue;
+                }
+
                 $resolvedValue = $env->getResolvedValueWithServer($this->mainServer);
                 // For literal/multiline vars, real_value includes quotes that we need to remove
                 if ($env->is_literal || $env->is_multiline) {
@@ -1752,6 +1771,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($sorted_environment_variables as $env) {
+                if ($this->build_pack === 'railpack' && $this->is_reserved_docker_client_env_key($env->key)) {
+                    continue;
+                }
+
                 $resolvedValue = $env->getResolvedValueWithServer($this->mainServer);
                 // For literal/multiline vars, real_value includes quotes that we need to remove
                 if ($env->is_literal || $env->is_multiline) {
@@ -2124,7 +2147,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function prepare_builder_image(bool $firstTry = true)
     {
         $this->checkForCancellation();
-        $helperImage = config('constants.coolify.helper_image');
+        $helperImage = coolifyHelperImage();
         $helperImage = "{$helperImage}:".getHelperVersion();
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(['echo $HOME'], $this->server);
@@ -2229,7 +2252,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Only include SOURCE_COMMIT in build context if enabled in settings
         if ($this->application->settings->include_source_commit_in_build) {
-            $this->coolify_variables .= "SOURCE_COMMIT={$this->commit} ";
+            $this->coolify_variables .= 'SOURCE_COMMIT='.escapeShellValue($this->commit).' ';
         }
         if ($this->pull_request_id === 0) {
             $fqdn = $this->application->fqdn;
@@ -2241,17 +2264,33 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $fqdn = $url->getHost();
             $url = $url->withHost($fqdn)->withPort(null)->__toString();
             if ((int) $this->application->compose_parsing_version >= 3) {
-                $this->coolify_variables .= "COOLIFY_URL={$url} ";
-                $this->coolify_variables .= "COOLIFY_FQDN={$fqdn} ";
+                $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($url).' ';
+                $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($fqdn).' ';
             } else {
-                $this->coolify_variables .= "COOLIFY_URL={$fqdn} ";
-                $this->coolify_variables .= "COOLIFY_FQDN={$url} ";
+                $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($fqdn).' ';
+                $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($url).' ';
             }
         }
         if (isset($this->application->git_branch)) {
             $this->coolify_variables .= 'COOLIFY_BRANCH='.escapeShellValue($this->application->git_branch).' ';
         }
-        $this->coolify_variables .= "COOLIFY_RESOURCE_UUID={$this->application->uuid} ";
+        $this->coolify_variables .= 'COOLIFY_RESOURCE_UUID='.escapeShellValue($this->application->uuid).' ';
+    }
+
+    private function shellAssignmentForDockerfileArg(string $assignment): string
+    {
+        [$key, $value] = array_pad(explode('=', $assignment, 2), 2, null);
+
+        if ($value === null) {
+            return $assignment;
+        }
+
+        if (str_starts_with($value, "'") && str_ends_with($value, "'")) {
+            $value = substr($value, 1, -1);
+            $value = str_replace("'\\''", "'", $value);
+        }
+
+        return "{$key}={$value}";
     }
 
     private function gitLsRemoteCommand(string $lsRemoteRef, ?string $identityFile = null): string
@@ -2327,7 +2366,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ],
             );
         }
-        if ($this->saved_outputs->get('git_commit_sha') && ! $this->rollback) {
+        if ($this->saved_outputs->get('git_commit_sha') && ! $this->rollback && $this->shouldResolveBranchHeadCommit()) {
             // Extract commit SHA from git ls-remote output, handling multi-line output (e.g., redirect warnings)
             // Expected format: "commit_sha\trefs/heads/branch" possibly preceded by warning lines
             // Note: Git warnings can be on the same line as the result (no newline)
@@ -2357,6 +2396,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry('Restarting helper container with actual SOURCE_COMMIT value.');
             $this->restart_builder_container_with_actual_commit();
         }
+    }
+
+    private function shouldResolveBranchHeadCommit(): bool
+    {
+        $commit = trim($this->commit);
+
+        return $commit === '' || $commit === 'HEAD';
     }
 
     private function clone_repository()
@@ -2566,6 +2612,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->env_nixpacks_args = $this->env_nixpacks_args->implode(' ');
     }
 
+    private function is_reserved_docker_client_env_key(?string $key): bool
+    {
+        if (blank($key)) {
+            return false;
+        }
+
+        return in_array(strtoupper($key), self::DOCKER_CLIENT_ENV_KEYS, true);
+    }
+
+    private function without_reserved_docker_client_variables(Collection $variables): Collection
+    {
+        return $variables->reject(fn ($value, $key) => $this->is_reserved_docker_client_env_key((string) $key));
+    }
+
     private function generate_railpack_env_variables(): Collection
     {
         $variables = $this->railpack_build_variables();
@@ -2686,6 +2746,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function railpack_build_command(string $imageName, Collection $variables): string
     {
+        $variables = $this->without_reserved_docker_client_variables($variables);
+
         $cacheArgs = '';
         if ($this->force_rebuild) {
             $cacheArgs = '--no-cache';
@@ -2712,7 +2774,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $secretFlags = $this->railpack_build_secret_flags($variables);
         $frontendImage = 'ghcr.io/railwayapp/railpack-frontend:v'.config('constants.coolify.railpack_version');
 
-        $buildxBuildCommand = "{$environmentPrefix}docker buildx build --builder coolify-railpack"
+        $buildxBuildCommand = "{$environmentPrefix}DOCKER_CONFIG=/root/.docker docker buildx build --builder coolify-railpack"
             ." {$this->addHosts} --network host"
             ." --build-arg BUILDKIT_SYNTAX=\"{$frontendImage}\""
             ." {$cacheArgs}"
@@ -2723,7 +2785,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ." -t {$imageName}"
             ." {$this->workdir}";
 
-        return 'docker buildx create --name coolify-railpack --driver docker-container 2>/dev/null || true'
+        return 'DOCKER_CONFIG=/root/.docker docker buildx create --name coolify-railpack --driver docker-container 2>/dev/null || true'
             .' && '.$this->wrap_build_command_with_env_export($buildxBuildCommand);
     }
 
@@ -2878,9 +2940,25 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         throw new DeploymentException('Railpack deployments require the Docker buildx CLI plugin on the build server. Install or enable docker buildx and retry the deployment.');
     }
 
+    private function ensure_helper_docker_buildx_available_for_railpack(): void
+    {
+        $this->execute_remote_command([
+            executeInDocker($this->deployment_uuid, 'DOCKER_CONFIG=/root/.docker docker buildx version >/dev/null 2>&1 && echo available || echo not-available'),
+            'hidden' => true,
+            'save' => 'railpack_helper_buildx_available',
+        ]);
+
+        if (trim((string) $this->saved_outputs->get('railpack_helper_buildx_available')) === 'available') {
+            return;
+        }
+
+        throw new DeploymentException('Railpack deployments require the Docker buildx CLI plugin inside the Coolify helper container. The helper could not find buildx at /root/.docker/cli-plugins/docker-buildx. Pull the latest helper image and retry the deployment.');
+    }
+
     private function build_railpack_image(): void
     {
         $this->ensure_docker_buildx_available_for_railpack();
+        $this->ensure_helper_docker_buildx_available_for_railpack();
 
         $railpackVariables = $this->generate_railpack_env_variables();
         $railpackConfigPath = $this->generate_railpack_config_file();
@@ -4080,6 +4158,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         $variables = $this->env_args;
 
+        if ($this->build_pack === 'railpack') {
+            $variables = $this->without_reserved_docker_client_variables($variables);
+        }
+
         if ($variables->isEmpty()) {
             return '';
         }
@@ -4220,7 +4302,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $coolify_vars = collect(explode(' ', trim($this->coolify_variables)))
                     ->filter()
                     ->map(function ($var) {
-                        return "ARG {$var}";
+                        return 'ARG '.$this->shellAssignmentForDockerfileArg($var);
                     });
                 $argsToInsert = $argsToInsert->merge($coolify_vars);
             }
@@ -4242,7 +4324,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $coolify_vars = collect(explode(' ', trim($this->coolify_variables)))
                     ->filter()
                     ->map(function ($var) {
-                        return "ARG {$var}";
+                        return 'ARG '.$this->shellAssignmentForDockerfileArg($var);
                     });
                 $argsToInsert = $argsToInsert->merge($coolify_vars);
             }

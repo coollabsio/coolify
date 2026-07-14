@@ -131,7 +131,16 @@ class FortifyServiceProvider extends ServiceProvider
             // Use real client IP (not spoofable forwarded headers)
             $realIp = $request->server('REMOTE_ADDR') ?? $request->ip();
 
-            return Limit::perMinute(5)->by($realIp);
+            $limits = [
+                Limit::perMinutes(10, 3)->by('forgot-password:ip:'.sha1($realIp)),
+            ];
+
+            $emailIdentity = normalize_email_identity($request->input('email'));
+            if ($emailIdentity !== null) {
+                $limits[] = Limit::perHour(3)->by('forgot-password:email-identity:'.sha1($emailIdentity));
+            }
+
+            return $limits;
         });
 
         RateLimiter::for('login', function (Request $request) {

@@ -1,13 +1,15 @@
 <?php
 
+use App\Models\InstanceSettings;
 use App\Rules\SafeWebhookUrl;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Validator;
 use Tests\TestCase;
 
-uses(TestCase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 it('accepts valid public URLs', function () {
-    $rule = new SafeWebhookUrl;
+    $rule = new SafeWebhookUrl(fn (string $host): array => ['93.184.216.34']);
 
     $validUrls = [
         'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXX',
@@ -21,17 +23,6 @@ it('accepts valid public URLs', function () {
         expect($validator->passes())->toBeTrue("Expected valid: {$url}");
     }
 });
-
-it('accepts private network IPs for self-hosted deployments', function (string $url) {
-    $rule = new SafeWebhookUrl;
-
-    $validator = Validator::make(['url' => $url], ['url' => $rule]);
-    expect($validator->passes())->toBeTrue("Expected valid (private IP): {$url}");
-})->with([
-    '10.x range' => 'http://10.0.0.5/webhook',
-    '172.16.x range' => 'http://172.16.0.1:8080/hook',
-    '192.168.x range' => 'http://192.168.1.50:8080/webhook',
-]);
 
 it('rejects loopback addresses', function (string $url) {
     $rule = new SafeWebhookUrl;
@@ -116,4 +107,174 @@ it('rejects IPv6 loopback', function () {
 
     $validator = Validator::make(['url' => 'http://[::1]'], ['url' => $rule]);
     expect($validator->fails())->toBeTrue('Expected rejection: IPv6 loopback');
+});
+
+it('rejects private and reserved network targets by default', function (string $url) {
+    $rule = new SafeWebhookUrl;
+
+    $validator = Validator::make(['url' => $url], ['url' => $rule]);
+
+    expect($validator->fails())->toBeTrue("Expected default rejection: {$url}");
+})->with([
+    'private 10/8' => 'http://10.0.0.5/webhook',
+    'private 172.16/12' => 'http://172.16.0.1:8080/hook',
+    'private 192.168/16' => 'http://192.168.1.50:8080/webhook',
+    'shared address space' => 'http://100.64.0.1/webhook',
+    'zero network peer alias' => 'http://0.0.0.1/webhook',
+    'multicast' => 'http://224.0.0.1/webhook',
+    'benchmark range' => 'http://198.18.0.1/webhook',
+    'documentation range' => 'http://192.0.2.10/webhook',
+]);
+
+it('rejects hostname forms that resolve to loopback', function (string $url) {
+    $rule = new SafeWebhookUrl;
+
+    $validator = Validator::make(['url' => $url], ['url' => $rule]);
+
+    expect($validator->fails())->toBeTrue("Expected loopback hostname-form rejection: {$url}");
+})->with([
+    'decimal IPv4' => 'http://2130706433:8888/exfil',
+    'hex IPv4' => 'http://0x7f000001:8888/exfil',
+    'octal IPv4' => 'http://017700000001:8888/exfil',
+    'short dotted IPv4' => 'http://127.1:8888/exfil',
+    'IPv4-mapped IPv6 hex loopback' => 'http://[::ffff:7f00:1]:8888/exfil',
+]);
+
+it('rejects internal DNS suffixes by default', function (string $url) {
+    $rule = new SafeWebhookUrl(fn (string $host): array => ['93.184.216.34']);
+
+    $validator = Validator::make(['url' => $url], ['url' => $rule]);
+
+    expect($validator->fails())->toBeTrue("Expected default rejection: {$url}");
+})->with([
+    '.local host' => 'http://receiver.local/webhook',
+    '.cluster.local host' => 'http://service.cluster.local/webhook',
+]);
+
+it('rejects unresolvable hostnames by default', function () {
+    $rule = new SafeWebhookUrl(fn (string $host): array => []);
+
+    $validator = Validator::make(['url' => 'http://does-not-resolve.example.test/webhook'], ['url' => $rule]);
+
+    expect($validator->fails())->toBeTrue('Expected default rejection for unresolvable host');
+});
+
+it('keeps webhook DNS resolution enabled when general DNS validation is disabled', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], ['is_dns_validation_enabled' => false]));
+
+    $rule = new SafeWebhookUrl(fn (string $host): array => ['127.0.0.1']);
+
+    $validator = Validator::make(['url' => 'http://rebinding.example.test/webhook'], ['url' => $rule]);
+
+    expect($validator->fails())->toBeTrue('Expected webhook SSRF DNS checks to remain enabled');
+});
+
+it('reads configured custom DNS servers for webhook hostname resolution', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], ['custom_dns_servers' => '1.1.1.1, invalid, 2606:4700:4700::1111']));
+
+    $method = new ReflectionMethod(SafeWebhookUrl::class, 'customDnsServers');
+    $method->setAccessible(true);
+
+    expect($method->invoke(new SafeWebhookUrl))
+        ->toBe(['1.1.1.1', '2606:4700:4700::1111']);
+});
+
+it('allows explicitly configured intranet webhook targets', function (string $url, array $resolvedIps, array $allowlist) {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], ['webhook_allowed_internal_hosts' => $allowlist]));
+
+    $rule = new SafeWebhookUrl(fn (string $host): array => $resolvedIps);
+
+    $validator = Validator::make(['url' => $url], ['url' => $rule]);
+
+    expect($validator->passes())->toBeTrue("Expected configured intranet target to pass: {$url}");
+})->with([
+    'exact .local hostname' => ['http://receiver.local/webhook', ['192.168.10.20'], ['receiver.local']],
+    'private CIDR' => ['http://hooks.example.test/webhook', ['10.50.10.20'], ['10.50.0.0/16']],
+]);
+
+it('requires explicit localhost opt in in addition to allowlist', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], ['webhook_allowed_internal_hosts' => ['localhost']]));
+
+    $rule = new SafeWebhookUrl;
+
+    $validator = Validator::make(['url' => 'http://localhost:8080/webhook'], ['url' => $rule]);
+
+    expect($validator->fails())->toBeTrue('Expected localhost to remain blocked without explicit localhost opt in');
+
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], ['webhook_allow_localhost' => true]));
+
+    $validator = Validator::make(['url' => 'http://localhost:8080/webhook'], ['url' => $rule]);
+
+    expect($validator->passes())->toBeTrue('Expected localhost to pass only after explicit localhost opt in');
+});
+
+it('builds HTTP client options that pin resolved DNS for the request', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
+        'webhook_allowed_internal_hosts' => ['localhost'],
+        'webhook_allow_localhost' => true,
+    ]));
+
+    $options = SafeWebhookUrl::httpClientOptions('http://localhost:8080/webhook');
+
+    expect($options['allow_redirects'])->toBeFalse();
+
+    if (defined('CURLOPT_RESOLVE')) {
+        expect($options['curl'][CURLOPT_RESOLVE])->toContain('localhost:8080:127.0.0.1');
+    }
+});
+
+it('fails closed while building HTTP options when the send-time resolution is unsafe', function () {
+    expect(fn () => SafeWebhookUrl::httpClientOptions('http://localhost:8080/webhook'))
+        ->toThrow(RuntimeException::class, 'unsafe IP address');
+});
+
+it('builds MinIO client resolve options for S3 backup uploads', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
+        'webhook_allowed_internal_hosts' => ['localhost'],
+        'webhook_allow_localhost' => true,
+    ]));
+
+    $options = SafeWebhookUrl::minioClientResolveOptions('http://localhost:9000');
+
+    expect($options)->toContain('localhost:9000=127.0.0.1');
+});
+
+it('rejects trailing-dot hostnames to avoid DNS pinning mismatch', function () {
+    $rule = new SafeWebhookUrl(fn (string $host): array => ['93.184.216.34']);
+
+    $validator = Validator::make(['url' => 'http://example.com./webhook'], ['url' => $rule]);
+
+    expect($validator->fails())->toBeTrue('Expected trailing-dot hostname rejection');
+
+    expect(fn () => SafeWebhookUrl::httpClientOptions('http://example.com./webhook'))
+        ->toThrow(RuntimeException::class, 'trailing dot');
+});
+
+it('rejects reserved IPv6 ranges by default', function (string $url) {
+    $rule = new SafeWebhookUrl;
+
+    $validator = Validator::make(['url' => $url], ['url' => $rule]);
+
+    expect($validator->fails())->toBeTrue("Expected reserved IPv6 rejection: {$url}");
+})->with([
+    'documentation IPv6' => 'http://[2001:db8::1]/webhook',
+    'IPv4/IPv6 translation prefix' => 'http://[64:ff9b::1]/webhook',
+    '6to4' => 'http://[2002::1]/webhook',
+]);
+
+it('rejects hostnames that resolve to reserved IPv6 ranges by default', function (string $resolvedIp) {
+    $rule = new SafeWebhookUrl(fn (string $host): array => [$resolvedIp]);
+
+    $validator = Validator::make(['url' => 'http://ipv6-reserved.example.test/webhook'], ['url' => $rule]);
+
+    expect($validator->fails())->toBeTrue("Expected reserved IPv6 resolution rejection: {$resolvedIp}");
+})->with([
+    '2001:db8::1',
+    '64:ff9b::1',
+    '2002::1',
+]);
+
+it('redacts webhook URLs for logs', function () {
+    expect(SafeWebhookUrl::redactedUrlForLog('https://hooks.slack.com/services/T000/B000/secret-token?foo=bar'))
+        ->toBe('https://hooks.slack.com');
 });

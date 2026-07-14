@@ -109,6 +109,12 @@ class ValidationPatterns
     public const ENVIRONMENT_VARIABLE_KEY_PATTERN = '/\A[A-Za-z_][A-Za-z0-9_.]*\z/u';
 
     /**
+     * Characters that are valid in some URL positions but unsafe for values
+     * that are later reused in shell assignment contexts.
+     */
+    public const APPLICATION_DOMAIN_FORBIDDEN_PATTERN = '/[`$;&|<>()\\\\\r\n]/';
+
+    /**
      * Pattern for SQL-safe unquoted database identifiers (usernames, database names).
      * Allows letters, digits, underscore; first char must be letter or underscore.
      * Excludes all shell metacharacters. Max 63 chars (Postgres identifier limit).
@@ -509,6 +515,156 @@ class ValidationPatterns
     public static function shellSafeCommandRules(int $maxLength = 1000): array
     {
         return ['nullable', 'string', 'max:'.$maxLength, 'regex:'.self::SHELL_SAFE_COMMAND_PATTERN];
+    }
+
+    /**
+     * Get validation rules for comma-separated application URL fields.
+     */
+    public static function applicationDomainRules(int $maxLength = 2048): array
+    {
+        return [
+            'nullable',
+            'string',
+            'max:'.$maxLength,
+            function (string $attribute, mixed $value, \Closure $fail): void {
+                foreach (self::validateApplicationDomains($value) as $error) {
+                    $fail($error);
+                }
+            },
+        ];
+    }
+
+    /**
+     * Validate a comma-separated list of application URLs.
+     *
+     * @return array<int, string>
+     */
+    public static function validateApplicationDomains(mixed $value): array
+    {
+        if (blank($value)) {
+            return [];
+        }
+
+        if (! is_string($value)) {
+            return ['The domains field must be a string.'];
+        }
+
+        $errors = [];
+        foreach (self::applicationDomainList($value) as $url) {
+            if (preg_match(self::APPLICATION_DOMAIN_FORBIDDEN_PATTERN, $url) === 1) {
+                $errors[] = "Invalid URL: {$url}";
+
+                continue;
+            }
+
+            if (! isValidDomainUrl($url)) {
+                $errors[] = "Invalid URL: {$url}";
+
+                continue;
+            }
+
+            $scheme = parse_url($url, PHP_URL_SCHEME) ?? '';
+            if (! in_array(strtolower($scheme), ['http', 'https'], true)) {
+                $errors[] = "Invalid URL scheme: {$scheme} for URL: {$url}. Only http and https are supported.";
+
+                continue;
+            }
+
+            if (blank(parse_url($url, PHP_URL_HOST))) {
+                $errors[] = "Invalid URL: {$url}";
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Normalize a comma-separated application URL list for storage.
+     */
+    public static function normalizeApplicationDomains(?string $value): ?string
+    {
+        $urls = self::applicationDomainList($value);
+
+        if ($urls === []) {
+            return null;
+        }
+
+        return collect($urls)
+            ->map(fn (string $url) => self::normalizeApplicationDomainUrl($url))
+            ->implode(',');
+    }
+
+    /**
+     * Normalize URL components that are case-insensitive while preserving
+     * case-sensitive path, query, and fragment components.
+     */
+    private static function normalizeApplicationDomainUrl(string $url): string
+    {
+        $components = parse_url($url);
+
+        if ($components === false) {
+            return $url;
+        }
+
+        $normalized = '';
+
+        if (isset($components['scheme'])) {
+            $normalized .= strtolower($components['scheme']).'://';
+        }
+
+        if (isset($components['user'])) {
+            $normalized .= $components['user'];
+
+            if (isset($components['pass'])) {
+                $normalized .= ':'.$components['pass'];
+            }
+
+            $normalized .= '@';
+        }
+
+        if (isset($components['host'])) {
+            $normalized .= strtolower($components['host']);
+        }
+
+        if (isset($components['port'])) {
+            $normalized .= ':'.$components['port'];
+        }
+
+        if (isset($components['path'])) {
+            $normalized .= $components['path'];
+        }
+
+        if (array_key_exists('query', $components)) {
+            $normalized .= '?'.$components['query'];
+        }
+
+        if (array_key_exists('fragment', $components)) {
+            $normalized .= '#'.$components['fragment'];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Split a comma-separated application URL list into trimmed URL strings.
+     *
+     * @return array<int, string>
+     */
+    public static function applicationDomainList(?string $value): array
+    {
+        if (blank($value)) {
+            return [];
+        }
+
+        return str($value)
+            ->replaceStart(',', '')
+            ->replaceEnd(',', '')
+            ->trim()
+            ->explode(',')
+            ->map(fn (string $url) => trim($url))
+            ->filter(fn (string $url) => filled($url))
+            ->values()
+            ->all();
     }
 
     /**

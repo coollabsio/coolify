@@ -15,8 +15,8 @@ function serviceExtraFieldsTestServiceWithApplicationImage(string $image): Servi
     $team = Team::factory()->create();
     $project = Project::factory()->create(['team_id' => $team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
-    $server = Server::factory()->create();
-    $destination = StandaloneDocker::factory()->create(['server_id' => $server->id]);
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
 
     $service = Service::factory()->create([
         'environment_id' => $environment->id,

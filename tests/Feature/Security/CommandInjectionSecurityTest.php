@@ -130,6 +130,69 @@ describe('deployment job path field validation', function () {
 });
 
 describe('API validation rules for path fields', function () {
+    test('domains validation rejects command injection payloads', function (string $payload) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['domains' => $payload],
+            ['domains' => $rules['domains']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    })->with([
+        'host command substitution' => 'http://$(whoami).example.com',
+        'path command substitution' => 'http://example.com/$(whoami)',
+        'query command substitution' => 'http://example.com/path?next=$(id)',
+        'host backtick substitution' => 'http://`whoami`.example.com',
+        'path backtick substitution' => 'http://example.com/`whoami`',
+        'semicolon command separator' => 'http://example.com/path;id',
+        'newline injection' => "http://example.com\nwhoami",
+        'carriage return injection' => "http://example.com\rwhoami",
+        'pipe injection' => 'http://example.com/path|id',
+    ]);
+
+    test('domains validation rejects non http schemes', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['domains' => 'ftp://example.com'],
+            ['domains' => $rules['domains']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('domains validation allows comma separated http and https urls', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['domains' => 'https://app.example.com,http://api.example.com/path'],
+            ['domains' => $rules['domains']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    });
+
+    test('docker compose service domains validation rejects command injection payloads', function () {
+        $rules = [
+            'docker_compose_domains' => 'array|nullable',
+            'docker_compose_domains.*' => 'array:name,domain',
+            'docker_compose_domains.*.name' => 'string|required',
+            'docker_compose_domains.*.domain' => ValidationPatterns::applicationDomainRules(),
+        ];
+
+        $validator = validator(
+            [
+                'docker_compose_domains' => [
+                    ['name' => 'app', 'domain' => 'https://app.example.com/$(whoami)'],
+                ],
+            ],
+            $rules
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
     test('git_branch validation rejects shell metacharacters', function (string $branch) {
         $rules = sharedDataApplications();
 
@@ -276,7 +339,45 @@ describe('deployment git command escaping', function () {
 
         expect($coolifyVariables->getValue($instance))
             ->toContain("COOLIFY_BRANCH='main`id`' ")
-            ->toContain('COOLIFY_RESOURCE_UUID=app-uuid ');
+            ->toContain("COOLIFY_RESOURCE_UUID='app-uuid' ");
+    });
+
+    test('coolify url and fqdn shell assignments are quoted', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $instance = $job->newInstanceWithoutConstructor();
+
+        $application = new Application;
+        $application->uuid = 'app-uuid';
+        $application->git_branch = 'main';
+        $application->fqdn = 'https://app.example.com/path';
+        $application->compose_parsing_version = '3';
+
+        $settings = new ApplicationSetting;
+        $settings->include_source_commit_in_build = true;
+        $application->setRelation('settings', $settings);
+
+        foreach ([
+            'application' => $application,
+            'commit' => 'HEAD$(id)',
+            'pull_request_id' => 0,
+        ] as $property => $value) {
+            $reflectionProperty = $job->getProperty($property);
+            $reflectionProperty->setAccessible(true);
+            $reflectionProperty->setValue($instance, $value);
+        }
+
+        $method = $job->getMethod('set_coolify_variables');
+        $method->setAccessible(true);
+        $method->invoke($instance);
+
+        $coolifyVariables = $job->getProperty('coolify_variables');
+        $coolifyVariables->setAccessible(true);
+
+        expect($coolifyVariables->getValue($instance))
+            ->toContain("SOURCE_COMMIT='HEAD$(id)' ")
+            ->toContain("COOLIFY_URL='https://app.example.com/path' ")
+            ->toContain("COOLIFY_FQDN='app.example.com' ")
+            ->toContain("COOLIFY_RESOURCE_UUID='app-uuid' ");
     });
 });
 
@@ -892,6 +993,43 @@ describe('API route middleware for deploy actions', function () {
         expect($matchedRoute)->not->toBeNull();
         $middleware = $matchedRoute->gatherMiddleware();
         expect($middleware)->toContain('api.ability:deploy');
+    });
+});
+
+describe('service application lifecycle command escaping', function () {
+    test('service application deploy action escapes docker command arguments', function () {
+        $source = file_get_contents(app_path('Actions/Service/DeployServiceApplication.php'));
+
+        expect($source)->toContain('escapeshellarg($workdir)')
+            ->and($source)->toContain('escapeshellarg($composeFile)')
+            ->and($source)->toContain('escapeshellarg($service->uuid)')
+            ->and($source)->toContain('escapeshellarg($composeServiceName)')
+            ->and($source)->toContain('escapeshellarg($service->destination->network)');
+    });
+
+    test('service application restart and stop actions escape container names', function (string $path) {
+        $source = file_get_contents(app_path($path));
+
+        expect($source)->toContain('escapeshellarg($serviceApplication->name');
+    })->with([
+        'restart action' => 'Actions/Service/RestartServiceApplication.php',
+        'stop action' => 'Actions/Service/StopServiceApplication.php',
+    ]);
+
+    test('docker status helper escapes container names', function () {
+        $source = file_get_contents(base_path('bootstrap/helpers/docker.php'));
+
+        expect($source)->toContain('function buildContainerStatusCommand')
+            ->and($source)->toContain('escapeshellarg("name={$container_id}")')
+            ->and($source)->toContain('escapeshellarg($container_id)');
+    });
+
+    test('service application logs endpoint passes raw container name to docker helpers', function () {
+        $source = file_get_contents(app_path('Http/Controllers/Api/ServiceApplicationsController.php'));
+
+        expect($source)->toContain('getContainerStatus($server, $containerName)')
+            ->and($source)->toContain('getContainerLogs($server, $containerName, $lines)')
+            ->and($source)->not->toContain('$safeContainerName = escapeshellarg($containerName)');
     });
 });
 

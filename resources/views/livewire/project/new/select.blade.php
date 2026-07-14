@@ -75,7 +75,9 @@
                     </div>
                 </div>
             </div>
-            <div x-show="loading">Loading...</div>
+            <div x-show="loading" class="flex items-center justify-center py-8">
+                <x-loading text="Loading resources..." />
+            </div>
             <div x-show="!loading" class="flex flex-col gap-4 py-4">
                 <h2 x-show="filteredGitBasedApplications.length > 0">Applications</h2>
                 <div x-show="filteredGitBasedApplications.length > 0 || filteredDockerBasedApplications.length > 0"
@@ -154,7 +156,7 @@
 
                     <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                         <template x-for="service in filteredServices" :key="service.name">
-                            <div class="relative" x-on:click="setType('one-click-service-' + service.name)"
+                            <div class="relative" x-on:click="setType('one-click-service-' + service.id)"
                                 :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
                                 <x-resource-view>
                                     <x-slot:title>
@@ -214,7 +216,7 @@
                                     </div>
                                 </template>
                                 <template x-if="shouldShowDocIcon(service)">
-                                    <a :href="getDocLink(service) || coolifyDocsUrl(service.name)" target="_blank"
+                                    <a :href="getDocLink(service) || coolifyDocsUrl(service)" target="_blank"
                                         @click.stop @mouseenter="resolveDocLink(service)"
                                         class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
                                         :class="{ 'opacity-50': docCheckInProgress[service.name] }"
@@ -287,8 +289,8 @@
                             // Remove flavor suffixes: -with-*, -without-*
                             return normalized.replace(/-(with|without)-.+$/, '');
                         },
-                        coolifyDocsUrl(serviceName) {
-                            const baseName = this.extractBaseServiceName(serviceName);
+                        coolifyDocsUrl(service) {
+                            const baseName = service.docsSlug || this.extractBaseServiceName(service.name);
                             return 'https://coolify.io/docs/services/' + baseName;
                         },
                         officialDocsUrl(service) {
@@ -322,7 +324,7 @@
                             this.docCheckInProgress[serviceName] = true;
 
                             // 1. Try Coolify docs first
-                            const coolifyUrl = this.coolifyDocsUrl(serviceName);
+                            const coolifyUrl = this.coolifyDocsUrl(service);
                             const coolifyExists = await this.checkUrlExists(coolifyUrl);
 
                             if (coolifyExists) {
