@@ -136,8 +136,8 @@ class ScheduledJobManager implements ShouldQueue
 
     private function processScheduledBackupsAndTasks(): void
     {
-        $lastBackupId = 0;
-        $lastTaskId = 0;
+        $lastBackupId = -1;
+        $lastTaskId = -1;
 
         do {
             $backups = $this->scheduledBackupQuery($lastBackupId)->get();

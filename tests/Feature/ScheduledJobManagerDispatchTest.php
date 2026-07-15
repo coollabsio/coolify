@@ -1,14 +1,17 @@
 <?php
 
+use App\Jobs\DatabaseBackupJob;
 use App\Jobs\ScheduledJobManager;
 use App\Jobs\ScheduledTaskJob;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\PrivateKey;
 use App\Models\Project;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -69,6 +72,70 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     (new ScheduledJobManager)->handle();
 
     Queue::assertPushed(ScheduledTaskJob::class, 101);
+});
+
+it('dispatches zero-id schedules and continues with positive ids', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 5, 27, 0, 1, 0, 'UTC'));
+    Queue::fake();
+
+    $application = createScheduledTaskApplication();
+    $database = StandalonePostgresql::create([
+        'name' => 'scheduled-backup-database',
+        'image' => 'postgres:16-alpine',
+        'postgres_user' => 'postgres',
+        'postgres_password' => 'password',
+        'postgres_db' => 'postgres',
+        'environment_id' => $application->environment_id,
+        'destination_id' => $application->destination_id,
+        'destination_type' => $application->destination_type,
+        'status' => 'running',
+    ]);
+
+    $zeroIdBackup = ScheduledDatabaseBackup::forceCreate([
+        'id' => 0,
+        'team_id' => $application->environment->project->team_id,
+        'database_id' => $database->id,
+        'database_type' => $database->getMorphClass(),
+        'frequency' => '* * * * *',
+        'enabled' => true,
+    ]);
+    $positiveIdBackup = ScheduledDatabaseBackup::create([
+        'team_id' => $application->environment->project->team_id,
+        'database_id' => $database->id,
+        'database_type' => $database->getMorphClass(),
+        'frequency' => '* * * * *',
+        'enabled' => true,
+    ]);
+    $zeroIdTask = ScheduledTask::forceCreate([
+        'id' => 0,
+        'team_id' => $application->environment->project->team_id,
+        'application_id' => $application->id,
+        'name' => 'Zero ID task',
+        'command' => 'echo zero',
+        'frequency' => '* * * * *',
+        'enabled' => true,
+    ]);
+    $positiveIdTask = ScheduledTask::factory()->create([
+        'team_id' => $application->environment->project->team_id,
+        'application_id' => $application->id,
+        'frequency' => '* * * * *',
+        'enabled' => true,
+    ]);
+
+    expect($zeroIdBackup->id)->toBe(0)
+        ->and($positiveIdBackup->id)->toBeGreaterThan(0)
+        ->and($zeroIdTask->id)->toBe(0)
+        ->and($positiveIdTask->id)->toBeGreaterThan(0);
+
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertPushed(DatabaseBackupJob::class, 2);
+    Queue::assertPushed(DatabaseBackupJob::class, fn (DatabaseBackupJob $job) => $job->backup->id === 0);
+    Queue::assertPushed(DatabaseBackupJob::class, fn (DatabaseBackupJob $job) => $job->backup->id === $positiveIdBackup->id);
+    Queue::assertPushed(ScheduledTaskJob::class, 2);
+    Queue::assertPushed(ScheduledTaskJob::class, fn (ScheduledTaskJob $job) => $job->task->id === 0);
+    Queue::assertPushed(ScheduledTaskJob::class, fn (ScheduledTaskJob $job) => $job->task->id === $positiveIdTask->id);
 });
 
 it('skips expensive dispatch for non-due schedules while seeding dedup cache', function () {
