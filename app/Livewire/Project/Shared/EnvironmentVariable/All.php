@@ -76,6 +76,7 @@ class All extends Component
             $this->resource->settings->save();
             $this->getDevView();
             $this->dispatch('success', 'Environment variable settings updated.');
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

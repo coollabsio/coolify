@@ -147,6 +147,7 @@ class Source extends Component
                 'source_id' => $source->id,
                 'source_type' => $sourceType,
             ]);
+            $this->dispatch('configurationChanged');
 
             ['repository' => $customRepository] = $this->application->customRepository();
             $repository = githubApi($this->application->source, "repos/{$customRepository}");

@@ -424,6 +424,33 @@ class ServiceApplicationsController extends Controller
             ),
         ]
     )]
+    #[OA\Post(
+        summary: 'Get service application logs',
+        description: 'Get Docker logs for a single compose service container.',
+        path: '/services/{uuid}/applications/{app_uuid}/logs',
+        operationId: 'post-service-application-logs-by-service-and-app-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Service applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'app_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'lines', in: 'query', required: false, schema: new OA\Schema(type: 'integer', format: 'int32', default: 100)),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Logs.',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [new OA\Property(property: 'logs', type: 'string')],
+                ),
+            ),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 501, description: 'Swarm not supported.'),
+        ]
+    )]
     public function logs_by_uuid(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
@@ -540,6 +567,34 @@ class ServiceApplicationsController extends Controller
             ),
         ]
     )]
+    #[OA\Post(
+        summary: 'Start or redeploy service application container',
+        description: 'Runs docker compose up for a single compose service (no-deps), optionally pulling the image and rebuilding.',
+        path: '/services/{uuid}/applications/{app_uuid}/start',
+        operationId: 'post-start-service-application-by-service-and-app-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Service applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'app_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'force', in: 'query', required: false, schema: new OA\Schema(type: 'boolean', default: false)),
+            new OA\Parameter(name: 'latest', in: 'query', required: false, schema: new OA\Schema(type: 'boolean', default: false)),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Deploy request queued.',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [new OA\Property(property: 'message', type: 'string')],
+                ),
+            ),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 501, description: 'Swarm not supported.'),
+        ]
+    )]
     public function action_start(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
@@ -635,6 +690,32 @@ class ServiceApplicationsController extends Controller
             ),
         ]
     )]
+    #[OA\Post(
+        summary: 'Restart service application container',
+        description: 'Restarts a single compose service container.',
+        path: '/services/{uuid}/applications/{app_uuid}/restart',
+        operationId: 'post-restart-service-application-by-service-and-app-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Service applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'app_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Restart queued.',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [new OA\Property(property: 'message', type: 'string')],
+                ),
+            ),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 501, description: 'Swarm not supported.'),
+        ]
+    )]
     public function action_restart(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
@@ -725,6 +806,32 @@ class ServiceApplicationsController extends Controller
                 response: 501,
                 description: 'Swarm not supported.',
             ),
+        ]
+    )]
+    #[OA\Post(
+        summary: 'Stop service application container',
+        description: 'Stops a single compose service container.',
+        path: '/services/{uuid}/applications/{app_uuid}/stop',
+        operationId: 'post-stop-service-application-by-service-and-app-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Service applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'app_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Stop queued.',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [new OA\Property(property: 'message', type: 'string')],
+                ),
+            ),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 501, description: 'Swarm not supported.'),
         ]
     )]
     public function action_stop(Request $request): JsonResponse

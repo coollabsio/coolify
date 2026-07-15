@@ -1053,11 +1053,6 @@ class ServicesController extends Controller
                         properties: [
                             'name' => ['type' => 'string', 'description' => 'The service name.'],
                             'description' => ['type' => 'string', 'description' => 'The service description.'],
-                            'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
-                            'environment_name' => ['type' => 'string', 'description' => 'The environment name.'],
-                            'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID.'],
-                            'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
-                            'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the service should be deployed instantly.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'default' => false, 'description' => 'Connect the service to the predefined docker network.'],
                             'docker_compose_raw' => ['type' => 'string', 'description' => 'The base64 encoded Docker Compose content.'],
@@ -1942,7 +1937,7 @@ class ServicesController extends Controller
             ),
         ]
     )]
-    public function move_by_uuid(Request $request): \Illuminate\Http\JsonResponse
+    public function move_by_uuid(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {

@@ -33,6 +33,14 @@ class ServiceDatabasePolicy
     }
 
     /**
+     * Determine whether the user can deploy or run lifecycle actions on the parent service stack.
+     */
+    public function deploy(User $user, ServiceDatabase $serviceDatabase): bool
+    {
+        return Gate::allows('deploy', $serviceDatabase->service);
+    }
+
+    /**
      * Determine whether the user can delete the model.
      */
     public function delete(User $user, ServiceDatabase $serviceDatabase): bool
