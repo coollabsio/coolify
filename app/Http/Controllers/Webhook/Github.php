@@ -46,10 +46,7 @@ class Github extends Controller
                 if (Str::isMatch('/refs\/heads\/*/', $branch)) {
                     $branch = Str::after($branch, 'refs/heads/');
                 }
-                $added_files = data_get($payload, 'commits.*.added');
-                $removed_files = data_get($payload, 'commits.*.removed');
-                $modified_files = data_get($payload, 'commits.*.modified');
-                $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
+                $changed_files = getGithubPushChangedFiles($payload);
                 $skip_deploy_commits = self::shouldSkipDeploy(data_get($payload, 'commits.*.message', []));
             }
             if ($x_github_event === 'pull_request') {
@@ -295,14 +292,16 @@ class Github extends Controller
             }
             if ($x_github_event === 'push') {
                 $id = data_get($payload, 'repository.id');
+                $full_name = data_get($payload, 'repository.full_name');
                 $branch = data_get($payload, 'ref');
                 if (Str::isMatch('/refs\/heads\/*/', $branch)) {
                     $branch = Str::after($branch, 'refs/heads/');
                 }
-                $added_files = data_get($payload, 'commits.*.added');
-                $removed_files = data_get($payload, 'commits.*.removed');
-                $modified_files = data_get($payload, 'commits.*.modified');
-                $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
+                $changed_files = getGithubPushChangedFiles($payload);
+                $before_sha = data_get($payload, 'before');
+                $after_sha = data_get($payload, 'after');
+                $repository_parts = explode('/', (string) $full_name, 2);
+                $null_sha = str_repeat('0', 40);
                 $skip_deploy_commits = self::shouldSkipDeploy(data_get($payload, 'commits.*.message', []));
             }
             if ($x_github_event === 'pull_request') {
@@ -331,6 +330,23 @@ class Github extends Controller
                 $applications = $applications->where('git_branch', $branch)->get();
                 if ($applications->isEmpty()) {
                     return response("Nothing to do. No applications found with branch '$branch'.");
+                }
+                if (
+                    $applications->contains(fn ($application) => filled($application->watch_paths))
+                    && count($repository_parts) === 2
+                    && $before_sha
+                    && $after_sha
+                    && $before_sha !== $null_sha
+                    && $after_sha !== $null_sha
+                ) {
+                    $compared_files = tryGetGithubCommitRangeFiles(
+                        $github_app,
+                        $repository_parts[0],
+                        $repository_parts[1],
+                        $before_sha,
+                        $after_sha,
+                    );
+                    $changed_files = getGithubPushChangedFiles($payload, $compared_files);
                 }
             }
             if ($x_github_event === 'pull_request') {

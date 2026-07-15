@@ -5,6 +5,7 @@ use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -389,29 +390,59 @@ function loadRepositoryByPage(GithubApp $source, string $token, int $page)
         'repositories' => $json['repositories'],
     ];
 }
-function getGithubCommitRangeFiles(?GithubApp $source, string $owner, string $repo, string $beforeSha, string $afterSha): array
+function getGithubPushChangedFiles(Collection|array $payload, ?array $comparedFiles = null): Collection
+{
+    $addedFiles = data_get($payload, 'commits.*.added', []);
+    $removedFiles = data_get($payload, 'commits.*.removed', []);
+    $modifiedFiles = data_get($payload, 'commits.*.modified', []);
+
+    $webhookFiles = collect($addedFiles)
+        ->concat($removedFiles)
+        ->concat($modifiedFiles)
+        ->flatten()
+        ->filter()
+        ->unique()
+        ->values();
+
+    if (is_null($comparedFiles)) {
+        return $webhookFiles;
+    }
+
+    $comparisonFiles = collect($comparedFiles)->filter()->unique()->values();
+    if ($comparisonFiles->count() < 300) {
+        return $comparisonFiles;
+    }
+
+    // GitHub caps Compare API responses at 300 files. Preserve webhook files
+    // when the response may be truncated so watch paths cannot be missed.
+    return $comparisonFiles->concat($webhookFiles)->unique()->values();
+}
+
+function tryGetGithubCommitRangeFiles(?GithubApp $source, string $owner, string $repo, string $beforeSha, string $afterSha): ?array
 {
     try {
         if (! $source) {
-            // Manual webhooks don't have GitHub App authentication
-            // Return empty array so watch paths are ignored (current behavior)
-            return [];
+            return null;
         }
 
         $endpoint = "/repos/{$owner}/{$repo}/compare/{$beforeSha}...{$afterSha}";
         $response = githubApi($source, $endpoint, 'get', null, false);
 
-        if (! $response) {
-            return [];
+        $files = data_get($response, 'data.files');
+        if (is_null($files)) {
+            return null;
         }
 
-        $files = collect(data_get($response, 'data.files', []));
-
-        return $files->pluck('filename')->filter()->values()->toArray();
+        return collect($files)->pluck('filename')->filter()->values()->toArray();
     } catch (Exception $e) {
 
-        return [];
+        return null;
     }
+}
+
+function getGithubCommitRangeFiles(?GithubApp $source, string $owner, string $repo, string $beforeSha, string $afterSha): array
+{
+    return tryGetGithubCommitRangeFiles($source, $owner, $repo, $beforeSha, $afterSha) ?? [];
 }
 
 function getGithubCommitMessage(?GithubApp $source, string $owner, string $repo, string $commitSha): ?string
