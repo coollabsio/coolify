@@ -132,6 +132,7 @@ class Application extends BaseModel
         'git_full_url',
         'docker_registry_image_name',
         'docker_registry_image_tag',
+        'docker_registry_id',
         'build_pack',
         'static_image',
         'install_command',
