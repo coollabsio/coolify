@@ -24,7 +24,11 @@ return new class extends Migration
             $table->boolean('disable_local_backup')->default(false);
             $table->boolean('stop_during_backup')->default(false);
             $table->unsignedInteger('retention_amount_locally')->default(7);
+            $table->unsignedInteger('retention_days_locally')->default(0);
+            $table->decimal('retention_max_storage_locally', 17, 7)->default(0);
             $table->unsignedInteger('retention_amount_s3')->default(7);
+            $table->unsignedInteger('retention_days_s3')->default(0);
+            $table->decimal('retention_max_storage_s3', 17, 7)->default(0);
             $table->unsignedInteger('timeout')->default(3600);
             $table->timestamps();
 
