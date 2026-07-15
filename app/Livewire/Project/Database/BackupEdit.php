@@ -206,6 +206,25 @@ class BackupEdit extends Component
 
             DatabaseBackupJob::dispatch($this->backup);
             $this->dispatch('success', 'Backup queued. It will be available in a few minutes.');
+
+            $database = $this->backup->database;
+
+            if ($database instanceof ServiceDatabase) {
+                return redirect()->route('project.service.database.backup.executions', [
+                    'project_uuid' => $database->service->project()->uuid,
+                    'environment_uuid' => $database->service->environment->uuid,
+                    'service_uuid' => $database->service->uuid,
+                    'stack_service_uuid' => $database->uuid,
+                    'backup_uuid' => $this->backup->uuid,
+                ]);
+            }
+
+            return redirect()->route('project.database.backup.executions', [
+                'project_uuid' => $database->project()->uuid,
+                'environment_uuid' => $database->environment->uuid,
+                'database_uuid' => $database->uuid,
+                'backup_uuid' => $this->backup->uuid,
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

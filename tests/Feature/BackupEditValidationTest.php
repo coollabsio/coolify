@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\DatabaseBackupJob;
 use App\Livewire\Project\Database\BackupEdit;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -12,6 +13,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -224,6 +226,40 @@ it('enables and disables a scheduled database backup from the title action', fun
     $component->call('toggleEnabled')->assertSet('backupEnabled', false);
 
     expect($backup->refresh()->enabled)->toBeFalsy();
+});
+
+it('redirects to executions after queuing a database backup with unusable S3 storage', function () {
+    Queue::fake();
+    $s3Storage = createS3StorageForBackupEditValidationTest($this->team, 'Unavailable storage');
+    $s3Storage->update(['is_usable' => false]);
+    $backup = createBackupForEditValidationTest($this->team, [
+        'enabled' => true,
+        's3_storage_id' => $s3Storage->id,
+        'database_backup_retention_amount_locally' => 7,
+        'database_backup_retention_days_locally' => 0,
+        'database_backup_retention_max_storage_locally' => 0,
+        'database_backup_retention_amount_s3' => 7,
+        'database_backup_retention_days_s3' => 0,
+        'database_backup_retention_max_storage_s3' => 0,
+        'dump_all' => false,
+        'timeout' => 3600,
+    ]);
+    $database = $backup->database;
+    $parameters = [
+        'project_uuid' => $database->project()->uuid,
+        'environment_uuid' => $database->environment->uuid,
+        'database_uuid' => $database->uuid,
+        'backup_uuid' => $backup->uuid,
+    ];
+
+    Livewire::test(BackupEdit::class, [
+        'backup' => $backup,
+        'availableS3Storages' => $this->team->s3s,
+    ])
+        ->call('backupNow')
+        ->assertRedirectToRoute('project.database.backup.executions', $parameters);
+
+    Queue::assertPushed(DatabaseBackupJob::class);
 });
 
 it('disables S3 backup when saved without a selected S3 storage', function () {

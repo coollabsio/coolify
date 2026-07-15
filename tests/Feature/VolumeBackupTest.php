@@ -1008,13 +1008,55 @@ it('queues a manual backup before a schedule has been saved', function () {
     signInForVolumeBackups($this, $team);
     [$application, $volume] = createVolumeBackupApplication($team);
 
-    Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
+    $component = Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
         ->call('backupNow')
         ->assertDispatched('success');
 
     $backup = ScheduledVolumeBackup::query()->sole();
 
+    $component->assertRedirectToRoute('project.application.backup.executions', [
+        'project_uuid' => $application->project()->uuid,
+        'environment_uuid' => $application->environment->uuid,
+        'application_uuid' => $application->uuid,
+        'backup_uuid' => $backup->uuid,
+    ]);
+
     expect($backup->enabled)->toBeFalse();
+    Queue::assertPushed(VolumeBackupJob::class, fn (VolumeBackupJob $job) => $job->backup->is($backup));
+});
+
+it('queues a manual backup when its S3 storage has become unusable', function () {
+    Queue::fake();
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $s3Storage = S3Storage::create([
+        'name' => 'Unavailable storage',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+        'is_usable' => false,
+    ]);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        's3_storage_id' => $s3Storage->id,
+        'frequency' => 'daily',
+        'save_s3' => true,
+    ]);
+    $parameters = [
+        'project_uuid' => $application->project()->uuid,
+        'environment_uuid' => $application->environment->uuid,
+        'application_uuid' => $application->uuid,
+        'backup_uuid' => $backup->uuid,
+    ];
+
+    Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
+        ->call('backupNow')
+        ->assertRedirectToRoute('project.application.backup.executions', $parameters);
+
     Queue::assertPushed(VolumeBackupJob::class, fn (VolumeBackupJob $job) => $job->backup->is($backup));
 });
 

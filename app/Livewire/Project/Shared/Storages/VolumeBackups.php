@@ -178,21 +178,28 @@ class VolumeBackups extends Component
         $this->dispatch('success', $this->enabled ? 'Storage backups enabled.' : 'Storage backups disabled.');
     }
 
-    public function backupNow(): void
+    public function backupNow()
     {
         $this->authorize('update', $this->resource);
 
-        if (! $this->validateSettings()) {
-            return;
-        }
-
         if (! $this->backup) {
+            if (! $this->validateSettings()) {
+                return;
+            }
+
             $this->enabled = false;
+            $this->backup = $this->persistBackup(false);
         }
 
-        $this->backup = $this->persistBackup($this->enabled);
         VolumeBackupJob::dispatch($this->backup);
         $this->dispatch('success', 'Storage backup queued.');
+
+        return redirect()->route('project.application.backup.executions', [
+            'project_uuid' => $this->resource->project()->uuid,
+            'environment_uuid' => $this->resource->environment->uuid,
+            'application_uuid' => $this->resource->uuid,
+            'backup_uuid' => $this->backup->uuid,
+        ]);
     }
 
     public function delete(?string $password = null, array $selectedActions = [])
