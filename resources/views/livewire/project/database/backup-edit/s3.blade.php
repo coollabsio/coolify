@@ -1,10 +1,19 @@
+@if ($availableS3Storages->isEmpty())
+    <div class="flex flex-col gap-4">
+        <h2>S3</h2>
+        <div>
+            No validated S3 available. Configure one <a class="underline dark:text-white" {{ wireNavigate() }}
+                href="{{ route('storage.index') }}">here</a>.
+        </div>
+    </div>
+@else
 <form wire:submit="submit" class="flex flex-col gap-4">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
         <h2>S3</h2>
         <x-forms.button type="submit" class="w-full sm:w-auto">Save</x-forms.button>
         @if (!$saveS3)
             <x-forms.button type="button" wire:click="toggleS3" wire:loading.attr="disabled"
-                wire:target="toggleS3" isHighlighted :disabled="$availableS3Storages->isEmpty()">Enable S3</x-forms.button>
+                wire:target="toggleS3" isHighlighted>Enable S3</x-forms.button>
         @else
             <x-forms.button type="button" wire:click="toggleS3" wire:loading.attr="disabled"
                 wire:target="toggleS3">Disable S3</x-forms.button>
@@ -20,15 +29,10 @@
                 <x-highlighted text="*" />
             @endif
         </div>
-        <x-forms.select id="s3StorageId" wire:model.live="s3StorageId" :required="$saveS3"
-            :disabled="$availableS3Storages->isEmpty()">
-            @if ($availableS3Storages->isEmpty())
-                <option value="">No S3 storage available</option>
-            @else
-                @foreach ($availableS3Storages as $s3)
-                    <option value="{{ $s3->id }}">{{ $s3->name }}</option>
-                @endforeach
-            @endif
+        <x-forms.select id="s3StorageId" wire:model.live="s3StorageId" :required="$saveS3">
+            @foreach ($availableS3Storages as $s3)
+                <option value="{{ $s3->id }}">{{ $s3->name }}</option>
+            @endforeach
         </x-forms.select>
     </div>
 
@@ -43,3 +47,4 @@
     </div>
 
 </form>
+@endif

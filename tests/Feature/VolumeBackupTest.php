@@ -252,8 +252,10 @@ it('splits scheduled backup settings and executions across dedicated urls', func
 
     $this->get($generalUrl.'/s3')
         ->assertOk()
-        ->assertSeeInOrder(['S3 Storage', 'Disable Local Backup'])
-        ->assertSee('S3 Storage')
+        ->assertSeeText('No validated S3 available. Configure one here.')
+        ->assertDontSee('Disable Local Backup')
+        ->assertDontSee('Enable S3')
+        ->assertDontSee('Disable S3')
         ->assertDontSee('S3 Storage Retention')
         ->assertDontSee('Local Backup Retention')
         ->assertDontSee('Frequency')
@@ -957,10 +959,18 @@ it('allows volume S3 backups to be disabled when no usable storage remains', fun
         'section' => 's3',
     ])
         ->assertSet('saveToS3', true)
-        ->assertSee('Disable S3')
+        ->assertSeeHtml('<h2>S3</h2>')
+        ->assertSeeText('No validated S3 available. Configure one here.')
+        ->assertSeeHtml('href="'.route('storage.index').'"')
+        ->assertSeeHtml('>here</a>')
+        ->assertDontSee('Save')
+        ->assertDontSee('Disable S3')
+        ->assertDontSee('S3 Storage')
+        ->assertDontSee('Disable Local Backup')
         ->call('toggleS3')
         ->assertDispatched('success')
-        ->assertSee('Enable S3');
+        ->assertSet('saveToS3', false)
+        ->assertDontSee('Enable S3');
 
     expect($backup->refresh()->save_s3)->toBeFalse()
         ->and($backup->s3_storage_id)->toBeNull();

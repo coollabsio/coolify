@@ -171,8 +171,10 @@ it('splits standalone database backup settings and executions across dedicated u
 
     $this->get($generalUrl.'/s3')
         ->assertOk()
-        ->assertSeeInOrder(['S3 Storage', 'Disable Local Backup'])
-        ->assertSee('S3 Storage')
+        ->assertSeeText('No validated S3 available. Configure one here.')
+        ->assertDontSee('Disable Local Backup')
+        ->assertDontSee('Enable S3')
+        ->assertDontSee('Disable S3')
         ->assertDontSee('S3 Storage Retention')
         ->assertDontSee('Local Backup Retention')
         ->assertDontSee('Frequency')
@@ -357,14 +359,23 @@ it('shows available S3 storages even when S3 backup is disabled', function () {
         ->assertSee('Second S3');
 });
 
-it('shows disabled S3 storage dropdown when no storages are available', function () {
+it('shows only an empty S3 state when no storages are available', function () {
     $backup = createBackupForEditValidationTest($this->team, [
         'save_s3' => false,
         's3_storage_id' => null,
     ]);
 
     Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s, 'section' => 's3'])
-        ->assertSee('No S3 storage available');
+        ->assertSeeHtml('<h2>S3</h2>')
+        ->assertSeeText('No validated S3 available. Configure one here.')
+        ->assertSeeHtml('href="'.route('storage.index').'"')
+        ->assertSeeHtml('>here</a>')
+        ->assertDontSee('Save')
+        ->assertDontSee('Enable S3')
+        ->assertDontSee('Disable S3')
+        ->assertDontSee('S3 Storage')
+        ->assertDontSee('Disable Local Backup')
+        ->assertDontSee('No S3 storage available');
 });
 
 it('allows S3 backups to be disabled when no usable storage remains', function () {
@@ -379,10 +390,12 @@ it('allows S3 backups to be disabled when no usable storage remains', function (
         'section' => 's3',
     ])
         ->assertSet('saveS3', true)
-        ->assertSee('Disable S3')
+        ->assertSeeText('No validated S3 available. Configure one here.')
+        ->assertDontSee('Disable S3')
         ->call('toggleS3')
         ->assertDispatched('success')
-        ->assertSee('Enable S3');
+        ->assertSet('saveS3', false)
+        ->assertDontSee('Enable S3');
 
     expect($backup->refresh()->save_s3)->toBeFalsy()
         ->and($backup->s3_storage_id)->toBeNull();
