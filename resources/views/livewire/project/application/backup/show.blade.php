@@ -1,8 +1,8 @@
 <div>
     <x-slot:title>
-        {{ data_get_str($application, 'name')->limit(10) }} > Storage Backups | Coolify
+        {{ data_get_str($application, 'name')->limit(10) }} > Backups | Coolify
     </x-slot>
-    <h1>Storage Backups</h1>
+    <h1>Backups</h1>
     <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" />
 

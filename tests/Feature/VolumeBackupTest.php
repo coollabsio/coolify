@@ -181,7 +181,7 @@ it('shows volume backups on the application backups pages', function () {
 
     $this->get(route('project.application.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]))
         ->assertOk()
-        ->assertSee('<h1>Storage Backups</h1>', false)
+        ->assertSee('<h1>Backups</h1>', false)
         ->assertSee($volume->name);
 });
 
@@ -208,7 +208,7 @@ it('shows directory backups on the application backup index and detail pages', f
 
     $this->get(route('project.application.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]))
         ->assertOk()
-        ->assertSee('<h1>Storage Backups</h1>', false)
+        ->assertSee('<h1>Backups</h1>', false)
         ->assertSee($directory->fs_path);
 });
 
