@@ -286,6 +286,69 @@ describe('GET /api/v1/github-apps', function () {
     });
 });
 
+describe('PATCH /api/v1/github-apps/{github_app_id}', function () {
+    test('updates the private key using its CUID2 identifier', function () {
+        $newPrivateKey = PrivateKey::create([
+            'name' => 'New Test Key',
+            'private_key' => validGithubAppsApiPrivateKey(),
+            'team_id' => $this->team->id,
+        ]);
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'client_id' => 'test-client-id',
+            'client_secret' => 'test-client-secret',
+            'webhook_secret' => 'test-webhook-secret',
+            'private_key_id' => $this->privateKey->id,
+            'team_id' => $this->team->id,
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->patchJson("/api/v1/github-apps/{$githubApp->id}", [
+            'private_key_uuid' => $newPrivateKey->uuid,
+        ]);
+
+        $response->assertSuccessful()
+            ->assertJsonPath('data.private_key_id', $newPrivateKey->id);
+        expect($githubApp->refresh()->private_key_id)->toBe($newPrivateKey->id);
+    });
+
+    test('rejects a private key owned by another team', function () {
+        $otherTeam = Team::factory()->create();
+        $otherTeamPrivateKey = PrivateKey::create([
+            'name' => 'Other Team Key',
+            'private_key' => validGithubAppsApiPrivateKey(),
+            'team_id' => $otherTeam->id,
+        ]);
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'client_id' => 'test-client-id',
+            'client_secret' => 'test-client-secret',
+            'webhook_secret' => 'test-webhook-secret',
+            'private_key_id' => $this->privateKey->id,
+            'team_id' => $this->team->id,
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->patchJson("/api/v1/github-apps/{$githubApp->id}", [
+            'private_key_uuid' => $otherTeamPrivateKey->uuid,
+        ]);
+
+        $response->assertNotFound()
+            ->assertJsonPath('message', 'Private key not found or does not belong to your team');
+        expect($githubApp->refresh()->private_key_id)->toBe($this->privateKey->id);
+    });
+});
+
 describe('GitHub app API url normalization', function () {
     test('normalizes ghe dot com api url when creating github apps', function () {
         $response = $this->withHeaders([
