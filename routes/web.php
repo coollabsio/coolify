@@ -18,6 +18,8 @@ use App\Livewire\Notifications\Telegram as NotificationTelegram;
 use App\Livewire\Notifications\Webhook as NotificationWebhook;
 use App\Livewire\Profile\Appearance as ProfileAppearance;
 use App\Livewire\Profile\Index as ProfileIndex;
+use App\Livewire\Project\Application\Backup\Index as ApplicationBackupIndex;
+use App\Livewire\Project\Application\Backup\Show as ApplicationBackupShow;
 use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
 use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
 use App\Livewire\Project\Application\Deployment\Show as DeploymentShow;
@@ -91,6 +93,7 @@ use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
 use App\Models\ScheduledDatabaseBackupExecution;
+use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Providers\RouteServiceProvider;
@@ -224,6 +227,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/advanced', ApplicationConfiguration::class)->name('project.application.advanced');
         Route::get('/environment-variables', ApplicationConfiguration::class)->name('project.application.environment-variables');
         Route::get('/persistent-storage', ApplicationConfiguration::class)->name('project.application.persistent-storage');
+        Route::get('/backups', ApplicationBackupIndex::class)->name('project.application.backup.index');
+        Route::get('/backups/{backup_uuid}', ApplicationBackupShow::class)->name('project.application.backup.show');
         Route::get('/source', ApplicationConfiguration::class)->name('project.application.source');
         Route::get('/servers', ApplicationConfiguration::class)->name('project.application.servers');
         Route::get('/scheduled-tasks', ApplicationConfiguration::class)->name('project.application.scheduled-tasks.show');
@@ -410,6 +415,68 @@ Route::middleware(['auth'])->group(function () {
             return response()->json(['message' => 'Failed to download backup.'], 500);
         }
     })->name('download.backup');
+
+    Route::get('/download/volume-backup/{executionId}', function () {
+        try {
+            $user = auth()->user();
+            $team = $user->currentTeam();
+            if (is_null($team)) {
+                return response()->json(['message' => 'Team not found.'], 404);
+            }
+            if ($user->isAdminFromSession() === false) {
+                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
+            }
+
+            $execution = ScheduledVolumeBackupExecution::query()
+                ->with('scheduledVolumeBackup.volume.resource')
+                ->findOrFail(request()->route('executionId'));
+            if ($team->id !== 0 && $team->id !== $execution->scheduledVolumeBackup->team_id) {
+                return response()->json(['message' => 'Permission denied.'], 403);
+            }
+            if ($execution->local_storage_deleted || blank($execution->filename)) {
+                return response()->json(['message' => 'Backup not found locally on the server.'], 404);
+            }
+
+            $server = $execution->scheduledVolumeBackup->server();
+            if (! $server) {
+                return response()->json(['message' => 'Server not found.'], 404);
+            }
+
+            $filename = $execution->filename;
+            $disk = Storage::build([
+                'driver' => 'sftp',
+                'host' => $server->ip,
+                'port' => (int) $server->port,
+                'username' => $server->user,
+                'privateKey' => $server->privateKey->getKeyLocation(),
+                'root' => '/',
+            ]);
+            if (! $disk->exists($filename)) {
+                return response()->json(['message' => 'Backup not found locally on the server.'], 404);
+            }
+
+            return new StreamedResponse(function () use ($disk, $filename) {
+                if (ob_get_level()) {
+                    ob_end_clean();
+                }
+                $stream = $disk->readStream($filename);
+                if ($stream === false || is_null($stream)) {
+                    abort(500, 'Failed to open stream for the requested file.');
+                }
+                while (! feof($stream)) {
+                    echo fread($stream, 2048);
+                    flush();
+                }
+
+                fclose($stream);
+            }, 200, [
+                'Content-Type' => 'application/gzip',
+                'Content-Disposition' => 'attachment; filename="'.basename($filename).'"',
+            ]);
+        } catch (Throwable) {
+            return response()->json(['message' => 'Failed to download backup.'], 500);
+        }
+    })->name('download.volume-backup');
 
 });
 

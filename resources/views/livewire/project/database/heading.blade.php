@@ -2,8 +2,6 @@
     @php
         $databasePageItems = [
             ['label' => 'Configuration', 'route' => 'project.database.configuration', 'active' => request()->routeIs('project.database.configuration')],
-            ['label' => 'Logs', 'route' => 'project.database.logs', 'active' => request()->routeIs('project.database.logs')],
-            ['label' => 'Terminal', 'route' => 'project.database.command', 'active' => request()->routeIs('project.database.command'), 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
             [
                 'label' => 'Backups',
                 'route' => 'project.database.backup.index',
@@ -15,6 +13,8 @@
                     'App\Models\StandaloneMariadb',
                 ]),
             ],
+            ['label' => 'Logs', 'route' => 'project.database.logs', 'active' => request()->routeIs('project.database.logs')],
+            ['label' => 'Terminal', 'route' => 'project.database.command', 'active' => request()->routeIs('project.database.command'), 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
         ];
 
         $databaseConfigurationItems = [
@@ -190,16 +190,6 @@
                 Configuration
             </a>
 
-            <a class="shrink-0 {{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}"
-                href="{{ route('project.database.logs', $parameters) }}">
-                Logs
-            </a>
-            @can('canAccessTerminal')
-                <a class="shrink-0 {{ request()->routeIs('project.database.command') ? 'dark:text-white' : '' }}"
-                    href="{{ route('project.database.command', $parameters) }}">
-                    Terminal
-                </a>
-            @endcan
             @if (
                 $database->getMorphClass() === 'App\Models\StandalonePostgresql' ||
                     $database->getMorphClass() === 'App\Models\StandaloneMongodb' ||
@@ -210,6 +200,16 @@
                     Backups
                 </a>
             @endif
+            <a class="shrink-0 {{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}"
+                href="{{ route('project.database.logs', $parameters) }}">
+                Logs
+            </a>
+            @can('canAccessTerminal')
+                <a class="shrink-0 {{ request()->routeIs('project.database.command') ? 'dark:text-white' : '' }}"
+                    href="{{ route('project.database.command', $parameters) }}">
+                    Terminal
+                </a>
+            @endcan
         </nav>
 
         @if ($database->destination->server->isFunctional())

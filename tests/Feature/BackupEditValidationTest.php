@@ -72,6 +72,35 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
+it('renders a highlighted enable backup button and a regular disable backup button', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/database/backup-edit.blade.php'));
+
+    expect($view)
+        ->toContain('wire:target="toggleEnabled" isHighlighted>Enable Backup</x-forms.button>')
+        ->toContain('wire:target="toggleEnabled">Disable Backup</x-forms.button>')
+        ->not->toContain('label="Backup Enabled"');
+});
+
+it('enables and disables a scheduled database backup from the title action', function () {
+    $backup = createBackupForEditValidationTest($this->team, [
+        'enabled' => false,
+        'save_s3' => false,
+    ]);
+
+    $component = Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s])
+        ->assertSet('backupEnabled', false)
+        ->assertSee('Enable Backup')
+        ->call('toggleEnabled')
+        ->assertSet('backupEnabled', true)
+        ->assertSee('Disable Backup');
+
+    expect($backup->refresh()->enabled)->toBeTruthy();
+
+    $component->call('toggleEnabled')->assertSet('backupEnabled', false);
+
+    expect($backup->refresh()->enabled)->toBeFalsy();
+});
+
 it('disables S3 backup when saved without a selected S3 storage', function () {
     $backup = createBackupForEditValidationTest($this->team);
 
@@ -175,6 +204,30 @@ it('shows disabled S3 storage dropdown when no storages are available', function
 
     Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s])
         ->assertSee('No S3 storage available');
+});
+
+it('allows S3 backups to be disabled when no usable storage remains', function () {
+    $backup = createBackupForEditValidationTest($this->team, [
+        'save_s3' => true,
+        's3_storage_id' => null,
+    ]);
+
+    $component = Livewire::test(BackupEdit::class, [
+        'backup' => $backup->fresh(),
+        'availableS3Storages' => collect(),
+    ])->assertSet('saveS3', true);
+
+    preg_match('/<input\b(?=[^>]*wire:model=(?:"saveS3"|saveS3))[^>]*>/', $component->html(), $matches);
+    expect($matches[0] ?? null)->not->toBeNull()
+        ->and(preg_match('/\sdisabled(?:\s|\/>)/', $matches[0]))->toBe(0);
+
+    $component->set('saveS3', false)->call('instantSave')->assertDispatched('success');
+
+    expect($backup->refresh()->save_s3)->toBeFalsy()
+        ->and($backup->s3_storage_id)->toBeNull();
+
+    preg_match('/<input\b(?=[^>]*wire:model=(?:"saveS3"|saveS3))[^>]*>/', $component->html(), $matches);
+    expect(preg_match('/\sdisabled(?:\s|\/>)/', $matches[0]))->toBe(1);
 });
 
 it('shows when S3 backups are currently disabled', function () {

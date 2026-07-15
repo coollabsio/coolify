@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Symfony\Component\Yaml\Yaml;
 
 class LocalPersistentVolume extends BaseModel
@@ -39,6 +40,11 @@ class LocalPersistentVolume extends BaseModel
     public function database()
     {
         return $this->morphTo('resource');
+    }
+
+    public function scheduledBackups(): HasMany
+    {
+        return $this->hasMany(ScheduledVolumeBackup::class, 'local_persistent_volume_id');
     }
 
     protected function customizeName($value)

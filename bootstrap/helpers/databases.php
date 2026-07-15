@@ -179,7 +179,7 @@ function create_standalone_clickhouse($environment_id, StandaloneDocker|SwarmDoc
     return $database;
 }
 
-function deleteBackupsLocally(string|array|null $filenames, Server $server): void
+function deleteBackupsLocally(string|array|null $filenames, Server $server, bool $throwError = false): void
 {
     if (empty($filenames)) {
         return;
@@ -187,8 +187,8 @@ function deleteBackupsLocally(string|array|null $filenames, Server $server): voi
     if (is_string($filenames)) {
         $filenames = [$filenames];
     }
-    $quotedFiles = array_map(fn ($file) => "\"$file\"", $filenames);
-    instant_remote_process(['rm -f '.implode(' ', $quotedFiles)], $server, throwError: false);
+    $quotedFiles = array_map(fn ($file) => escapeshellarg($file), $filenames);
+    instant_remote_process(['rm -f '.implode(' ', $quotedFiles)], $server, throwError: $throwError);
 
     $foldersToCheck = collect($filenames)->map(fn ($file) => dirname($file))->unique();
     $foldersToCheck->each(fn ($folder) => deleteEmptyBackupFolder($folder, $server));
@@ -214,7 +214,9 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
         'aws_url' => $s3->awsUrl(),
     ]);
 
-    $disk->delete($filenames);
+    if (! $disk->delete($filenames)) {
+        throw new RuntimeException('One or more S3 backup files could not be deleted.');
+    }
 }
 
 function deleteEmptyBackupFolder($folderPath, Server $server): void

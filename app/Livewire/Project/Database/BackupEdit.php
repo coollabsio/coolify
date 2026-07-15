@@ -217,6 +217,19 @@ class BackupEdit extends Component
         }
     }
 
+    public function toggleEnabled(): void
+    {
+        try {
+            $this->authorize('manageBackups', $this->backup->database);
+
+            $this->backupEnabled = ! $this->backupEnabled;
+            $this->backup->update(['enabled' => $this->backupEnabled]);
+            $this->dispatch('success', $this->backupEnabled ? 'Backup enabled.' : 'Backup disabled.');
+        } catch (\Throwable $e) {
+            $this->dispatch('error', $e->getMessage());
+        }
+    }
+
     public function updatedS3StorageId(): void
     {
         $this->instantSave();

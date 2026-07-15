@@ -1,4 +1,15 @@
-<div>
+<div x-data="{
+    search: '',
+    backups: @js($database->scheduledBackups->map(fn ($backup) => [
+        'name' => strtolower($database->name),
+        'frequency' => strtolower($backup->frequency),
+    ])->values()),
+    hasMatches() {
+        const query = this.search.toLowerCase();
+
+        return this.backups.some((backup) => backup.name.includes(query) || backup.frequency.includes(query));
+    },
+}">
     <div class="flex flex-col gap-2">
         @if ($database->is_migrated && blank($database->custom_type))
             <div>
@@ -18,9 +29,16 @@
                 </form>
             </div>
         @else
+            <div class="max-w-md pb-4">
+                <x-forms.input id="null" type="search" x-model="search"
+                    placeholder="Search by database name or frequency..." />
+            </div>
+            <div x-cloak x-show="search !== '' && backups.length > 0 && !hasMatches()">
+                No scheduled backups match your search.
+            </div>
             @forelse($database->scheduledBackups as $backup)
                 @if ($type == 'database')
-                    <a @class([
+                    <a x-show="search === '' || @js(strtolower($database->name)).includes(search.toLowerCase()) || @js(strtolower($backup->frequency)).includes(search.toLowerCase())" @class([
                         'flex flex-col border-l-2 transition-colors p-4 cursor-pointer bg-white hover:bg-gray-100 dark:bg-coolgray-100 dark:hover:bg-coolgray-200 text-black dark:text-white',
                         'border-blue-500/50 border-dashed' =>
                             $backup->latest_log &&
@@ -105,7 +123,7 @@
                         </div>
                     </a>
                 @else
-                    <div @class([
+                    <div x-show="search === '' || @js(strtolower($database->name)).includes(search.toLowerCase()) || @js(strtolower($backup->frequency)).includes(search.toLowerCase())" @class([
                         'flex flex-col border-l-2 transition-colors p-4 cursor-pointer bg-white hover:bg-gray-100 dark:bg-coolgray-100 dark:hover:bg-coolgray-200 text-black dark:text-white',
                         'bg-gray-200 dark:bg-coolgray-200' =>
                             data_get($backup, 'id') === data_get($selectedBackup, 'id'),

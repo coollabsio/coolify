@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Shared\Storages;
 use App\Models\LocalPersistentVolume;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Show extends Component
@@ -31,6 +32,8 @@ class Show extends Component
     public ?string $hostPath = null;
 
     public bool $isPreviewSuffixEnabled = true;
+
+    public bool $hasEnabledBackup = false;
 
     protected $validationAttributes = [
         'name' => 'name',
@@ -81,10 +84,19 @@ class Show extends Component
         }
     }
 
-    public function mount()
+    public function mount(): void
     {
         $this->syncData(false);
         $this->isReadOnly = $this->storage->shouldBeReadOnlyInUI();
+        $this->refreshBackupStatus();
+    }
+
+    #[On('refreshVolumeBackups')]
+    public function refreshBackupStatus(): void
+    {
+        $this->hasEnabledBackup = $this->storage->scheduledBackups()
+            ->where('enabled', true)
+            ->exists();
     }
 
     public function instantSave(): void
@@ -113,6 +125,12 @@ class Show extends Component
 
         if (! verifyPasswordConfirmation($password, $this)) {
             return 'The provided password is incorrect.';
+        }
+
+        if ($this->storage->scheduledBackups()->exists()) {
+            $this->dispatch('error', 'Delete this volume backup schedule and its archives before deleting the volume.');
+
+            return false;
         }
 
         $this->storage->delete();

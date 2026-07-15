@@ -5,6 +5,13 @@
             <x-forms.button type="submit" class="w-full sm:w-auto">
                 Save
             </x-forms.button>
+            @if (!$backupEnabled)
+                <x-forms.button type="button" wire:click="toggleEnabled" wire:loading.attr="disabled"
+                    wire:target="toggleEnabled" isHighlighted>Enable Backup</x-forms.button>
+            @else
+                <x-forms.button type="button" wire:click="toggleEnabled" wire:loading.attr="disabled"
+                    wire:target="toggleEnabled">Disable Backup</x-forms.button>
+            @endif
             @if (str($status)->startsWith('running'))
                 <x-forms.button wire:click='backupNow' class="w-full sm:w-auto">Backup Now</x-forms.button>
             @endif
@@ -27,9 +34,11 @@
         </div>
     </div>
     <div class="w-full max-w-md pb-2">
-        <x-forms.checkbox instantSave label="Backup Enabled" id="backupEnabled" />
         @if ($availableS3Storages->count() > 0)
             <x-forms.checkbox instantSave label="S3 Enabled" id="saveS3" />
+        @elseif ($saveS3)
+            <x-forms.checkbox instantSave label="S3 Enabled" id="saveS3"
+                helper="The configured S3 storage is no longer available. Disable S3 backups or configure a usable S3 storage." />
         @else
             <x-forms.checkbox instantSave helper="No validated S3 storage available." label="S3 Enabled" id="saveS3"
                 disabled />
