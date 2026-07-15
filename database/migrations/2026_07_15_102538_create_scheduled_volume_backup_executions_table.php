@@ -19,8 +19,8 @@ return new class extends Migration
             $table->longText('message')->nullable();
             $table->unsignedBigInteger('size')->default(0);
             $table->text('filename')->nullable();
-            $table->json('pause_container_ids')->nullable();
-            $table->boolean('pause_recovery_pending')->default(false);
+            $table->json('stop_container_ids')->nullable();
+            $table->boolean('stop_recovery_pending')->default(false);
             $table->boolean('s3_cleanup_pending')->default(false);
             $table->timestamp('finished_at')->nullable();
             $table->boolean('local_storage_deleted')->default(false);

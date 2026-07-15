@@ -112,7 +112,7 @@ class ScheduledJobManager implements ShouldQueue
         }
 
         try {
-            $this->recoverPausedVolumeBackupContainers();
+            $this->recoverStoppedVolumeBackupContainers();
             $this->processScheduledVolumeBackups();
         } catch (\Exception $e) {
             Log::channel('scheduled-errors')->error('Failed to process scheduled volume backups', [
@@ -365,11 +365,11 @@ class ScheduledJobManager implements ShouldQueue
             });
     }
 
-    private function recoverPausedVolumeBackupContainers(): void
+    private function recoverStoppedVolumeBackupContainers(): void
     {
         ScheduledVolumeBackupExecution::query()
             ->where(fn (Builder $query) => $query
-                ->where('pause_recovery_pending', true)
+                ->where('stop_recovery_pending', true)
                 ->orWhere('s3_cleanup_pending', true))
             ->chunkById(self::CHUNK_SIZE, function ($executions): void {
                 foreach ($executions as $execution) {
@@ -385,7 +385,7 @@ class ScheduledJobManager implements ShouldQueue
 
             if ($backup->executions()
                 ->where(fn (Builder $query) => $query
-                    ->where('pause_recovery_pending', true)
+                    ->where('stop_recovery_pending', true)
                     ->orWhere('s3_cleanup_pending', true))
                 ->exists()) {
                 $this->skippedCount++;

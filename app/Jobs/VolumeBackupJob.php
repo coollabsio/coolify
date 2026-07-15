@@ -83,11 +83,11 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 .' '.escapeshellarg($image)
                 .' tar -czf - -C /volume . > '.escapeshellarg($backupLocation);
 
-            if ($this->backup->pause_during_backup) {
+            if ($this->backup->stop_during_backup) {
                 $containers = $this->containersUsingVolume($source, $server);
                 if ($containers !== []) {
-                    $this->execution->update(['pause_recovery_pending' => true]);
-                    $archiveCommand = $this->archiveWithPausedContainers(
+                    $this->execution->update(['stop_recovery_pending' => true]);
+                    $archiveCommand = $this->archiveWithStoppedContainers(
                         $archiveCommand,
                         $containers,
                         VolumeBackupRecoveryJob::stateFile($this->execution),
@@ -101,8 +101,8 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $archiveCommand,
             ], $server, timeout: $this->timeout, disableMultiplexing: true);
             $this->execution->update([
-                'pause_container_ids' => null,
-                'pause_recovery_pending' => false,
+                'stop_container_ids' => null,
+                'stop_recovery_pending' => false,
             ]);
 
             $size = (int) instant_remote_process(
@@ -253,7 +253,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * @param  array<int, string>  $containers
      */
-    private function archiveWithPausedContainers(string $archiveCommand, array $containers, string $stateFile): string
+    private function archiveWithStoppedContainers(string $archiveCommand, array $containers, string $stateFile): string
     {
         if ($containers === []) {
             return $archiveCommand;
@@ -263,9 +263,12 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         $script = "set -eu\n"
             .'state_file='.escapeshellarg($stateFile)."\n"
             .": > \"\$state_file\"\n"
-            ."cleanup() { status=\$?; trap - EXIT HUP INT TERM; while IFS= read -r container; do docker unpause \"\$container\" >/dev/null || status=1; done < \"\$state_file\"; [ \$status -eq 0 ] && rm -f \"\$state_file\"; exit \$status; }\n"
-            ."trap cleanup EXIT HUP INT TERM\n"
-            ."for container in {$containerList}; do echo \"\$container\" >> \"\$state_file\"; docker pause \"\$container\" >/dev/null; done\n"
+            ."cleanup() { status=\$?; trap - EXIT HUP INT TERM; while IFS= read -r container; do docker start \"\$container\" >/dev/null || status=1; done < \"\$state_file\"; [ \$status -eq 0 ] && rm -f \"\$state_file\"; exit \$status; }\n"
+            ."trap cleanup EXIT\n"
+            ."trap 'exit 129' HUP\n"
+            ."trap 'exit 130' INT\n"
+            ."trap 'exit 143' TERM\n"
+            ."for container in {$containerList}; do echo \"\$container\" >> \"\$state_file\"; docker stop \"\$container\" >/dev/null; done\n"
             .$archiveCommand;
 
         return 'sh -c '.escapeshellarg($script);
@@ -273,7 +276,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private function recoverIncompleteBackup(ScheduledVolumeBackupExecution $execution): string
     {
-        if (! $execution->pause_recovery_pending && ! $execution->s3_cleanup_pending) {
+        if (! $execution->stop_recovery_pending && ! $execution->s3_cleanup_pending) {
             return '';
         }
 

@@ -21,7 +21,7 @@ return new class extends Migration
             $table->boolean('enabled')->default(true);
             $table->boolean('save_s3')->default(false);
             $table->boolean('disable_local_backup')->default(false);
-            $table->boolean('pause_during_backup')->default(false);
+            $table->boolean('stop_during_backup')->default(false);
             $table->unsignedInteger('retention_amount_locally')->default(7);
             $table->unsignedInteger('retention_amount_s3')->default(7);
             $table->unsignedInteger('timeout')->default(3600);

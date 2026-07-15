@@ -96,18 +96,25 @@ it('shows volume backups on the application backups pages', function () {
         ->assertSee($volume->name);
 });
 
-it('shows the configure backup modal trigger instead of inline backup settings on a volume', function () {
+it('shows the configure backup modal trigger inside the volume card instead of inline backup settings', function () {
     InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
     $team = Team::factory()->create();
     signInForVolumeBackups($this, $team);
     [$application, $volume] = createVolumeBackupApplication($team);
 
-    Livewire::test(Show::class, [
+    $component = Livewire::test(Show::class, [
         'storage' => $volume,
         'resource' => $application,
     ])
+        ->set('isReadOnly', true)
         ->assertSee('Configure Backup')
         ->assertDontSee('Backups made while the application is writing');
+
+    $html = $component->html();
+
+    expect(strpos($html, 'Configure Backup'))
+        ->toBeGreaterThan(strpos($html, '<form'))
+        ->toBeLessThan(strpos($html, '</form>'));
 });
 
 it('only shows the backup enabled badge for an enabled volume backup', function () {
@@ -151,7 +158,7 @@ it('stores volume backup schedules and executions', function () {
         'enabled',
         'save_s3',
         'disable_local_backup',
-        'pause_during_backup',
+        'stop_during_backup',
         'retention_amount_locally',
         'retention_days_locally',
         'retention_max_storage_locally',
@@ -167,8 +174,8 @@ it('stores volume backup schedules and executions', function () {
             'message',
             'size',
             'filename',
-            'pause_container_ids',
-            'pause_recovery_pending',
+            'stop_container_ids',
+            'stop_recovery_pending',
             's3_cleanup_pending',
             'finished_at',
             'local_storage_deleted',
@@ -215,7 +222,7 @@ it('renders volume backup executions like database backup executions', function 
             'Backup Now',
             'Delete Backups and Schedule',
             'Persistent volume:',
-            'Pause containers while creating the archive',
+            'Stop containers while creating the archive',
             'S3 Enabled',
             'Disable Local Backup',
             'S3 Storage',
@@ -397,11 +404,12 @@ it('creates a local scheduled backup for a persistent volume', function () {
         ->assertSee('Scheduled Backup')
         ->assertSee('Persistent volume:')
         ->assertSee('inconsistent or corrupted')
+        ->assertSee('gracefully stop containers')
         ->set('frequency', 'daily')
         ->set('retentionAmountLocally', 5)
         ->set('retentionDaysLocally', 14)
         ->set('retentionMaxStorageLocally', 1.5)
-        ->set('pauseDuringBackup', true)
+        ->set('stopDuringBackup', true)
         ->call('save')
         ->assertDispatched('success');
 
@@ -413,7 +421,7 @@ it('creates a local scheduled backup for a persistent volume', function () {
         ->and($backup->retention_amount_locally)->toBe(5)
         ->and($backup->retention_days_locally)->toBe(14)
         ->and($backup->retention_max_storage_locally)->toBe(1.5)
-        ->and($backup->pause_during_backup)->toBeTrue()
+        ->and($backup->stop_during_backup)->toBeTrue()
         ->and($backup->save_s3)->toBeFalse();
 });
 
@@ -485,6 +493,45 @@ it('saves the database-style S3 backup controls immediately', function () {
     expect($backup->fresh()->save_s3)->toBeFalse()
         ->and($backup->fresh()->s3_storage_id)->toBeNull()
         ->and($backup->fresh()->disable_local_backup)->toBeFalse();
+});
+
+it('saves each editable volume backup checkbox immediately', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $s3Storage = S3Storage::create([
+        'name' => 'Volume backups',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+    $backup = ScheduledVolumeBackup::create([
+        'local_persistent_volume_id' => $volume->id,
+        'team_id' => $team->id,
+        's3_storage_id' => $s3Storage->id,
+        'frequency' => 'daily',
+        'save_s3' => true,
+    ]);
+
+    $component = Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application]);
+    $html = $component->html();
+
+    foreach (['stopDuringBackup', 'saveToS3', 'disableLocalBackup'] as $property) {
+        preg_match('/<input\b(?=[^>]*wire:model=(?:"'.$property.'"|'.$property.'))[^>]*>/', $html, $matches);
+
+        expect($matches[0] ?? null)->not->toBeNull()
+            ->and($matches[0])->toContain("wire:click='instantSave'");
+    }
+
+    $component->set('stopDuringBackup', true)->call('instantSave')->assertDispatched('success');
+    expect($backup->refresh()->stop_during_backup)->toBeTrue();
+
+    $component->set('stopDuringBackup', false)->call('instantSave')->assertDispatched('success');
+    expect($backup->refresh()->stop_during_backup)->toBeFalse();
 });
 
 it('allows volume S3 backups to be disabled when no usable storage remains', function () {
@@ -829,7 +876,7 @@ it('keeps a successful backup successful when retention cleanup fails', function
         ->and($oldExecution->fresh()->local_storage_deleted)->toBeFalse();
 });
 
-it('pauses and resumes containers that use the volume when requested', function () {
+it('stops and restarts containers that use the volume when requested', function () {
     config(['broadcasting.default' => 'null']);
     InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
     $team = Team::factory()->create();
@@ -838,7 +885,7 @@ it('pauses and resumes containers that use the volume when requested', function 
         'local_persistent_volume_id' => $volume->id,
         'team_id' => $team->id,
         'frequency' => 'daily',
-        'pause_during_backup' => true,
+        'stop_during_backup' => true,
     ]);
 
     Process::fake([
@@ -849,9 +896,11 @@ it('pauses and resumes containers that use the volume when requested', function 
 
     (new VolumeBackupJob($backup))->handle();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'trap cleanup EXIT HUP INT TERM')
-        && str_contains($process->command, 'docker pause')
-        && str_contains($process->command, 'docker unpause')
+    Process::assertRan(fn ($process) => str_contains($process->command, 'trap cleanup EXIT')
+        && str_contains($process->command, 'exit 143')
+        && str_contains($process->command, 'TERM')
+        && str_contains($process->command, 'docker stop')
+        && str_contains($process->command, 'docker start')
         && str_contains($process->command, 'state_file='));
     Process::assertRan(fn ($process) => str_contains($process->command, '{{println .Source}}{{println .Name}}')
         && str_contains($process->command, "grep -Fqx -- 'app-data'")
@@ -859,7 +908,7 @@ it('pauses and resumes containers that use the volume when requested', function 
         && str_contains($process->command, 'continue'));
 });
 
-it('finds containers using a bind mounted host path before pausing', function () {
+it('finds containers using a bind mounted host path before stopping', function () {
     config(['broadcasting.default' => 'null']);
     InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
     $team = Team::factory()->create();
@@ -869,7 +918,7 @@ it('finds containers using a bind mounted host path before pausing', function ()
         'local_persistent_volume_id' => $volume->id,
         'team_id' => $team->id,
         'frequency' => 'daily',
-        'pause_during_backup' => true,
+        'stop_during_backup' => true,
     ]);
 
     Process::fake([
@@ -884,7 +933,7 @@ it('finds containers using a bind mounted host path before pausing', function ()
         && str_contains($process->command, "grep -Fqx -- '/srv/app-data'"));
 });
 
-it('retries container recovery when a timed out backup left a container paused', function () {
+it('retries container recovery when a timed out backup left a container stopped', function () {
     Queue::fake();
     $team = Team::factory()->create();
     [$application, $volume] = createVolumeBackupApplication($team);
@@ -896,23 +945,23 @@ it('retries container recovery when a timed out backup left a container paused',
     $execution = ScheduledVolumeBackupExecution::create([
         'scheduled_volume_backup_id' => $backup->id,
         'status' => 'running',
-        'pause_recovery_pending' => true,
+        'stop_recovery_pending' => true,
     ]);
     Process::fake([
         '*cat *coolify-volume-backup-*' => 'abc123',
-        '*docker unpause*' => Process::result(errorOutput: 'daemon unavailable', exitCode: 1),
+        '*docker start*' => Process::result(errorOutput: 'daemon unavailable', exitCode: 1),
     ]);
 
     (new VolumeBackupJob($backup))->failed(new RuntimeException('Worker timed out'));
 
     expect($execution->fresh()->status)->toBe('failed')
         ->and($execution->fresh()->message)->toContain('Container recovery failed')
-        ->and($execution->fresh()->pause_container_ids)->toBe(['abc123'])
-        ->and($execution->fresh()->pause_recovery_pending)->toBeTrue();
+        ->and($execution->fresh()->stop_container_ids)->toBe(['abc123'])
+        ->and($execution->fresh()->stop_recovery_pending)->toBeTrue();
     Queue::assertPushed(VolumeBackupRecoveryJob::class);
 });
 
-it('resumes containers and removes a partial archive when archiving fails', function () {
+it('restarts containers and removes a partial archive when archiving fails', function () {
     config(['broadcasting.default' => 'null']);
     InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
     $team = Team::factory()->create();
@@ -921,11 +970,11 @@ it('resumes containers and removes a partial archive when archiving fails', func
         'local_persistent_volume_id' => $volume->id,
         'team_id' => $team->id,
         'frequency' => 'daily',
-        'pause_during_backup' => true,
+        'stop_during_backup' => true,
     ]);
     Process::fake([
         '*docker ps -q*' => 'abc123',
-        '*trap cleanup EXIT HUP INT TERM*' => Process::result(errorOutput: 'archive failed', exitCode: 1),
+        '*trap cleanup EXIT*' => Process::result(errorOutput: 'archive failed', exitCode: 1),
         '*' => '',
     ]);
 
@@ -933,7 +982,7 @@ it('resumes containers and removes a partial archive when archiving fails', func
 
     $execution = ScheduledVolumeBackupExecution::query()->sole();
     expect($execution->status)->toBe('failed')
-        ->and($execution->pause_container_ids)->toBeNull();
+        ->and($execution->stop_container_ids)->toBeNull();
     Process::assertRan(fn ($process) => str_contains($process->command, 'rm -f')
         && str_contains($process->command, '.tar.gz'));
 });
@@ -1079,7 +1128,7 @@ it('dispatches pending recovery without starting another volume backup', functio
     $execution = ScheduledVolumeBackupExecution::create([
         'scheduled_volume_backup_id' => $backup->id,
         'status' => 'failed',
-        'pause_recovery_pending' => true,
+        'stop_recovery_pending' => true,
     ]);
 
     (new ScheduledJobManager)->handle();

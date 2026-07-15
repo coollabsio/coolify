@@ -32,7 +32,7 @@ class VolumeBackups extends Component
 
     public bool $disableLocalBackup = false;
 
-    public bool $pauseDuringBackup = false;
+    public bool $stopDuringBackup = false;
 
     public ?int $s3StorageId = null;
 
@@ -63,7 +63,7 @@ class VolumeBackups extends Component
             'enabled' => ['required', 'boolean'],
             'saveToS3' => ['required', 'boolean'],
             'disableLocalBackup' => ['required', 'boolean'],
-            'pauseDuringBackup' => ['required', 'boolean'],
+            'stopDuringBackup' => ['required', 'boolean'],
             's3StorageId' => ['nullable', 'integer'],
             'retentionAmountLocally' => ['required', 'integer', 'min:0', 'max:10000'],
             'retentionDaysLocally' => ['required', 'integer', 'min:0'],
@@ -90,7 +90,7 @@ class VolumeBackups extends Component
             $this->enabled = $this->backup->enabled;
             $this->saveToS3 = $this->backup->save_s3;
             $this->disableLocalBackup = $this->backup->disable_local_backup;
-            $this->pauseDuringBackup = $this->backup->pause_during_backup;
+            $this->stopDuringBackup = $this->backup->stop_during_backup;
             $this->s3StorageId = $this->backup->s3_storage_id ?? $this->availableS3Storages->first()?->id;
             $this->retentionAmountLocally = $this->backup->retention_amount_locally;
             $this->retentionDaysLocally = $this->backup->retention_days_locally;
@@ -188,7 +188,7 @@ class VolumeBackups extends Component
             if ($this->backup->executions()
                 ->where(fn ($query) => $query
                     ->where('status', 'running')
-                    ->orWhere('pause_recovery_pending', true)
+                    ->orWhere('stop_recovery_pending', true)
                     ->orWhere('s3_cleanup_pending', true))
                 ->exists()) {
                 $this->dispatch('error', 'Wait for the running volume backup and container recovery to finish before deleting this schedule.');
@@ -246,7 +246,7 @@ class VolumeBackups extends Component
 
         $deletedCount = $this->backup?->executions()
             ->where('status', 'failed')
-            ->where('pause_recovery_pending', false)
+            ->where('stop_recovery_pending', false)
             ->where('s3_cleanup_pending', false)
             ->where(fn ($query) => $query
                 ->whereNull('filename')
@@ -292,7 +292,7 @@ class VolumeBackups extends Component
             return false;
         }
 
-        if ($execution->status === 'running' || $execution->pause_recovery_pending || $execution->s3_cleanup_pending) {
+        if ($execution->status === 'running' || $execution->stop_recovery_pending || $execution->s3_cleanup_pending) {
             $this->dispatch('error', 'Wait for the backup and recovery operations to finish before deleting it.');
 
             return false;
@@ -369,7 +369,7 @@ class VolumeBackups extends Component
                 'enabled' => $enabled,
                 'save_s3' => $this->saveToS3,
                 'disable_local_backup' => $this->disableLocalBackup,
-                'pause_during_backup' => $this->pauseDuringBackup,
+                'stop_during_backup' => $this->stopDuringBackup,
                 's3_storage_id' => $this->saveToS3 ? $this->s3StorageId : null,
                 'retention_amount_locally' => $this->retentionAmountLocally,
                 'retention_days_locally' => $this->retentionDaysLocally,

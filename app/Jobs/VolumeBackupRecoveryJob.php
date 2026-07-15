@@ -48,7 +48,7 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldQueue
     {
         $execution->loadMissing('scheduledVolumeBackup.volume.resource');
 
-        if ($execution->pause_recovery_pending) {
+        if ($execution->stop_recovery_pending) {
             self::recoverContainers($execution);
         }
 
@@ -75,22 +75,22 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldQueue
             ->filter(fn (string $container): bool => preg_match('/^[a-f0-9]{6,64}$/i', $container) === 1)
             ->values()
             ->all();
-        $execution->update(['pause_container_ids' => $containers]);
+        $execution->update(['stop_container_ids' => $containers]);
 
         $remainingFile = $stateFile.'.remaining';
         $script = 'status=0; : > '.escapeshellarg($remainingFile).'; '
             .'if [ -f '.escapeshellarg($stateFile).' ]; then while IFS= read -r container; do '
-            .'[ -z "$container" ] && continue; paused=$(docker inspect --format \'{{.State.Paused}}\' "$container" 2>/dev/null) '
+            .'[ -z "$container" ] && continue; running=$(docker inspect --format \'{{.State.Running}}\' "$container" 2>/dev/null) '
             .'|| { echo "$container" >> '.escapeshellarg($remainingFile).'; status=1; continue; }; '
-            .'if [ "$paused" = true ] && ! docker unpause "$container" >/dev/null; then echo "$container" >> '
+            .'if [ "$running" != true ] && ! docker start "$container" >/dev/null; then echo "$container" >> '
             .escapeshellarg($remainingFile).'; status=1; fi; done < '.escapeshellarg($stateFile).'; fi; '
             .'if [ -s '.escapeshellarg($remainingFile).' ]; then mv '.escapeshellarg($remainingFile).' '.escapeshellarg($stateFile)
             .'; else rm -f '.escapeshellarg($stateFile).' '.escapeshellarg($remainingFile).'; fi; exit $status';
 
         instant_remote_process(['sh -c '.escapeshellarg($script)], $server, disableMultiplexing: true);
         $execution->update([
-            'pause_container_ids' => null,
-            'pause_recovery_pending' => false,
+            'stop_container_ids' => null,
+            'stop_recovery_pending' => false,
         ]);
     }
 
@@ -112,6 +112,6 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldQueue
 
     public static function stateFile(ScheduledVolumeBackupExecution $execution): string
     {
-        return '/tmp/coolify-volume-backup-'.$execution->uuid.'.paused';
+        return '/tmp/coolify-volume-backup-'.$execution->uuid.'.stopped';
     }
 }

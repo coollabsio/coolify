@@ -65,6 +65,15 @@
                     </div>
                 @endcan
             @endif
+            @if ($resource instanceof \App\Models\Application)
+                @can('update', $resource)
+                    <x-modal-input buttonTitle="Configure Backup" title="Configure Volume Backup" :wireIgnore="false">
+                        <livewire:project.application.backup.create :application="$resource"
+                            :selected-volume-id="$storage->id"
+                            wire:key="configure-readonly-volume-backup-{{ $storage->id }}" />
+                    </x-modal-input>
+                @endcan
+            @endif
         @else
             @can('update', $resource)
                 @if ($isFirst)
@@ -150,15 +159,4 @@
             @endcan
         @endif
     </form>
-    @if ($isReadOnly && $resource instanceof \App\Models\Application)
-        @can('update', $resource)
-            <div class="pt-2">
-                <x-modal-input buttonTitle="Configure Backup" title="Configure Volume Backup" :wireIgnore="false">
-                    <livewire:project.application.backup.create :application="$resource"
-                        :selected-volume-id="$storage->id"
-                        wire:key="configure-readonly-volume-backup-{{ $storage->id }}" />
-                </x-modal-input>
-            </div>
-        @endcan
-    @endif
 </div>

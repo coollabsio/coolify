@@ -33,12 +33,16 @@
                 <span class="font-medium text-neutral-800 dark:text-neutral-200">{{ $storage->name }}</span>
             </p>
             </div>
-
+            <div class="p-3 text-sm rounded bg-warning/10 text-warning">
+                Backups made while the application is writing to this volume may be inconsistent or corrupted. You can
+                gracefully stop containers during the archive step for a safer file-level backup, but this briefly
+                interrupts the application.
+            </div>
         </div>
 
         <div class="w-full max-w-md">
-            <x-forms.checkbox id="pauseDuringBackup" label="Pause containers while creating the archive"
-                helper="Off by default. Containers using this volume are resumed immediately after the archive is created." />
+            <x-forms.checkbox instantSave id="stopDuringBackup" label="Stop containers while creating the archive"
+                helper="Off by default. Containers using this volume are gracefully stopped and restarted immediately after the archive is created." />
             @if ($availableS3Storages->isNotEmpty())
                 <x-forms.checkbox instantSave id="saveToS3" label="S3 Enabled" />
             @elseif ($saveToS3)
@@ -80,11 +84,7 @@
 
         <div class="flex flex-col gap-4">
             <h3>Settings</h3>
-            <div class="p-3 text-sm rounded bg-warning/10 text-warning">
-                Backups made while the application is writing to this volume may be inconsistent or corrupted. You can
-                pause containers during the archive step for a more consistent backup, but this briefly interrupts the
-                application.
-            </div>
+
             <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
                 <x-forms.input id="frequency" label="Frequency" required
                     helper="Use every_minute, hourly, daily, weekly, monthly, yearly, or a cron expression." />
