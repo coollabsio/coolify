@@ -351,7 +351,7 @@ class Previews extends Component
 
         foreach ($containersToStop as $containerName) {
             instant_remote_process(command: [
-                "docker stop --time=$timeout $containerName",
+                "docker stop -t $timeout $containerName",
                 "docker rm -f $containerName",
             ], server: $server, throwError: false);
         }
