@@ -181,3 +181,56 @@ test('raw compose deployment can only be enabled for Docker Compose applications
         ->assertUnprocessable()
         ->assertJsonValidationErrors('is_raw_compose_deployment_enabled');
 });
+
+test('GET /api/v1/applications/{uuid}/settings returns the full settings record', function () {
+    $this->application->settings->update(recommendedApplicationSettingsPayload());
+
+    $response = $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->getJson("/api/v1/applications/{$this->application->uuid}/settings")
+        ->assertOk()
+        ->assertJsonPath('disable_build_cache', true)
+        ->assertJsonPath('stop_grace_period', 45)
+        ->assertJsonPath('docker_images_to_keep', 7)
+        ->assertJsonMissingPath('id')
+        ->assertJsonMissingPath('application_id')
+        ->assertJsonMissingPath('created_at')
+        ->assertJsonMissingPath('updated_at');
+
+    expect($response->json())->toHaveKeys([
+        'is_static',
+        'is_auto_deploy_enabled',
+        'is_force_https_enabled',
+        'is_debug_enabled',
+        'is_preview_deployments_enabled',
+        'is_build_server_enabled',
+        'is_gpu_enabled',
+    ]);
+});
+
+test('GET /api/v1/applications/{uuid}/settings returns 404 for applications owned by another team', function () {
+    $otherTeam = Team::factory()->create();
+    $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+    $otherDestination = StandaloneDocker::where('server_id', $otherServer->id)->first();
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnvironment = Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherApplication = Application::factory()->create([
+        'environment_id' => $otherEnvironment->id,
+        'destination_id' => $otherDestination->id,
+        'destination_type' => $otherDestination->getMorphClass(),
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->getJson("/api/v1/applications/{$otherApplication->uuid}/settings")
+        ->assertNotFound();
+});
+
+test('GET /api/v1/applications/{uuid}/settings returns 404 for an unknown application uuid', function () {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->getJson('/api/v1/applications/unknown-application-uuid/settings')
+        ->assertNotFound();
+});
+
+test('GET /api/v1/applications/{uuid}/settings rejects unauthenticated requests', function () {
+    $this->getJson("/api/v1/applications/{$this->application->uuid}/settings")
+        ->assertUnauthorized();
+});

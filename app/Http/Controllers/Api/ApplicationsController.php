@@ -2279,6 +2279,81 @@ class ApplicationsController extends Controller
     }
 
     #[OA\Get(
+        summary: 'Get settings',
+        description: 'Get application settings by application UUID.',
+        path: '/applications/{uuid}/settings',
+        operationId: 'get-application-settings-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get application settings by application UUID.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            ref: '#/components/schemas/ApplicationSetting'
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function settings_by_uuid(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('view', $application);
+
+        $settings = $application->settings;
+        $settings->makeHidden([
+            'id',
+            'application_id',
+            'created_at',
+            'updated_at',
+        ]);
+
+        return response()->json(serializeApiResponse($settings));
+    }
+
+    #[OA\Get(
         summary: 'Get application logs.',
         description: 'Get application logs by UUID.',
         path: '/applications/{uuid}/logs',
