@@ -252,9 +252,9 @@ it('splits scheduled backup settings and executions across dedicated urls', func
 
     $this->get($generalUrl.'/s3')
         ->assertOk()
-        ->assertSeeInOrder(['S3 Storage', 'Disable Local Backup', 'S3 Storage Retention'])
+        ->assertSeeInOrder(['S3 Storage', 'Disable Local Backup'])
         ->assertSee('S3 Storage')
-        ->assertSee('S3 Storage Retention')
+        ->assertDontSee('S3 Storage Retention')
         ->assertDontSee('Local Backup Retention')
         ->assertDontSee('Frequency')
         ->assertDontSee('Backup Availability:');
@@ -266,8 +266,8 @@ it('splits scheduled backup settings and executions across dedicated urls', func
     $this->get($generalUrl.'/retention')
         ->assertOk()
         ->assertSee('Local Backup Retention')
+        ->assertSee('S3 Storage Retention')
         ->assertSee('Number of backups to keep')
-        ->assertDontSee('S3 Storage Retention')
         ->assertDontSee('Stop containers while creating the archive')
         ->assertDontSee('Backup Availability:');
 
@@ -658,7 +658,7 @@ it('shows and saves volume S3 retention while S3 backups are disabled', function
     Livewire::test(VolumeBackups::class, [
         'storage' => $volume,
         'resource' => $application,
-        'section' => 's3',
+        'section' => 'retention',
     ])
         ->assertSee('S3 Storage Retention')
         ->set('retentionAmountS3', 12)

@@ -42,19 +42,4 @@
         @endif
     </div>
 
-    <div>
-        <h3 class="mb-3">S3 Storage Retention</h3>
-        <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
-            <x-forms.input label="Number of backups to keep" id="retentionAmountS3" type="number" min="0"
-                helper="Keeps only the specified number of most recent backups on S3 storage. Set to 0 for unlimited backups."
-                required />
-            <x-forms.input label="Days to keep backups" id="retentionDaysS3" type="number" min="0"
-                helper="Automatically removes S3 backups older than the specified number of days. Set to 0 for no time limit."
-                required />
-            <x-forms.input label="Maximum storage (GB)" id="retentionMaxStorageS3" type="number" min="0"
-                step="any"
-                helper="When total size of all backups in the current backup job exceeds this limit in GB, the oldest backups will be removed. Decimal values are supported (e.g. 0.5 for 500MB). Set to 0 for unlimited storage."
-                required />
-        </div>
-    </div>
 </form>
