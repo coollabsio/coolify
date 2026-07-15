@@ -17,6 +17,8 @@ class Show extends Component
 
     public array $parameters;
 
+    public string $section = 'general';
+
     public function mount(): void
     {
         $project = currentTeam()->projects()
@@ -32,11 +34,18 @@ class Show extends Component
         $this->authorize('view', $this->application);
 
         $this->backup = ScheduledVolumeBackup::query()
-            ->with('volume')
+            ->with('backupable')
             ->where('uuid', request()->route('backup_uuid'))
-            ->whereIn('local_persistent_volume_id', $this->application->persistentStorages()->pluck('id'))
+            ->forApplication($this->application)
             ->firstOrFail();
         $this->parameters = get_route_parameters();
+        $this->section = match (request()->route()?->getName()) {
+            'project.application.backup.s3' => 's3',
+            'project.application.backup.retention' => 'retention',
+            'project.application.backup.executions' => 'executions',
+            'project.application.backup.danger' => 'danger',
+            default => 'general',
+        };
     }
 
     public function render()

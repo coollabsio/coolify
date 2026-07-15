@@ -1,13 +1,14 @@
 <div x-data="{
-    search: '',
+    search: @js($search),
     backups: @js($backups->map(fn ($backup) => [
-        'name' => strtolower($backup->volume->name),
+        'name' => strtolower($backup->targetName()),
+        'type' => strtolower($backup->targetType()),
         'frequency' => strtolower($backup->frequency),
     ])->values()),
     hasMatches() {
         const query = this.search.toLowerCase();
 
-        return this.backups.some((backup) => backup.name.includes(query) || backup.frequency.includes(query));
+        return this.backups.some((backup) => backup.name.includes(query) || backup.type.includes(query) || backup.frequency.includes(query));
     },
 }">
     <x-slot:title>
@@ -28,7 +29,7 @@
     </div>
 
     <div class="max-w-md pb-4">
-        <x-forms.input id="null" type="search" x-model="search" placeholder="Search by volume name or frequency..." />
+        <x-forms.input id="null" type="search" x-model="search" placeholder="Search by target name, type, or frequency..." />
     </div>
 
     <div class="flex flex-col gap-2">
@@ -37,7 +38,7 @@
         </div>
         @forelse ($backups as $backup)
             @php($latestExecution = $backup->latestExecution)
-            <a x-show="search === '' || @js(strtolower($backup->volume->name)).includes(search.toLowerCase()) || @js(strtolower($backup->frequency)).includes(search.toLowerCase())" @class([
+            <a x-show="search === '' || @js(strtolower($backup->targetName())).includes(search.toLowerCase()) || @js(strtolower($backup->targetType())).includes(search.toLowerCase()) || @js(strtolower($backup->frequency)).includes(search.toLowerCase())" @class([
                 'flex flex-col border-l-2 transition-colors p-4 cursor-pointer bg-white hover:bg-gray-100 dark:bg-coolgray-100 dark:hover:bg-coolgray-200 text-black dark:text-white',
                 'border-blue-500/50 border-dashed' => $latestExecution?->status === 'running',
                 'border-error' => $latestExecution?->status === 'failed',
@@ -66,7 +67,7 @@
                     @endif
                 </div>
                 <div class="text-sm text-gray-600 dark:text-gray-400">
-                    Volume: {{ $backup->volume->name }}
+                    {{ $backup->targetType() }}: {{ $backup->targetName() }}
                     @if ($latestExecution?->finished_at)
                         • Last run {{ $latestExecution->finished_at->diffForHumans() }}
                     @else

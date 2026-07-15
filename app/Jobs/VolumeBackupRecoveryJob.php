@@ -46,7 +46,7 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldQueue
 
     public static function recover(ScheduledVolumeBackupExecution $execution): void
     {
-        $execution->loadMissing('scheduledVolumeBackup.volume.resource');
+        $execution->loadMissing('scheduledVolumeBackup.backupable.resource');
 
         if ($execution->stop_recovery_pending) {
             self::recoverContainers($execution);

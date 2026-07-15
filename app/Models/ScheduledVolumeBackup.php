@@ -2,15 +2,19 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ScheduledVolumeBackup extends BaseModel
 {
     protected $fillable = [
         'uuid',
-        'local_persistent_volume_id',
+        'backupable_type',
+        'backupable_id',
         'team_id',
         's3_storage_id',
         'frequency',
@@ -44,9 +48,28 @@ class ScheduledVolumeBackup extends BaseModel
         ];
     }
 
-    public function volume(): BelongsTo
+    public function scopeForApplication(Builder $query, Application $application): Builder
     {
-        return $this->belongsTo(LocalPersistentVolume::class, 'local_persistent_volume_id');
+        $volumeIds = $application->persistentStorages()->pluck('id');
+        $directoryIds = $application->fileStorages()
+            ->where('is_directory', true)
+            ->where('is_host_file', false)
+            ->pluck('id');
+
+        return $query->where(function (Builder $query) use ($volumeIds, $directoryIds): void {
+            $query->where(function (Builder $query) use ($volumeIds): void {
+                $query->where('backupable_type', (new LocalPersistentVolume)->getMorphClass())
+                    ->whereIn('backupable_id', $volumeIds);
+            })->orWhere(function (Builder $query) use ($directoryIds): void {
+                $query->where('backupable_type', (new LocalFileVolume)->getMorphClass())
+                    ->whereIn('backupable_id', $directoryIds);
+            });
+        });
+    }
+
+    public function backupable(): MorphTo
+    {
+        return $this->morphTo();
     }
 
     public function team(): BelongsTo
@@ -71,12 +94,56 @@ class ScheduledVolumeBackup extends BaseModel
 
     public function server(): ?Server
     {
-        $resource = $this->volume?->resource;
+        $resource = $this->targetResource();
 
         if ($resource instanceof ServiceApplication || $resource instanceof ServiceDatabase) {
             return $resource->service?->server?->fresh();
         }
 
         return $resource?->destination?->server?->fresh();
+    }
+
+    public function targetResource(): ?Model
+    {
+        return $this->backupable?->resource;
+    }
+
+    public function targetType(): string
+    {
+        return $this->backupable instanceof LocalFileVolume ? 'Directory' : 'Volume';
+    }
+
+    public function targetName(): string
+    {
+        return match (true) {
+            $this->backupable instanceof LocalFileVolume => $this->backupable->fs_path,
+            $this->backupable instanceof LocalPersistentVolume => $this->backupable->name,
+            default => 'Unknown storage',
+        };
+    }
+
+    public function sourcePath(): string
+    {
+        $target = $this->backupable;
+
+        if ($target instanceof LocalPersistentVolume) {
+            return filled($target->host_path) ? $target->host_path : $target->name;
+        }
+
+        if (! $target instanceof LocalFileVolume || ! $target->is_directory) {
+            throw new \RuntimeException('The backup target is not a directory or persistent volume.');
+        }
+
+        $path = str($target->fs_path);
+        if ($path->startsWith('.')) {
+            $resource = $this->targetResource();
+            if (! $resource || ! method_exists($resource, 'workdir')) {
+                throw new \RuntimeException('The directory backup workdir is unavailable.');
+            }
+
+            return $resource->workdir().$path->after('.')->toString();
+        }
+
+        return $path->toString();
     }
 }

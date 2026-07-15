@@ -16,6 +16,8 @@ class Index extends Component
 
     public array $parameters;
 
+    public string $search = '';
+
     protected $listeners = ['refreshVolumeBackups' => '$refresh'];
 
     public function mount(): void
@@ -23,15 +25,15 @@ class Index extends Component
         $this->application = $this->findApplication();
         $this->authorize('view', $this->application);
         $this->parameters = get_route_parameters();
+        $this->search = request()->string('search')->toString();
     }
 
     public function render(): View
     {
-        $volumeIds = $this->application->persistentStorages()->pluck('id');
         $backups = ScheduledVolumeBackup::query()
-            ->with(['volume', 'latestExecution'])
+            ->with(['backupable', 'latestExecution'])
             ->withCount('executions')
-            ->whereIn('local_persistent_volume_id', $volumeIds)
+            ->forApplication($this->application)
             ->latest()
             ->get();
 

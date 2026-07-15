@@ -5,7 +5,6 @@ use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\LocalPersistentVolume;
 use App\Models\Project;
-use App\Models\ScheduledVolumeBackup;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
@@ -16,6 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config(['app.maintenance.driver' => 'file']);
     InstanceSettings::forceCreate(['id' => 0]);
 
     $this->team = Team::factory()->create();
@@ -30,13 +30,11 @@ it('renders frontend-only application backup search data for volume names and fr
     $dailyVolume = createBackupSearchVolume($application, 'app-data');
     $weeklyVolume = createBackupSearchVolume($application, 'Cache-Data');
 
-    ScheduledVolumeBackup::create([
-        'local_persistent_volume_id' => $dailyVolume->id,
+    $dailyVolume->scheduledBackups()->create([
         'team_id' => $this->team->id,
         'frequency' => 'daily',
     ]);
-    ScheduledVolumeBackup::create([
-        'local_persistent_volume_id' => $weeklyVolume->id,
+    $weeklyVolume->scheduledBackups()->create([
         'team_id' => $this->team->id,
         'frequency' => '0 4 * * 0',
     ]);
@@ -51,6 +49,7 @@ it('renders frontend-only application backup search data for volume names and fr
         ->assertOk()
         ->assertSee('Cache-Data')
         ->assertSee('Volume: app-data')
+        ->assertSee("search: 'cache'", false)
         ->assertSee('x-model="search"', false)
         ->assertSee('x-show=', false)
         ->assertSee('No scheduled backups match your search.');

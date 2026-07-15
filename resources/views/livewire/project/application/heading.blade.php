@@ -14,7 +14,7 @@
             [
                 'label' => 'Backups',
                 'route' => 'project.application.backup.index',
-                'active' => request()->routeIs('project.application.backup.index', 'project.application.backup.show'),
+                'active' => request()->routeIs('project.application.backup.*'),
             ],
             [
                 'label' => 'Logs',
@@ -452,7 +452,7 @@
                 href="{{ route('project.application.deployment.index', $parameters) }}">
                 Deployments
             </a>
-            <a class="hidden md:block shrink-0 {{ request()->routeIs('project.application.backup.index', 'project.application.backup.show') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+            <a class="hidden md:block shrink-0 {{ request()->routeIs('project.application.backup.*') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
                 href="{{ route('project.application.backup.index', $parameters) }}">
                 Backups
             </a>

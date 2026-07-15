@@ -3,8 +3,8 @@
 namespace App\Livewire\Project\Application\Backup;
 
 use App\Models\Application;
-use App\Models\S3Storage;
-use App\Models\ScheduledVolumeBackup;
+use App\Models\LocalFileVolume;
+use App\Models\LocalPersistentVolume;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
@@ -17,44 +17,52 @@ class Create extends Component
     #[Locked]
     public Application $application;
 
-    public ?int $selectedVolumeId = null;
+    public ?string $selectedTargetKey = null;
 
-    public ?int $volumeId = null;
+    public ?string $targetKey = null;
 
-    public bool $volumeLocked = false;
+    public bool $targetLocked = false;
 
     public string $frequency = 'daily';
 
-    public bool $saveToS3 = false;
-
-    public ?int $s3StorageId = null;
-
-    public Collection $volumes;
-
-    public Collection $definedS3s;
+    public Collection $targets;
 
     protected function rules(): array
     {
         return [
-            'volumeId' => ['required', 'integer'],
+            'targetKey' => ['required', 'string', 'regex:/^(volume|directory):[1-9][0-9]*$/'],
             'frequency' => ['required', 'string'],
-            'saveToS3' => ['required', 'boolean'],
-            's3StorageId' => ['nullable', 'integer'],
         ];
     }
 
     public function mount(): void
     {
         $this->authorize('view', $this->application);
-        $this->volumes = $this->application->persistentStorages()->orderBy('name')->get();
-        $this->definedS3s = S3Storage::ownedByCurrentTeam()->where('is_usable', true)->get();
-        $this->s3StorageId = $this->definedS3s->first()?->id;
-        $this->volumeLocked = $this->selectedVolumeId !== null;
-        $this->volumeId = $this->selectedVolumeId ?? $this->volumes->first()?->id;
+        $volumes = $this->application->persistentStorages()
+            ->orderBy('name')
+            ->get()
+            ->map(fn (LocalPersistentVolume $volume): array => [
+                'key' => 'volume:'.$volume->id,
+                'type' => 'Volume',
+                'name' => $volume->name,
+            ]);
+        $directories = $this->application->fileStorages()
+            ->where('is_directory', true)
+            ->where('is_host_file', false)
+            ->orderBy('fs_path')
+            ->get()
+            ->map(fn (LocalFileVolume $directory): array => [
+                'key' => 'directory:'.$directory->id,
+                'type' => 'Directory',
+                'name' => $directory->fs_path,
+            ]);
+        $this->targets = $volumes->concat($directories)->values();
+        $this->targetLocked = $this->selectedTargetKey !== null;
+        $this->targetKey = $this->selectedTargetKey ?? data_get($this->targets->first(), 'key');
         $this->loadSelectedBackup();
     }
 
-    public function updatedVolumeId(): void
+    public function updatedTargetKey(): void
     {
         $this->loadSelectedBackup();
     }
@@ -64,9 +72,9 @@ class Create extends Component
         $this->authorize('update', $this->application);
         $this->validate();
 
-        $volume = $this->application->persistentStorages()->whereKey($this->volumeId)->first();
-        if (! $volume) {
-            $this->addError('volumeId', 'Select a volume owned by this application.');
+        $target = $this->selectedTarget();
+        if (! $target) {
+            $this->addError('targetKey', 'Select a volume or directory owned by this application.');
 
             return;
         }
@@ -77,26 +85,22 @@ class Create extends Component
             return;
         }
 
-        if ($this->saveToS3 && ! $this->validS3StorageExists()) {
-            $this->addError('s3StorageId', 'Select a usable S3 storage owned by your team.');
-
-            return;
-        }
-
-        $backup = ScheduledVolumeBackup::query()->updateOrCreate(
-            ['local_persistent_volume_id' => $volume->id],
+        $backup = $target->scheduledBackups()->updateOrCreate(
+            [],
             [
                 'team_id' => currentTeam()->id,
                 'frequency' => $this->frequency,
                 'enabled' => true,
-                'save_s3' => $this->saveToS3,
-                's3_storage_id' => $this->saveToS3 ? $this->s3StorageId : null,
             ],
         );
 
-        $this->dispatch('success', $backup->wasRecentlyCreated ? 'Scheduled volume backup created.' : 'Scheduled volume backup updated.');
-        $this->dispatch('refreshVolumeBackups');
-        $this->dispatch('close-modal');
+        $this->dispatch('success', $backup->wasRecentlyCreated ? 'Scheduled storage backup created.' : 'Scheduled storage backup updated.');
+        $this->redirectRoute('project.application.backup.show', [
+            'project_uuid' => $this->application->project()->uuid,
+            'environment_uuid' => $this->application->environment->uuid,
+            'application_uuid' => $this->application->uuid,
+            'backup_uuid' => $backup->uuid,
+        ], navigate: true);
     }
 
     public function render()
@@ -106,25 +110,32 @@ class Create extends Component
 
     private function loadSelectedBackup(): void
     {
-        $volume = $this->volumes->firstWhere('id', $this->volumeId);
-        if (! $volume) {
+        $target = $this->selectedTarget();
+        if (! $target) {
             return;
         }
 
-        $backup = $volume->scheduledBackups()->first();
+        $backup = $target->scheduledBackups()->first();
         if ($backup) {
             $this->frequency = $backup->frequency;
-            $this->saveToS3 = $backup->save_s3;
-            $this->s3StorageId = $backup->s3_storage_id ?? $this->definedS3s->first()?->id;
         }
     }
 
-    private function validS3StorageExists(): bool
+    private function selectedTarget(): LocalPersistentVolume|LocalFileVolume|null
     {
-        return $this->s3StorageId !== null
-            && S3Storage::ownedByCurrentTeam()
-                ->where('is_usable', true)
-                ->whereKey($this->s3StorageId)
-                ->exists();
+        [$type, $id] = array_pad(explode(':', (string) $this->targetKey, 2), 2, null);
+        if (! ctype_digit((string) $id)) {
+            return null;
+        }
+
+        return match ($type) {
+            'volume' => $this->application->persistentStorages()->whereKey((int) $id)->first(),
+            'directory' => $this->application->fileStorages()
+                ->whereKey((int) $id)
+                ->where('is_directory', true)
+                ->where('is_host_file', false)
+                ->first(),
+            default => null,
+        };
     }
 }

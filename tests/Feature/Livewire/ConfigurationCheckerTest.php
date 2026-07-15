@@ -5,6 +5,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\LocalFileVolume;
 use App\Models\Project;
 use App\Models\Team;
 use App\Models\User;
@@ -85,6 +86,30 @@ it('refreshes configuration changes when the event is received', function () {
         ->assertSet('isConfigurationChanged', true)
         ->assertSee('The latest configuration has not been applied')
         ->assertSee('Build command');
+});
+
+it('shows an unapplied configuration warning after a directory mount is added', function () {
+    $application = configurationCheckerApplication($this->environment);
+    markConfigurationCheckerApplicationDeployed($application);
+
+    $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
+        ->assertSet('isConfigurationChanged', false);
+
+    LocalFileVolume::withoutEvents(fn () => LocalFileVolume::forceCreate([
+        'uuid' => (string) Str::uuid(),
+        'fs_path' => application_configuration_dir().'/'.$application->uuid.'/data',
+        'mount_path' => '/app/data',
+        'is_directory' => true,
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+    ]));
+
+    $component
+        ->dispatch('configurationChanged')
+        ->assertSet('isConfigurationChanged', true)
+        ->assertSee('The latest configuration has not been applied')
+        ->assertSee('Directory mount')
+        ->assertSee('Please redeploy to apply the new configuration.');
 });
 
 it('refreshes stale modal configuration diff before opening changes', function () {

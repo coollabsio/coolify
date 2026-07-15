@@ -15,7 +15,9 @@
                             helper="Warning: Changing the volume name after the initial start could cause problems. Only use it when you know what are you doing.">
                             <x-slot:labelSuffix>
                                 @if ($hasEnabledBackup)
-                                    <x-status-badge status="Backup enabled" type="success" />
+                                    <x-status-badge :as="$backupUrl ? 'a' : 'span'" :href="$backupUrl"
+                                        status="Backup enabled" type="success"
+                                        :class="$backupUrl ? 'cursor-pointer underline' : null" />
                                 @endif
                             </x-slot:labelSuffix>
                         </x-forms.input>
@@ -24,7 +26,9 @@
                             helper="Warning: Changing the volume name after the initial start could cause problems. Only use it when you know what are you doing.">
                             <x-slot:labelSuffix>
                                 @if ($hasEnabledBackup)
-                                    <x-status-badge status="Backup enabled" type="success" />
+                                    <x-status-badge :as="$backupUrl ? 'a' : 'span'" :href="$backupUrl"
+                                        status="Backup enabled" type="success"
+                                        :class="$backupUrl ? 'cursor-pointer underline' : null" />
                                 @endif
                             </x-slot:labelSuffix>
                         </x-forms.input>
@@ -48,7 +52,9 @@
                     <x-forms.input id="name" :label="$hasEnabledBackup ? 'Volume Name' : null" required readonly>
                         <x-slot:labelSuffix>
                             @if ($hasEnabledBackup)
-                                <x-status-badge status="Backup enabled" type="success" />
+                                <x-status-badge :as="$backupUrl ? 'a' : 'span'" :href="$backupUrl"
+                                    status="Backup enabled" type="success"
+                                    :class="$backupUrl ? 'cursor-pointer underline' : null" />
                             @endif
                         </x-slot:labelSuffix>
                     </x-forms.input>
@@ -69,7 +75,7 @@
                 @can('update', $resource)
                     <x-modal-input buttonTitle="Configure Backup" title="Configure Volume Backup" :wireIgnore="false">
                         <livewire:project.application.backup.create :application="$resource"
-                            :selected-volume-id="$storage->id"
+                            :selected-target-key="'volume:' . $storage->id"
                             wire:key="configure-readonly-volume-backup-{{ $storage->id }}" />
                     </x-modal-input>
                 @endcan
@@ -81,7 +87,9 @@
                         <x-forms.input id="name" label="Volume Name" required>
                             <x-slot:labelSuffix>
                                 @if ($hasEnabledBackup)
-                                    <x-status-badge status="Backup enabled" type="success" />
+                                    <x-status-badge :as="$backupUrl ? 'a' : 'span'" :href="$backupUrl"
+                                        status="Backup enabled" type="success"
+                                        :class="$backupUrl ? 'cursor-pointer underline' : null" />
                                 @endif
                             </x-slot:labelSuffix>
                         </x-forms.input>
@@ -94,7 +102,9 @@
                         <x-forms.input id="name" :label="$hasEnabledBackup ? 'Volume Name' : null" required>
                             <x-slot:labelSuffix>
                                 @if ($hasEnabledBackup)
-                                    <x-status-badge status="Backup enabled" type="success" />
+                                    <x-status-badge :as="$backupUrl ? 'a' : 'span'" :href="$backupUrl"
+                                        status="Backup enabled" type="success"
+                                        :class="$backupUrl ? 'cursor-pointer underline' : null" />
                                 @endif
                             </x-slot:labelSuffix>
                         </x-forms.input>
@@ -116,7 +126,7 @@
                     @if ($resource instanceof \App\Models\Application)
                         <x-modal-input buttonTitle="Configure Backup" title="Configure Volume Backup" :wireIgnore="false">
                             <livewire:project.application.backup.create :application="$resource"
-                                :selected-volume-id="$storage->id"
+                                :selected-target-key="'volume:' . $storage->id"
                                 wire:key="configure-volume-backup-{{ $storage->id }}" />
                         </x-modal-input>
                     @endif
@@ -134,7 +144,9 @@
                         <x-forms.input id="name" label="Volume Name" required disabled>
                             <x-slot:labelSuffix>
                                 @if ($hasEnabledBackup)
-                                    <x-status-badge status="Backup enabled" type="success" />
+                                    <x-status-badge :as="$backupUrl ? 'a' : 'span'" :href="$backupUrl"
+                                        status="Backup enabled" type="success"
+                                        :class="$backupUrl ? 'cursor-pointer underline' : null" />
                                 @endif
                             </x-slot:labelSuffix>
                         </x-forms.input>
@@ -148,7 +160,9 @@
                         <x-forms.input id="name" :label="$hasEnabledBackup ? 'Volume Name' : null" required disabled>
                             <x-slot:labelSuffix>
                                 @if ($hasEnabledBackup)
-                                    <x-status-badge status="Backup enabled" type="success" />
+                                    <x-status-badge :as="$backupUrl ? 'a' : 'span'" :href="$backupUrl"
+                                        status="Backup enabled" type="success"
+                                        :class="$backupUrl ? 'cursor-pointer underline' : null" />
                                 @endif
                             </x-slot:labelSuffix>
                         </x-forms.input>

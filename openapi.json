@@ -15716,6 +15716,252 @@
                 ]
             }
         },
+        "\/applications\/{uuid}\/storages\/{storage_uuid}\/backups": {
+            "put": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Set application storage backup schedule",
+                "description": "Create or replace the backup schedule for an application persistent volume or directory storage.",
+                "operationId": "set-application-storage-backup-schedule",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "storage_uuid",
+                        "in": "path",
+                        "description": "UUID of the persistent volume or directory storage.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "$ref": "#\/components\/schemas\/VolumeBackupScheduleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Backup schedule replaced.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/VolumeBackupScheduleResponse"
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "Backup schedule created.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/VolumeBackupScheduleResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Forbidden."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/storages\/{storage_uuid}\/backups": {
+            "put": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Set database storage backup schedule",
+                "description": "Create or replace the backup schedule for a database persistent volume or directory storage.",
+                "operationId": "set-database-storage-backup-schedule",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "storage_uuid",
+                        "in": "path",
+                        "description": "UUID of the persistent volume or directory storage.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "$ref": "#\/components\/schemas\/VolumeBackupScheduleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Backup schedule replaced.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/VolumeBackupScheduleResponse"
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "Backup schedule created.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/VolumeBackupScheduleResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Forbidden."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/storages\/{storage_uuid}\/backups": {
+            "put": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Set service storage backup schedule",
+                "description": "Create or replace the backup schedule for a service persistent volume or directory storage.",
+                "operationId": "set-service-storage-backup-schedule",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "storage_uuid",
+                        "in": "path",
+                        "description": "UUID of the persistent volume or directory storage.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "$ref": "#\/components\/schemas\/VolumeBackupScheduleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Backup schedule replaced.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/VolumeBackupScheduleResponse"
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "Backup schedule created.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/VolumeBackupScheduleResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Forbidden."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/vultr\/regions": {
             "get": {
                 "tags": [
@@ -15852,6 +16098,169 @@
     },
     "components": {
         "schemas": {
+            "VolumeBackupScheduleRequest": {
+                "required": [
+                    "frequency"
+                ],
+                "properties": {
+                    "frequency": {
+                        "type": "string",
+                        "maxLength": 255,
+                        "example": "0 2 * * *"
+                    },
+                    "enabled": {
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "save_s3": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "disable_local_backup": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "stop_during_backup": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "s3_storage_uuid": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "retention_amount_locally": {
+                        "type": "integer",
+                        "default": 7,
+                        "maximum": 10000,
+                        "minimum": 0
+                    },
+                    "retention_days_locally": {
+                        "type": "integer",
+                        "default": 0,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                    },
+                    "retention_max_storage_locally": {
+                        "type": "number",
+                        "format": "float",
+                        "default": 0,
+                        "maximum": 9999999999,
+                        "minimum": 0
+                    },
+                    "retention_amount_s3": {
+                        "type": "integer",
+                        "default": 7,
+                        "maximum": 10000,
+                        "minimum": 0
+                    },
+                    "retention_days_s3": {
+                        "type": "integer",
+                        "default": 0,
+                        "maximum": 2147483647,
+                        "minimum": 0
+                    },
+                    "retention_max_storage_s3": {
+                        "type": "number",
+                        "format": "float",
+                        "default": 0,
+                        "maximum": 9999999999,
+                        "minimum": 0
+                    },
+                    "timeout": {
+                        "type": "integer",
+                        "default": 3600,
+                        "maximum": 36000,
+                        "minimum": 60
+                    }
+                },
+                "type": "object",
+                "additionalProperties": false
+            },
+            "VolumeBackupScheduleResponse": {
+                "required": [
+                    "uuid",
+                    "message",
+                    "storage_uuid",
+                    "storage_type",
+                    "frequency",
+                    "enabled",
+                    "save_s3",
+                    "disable_local_backup",
+                    "stop_during_backup",
+                    "retention_amount_locally",
+                    "retention_days_locally",
+                    "retention_max_storage_locally",
+                    "retention_amount_s3",
+                    "retention_days_s3",
+                    "retention_max_storage_s3",
+                    "timeout"
+                ],
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "storage_uuid": {
+                        "type": "string"
+                    },
+                    "storage_type": {
+                        "type": "string",
+                        "enum": [
+                            "persistent",
+                            "directory"
+                        ]
+                    },
+                    "frequency": {
+                        "type": "string"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "save_s3": {
+                        "type": "boolean"
+                    },
+                    "disable_local_backup": {
+                        "type": "boolean"
+                    },
+                    "stop_during_backup": {
+                        "type": "boolean"
+                    },
+                    "s3_storage_uuid": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "retention_amount_locally": {
+                        "type": "integer"
+                    },
+                    "retention_days_locally": {
+                        "type": "integer"
+                    },
+                    "retention_max_storage_locally": {
+                        "type": "number",
+                        "format": "float"
+                    },
+                    "retention_amount_s3": {
+                        "type": "integer"
+                    },
+                    "retention_days_s3": {
+                        "type": "integer"
+                    },
+                    "retention_max_storage_s3": {
+                        "type": "number",
+                        "format": "float"
+                    },
+                    "timeout": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "Application": {
                 "description": "Application model",
                 "properties": {

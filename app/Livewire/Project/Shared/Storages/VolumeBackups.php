@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Shared\Storages;
 
 use App\Jobs\VolumeBackupJob;
+use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\S3Storage;
 use App\Models\ScheduledVolumeBackup;
@@ -18,11 +19,13 @@ class VolumeBackups extends Component
     use AuthorizesRequests;
     use WithPagination;
 
-    public LocalPersistentVolume $storage;
+    public LocalPersistentVolume|LocalFileVolume $storage;
 
     public $resource;
 
     public ?ScheduledVolumeBackup $backup = null;
+
+    public string $section = 'general';
 
     public string $frequency = 'daily';
 
@@ -113,7 +116,7 @@ class VolumeBackups extends Component
         }
 
         $this->backup = $this->persistBackup($this->enabled);
-        $this->dispatch('success', 'Volume backup schedule saved.');
+        $this->dispatch('success', 'Storage backup schedule saved.');
     }
 
     public function instantSave(): void
@@ -123,9 +126,37 @@ class VolumeBackups extends Component
 
     public function updatedS3StorageId(): void
     {
-        if ($this->saveToS3) {
-            $this->save();
+        $this->authorize('update', $this->resource);
+
+        if (! $this->hasValidS3Storage()) {
+            $this->addError('s3StorageId', 'Select a usable S3 storage owned by your team.');
+
+            return;
         }
+
+        $this->resetErrorBag('s3StorageId');
+        $this->backup?->update(['s3_storage_id' => $this->s3StorageId]);
+        $this->dispatch('success', 'S3 storage updated.');
+    }
+
+    public function toggleS3(): void
+    {
+        $this->authorize('update', $this->resource);
+
+        if (! $this->saveToS3 && ! $this->hasValidS3Storage()) {
+            $this->dispatch('error', 'Select a usable S3 storage before enabling S3 backups.');
+
+            return;
+        }
+
+        $this->saveToS3 = ! $this->saveToS3;
+        $this->disableLocalBackup = $this->saveToS3 && $this->disableLocalBackup;
+        $this->backup?->update([
+            'save_s3' => $this->saveToS3,
+            'disable_local_backup' => $this->disableLocalBackup,
+            's3_storage_id' => $this->s3StorageId,
+        ]);
+        $this->dispatch('success', $this->saveToS3 ? 'S3 backups enabled.' : 'S3 backups disabled.');
     }
 
     public function toggleEnabled(): void
@@ -144,7 +175,7 @@ class VolumeBackups extends Component
             $this->backup->update(['enabled' => $this->enabled]);
         }
 
-        $this->dispatch('success', $this->enabled ? 'Volume backups enabled.' : 'Volume backups disabled.');
+        $this->dispatch('success', $this->enabled ? 'Storage backups enabled.' : 'Storage backups disabled.');
     }
 
     public function backupNow(): void
@@ -161,7 +192,7 @@ class VolumeBackups extends Component
 
         $this->backup = $this->persistBackup($this->enabled);
         VolumeBackupJob::dispatch($this->backup);
-        $this->dispatch('success', 'Volume backup queued.');
+        $this->dispatch('success', 'Storage backup queued.');
     }
 
     public function delete(?string $password = null, array $selectedActions = [])
@@ -179,7 +210,7 @@ class VolumeBackups extends Component
         $lock = Cache::lock(VolumeBackupJob::lockKey($this->backup->id), $this->backup->timeout + 300);
 
         if (! $lock->get()) {
-            $this->dispatch('error', 'Wait for the queued or running volume backup to finish before deleting this schedule.');
+            $this->dispatch('error', 'Wait for the queued or running storage backup to finish before deleting this schedule.');
 
             return false;
         }
@@ -191,7 +222,7 @@ class VolumeBackups extends Component
                     ->orWhere('stop_recovery_pending', true)
                     ->orWhere('s3_cleanup_pending', true))
                 ->exists()) {
-                $this->dispatch('error', 'Wait for the running volume backup and container recovery to finish before deleting this schedule.');
+                $this->dispatch('error', 'Wait for the running storage backup and container recovery to finish before deleting this schedule.');
 
                 return false;
             }
@@ -228,7 +259,12 @@ class VolumeBackups extends Component
 
             $this->backup->delete();
             $this->backup = null;
-            $this->dispatch('success', 'Volume backup schedule and archives deleted.');
+            $this->dispatch('success', 'Storage backup schedule and archives deleted.');
+            $this->redirectRoute('project.application.backup.index', [
+                'project_uuid' => $this->resource->project()->uuid,
+                'environment_uuid' => $this->resource->environment->uuid,
+                'application_uuid' => $this->resource->uuid,
+            ], navigate: true);
 
             return true;
         } catch (Throwable $exception) {
@@ -361,8 +397,8 @@ class VolumeBackups extends Component
 
     private function persistBackup(bool $enabled): ScheduledVolumeBackup
     {
-        return ScheduledVolumeBackup::query()->updateOrCreate(
-            ['local_persistent_volume_id' => $this->storage->id],
+        return $this->storage->scheduledBackups()->updateOrCreate(
+            [],
             [
                 'team_id' => currentTeam()->id,
                 'frequency' => $this->frequency,
@@ -370,7 +406,7 @@ class VolumeBackups extends Component
                 'save_s3' => $this->saveToS3,
                 'disable_local_backup' => $this->disableLocalBackup,
                 'stop_during_backup' => $this->stopDuringBackup,
-                's3_storage_id' => $this->saveToS3 ? $this->s3StorageId : null,
+                's3_storage_id' => $this->hasValidS3Storage() ? $this->s3StorageId : $this->backup?->s3_storage_id,
                 'retention_amount_locally' => $this->retentionAmountLocally,
                 'retention_days_locally' => $this->retentionDaysLocally,
                 'retention_max_storage_locally' => $this->retentionMaxStorageLocally,

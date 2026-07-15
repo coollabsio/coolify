@@ -229,6 +229,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/persistent-storage', ApplicationConfiguration::class)->name('project.application.persistent-storage');
         Route::get('/backups', ApplicationBackupIndex::class)->name('project.application.backup.index');
         Route::get('/backups/{backup_uuid}', ApplicationBackupShow::class)->name('project.application.backup.show');
+        Route::get('/backups/{backup_uuid}/s3', ApplicationBackupShow::class)->name('project.application.backup.s3');
+        Route::get('/backups/{backup_uuid}/retention', ApplicationBackupShow::class)->name('project.application.backup.retention');
+        Route::get('/backups/{backup_uuid}/executions', ApplicationBackupShow::class)->name('project.application.backup.executions');
+        Route::get('/backups/{backup_uuid}/danger', ApplicationBackupShow::class)->name('project.application.backup.danger');
         Route::get('/source', ApplicationConfiguration::class)->name('project.application.source');
         Route::get('/servers', ApplicationConfiguration::class)->name('project.application.servers');
         Route::get('/scheduled-tasks', ApplicationConfiguration::class)->name('project.application.scheduled-tasks.show');
@@ -266,6 +270,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.database.command')->middleware('can.access.terminal');
         Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
         Route::get('/backups/{backup_uuid}', DatabaseBackupExecution::class)->name('project.database.backup.execution');
+        Route::get('/backups/{backup_uuid}/s3', DatabaseBackupExecution::class)->name('project.database.backup.s3');
+        Route::get('/backups/{backup_uuid}/retention', DatabaseBackupExecution::class)->name('project.database.backup.retention');
+        Route::get('/backups/{backup_uuid}/executions', DatabaseBackupExecution::class)->name('project.database.backup.executions');
+        Route::get('/backups/{backup_uuid}/danger', DatabaseBackupExecution::class)->name('project.database.backup.danger');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}')->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
@@ -279,6 +287,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/danger', ServiceConfiguration::class)->name('project.service.danger');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command')->middleware('can.access.terminal');
         Route::get('/{stack_service_uuid}/backups', ServiceDatabaseBackups::class)->name('project.service.database.backups');
+        Route::get('/{stack_service_uuid}/backups/{backup_uuid}', ServiceDatabaseBackups::class)->name('project.service.database.backup.show');
+        Route::get('/{stack_service_uuid}/backups/{backup_uuid}/s3', ServiceDatabaseBackups::class)->name('project.service.database.backup.s3');
+        Route::get('/{stack_service_uuid}/backups/{backup_uuid}/retention', ServiceDatabaseBackups::class)->name('project.service.database.backup.retention');
+        Route::get('/{stack_service_uuid}/backups/{backup_uuid}/executions', ServiceDatabaseBackups::class)->name('project.service.database.backup.executions');
+        Route::get('/{stack_service_uuid}/backups/{backup_uuid}/danger', ServiceDatabaseBackups::class)->name('project.service.database.backup.danger');
         Route::get('/{stack_service_uuid}/import', ServiceIndex::class)->name('project.service.database.import')->middleware('can.update.resource');
         Route::get('/{stack_service_uuid}/advanced', ServiceIndex::class)->name('project.service.index.advanced');
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
@@ -428,7 +441,7 @@ Route::middleware(['auth'])->group(function () {
             }
 
             $execution = ScheduledVolumeBackupExecution::query()
-                ->with('scheduledVolumeBackup.volume.resource')
+                ->with('scheduledVolumeBackup.backupable.resource')
                 ->findOrFail(request()->route('executionId'));
             if ($team->id !== 0 && $team->id !== $execution->scheduledVolumeBackup->team_id) {
                 return response()->json(['message' => 'Permission denied.'], 403);

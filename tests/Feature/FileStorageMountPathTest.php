@@ -1,14 +1,19 @@
 <?php
 
 use App\Jobs\ServerStorageSaveJob;
+use App\Livewire\Project\Service\FileStorage;
 use App\Livewire\Project\Service\Storage;
+use App\Livewire\Project\Shared\Storages\All;
+use App\Livewire\Project\Shared\Storages\Show;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
+use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -95,7 +100,8 @@ test('livewire file storage stores safe file mounts under the application config
         ->set('file_storage_path', '/etc/nginx/nginx.conf')
         ->set('file_storage_content', 'server {}')
         ->call('submitFileStorage')
-        ->assertDispatched('success');
+        ->assertDispatched('success')
+        ->assertDispatched('configurationChanged');
 
     $volume = LocalFileVolume::query()->sole();
 
@@ -109,7 +115,8 @@ test('livewire host file storage stores an existing host file path without manag
         ->set('host_file_storage_source', '/etc/nginx/nginx.conf')
         ->set('host_file_storage_destination', '/etc/nginx/nginx.conf')
         ->call('submitHostFileStorage')
-        ->assertDispatched('success');
+        ->assertDispatched('success')
+        ->assertDispatched('configurationChanged');
 
     $volume = LocalFileVolume::query()->sole();
 
@@ -120,4 +127,81 @@ test('livewire host file storage stores an existing host file path without manag
         ->and($volume->is_directory)->toBeFalse();
 
     Bus::assertNotDispatched(ServerStorageSaveJob::class);
+});
+
+test('livewire volume storage refreshes the storage list and configuration warning', function () {
+    Livewire::test(Storage::class, ['resource' => $this->application])
+        ->set('name', 'data')
+        ->set('mount_path', '/app/data')
+        ->call('submitPersistentVolume')
+        ->assertDispatched('success')
+        ->assertDispatched('refreshStorages')
+        ->assertDispatched('configurationChanged');
+});
+
+test('volume storage list shows volumes added after it was mounted', function () {
+    $firstVolume = LocalPersistentVolume::create([
+        'name' => $this->application->uuid.'-first',
+        'mount_path' => '/app/first',
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+    ]);
+
+    $storageList = Livewire::test(All::class, ['resource' => $this->application])
+        ->assertSee($firstVolume->name);
+
+    $secondVolume = LocalPersistentVolume::create([
+        'name' => $this->application->uuid.'-second',
+        'mount_path' => '/app/second',
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+    ]);
+
+    $storageList
+        ->assertDontSee($secondVolume->name)
+        ->dispatch('refreshStorages')
+        ->assertSee($secondVolume->name);
+});
+
+test('deleting a file mount refreshes the configuration warning', function () {
+    $file = LocalFileVolume::create([
+        'fs_path' => '/etc/nginx/nginx.conf',
+        'mount_path' => '/etc/nginx/nginx.conf',
+        'is_host_file' => true,
+        'is_based_on_git' => false,
+        'is_preview_suffix_enabled' => true,
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+    ]);
+
+    Livewire::test(FileStorage::class, ['fileStorage' => $file])
+        ->call('delete', 'password')
+        ->assertDispatched('configurationChanged');
+
+    expect($file->fresh())->toBeNull();
+});
+
+test('deleting a volume mount refreshes the configuration warning', function () {
+    $database = StandalonePostgresql::create([
+        'name' => 'test-postgres',
+        'image' => 'postgres:15-alpine',
+        'postgres_user' => 'postgres',
+        'postgres_password' => 'password',
+        'postgres_db' => 'postgres',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $volume = LocalPersistentVolume::create([
+        'name' => $database->uuid.'-data',
+        'mount_path' => '/var/lib/postgresql/data',
+        'resource_id' => $database->id,
+        'resource_type' => $database->getMorphClass(),
+    ]);
+
+    Livewire::test(Show::class, ['storage' => $volume, 'resource' => $database])
+        ->call('delete', 'password')
+        ->assertDispatched('configurationChanged');
+
+    expect($volume->fresh())->toBeNull();
 });

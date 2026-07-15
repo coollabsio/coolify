@@ -19,6 +19,8 @@ class BackupEdit extends Component
 
     public ScheduledDatabaseBackup $backup;
 
+    public string $section = 'general';
+
     #[Locked]
     public $availableS3Storages;
 
@@ -184,7 +186,11 @@ class BackupEdit extends Component
                     'stack_service_uuid' => $serviceDatabase->uuid,
                 ]);
             } else {
-                return redirect()->route('project.database.backup.index', $this->parameters);
+                return redirect()->route('project.database.backup.index', [
+                    'project_uuid' => $this->parameters['project_uuid'],
+                    'environment_uuid' => $this->parameters['environment_uuid'],
+                    'database_uuid' => $this->parameters['database_uuid'],
+                ]);
             }
         } catch (Exception $e) {
             $this->dispatch('error', 'Failed to delete backup: '.$e->getMessage());
@@ -232,6 +238,19 @@ class BackupEdit extends Component
 
     public function updatedS3StorageId(): void
     {
+        $this->instantSave();
+    }
+
+    public function toggleS3(): void
+    {
+        if (! $this->saveS3 && $this->availableS3StorageIds()->isEmpty()) {
+            $this->dispatch('error', 'Select a usable S3 storage before enabling S3 backups.');
+
+            return;
+        }
+
+        $this->saveS3 = ! $this->saveS3;
+        $this->disableLocalBackup = $this->saveS3 && $this->disableLocalBackup;
         $this->instantSave();
     }
 

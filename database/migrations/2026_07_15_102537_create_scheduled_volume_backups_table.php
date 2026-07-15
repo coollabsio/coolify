@@ -14,7 +14,8 @@ return new class extends Migration
         Schema::create('scheduled_volume_backups', function (Blueprint $table) {
             $table->id();
             $table->string('uuid')->unique();
-            $table->foreignId('local_persistent_volume_id')->unique()->constrained()->restrictOnDelete();
+            $table->string('backupable_type');
+            $table->unsignedBigInteger('backupable_id');
             $table->foreignId('team_id')->constrained()->cascadeOnDelete();
             $table->foreignId('s3_storage_id')->nullable()->constrained()->nullOnDelete();
             $table->string('frequency');
@@ -26,6 +27,8 @@ return new class extends Migration
             $table->unsignedInteger('retention_amount_s3')->default(7);
             $table->unsignedInteger('timeout')->default(3600);
             $table->timestamps();
+
+            $table->unique(['backupable_type', 'backupable_id']);
         });
     }
 

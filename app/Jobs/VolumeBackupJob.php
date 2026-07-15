@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Events\BackupCreated;
+use App\Models\LocalPersistentVolume;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
@@ -53,30 +54,30 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
-        $this->backup->loadMissing(['volume.resource', 'team', 's3']);
+        $this->backup->loadMissing(['backupable.resource', 'team', 's3']);
         $server = $this->backup->server();
-        $volume = $this->backup->volume;
+        $target = $this->backup->backupable;
         $team = $this->backup->team;
 
-        if (! $server || ! $volume || ! $team) {
-            throw new \RuntimeException('The volume backup resource, team, or server no longer exists.');
+        if (! $server || ! $target || ! $team) {
+            throw new \RuntimeException('The storage backup resource, team, or server no longer exists.');
         }
 
         $this->execution = $this->backup->executions()->create();
         BackupCreated::dispatch($team->id);
 
-        $backupDirectory = backup_dir().'/volumes/'.str($team->name)->slug().'-'.$team->id.'/'.$volume->uuid;
-        $filename = 'volume-'.str($volume->name)->slug().'-'.Carbon::now()->timestamp.'.tar.gz';
+        $backupDirectory = backup_dir().'/volumes/'.str($team->name)->slug().'-'.$team->id.'/'.$target->uuid;
+        $filename = str($this->backup->targetType())->lower().'-'.str($this->backup->targetName())->slug().'-'.Carbon::now()->timestamp.'.tar.gz';
         $backupLocation = $backupDirectory.'/'.$filename;
         $this->execution->update(['filename' => $backupLocation]);
 
         try {
-            $source = filled($volume->host_path) ? $volume->host_path : $volume->name;
+            $source = $this->backup->sourcePath();
             $containerName = 'volume-backup-'.$this->execution->uuid;
             $image = coolifyHelperImage().':'.getHelperVersion();
-            $verifySourceCommand = filled($volume->host_path)
-                ? 'test -d '.escapeshellarg($source)
-                : 'docker volume inspect '.escapeshellarg($source).' >/dev/null';
+            $verifySourceCommand = $target instanceof LocalPersistentVolume && blank($target->host_path)
+                ? 'docker volume inspect '.escapeshellarg($source).' >/dev/null'
+                : 'test -d '.escapeshellarg($source);
 
             $archiveCommand = 'docker run --rm --name '.escapeshellarg($containerName)
                 .' -v '.escapeshellarg($source.':/volume:ro')
@@ -112,7 +113,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             );
 
             if ($size <= 0) {
-                throw new \RuntimeException('The volume backup archive is empty or was not created.');
+                throw new \RuntimeException('The storage backup archive is empty or was not created.');
             }
 
             $warning = null;

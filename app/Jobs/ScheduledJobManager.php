@@ -356,7 +356,7 @@ class ScheduledJobManager implements ShouldQueue
     private function processScheduledVolumeBackups(): void
     {
         ScheduledVolumeBackup::query()
-            ->with(['volume', 'team.subscription'])
+            ->with(['backupable', 'team.subscription'])
             ->where('enabled', true)
             ->chunkById(self::CHUNK_SIZE, function ($backups): void {
                 foreach ($backups as $backup) {
@@ -397,7 +397,7 @@ class ScheduledJobManager implements ShouldQueue
                 return;
             }
 
-            if (! $backup->volume || ! $server) {
+            if (! $backup->backupable || ! $server) {
                 $backup->delete();
                 $this->skippedCount++;
                 $this->logSkip('volume_backup', 'resource_deleted', [
@@ -435,7 +435,8 @@ class ScheduledJobManager implements ShouldQueue
                 $this->dispatchedCount++;
                 Log::channel('scheduled')->info('Volume backup dispatched', [
                     'backup_id' => $backup->id,
-                    'volume_id' => $backup->local_persistent_volume_id,
+                    'backupable_type' => $backup->backupable_type,
+                    'backupable_id' => $backup->backupable_id,
                     'team_id' => $backup->team_id,
                     'server_id' => $server->id,
                 ]);

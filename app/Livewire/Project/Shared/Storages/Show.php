@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Project\Shared\Storages;
 
+use App\Models\Application;
 use App\Models\LocalPersistentVolume;
+use App\Models\ScheduledVolumeBackup;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\On;
@@ -34,6 +36,8 @@ class Show extends Component
     public bool $isPreviewSuffixEnabled = true;
 
     public bool $hasEnabledBackup = false;
+
+    public ?string $backupUrl = null;
 
     protected $validationAttributes = [
         'name' => 'name',
@@ -94,9 +98,28 @@ class Show extends Component
     #[On('refreshVolumeBackups')]
     public function refreshBackupStatus(): void
     {
-        $this->hasEnabledBackup = $this->storage->scheduledBackups()
-            ->where('enabled', true)
+        $backup = $this->storage->scheduledBackups()->first();
+
+        $this->hasEnabledBackup = $backup?->enabled ?? false;
+        $this->backupUrl = null;
+
+        if (! $this->hasEnabledBackup || ! $this->resource instanceof Application) {
+            return;
+        }
+
+        $parameters = [
+            'project_uuid' => $this->resource->project()->uuid,
+            'environment_uuid' => $this->resource->environment->uuid,
+            'application_uuid' => $this->resource->uuid,
+        ];
+        $hasOtherBackups = ScheduledVolumeBackup::query()
+            ->forApplication($this->resource)
+            ->where('id', '!=', $backup->id)
             ->exists();
+
+        $this->backupUrl = $hasOtherBackups
+            ? route('project.application.backup.index', [...$parameters, 'search' => $this->storage->name])
+            : route('project.application.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]);
     }
 
     public function instantSave(): void
@@ -135,6 +158,7 @@ class Show extends Component
 
         $this->storage->delete();
         $this->dispatch('refreshStorages');
+        $this->dispatch('configurationChanged');
 
         return true;
     }

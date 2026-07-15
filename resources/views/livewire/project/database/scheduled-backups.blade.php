@@ -123,10 +123,8 @@
                         </div>
                     </a>
                 @else
-                    <div x-show="search === '' || @js(strtolower($database->name)).includes(search.toLowerCase()) || @js(strtolower($backup->frequency)).includes(search.toLowerCase())" @class([
+                    <a x-show="search === '' || @js(strtolower($database->name)).includes(search.toLowerCase()) || @js(strtolower($backup->frequency)).includes(search.toLowerCase())" @class([
                         'flex flex-col border-l-2 transition-colors p-4 cursor-pointer bg-white hover:bg-gray-100 dark:bg-coolgray-100 dark:hover:bg-coolgray-200 text-black dark:text-white',
-                        'bg-gray-200 dark:bg-coolgray-200' =>
-                            data_get($backup, 'id') === data_get($selectedBackup, 'id'),
                         'border-blue-500/50 border-dashed' =>
                             $backup->latest_log &&
                             data_get($backup->latest_log, 'status') === 'running',
@@ -137,9 +135,8 @@
                             $backup->latest_log &&
                             data_get($backup->latest_log, 'status') === 'success',
                         'border-gray-200 dark:border-coolgray-300' => !$backup->latest_log,
-                        'border-coollabs' =>
-                            data_get($backup, 'id') === data_get($selectedBackup, 'id'),
-                    ]) wire:click="setSelectedBackup('{{ data_get($backup, 'id') }}')">
+                    ]) {{ wireNavigate() }}
+                        href="{{ route('project.service.database.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]) }}">
                         @if ($backup->latest_log && data_get($backup->latest_log, 'status') === 'running')
                             <div class="absolute top-2 right-2">
                                 <x-loading />
@@ -224,19 +221,11 @@
                                 @endif
                             @endif
                         </div>
-                    </div>
+                    </a>
                 @endif
             @empty
                 <div>No scheduled backups configured.</div>
             @endforelse
         @endif
     </div>
-    @if ($type === 'service-database' && $selectedBackup)
-        <div class="pt-10">
-            <livewire:project.database.backup-edit wire:key="{{ $selectedBackup->id }}" :backup="$selectedBackup"
-                :available-s3-storages="$s3s" :status="data_get($database, 'status')" />
-            <livewire:project.database.backup-executions wire:key="{{ $selectedBackup->uuid }}" :backup="$selectedBackup"
-                :database="$database" />
-        </div>
-    @endif
 </div>

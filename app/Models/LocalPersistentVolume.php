@@ -3,11 +3,20 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Symfony\Component\Yaml\Yaml;
 
 class LocalPersistentVolume extends BaseModel
 {
+    protected static function booted(): void
+    {
+        static::deleting(function (LocalPersistentVolume $volume): void {
+            if ($volume->scheduledBackups()->exists()) {
+                throw new \RuntimeException('Delete this volume backup schedule and its archives before deleting the volume.');
+            }
+        });
+    }
+
     protected $fillable = [
         'name',
         'mount_path',
@@ -42,9 +51,9 @@ class LocalPersistentVolume extends BaseModel
         return $this->morphTo('resource');
     }
 
-    public function scheduledBackups(): HasMany
+    public function scheduledBackups(): MorphMany
     {
-        return $this->hasMany(ScheduledVolumeBackup::class, 'local_persistent_volume_id');
+        return $this->morphMany(ScheduledVolumeBackup::class, 'backupable');
     }
 
     protected function customizeName($value)
