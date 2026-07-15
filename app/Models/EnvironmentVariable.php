@@ -80,6 +80,16 @@ class EnvironmentVariable extends BaseModel
 
     protected $appends = ['real_value', 'is_shared', 'is_really_required', 'is_buildpack_control', 'is_coolify'];
 
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability.
+     */
+    protected $hidden = [
+        'value',
+        'real_value',
+    ];
+
     protected static function booted()
     {
         static::created(function (ModelsEnvironmentVariable $environment_variable) {
@@ -356,7 +366,7 @@ class EnvironmentVariable extends BaseModel
 
     private function set_environment_variables(?string $environment_variable = null): ?string
     {
-        if (is_null($environment_variable) && $environment_variable === '') {
+        if (is_null($environment_variable)) {
             return null;
         }
         $environment_variable = trim($environment_variable);

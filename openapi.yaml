@@ -118,6 +118,9 @@ paths:
                 is_force_https_enabled:
                   type: boolean
                   description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
+                is_preview_deployments_enabled:
+                  type: boolean
+                  description: 'Enable preview deployments for pull requests.'
                 static_image:
                   type: string
                   enum: ['nginx:alpine']
@@ -265,6 +268,54 @@ paths:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                use_build_secrets:
+                  type: boolean
+                  default: false
+                  description: 'Use Docker Build Secrets for build-time environment variables.'
+                is_git_submodules_enabled:
+                  type: boolean
+                  description: 'Clone Git submodules.'
+                is_git_lfs_enabled:
+                  type: boolean
+                  description: 'Enable Git LFS.'
+                is_git_shallow_clone_enabled:
+                  type: boolean
+                  description: 'Use a shallow Git clone.'
+                disable_build_cache:
+                  type: boolean
+                  description: 'Disable the build cache.'
+                inject_build_args_to_dockerfile:
+                  type: boolean
+                  description: 'Inject build arguments into the Dockerfile build.'
+                include_source_commit_in_build:
+                  type: boolean
+                  description: 'Include the source commit in the build.'
+                is_env_sorting_enabled:
+                  type: boolean
+                  description: 'Sort environment variables.'
+                is_pr_deployments_public_enabled:
+                  type: boolean
+                  description: 'Make pull request deployments public.'
+                stop_grace_period:
+                  type: integer
+                  nullable: true
+                  minimum: 1
+                  maximum: 3600
+                  description: 'Container stop grace period in seconds.'
+                docker_images_to_keep:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  description: 'Number of Docker images to retain.'
+                is_gzip_enabled:
+                  type: boolean
+                  description: 'Enable gzip compression.'
+                is_stripprefix_enabled:
+                  type: boolean
+                  description: 'Enable path prefix stripping.'
+                is_raw_compose_deployment_enabled:
+                  type: boolean
+                  description: 'Deploy the raw Docker Compose definition.'
                 is_http_basic_auth_enabled:
                   type: boolean
                   description: 'HTTP Basic Authentication enabled.'
@@ -290,6 +341,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the application.'
                 is_preserve_repository_enabled:
                   type: boolean
                   default: false
@@ -405,6 +460,9 @@ paths:
                 is_force_https_enabled:
                   type: boolean
                   description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
+                is_preview_deployments_enabled:
+                  type: boolean
+                  description: 'Enable preview deployments for pull requests.'
                 static_image:
                   type: string
                   enum: ['nginx:alpine']
@@ -552,6 +610,54 @@ paths:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                use_build_secrets:
+                  type: boolean
+                  default: false
+                  description: 'Use Docker Build Secrets for build-time environment variables.'
+                is_git_submodules_enabled:
+                  type: boolean
+                  description: 'Clone Git submodules.'
+                is_git_lfs_enabled:
+                  type: boolean
+                  description: 'Enable Git LFS.'
+                is_git_shallow_clone_enabled:
+                  type: boolean
+                  description: 'Use a shallow Git clone.'
+                disable_build_cache:
+                  type: boolean
+                  description: 'Disable the build cache.'
+                inject_build_args_to_dockerfile:
+                  type: boolean
+                  description: 'Inject build arguments into the Dockerfile build.'
+                include_source_commit_in_build:
+                  type: boolean
+                  description: 'Include the source commit in the build.'
+                is_env_sorting_enabled:
+                  type: boolean
+                  description: 'Sort environment variables.'
+                is_pr_deployments_public_enabled:
+                  type: boolean
+                  description: 'Make pull request deployments public.'
+                stop_grace_period:
+                  type: integer
+                  nullable: true
+                  minimum: 1
+                  maximum: 3600
+                  description: 'Container stop grace period in seconds.'
+                docker_images_to_keep:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  description: 'Number of Docker images to retain.'
+                is_gzip_enabled:
+                  type: boolean
+                  description: 'Enable gzip compression.'
+                is_stripprefix_enabled:
+                  type: boolean
+                  description: 'Enable path prefix stripping.'
+                is_raw_compose_deployment_enabled:
+                  type: boolean
+                  description: 'Deploy the raw Docker Compose definition.'
                 is_http_basic_auth_enabled:
                   type: boolean
                   description: 'HTTP Basic Authentication enabled.'
@@ -577,6 +683,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the application.'
                 is_preserve_repository_enabled:
                   type: boolean
                   default: false
@@ -692,6 +802,9 @@ paths:
                 is_force_https_enabled:
                   type: boolean
                   description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
+                is_preview_deployments_enabled:
+                  type: boolean
+                  description: 'Enable preview deployments for pull requests.'
                 static_image:
                   type: string
                   enum: ['nginx:alpine']
@@ -839,6 +952,54 @@ paths:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                use_build_secrets:
+                  type: boolean
+                  default: false
+                  description: 'Use Docker Build Secrets for build-time environment variables.'
+                is_git_submodules_enabled:
+                  type: boolean
+                  description: 'Clone Git submodules.'
+                is_git_lfs_enabled:
+                  type: boolean
+                  description: 'Enable Git LFS.'
+                is_git_shallow_clone_enabled:
+                  type: boolean
+                  description: 'Use a shallow Git clone.'
+                disable_build_cache:
+                  type: boolean
+                  description: 'Disable the build cache.'
+                inject_build_args_to_dockerfile:
+                  type: boolean
+                  description: 'Inject build arguments into the Dockerfile build.'
+                include_source_commit_in_build:
+                  type: boolean
+                  description: 'Include the source commit in the build.'
+                is_env_sorting_enabled:
+                  type: boolean
+                  description: 'Sort environment variables.'
+                is_pr_deployments_public_enabled:
+                  type: boolean
+                  description: 'Make pull request deployments public.'
+                stop_grace_period:
+                  type: integer
+                  nullable: true
+                  minimum: 1
+                  maximum: 3600
+                  description: 'Container stop grace period in seconds.'
+                docker_images_to_keep:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  description: 'Number of Docker images to retain.'
+                is_gzip_enabled:
+                  type: boolean
+                  description: 'Enable gzip compression.'
+                is_stripprefix_enabled:
+                  type: boolean
+                  description: 'Enable path prefix stripping.'
+                is_raw_compose_deployment_enabled:
+                  type: boolean
+                  description: 'Deploy the raw Docker Compose definition.'
                 is_http_basic_auth_enabled:
                   type: boolean
                   description: 'HTTP Basic Authentication enabled.'
@@ -864,6 +1025,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the application.'
                 is_preserve_repository_enabled:
                   type: boolean
                   default: false
@@ -1063,10 +1228,61 @@ paths:
                 is_force_https_enabled:
                   type: boolean
                   description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
+                is_preview_deployments_enabled:
+                  type: boolean
+                  description: 'Enable preview deployments for pull requests.'
                 use_build_server:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                use_build_secrets:
+                  type: boolean
+                  default: false
+                  description: 'Use Docker Build Secrets for build-time environment variables.'
+                is_git_submodules_enabled:
+                  type: boolean
+                  description: 'Clone Git submodules.'
+                is_git_lfs_enabled:
+                  type: boolean
+                  description: 'Enable Git LFS.'
+                is_git_shallow_clone_enabled:
+                  type: boolean
+                  description: 'Use a shallow Git clone.'
+                disable_build_cache:
+                  type: boolean
+                  description: 'Disable the build cache.'
+                inject_build_args_to_dockerfile:
+                  type: boolean
+                  description: 'Inject build arguments into the Dockerfile build.'
+                include_source_commit_in_build:
+                  type: boolean
+                  description: 'Include the source commit in the build.'
+                is_env_sorting_enabled:
+                  type: boolean
+                  description: 'Sort environment variables.'
+                is_pr_deployments_public_enabled:
+                  type: boolean
+                  description: 'Make pull request deployments public.'
+                stop_grace_period:
+                  type: integer
+                  nullable: true
+                  minimum: 1
+                  maximum: 3600
+                  description: 'Container stop grace period in seconds.'
+                docker_images_to_keep:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  description: 'Number of Docker images to retain.'
+                is_gzip_enabled:
+                  type: boolean
+                  description: 'Enable gzip compression.'
+                is_stripprefix_enabled:
+                  type: boolean
+                  description: 'Enable path prefix stripping.'
+                is_raw_compose_deployment_enabled:
+                  type: boolean
+                  description: 'Deploy the raw Docker Compose definition.'
                 is_http_basic_auth_enabled:
                   type: boolean
                   description: 'HTTP Basic Authentication enabled.'
@@ -1092,6 +1308,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the application.'
               type: object
       responses:
         '201':
@@ -1277,10 +1497,61 @@ paths:
                 is_force_https_enabled:
                   type: boolean
                   description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
+                is_preview_deployments_enabled:
+                  type: boolean
+                  description: 'Enable preview deployments for pull requests.'
                 use_build_server:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                use_build_secrets:
+                  type: boolean
+                  default: false
+                  description: 'Use Docker Build Secrets for build-time environment variables.'
+                is_git_submodules_enabled:
+                  type: boolean
+                  description: 'Clone Git submodules.'
+                is_git_lfs_enabled:
+                  type: boolean
+                  description: 'Enable Git LFS.'
+                is_git_shallow_clone_enabled:
+                  type: boolean
+                  description: 'Use a shallow Git clone.'
+                disable_build_cache:
+                  type: boolean
+                  description: 'Disable the build cache.'
+                inject_build_args_to_dockerfile:
+                  type: boolean
+                  description: 'Inject build arguments into the Dockerfile build.'
+                include_source_commit_in_build:
+                  type: boolean
+                  description: 'Include the source commit in the build.'
+                is_env_sorting_enabled:
+                  type: boolean
+                  description: 'Sort environment variables.'
+                is_pr_deployments_public_enabled:
+                  type: boolean
+                  description: 'Make pull request deployments public.'
+                stop_grace_period:
+                  type: integer
+                  nullable: true
+                  minimum: 1
+                  maximum: 3600
+                  description: 'Container stop grace period in seconds.'
+                docker_images_to_keep:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  description: 'Number of Docker images to retain.'
+                is_gzip_enabled:
+                  type: boolean
+                  description: 'Enable gzip compression.'
+                is_stripprefix_enabled:
+                  type: boolean
+                  description: 'Enable path prefix stripping.'
+                is_raw_compose_deployment_enabled:
+                  type: boolean
+                  description: 'Deploy the raw Docker Compose definition.'
                 is_http_basic_auth_enabled:
                   type: boolean
                   description: 'HTTP Basic Authentication enabled.'
@@ -1306,6 +1577,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the application.'
               type: object
       responses:
         '201':
@@ -1507,6 +1782,9 @@ paths:
                 is_force_https_enabled:
                   type: boolean
                   description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
+                is_preview_deployments_enabled:
+                  type: boolean
+                  description: 'Enable preview deployments for pull requests.'
                 install_command:
                   type: string
                   description: 'The install command.'
@@ -1650,6 +1928,53 @@ paths:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                use_build_secrets:
+                  type: boolean
+                  description: 'Use Docker Build Secrets for build-time environment variables.'
+                is_git_submodules_enabled:
+                  type: boolean
+                  description: 'Clone Git submodules.'
+                is_git_lfs_enabled:
+                  type: boolean
+                  description: 'Enable Git LFS.'
+                is_git_shallow_clone_enabled:
+                  type: boolean
+                  description: 'Use a shallow Git clone.'
+                disable_build_cache:
+                  type: boolean
+                  description: 'Disable the build cache.'
+                inject_build_args_to_dockerfile:
+                  type: boolean
+                  description: 'Inject build arguments into the Dockerfile build.'
+                include_source_commit_in_build:
+                  type: boolean
+                  description: 'Include the source commit in the build.'
+                is_env_sorting_enabled:
+                  type: boolean
+                  description: 'Sort environment variables.'
+                is_pr_deployments_public_enabled:
+                  type: boolean
+                  description: 'Make pull request deployments public.'
+                stop_grace_period:
+                  type: integer
+                  nullable: true
+                  minimum: 1
+                  maximum: 3600
+                  description: 'Container stop grace period in seconds.'
+                docker_images_to_keep:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  description: 'Number of Docker images to retain.'
+                is_gzip_enabled:
+                  type: boolean
+                  description: 'Enable gzip compression.'
+                is_stripprefix_enabled:
+                  type: boolean
+                  description: 'Enable path prefix stripping.'
+                is_raw_compose_deployment_enabled:
+                  type: boolean
+                  description: 'Deploy the raw Docker Compose definition.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -1716,6 +2041,14 @@ paths:
             type: integer
             format: int32
             default: 100
+        -
+          name: show_timestamps
+          in: query
+          description: 'Show timestamps in the logs.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'Get application logs by UUID.'
@@ -2092,6 +2425,57 @@ paths:
       security:
         -
           bearerAuth: []
+  '/applications/{uuid}/move':
+    post:
+      tags:
+        - Applications
+      summary: Move
+      description: 'Move application to another project/environment. This is a purely organizational change — running containers are not affected. Note: after moving, the application will pick up shared environment variables from the new environment on the next deployment.'
+      operationId: move-application-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Target environment to move the application to.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - environment_uuid
+              properties:
+                environment_uuid:
+                  type: string
+                  description: 'UUID of the target environment.'
+              type: object
+      responses:
+        '200':
+          description: 'Application moved successfully.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Application moved successfully.' }
+                  uuid: { type: string }
+                  project_uuid: { type: string }
+                  environment_uuid: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   '/applications/{uuid}/storages':
     get:
       tags:
@@ -2347,6 +2731,121 @@ paths:
       security:
         -
           bearerAuth: []
+  '/applications/{uuid}/tags':
+    get:
+      tags:
+        - Applications
+      summary: 'List Tags'
+      description: 'List tags for an application by UUID.'
+      operationId: list-tags-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of tags.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Applications
+      summary: 'Create Tag'
+      description: 'Add tag(s) to an application by UUID.'
+      operationId: create-tag-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                tag_name:
+                  type: string
+                  description: 'The tag name (min 2 characters). Required if tag_names is not provided.'
+                tag_names:
+                  type: array
+                  items: { type: string }
+                  description: 'Array of tag names (each min 2 characters). Required if tag_name is not provided.'
+              type: object
+      responses:
+        '201':
+          description: 'Tags added successfully.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/tags/{tag_uuid}':
+    delete:
+      tags:
+        - Applications
+      summary: 'Delete Tag'
+      description: 'Remove a tag from an application by UUID.'
+      operationId: delete-tag-by-application-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: tag_uuid
+          in: path
+          description: 'UUID of the tag.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Tag removed.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   /cloud-tokens:
     get:
       tags:
@@ -2362,7 +2861,7 @@ paths:
               schema:
                 type: array
                 items:
-                  properties: { uuid: { type: string }, name: { type: string }, provider: { type: string, enum: [hetzner, digitalocean] }, team_id: { type: integer }, servers_count: { type: integer }, created_at: { type: string }, updated_at: { type: string } }
+                  properties: { uuid: { type: string }, name: { type: string }, provider: { type: string, enum: [hetzner, digitalocean, vultr] }, team_id: { type: integer }, servers_count: { type: integer }, created_at: { type: string }, updated_at: { type: string } }
                   type: object
         '401':
           $ref: '#/components/responses/401'
@@ -2390,7 +2889,7 @@ paths:
               properties:
                 provider:
                   type: string
-                  enum: [hetzner, digitalocean]
+                  enum: [hetzner, digitalocean, vultr]
                   example: hetzner
                   description: 'The cloud provider.'
                 token:
@@ -3215,6 +3714,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
               type: object
       responses:
         '200':
@@ -3310,6 +3813,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
               type: object
       responses:
         '200':
@@ -3402,6 +3909,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
               type: object
       responses:
         '200':
@@ -3497,6 +4008,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
               type: object
       responses:
         '200':
@@ -3592,6 +4107,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
               type: object
       responses:
         '200':
@@ -3696,6 +4215,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
               type: object
       responses:
         '200':
@@ -3800,6 +4323,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
               type: object
       responses:
         '200':
@@ -3895,6 +4422,10 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
               type: object
       responses:
         '200':
@@ -3905,6 +4436,57 @@ paths:
           $ref: '#/components/responses/400'
         '422':
           $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/logs':
+    get:
+      tags:
+        - Databases
+      summary: 'Get database logs.'
+      description: 'Get database logs by UUID.'
+      operationId: get-database-logs-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: lines
+          in: query
+          description: 'Number of lines to show from the end of the logs.'
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 100
+        -
+          name: show_timestamps
+          in: query
+          description: 'Show timestamps in the logs.'
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: 'Get database logs by UUID.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  logs: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -3998,6 +4580,57 @@ paths:
                 type: object
         '404':
           description: 'Backup configuration not found.'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/move':
+    post:
+      tags:
+        - Databases
+      summary: Move
+      description: 'Move database to another project/environment. This is a purely organizational change — running containers are not affected. Note: after moving, the database will pick up shared environment variables from the new environment on the next deployment.'
+      operationId: move-database-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Target environment to move the database to.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - environment_uuid
+              properties:
+                environment_uuid:
+                  type: string
+                  description: 'UUID of the target environment.'
+              type: object
+      responses:
+        '200':
+          description: 'Database moved successfully.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Database moved successfully.' }
+                  uuid: { type: string }
+                  project_uuid: { type: string }
+                  environment_uuid: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -4556,6 +5189,121 @@ paths:
       security:
         -
           bearerAuth: []
+  '/databases/{uuid}/tags':
+    get:
+      tags:
+        - Databases
+      summary: 'List Tags'
+      description: 'List tags for a database by UUID.'
+      operationId: list-tags-by-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of tags.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Databases
+      summary: 'Create Tag'
+      description: 'Add tag(s) to a database by UUID.'
+      operationId: create-tag-by-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                tag_name:
+                  type: string
+                  description: 'The tag name (min 2 characters). Required if tag_names is not provided.'
+                tag_names:
+                  type: array
+                  items: { type: string }
+                  description: 'Array of tag names (each min 2 characters). Required if tag_name is not provided.'
+              type: object
+      responses:
+        '201':
+          description: 'Tags added successfully.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/tags/{tag_uuid}':
+    delete:
+      tags:
+        - Databases
+      summary: 'Delete Tag'
+      description: 'Remove a tag from a database by UUID.'
+      operationId: delete-tag-by-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+        -
+          name: tag_uuid
+          in: path
+          description: 'UUID of the tag.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Tag removed.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   /deployments:
     get:
       tags:
@@ -4768,6 +5516,308 @@ paths:
       security:
         -
           bearerAuth: []
+  /destinations:
+    get:
+      tags:
+        - Destinations
+      summary: 'List destinations'
+      description: 'List all Docker network destinations for the authenticated team.'
+      operationId: list-destinations
+      responses:
+        '200':
+          description: 'Destinations for the authenticated team.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Destination'
+        '401':
+          $ref: '#/components/responses/401'
+      security:
+        -
+          bearerAuth: []
+  '/servers/{server_uuid}/destinations':
+    get:
+      tags:
+        - Destinations
+      summary: 'List destinations by server'
+      description: 'List Docker network destinations attached to a server owned by the authenticated team.'
+      operationId: list-server-destinations
+      parameters:
+        -
+          name: server_uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Destinations attached to the server.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Destination'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Destinations
+      summary: 'Create destination'
+      description: 'Create a Docker network destination on a server owned by the authenticated team.'
+      operationId: create-server-destination
+      parameters:
+        -
+          name: server_uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - network
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                network:
+                  type: string
+                  maxLength: 255
+                  pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+                type:
+                  type: string
+                  enum: [standalone, swarm]
+              type: object
+      responses:
+        '201':
+          description: 'Destination created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Destination'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'A destination with this network already exists.'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/destinations/{uuid}':
+    get:
+      tags:
+        - Destinations
+      summary: 'Get destination'
+      description: 'Get a Docker network destination by UUID.'
+      operationId: get-destination-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Destination UUID'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Destination details.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Destination'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Destinations
+      summary: 'Delete destination'
+      description: 'Delete an unused Docker network destination.'
+      operationId: delete-destination-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Destination UUID'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Destination deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: Deleted. }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'Destination has attached resources.'
+      security:
+        -
+          bearerAuth: []
+  /digitalocean/regions:
+    get:
+      tags:
+        - DigitalOcean
+      summary: 'Get DigitalOcean regions'
+      operationId: get-digitalocean-regions
+      parameters:
+        -
+          name: cloud_provider_token_uuid
+          in: query
+          required: false
+          schema:
+            type: string
+        -
+          name: cloud_provider_token_id
+          in: query
+          required: false
+          deprecated: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of DigitalOcean regions.'
+        '401':
+          $ref: '#/components/responses/401'
+        '422':
+          description: 'Validation failed.'
+      security:
+        -
+          bearerAuth: []
+  /digitalocean/sizes:
+    get:
+      tags:
+        - DigitalOcean
+      summary: 'Get DigitalOcean sizes'
+      operationId: get-digitalocean-sizes
+      parameters:
+        -
+          name: cloud_provider_token_uuid
+          in: query
+          required: false
+          schema:
+            type: string
+        -
+          name: cloud_provider_token_id
+          in: query
+          required: false
+          deprecated: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of DigitalOcean sizes.'
+        '401':
+          $ref: '#/components/responses/401'
+        '422':
+          description: 'Validation failed.'
+      security:
+        -
+          bearerAuth: []
+  /digitalocean/images:
+    get:
+      tags:
+        - DigitalOcean
+      summary: 'Get DigitalOcean images'
+      operationId: get-digitalocean-images
+      parameters:
+        -
+          name: cloud_provider_token_uuid
+          in: query
+          required: false
+          schema:
+            type: string
+        -
+          name: cloud_provider_token_id
+          in: query
+          required: false
+          deprecated: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of DigitalOcean images.'
+        '401':
+          $ref: '#/components/responses/401'
+        '422':
+          description: 'Validation failed.'
+      security:
+        -
+          bearerAuth: []
+  /digitalocean/ssh-keys:
+    get:
+      tags:
+        - DigitalOcean
+      summary: 'Get DigitalOcean SSH keys'
+      operationId: get-digitalocean-ssh-keys
+      parameters:
+        -
+          name: cloud_provider_token_uuid
+          in: query
+          required: false
+          schema:
+            type: string
+        -
+          name: cloud_provider_token_id
+          in: query
+          required: false
+          deprecated: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of DigitalOcean SSH keys.'
+        '401':
+          $ref: '#/components/responses/401'
+        '422':
+          description: 'Validation failed.'
+      security:
+        -
+          bearerAuth: []
+  /servers/digitalocean:
+    post:
+      tags:
+        - DigitalOcean
+      summary: 'Create a server on DigitalOcean'
+      operationId: create-digitalocean-server
+      responses:
+        '201':
+          description: 'DigitalOcean droplet created and linked to a Coolify server.'
+        '401':
+          $ref: '#/components/responses/401'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'DigitalOcean rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
   /github-apps:
     get:
       tags:
@@ -4806,7 +5856,6 @@ paths:
             schema:
               required:
                 - name
-                - api_url
                 - html_url
                 - app_id
                 - installation_id
@@ -5245,6 +6294,86 @@ paths:
       security:
         -
           bearerAuth: []
+  /hetzner/firewalls:
+    get:
+      tags:
+        - Hetzner
+      summary: 'Get Hetzner Firewalls'
+      description: 'Get all existing Hetzner firewalls for the current project.'
+      operationId: get-hetzner-firewalls
+      parameters:
+        -
+          name: cloud_provider_token_uuid
+          in: query
+          description: 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.'
+          required: false
+          schema:
+            type: string
+        -
+          name: cloud_provider_token_id
+          in: query
+          description: 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.'
+          required: false
+          deprecated: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of Hetzner firewalls.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { id: { type: integer }, name: { type: string } }
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /hetzner/networks:
+    get:
+      tags:
+        - Hetzner
+      summary: 'Get Hetzner Networks'
+      description: 'Get all existing Hetzner private networks for the current project.'
+      operationId: get-hetzner-networks
+      parameters:
+        -
+          name: cloud_provider_token_uuid
+          in: query
+          description: 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.'
+          required: false
+          schema:
+            type: string
+        -
+          name: cloud_provider_token_id
+          in: query
+          description: 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.'
+          required: false
+          deprecated: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of Hetzner networks.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { id: { type: integer }, name: { type: string }, ip_range: { type: string } }
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   /servers/hetzner:
     post:
       tags:
@@ -5301,10 +6430,22 @@ paths:
                   type: boolean
                   example: true
                   description: 'Enable IPv6 (default: true)'
+                enable_backups:
+                  type: boolean
+                  example: false
+                  description: 'Enable Hetzner server backups after creation (adds 20% to the monthly server fee)'
                 hetzner_ssh_key_ids:
                   type: array
                   items: { type: integer }
                   description: 'Additional Hetzner SSH key IDs'
+                hetzner_firewall_ids:
+                  type: array
+                  items: { type: integer }
+                  description: 'Existing Hetzner firewall IDs to apply during server creation'
+                hetzner_network_ids:
+                  type: array
+                  items: { type: integer }
+                  description: 'Existing Hetzner network IDs to attach during server creation'
                 cloud_init_script:
                   type: string
                   description: 'Cloud-init YAML script (optional)'
@@ -6844,6 +7985,822 @@ paths:
       security:
         -
           bearerAuth: []
+  '/services/{uuid}/applications':
+    get:
+      tags:
+        - 'Service applications'
+      summary: 'List service applications'
+      description: 'List compose service applications (containers) for a single service.'
+      operationId: list-service-applications-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Service applications for this service.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/applications/{app_uuid}':
+    get:
+      tags:
+        - 'Service applications'
+      summary: 'Get service application'
+      description: 'Get a single compose service application by service UUID and application UUID.'
+      operationId: get-service-application-by-service-and-app-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: app_uuid
+          in: path
+          description: 'Service application UUID.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Service application.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - 'Service applications'
+      summary: 'Update service application'
+      description: 'Update fields for a compose service application. Use `url` for comma-separated public URLs (same rules as `urls[].url` on PATCH /services/{uuid}).'
+      operationId: patch-service-application-by-service-and-app-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: app_uuid
+          in: path
+          description: 'Service application UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: force_domain_override
+          in: query
+          description: 'When true, allow duplicate URLs in the request and proceed despite domain conflicts (same as service PATCH).'
+          required: false
+          schema:
+            type: boolean
+            default: false
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                url:
+                  description: 'Comma-separated list of URLs (e.g. "http://app.example.com:8080,https://app2.example.com"). Stored as fqdn.'
+                  type: [string, 'null']
+                human_name:
+                  type: [string, 'null']
+                description:
+                  type: [string, 'null']
+                image:
+                  type: [string, 'null']
+                exclude_from_status:
+                  type: [boolean, 'null']
+                is_log_drain_enabled:
+                  type: [boolean, 'null']
+                is_gzip_enabled:
+                  type: [boolean, 'null']
+                is_stripprefix_enabled:
+                  type: [boolean, 'null']
+              type: object
+      responses:
+        '200':
+          description: 'Updated service application.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'Domain conflicts (unless force_domain_override).'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/applications/{app_uuid}/logs':
+    get:
+      tags:
+        - 'Service applications'
+      summary: 'Get service application logs'
+      description: 'Get Docker logs for a single compose service container.'
+      operationId: get-service-application-logs-by-service-and-app-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: app_uuid
+          in: path
+          description: 'Service application UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: lines
+          in: query
+          description: 'Number of lines to show from the end of the logs.'
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 100
+      responses:
+        '200':
+          description: Logs.
+          content:
+            application/json:
+              schema:
+                properties:
+                  logs: { type: string }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '501':
+          description: 'Swarm not supported.'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - 'Service applications'
+      summary: 'Get service application logs'
+      description: 'Get Docker logs for a single compose service container.'
+      operationId: post-service-application-logs-by-service-and-app-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: app_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: lines
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 100
+      responses:
+        '200':
+          description: Logs.
+          content:
+            application/json:
+              schema:
+                properties:
+                  logs: { type: string }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '501':
+          description: 'Swarm not supported.'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/applications/{app_uuid}/start':
+    get:
+      tags:
+        - 'Service applications'
+      summary: 'Start or redeploy service application container'
+      description: 'Runs docker compose up for a single compose service (no-deps), optionally pulling the image and rebuilding.'
+      operationId: start-service-application-by-service-and-app-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: app_uuid
+          in: path
+          description: 'Service application UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: force
+          in: query
+          description: 'When true, passes --build to docker compose up.'
+          required: false
+          schema:
+            type: boolean
+            default: false
+        -
+          name: latest
+          in: query
+          description: 'When true, pulls the image for this compose service before up.'
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: 'Deploy request queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '501':
+          description: 'Swarm not supported.'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - 'Service applications'
+      summary: 'Start or redeploy service application container'
+      description: 'Runs docker compose up for a single compose service (no-deps), optionally pulling the image and rebuilding.'
+      operationId: post-start-service-application-by-service-and-app-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: app_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: force
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+        -
+          name: latest
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: 'Deploy request queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '501':
+          description: 'Swarm not supported.'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/applications/{app_uuid}/restart':
+    get:
+      tags:
+        - 'Service applications'
+      summary: 'Restart service application container'
+      description: 'Restarts a single compose service container (docker restart).'
+      operationId: restart-service-application-by-service-and-app-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: app_uuid
+          in: path
+          description: 'Service application UUID.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Restart queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '501':
+          description: 'Swarm not supported.'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - 'Service applications'
+      summary: 'Restart service application container'
+      description: 'Restarts a single compose service container.'
+      operationId: post-restart-service-application-by-service-and-app-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: app_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Restart queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '501':
+          description: 'Swarm not supported.'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/applications/{app_uuid}/stop':
+    get:
+      tags:
+        - 'Service applications'
+      summary: 'Stop service application container'
+      description: 'Stops a single compose service container (docker stop).'
+      operationId: stop-service-application-by-service-and-app-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: app_uuid
+          in: path
+          description: 'Service application UUID.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Stop queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '501':
+          description: 'Swarm not supported.'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - 'Service applications'
+      summary: 'Stop service application container'
+      description: 'Stops a single compose service container.'
+      operationId: post-stop-service-application-by-service-and-app-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: app_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Stop queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '501':
+          description: 'Swarm not supported.'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/databases':
+    get:
+      tags:
+        - 'Service databases'
+      summary: 'List service databases'
+      description: 'List compose databases for a single service.'
+      operationId: list-service-databases-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Service databases.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/databases/{database_uuid}':
+    get:
+      tags:
+        - 'Service databases'
+      summary: 'Get service database'
+      description: 'Get a compose database by service UUID and database UUID.'
+      operationId: get-service-database-by-service-and-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: database_uuid
+          in: path
+          description: 'Service database UUID.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Service database.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - 'Service databases'
+      summary: 'Update service database'
+      description: 'Update mutable fields for a compose service database.'
+      operationId: patch-service-database-by-service-and-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: database_uuid
+          in: path
+          description: 'Service database UUID.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                human_name:
+                  type: [string, 'null']
+                description:
+                  type: [string, 'null']
+                image:
+                  type: string
+                exclude_from_status:
+                  type: boolean
+                is_log_drain_enabled:
+                  type: boolean
+                is_public:
+                  type: boolean
+                public_port:
+                  type: [integer, 'null']
+                  maximum: 65535
+                  minimum: 1
+                public_port_timeout:
+                  type: [integer, 'null']
+                  minimum: 1
+              type: object
+              additionalProperties: false
+      responses:
+        '200':
+          description: 'Updated service database.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/databases/{database_uuid}/logs':
+    get:
+      tags:
+        - 'Service databases'
+      summary: 'Get service database logs'
+      description: 'Get Docker logs for a compose database container.'
+      operationId: get-service-database-logs-by-service-and-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: database_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: lines
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 100
+      responses:
+        '200':
+          description: Logs.
+          content:
+            application/json:
+              schema:
+                properties:
+                  logs: { type: string }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '501':
+          description: 'Swarm not supported.'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/databases/{database_uuid}/start':
+    post:
+      tags:
+        - 'Service databases'
+      summary: 'Start or redeploy service database container'
+      description: 'Run docker compose up for a single compose database.'
+      operationId: start-service-database-by-service-and-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: database_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: force
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+        -
+          name: latest
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: 'Deploy request queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '501':
+          description: 'Swarm not supported.'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/databases/{database_uuid}/restart':
+    post:
+      tags:
+        - 'Service databases'
+      summary: 'Restart service database container'
+      description: 'Restart a compose database container.'
+      operationId: restart-service-database-by-service-and-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: database_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Restart queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '501':
+          description: 'Swarm not supported.'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/databases/{database_uuid}/stop':
+    post:
+      tags:
+        - 'Service databases'
+      summary: 'Stop service database container'
+      description: 'Stop a compose database container.'
+      operationId: stop-service-database-by-service-and-database-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: database_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Stop queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '501':
+          description: 'Swarm not supported.'
+      security:
+        -
+          bearerAuth: []
   /services:
     get:
       tags:
@@ -6929,6 +8886,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the service.'
               type: object
       responses:
         '201':
@@ -7081,21 +9042,6 @@ paths:
                 description:
                   type: string
                   description: 'The service description.'
-                project_uuid:
-                  type: string
-                  description: 'The project UUID.'
-                environment_name:
-                  type: string
-                  description: 'The environment name.'
-                environment_uuid:
-                  type: string
-                  description: 'The environment UUID.'
-                server_uuid:
-                  type: string
-                  description: 'The server UUID.'
-                destination_uuid:
-                  type: string
-                  description: 'The destination UUID.'
                 instant_deploy:
                   type: boolean
                   description: 'The flag to indicate if the service should be deployed instantly.'
@@ -7147,6 +9093,65 @@ paths:
                 type: object
         '422':
           $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/logs':
+    get:
+      tags:
+        - Services
+      summary: 'Get service logs.'
+      description: 'Get logs for a specific service sub-resource by service UUID. The `sub_service_name` query parameter must match the `name` field of one of the service applications or databases returned by `GET /services/{uuid}`.'
+      operationId: get-service-logs-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: sub_service_name
+          in: query
+          description: 'Sub-service name from `GET /services/{uuid}` under `applications[].name` or `databases[].name`. Do not use `human_name` or the Docker container name with the service UUID suffix.'
+          required: true
+          schema:
+            type: string
+            example: appwrite-console
+        -
+          name: lines
+          in: query
+          description: 'Number of lines to show from the end of the logs.'
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 100
+        -
+          name: show_timestamps
+          in: query
+          description: 'Show timestamps in the logs.'
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: 'Get service logs by UUID.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  logs: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -7389,6 +9394,57 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/move':
+    post:
+      tags:
+        - Services
+      summary: Move
+      description: 'Move service to another project/environment. This is a purely organizational change — running containers are not affected. Note: after moving, the service will pick up shared environment variables from the new environment on the next deployment.'
+      operationId: move-service-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Target environment to move the service to.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - environment_uuid
+              properties:
+                environment_uuid:
+                  type: string
+                  description: 'UUID of the target environment.'
+              type: object
+      responses:
+        '200':
+          description: 'Service moved successfully.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Service moved successfully.' }
+                  uuid: { type: string }
+                  project_uuid: { type: string }
+                  environment_uuid: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -7722,6 +9778,144 @@ paths:
       security:
         -
           bearerAuth: []
+  '/services/{uuid}/tags':
+    get:
+      tags:
+        - Services
+      summary: 'List Tags'
+      description: 'List tags for a service by UUID.'
+      operationId: list-tags-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of tags.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Services
+      summary: 'Create Tag'
+      description: 'Add tag(s) to a service by UUID.'
+      operationId: create-tag-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                tag_name:
+                  type: string
+                  description: 'The tag name (min 2 characters). Required if tag_names is not provided.'
+                tag_names:
+                  type: array
+                  items: { type: string }
+                  description: 'Array of tag names (each min 2 characters). Required if tag_name is not provided.'
+              type: object
+      responses:
+        '201':
+          description: 'Tags added successfully.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/tags/{tag_uuid}':
+    delete:
+      tags:
+        - Services
+      summary: 'Delete Tag'
+      description: 'Remove a tag from a service by UUID.'
+      operationId: delete-tag-by-service-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+        -
+          name: tag_uuid
+          in: path
+          description: 'UUID of the tag.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Tag removed.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /tags:
+    get:
+      tags:
+        - Tags
+      summary: List
+      description: 'List all tags for the current team.'
+      operationId: list-tags
+      responses:
+        '200':
+          description: 'All tags for the current team.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
   /teams:
     get:
       tags:
@@ -7850,6 +10044,93 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /vultr/regions:
+    get:
+      tags:
+        - Vultr
+      summary: 'Get Vultr Regions'
+      description: 'Get all available Vultr regions.'
+      operationId: get-vultr-regions
+      responses:
+        '200':
+          description: 'List of Vultr regions.'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /vultr/plans:
+    get:
+      tags:
+        - Vultr
+      summary: 'Get Vultr Plans'
+      description: 'Get all available Vultr plans.'
+      operationId: get-vultr-plans
+      responses:
+        '200':
+          description: 'List of Vultr plans.'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /vultr/os:
+    get:
+      tags:
+        - Vultr
+      summary: 'Get Vultr Operating Systems'
+      description: 'Get all available Vultr operating systems.'
+      operationId: get-vultr-operating-systems
+      responses:
+        '200':
+          description: 'List of Vultr operating systems.'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /vultr/ssh-keys:
+    get:
+      tags:
+        - Vultr
+      summary: 'Get Vultr SSH Keys'
+      description: 'Get all Vultr SSH keys available to the selected token.'
+      operationId: get-vultr-ssh-keys
+      responses:
+        '200':
+          description: 'List of Vultr SSH keys.'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /servers/vultr:
+    post:
+      tags:
+        - Vultr
+      summary: 'Create Vultr Server'
+      description: 'Create a Vultr instance and link it as a Coolify server.'
+      operationId: create-vultr-server
+      responses:
+        '201':
+          description: 'Vultr server created.'
+        '401':
+          $ref: '#/components/responses/401'
+        '422':
+          description: 'Validation failed.'
+        '429':
+          description: 'Vultr API rate limit exceeded.'
       security:
         -
           bearerAuth: []
@@ -8163,6 +10444,8 @@ components:
           type: string
           nullable: true
           description: 'Password for HTTP Basic Authentication'
+        settings:
+          $ref: '#/components/schemas/ApplicationSetting'
       type: object
     ApplicationDeploymentQueue:
       description: 'Project model'
@@ -8225,6 +10508,86 @@ components:
           type: boolean
         commit_message:
           type: string
+      type: object
+    ApplicationSetting:
+      description: 'Application settings.'
+      properties:
+        is_static:
+          type: boolean
+        is_git_submodules_enabled:
+          type: boolean
+        is_git_lfs_enabled:
+          type: boolean
+        is_auto_deploy_enabled:
+          type: boolean
+        is_force_https_enabled:
+          type: boolean
+        is_debug_enabled:
+          type: boolean
+        is_preview_deployments_enabled:
+          type: boolean
+        is_log_drain_enabled:
+          type: boolean
+        is_gpu_enabled:
+          type: boolean
+        gpu_driver:
+          type: string
+          nullable: true
+        gpu_count:
+          type: string
+          nullable: true
+        gpu_device_ids:
+          type: string
+          nullable: true
+        gpu_options:
+          type: string
+          nullable: true
+        is_include_timestamps:
+          type: boolean
+        is_swarm_only_worker_nodes:
+          type: boolean
+        is_raw_compose_deployment_enabled:
+          type: boolean
+        is_build_server_enabled:
+          type: boolean
+        is_consistent_container_name_enabled:
+          type: boolean
+        is_gzip_enabled:
+          type: boolean
+        is_stripprefix_enabled:
+          type: boolean
+        connect_to_docker_network:
+          type: boolean
+        custom_internal_name:
+          type: string
+          nullable: true
+        is_container_label_escape_enabled:
+          type: boolean
+        is_env_sorting_enabled:
+          type: boolean
+        is_container_label_readonly_enabled:
+          type: boolean
+        is_preserve_repository_enabled:
+          type: boolean
+        disable_build_cache:
+          type: boolean
+        is_spa:
+          type: boolean
+        is_git_shallow_clone_enabled:
+          type: boolean
+        is_pr_deployments_public_enabled:
+          type: boolean
+        use_build_secrets:
+          type: boolean
+        inject_build_args_to_dockerfile:
+          type: boolean
+        include_source_commit_in_build:
+          type: boolean
+        docker_images_to_keep:
+          type: integer
+        stop_grace_period:
+          type: integer
+          nullable: true
       type: object
     Environment:
       description: 'Environment model'
@@ -8602,6 +10965,41 @@ components:
           type: string
           description: 'The date and time when the service was deleted.'
       type: object
+    Destination:
+      description: 'A Docker network destination attached to a server.'
+      properties:
+        uuid:
+          type: string
+        name:
+          type: string
+        network:
+          type: string
+        type:
+          type: string
+          enum:
+            - standalone
+            - swarm
+        server_uuid:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      type: object
+    Tag:
+      description: 'Tag model'
+      properties:
+        uuid:
+          type: string
+        name:
+          type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+      type: object
     Team:
       description: 'Team model'
       properties:
@@ -8750,6 +11148,12 @@ tags:
     name: Deployments
     description: Deployments
   -
+    name: Destinations
+    description: Destinations
+  -
+    name: DigitalOcean
+    description: DigitalOcean
+  -
     name: 'GitHub Apps'
     description: 'GitHub Apps'
   -
@@ -8771,8 +11175,20 @@ tags:
     name: Servers
     description: Servers
   -
+    name: 'Service applications'
+    description: 'Service applications'
+  -
+    name: 'Service databases'
+    description: 'Service databases'
+  -
     name: Services
     description: Services
   -
+    name: Tags
+    description: Tags
+  -
     name: Teams
     description: Teams
+  -
+    name: Vultr
+    description: Vultr

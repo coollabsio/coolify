@@ -13,13 +13,14 @@ use App\Mcp\Tools\ListProjects;
 use App\Mcp\Tools\ListServers;
 use App\Mcp\Tools\ListServices;
 use Laravel\Mcp\Server;
-use Laravel\Mcp\Server\Attributes\Instructions;
-use Laravel\Mcp\Server\Attributes\Name;
-use Laravel\Mcp\Server\Attributes\Version;
 
-#[Name('Coolify')]
-#[Version('0.1.0')]
-#[Instructions(<<<'MD'
+class CoolifyServer extends Server
+{
+    protected string $name = 'Coolify';
+
+    protected string $version = '0.1.0';
+
+    protected string $instructions = <<<'MD'
 Read-only MCP server for Coolify, scoped to the authenticated team token.
 
 Recommended workflow:
@@ -28,9 +29,8 @@ Recommended workflow:
 3. get_server / get_application / get_database / get_service — full details for a single UUID.
 
 Every response is `{ data, _actions?, _pagination? }`. `_actions` suggests the next tool + args; `_pagination.next` is the args to call again for the next page.
-MD)]
-class CoolifyServer extends Server
-{
+MD;
+
     protected array $tools = [
         GetInfrastructureOverview::class,
         ListServers::class,

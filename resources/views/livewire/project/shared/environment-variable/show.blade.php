@@ -184,6 +184,7 @@
                             @endif
                         </div>
                         <x-forms.input instantSave id="comment" label="Comment"
+                            placeholder="{{ $isMagicVariable ? 'This env cannot be edited manually, it is handled by Coolify.' : '' }}"
                             helper="Add a note to document what this environment variable is used for." maxlength="256" />
                     </div>
                 @endif
@@ -191,16 +192,23 @@
                 <div class="flex flex-col w-full gap-2">
                     <div class="flex flex-col w-full gap-2 lg:flex-row">
                         <x-forms.input disabled id="key" />
-                        <x-forms.env-var-input
-                            disabled
-                            type="password"
-                            id="value"
-                            :availableVars="$isSharedVariable ? [] : $this->availableSharedVariables"
-                            :projectUuid="data_get($parameters, 'project_uuid')"
-                            :environmentUuid="data_get($parameters, 'environment_uuid')"
-                            :serverUuid="data_get($parameters, 'server_uuid')" />
-                        @if ($is_shared)
-                            <x-forms.input disabled type="password" id="real_value" />
+                        @if ($isValueHidden)
+                            <div class="w-full">
+                                <input disabled type="text" value="Hidden (only admins can view)"
+                                    class="input italic !text-neutral-500 dark:!text-neutral-500" />
+                            </div>
+                        @else
+                            <x-forms.env-var-input
+                                disabled
+                                type="password"
+                                id="value"
+                                :availableVars="$isSharedVariable ? [] : $this->availableSharedVariables"
+                                :projectUuid="data_get($parameters, 'project_uuid')"
+                                :environmentUuid="data_get($parameters, 'environment_uuid')"
+                                :serverUuid="data_get($parameters, 'server_uuid')" />
+                            @if ($is_shared)
+                                <x-forms.input disabled type="password" id="real_value" />
+                            @endif
                         @endif
                     </div>
                     <x-forms.input disabled id="comment" label="Comment"
@@ -209,8 +217,9 @@
                 </div>
             @endcan
             @can('update', $this->env)
-                <div class="flex flex-col w-full gap-3">
-                    <div class="flex flex-wrap w-full items-center gap-4">
+                <div class="flex w-full flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="flex min-w-0 flex-1 flex-col gap-3">
+                        <div class="flex flex-wrap w-full items-center gap-4">
                         @if (!$is_redis_credential)
                             @if ($type === 'service')
                                 @if (!$isMagicVariable)
@@ -258,16 +267,17 @@
                                 @endif
                             @endif
                         @endif
+                        </div>
+                        <x-environment-variable-warning :problematic-variables="$problematicVariables" />
                     </div>
-                    <x-environment-variable-warning :problematic-variables="$problematicVariables" />
                     @if (!$isMagicVariable)
-                        <div class="flex w-full justify-end gap-2">
+                        <div class="flex w-full justify-end gap-2 lg:w-auto lg:shrink-0">
                             @if ($isDisabled)
                             <x-forms.button disabled type="submit">Update</x-forms.button>
                             <x-forms.button wire:click='lock'>Lock</x-forms.button>
                             <x-modal-confirmation title="Confirm Environment Variable Deletion?" isErrorButton buttonTitle="Delete"
                                 submitAction="delete" :actions="['The selected environment variable will be permanently deleted.']"
-                                confirmationText="{{ $key }}" buttonFullWidth="true"
+                                confirmationText="{{ $key }}"
                                 confirmationLabel="Please confirm the execution of the actions by entering the Environment Variable Name below"
                                 shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
                                 step2ButtonText="Permanently Delete" />
@@ -276,14 +286,14 @@
                             <x-forms.button wire:click='lock'>Lock</x-forms.button>
                             <x-modal-confirmation title="Confirm Environment Variable Deletion?" isErrorButton buttonTitle="Delete"
                                 submitAction="delete" :actions="['The selected environment variable will be permanently deleted.']"
-                                confirmationText="{{ $key }}" buttonFullWidth="true"
+                                confirmationText="{{ $key }}"
                                 confirmationLabel="Please confirm the execution of the actions by entering the Environment Variable Name below"
                                 shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
                                 step2ButtonText="Permanently Delete" />
                             @endif
                         </div>
                     @elseif ($type === 'service')
-                        <div class="flex w-full justify-end gap-2">
+                        <div class="flex w-full justify-end gap-2 lg:w-auto lg:shrink-0">
                             <x-forms.button wire:click='lock'>Lock</x-forms.button>
                         </div>
                     @endif

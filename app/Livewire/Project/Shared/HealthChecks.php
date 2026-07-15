@@ -78,8 +78,12 @@ class HealthChecks extends Component
 
     public function mount()
     {
-        $this->authorize('view', $this->resource);
-        $this->syncData();
+        try {
+            $this->authorize('view', $this->resource);
+            $this->syncData();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function syncData(bool $toModel = false): void
@@ -148,6 +152,7 @@ class HealthChecks extends Component
         $this->resource->custom_healthcheck_found = $this->customHealthcheckFound;
         $this->resource->save();
         $this->dispatch('success', 'Health check updated.');
+        $this->dispatch('configurationChanged');
     }
 
     public function submit()
@@ -174,6 +179,7 @@ class HealthChecks extends Component
             $this->resource->custom_healthcheck_found = $this->customHealthcheckFound;
             $this->resource->save();
             $this->dispatch('success', 'Health check updated.');
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -209,6 +215,7 @@ class HealthChecks extends Component
             } else {
                 $this->dispatch('success', 'Health check '.($this->healthCheckEnabled ? 'enabled' : 'disabled').'.');
             }
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

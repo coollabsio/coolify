@@ -28,18 +28,22 @@ class DeleteEnvironment extends Component
 
     public function delete()
     {
-        $this->validate([
-            'environment_id' => 'required|int',
-        ]);
-        $environment = Environment::ownedByCurrentTeam()->findOrFail($this->environment_id);
-        $this->authorize('delete', $environment);
+        try {
+            $this->validate([
+                'environment_id' => 'required|int',
+            ]);
+            $environment = Environment::ownedByCurrentTeam()->findOrFail($this->environment_id);
+            $this->authorize('delete', $environment);
 
-        if ($environment->isEmpty()) {
-            $environment->delete();
+            if ($environment->isEmpty()) {
+                $environment->delete();
 
-            return redirectRoute($this, 'project.show', ['project_uuid' => $this->parameters['project_uuid']]);
+                return redirectRoute($this, 'project.show', ['project_uuid' => $this->parameters['project_uuid']]);
+            }
+
+            return $this->dispatch('error', "<strong>Environment {$environment->name}</strong> has defined resources, please delete them first.");
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-
-        return $this->dispatch('error', "<strong>Environment {$environment->name}</strong> has defined resources, please delete them first.");
     }
 }
