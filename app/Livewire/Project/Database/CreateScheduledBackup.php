@@ -26,6 +26,12 @@ class CreateScheduledBackup extends Component
         try {
             $this->authorize('manageBackups', $this->database);
 
+            if (! $this->database->isBackupSolutionAvailable()) {
+                $this->dispatch('error', 'Scheduled backups are not supported for this database type.');
+
+                return;
+            }
+
             $this->validate();
 
             $isValid = validate_cron_expression($this->frequency);
@@ -51,6 +57,8 @@ class CreateScheduledBackup extends Component
                 $payload['databases_to_backup'] = $this->database->mysql_database;
             } elseif ($this->database->type() === 'standalone-mariadb') {
                 $payload['databases_to_backup'] = $this->database->mariadb_database;
+            } elseif ($this->database->type() === 'standalone-clickhouse') {
+                $payload['databases_to_backup'] = $this->database->clickhouse_db;
             }
 
             $databaseBackup = ScheduledDatabaseBackup::create($payload);

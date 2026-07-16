@@ -5,8 +5,10 @@ use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
+use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -15,7 +17,7 @@ use Illuminate\Support\Str;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -77,6 +79,56 @@ function backupHeaders(): array
 }
 
 describe('POST /api/v1/databases/{uuid}/backups', function () {
+    test('rejects backup configurations for unsupported database types', function () {
+        $database = StandaloneRedis::create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Redis DB',
+            'status' => 'running',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $response = $this->withHeaders(backupHeaders())
+            ->postJson("/api/v1/databases/{$database->uuid}/backups", [
+                'frequency' => 'daily',
+            ]);
+
+        $response->assertUnprocessable()
+            ->assertJson([
+                'message' => 'Scheduled backups are not supported for this database type.',
+            ]);
+
+        expect(ScheduledDatabaseBackup::count())->toBe(0);
+    });
+
+    test('defaults clickhouse backups to its configured database', function () {
+        $database = StandaloneClickhouse::create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'ClickHouse DB',
+            'clickhouse_admin_user' => 'default',
+            'clickhouse_admin_password' => 'password',
+            'clickhouse_db' => 'analytics',
+            'image' => 'clickhouse/clickhouse-server:25.11',
+            'status' => 'running',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $response = $this->withHeaders(backupHeaders())
+            ->postJson("/api/v1/databases/{$database->uuid}/backups", [
+                'frequency' => 'daily',
+            ]);
+
+        $response->assertCreated();
+
+        $backup = ScheduledDatabaseBackup::where('uuid', $response->json('uuid'))->firstOrFail();
+
+        expect($backup->databases_to_backup)->toBe('analytics')
+            ->and($backup->database_type)->toBe(StandaloneClickhouse::class);
+    });
+
     test('creates backup configuration with valid frequency', function () {
         $response = $this->withHeaders(backupHeaders())
             ->postJson("/api/v1/databases/{$this->database->uuid}/backups", [

@@ -490,7 +490,7 @@ class ServiceApplicationsController extends Controller
             ], 400);
         }
 
-        $lines = (int) ($request->query('lines', 100) ?: 100);
+        $lines = normalizeLogLines($request->query('lines'));
         $logs = getContainerLogs($server, $containerName, $lines);
 
         return response()->json([

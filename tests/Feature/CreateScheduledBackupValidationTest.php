@@ -7,8 +7,10 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -90,4 +92,56 @@ it('creates a service database backup without S3 and opens its configuration', f
 
     expect($backup->save_s3)->toBeFalsy()
         ->and($backup->s3_storage_id)->toBeNull();
+});
+
+it('creates a clickhouse backup for its configured database', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $database = StandaloneClickhouse::create([
+        'name' => 'clickhouse-scheduled-backup',
+        'clickhouse_admin_user' => 'default',
+        'clickhouse_admin_password' => 'password',
+        'clickhouse_db' => 'analytics',
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+
+    $component = Livewire::test(CreateScheduledBackup::class, ['database' => $database])
+        ->set('frequency', 'daily')
+        ->call('submit');
+
+    $backup = ScheduledDatabaseBackup::firstOrFail();
+
+    $component->assertRedirectToRoute('project.database.backup.execution', [
+        'project_uuid' => $project->uuid,
+        'environment_uuid' => $environment->uuid,
+        'database_uuid' => $database->uuid,
+        'backup_uuid' => $backup->uuid,
+    ]);
+
+    expect($backup->database_type)->toBe(StandaloneClickhouse::class)
+        ->and($backup->databases_to_backup)->toBe('analytics');
+});
+
+it('rejects scheduled backups for unsupported database types', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $database = StandaloneRedis::create([
+        'name' => 'redis-without-backups',
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+
+    Livewire::test(CreateScheduledBackup::class, ['database' => $database])
+        ->set('frequency', 'daily')
+        ->call('submit')
+        ->assertDispatched('error');
+
+    expect(ScheduledDatabaseBackup::count())->toBe(0);
 });

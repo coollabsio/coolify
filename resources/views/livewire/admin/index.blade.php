@@ -22,7 +22,7 @@
                             <div class="box-title">{{ $user->name }}</div>
                             <div class="box-description">{{ $user->email }}</div>
                             <div class="box-description">Active:
-                                {{ $user->teams()->whereRelation('subscription', 'stripe_subscription_id', '!=', null)->exists() ? 'Yes' : 'No' }}
+                                {{ $user->teams()->whereRelation('subscription', 'stripe_invoice_paid', true)->exists() ? 'Yes' : 'No' }}
                             </div>
                         </div>
                     </div>

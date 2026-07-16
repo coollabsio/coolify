@@ -8,6 +8,7 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -17,6 +18,7 @@ use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
 use App\Rules\SafeWebhookUrl;
+use App\Support\ClickhouseBackupCommand;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -39,7 +41,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public Server $server;
 
-    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|ServiceDatabase $database;
+    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneClickhouse|ServiceDatabase $database;
 
     public ?string $container_name = null;
 
@@ -271,6 +273,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $databasesToBackup = [$this->database->mysql_database];
                 } elseif (str($databaseType)->contains('mariadb')) {
                     $databasesToBackup = [$this->database->mariadb_database];
+                } elseif ($this->database instanceof StandaloneClickhouse) {
+                    $databasesToBackup = [$this->database->clickhouse_db];
                 } else {
                     return;
                 }
@@ -291,6 +295,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $databasesToBackup = explode(',', $databasesToBackup);
                     $databasesToBackup = array_map('trim', $databasesToBackup);
                 } elseif (str($databaseType)->contains('mariadb')) {
+                    // Format: db1,db2,db3
+                    $databasesToBackup = explode(',', $databasesToBackup);
+                    $databasesToBackup = array_map('trim', $databasesToBackup);
+                } elseif ($this->database instanceof StandaloneClickhouse) {
                     // Format: db1,db2,db3
                     $databasesToBackup = explode(',', $databasesToBackup);
                     $databasesToBackup = array_map('trim', $databasesToBackup);
@@ -386,6 +394,17 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'local_storage_deleted' => false,
                         ]);
                         $this->backup_standalone_mariadb($database);
+                    } elseif ($this->database instanceof StandaloneClickhouse) {
+                        $this->backup_file = '/clickhouse-backup-'.Carbon::now()->timestamp."-{$this->backup_log_uuid}.zip";
+                        $this->backup_location = $this->backup_dir.$this->backup_file;
+                        $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                            'uuid' => $this->backup_log_uuid,
+                            'database_name' => $database,
+                            'filename' => $this->backup_location,
+                            'scheduled_database_backup_id' => $this->backup->id,
+                            'local_storage_deleted' => false,
+                        ]);
+                        $this->backup_standalone_clickhouse($database);
                     } else {
                         throw new \Exception('Unsupported database type');
                     }
@@ -400,6 +419,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 } catch (Throwable $e) {
                     // Local backup failed
+                    if ($this->database instanceof StandaloneClickhouse) {
+                        deleteBackupsLocally($this->backup_location, $this->server);
+                    }
                     if ($this->backup_log) {
                         $this->backup_log->update([
                             'status' => 'failed',
@@ -639,6 +661,32 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;
+        }
+    }
+
+    private function backup_standalone_clickhouse(string $database): void
+    {
+        $archiveName = ltrim($this->backup_file, '/');
+
+        try {
+            $commands = ClickhouseBackupCommand::make(
+                containerName: $this->container_name,
+                database: $database,
+                archiveName: $archiveName,
+                backupDirectory: $this->backup_dir,
+            );
+
+            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = trim($this->backup_output);
+            if ($this->backup_output === '') {
+                $this->backup_output = null;
+            }
+        } catch (Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
+        } finally {
+            $cleanupCommand = ClickhouseBackupCommand::cleanup($this->container_name, $archiveName);
+            instant_remote_process([$cleanupCommand], $this->server, false, false, null, disableMultiplexing: true);
         }
     }
 
