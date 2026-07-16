@@ -6,14 +6,16 @@ use App\Models\CloudProviderToken;
 use App\Models\Server;
 use App\Models\Team;
 use App\Notifications\Server\HetznerDeletionFailed;
+use App\Notifications\Server\OpenstackDeletionFailed;
 use App\Services\HetznerService;
+use App\Services\OpenStackService;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class DeleteServer
 {
     use AsAction;
 
-    public function handle(int $serverId, bool $deleteFromHetzner = false, ?int $hetznerServerId = null, ?int $cloudProviderTokenId = null, ?int $teamId = null)
+    public function handle(int $serverId, bool $deleteFromHetzner = false, ?int $hetznerServerId = null, ?int $cloudProviderTokenId = null, ?int $teamId = null, bool $deleteFromOpenstack = false, ?string $openstackServerId = null, ?string $openstackFloatingIpId = null)
     {
         $server = Server::withTrashed()->find($serverId);
 
@@ -21,6 +23,16 @@ class DeleteServer
         if ($deleteFromHetzner && ($hetznerServerId || ($server && $server->hetzner_server_id))) {
             $this->deleteFromHetznerById(
                 $hetznerServerId ?? $server->hetzner_server_id,
+                $cloudProviderTokenId ?? $server->cloud_provider_token_id,
+                $teamId ?? $server->team_id
+            );
+        }
+
+        // Delete from OpenStack even if server is already gone from Coolify
+        if ($deleteFromOpenstack && ($openstackServerId || ($server && $server->openstack_server_id))) {
+            $this->deleteFromOpenstackById(
+                $openstackServerId ?? $server->openstack_server_id,
+                $openstackFloatingIpId ?? $server?->openstack_floating_ip_id,
                 $cloudProviderTokenId ?? $server->cloud_provider_token_id,
                 $teamId ?? $server->team_id
             );
@@ -98,6 +110,68 @@ class DeleteServer
             // Notify the team about the failure
             $team = Team::find($teamId);
             $team?->notify(new HetznerDeletionFailed($hetznerServerId, $teamId, $e->getMessage()));
+        }
+    }
+
+    private function deleteFromOpenstackById(string $openstackServerId, ?string $openstackFloatingIpId, ?int $cloudProviderTokenId, int $teamId): void
+    {
+        try {
+            $token = null;
+
+            if ($cloudProviderTokenId) {
+                $token = CloudProviderToken::find($cloudProviderTokenId);
+            }
+
+            if (! $token) {
+                $token = CloudProviderToken::where('team_id', $teamId)
+                    ->where('provider', 'openstack')
+                    ->first();
+            }
+
+            if (! $token) {
+                ray('No OpenStack credential found for team, skipping OpenStack deletion', [
+                    'team_id' => $teamId,
+                    'openstack_server_id' => $openstackServerId,
+                ]);
+
+                return;
+            }
+
+            $openstackService = new OpenStackService($token->credentials());
+
+            // Release the floating IP first (best effort) so it is not left dangling.
+            if ($openstackFloatingIpId) {
+                try {
+                    $openstackService->releaseFloatingIp($openstackFloatingIpId);
+                } catch (\Throwable $e) {
+                    ray('Failed to release OpenStack floating IP', [
+                        'error' => $e->getMessage(),
+                        'floating_ip_id' => $openstackFloatingIpId,
+                    ]);
+                }
+            }
+
+            $openstackService->deleteServer($openstackServerId);
+
+            ray('Deleted server from OpenStack', [
+                'openstack_server_id' => $openstackServerId,
+                'team_id' => $teamId,
+            ]);
+        } catch (\Throwable $e) {
+            ray('Failed to delete server from OpenStack', [
+                'error' => $e->getMessage(),
+                'openstack_server_id' => $openstackServerId,
+                'team_id' => $teamId,
+            ]);
+
+            logger()->error('Failed to delete server from OpenStack', [
+                'error' => $e->getMessage(),
+                'openstack_server_id' => $openstackServerId,
+                'team_id' => $teamId,
+            ]);
+
+            $team = Team::find($teamId);
+            $team?->notify(new OpenstackDeletionFailed($openstackServerId, $teamId, $e->getMessage()));
         }
     }
 }

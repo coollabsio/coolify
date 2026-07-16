@@ -18,6 +18,14 @@
                     </span>
                     <span class="font-bold dark:text-white">{{ $savedToken->name }}</span>
                 </div>
+                @if ($savedToken->isOpenstack())
+                    <div class="text-sm dark:text-neutral-400">
+                        {{ $savedToken->maskedCredentials()['auth_url'] }}
+                        @if ($savedToken->maskedCredentials()['region'])
+                            · {{ $savedToken->maskedCredentials()['region'] }}
+                        @endif
+                    </div>
+                @endif
                 <div class="text-sm">Created: {{ $savedToken->created_at->diffForHumans() }}</div>
 
                 <div class="flex gap-2 pt-2">

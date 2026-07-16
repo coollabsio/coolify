@@ -40,7 +40,12 @@ RUN set -eux; \
     sed -i 's|http://nginx.org/packages|https://nginx.org/packages|g' /etc/apk/repositories; \
     grep -qxF "@nginx ${NGINX_REPOSITORY}" /etc/apk/repositories || echo "@nginx ${NGINX_REPOSITORY}" >> /etc/apk/repositories; \
     curl -fsSL https://nginx.org/keys/nginx_signing.rsa.pub -o /etc/apk/keys/nginx_signing.rsa.pub; \
-    apk add --no-cache --upgrade "nginx@nginx=${NGINX_VERSION}"; \
+    # Prefer the pinned nginx.org mainline build, but fall back to the nginx
+    # already provided by the base image when nginx.org has not published
+    # packages for this Alpine release yet (e.g. newer Alpine on the moving tag).
+    { apk add --no-cache --upgrade "nginx@nginx=${NGINX_VERSION}" \
+        || apk add --no-cache --upgrade nginx@nginx \
+        || apk add --no-cache nginx; }; \
     rm -f /etc/nginx/nginx.conf /etc/nginx/conf.d/default.conf; \
     nginx -v
 
@@ -65,7 +70,12 @@ RUN apk add --no-cache \
     vim
 
 # Install PHP extensions
-RUN install-php-extensions sockets
+# Retry to tolerate transient extraction I/O errors seen on some Docker Desktop
+# VMs; the sockets extension is not required to serve the dev app.
+RUN install-php-extensions sockets \
+    || install-php-extensions sockets \
+    || install-php-extensions sockets \
+    || echo "WARNING: skipping ext-sockets (install-php-extensions failed)"
 
 # Configure shell aliases
 RUN echo "alias ll='ls -al'" >> /etc/profile && \

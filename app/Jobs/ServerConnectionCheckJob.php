@@ -7,6 +7,7 @@ use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
 use App\Services\ConfigurationRepository;
 use App\Services\HetznerService;
+use App\Services\OpenStackService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -65,6 +66,11 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             // Check Hetzner server status if applicable
             if ($this->server->hetzner_server_id && $this->server->cloudProviderToken) {
                 $this->checkHetznerStatus();
+            }
+
+            // Check OpenStack server status if applicable
+            if ($this->server->openstack_server_id && $this->server->cloudProviderToken) {
+                $this->checkOpenstackStatus();
             }
 
             // Temporarily disable mux if requested
@@ -184,6 +190,29 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
+    }
+
+    private function checkOpenstackStatus(): void
+    {
+        $status = null;
+
+        try {
+            $openstackService = new OpenStackService($this->server->cloudProviderToken->credentials());
+            $serverData = $openstackService->getServer($this->server->openstack_server_id);
+            $status = $serverData['status'] ?? null;
+        } catch (\Throwable) {
+            // Silently ignore — instance may have been deleted from OpenStack.
+        }
+
+        if ($this->server->openstack_server_status !== $status) {
+            $this->server->update(['openstack_server_status' => $status]);
+            $this->server->openstack_server_status = $status;
+            // OpenStack reports SHUTOFF for powered-off instances.
+            if ($status === 'SHUTOFF') {
+                ray('OpenStack instance is powered off, marking as unreachable');
+                throw new \Exception('Server is powered off');
+            }
+        }
     }
 
     private function checkConnection(): bool

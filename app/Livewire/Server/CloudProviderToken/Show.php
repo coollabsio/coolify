@@ -34,10 +34,15 @@ class Show extends Component
         ];
     }
 
+    public function serverProvider(): string
+    {
+        return $this->server->openstack_server_id ? 'openstack' : 'hetzner';
+    }
+
     public function loadTokens()
     {
         $this->cloudProviderTokens = CloudProviderToken::ownedByCurrentTeam()
-            ->where('provider', 'hetzner')
+            ->where('provider', $this->serverProvider())
             ->get();
     }
 
@@ -67,7 +72,7 @@ class Show extends Component
 
             $this->server->cloudProviderToken()->associate($ownedToken);
             $this->server->save();
-            $this->dispatch('success', 'Hetzner token updated successfully.');
+            $this->dispatch('success', 'Cloud provider token updated successfully.');
             $this->dispatch('refreshServerShow');
         } catch (\Exception $e) {
             $this->server->refresh();
@@ -77,6 +82,25 @@ class Show extends Component
 
     private function validateTokenForServer(CloudProviderToken $token): array
     {
+        if ($token->isOpenstack()) {
+            try {
+                $service = new \App\Services\OpenStackService($token->credentials());
+
+                if ($this->server->openstack_server_id) {
+                    $service->getServer($this->server->openstack_server_id);
+                } else {
+                    $service->authenticate();
+                }
+
+                return ['valid' => true];
+            } catch (\Throwable $e) {
+                return [
+                    'valid' => false,
+                    'error' => 'This credential cannot access this instance. It may belong to a different OpenStack project.',
+                ];
+            }
+        }
+
         try {
             // First, validate the token itself
             $response = \Illuminate\Support\Facades\Http::withHeaders([
@@ -118,7 +142,18 @@ class Show extends Component
         try {
             $token = $this->server->cloudProviderToken;
             if (! $token) {
-                $this->dispatch('error', 'No Hetzner token is associated with this server.');
+                $this->dispatch('error', 'No cloud provider token is associated with this server.');
+
+                return;
+            }
+
+            if ($token->isOpenstack()) {
+                try {
+                    (new \App\Services\OpenStackService($token->credentials()))->authenticate();
+                    $this->dispatch('success', 'OpenStack credential is valid and working.');
+                } catch (\Throwable $e) {
+                    $this->dispatch('error', 'OpenStack credential is invalid or has insufficient permissions.');
+                }
 
                 return;
             }

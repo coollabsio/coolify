@@ -30,6 +30,13 @@ class CloudProviderTokensController extends Controller
     private function validateProviderToken(string $provider, string $token): array
     {
         try {
+            if ($provider === 'openstack') {
+                $credentials = json_decode($token, true) ?: [];
+                (new \App\Services\OpenStackService($credentials))->authenticate();
+
+                return ['valid' => true, 'error' => null];
+            }
+
             $response = match ($provider) {
                 'hetzner' => Http::withHeaders([
                     'Authorization' => 'Bearer '.$token,
@@ -82,7 +89,7 @@ class CloudProviderTokensController extends Controller
                                 properties: [
                                     'uuid' => ['type' => 'string'],
                                     'name' => ['type' => 'string'],
-                                    'provider' => ['type' => 'string', 'enum' => ['hetzner', 'digitalocean']],
+                                    'provider' => ['type' => 'string', 'enum' => ['hetzner', 'digitalocean', 'openstack']],
                                     'team_id' => ['type' => 'integer'],
                                     'servers_count' => ['type' => 'integer'],
                                     'created_at' => ['type' => 'string'],
@@ -197,11 +204,15 @@ class CloudProviderTokensController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['provider', 'token', 'name'],
+                    required: ['provider', 'name'],
                     properties: [
-                        'provider' => ['type' => 'string', 'enum' => ['hetzner', 'digitalocean'], 'example' => 'hetzner', 'description' => 'The cloud provider.'],
-                        'token' => ['type' => 'string', 'example' => 'your-api-token-here', 'description' => 'The API token for the cloud provider.'],
+                        'provider' => ['type' => 'string', 'enum' => ['hetzner', 'digitalocean', 'openstack'], 'example' => 'hetzner', 'description' => 'The cloud provider.'],
+                        'token' => ['type' => 'string', 'example' => 'your-api-token-here', 'description' => 'The API token (required for hetzner/digitalocean).'],
                         'name' => ['type' => 'string', 'example' => 'My Hetzner Token', 'description' => 'A friendly name for the token.'],
+                        'auth_url' => ['type' => 'string', 'example' => 'https://identity.example.cloud:443/v3', 'description' => 'OpenStack Keystone auth URL (required for openstack).'],
+                        'application_credential_id' => ['type' => 'string', 'description' => 'OpenStack application credential ID (required for openstack).'],
+                        'application_credential_secret' => ['type' => 'string', 'description' => 'OpenStack application credential secret (required for openstack).'],
+                        'region' => ['type' => 'string', 'description' => 'OpenStack region (optional).'],
                     ],
                 ),
             ),
@@ -237,7 +248,11 @@ class CloudProviderTokensController extends Controller
     )]
     public function store(Request $request)
     {
-        $allowedFields = ['provider', 'token', 'name'];
+        $isOpenstack = ($request->json('provider') === 'openstack');
+
+        $allowedFields = $isOpenstack
+            ? ['provider', 'name', 'auth_url', 'application_credential_id', 'application_credential_secret', 'region']
+            : ['provider', 'token', 'name'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -252,11 +267,22 @@ class CloudProviderTokensController extends Controller
         // Use request body only (excludes any route parameters)
         $body = $request->json()->all();
 
-        $validator = customApiValidator($body, [
-            'provider' => 'required|string|in:hetzner,digitalocean',
-            'token' => 'required|string',
-            'name' => 'required|string|max:255',
-        ]);
+        $validationRules = $isOpenstack
+            ? [
+                'provider' => 'required|string|in:hetzner,digitalocean,openstack',
+                'name' => 'required|string|max:255',
+                'auth_url' => 'required|url',
+                'application_credential_id' => 'required|string',
+                'application_credential_secret' => 'required|string',
+                'region' => 'nullable|string',
+            ]
+            : [
+                'provider' => 'required|string|in:hetzner,digitalocean,openstack',
+                'token' => 'required|string',
+                'name' => 'required|string|max:255',
+            ];
+
+        $validator = customApiValidator($body, $validationRules);
 
         $extraFields = array_diff(array_keys($body), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
@@ -273,8 +299,18 @@ class CloudProviderTokensController extends Controller
             ], 422);
         }
 
+        // For OpenStack the encrypted token column stores a JSON credential blob.
+        $tokenValue = $isOpenstack
+            ? json_encode([
+                'auth_url' => rtrim($body['auth_url'], '/'),
+                'application_credential_id' => $body['application_credential_id'],
+                'application_credential_secret' => $body['application_credential_secret'],
+                'region' => $body['region'] ?? null,
+            ])
+            : $body['token'];
+
         // Validate token with the provider's API
-        $validation = $this->validateProviderToken($body['provider'], $body['token']);
+        $validation = $this->validateProviderToken($body['provider'], $tokenValue);
 
         if (! $validation['valid']) {
             return response()->json(['message' => $validation['error']], 400);
@@ -283,7 +319,7 @@ class CloudProviderTokensController extends Controller
         $cloudProviderToken = CloudProviderToken::create([
             'team_id' => $teamId,
             'provider' => $body['provider'],
-            'token' => $body['token'],
+            'token' => $tokenValue,
             'name' => $body['name'],
         ]);
 

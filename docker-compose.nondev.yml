@@ -1,0 +1,14 @@
+# Opt-in override that runs the local dev stack against .env.production instead
+# of .env, so the app runs in non-"local" mode (isDev() === false) and remote
+# deployments use the correct /data/coolify/... paths.
+#
+# It swaps only the env file the container reads; .env stays your dev config.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.nondev.yml up -d
+#
+# Drop this -f to return to normal dev mode.
+services:
+  coolify:
+    volumes:
+      - ./.env.production:/var/www/html/.env:ro

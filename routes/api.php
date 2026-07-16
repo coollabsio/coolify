@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\DatabasesController;
 use App\Http\Controllers\Api\DeployController;
 use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\HetznerController;
+use App\Http\Controllers\Api\OpenstackController;
 use App\Http\Controllers\Api\OtherController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ResourcesController;
@@ -97,6 +98,13 @@ Route::group([
     Route::get('/hetzner/images', [HetznerController::class, 'images'])->middleware(['api.ability:read']);
     Route::get('/hetzner/ssh-keys', [HetznerController::class, 'sshKeys'])->middleware(['api.ability:read']);
     Route::post('/servers/hetzner', [HetznerController::class, 'createServer'])->middleware(['api.ability:write']);
+
+    Route::get('/openstack/flavors', [OpenstackController::class, 'flavors'])->middleware(['api.ability:read']);
+    Route::get('/openstack/images', [OpenstackController::class, 'images'])->middleware(['api.ability:read']);
+    Route::get('/openstack/networks', [OpenstackController::class, 'networks'])->middleware(['api.ability:read']);
+    Route::get('/openstack/availability-zones', [OpenstackController::class, 'availabilityZones'])->middleware(['api.ability:read']);
+    Route::get('/openstack/keypairs', [OpenstackController::class, 'keypairs'])->middleware(['api.ability:read']);
+    Route::post('/servers/openstack', [OpenstackController::class, 'createServer'])->middleware(['api.ability:write']);
 
     Route::get('/resources', [ResourcesController::class, 'resources'])->middleware(['api.ability:read']);
 

@@ -15,6 +15,8 @@ class Create extends Component
 
     public bool $has_hetzner_tokens = false;
 
+    public bool $has_openstack_tokens = false;
+
     public function mount()
     {
         $this->private_keys = PrivateKey::ownedByCurrentTeamCached();
@@ -28,6 +30,10 @@ class Create extends Component
         // Check if user has Hetzner tokens
         $this->has_hetzner_tokens = CloudProviderToken::ownedByCurrentTeam()
             ->where('provider', 'hetzner')
+            ->exists();
+
+        $this->has_openstack_tokens = CloudProviderToken::ownedByCurrentTeam()
+            ->where('provider', 'openstack')
             ->exists();
     }
 

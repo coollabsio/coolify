@@ -43,6 +43,13 @@ class CloudProviderTokens extends Component
                 } else {
                     $this->dispatch('error', 'Hetzner token validation failed. Please check the token.');
                 }
+            } elseif ($token->provider === 'openstack') {
+                $isValid = $this->validateOpenstackToken($token->credentials());
+                if ($isValid) {
+                    $this->dispatch('success', 'OpenStack credentials are valid.');
+                } else {
+                    $this->dispatch('error', 'OpenStack credential validation failed. Please check the credentials.');
+                }
             } elseif ($token->provider === 'digitalocean') {
                 $isValid = $this->validateDigitalOceanToken($token->token);
                 if ($isValid) {
@@ -66,6 +73,17 @@ class CloudProviderTokens extends Component
                 ->get('https://api.hetzner.cloud/v1/servers?per_page=1');
 
             return $response->successful();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function validateOpenstackToken(array $credentials): bool
+    {
+        try {
+            (new \App\Services\OpenStackService($credentials))->authenticate();
+
+            return true;
         } catch (\Throwable $e) {
             return false;
         }

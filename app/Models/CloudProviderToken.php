@@ -41,4 +41,44 @@ class CloudProviderToken extends BaseModel
     {
         return $query->where('provider', $provider);
     }
+
+    public function isHetzner(): bool
+    {
+        return $this->provider === 'hetzner';
+    }
+
+    public function isOpenstack(): bool
+    {
+        return $this->provider === 'openstack';
+    }
+
+    /**
+     * For OpenStack the encrypted `token` column stores a JSON blob of
+     * credentials rather than a single bearer token.
+     *
+     * @return array{auth_url?: string, application_credential_id?: string, application_credential_secret?: string, region?: string|null}
+     */
+    public function credentials(): array
+    {
+        $decoded = json_decode((string) $this->token, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * Non-sensitive view of the stored credentials, safe to render in the UI.
+     * Only applicable to OpenStack tokens.
+     *
+     * @return array{auth_url: ?string, application_credential_id: ?string, region: ?string}
+     */
+    public function maskedCredentials(): array
+    {
+        $credentials = $this->credentials();
+
+        return [
+            'auth_url' => $credentials['auth_url'] ?? null,
+            'application_credential_id' => $credentials['application_credential_id'] ?? null,
+            'region' => $credentials['region'] ?? null,
+        ];
+    }
 }
