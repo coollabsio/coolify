@@ -454,14 +454,7 @@ class Select extends Component
     public function loadServers()
     {
         $this->servers = Server::isUsable()->get()->sortBy('name');
-        $this->buildServers = Server::ownedByCurrentTeam()
-            ->whereRelation('settings', 'is_reachable', true)
-            ->whereRelation('settings', 'is_usable', true)
-            ->whereRelation('settings', 'is_swarm_worker', false)
-            ->whereRelation('settings', 'is_build_server', true)
-            ->whereRelation('settings', 'force_disabled', false)
-            ->get()
-            ->sortBy('name');
+        $this->buildServers = Server::isUsableBuildServer()->get()->sortBy('name');
         $this->allServers = $this->servers->concat($this->buildServers);
         $this->onlyBuildServerAvailable = $this->servers->isEmpty() && $this->buildServers->isNotEmpty();
     }

@@ -546,22 +546,6 @@ function find_resource_destination_for_current_team(?string $uuid): StandaloneDo
     return $destination;
 }
 
-function find_resource_destination_for_current_team_by_id(?int $id): StandaloneDocker|SwarmDocker|null
-{
-    if (! $id || ! currentTeam()) {
-        return null;
-    }
-
-    $destination = StandaloneDocker::ownedByCurrentTeam()->find($id)
-        ?? SwarmDocker::ownedByCurrentTeam()->find($id);
-
-    if (! $destination?->server?->canHostResources()) {
-        return null;
-    }
-
-    return $destination;
-}
-
 function showBoarding(): bool
 {
     if (isDev()) {

@@ -736,7 +736,7 @@ class ServersController extends Controller
             ], 422);
         }
 
-        if ($request->boolean('is_build_server') && ! $server->isEmpty()) {
+        if ($request->boolean('is_build_server') && ! $server->isBuildServer() && ! $server->isEmpty()) {
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => ['is_build_server' => ['A server with existing resources cannot be configured as a build server.']],

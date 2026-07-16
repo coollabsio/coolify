@@ -10,11 +10,14 @@ use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
+use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Blade;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -118,8 +121,26 @@ test('resource selection keeps excluded build servers visible for explanation', 
 
     expect($component->servers->pluck('id'))->toContain($this->server->id)
         ->not->toContain($buildServer->id)
+        ->and(Server::isUsableBuildServer()->pluck('id'))->toContain($buildServer->id)
+        ->not->toContain($this->server->id)
         ->and($component->buildServers->pluck('id'))->toContain($buildServer->id)
         ->and($component->allServers->pluck('id'))->toContain($this->server->id, $buildServer->id);
+});
+
+test('resource selection does not show the empty server message when only build servers are available', function () {
+    $html = Blade::render(
+        file_get_contents(resource_path('views/livewire/project/new/select.blade.php')),
+        [
+            'current_step' => 'servers',
+            'onlyBuildServerAvailable' => true,
+            'servers' => collect(),
+            'buildServers' => collect(),
+        ],
+    );
+
+    expect($html)
+        ->toContain('Only build servers are available')
+        ->not->toContain('No validated & reachable servers found');
 });
 
 test('application API rejects build servers', function () {
@@ -172,15 +193,31 @@ test('service API rejects build servers', function () {
 
 test('server API rejects enabling build mode when resources exist', function () {
     createResourceHostingTestApplication($this);
+    $originalName = $this->server->name;
+
+    $this->withHeaders(resourceHostingApiHeaders($this->bearerToken))
+        ->patchJson('/api/v1/servers/'.$this->server->uuid, [
+            'is_build_server' => true,
+            'name' => 'should-not-be-saved',
+        ])
+        ->assertUnprocessable()
+        ->assertInvalid(['is_build_server']);
+
+    expect((bool) $this->server->settings->fresh()->is_build_server)->toBeFalse()
+        ->and($this->server->fresh()->name)->toBe($originalName);
+});
+
+test('server API allows keeping build mode enabled when resources exist', function () {
+    createResourceHostingTestApplication($this);
+    $this->server->settings()->update(['is_build_server' => true]);
 
     $this->withHeaders(resourceHostingApiHeaders($this->bearerToken))
         ->patchJson('/api/v1/servers/'.$this->server->uuid, [
             'is_build_server' => true,
         ])
-        ->assertUnprocessable()
-        ->assertInvalid(['is_build_server']);
+        ->assertCreated();
 
-    expect((bool) $this->server->settings->fresh()->is_build_server)->toBeFalse();
+    expect((bool) $this->server->settings->fresh()->is_build_server)->toBeTrue();
 });
 
 test('server API allows disabling build mode when resources exist', function () {
@@ -190,10 +227,12 @@ test('server API allows disabling build mode when resources exist', function () 
     $this->withHeaders(resourceHostingApiHeaders($this->bearerToken))
         ->patchJson('/api/v1/servers/'.$this->server->uuid, [
             'is_build_server' => false,
+            'name' => 'Deployment Server',
         ])
         ->assertCreated();
 
-    expect((bool) $this->server->settings->fresh()->is_build_server)->toBeFalse();
+    expect((bool) $this->server->settings->fresh()->is_build_server)->toBeFalse()
+        ->and($this->server->fresh()->name)->toBe('Deployment Server');
 });
 
 test('resource APIs still accept deployment servers', function () {
@@ -271,11 +310,78 @@ test('a manipulated project clone cannot target a build server', function () {
         'project_uuid' => $this->project->uuid,
         'environment_uuid' => $this->environment->uuid,
     ])
-        ->set('selectedDestination', $this->destination->id)
+        ->set('selectedDestination', $this->destination->uuid)
         ->set('newName', 'blocked-clone')
         ->call('clone', 'project');
 
     expect(Project::count())->toBe($projectCount);
+});
+
+test('project clone resolves overlapping destination ids by uuid', function () {
+    $this->actingAs($this->user);
+    createResourceHostingTestApplication($this);
+    $swarmDestination = SwarmDocker::create([
+        'server_id' => $this->server->id,
+        'name' => 'Swarm destination',
+        'network' => 'swarm-network',
+    ]);
+
+    expect($swarmDestination->id)->toBe($this->destination->id);
+
+    Livewire::test(CloneMe::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+    ])
+        ->set('selectedDestination', $swarmDestination->uuid)
+        ->set('newName', 'swarm-clone')
+        ->call('clone', 'project')
+        ->assertNotDispatched('error');
+
+    $clonedApplication = Project::where('name', 'swarm-clone')
+        ->firstOrFail()
+        ->environments()
+        ->where('name', $this->environment->name)
+        ->firstOrFail()
+        ->applications()
+        ->firstOrFail();
+
+    expect($clonedApplication->destination_id)->toBe($swarmDestination->id)
+        ->and($clonedApplication->destination_type)->toBe(SwarmDocker::class)
+        ->and($clonedApplication->destination->is($swarmDestination))->toBeTrue();
+});
+
+test('project clone assigns services to the selected server', function () {
+    $this->actingAs($this->user);
+    Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $targetServer = Server::factory()->create(['team_id' => $this->team->id]);
+    $targetServer->settings()->update(['is_build_server' => false]);
+    $targetDestination = StandaloneDocker::where('server_id', $targetServer->id)->firstOrFail();
+
+    Livewire::test(CloneMe::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+    ])
+        ->set('selectedDestination', $targetDestination->uuid)
+        ->set('newName', 'service-clone')
+        ->call('clone', 'project')
+        ->assertNotDispatched('error');
+
+    $clonedService = Project::where('name', 'service-clone')
+        ->firstOrFail()
+        ->environments()
+        ->where('name', $this->environment->name)
+        ->firstOrFail()
+        ->services()
+        ->firstOrFail();
+
+    expect($clonedService->server_id)->toBe($targetServer->id)
+        ->and($clonedService->destination_id)->toBe($targetDestination->id)
+        ->and($targetServer->fresh()->isEmpty())->toBeFalse();
 });
 
 test('a manipulated clone request cannot target a build server', function () {
@@ -290,10 +396,31 @@ test('a manipulated clone request cannot target a build server', function () {
     $buildDestination = StandaloneDocker::where('server_id', $buildServer->id)->firstOrFail();
 
     Livewire::test(ResourceOperations::class, ['resource' => $source])
-        ->call('cloneTo', $buildDestination->id)
+        ->call('cloneTo', $buildDestination->uuid)
         ->assertHasErrors(['destination_id']);
 
     expect(Application::count())->toBe(1);
+});
+
+test('resource clone resolves overlapping destination ids by uuid', function () {
+    $this->actingAs($this->user);
+    $source = createResourceHostingTestApplication($this);
+    $swarmDestination = SwarmDocker::create([
+        'server_id' => $this->server->id,
+        'name' => 'Swarm clone target',
+        'network' => 'swarm-clone-target',
+    ]);
+
+    expect($swarmDestination->id)->toBe($this->destination->id);
+
+    Livewire::test(ResourceOperations::class, ['resource' => $source])
+        ->call('cloneTo', $swarmDestination->uuid);
+
+    $clone = Application::whereKeyNot($source->id)->firstOrFail();
+
+    expect($clone->destination_id)->toBe($swarmDestination->id)
+        ->and($clone->destination_type)->toBe(SwarmDocker::class)
+        ->and($clone->destination->is($swarmDestination))->toBeTrue();
 });
 
 test('resource operations explains why build servers cannot be clone targets', function () {

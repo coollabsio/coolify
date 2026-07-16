@@ -11,7 +11,6 @@ use App\Models\Application;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\StandaloneClickhouse;
-use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
@@ -19,7 +18,6 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
-use App\Models\SwarmDocker;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -57,15 +55,12 @@ class ResourceOperations extends Component
         $this->cloneVolumeData = $value;
     }
 
-    public function cloneTo($destination_id)
+    public function cloneTo($destination_uuid)
     {
         try {
             $this->authorize('update', $this->resource);
 
-            $new_destination = StandaloneDocker::ownedByCurrentTeam()->find($destination_id);
-            if (! $new_destination) {
-                $new_destination = SwarmDocker::ownedByCurrentTeam()->find($destination_id);
-            }
+            $new_destination = find_resource_destination_for_current_team($destination_uuid);
             if (! $new_destination) {
                 return $this->addError('destination_id', 'Destination not found.');
             }
@@ -106,6 +101,7 @@ class ResourceOperations extends Component
                     'status' => 'exited',
                     'started_at' => null,
                     'destination_id' => $new_destination->id,
+                    'destination_type' => $new_destination->getMorphClass(),
                 ]);
                 $new_resource->save();
 

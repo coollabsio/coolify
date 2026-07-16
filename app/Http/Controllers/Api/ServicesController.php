@@ -507,7 +507,8 @@ class ServicesController extends Controller
                 if (in_array($oneClickServiceName, NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK)) {
                     data_set($servicePayload, 'connect_to_docker_network', true);
                 }
-                $service = Service::create($servicePayload);
+                $service = new Service($servicePayload);
+                $service->save();
                 $service->name = $request->name ?? "$oneClickServiceName-".$service->uuid;
                 $service->description = $request->description;
                 if ($request->has('is_container_label_escape_enabled')) {

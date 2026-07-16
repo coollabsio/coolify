@@ -53,13 +53,14 @@ class DockerCompose extends Component
             }
             $destination_class = $destination->getMorphClass();
 
-            $service = Service::create([
+            $service = new Service([
                 'docker_compose_raw' => $this->dockerComposeRaw,
                 'environment_id' => $environment->id,
                 'server_id' => $destination->server_id,
                 'destination_id' => $destination->id,
                 'destination_type' => $destination_class,
             ]);
+            $service->save();
 
             $variables = parseEnvFormatToArray($this->envFile);
             foreach ($variables as $key => $data) {

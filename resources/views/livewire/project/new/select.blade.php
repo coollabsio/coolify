@@ -446,7 +446,7 @@
                     </div>
                 </div>
             @empty
-                @if ($buildServers?->isEmpty())
+                @if ($buildServers?->isEmpty() && ! $onlyBuildServerAvailable)
                     <div>
                         <div>No validated & reachable servers found. <a class="underline dark:text-white"
                                 href="/servers" {{ wireNavigate() }}>
