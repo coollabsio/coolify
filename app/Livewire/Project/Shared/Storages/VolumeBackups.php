@@ -206,7 +206,7 @@ class VolumeBackups extends Component
     {
         $this->authorize('update', $this->resource);
 
-        if (! $password || ! verifyPasswordConfirmation($password, $this)) {
+        if (! verifyPasswordConfirmation($password, $this)) {
             return 'The provided password is incorrect.';
         }
 

@@ -1151,6 +1151,23 @@ it('deletes local archives before deleting a volume backup schedule', function (
         && str_contains($process->command, 'archive.tar.gz'));
 });
 
+it('deletes a volume backup schedule without a password when two-step confirmation is disabled', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    InstanceSettings::get()->update(['disable_two_step_confirmation' => true]);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+
+    Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
+        ->call('delete', '')
+        ->assertDispatched('success');
+
+    expect($backup->fresh())->toBeNull();
+});
+
 it('deletes S3 archives from the storage recorded on each execution', function () {
     $team = Team::factory()->create();
     signInForVolumeBackups($this, $team);
