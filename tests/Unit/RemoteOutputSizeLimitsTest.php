@@ -5,6 +5,7 @@ use App\Jobs\ScheduledTaskJob;
 use App\Livewire\Project\Shared\GetLogs;
 use App\Livewire\Server\Proxy\DynamicConfigurations;
 use App\Models\Application;
+use App\Models\Server;
 
 function remoteOutputSource(string $path): string
 {
@@ -75,6 +76,25 @@ it('bounds scheduled task output before storing or notifying', function () {
         ->and(implode("\n", $commandOutput))->toBe('hello')
         ->and($failureExitCode)->toBe(7)
         ->and(implode("\n", $failureOutput))->toBe('failure');
+});
+
+it('does not pass the scheduled task output wrapper through the sudo rewriter', function () {
+    $source = remoteOutputSource('app/Jobs/ScheduledTaskJob.php');
+    $reflection = new ReflectionClass(ScheduledTaskJob::class);
+    $method = $reflection->getMethod('boundedTaskCommand');
+    $command = $method->invoke($reflection->newInstanceWithoutConstructor(), 'sudo docker exec example true');
+    $server = Mockery::mock(Server::class)->makePartial();
+    $server->shouldReceive('getAttribute')->with('user')->andReturn('ubuntu');
+    $rewrittenCommand = parseCommandsByLineForSudo(collect([$command]), $server)[0];
+
+    exec('bash -n -c '.escapeshellarg($command), $output, $exitCode);
+    exec('bash -n -c '.escapeshellarg($rewrittenCommand).' 2>/dev/null', $rewrittenOutput, $rewrittenExitCode);
+
+    expect($source)
+        ->toContain("\$dockerCommand = \$this->server->isNonRoot() ? 'sudo docker' : 'docker'")
+        ->toContain('instant_remote_process([$exec], $this->server, throwError: true, no_sudo: true')
+        ->and($exitCode)->toBe(0)
+        ->and($rewrittenExitCode)->not->toBe(0);
 });
 
 it('bounds proxy configuration backfill before storing it', function () {

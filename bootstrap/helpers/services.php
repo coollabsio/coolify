@@ -167,11 +167,10 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
             $isDir = instant_remote_process(["test -d $fileLocation && echo OK || echo NOK"], $server);
 
             if ($isFile === 'OK') {
+                $fileVolume->is_directory = false;
+                $fileVolume->save();
                 if ($fileVolume->is_based_on_git) {
                     $fileVolume->loadStorageOnServer();
-                } else {
-                    $fileVolume->is_directory = false;
-                    $fileVolume->save();
                 }
             } elseif ($isDir === 'OK') {
                 // If its a directory & exists

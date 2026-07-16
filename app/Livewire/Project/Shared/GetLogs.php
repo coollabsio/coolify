@@ -192,17 +192,17 @@ class GetLogs extends Component
                     return;
                 }
 
-                $output = removeAnsiColors($output);
                 $remainingBytes = self::MAX_DISPLAY_SIZE_BYTES - $accumulatedBytes;
-                if (strlen($output) > $remainingBytes) {
-                    $logChunks[] = substr($output, 0, max(0, $remainingBytes));
+                $outputBytes = strlen($output);
+                if ($outputBytes > $remainingBytes) {
+                    $logChunks[] = removeAnsiColors(substr($output, 0, max(0, $remainingBytes)));
                     $truncated = true;
 
                     return;
                 }
 
-                $logChunks[] = $output;
-                $accumulatedBytes += strlen($output);
+                $logChunks[] = removeAnsiColors($output);
+                $accumulatedBytes += $outputBytes;
             });
             $newOutputs = implode('', $logChunks);
 
@@ -274,20 +274,19 @@ class GetLogs extends Component
                 return;
             }
 
-            $output = removeAnsiColors($output);
             $outputBytes = strlen($output);
 
             if ($accumulatedBytes + $outputBytes > self::MAX_DOWNLOAD_SIZE_BYTES) {
                 $remaining = self::MAX_DOWNLOAD_SIZE_BYTES - $accumulatedBytes;
                 if ($remaining > 0) {
-                    $logChunks[] = substr($output, 0, $remaining);
+                    $logChunks[] = removeAnsiColors(substr($output, 0, $remaining));
                 }
                 $truncated = true;
 
                 return;
             }
 
-            $logChunks[] = $output;
+            $logChunks[] = removeAnsiColors($output);
             $accumulatedBytes += $outputBytes;
         });
 

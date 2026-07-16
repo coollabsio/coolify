@@ -77,3 +77,14 @@ it('does not read regular bind-mounted file contents while loading service setti
         ->toContain('if ($fileVolume->is_based_on_git)')
         ->toContain('$fileVolume->loadStorageOnServer();');
 });
+
+it('marks git-based file volumes as files before refreshing their content', function () {
+    $helpers = file_get_contents(base_path('bootstrap/helpers/services.php'));
+    $fileBranch = str($helpers)
+        ->after("if (\$isFile === 'OK') {")
+        ->before("} elseif (\$isDir === 'OK') {");
+
+    expect($fileBranch->value())->toMatch(
+        '/\$fileVolume->is_directory = false;\s+\$fileVolume->save\(\);\s+if \(\$fileVolume->is_based_on_git\) \{/'
+    );
+});

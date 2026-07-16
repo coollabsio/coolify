@@ -150,11 +150,12 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             foreach ($this->containers as $containerName) {
                 if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
                     $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
-                    $execCommand = "docker exec {$containerName} {$cmd}";
+                    $dockerCommand = $this->server->isNonRoot() ? 'sudo docker' : 'docker';
+                    $execCommand = "{$dockerCommand} exec {$containerName} {$cmd}";
                     $exec = $this->boundedTaskCommand($execCommand);
                     // Disable SSH multiplexing to prevent race conditions when multiple tasks run concurrently
                     // See: https://github.com/coollabsio/coolify/issues/6736
-                    $this->task_output = instant_remote_process([$exec], $this->server, true, false, $this->timeout, disableMultiplexing: true);
+                    $this->task_output = instant_remote_process([$exec], $this->server, throwError: true, no_sudo: true, timeout: $this->timeout, disableMultiplexing: true);
                     $this->task_log->update([
                         'status' => 'success',
                         'message' => $this->task_output,
