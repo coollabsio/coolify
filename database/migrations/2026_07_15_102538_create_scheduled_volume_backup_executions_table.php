@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('uuid')->unique();
             $table->foreignId('scheduled_volume_backup_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('s3_storage_id')->nullable()->constrained()->nullOnDelete();
             $table->enum('status', ['success', 'failed', 'running'])->default('running');
             $table->longText('message')->nullable();
             $table->unsignedBigInteger('size')->default(0);

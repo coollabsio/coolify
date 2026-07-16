@@ -96,8 +96,8 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldQueue
 
     public static function cleanupS3Upload(ScheduledVolumeBackupExecution $execution): void
     {
-        $execution->loadMissing('scheduledVolumeBackup.s3');
-        $s3 = $execution->scheduledVolumeBackup?->s3;
+        $execution->loadMissing('s3');
+        $s3 = $execution->s3;
 
         if (! $s3 || blank($execution->filename)) {
             throw new \RuntimeException('The S3 storage or backup filename is unavailable for upload cleanup.');

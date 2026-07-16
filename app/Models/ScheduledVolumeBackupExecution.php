@@ -9,6 +9,7 @@ class ScheduledVolumeBackupExecution extends BaseModel
     protected $fillable = [
         'uuid',
         'scheduled_volume_backup_id',
+        's3_storage_id',
         'status',
         'message',
         'size',
@@ -39,5 +40,10 @@ class ScheduledVolumeBackupExecution extends BaseModel
     public function scheduledVolumeBackup(): BelongsTo
     {
         return $this->belongsTo(ScheduledVolumeBackup::class);
+    }
+
+    public function s3(): BelongsTo
+    {
+        return $this->belongsTo(S3Storage::class, 's3_storage_id');
     }
 }

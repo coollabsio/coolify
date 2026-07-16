@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\DeleteResourceJob;
 use App\Jobs\ScheduledJobManager;
 use App\Jobs\VolumeBackupJob;
 use App\Jobs\VolumeBackupRecoveryJob;
@@ -465,6 +466,11 @@ it('stores volume backup schedules and executions', function () {
             's3_storage_deleted',
             's3_uploaded',
         ]))->toBeTrue();
+});
+
+it('records the S3 storage used by each volume backup execution', function () {
+    expect(Schema::hasColumn('scheduled_volume_backup_executions', 's3_storage_id'))->toBeTrue()
+        ->and((new ScheduledVolumeBackupExecution)->s3())->not->toBeNull();
 });
 
 it('exposes actions to manage and run volume backups', function () {
@@ -998,6 +1004,7 @@ it('disables S3 volume backups when the storage is deleted', function () {
     ]);
     $execution = ScheduledVolumeBackupExecution::create([
         'scheduled_volume_backup_id' => $backup->id,
+        's3_storage_id' => $s3Storage->id,
         'status' => 'success',
         'filename' => '/data/coolify/backups/volumes/test/s3.tar.gz',
         's3_uploaded' => true,
@@ -1008,6 +1015,50 @@ it('disables S3 volume backups when the storage is deleted', function () {
 
     expect($backup->fresh()->save_s3)->toBeFalse()
         ->and($backup->fresh()->s3_storage_id)->toBeNull()
+        ->and($execution->fresh()->s3_storage_deleted)->toBeTrue()
+        ->and($execution->fresh()->s3_cleanup_pending)->toBeFalse();
+});
+
+it('marks historical executions deleted when their recorded S3 storage is removed', function () {
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $originalStorage = S3Storage::create([
+        'name' => 'Original storage',
+        'region' => 'us-east-1',
+        'key' => 'original-key',
+        'secret' => 'secret',
+        'bucket' => 'original-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+    ]);
+    $newStorage = S3Storage::create([
+        'name' => 'New storage',
+        'region' => 'us-east-1',
+        'key' => 'new-key',
+        'secret' => 'secret',
+        'bucket' => 'new-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+    ]);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        's3_storage_id' => $newStorage->id,
+        'frequency' => 'daily',
+        'save_s3' => true,
+    ]);
+    $execution = ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        's3_storage_id' => $originalStorage->id,
+        'status' => 'success',
+        'filename' => '/data/coolify/backups/volumes/test/historical.tar.gz',
+        's3_uploaded' => true,
+        's3_cleanup_pending' => true,
+    ]);
+
+    $originalStorage->delete();
+
+    expect($backup->fresh()->s3_storage_id)->toBe($newStorage->id)
+        ->and($execution->fresh()->s3_storage_id)->toBeNull()
         ->and($execution->fresh()->s3_storage_deleted)->toBeTrue()
         ->and($execution->fresh()->s3_cleanup_pending)->toBeFalse();
 });
@@ -1100,6 +1151,61 @@ it('deletes local archives before deleting a volume backup schedule', function (
         && str_contains($process->command, 'archive.tar.gz'));
 });
 
+it('deletes S3 archives from the storage recorded on each execution', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $originalStorage = S3Storage::create([
+        'name' => 'Original storage',
+        'region' => 'us-east-1',
+        'key' => 'original-key',
+        'secret' => 'secret',
+        'bucket' => 'original-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+    $newStorage = S3Storage::create([
+        'name' => 'New storage',
+        'region' => 'us-east-1',
+        'key' => 'new-key',
+        'secret' => 'secret',
+        'bucket' => 'new-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        's3_storage_id' => $newStorage->id,
+        'frequency' => 'daily',
+        'save_s3' => true,
+    ]);
+    ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        's3_storage_id' => $originalStorage->id,
+        'status' => 'success',
+        'filename' => '/data/coolify/backups/volumes/test/historical.tar.gz',
+        'local_storage_deleted' => true,
+        's3_uploaded' => true,
+    ]);
+    $disk = Mockery::mock();
+    $disk->shouldReceive('delete')
+        ->once()
+        ->with(['/data/coolify/backups/volumes/test/historical.tar.gz'])
+        ->andReturnTrue();
+    Storage::shouldReceive('build')
+        ->once()
+        ->with(Mockery::on(fn (array $config): bool => $config['key'] === 'original-key'))
+        ->andReturn($disk);
+
+    Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
+        ->call('delete', 'password')
+        ->assertDispatched('success');
+
+    expect($backup->fresh())->toBeNull();
+});
+
 it('refuses to delete a schedule while its backup is running', function () {
     Process::fake();
     $team = Team::factory()->create();
@@ -1154,6 +1260,31 @@ it('prevents a volume with tracked backup archives from being deleted', function
 
     expect(fn () => $volume->delete())->toThrow(RuntimeException::class, 'Delete this volume backup schedule');
     expect($volume->fresh())->not->toBeNull();
+});
+
+it('deletes disabled volume backup archives before deleting their application', function () {
+    Process::fake();
+    Queue::fake();
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'enabled' => false,
+    ]);
+    $execution = ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        'status' => 'success',
+        'filename' => '/data/coolify/backups/volumes/test/application-delete.tar.gz',
+    ]);
+    $application->delete();
+
+    (new DeleteResourceJob($application))->handle();
+
+    expect($backup->fresh())->toBeNull()
+        ->and($execution->fresh())->toBeNull();
+    Process::assertRan(fn ($process) => str_contains($process->command, 'rm -f')
+        && str_contains($process->command, 'application-delete.tar.gz'));
 });
 
 it('marks a running execution failed even when the job instance lost its execution state', function () {
@@ -1220,6 +1351,46 @@ it('archives a named volume on its server', function () {
         && str_contains($process->command, '> ')
         && str_contains($process->command, '.tar.gz')
         && ! str_contains($process->command, ':/backup'));
+});
+
+it('keeps the upload destination on the volume backup execution', function () {
+    config(['broadcasting.default' => 'null']);
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $s3Storage = S3Storage::create([
+        'name' => 'Execution destination',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'save_s3' => true,
+        's3_storage_id' => $s3Storage->id,
+    ]);
+    $sshDisk = Storage::fake('ssh-keys');
+    $disk = Mockery::mock();
+    $disk->shouldReceive('files')->zeroOrMoreTimes()->andReturn([]);
+    $disk->shouldReceive('delete')->zeroOrMoreTimes()->andReturnTrue();
+    Storage::shouldReceive('disk')->with('ssh-keys')->andReturn($sshDisk);
+    Storage::shouldReceive('build')->zeroOrMoreTimes()->andReturn($disk);
+    Process::fake([
+        '*du -b*' => '128',
+        '*' => '',
+    ]);
+
+    (new VolumeBackupJob($backup))->handle();
+
+    $execution = ScheduledVolumeBackupExecution::query()->sole();
+
+    expect($execution->s3_storage_id)->toBe($s3Storage->id)
+        ->and($execution->s3->is($s3Storage))->toBeTrue();
 });
 
 it('removes local volume backups older than the configured retention days', function () {
@@ -1293,6 +1464,70 @@ it('removes oldest local volume backups over the configured storage limit', func
         ->and($backup->executions()->where('status', 'success')->count())->toBe(1);
     Process::assertRan(fn ($process) => str_contains($process->command, 'rm -f')
         && str_contains($process->command, 'over-limit.tar.gz'));
+});
+
+it('removes retained S3 archives from the storage recorded on each execution', function () {
+    $team = Team::factory()->create();
+    [$application, $volume, $server] = createVolumeBackupApplication($team);
+    $originalStorage = S3Storage::create([
+        'name' => 'Original storage',
+        'region' => 'us-east-1',
+        'key' => 'original-key',
+        'secret' => 'secret',
+        'bucket' => 'original-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+    $newStorage = S3Storage::create([
+        'name' => 'New storage',
+        'region' => 'us-east-1',
+        'key' => 'new-key',
+        'secret' => 'secret',
+        'bucket' => 'new-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        's3_storage_id' => $newStorage->id,
+        'frequency' => 'daily',
+        'save_s3' => true,
+        'retention_amount_locally' => 0,
+        'retention_days_locally' => 0,
+        'retention_max_storage_locally' => 0,
+        'retention_amount_s3' => 1,
+        'retention_days_s3' => 0,
+        'retention_max_storage_s3' => 0,
+    ]);
+    $oldExecution = ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        's3_storage_id' => $originalStorage->id,
+        'status' => 'success',
+        'filename' => '/data/coolify/backups/volumes/test/old.tar.gz',
+        's3_uploaded' => true,
+        'created_at' => now()->subDay(),
+    ]);
+    ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        's3_storage_id' => $newStorage->id,
+        'status' => 'success',
+        'filename' => '/data/coolify/backups/volumes/test/new.tar.gz',
+        's3_uploaded' => true,
+    ]);
+    $disk = Mockery::mock();
+    $disk->shouldReceive('delete')->once()->with(['/data/coolify/backups/volumes/test/old.tar.gz'])->andReturnTrue();
+    Storage::shouldReceive('build')
+        ->once()
+        ->with(Mockery::on(fn (array $config): bool => $config['key'] === 'original-key'))
+        ->andReturn($disk);
+    $job = new VolumeBackupJob($backup);
+    $method = (new ReflectionClass($job))->getMethod('removeExpiredBackups');
+
+    $method->invoke($job, $server);
+
+    expect($oldExecution->fresh()->s3_storage_deleted)->toBeTrue();
 });
 
 it('keeps a successful backup successful when retention cleanup fails', function () {
@@ -1511,6 +1746,7 @@ it('cleans an interrupted S3 upload and coordinates recovery with the backup loc
     ]);
     $execution = ScheduledVolumeBackupExecution::create([
         'scheduled_volume_backup_id' => $backup->id,
+        's3_storage_id' => $s3Storage->id,
         'status' => 'failed',
         'filename' => '/data/coolify/backups/volumes/test/interrupted.tar.gz',
         's3_cleanup_pending' => true,
@@ -1522,6 +1758,55 @@ it('cleans an interrupted S3 upload and coordinates recovery with the backup loc
 
     expect($job->middleware()[0]->getLockKey($job))->toBe(VolumeBackupJob::lockKey($backup->id));
     $job->handle();
+
+    expect($execution->fresh()->s3_cleanup_pending)->toBeFalse()
+        ->and($execution->fresh()->s3_storage_deleted)->toBeTrue();
+});
+
+it('cleans an interrupted upload from the execution S3 storage after a schedule switch', function () {
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $originalStorage = S3Storage::create([
+        'name' => 'Original storage',
+        'region' => 'us-east-1',
+        'key' => 'original-key',
+        'secret' => 'secret',
+        'bucket' => 'original-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+    $newStorage = S3Storage::create([
+        'name' => 'New storage',
+        'region' => 'us-east-1',
+        'key' => 'new-key',
+        'secret' => 'secret',
+        'bucket' => 'new-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        's3_storage_id' => $newStorage->id,
+        'frequency' => 'daily',
+        'save_s3' => true,
+    ]);
+    $execution = ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        's3_storage_id' => $originalStorage->id,
+        'status' => 'failed',
+        'filename' => '/data/coolify/backups/volumes/test/interrupted.tar.gz',
+        's3_cleanup_pending' => true,
+    ]);
+    $disk = Mockery::mock();
+    $disk->shouldReceive('delete')->once()->andReturnTrue();
+    Storage::shouldReceive('build')
+        ->once()
+        ->with(Mockery::on(fn (array $config): bool => $config['key'] === 'original-key'))
+        ->andReturn($disk);
+
+    VolumeBackupRecoveryJob::cleanupS3Upload($execution);
 
     expect($execution->fresh()->s3_cleanup_pending)->toBeFalse()
         ->and($execution->fresh()->s3_storage_deleted)->toBeTrue();
@@ -1550,6 +1835,7 @@ it('keeps the S3 key tracked when interrupted upload cleanup must be retried', f
     ]);
     $execution = ScheduledVolumeBackupExecution::create([
         'scheduled_volume_backup_id' => $backup->id,
+        's3_storage_id' => $s3Storage->id,
         'status' => 'running',
         'filename' => '/data/coolify/backups/volumes/test/interrupted.tar.gz',
         's3_cleanup_pending' => true,

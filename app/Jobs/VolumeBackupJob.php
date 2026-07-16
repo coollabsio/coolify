@@ -63,7 +63,9 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             throw new \RuntimeException('The storage backup resource, team, or server no longer exists.');
         }
 
-        $this->execution = $this->backup->executions()->create();
+        $this->execution = $this->backup->executions()->create([
+            's3_storage_id' => $this->backup->save_s3 ? $this->backup->s3_storage_id : null,
+        ]);
         BackupCreated::dispatch($team->id);
 
         $backupDirectory = backup_dir().'/volumes/'.str($team->name)->slug().'-'.$team->id.'/'.$target->uuid;
@@ -352,6 +354,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
         if ($this->backup->save_s3 && $this->backup->s3) {
             $s3Executions = $this->backup->executions()
+                ->with('s3')
                 ->where('status', 'success')
                 ->where('s3_uploaded', true)
                 ->where('s3_storage_deleted', false)
@@ -363,11 +366,18 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->backup->retention_max_storage_s3,
             );
 
-            $filenames = $s3Executions->pluck('filename')->filter()->all();
-            if ($filenames !== []) {
-                deleteBackupsS3($filenames, $this->backup->s3);
-                $this->backup->executions()->whereKey($s3Executions->pluck('id')->all())
-                    ->update(['s3_storage_deleted' => true]);
+            foreach ($s3Executions->groupBy('s3_storage_id') as $executions) {
+                $s3 = $executions->first()->s3;
+                if (! $s3) {
+                    throw new \RuntimeException('The S3 storage used by an existing backup is unavailable.');
+                }
+
+                $filenames = $executions->pluck('filename')->filter()->all();
+                if ($filenames !== []) {
+                    deleteBackupsS3($filenames, $s3);
+                    $this->backup->executions()->whereKey($executions->pluck('id')->all())
+                        ->update(['s3_storage_deleted' => true]);
+                }
             }
         }
 

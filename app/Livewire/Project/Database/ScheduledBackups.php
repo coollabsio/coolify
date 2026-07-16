@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ServiceDatabase;
+use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -62,5 +63,12 @@ class ScheduledBackups extends Component
     {
         $this->database->refresh();
         $this->dispatch('refreshScheduledBackups');
+    }
+
+    public function render(): View
+    {
+        $this->database->loadMissing('scheduledBackups.s3');
+
+        return view('livewire.project.database.scheduled-backups');
     }
 }

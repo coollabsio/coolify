@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared\Storages;
 
+use App\Actions\Shared\DeleteScheduledVolumeBackup;
 use App\Jobs\VolumeBackupJob;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
@@ -9,7 +10,6 @@ use App\Models\S3Storage;
 use App\Models\ScheduledVolumeBackup;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Throwable;
@@ -214,57 +214,8 @@ class VolumeBackups extends Component
             return false;
         }
 
-        $lock = Cache::lock(VolumeBackupJob::lockKey($this->backup->id), $this->backup->timeout + 300);
-
-        if (! $lock->get()) {
-            $this->dispatch('error', 'Wait for the queued or running storage backup to finish before deleting this schedule.');
-
-            return false;
-        }
-
         try {
-            if ($this->backup->executions()
-                ->where(fn ($query) => $query
-                    ->where('status', 'running')
-                    ->orWhere('stop_recovery_pending', true)
-                    ->orWhere('s3_cleanup_pending', true))
-                ->exists()) {
-                $this->dispatch('error', 'Wait for the running storage backup and container recovery to finish before deleting this schedule.');
-
-                return false;
-            }
-
-            $localFilenames = $this->backup->executions()
-                ->where('local_storage_deleted', false)
-                ->pluck('filename')
-                ->filter()
-                ->all();
-            $server = $this->backup->server();
-
-            if ($localFilenames !== []) {
-                if (! $server) {
-                    throw new \RuntimeException('The server is unavailable, so local backup archives cannot be deleted.');
-                }
-
-                deleteBackupsLocally($localFilenames, $server, throwError: true);
-            }
-
-            $s3Filenames = $this->backup->executions()
-                ->where('s3_uploaded', true)
-                ->where('s3_storage_deleted', false)
-                ->pluck('filename')
-                ->filter()
-                ->all();
-
-            if ($s3Filenames !== []) {
-                if (! $this->backup->s3) {
-                    throw new \RuntimeException('The S3 storage is unavailable, so remote backup archives cannot be deleted.');
-                }
-
-                deleteBackupsS3($s3Filenames, $this->backup->s3);
-            }
-
-            $this->backup->delete();
+            DeleteScheduledVolumeBackup::run($this->backup);
             $this->backup = null;
             $this->dispatch('success', 'Storage backup schedule and archives deleted.');
             $this->redirectRoute('project.application.backup.index', [
@@ -278,8 +229,6 @@ class VolumeBackups extends Component
             $this->dispatch('error', 'Could not delete the backup archives: '.$exception->getMessage());
 
             return false;
-        } finally {
-            $lock->release();
         }
     }
 
