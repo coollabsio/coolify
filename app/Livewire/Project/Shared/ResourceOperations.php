@@ -37,6 +37,8 @@ class ResourceOperations extends Component
 
     public $servers;
 
+    public $buildServers;
+
     public bool $cloneVolumeData = false;
 
     public function mount()
@@ -45,7 +47,9 @@ class ResourceOperations extends Component
         $this->projectUuid = data_get($parameters, 'project_uuid');
         $this->environmentUuid = data_get($parameters, 'environment_uuid');
         $this->projects = Project::ownedByCurrentTeamCached();
-        $this->servers = currentTeam()->servers->filter(fn ($server) => ! $server->isBuildServer());
+        $servers = currentTeam()->servers()->get();
+        $this->servers = $servers->reject(fn ($server) => $server->isBuildServer());
+        $this->buildServers = $servers->filter(fn ($server) => $server->isBuildServer());
     }
 
     public function toggleVolumeCloning(bool $value)
@@ -67,6 +71,9 @@ class ResourceOperations extends Component
             }
             $uuid = new_public_id();
             $server = $new_destination->server;
+            if (! $server->canHostResources()) {
+                return $this->addError('destination_id', 'The selected server cannot host resources.');
+            }
 
             if ($this->resource->getMorphClass() === Application::class) {
                 $new_resource = clone_application($this->resource, $new_destination, ['uuid' => $uuid], $this->cloneVolumeData);

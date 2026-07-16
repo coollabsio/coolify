@@ -202,7 +202,7 @@ class Show extends Component
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->syncData();
-            if (! $this->server->isEmpty()) {
+            if (! $this->server->isBuildServer() && ! $this->server->isEmpty()) {
                 $this->isBuildServerLocked = true;
             }
             // Load saved Hetzner status and validation state
@@ -409,6 +409,12 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            if ($value === true && ! $this->server->isEmpty()) {
+                $this->isBuildServer = false;
+                $this->dispatch('error', 'A server with existing resources cannot be configured as a build server.');
+
+                return;
+            }
             if ($value === true && $this->isSentinelEnabled) {
                 $this->isSentinelEnabled = false;
                 $this->isMetricsEnabled = false;

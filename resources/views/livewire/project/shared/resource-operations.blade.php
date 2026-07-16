@@ -77,6 +77,9 @@
                             <template x-for="server in servers" :key="server.id">
                                 <option :value="server.id" x-text="`${server.name} (${server.ip})`"></option>
                             </template>
+                            @foreach ($buildServers as $buildServer)
+                                <option disabled>{{ $buildServer->name }} — Build server — cannot host resources</option>
+                            @endforeach
                         </select>
                     </div>
 

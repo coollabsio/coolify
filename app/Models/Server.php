@@ -514,6 +514,11 @@ class Server extends BaseModel
         return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_swarm_worker', false)->whereRelation('settings', 'is_build_server', false)->whereRelation('settings', 'force_disabled', false);
     }
 
+    public function canHostResources(): bool
+    {
+        return ! $this->isBuildServer();
+    }
+
     public function settings()
     {
         return $this->hasOne(ServerSetting::class);

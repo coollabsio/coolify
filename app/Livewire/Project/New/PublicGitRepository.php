@@ -290,7 +290,7 @@ class PublicGitRepository extends Component
             $project_uuid = $this->parameters['project_uuid'];
             $environment_uuid = $this->parameters['environment_uuid'];
 
-            $destination = find_destination_for_current_team($destination_uuid);
+            $destination = find_resource_destination_for_current_team($destination_uuid);
             if (! $destination) {
                 throw new \Exception('Destination not found.');
             }

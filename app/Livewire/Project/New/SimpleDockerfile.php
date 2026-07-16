@@ -38,7 +38,7 @@ CMD ["nginx", "-g", "daemon off;"]
             'dockerfile' => 'required',
         ]);
         $destination_uuid = $this->query['destination'] ?? null;
-        $destination = find_destination_for_current_team($destination_uuid);
+        $destination = find_resource_destination_for_current_team($destination_uuid);
         if (! $destination) {
             throw new \Exception('Destination not found.');
         }

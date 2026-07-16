@@ -24,6 +24,8 @@ class Select extends Component
 
     public Collection|null|Server $servers;
 
+    public ?Collection $buildServers = null;
+
     public bool $onlyBuildServerAvailable = false;
 
     public ?Collection $standaloneDockers;
@@ -380,7 +382,7 @@ class Select extends Component
 
             return;
         }
-        if (count($this->servers) === 1) {
+        if (count($this->servers) === 1 && $this->buildServers?->isEmpty()) {
             $server = $this->servers->first();
             if ($server instanceof Server) {
                 $this->setServer($server);
@@ -452,12 +454,15 @@ class Select extends Component
     public function loadServers()
     {
         $this->servers = Server::isUsable()->get()->sortBy('name');
-        $this->allServers = $this->servers;
-
-        if ($this->allServers && $this->allServers->isNotEmpty()) {
-            $this->onlyBuildServerAvailable = $this->allServers->every(function ($server) {
-                return $server->isBuildServer();
-            });
-        }
+        $this->buildServers = Server::ownedByCurrentTeam()
+            ->whereRelation('settings', 'is_reachable', true)
+            ->whereRelation('settings', 'is_usable', true)
+            ->whereRelation('settings', 'is_swarm_worker', false)
+            ->whereRelation('settings', 'is_build_server', true)
+            ->whereRelation('settings', 'force_disabled', false)
+            ->get()
+            ->sortBy('name');
+        $this->allServers = $this->servers->concat($this->buildServers);
+        $this->onlyBuildServerAvailable = $this->servers->isEmpty() && $this->buildServers->isNotEmpty();
     }
 }

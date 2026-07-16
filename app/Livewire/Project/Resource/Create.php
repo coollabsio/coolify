@@ -33,7 +33,7 @@ class Create extends Component
             return redirect()->route('dashboard');
         }
         if (isset($type) && isset($destination_uuid)) {
-            $destination = find_destination_for_current_team($destination_uuid);
+            $destination = find_resource_destination_for_current_team($destination_uuid);
             if (! $destination) {
                 return redirect()->route('dashboard');
             }

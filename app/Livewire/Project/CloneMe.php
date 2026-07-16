@@ -98,6 +98,10 @@ class CloneMe extends Component
                 'selectedDestination' => 'required',
                 'newName' => ValidationPatterns::nameRules(),
             ]);
+            $selectedDestination = find_resource_destination_for_current_team_by_id($this->selectedDestination);
+            if (! $selectedDestination) {
+                throw new \Exception('Destination not found.');
+            }
             if ($type === 'project') {
                 $foundProject = Project::where('name', $this->newName)->first();
                 if ($foundProject) {
@@ -130,7 +134,6 @@ class CloneMe extends Component
             $databases = $this->environment->databases();
             $services = $this->environment->services;
             foreach ($applications as $application) {
-                $selectedDestination = $this->servers->flatMap(fn ($server) => $server->destinations())->where('id', $this->selectedDestination)->first();
                 clone_application($application, $selectedDestination, [
                     'environment_id' => $environment->id,
                 ], $this->cloneVolumeData);
@@ -147,7 +150,7 @@ class CloneMe extends Component
                     'status' => 'exited',
                     'started_at' => null,
                     'environment_id' => $environment->id,
-                    'destination_id' => $this->selectedDestination,
+                    'destination_id' => $selectedDestination->id,
                 ]);
                 $newDatabase->save();
 
@@ -265,7 +268,7 @@ class CloneMe extends Component
                 ])->fill([
                     'uuid' => $uuid,
                     'environment_id' => $environment->id,
-                    'destination_id' => $this->selectedDestination,
+                    'destination_id' => $selectedDestination->id,
                 ]);
                 $newService->save();
 
