@@ -64,3 +64,16 @@ it('exposes the too-large flag via toArray for Livewire serialization', function
     expect($array)->toHaveKey('is_too_large');
     expect($array['is_too_large'])->toBeTrue();
 });
+
+it('does not read regular bind-mounted file contents while loading service settings', function () {
+    $helpers = file_get_contents(base_path('bootstrap/helpers/services.php'));
+    $filesystemSync = str($helpers)
+        ->after('function getFilesystemVolumesFromServer')
+        ->before('function updateCompose');
+
+    expect($filesystemSync->value())
+        ->not->toContain('instant_remote_process(["cat $fileLocation"]');
+    expect($filesystemSync->value())
+        ->toContain('if ($fileVolume->is_based_on_git)')
+        ->toContain('$fileVolume->loadStorageOnServer();');
+});

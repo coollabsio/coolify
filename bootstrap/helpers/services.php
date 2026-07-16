@@ -139,7 +139,7 @@ function replaceVariables(string $variable): Stringable
 function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Application $oneService, bool $isInit = false)
 {
     try {
-        if ($oneService->getMorphClass() === \App\Models\Application::class) {
+        if ($oneService->getMorphClass() === Application::class) {
             $workdir = $oneService->workdir();
             $server = $oneService->destination->server;
         } else {
@@ -167,13 +167,12 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
             $isDir = instant_remote_process(["test -d $fileLocation && echo OK || echo NOK"], $server);
 
             if ($isFile === 'OK') {
-                // If its a file & exists
-                $filesystemContent = instant_remote_process(["cat $fileLocation"], $server);
                 if ($fileVolume->is_based_on_git) {
-                    $fileVolume->content = $filesystemContent;
+                    $fileVolume->loadStorageOnServer();
+                } else {
+                    $fileVolume->is_directory = false;
+                    $fileVolume->save();
                 }
-                $fileVolume->is_directory = false;
-                $fileVolume->save();
             } elseif ($isDir === 'OK') {
                 // If its a directory & exists
                 $fileVolume->content = null;
@@ -204,7 +203,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 instant_remote_process(["mkdir -p $fileLocation"], $server);
             }
         }
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         return handleError($e);
     }
 }
@@ -214,7 +213,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         $name = data_get($resource, 'name');
         $dockerComposeRaw = data_get($resource, 'service.docker_compose_raw');
         if (! $dockerComposeRaw) {
-            throw new \Exception('No compose file found or not a valid YAML file.');
+            throw new Exception('No compose file found or not a valid YAML file.');
         }
         $dockerCompose = Yaml::parse($dockerComposeRaw);
 
@@ -396,7 +395,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
                 }
             }
         }
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         return handleError($e);
     }
 }
@@ -495,7 +494,7 @@ function applyServiceApplicationPrerequisites(Service $service): void
                 }
             }
         }
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         // Log error but don't throw - prerequisites are nice-to-have, not critical
         Log::error('Failed to apply service application prerequisites', [
             'service_id' => $service->id,
