@@ -38,9 +38,9 @@ return [
             'options' => [
                 'host' => env('PUSHER_BACKEND_HOST', 'coolify-realtime'),
                 'port' => env('PUSHER_BACKEND_PORT', 6001),
-                'scheme' => env('PUSHER_SCHEME', 'http'),
+                'scheme' => env('PUSHER_BACKEND_SCHEME', 'http'),
                 'encrypted' => true,
-                'useTLS' => env('PUSHER_SCHEME', 'https') === 'https',
+                'useTLS' => env('PUSHER_BACKEND_SCHEME', 'http') === 'https',
             ],
             'client_options' => [
                 // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
