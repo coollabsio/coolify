@@ -2377,13 +2377,6 @@ class ApplicationsController extends Controller
 
         $container = $containers->first();
 
-        $status = getContainerStatus($application->destination->server, $container['Names']);
-        if ($status !== 'running') {
-            return response()->json([
-                'message' => 'Application is not running.',
-            ], 400);
-        }
-
         $lines = normalizeLogLines($request->query('lines'));
         $showTimestamps = parseLogTimestampFlag($request->query('show_timestamps'));
         $logs = getContainerLogs($application->destination->server, $container['ID'], $lines, $showTimestamps);
