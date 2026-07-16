@@ -1,0 +1,41 @@
+# documentation: https://github.com/systempromptio/systemprompt-template/tree/main/docs
+# slogan: Self-hosted AI governance gateway for Claude, OpenAI, and Gemini with policy checks, audit trails, rate limits, and MCP orchestration on every tool call.
+# category: ai
+# tags: ai, llm, governance, gateway, claude, openai, gemini, mcp, anthropic, audit, self-hosted
+# logo: svgs/systemprompt.svg
+# port: 8080
+
+services:
+  gateway:
+    image: ghcr.io/systempromptio/systemprompt-template:latest
+    environment:
+      - SERVICE_FQDN_GATEWAY_8080
+      - DATABASE_URL=postgres://systemprompt:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/systemprompt
+      - JWT_SECRET=${SERVICE_PASSWORD_64_JWTSECRET}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - HOST=0.0.0.0
+      - PORT=8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      - POSTGRES_USER=systemprompt
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=systemprompt
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U systemprompt -d systemprompt"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
