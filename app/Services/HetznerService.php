@@ -177,6 +177,21 @@ class HetznerService
         return $this->requestPaginated('get', '/servers', 'servers');
     }
 
+    public function getPublicIpAddress(array $server, bool $enableIpv4 = true, bool $enableIpv6 = true): ?string
+    {
+        $ipv4 = data_get($server, 'public_net.ipv4.ip');
+        if ($enableIpv4 && filled($ipv4)) {
+            return $ipv4;
+        }
+
+        $ipv6 = data_get($server, 'public_net.ipv6.ip');
+        if ($enableIpv6 && filled($ipv6)) {
+            return $this->firstIpv6Address($ipv6);
+        }
+
+        return null;
+    }
+
     public function findServerByIp(string $ip): ?array
     {
         $servers = $this->getServers();
@@ -188,13 +203,98 @@ class HetznerService
                 return $server;
             }
 
-            // Check IPv6 (Hetzner returns the full /64 block)
-            $ipv6 = data_get($server, 'public_net.ipv6.ip');
-            if ($ipv6 && str_starts_with($ip, rtrim($ipv6, '/'))) {
+            if ($this->ipv6AddressBelongsToAllocation($ip, data_get($server, 'public_net.ipv6.ip'))) {
                 return $server;
             }
         }
 
         return null;
+    }
+
+    private function firstIpv6Address(?string $allocation): ?string
+    {
+        $parsedAllocation = $this->parseIpv6Allocation($allocation);
+        if ($parsedAllocation === null) {
+            return null;
+        }
+
+        $networkAddress = $this->maskIpv6Address(
+            $parsedAllocation['address'],
+            $parsedAllocation['prefix']
+        );
+
+        if ($parsedAllocation['prefix'] < 128) {
+            $networkAddress[15] = chr(ord($networkAddress[15]) | 1);
+        }
+
+        return inet_ntop($networkAddress) ?: null;
+    }
+
+    private function ipv6AddressBelongsToAllocation(string $ip, ?string $allocation): bool
+    {
+        $parsedAllocation = $this->parseIpv6Allocation($allocation);
+        if ($parsedAllocation === null || filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === false) {
+            return false;
+        }
+
+        $packedIp = inet_pton($ip);
+        if ($packedIp === false) {
+            return false;
+        }
+
+        return $this->maskIpv6Address($packedIp, $parsedAllocation['prefix'])
+            === $this->maskIpv6Address($parsedAllocation['address'], $parsedAllocation['prefix']);
+    }
+
+    /**
+     * @return array{address: string, prefix: int}|null
+     */
+    private function parseIpv6Allocation(?string $allocation): ?array
+    {
+        if (blank($allocation)) {
+            return null;
+        }
+
+        $parts = explode('/', $allocation);
+        if (count($parts) > 2) {
+            return null;
+        }
+
+        if (filter_var($parts[0], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === false) {
+            return null;
+        }
+
+        $packedAddress = inet_pton($parts[0]);
+        if ($packedAddress === false) {
+            return null;
+        }
+
+        $prefix = $parts[1] ?? '128';
+        if (! ctype_digit($prefix) || (int) $prefix > 128) {
+            return null;
+        }
+
+        return [
+            'address' => $packedAddress,
+            'prefix' => (int) $prefix,
+        ];
+    }
+
+    private function maskIpv6Address(string $packedAddress, int $prefix): string
+    {
+        $networkAddress = '';
+
+        for ($byteIndex = 0; $byteIndex < 16; $byteIndex++) {
+            $remainingPrefixBits = $prefix - ($byteIndex * 8);
+            $mask = match (true) {
+                $remainingPrefixBits >= 8 => 0xFF,
+                $remainingPrefixBits <= 0 => 0,
+                default => (0xFF << (8 - $remainingPrefixBits)) & 0xFF,
+            };
+
+            $networkAddress .= chr(ord($packedAddress[$byteIndex]) & $mask);
+        }
+
+        return $networkAddress;
     }
 }

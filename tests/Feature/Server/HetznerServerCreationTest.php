@@ -3,6 +3,7 @@
 use App\Livewire\Server\New\ByHetzner;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
+use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -315,5 +316,42 @@ describe('Hetzner data loading', function () {
             ->assertHasErrors(['enable_ipv4', 'enable_ipv6']);
 
         Http::assertNothingSent();
+    });
+
+    test('stores the first host from the Hetzner IPv6 allocation', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/ssh_keys' => Http::response([
+                'ssh_key' => ['id' => 123],
+            ], 201),
+            'https://api.hetzner.cloud/v1/ssh_keys*' => Http::response([
+                'ssh_keys' => [],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+            'https://api.hetzner.cloud/v1/servers' => Http::response([
+                'server' => [
+                    'id' => 456,
+                    'status' => 'running',
+                    'public_net' => [
+                        'ipv4' => ['ip' => null],
+                        'ipv6' => ['ip' => '2a01:4f8:c17:4c00::/64'],
+                    ],
+                ],
+            ], 201),
+        ]);
+
+        Livewire::test(ByHetzner::class)
+            ->set('current_step', 2)
+            ->set('selected_token_id', $this->hetznerToken->id)
+            ->set('server_name', 'ipv6-server')
+            ->set('selected_location', 'nbg1')
+            ->set('selected_server_type', 'cx11')
+            ->set('selected_image', 15512617)
+            ->set('private_key_id', $this->privateKey->id)
+            ->set('enable_ipv4', false)
+            ->set('enable_ipv6', true)
+            ->call('submit')
+            ->assertRedirect();
+
+        expect(Server::query()->sole()->ip)->toBe('2a01:4f8:c17:4c00::1');
     });
 });

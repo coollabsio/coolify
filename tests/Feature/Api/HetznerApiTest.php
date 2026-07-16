@@ -646,7 +646,7 @@ describe('POST /api/v1/servers/hetzner', function () {
                     'id' => 456,
                     'public_net' => [
                         'ipv4' => ['ip' => null],
-                        'ipv6' => ['ip' => '2001:db8::1'],
+                        'ipv6' => ['ip' => '2001:db8::/64'],
                     ],
                 ],
             ], 201),

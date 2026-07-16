@@ -709,13 +709,11 @@ class ByHetzner extends Component
             // Create server on Hetzner
             $hetznerServer = $this->createHetznerServer($hetznerService);
 
-            // Determine IP address to use (prefer IPv4, fallback to IPv6)
-            $ipAddress = null;
-            if ($this->enable_ipv4 && isset($hetznerServer['public_net']['ipv4']['ip'])) {
-                $ipAddress = $hetznerServer['public_net']['ipv4']['ip'];
-            } elseif ($this->enable_ipv6 && isset($hetznerServer['public_net']['ipv6']['ip'])) {
-                $ipAddress = $hetznerServer['public_net']['ipv6']['ip'];
-            }
+            $ipAddress = $hetznerService->getPublicIpAddress(
+                $hetznerServer,
+                $this->enable_ipv4,
+                $this->enable_ipv6
+            );
 
             // Create server in Coolify database immediately so the Hetzner
             // server is always tracked, even when no IP is assigned yet —

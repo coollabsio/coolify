@@ -384,7 +384,7 @@ class Server extends BaseModel
         $hetznerService = new HetznerService($this->cloudProviderToken->token);
         $server = $hetznerService->getServer($this->hetzner_server_id);
         $status = $server['status'] ?? null;
-        $assignedIp = data_get($server, 'public_net.ipv4.ip') ?? data_get($server, 'public_net.ipv6.ip');
+        $assignedIp = $hetznerService->getPublicIpAddress($server);
 
         $updates = [];
         if ($this->hetzner_server_status !== $status) {

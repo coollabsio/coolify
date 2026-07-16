@@ -109,7 +109,8 @@ it('backfills a Hetzner placeholder without changing reachability', function () 
                 'id' => 123,
                 'status' => 'running',
                 'public_net' => [
-                    'ipv4' => ['ip' => '198.51.100.20'],
+                    'ipv4' => ['ip' => null],
+                    'ipv6' => ['ip' => '2a01:4f8:c17:4c00::/64'],
                 ],
             ],
         ]),
@@ -118,7 +119,7 @@ it('backfills a Hetzner placeholder without changing reachability', function () 
     (new ServerCloudProviderStatusCheckJob($server))->handle();
 
     $server->refresh();
-    expect($server->ip)->toBe('198.51.100.20')
+    expect($server->ip)->toBe('2a01:4f8:c17:4c00::1')
         ->and($server->hetzner_server_status)->toBe('running')
         ->and((bool) $server->settings->fresh()->is_reachable)->toBeTrue()
         ->and((bool) $server->settings->fresh()->is_usable)->toBeTrue();

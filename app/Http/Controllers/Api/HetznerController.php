@@ -926,13 +926,11 @@ class HetznerController extends Controller
             // Create server on Hetzner
             $hetznerServer = $hetznerService->createServer($params);
 
-            // Determine IP address to use (prefer IPv4, fallback to IPv6)
-            $ipAddress = null;
-            if ($request->enable_ipv4 && isset($hetznerServer['public_net']['ipv4']['ip'])) {
-                $ipAddress = $hetznerServer['public_net']['ipv4']['ip'];
-            } elseif ($request->enable_ipv6 && isset($hetznerServer['public_net']['ipv6']['ip'])) {
-                $ipAddress = $hetznerServer['public_net']['ipv6']['ip'];
-            }
+            $ipAddress = $hetznerService->getPublicIpAddress(
+                $hetznerServer,
+                $request->boolean('enable_ipv4'),
+                $request->boolean('enable_ipv6')
+            );
 
             if (! $ipAddress) {
                 throw new \Exception('No public IP address available. Enable at least one of IPv4 or IPv6.');
