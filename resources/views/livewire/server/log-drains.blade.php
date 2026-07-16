@@ -99,7 +99,7 @@
                                     <x-forms.textarea disabled id="logDrainCustomConfigParser"
                                         label="Custom Parser Configuration" />
                                 @else
-                                    <x-forms.textarea canGate="update" :canResource="$server" rows="6" required
+                                    <x-forms.textarea canGate="update" :canResource="$server" rows="6"
                                         id="logDrainCustomConfig" label="Custom FluentBit Configuration" />
                                     <x-forms.textarea canGate="update" :canResource="$server"
                                         id="logDrainCustomConfigParser" label="Custom Parser Configuration" />
