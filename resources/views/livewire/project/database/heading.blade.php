@@ -8,12 +8,7 @@
                 'label' => 'Backups',
                 'route' => 'project.database.backup.index',
                 'active' => request()->routeIs('project.database.backup.index', 'project.database.backup.execution'),
-                'visible' => in_array($database->getMorphClass(), [
-                    'App\Models\StandalonePostgresql',
-                    'App\Models\StandaloneMongodb',
-                    'App\Models\StandaloneMysql',
-                    'App\Models\StandaloneMariadb',
-                ]),
+                'visible' => $database->isBackupSolutionAvailable(),
             ],
         ];
 
@@ -200,11 +195,7 @@
                     Terminal
                 </a>
             @endcan
-            @if (
-                $database->getMorphClass() === 'App\Models\StandalonePostgresql' ||
-                    $database->getMorphClass() === 'App\Models\StandaloneMongodb' ||
-                    $database->getMorphClass() === 'App\Models\StandaloneMysql' ||
-                    $database->getMorphClass() === 'App\Models\StandaloneMariadb')
+            @if ($database->isBackupSolutionAvailable())
                 <a class="shrink-0 {{ request()->routeIs('project.database.backup.index') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
                     href="{{ route('project.database.backup.index', $parameters) }}">
                     Backups

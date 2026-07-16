@@ -1,6 +1,6 @@
 <div>
     <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="$query" />
-    <div class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
+    <div class="flex flex-col h-full gap-2 md:gap-8 md:flex-row">
         <x-service-database.sidebar :parameters="$parameters" :serviceDatabase="$serviceDatabase" :isImportSupported="$isImportSupported" />
         <div class="w-full">
             <x-slot:title>

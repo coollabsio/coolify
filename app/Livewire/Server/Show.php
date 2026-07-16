@@ -8,7 +8,9 @@ use App\Events\ServerReachabilityChanged;
 use App\Models\CloudProviderToken;
 use App\Models\Server;
 use App\Rules\ValidServerIp;
+use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
+use App\Services\VultrService;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -75,7 +77,15 @@ class Show extends Component
 
     public ?string $hetznerServerStatus = null;
 
+    public ?string $vultrInstanceStatus = null;
+
+    public ?string $digitalOceanDropletStatus = null;
+
     public bool $hetznerServerManuallyStarted = false;
+
+    public bool $vultrInstanceManuallyStarted = false;
+
+    public bool $digitalOceanDropletManuallyStarted = false;
 
     public bool $isValidating = false;
 
@@ -91,6 +101,30 @@ class Show extends Component
     public ?string $hetznerSearchError = null;
 
     public bool $hetznerNoMatchFound = false;
+
+    public Collection $availableVultrTokens;
+
+    public ?int $selectedVultrTokenId = null;
+
+    public ?string $manualVultrInstanceId = null;
+
+    public ?array $matchedVultrInstance = null;
+
+    public ?string $vultrSearchError = null;
+
+    public bool $vultrNoMatchFound = false;
+
+    public Collection $availableDigitalOceanTokens;
+
+    public ?int $selectedDigitalOceanTokenId = null;
+
+    public ?string $manualDigitalOceanDropletId = null;
+
+    public ?array $matchedDigitalOceanDroplet = null;
+
+    public ?string $digitalOceanSearchError = null;
+
+    public bool $digitalOceanNoMatchFound = false;
 
     public function getListeners()
     {
@@ -173,10 +207,14 @@ class Show extends Component
             }
             // Load saved Hetzner status and validation state
             $this->hetznerServerStatus = $this->server->hetzner_server_status;
+            $this->vultrInstanceStatus = $this->server->vultr_instance_status;
+            $this->digitalOceanDropletStatus = $this->server->digitalocean_droplet_status;
             $this->isValidating = $this->server->is_validating ?? false;
 
-            // Load Hetzner tokens for linking
+            // Load cloud provider tokens for linking
             $this->loadHetznerTokens();
+            $this->loadVultrTokens();
+            $this->loadDigitalOceanTokens();
 
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -289,6 +327,22 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            if ($this->server->vultr_instance_id) {
+                $status = $this->server->refreshVultrState();
+                $this->server->refresh();
+                $this->vultrInstanceStatus = $this->server->vultr_instance_status;
+                $this->ip = $this->server->ip;
+
+                if (in_array($status, ['stopped', 'suspended', 'deleted'], true)) {
+                    $message = $status === 'deleted'
+                        ? 'Vultr instance is deleted or no longer accessible. Relink this server before validating.'
+                        : 'Vultr instance is '.($status ?? 'not running').'. Power it on before validating.';
+                    $this->dispatch('error', $message);
+
+                    return;
+                }
+            }
+
             $this->validationLogs = $this->server->validation_logs = null;
             $this->server->save();
             $this->dispatch('init', $install);
@@ -434,6 +488,11 @@ class Show extends Component
                 $this->server->hetzner_server_status = $this->hetznerServerStatus;
                 $this->server->update(['hetzner_server_status' => $this->hetznerServerStatus]);
             }
+
+            $assignedIp = data_get($serverData, 'public_net.ipv4.ip') ?? data_get($serverData, 'public_net.ipv6.ip');
+            if ($this->server->backfillPlaceholderIp($assignedIp)) {
+                $this->ip = $this->server->ip;
+            }
             if ($manual) {
                 $this->dispatch('success', 'Server status refreshed: '.ucfirst($this->hetznerServerStatus ?? 'unknown'));
             }
@@ -452,6 +511,49 @@ class Show extends Component
 
                     return;
                 }
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function checkVultrInstanceStatus(bool $manual = false)
+    {
+        try {
+            if (! $this->server->vultr_instance_id || ! $this->server->cloudProviderToken) {
+                $this->dispatch('error', 'This server is not associated with a Vultr instance or token.');
+
+                return;
+            }
+
+            $this->vultrInstanceStatus = $this->server->refreshVultrState();
+            $this->server->refresh();
+            $this->ip = $this->server->ip;
+
+            if ($manual) {
+                $this->dispatch('success', 'Instance status refreshed: '.ucfirst($this->vultrInstanceStatus ?? 'unknown'));
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function checkDigitalOceanDropletStatus(bool $manual = false)
+    {
+        try {
+            $this->authorize('view', $this->server);
+            if (! $this->server->digitalocean_droplet_id || ! $this->server->cloudProviderToken) {
+                $this->dispatch('error', 'This server is not associated with a DigitalOcean droplet or token.');
+
+                return;
+            }
+
+            $this->digitalOceanDropletStatus = $this->server->refreshDigitalOceanState();
+            $this->server->refresh();
+            $this->ip = $this->server->ip;
+
+            if ($manual) {
+                $this->dispatch('success', 'Droplet status refreshed: '.ucfirst($this->digitalOceanDropletStatus ?? 'unknown'));
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -477,6 +579,8 @@ class Show extends Component
 
         // Reload Hetzner tokens in case the linking section should now be shown
         $this->loadHetznerTokens();
+        $this->loadVultrTokens();
+        $this->loadDigitalOceanTokens();
 
         $this->dispatch('refreshServerShow');
         $this->dispatch('refreshServer');
@@ -499,6 +603,50 @@ class Show extends Component
             $this->server->update(['hetzner_server_status' => 'starting']);
             $this->hetznerServerManuallyStarted = true; // Set flag to trigger auto-validation when running
             $this->dispatch('success', 'Hetzner server is starting...');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function startVultrInstance()
+    {
+        try {
+            $this->authorize('update', $this->server);
+            if (! $this->server->vultr_instance_id || ! $this->server->cloudProviderToken) {
+                $this->dispatch('error', 'This server is not associated with a Vultr instance or token.');
+
+                return;
+            }
+
+            $vultrService = new VultrService($this->server->cloudProviderToken->token);
+            $vultrService->startInstance($this->server->vultr_instance_id);
+
+            $this->vultrInstanceStatus = 'starting';
+            $this->server->update(['vultr_instance_status' => 'starting']);
+            $this->vultrInstanceManuallyStarted = true;
+            $this->dispatch('success', 'Vultr instance is starting...');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function startDigitalOceanDroplet()
+    {
+        try {
+            $this->authorize('update', $this->server);
+            if (! $this->server->digitalocean_droplet_id || ! $this->server->cloudProviderToken) {
+                $this->dispatch('error', 'This server is not associated with a DigitalOcean droplet or token.');
+
+                return;
+            }
+
+            $digitalOceanService = new DigitalOceanService($this->server->cloudProviderToken->token);
+            $digitalOceanService->powerOnDroplet((int) $this->server->digitalocean_droplet_id);
+
+            $this->digitalOceanDropletStatus = 'new';
+            $this->server->update(['digitalocean_droplet_status' => 'new']);
+            $this->digitalOceanDropletManuallyStarted = true;
+            $this->dispatch('success', 'DigitalOcean droplet is starting...');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -535,6 +683,34 @@ class Show extends Component
         $this->availableHetznerTokens = CloudProviderToken::ownedByCurrentTeam()
             ->where('provider', 'hetzner')
             ->get();
+    }
+
+    public function loadVultrTokens(): void
+    {
+        $this->availableVultrTokens = CloudProviderToken::ownedByCurrentTeam()
+            ->where('provider', 'vultr')
+            ->get();
+    }
+
+    public function loadDigitalOceanTokens(): void
+    {
+        $this->availableDigitalOceanTokens = CloudProviderToken::ownedByCurrentTeam()
+            ->where('provider', 'digitalocean')
+            ->get();
+    }
+
+    #[Computed]
+    public function limaStartCommand(): ?string
+    {
+        if (! isDev()) {
+            return null;
+        }
+
+        return match ($this->server->uuid) {
+            'lima-ubuntu-2404' => 'limactl start --yes --name=coolify-lima-ubuntu-2404 docker/lima/ubuntu-2404.yaml',
+            'lima-ubuntu-2604' => 'limactl start --yes --name=coolify-lima-ubuntu-2604 docker/lima/ubuntu-2604.yaml',
+            default => null,
+        };
     }
 
     public function searchHetznerServer(): void
@@ -658,6 +834,263 @@ class Show extends Component
             $this->hetznerSearchError = null;
 
             $this->dispatch('success', 'Server successfully linked to Hetzner Cloud!');
+            $this->dispatch('close-modal');
+            $this->dispatch('refreshServerShow');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function searchDigitalOceanDroplet(): void
+    {
+        $this->digitalOceanSearchError = null;
+        $this->digitalOceanNoMatchFound = false;
+        $this->matchedDigitalOceanDroplet = null;
+
+        if (! $this->selectedDigitalOceanTokenId) {
+            $this->digitalOceanSearchError = 'Please select a DigitalOcean token.';
+
+            return;
+        }
+
+        try {
+            $this->authorize('update', $this->server);
+
+            $token = $this->availableDigitalOceanTokens->firstWhere('id', $this->selectedDigitalOceanTokenId);
+            if (! $token) {
+                $this->digitalOceanSearchError = 'Invalid token selected.';
+
+                return;
+            }
+
+            $digitalOceanService = new DigitalOceanService($token->token);
+            $matched = $digitalOceanService->findDropletByIp($this->server->ip);
+
+            if ($matched) {
+                $this->matchedDigitalOceanDroplet = $matched;
+            } else {
+                $this->digitalOceanNoMatchFound = true;
+            }
+        } catch (\Throwable $e) {
+            $this->digitalOceanSearchError = 'Failed to search DigitalOcean droplets: '.$e->getMessage();
+        }
+    }
+
+    public function searchDigitalOceanDropletById(): void
+    {
+        $this->digitalOceanSearchError = null;
+        $this->digitalOceanNoMatchFound = false;
+        $this->matchedDigitalOceanDroplet = null;
+
+        if (! $this->selectedDigitalOceanTokenId) {
+            $this->digitalOceanSearchError = 'Please select a DigitalOcean token first.';
+
+            return;
+        }
+
+        if (! $this->manualDigitalOceanDropletId) {
+            $this->digitalOceanSearchError = 'Please enter a DigitalOcean Droplet ID.';
+
+            return;
+        }
+
+        try {
+            $this->authorize('update', $this->server);
+
+            $token = $this->availableDigitalOceanTokens->firstWhere('id', $this->selectedDigitalOceanTokenId);
+            if (! $token) {
+                $this->digitalOceanSearchError = 'Invalid token selected.';
+
+                return;
+            }
+
+            $digitalOceanService = new DigitalOceanService($token->token);
+            $dropletData = $digitalOceanService->getDroplet((int) $this->manualDigitalOceanDropletId);
+
+            if (! empty($dropletData)) {
+                $this->matchedDigitalOceanDroplet = $dropletData;
+            } else {
+                $this->digitalOceanNoMatchFound = true;
+            }
+        } catch (\Throwable $e) {
+            $this->digitalOceanSearchError = 'Failed to fetch DigitalOcean droplet: '.$e->getMessage();
+        }
+    }
+
+    public function linkToDigitalOcean()
+    {
+        if (! $this->matchedDigitalOceanDroplet) {
+            $this->dispatch('error', 'No DigitalOcean droplet selected.');
+
+            return;
+        }
+
+        try {
+            $this->authorize('update', $this->server);
+
+            $token = $this->availableDigitalOceanTokens->firstWhere('id', $this->selectedDigitalOceanTokenId);
+            if (! $token) {
+                $this->dispatch('error', 'Invalid token selected.');
+
+                return;
+            }
+
+            $digitalOceanService = new DigitalOceanService($token->token);
+            $dropletData = $digitalOceanService->getDroplet((int) $this->matchedDigitalOceanDroplet['id']);
+
+            if (empty($dropletData)) {
+                $this->dispatch('error', 'Could not find DigitalOcean droplet with ID: '.$this->matchedDigitalOceanDroplet['id']);
+
+                return;
+            }
+
+            $ip = $digitalOceanService->getPublicIpAddress($dropletData);
+            $updates = [
+                'cloud_provider_token_id' => $this->selectedDigitalOceanTokenId,
+                'digitalocean_droplet_id' => $this->matchedDigitalOceanDroplet['id'],
+                'digitalocean_droplet_status' => $dropletData['status'] ?? null,
+            ];
+
+            if ($ip) {
+                $updates['ip'] = $ip;
+            }
+
+            $this->server->update($updates);
+            $this->digitalOceanDropletStatus = $dropletData['status'] ?? null;
+
+            $this->matchedDigitalOceanDroplet = null;
+            $this->selectedDigitalOceanTokenId = null;
+            $this->manualDigitalOceanDropletId = null;
+            $this->digitalOceanNoMatchFound = false;
+            $this->digitalOceanSearchError = null;
+
+            $this->dispatch('success', 'Server successfully linked to DigitalOcean!');
+            $this->dispatch('close-modal');
+            $this->dispatch('refreshServerShow');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function searchVultrInstance(): void
+    {
+        $this->vultrSearchError = null;
+        $this->vultrNoMatchFound = false;
+        $this->matchedVultrInstance = null;
+
+        if (! $this->selectedVultrTokenId) {
+            $this->vultrSearchError = 'Please select a Vultr token.';
+
+            return;
+        }
+
+        try {
+            $this->authorize('update', $this->server);
+
+            $token = $this->availableVultrTokens->firstWhere('id', $this->selectedVultrTokenId);
+            if (! $token) {
+                $this->vultrSearchError = 'Invalid token selected.';
+
+                return;
+            }
+
+            $vultrService = new VultrService($token->token);
+            $matched = $vultrService->findInstanceByIp($this->server->ip);
+
+            if ($matched) {
+                $this->matchedVultrInstance = $matched;
+            } else {
+                $this->vultrNoMatchFound = true;
+            }
+        } catch (\Throwable $e) {
+            $this->vultrSearchError = 'Failed to search Vultr instances: '.$e->getMessage();
+        }
+    }
+
+    public function searchVultrInstanceById(): void
+    {
+        $this->vultrSearchError = null;
+        $this->vultrNoMatchFound = false;
+        $this->matchedVultrInstance = null;
+
+        if (! $this->selectedVultrTokenId) {
+            $this->vultrSearchError = 'Please select a Vultr token first.';
+
+            return;
+        }
+
+        if (! $this->manualVultrInstanceId) {
+            $this->vultrSearchError = 'Please enter a Vultr Instance ID.';
+
+            return;
+        }
+
+        try {
+            $this->authorize('update', $this->server);
+
+            $token = $this->availableVultrTokens->firstWhere('id', $this->selectedVultrTokenId);
+            if (! $token) {
+                $this->vultrSearchError = 'Invalid token selected.';
+
+                return;
+            }
+
+            $vultrService = new VultrService($token->token);
+            $instanceData = $vultrService->getInstance($this->manualVultrInstanceId);
+
+            if (! empty($instanceData)) {
+                $this->matchedVultrInstance = $instanceData;
+            } else {
+                $this->vultrNoMatchFound = true;
+            }
+        } catch (\Throwable $e) {
+            $this->vultrSearchError = 'Failed to fetch Vultr instance: '.$e->getMessage();
+        }
+    }
+
+    public function linkToVultr()
+    {
+        if (! $this->matchedVultrInstance) {
+            $this->dispatch('error', 'No Vultr instance selected.');
+
+            return;
+        }
+
+        try {
+            $this->authorize('update', $this->server);
+
+            $token = $this->availableVultrTokens->firstWhere('id', $this->selectedVultrTokenId);
+            if (! $token) {
+                $this->dispatch('error', 'Invalid token selected.');
+
+                return;
+            }
+
+            $vultrService = new VultrService($token->token);
+            $instanceData = $vultrService->getInstance($this->matchedVultrInstance['id']);
+
+            if (empty($instanceData)) {
+                $this->dispatch('error', 'Could not find Vultr instance with ID: '.$this->matchedVultrInstance['id']);
+
+                return;
+            }
+
+            $this->server->update([
+                'cloud_provider_token_id' => $this->selectedVultrTokenId,
+                'vultr_instance_id' => $this->matchedVultrInstance['id'],
+                'vultr_instance_status' => $instanceData['status'] ?? null,
+            ]);
+
+            $this->vultrInstanceStatus = $instanceData['status'] ?? null;
+
+            $this->matchedVultrInstance = null;
+            $this->selectedVultrTokenId = null;
+            $this->manualVultrInstanceId = null;
+            $this->vultrNoMatchFound = false;
+            $this->vultrSearchError = null;
+
+            $this->dispatch('success', 'Server successfully linked to Vultr!');
+            $this->dispatch('close-modal');
             $this->dispatch('refreshServerShow');
         } catch (\Throwable $e) {
             return handleError($e, $this);

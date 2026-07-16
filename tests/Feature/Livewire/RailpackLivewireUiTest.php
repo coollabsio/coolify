@@ -118,4 +118,24 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             ->assertSee('nixpacks.toml')
             ->assertDontSee('railpack.json');
     });
+
+    test('saving general settings refreshes configuration changes when label reset is disabled', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => StandaloneDocker::class,
+            'build_pack' => 'nixpacks',
+            'static_image' => 'nginx:alpine',
+            'base_directory' => '/',
+            'is_http_basic_auth_enabled' => false,
+            'redirect' => 'no',
+        ]);
+        $application->settings->update(['is_container_label_readonly_enabled' => false]);
+
+        Livewire::test(General::class, ['application' => $application->refresh()])
+            ->set('isPreserveRepositoryEnabled', true)
+            ->call('instantSave')
+            ->assertHasNoErrors()
+            ->assertDispatched('configurationChanged');
+    });
 });

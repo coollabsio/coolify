@@ -66,6 +66,17 @@ class Service extends BaseModel
 
     protected $appends = ['server_status', 'status'];
 
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability. Internal compose generators
+     * must makeVisible explicitly before toArray().
+     */
+    protected $hidden = [
+        'docker_compose',
+        'docker_compose_raw',
+    ];
+
     protected static function booted()
     {
         static::creating(function ($service) {
@@ -94,7 +105,7 @@ class Service extends BaseModel
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
         $newConfigHash = $images.$domains.$images.$storages;
-        $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
+        $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {
@@ -1583,7 +1594,6 @@ class Service extends BaseModel
                     $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
                 }
             } catch (\Exception $e) {
-                ray($e->getMessage());
             }
         }
 

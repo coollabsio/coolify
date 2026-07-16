@@ -5,9 +5,9 @@
     <div class="flex items-center gap-2">
         <h1>Servers</h1>
         @can('createAnyResource')
-            <x-modal-input buttonTitle="+ Add" title="New Server" :closeOutside="false">
-                <livewire:server.create />
-            </x-modal-input>
+            <a href="{{ route('server.create') }}" {{ wireNavigate() }}>
+                <x-forms.button>+ Add</x-forms.button>
+            </a>
         @endcan
     </div>
     <div class="subtitle">All your servers are here.</div>

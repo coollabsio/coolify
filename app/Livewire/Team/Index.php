@@ -24,11 +24,14 @@ class Index extends Component
 
     public ?string $description = null;
 
+    public bool $is_mcp_server_enabled = true;
+
     protected function rules(): array
     {
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
+            'is_mcp_server_enabled' => 'boolean',
         ];
     }
 
@@ -58,10 +61,12 @@ class Index extends Component
             // Sync TO model (before save)
             $this->team->name = $this->name;
             $this->team->description = $this->description;
+            $this->team->is_mcp_server_enabled = $this->is_mcp_server_enabled;
         } else {
             // Sync FROM model (on load/refresh)
             $this->name = $this->team->name;
             $this->description = $this->team->description;
+            $this->is_mcp_server_enabled = $this->team->is_mcp_server_enabled;
         }
     }
 

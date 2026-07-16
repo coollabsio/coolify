@@ -9,7 +9,7 @@
 ## DOCKER_ADDRESS_POOL_SIZE - Custom Docker address pool size (default: 24)
 ## DOCKER_POOL_FORCE_OVERRIDE - Force override Docker address pool configuration (default: false)
 ## AUTOUPDATE - Set to "false" to disable auto-updates
-## REGISTRY_URL - Custom registry URL for Docker images (default: ghcr.io)
+## REGISTRY_URL - Custom registry URL for Docker images (default: docker.io)
 
 set -e # Exit immediately if a command exits with a non-zero status
 ## $1 could be empty, so we need to disable this check
@@ -50,7 +50,7 @@ else
         REGISTRY_URL=$(grep "^REGISTRY_URL=" "$ENV_FILE" | cut -d '=' -f2)
         echo "Using registry URL from .env: $REGISTRY_URL"
     else
-        REGISTRY_URL="ghcr.io"
+        REGISTRY_URL="docker.io"
         echo "Using default registry URL: $REGISTRY_URL"
     fi
 fi
@@ -920,9 +920,9 @@ echo -e " - Please wait."
 getAJoke
 
 if [[ $- == *x* ]]; then
-    bash -x /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}" "true"
+    bash -x /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-docker.io}" "true"
 else
-    bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}" "true"
+    bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-docker.io}" "true"
 fi
 echo " - Coolify installed successfully."
 echo " - Waiting for Coolify to be ready..."

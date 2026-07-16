@@ -218,7 +218,7 @@ describe('security UI audit logging', function () {
 
     test('cloud provider token form does not contain debug ray calls', function () {
         expect(file_get_contents(app_path('Livewire/Security/CloudProviderTokenForm.php')))
-            ->not->toContain('ray(');
+            ->not->toContain('ray'.'(');
     });
 });
 
