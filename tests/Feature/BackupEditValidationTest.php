@@ -430,3 +430,59 @@ it('saves selected S3 storage immediately when it changes', function () {
     expect($backup->save_s3)->toBeFalsy();
     expect($backup->s3_storage_id)->toBe($secondS3->id);
 });
+
+it('subscribes to database status broadcasts so Backup Now can refresh without a full page reload', function () {
+    $component = app(BackupEdit::class);
+    $method = new ReflectionMethod($component, 'getListeners');
+    $method->setAccessible(true);
+    $listeners = (array) $method->invoke($component);
+
+    expect($listeners)
+        ->toHaveKey("echo-private:user.{$this->user->id},DatabaseStatusChanged")
+        ->toHaveKey("echo-private:team.{$this->team->id},ServiceChecked")
+        ->toHaveKey('databaseUpdated');
+});
+
+it('shows Backup Now after refresh when the database becomes running', function () {
+    $backup = createBackupForEditValidationTest($this->team, [
+        'enabled' => true,
+    ]);
+    $database = $backup->database;
+    $database->update(['status' => 'exited:unhealthy']);
+
+    $component = Livewire::test(BackupEdit::class, [
+        'backup' => $backup->fresh(),
+        'availableS3Storages' => $this->team->s3s,
+        'status' => 'exited:unhealthy',
+    ])
+        ->assertDontSee('Backup Now')
+        ->assertSet('status', 'exited:unhealthy');
+
+    $database->update(['status' => 'running:healthy']);
+
+    $component->call('refreshStatus')
+        ->assertSet('status', 'running:healthy')
+        ->assertSee('Backup Now');
+});
+
+it('hides Backup Now after refresh when the database stops', function () {
+    $backup = createBackupForEditValidationTest($this->team, [
+        'enabled' => true,
+    ]);
+    $database = $backup->database;
+    $database->update(['status' => 'running:healthy']);
+
+    $component = Livewire::test(BackupEdit::class, [
+        'backup' => $backup->fresh(),
+        'availableS3Storages' => $this->team->s3s,
+        'status' => 'running:healthy',
+    ])
+        ->assertSee('Backup Now')
+        ->assertSet('status', 'running:healthy');
+
+    $database->update(['status' => 'exited:unhealthy']);
+
+    $component->call('refreshStatus')
+        ->assertSet('status', 'exited:unhealthy')
+        ->assertDontSee('Backup Now');
+});

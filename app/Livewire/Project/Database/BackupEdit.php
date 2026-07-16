@@ -9,6 +9,7 @@ use App\Models\ServiceDatabase;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -84,15 +85,47 @@ class BackupEdit extends Component
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int|string $timeout = 3600;
 
+    public function getListeners(): array
+    {
+        // Keep "Backup Now" in sync when the database starts/stops without a full page refresh.
+        $listeners = ['databaseUpdated' => 'refreshStatus'];
+
+        $user = Auth::user();
+        if (! $user) {
+            return $listeners;
+        }
+
+        $listeners["echo-private:user.{$user->id},DatabaseStatusChanged"] = 'refreshStatus';
+
+        $team = $user->currentTeam();
+        if ($team) {
+            $listeners["echo-private:team.{$team->id},ServiceChecked"] = 'refreshStatus';
+        }
+
+        return $listeners;
+    }
+
     public function mount()
     {
         try {
             $this->authorize('view', $this->backup->database);
             $this->parameters = get_route_parameters();
             $this->syncData();
+            $this->refreshStatus();
         } catch (Exception $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function refreshStatus(): void
+    {
+        $database = $this->backup->database;
+        if (! $database) {
+            return;
+        }
+
+        $database->refresh();
+        $this->status = $database->status;
     }
 
     public function syncData(bool $toModel = false)
