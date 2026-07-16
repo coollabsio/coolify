@@ -379,6 +379,42 @@ describe('deployment git command escaping', function () {
             ->toContain("COOLIFY_FQDN='app.example.com' ")
             ->toContain("COOLIFY_RESOURCE_UUID='app-uuid' ");
     });
+
+    test('coolify url and fqdn preserve multiple comma-separated domains', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $instance = $job->newInstanceWithoutConstructor();
+
+        $application = new Application;
+        $application->uuid = 'app-uuid';
+        $application->git_branch = 'main';
+        $application->fqdn = 'https://admin.example.com:8443/path, https://gate.example.com:9443/other';
+        $application->compose_parsing_version = '3';
+
+        $settings = new ApplicationSetting;
+        $settings->include_source_commit_in_build = false;
+        $application->setRelation('settings', $settings);
+
+        foreach ([
+            'application' => $application,
+            'commit' => 'HEAD',
+            'pull_request_id' => 0,
+        ] as $property => $value) {
+            $reflectionProperty = $job->getProperty($property);
+            $reflectionProperty->setAccessible(true);
+            $reflectionProperty->setValue($instance, $value);
+        }
+
+        $method = $job->getMethod('set_coolify_variables');
+        $method->setAccessible(true);
+        $method->invoke($instance);
+
+        $coolifyVariables = $job->getProperty('coolify_variables');
+        $coolifyVariables->setAccessible(true);
+
+        expect($coolifyVariables->getValue($instance))
+            ->toContain("COOLIFY_URL='https://admin.example.com/path,https://gate.example.com/other' ")
+            ->toContain("COOLIFY_FQDN='admin.example.com,gate.example.com' ");
+    });
 });
 
 describe('sharedDataApplications rules survive array_merge in controller', function () {

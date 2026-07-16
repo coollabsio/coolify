@@ -2260,9 +2260,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $fqdn = $this->preview->fqdn;
         }
         if (isset($fqdn)) {
-            $url = Url::fromString($fqdn);
-            $fqdn = $url->getHost();
-            $url = $url->withHost($fqdn)->withPort(null)->__toString();
+            $parsedUrls = str($fqdn)->explode(',')->map(fn (string $domain) => Url::fromString(trim($domain)));
+            $fqdn = $parsedUrls->map(fn (Url $url) => $url->getHost())->implode(',');
+            $url = $parsedUrls->map(fn (Url $url) => $url->withHost($url->getHost())->withPort(null)->__toString())->implode(',');
             if ((int) $this->application->compose_parsing_version >= 3) {
                 $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($url).' ';
                 $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($fqdn).' ';
