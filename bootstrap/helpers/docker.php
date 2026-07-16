@@ -608,6 +608,8 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 }
                 if ($is_force_https_enabled) {
                     $labels->push("traefik.http.routers.{$http_label}.middlewares=redirect-to-https");
+                } elseif ($is_http_basic_auth_enabled) {
+                    $labels->push("traefik.http.routers.{$http_label}.middlewares={$http_basic_auth_label}");
                 }
             } else {
                 // Set labels for http
