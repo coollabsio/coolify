@@ -850,6 +850,12 @@ class DatabasesController extends Controller
 
         $this->authorize('manageBackups', $database);
 
+        if (! $database->isBackupSolutionAvailable()) {
+            return response()->json([
+                'message' => 'Scheduled backups are not supported for this database type.',
+            ], 422);
+        }
+
         // Validate frequency is a valid cron expression
         $isValid = validate_cron_expression($request->frequency);
         if (! $isValid) {
@@ -915,6 +921,8 @@ class DatabasesController extends Controller
                 $backupData['databases_to_backup'] = $database->mysql_database;
             } elseif ($database->type() === 'standalone-mariadb') {
                 $backupData['databases_to_backup'] = $database->mariadb_database;
+            } elseif ($database->type() === 'standalone-clickhouse') {
+                $backupData['databases_to_backup'] = $database->clickhouse_db;
             }
         }
 
@@ -3016,7 +3024,7 @@ class DatabasesController extends Controller
             ),
         ]
     )]
-    public function move_by_uuid(Request $request): \Illuminate\Http\JsonResponse
+    public function move_by_uuid(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {

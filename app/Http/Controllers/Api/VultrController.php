@@ -15,6 +15,7 @@ use App\Rules\ValidHostname;
 use App\Services\VultrService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
 
 class VultrController extends Controller
@@ -286,6 +287,10 @@ class VultrController extends Controller
             return response()->json(['message' => 'Private key not found.'], 404);
         }
 
+        $vultrService = null;
+        $vultrInstanceId = null;
+        $server = null;
+
         try {
             $vultrService = new VultrService($token->token);
             $publicKey = $privateKey->getPublicKey();
@@ -317,33 +322,41 @@ class VultrController extends Controller
             }
 
             $vultrInstance = $vultrService->createInstance($params);
+            $vultrInstanceId = (string) $vultrInstance['id'];
             $ipAddress = $vultrService->getPublicIp($vultrInstance, $request->disable_public_ipv4, $request->enable_ipv6) ?? Server::PLACEHOLDER_IP;
 
-            $server = Server::create([
-                'name' => $normalizedServerName,
-                'ip' => $ipAddress,
-                'user' => 'root',
-                'port' => 22,
-                'team_id' => $teamId,
-                'private_key_id' => $privateKey->id,
-                'cloud_provider_token_id' => $token->id,
-                'vultr_instance_id' => $vultrInstance['id'],
-                'vultr_instance_status' => $vultrInstance['status'] ?? null,
-            ]);
-
-            $vultrInstance = $vultrService->waitForPublicIp($vultrInstance, $request->disable_public_ipv4, $request->enable_ipv6);
-            $assignedIpAddress = $vultrService->getPublicIp($vultrInstance, $request->disable_public_ipv4, $request->enable_ipv6);
-            if ($assignedIpAddress && $assignedIpAddress !== $server->ip) {
-                $ipAddress = $assignedIpAddress;
-                $server->update([
-                    'ip' => $assignedIpAddress,
-                    'vultr_instance_status' => $vultrInstance['status'] ?? $server->vultr_instance_status,
+            $server = DB::transaction(function () use ($normalizedServerName, $ipAddress, $teamId, $privateKey, $token, $vultrInstanceId, $vultrInstance): Server {
+                $server = Server::create([
+                    'name' => $normalizedServerName,
+                    'ip' => $ipAddress,
+                    'user' => 'root',
+                    'port' => 22,
+                    'team_id' => $teamId,
+                    'private_key_id' => $privateKey->id,
+                    'cloud_provider_token_id' => $token->id,
+                    'vultr_instance_id' => $vultrInstanceId,
+                    'vultr_instance_status' => $vultrInstance['status'] ?? null,
                 ]);
-            }
 
-            $server->proxy->set('status', 'exited');
-            $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
-            $server->save();
+                $server->proxy->set('status', 'exited');
+                $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
+                $server->save();
+
+                return $server;
+            });
+
+            try {
+                $vultrInstance = $vultrService->waitForPublicIp($vultrInstance, $request->disable_public_ipv4, $request->enable_ipv6);
+                $assignedIpAddress = $vultrService->getPublicIp($vultrInstance, $request->disable_public_ipv4, $request->enable_ipv6);
+                if ($assignedIpAddress && $assignedIpAddress !== $server->ip) {
+                    $server->update([
+                        'ip' => $assignedIpAddress,
+                        'vultr_instance_status' => $vultrInstance['status'] ?? $server->vultr_instance_status,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
 
             if ($request->instant_validate) {
                 ValidateServer::dispatch($server);
@@ -353,24 +366,45 @@ class VultrController extends Controller
                 'team_id' => $teamId,
                 'server_uuid' => $server->uuid,
                 'server_name' => $server->name,
-                'vultr_instance_id' => $vultrInstance['id'],
-                'ip' => $ipAddress,
+                'vultr_instance_id' => $vultrInstanceId,
+                'ip' => $server->ip,
             ]);
 
             return response()->json([
                 'uuid' => $server->uuid,
-                'vultr_instance_id' => $vultrInstance['id'],
-                'ip' => $ipAddress,
+                'vultr_instance_id' => $vultrInstanceId,
+                'ip' => $server->ip,
             ])->setStatusCode(201);
         } catch (RateLimitException $e) {
+            $this->deleteUntrackedInstance($vultrService, $vultrInstanceId, $server);
+
             $response = response()->json(['message' => $e->getMessage()], 429);
             if ($e->retryAfter !== null) {
                 $response->header('Retry-After', $e->retryAfter);
             }
 
             return $response;
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            $this->deleteUntrackedInstance($vultrService, $vultrInstanceId, $server);
+
+            logger()->error('Failed to create Vultr server', [
+                'error' => $e->getMessage(),
+            ]);
+
             return response()->json(['message' => 'Failed to create Vultr server.'], 500);
+        }
+    }
+
+    private function deleteUntrackedInstance(?VultrService $vultrService, ?string $vultrInstanceId, ?Server $server): void
+    {
+        if (! $vultrService || ! $vultrInstanceId || $server) {
+            return;
+        }
+
+        try {
+            $vultrService->deleteInstance($vultrInstanceId);
+        } catch (\Throwable $e) {
+            report($e);
         }
     }
 

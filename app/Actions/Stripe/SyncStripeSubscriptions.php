@@ -1,30 +1,18 @@
 <?php
 
-namespace App\Jobs;
+namespace App\Actions\Stripe;
 
 use App\Models\Subscription;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeEncrypted;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
+use Lorisleiva\Actions\Concerns\AsAction;
 use Stripe\StripeClient;
 
-class SyncStripeSubscriptionsJob implements ShouldBeEncrypted, ShouldQueue
+class SyncStripeSubscriptions
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use AsAction;
 
-    public int $tries = 1;
+    private const VALID_STRIPE_STATUSES = ['active', 'past_due'];
 
-    public int $timeout = 1800; // 30 minutes max
-
-    public function __construct(public bool $fix = false)
-    {
-        $this->onQueue('high');
-    }
-
-    public function handle(?\Closure $onProgress = null): array
+    public function handle(bool $fix = false, ?\Closure $onProgress = null): array
     {
         if (! isCloud() || ! isStripe()) {
             return ['error' => 'Not running on Cloud or Stripe not configured'];
@@ -34,7 +22,9 @@ class SyncStripeSubscriptionsJob implements ShouldBeEncrypted, ShouldQueue
             ->where('stripe_invoice_paid', true)
             ->get();
 
-        $stripe = app(StripeClient::class);
+        $stripe = app()->bound(StripeClient::class)
+            ? app(StripeClient::class)
+            : new StripeClient(config('subscription.stripe_api_key'));
 
         // Bulk fetch all valid subscription IDs from Stripe (active + past_due)
         $validStripeIds = $this->fetchValidStripeSubscriptionIds($stripe, $onProgress);
@@ -43,13 +33,20 @@ class SyncStripeSubscriptionsJob implements ShouldBeEncrypted, ShouldQueue
         $staleSubscriptions = $subscriptions->filter(
             fn (Subscription $sub) => ! in_array($sub->stripe_subscription_id, $validStripeIds)
         );
+        $staleSubscriptionCount = $staleSubscriptions->count();
+
+        $onProgress?->__invoke('checking', 0, $staleSubscriptionCount);
 
         // For each stale subscription, get the exact Stripe status and check for resubscriptions
         $discrepancies = [];
         $resubscribed = [];
         $errors = [];
+        $fixedCount = 0;
+        $manualReviewCount = 0;
 
-        foreach ($staleSubscriptions as $subscription) {
+        foreach ($staleSubscriptions->values() as $index => $subscription) {
+            $onProgress?->__invoke('checking', $index + 1, $staleSubscriptionCount);
+
             try {
                 $stripeSubscription = $stripe->subscriptions->retrieve(
                     $subscription->stripe_subscription_id
@@ -66,8 +63,18 @@ class SyncStripeSubscriptionsJob implements ShouldBeEncrypted, ShouldQueue
                 continue;
             }
 
-            // Check if this user resubscribed under a different customer/subscription
+            if (in_array($stripeStatus, self::VALID_STRIPE_STATUSES, true)) {
+                continue;
+            }
+
             $activeSub = $this->findActiveSubscriptionByEmail($stripe, $stripeSubscription->customer);
+            $validReplacement = Subscription::query()
+                ->where('team_id', $subscription->team_id)
+                ->where('id', '!=', $subscription->id)
+                ->where('stripe_invoice_paid', true)
+                ->whereIn('stripe_subscription_id', $validStripeIds)
+                ->first();
+
             if ($activeSub) {
                 $resubscribed[] = [
                     'subscription_id' => $subscription->id,
@@ -78,33 +85,69 @@ class SyncStripeSubscriptionsJob implements ShouldBeEncrypted, ShouldQueue
                     'new_stripe_subscription_id' => $activeSub['subscription_id'],
                     'new_stripe_customer_id' => $activeSub['customer_id'],
                     'new_status' => $activeSub['status'],
+                    'linked_to_team' => $validReplacement?->stripe_subscription_id === $activeSub['subscription_id'],
                 ];
-
-                continue;
             }
+
+            $inactiveSubscription = null;
+            if (! $validReplacement && ! $activeSub) {
+                $inactiveSubscription = Subscription::query()
+                    ->where('team_id', $subscription->team_id)
+                    ->where('id', '!=', $subscription->id)
+                    ->where('stripe_invoice_paid', false)
+                    ->first();
+            }
+
+            $resolution = match (true) {
+                (bool) $validReplacement => 'delete_stale',
+                (bool) $activeSub => 'manual_review',
+                (bool) $inactiveSubscription => 'delete_stale',
+                default => 'end_subscription',
+            };
 
             $discrepancies[] = [
                 'subscription_id' => $subscription->id,
                 'team_id' => $subscription->team_id,
                 'stripe_subscription_id' => $subscription->stripe_subscription_id,
                 'stripe_status' => $stripeStatus,
+                'resolution' => $resolution,
             ];
 
-            if ($this->fix) {
-                $subscription->update([
-                    'stripe_invoice_paid' => false,
-                    'stripe_past_due' => false,
-                ]);
+            if ($fix) {
+                $team = $subscription->team;
 
-                if ($stripeStatus === 'canceled') {
-                    $subscription->team?->subscriptionEnded();
+                if ($resolution === 'manual_review') {
+                    $manualReviewCount++;
+
+                    continue;
                 }
+
+                if ($resolution === 'delete_stale') {
+                    if (! $validReplacement && $inactiveSubscription && $team) {
+                        $team->subscriptionEnded($inactiveSubscription);
+                    }
+
+                    $subscription->delete();
+                    $fixedCount++;
+
+                    continue;
+                }
+
+                if ($team) {
+                    $team->subscriptionEnded($subscription);
+                } else {
+                    $subscription->update([
+                        'stripe_invoice_paid' => false,
+                        'stripe_past_due' => false,
+                    ]);
+                }
+                $fixedCount++;
             }
         }
 
-        if ($this->fix && count($discrepancies) > 0) {
+        if ($fix && $fixedCount > 0) {
             send_internal_notification(
-                'SyncStripeSubscriptionsJob: Fixed '.count($discrepancies)." discrepancies:\n".
+                "SyncStripeSubscriptions: Fixed {$fixedCount} discrepancies:\n".
                 json_encode($discrepancies, JSON_PRETTY_PRINT)
             );
         }
@@ -114,7 +157,9 @@ class SyncStripeSubscriptionsJob implements ShouldBeEncrypted, ShouldQueue
             'discrepancies' => $discrepancies,
             'resubscribed' => $resubscribed,
             'errors' => $errors,
-            'fixed' => $this->fix,
+            'fixed' => $fix,
+            'fixed_count' => $fixedCount,
+            'manual_review_count' => $manualReviewCount,
         ];
     }
 
@@ -183,13 +228,13 @@ class SyncStripeSubscriptionsJob implements ShouldBeEncrypted, ShouldQueue
         $validIds = [];
         $fetched = 0;
 
-        foreach (['active', 'past_due'] as $status) {
+        foreach (self::VALID_STRIPE_STATUSES as $status) {
             foreach ($stripe->subscriptions->all(['status' => $status, 'limit' => 100])->autoPagingIterator() as $sub) {
                 $validIds[] = $sub->id;
                 $fetched++;
 
                 if ($onProgress) {
-                    $onProgress($fetched);
+                    $onProgress('fetching', $fetched, null);
                 }
             }
         }
