@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Shared\DeleteScheduledVolumeBackup;
 use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\LocalFileVolume;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
+use RuntimeException;
 
 #[OA\Schema(
     schema: 'VolumeBackupScheduleRequest',
@@ -255,6 +257,105 @@ class VolumeBackupsController extends Controller
         ]);
 
         return response()->json($this->responseData($backup, $storage, $s3Storage, $created), $created ? 201 : 200);
+    }
+
+    #[OA\Delete(
+        summary: 'Delete application storage backup schedule',
+        description: 'Delete the backup schedule and its local and S3 archives for an application storage.',
+        path: '/applications/{uuid}/storages/{storage_uuid}/backups',
+        operationId: 'delete-application-storage-backup-schedule',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'storage_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Backup schedule and archives deleted.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Forbidden.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 409, description: 'Backup or recovery operation is still running.'),
+        ],
+    )]
+    #[OA\Delete(
+        summary: 'Delete database storage backup schedule',
+        description: 'Delete the backup schedule and its local and S3 archives for a database storage.',
+        path: '/databases/{uuid}/storages/{storage_uuid}/backups',
+        operationId: 'delete-database-storage-backup-schedule',
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'storage_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Backup schedule and archives deleted.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Forbidden.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 409, description: 'Backup or recovery operation is still running.'),
+        ],
+    )]
+    #[OA\Delete(
+        summary: 'Delete service storage backup schedule',
+        description: 'Delete the backup schedule and its local and S3 archives for a service storage.',
+        path: '/services/{uuid}/storages/{storage_uuid}/backups',
+        operationId: 'delete-service-storage-backup-schedule',
+        security: [['bearerAuth' => []]],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'storage_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Backup schedule and archives deleted.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Forbidden.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 409, description: 'Backup or recovery operation is still running.'),
+        ],
+    )]
+    public function destroy(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $resourceType = $request->route('resource_type');
+        $resource = $this->findResource($resourceType, $request->route('uuid'), $teamId);
+        if (! $resource) {
+            return response()->json(['message' => 'Resource not found.'], 404);
+        }
+
+        $this->authorize('update', $resource);
+
+        $storage = $this->findStorage($resource, $request->route('storage_uuid'));
+        if (! $storage) {
+            return response()->json(['message' => 'Storage not found.'], 404);
+        }
+
+        $backup = $storage->scheduledBackups()->first();
+        if (! $backup) {
+            return response()->json(['message' => 'Storage backup schedule not found.'], 404);
+        }
+
+        try {
+            DeleteScheduledVolumeBackup::run($backup);
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        }
+
+        auditLog('api.volume_backup.schedule_deleted', [
+            'team_id' => $teamId,
+            'resource_type' => $resourceType,
+            'resource_uuid' => $resource->uuid,
+            'storage_uuid' => $storage->uuid,
+            'backup_uuid' => $backup->uuid,
+        ]);
+
+        return response()->json(['message' => 'Storage backup schedule and archives deleted.']);
     }
 
     private function findResource(string $resourceType, string $uuid, int|string $teamId): ?Model

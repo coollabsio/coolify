@@ -26,6 +26,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
@@ -576,6 +577,62 @@ it('deletes an individual volume backup archive and execution', function () {
     expect($execution->fresh())->toBeNull();
     Process::assertRan(fn ($process) => str_contains($process->command, 'rm -f')
         && str_contains($process->command, 'archive.tar.gz'));
+});
+
+it('deletes an individual S3 archive from the storage recorded on its execution', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $originalStorage = S3Storage::create([
+        'name' => 'Original storage',
+        'region' => 'us-east-1',
+        'key' => 'original-key',
+        'secret' => 'secret',
+        'bucket' => 'original-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+    $newStorage = S3Storage::create([
+        'name' => 'New storage',
+        'region' => 'us-east-1',
+        'key' => 'new-key',
+        'secret' => 'secret',
+        'bucket' => 'new-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        's3_storage_id' => $newStorage->id,
+        'frequency' => 'daily',
+        'save_s3' => true,
+    ]);
+    $execution = ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        's3_storage_id' => $originalStorage->id,
+        'status' => 'success',
+        'filename' => '/data/coolify/backups/volumes/test/historical.tar.gz',
+        'local_storage_deleted' => true,
+        's3_uploaded' => true,
+    ]);
+    $disk = Mockery::mock();
+    $disk->shouldReceive('delete')
+        ->once()
+        ->with(['/data/coolify/backups/volumes/test/historical.tar.gz'])
+        ->andReturnTrue();
+    Storage::shouldReceive('build')
+        ->once()
+        ->with(Mockery::on(fn (array $config): bool => $config['key'] === 'original-key'))
+        ->andReturn($disk);
+
+    Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
+        ->set('delete_backup_s3', true)
+        ->call('deleteBackup', $execution->id, 'password')
+        ->assertDispatched('success');
+
+    expect($execution->fresh())->toBeNull();
 });
 
 it('prevents another team from downloading a volume backup', function () {
@@ -1545,6 +1602,36 @@ it('removes retained S3 archives from the storage recorded on each execution', f
     $method->invoke($job, $server);
 
     expect($oldExecution->fresh()->s3_storage_deleted)->toBeTrue();
+});
+
+it('does not query execution history when local retention is unlimited', function () {
+    $team = Team::factory()->create();
+    [$application, $volume, $server] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'save_s3' => false,
+        'retention_amount_locally' => 0,
+        'retention_days_locally' => 0,
+        'retention_max_storage_locally' => 0,
+    ]);
+    ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        'status' => 'success',
+        'filename' => '/data/coolify/backups/volumes/test/unlimited.tar.gz',
+    ]);
+    $job = new VolumeBackupJob($backup);
+    $method = (new ReflectionClass($job))->getMethod('removeExpiredBackups');
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+
+    $method->invoke($job, $server);
+
+    $executionQueries = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_contains($query['query'], 'scheduled_volume_backup_executions'))
+        ->filter(fn (array $query): bool => str_starts_with(strtolower(ltrim($query['query'])), 'select'));
+
+    expect($executionQueries)->toBeEmpty();
 });
 
 it('keeps a successful backup successful when retention cleanup fails', function () {

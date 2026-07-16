@@ -154,6 +154,9 @@ Route::group([
     Route::put('/applications/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'upsert'])
         ->defaults('resource_type', 'application')
         ->middleware(['api.ability:write']);
+    Route::delete('/applications/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'destroy'])
+        ->defaults('resource_type', 'application')
+        ->middleware(['api.ability:write']);
 
     Route::get('/applications/{uuid}/tags', [ApplicationsController::class, 'tags'])->middleware(['api.ability:read']);
     Route::post('/applications/{uuid}/tags', [ApplicationsController::class, 'create_tag'])->middleware(['api.ability:write']);
@@ -201,6 +204,9 @@ Route::group([
     Route::put('/databases/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'upsert'])
         ->defaults('resource_type', 'database')
         ->middleware(['api.ability:write']);
+    Route::delete('/databases/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'destroy'])
+        ->defaults('resource_type', 'database')
+        ->middleware(['api.ability:write']);
 
     Route::get('/databases/{uuid}/envs', [DatabasesController::class, 'envs'])->middleware(['api.ability:read']);
     Route::post('/databases/{uuid}/envs', [DatabasesController::class, 'create_env'])->middleware(['api.ability:write']);
@@ -229,6 +235,9 @@ Route::group([
     Route::patch('/services/{uuid}/storages', [ServicesController::class, 'update_storage'])->middleware(['api.ability:write']);
     Route::delete('/services/{uuid}/storages/{storage_uuid}', [ServicesController::class, 'delete_storage'])->middleware(['api.ability:write']);
     Route::put('/services/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'upsert'])
+        ->defaults('resource_type', 'service')
+        ->middleware(['api.ability:write']);
+    Route::delete('/services/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'destroy'])
         ->defaults('resource_type', 'service')
         ->middleware(['api.ability:write']);
 

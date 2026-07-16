@@ -16,11 +16,15 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Config::set('cache.default', 'array');
+    Config::set('app.maintenance.store', 'array');
     InstanceSettings::unguarded(fn () => InstanceSettings::updateOrCreate(['id' => 0], ['id' => 0]));
 
     $this->team = Team::factory()->create();
@@ -165,7 +169,46 @@ it('sets a directory backup schedule through the API', function () {
     expect(ScheduledVolumeBackup::query()->sole()->backupable->is($directory))->toBeTrue();
 });
 
-it('sets database and service volume backup schedules through their storage APIs', function () {
+it('refuses to delete an application directory before its backup schedule is removed', function () {
+    Process::fake();
+    $directory = LocalFileVolume::unguarded(fn () => LocalFileVolume::withoutEvents(fn () => LocalFileVolume::create([
+        'uuid' => new_public_id(),
+        'fs_path' => './uploads',
+        'mount_path' => '/app/uploads',
+        'is_directory' => true,
+        'is_host_file' => false,
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+    ])));
+    $directory->scheduledBackups()->create([
+        'team_id' => $this->team->id,
+        'frequency' => 'daily',
+    ]);
+
+    $this->withHeaders($this->headers)
+        ->deleteJson("/api/v1/applications/{$this->application->uuid}/storages/{$directory->uuid}")
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Delete this directory backup schedule and its archives before deleting the directory.');
+
+    expect($directory->fresh())->not->toBeNull();
+    Process::assertNothingRan();
+});
+
+it('deletes an application volume backup schedule through the API', function () {
+    $backup = $this->volume->scheduledBackups()->create([
+        'team_id' => $this->team->id,
+        'frequency' => 'daily',
+    ]);
+
+    $this->withHeaders($this->headers)
+        ->deleteJson("/api/v1/applications/{$this->application->uuid}/storages/{$this->volume->uuid}/backups")
+        ->assertOk()
+        ->assertJsonPath('message', 'Storage backup schedule and archives deleted.');
+
+    expect($backup->fresh())->toBeNull();
+});
+
+it('sets and deletes database and service volume backup schedules through their storage APIs', function () {
     $database = StandalonePostgresql::create([
         'name' => 'api-postgres',
         'image' => 'postgres:17-alpine',
@@ -205,6 +248,16 @@ it('sets database and service volume backup schedules through their storage APIs
 
     expect($databaseVolume->scheduledBackups()->sole()->frequency)->toBe('daily')
         ->and($serviceVolume->scheduledBackups()->sole()->frequency)->toBe('weekly');
+
+    $this->withHeaders($this->headers)
+        ->deleteJson("/api/v1/databases/{$database->uuid}/storages/{$databaseVolume->uuid}/backups")
+        ->assertOk();
+    $this->withHeaders($this->headers)
+        ->deleteJson("/api/v1/services/{$service->uuid}/storages/{$serviceVolume->uuid}/backups")
+        ->assertOk();
+
+    expect($databaseVolume->scheduledBackups()->count())->toBe(0)
+        ->and($serviceVolume->scheduledBackups()->count())->toBe(0);
 });
 
 it('rejects ineligible file storages and invalid schedule settings', function () {

@@ -301,11 +301,11 @@ class VolumeBackups extends Component
             }
 
             if ($this->delete_backup_s3 && $execution->s3_uploaded && ! $execution->s3_storage_deleted) {
-                if (! $this->backup->s3) {
+                if (! $execution->s3) {
                     throw new \RuntimeException('The S3 storage is unavailable.');
                 }
 
-                deleteBackupsS3($execution->filename, $this->backup->s3);
+                deleteBackupsS3($execution->filename, $execution->s3);
             }
 
             $execution->delete();

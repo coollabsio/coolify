@@ -10101,6 +10101,39 @@ paths:
       security:
         -
           bearerAuth: []
+    delete:
+      tags:
+        - Applications
+      summary: 'Delete application storage backup schedule'
+      description: 'Delete the backup schedule and its local and S3 archives for an application storage.'
+      operationId: delete-application-storage-backup-schedule
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: storage_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Backup schedule and archives deleted.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: Forbidden.
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'Backup or recovery operation is still running.'
+      security:
+        -
+          bearerAuth: []
   '/databases/{uuid}/storages/{storage_uuid}/backups':
     put:
       tags:
@@ -10155,6 +10188,39 @@ paths:
       security:
         -
           bearerAuth: []
+    delete:
+      tags:
+        - Databases
+      summary: 'Delete database storage backup schedule'
+      description: 'Delete the backup schedule and its local and S3 archives for a database storage.'
+      operationId: delete-database-storage-backup-schedule
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: storage_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Backup schedule and archives deleted.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: Forbidden.
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'Backup or recovery operation is still running.'
+      security:
+        -
+          bearerAuth: []
   '/services/{uuid}/storages/{storage_uuid}/backups':
     put:
       tags:
@@ -10206,6 +10272,39 @@ paths:
           $ref: '#/components/responses/404'
         '422':
           $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Services
+      summary: 'Delete service storage backup schedule'
+      description: 'Delete the backup schedule and its local and S3 archives for a service storage.'
+      operationId: delete-service-storage-backup-schedule
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: storage_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Backup schedule and archives deleted.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: Forbidden.
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'Backup or recovery operation is still running.'
       security:
         -
           bearerAuth: []

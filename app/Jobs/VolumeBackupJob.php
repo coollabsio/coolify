@@ -334,25 +334,35 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private function removeExpiredBackups(Server $server): void
     {
-        $localExecutions = $this->backup->executions()
-            ->where('status', 'success')
-            ->where('local_storage_deleted', false)
-            ->get();
-        $localExecutions = $this->executionsOutsideRetention(
-            $localExecutions,
+        if ($this->hasRetentionLimits(
             $this->backup->retention_amount_locally,
             $this->backup->retention_days_locally,
             $this->backup->retention_max_storage_locally,
-        );
+        )) {
+            $localExecutions = $this->backup->executions()
+                ->where('status', 'success')
+                ->where('local_storage_deleted', false)
+                ->get();
+            $localExecutions = $this->executionsOutsideRetention(
+                $localExecutions,
+                $this->backup->retention_amount_locally,
+                $this->backup->retention_days_locally,
+                $this->backup->retention_max_storage_locally,
+            );
 
-        $filenames = $localExecutions->pluck('filename')->filter()->all();
-        if ($filenames !== []) {
-            deleteBackupsLocally($filenames, $server, throwError: true);
-            $this->backup->executions()->whereKey($localExecutions->pluck('id')->all())
-                ->update(['local_storage_deleted' => true]);
+            $filenames = $localExecutions->pluck('filename')->filter()->all();
+            if ($filenames !== []) {
+                deleteBackupsLocally($filenames, $server, throwError: true);
+                $this->backup->executions()->whereKey($localExecutions->pluck('id')->all())
+                    ->update(['local_storage_deleted' => true]);
+            }
         }
 
-        if ($this->backup->save_s3 && $this->backup->s3) {
+        if ($this->backup->save_s3 && $this->backup->s3 && $this->hasRetentionLimits(
+            $this->backup->retention_amount_s3,
+            $this->backup->retention_days_s3,
+            $this->backup->retention_max_storage_s3,
+        )) {
             $s3Executions = $this->backup->executions()
                 ->with('s3')
                 ->where('status', 'success')
@@ -387,6 +397,11 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $query->where('s3_storage_deleted', true)->orWhereNull('s3_uploaded');
             })
             ->delete();
+    }
+
+    private function hasRetentionLimits(int $amount, int $days, float $maxStorageGb): bool
+    {
+        return $amount > 0 || $days > 0 || $maxStorageGb > 0;
     }
 
     private function executionsOutsideRetention(Collection $executions, int $amount, int $days, float $maxStorageGb): Collection
