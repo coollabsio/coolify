@@ -33,17 +33,23 @@ class DashboardController extends Controller
         $currentTeam = $request->attributes->get('v5.currentTeam');
         $projects = $this->projects($currentTeam);
         [$selectedProject, $selectedEnvironment] = $this->selectedProjectAndEnvironment($request, $projects);
+        $applications = $this->applications($currentTeam, $selectedProject, $selectedEnvironment);
+        $requestedApplicationUuid = $request->query('application');
+        $selectedApplicationUuid = collect($applications)->contains(
+            fn (array $application): bool => $application['id'] === $requestedApplicationUuid
+        ) ? $requestedApplicationUuid : null;
 
         return Inertia::render('Dashboard', [
             'currentTeam' => $this->serializeCurrentTeam($currentTeam),
             'flux' => $fluxHealth->check(),
-            'applications' => $this->applications($currentTeam, $selectedProject, $selectedEnvironment),
+            'applications' => $applications,
             'caddyIngresses' => $this->caddyIngresses($currentTeam),
             'resourceConnections' => $this->resourceConnections($currentTeam, $selectedProject, $selectedEnvironment),
             'nginxServers' => $this->nginxServers($currentTeam),
             'projects' => $projects,
             'selectedProjectUuid' => $selectedProject['uuid'] ?? null,
             'selectedEnvironmentUuid' => $selectedEnvironment['uuid'] ?? null,
+            'selectedApplicationUuid' => $selectedApplicationUuid,
         ]);
     }
 

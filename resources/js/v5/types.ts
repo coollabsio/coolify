@@ -145,6 +145,7 @@ export type V5DashboardProps = {
     projects?: V5Project[];
     selectedProjectUuid?: string | null;
     selectedEnvironmentUuid?: string | null;
+    selectedApplicationUuid?: string | null;
 };
 
 export type SelectItemOption = {

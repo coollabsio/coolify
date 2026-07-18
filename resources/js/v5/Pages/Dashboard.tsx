@@ -90,6 +90,7 @@ export default function Dashboard({
     projects = [],
     selectedProjectUuid = null,
     selectedEnvironmentUuid = null,
+    selectedApplicationUuid = null,
 }: V5DashboardProps) {
     const [applications, setApplications] = useState<V5Application[]>(initialApplications);
     const [ingresses, setIngresses] = useState<V5CaddyIngress[]>(caddyIngresses);
@@ -175,11 +176,20 @@ export default function Dashboard({
         setIngresses(settledResources.ingresses);
         resetConnections(initialResourceConnections);
         setSelectedNginxServerId((currentServerId) => currentServerId || nginxServers[0]?.id || '');
-        setSelectedApplicationId(null);
-        setSelectedInspectorApplicationId(null);
+        const linkedApplicationExists = settledResources.applications.some((application) => application.id === selectedApplicationUuid);
+        setSelectedApplicationId(linkedApplicationExists ? selectedApplicationUuid : null);
+        setSelectedInspectorApplicationId(linkedApplicationExists ? selectedApplicationUuid : null);
         centerOnCanvasNodes(settledResources.applications, settledResources.ingresses);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [initialApplications, caddyIngresses, initialResourceConnections, nginxServers[0]?.id, selectedProjectUuid, selectedEnvironmentUuid]);
+    }, [
+        initialApplications,
+        caddyIngresses,
+        initialResourceConnections,
+        nginxServers[0]?.id,
+        selectedProjectUuid,
+        selectedEnvironmentUuid,
+        selectedApplicationUuid,
+    ]);
 
     useCanvasResourceMerge({
         teamId: currentTeam?.id ?? null,

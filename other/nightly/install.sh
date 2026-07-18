@@ -228,11 +228,12 @@ if [ "$WARNING_SPACE" = true ]; then
     sleep 5
 fi
 
-mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,sentinel}
+mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,sentinel,flux}
 mkdir -p /data/coolify/ssh/{keys,mux}
 mkdir -p /data/coolify/proxy/dynamic
 
 chown -R 9999:root /data/coolify
+chown -R 9999:root /data/coolify/flux
 chmod -R 700 /data/coolify
 
 INSTALLATION_LOG_WITH_DATE="/data/coolify/source/installation-${DATE}.log"

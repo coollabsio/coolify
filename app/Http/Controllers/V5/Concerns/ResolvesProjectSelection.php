@@ -34,8 +34,8 @@ trait ResolvesProjectSelection
      */
     protected function selectedProjectAndEnvironment(Request $request, array $projects): array
     {
-        $selectedProjectUuid = $request->session()->get(self::SELECTED_PROJECT_SESSION_KEY);
-        $selectedEnvironmentUuid = $request->session()->get(self::SELECTED_ENVIRONMENT_SESSION_KEY);
+        $selectedProjectUuid = $request->query('project', $request->session()->get(self::SELECTED_PROJECT_SESSION_KEY));
+        $selectedEnvironmentUuid = $request->query('environment', $request->session()->get(self::SELECTED_ENVIRONMENT_SESSION_KEY));
         $selectedProject = null;
 
         foreach ($projects as $project) {
@@ -58,6 +58,13 @@ trait ResolvesProjectSelection
         }
 
         $selectedEnvironment ??= $selectedProject['environments'][0] ?? null;
+
+        if ($request->query->has('project') || $request->query->has('environment')) {
+            $request->session()->put([
+                self::SELECTED_PROJECT_SESSION_KEY => $selectedProject['uuid'] ?? null,
+                self::SELECTED_ENVIRONMENT_SESSION_KEY => $selectedEnvironment['uuid'] ?? null,
+            ]);
+        }
 
         return [$selectedProject, $selectedEnvironment];
     }

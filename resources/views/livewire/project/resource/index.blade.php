@@ -91,6 +91,7 @@
                                             ->merge($env->clickhouses ?? collect());
                                         $envResources = collect()
                                             ->merge($env->applications->map(fn($app) => ['type' => 'application', 'resource' => $app]))
+                                            ->merge($env->v5Applications->map(fn($app) => ['type' => 'v5-application', 'resource' => $app]))
                                             ->merge($envDatabases->map(fn($db) => ['type' => 'database', 'resource' => $db]))
                                             ->merge($env->services->map(fn($svc) => ['type' => 'service', 'resource' => $svc]))
                                             ->sortBy(fn($item) => strtolower($item['resource']->name));
@@ -140,6 +141,7 @@
                                         ->merge($env->clickhouses ?? collect());
                                     $envResources = collect()
                                         ->merge($env->applications->map(fn($app) => ['type' => 'application', 'resource' => $app]))
+                                        ->merge($env->v5Applications->map(fn($app) => ['type' => 'v5-application', 'resource' => $app]))
                                         ->merge($envDatabases->map(fn($db) => ['type' => 'database', 'resource' => $db]))
                                         ->merge($env->services->map(fn($svc) => ['type' => 'service', 'resource' => $svc]));
                                 @endphp
@@ -157,6 +159,11 @@
                                                     $resType = $envResource['type'];
                                                     $res = $envResource['resource'];
                                                     $resRoute = match ($resType) {
+                                                        'v5-application' => route('v5.dashboard', [
+                                                            'project' => $project->uuid,
+                                                            'environment' => $env->uuid,
+                                                            'application' => $res->uuid,
+                                                        ]),
                                                         'application' => route('project.application.configuration', [
                                                             'project_uuid' => $project->uuid,
                                                             'environment_uuid' => $env->uuid,
@@ -233,10 +240,15 @@
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredApplications" :key="item.uuid">
                     <span>
-                        <a class="h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
+                        <a class="h-24 coolbox group" :href="item.hrefLink"
+                            @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
+                            {{ wireNavigate() }}>
                             <div class="flex flex-col w-full">
                                 <div class="flex gap-2 px-4">
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
+                                    <template x-if="item.version === 'v5'">
+                                        <span class="badge">V5</span>
+                                    </template>
                                     <div class="flex-1"></div>
                                     <template x-if="item.status.startsWith('running')">
                                         <div title="running" class="bg-success badge-dashboard"></div>
@@ -271,9 +283,9 @@
                                 <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
                                 </a>
                             </template>
-                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
-                                Add tag
-                            </a>
+                            <template x-if="item.version !== 'v5'">
+                                <a :href="`${item.hrefLink}/tags`" class="add-tag">Add tag</a>
+                            </template>
                         </div>
                     </span>
                 </template>

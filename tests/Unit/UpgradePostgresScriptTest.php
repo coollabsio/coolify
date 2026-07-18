@@ -56,6 +56,19 @@ it('generates a dedicated flux laravel api token during install and upgrade', fu
     'nightly upgrade' => 'other/nightly/upgrade.sh',
 ]);
 
+it('creates a writable flux storage directory during install and upgrade', function (string $path) {
+    $script = file_get_contents(getcwd().'/'.$path);
+
+    expect($script)
+        ->toContain('/data/coolify/flux')
+        ->toContain('chown -R 9999:root /data/coolify/flux');
+})->with([
+    'stable install' => 'scripts/install.sh',
+    'nightly install' => 'other/nightly/install.sh',
+    'stable upgrade' => 'scripts/upgrade.sh',
+    'nightly upgrade' => 'other/nightly/upgrade.sh',
+]);
+
 it('uses the selected registry url when extracting upgrade images', function (string $path) {
     $script = file_get_contents(getcwd().'/'.$path);
 

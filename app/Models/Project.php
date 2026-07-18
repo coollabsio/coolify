@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\V5\Application as V5Application;
+use App\Models\V5\ResourceConnection as V5ResourceConnection;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -144,7 +146,9 @@ class Project extends BaseModel
 
     public function isEmpty()
     {
-        return $this->applications()->count() == 0 &&
+        return ! V5Application::query()->where('project_id', $this->id)->exists() &&
+            ! V5ResourceConnection::query()->where('project_id', $this->id)->exists() &&
+            $this->applications()->count() == 0 &&
             $this->redis()->count() == 0 &&
             $this->postgresqls()->count() == 0 &&
             $this->mysqls()->count() == 0 &&

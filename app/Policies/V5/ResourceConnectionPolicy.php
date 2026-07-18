@@ -9,6 +9,13 @@ use Illuminate\Auth\Access\Response;
 
 class ResourceConnectionPolicy
 {
+    public function create(User $user, Team $team): Response
+    {
+        return $user->isAdminOfTeam($team->id)
+            ? Response::allow()
+            : Response::deny('You do not have permission to manage resource connections in this team.');
+    }
+
     /**
      * Determine whether the user can update the connection within the current team.
      */

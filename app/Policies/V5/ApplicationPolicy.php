@@ -9,6 +9,13 @@ use Illuminate\Auth\Access\Response;
 
 class ApplicationPolicy
 {
+    public function create(User $user, Team $team): Response
+    {
+        return $user->isAdminOfTeam($team->id)
+            ? Response::allow()
+            : Response::deny('You do not have permission to manage applications in this team.');
+    }
+
     /**
      * Determine whether the user can view the application within the current team.
      *

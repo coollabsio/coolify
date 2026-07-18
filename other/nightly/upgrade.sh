@@ -171,6 +171,9 @@ else
     log "Network 'coolify' already exists"
 fi
 
+mkdir -p /data/coolify/flux
+chown -R 9999:root /data/coolify/flux
+
 # Check if Docker config file exists
 DOCKER_CONFIG_MOUNT=""
 if [ -f /root/.docker/config.json ]; then

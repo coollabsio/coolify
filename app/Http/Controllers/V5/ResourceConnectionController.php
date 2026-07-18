@@ -35,6 +35,7 @@ class ResourceConnectionController extends Controller
     public function store(Request $request): JsonResponse
     {
         $currentTeam = $this->currentTeamOrFail($request);
+        $this->authorize('create', [ResourceConnection::class, $currentTeam]);
         $projects = $this->projects($currentTeam);
         [$selectedProject, $selectedEnvironment] = $this->selectedProjectAndEnvironment($request, $projects);
 

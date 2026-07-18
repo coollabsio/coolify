@@ -51,6 +51,7 @@ class ApplicationController extends Controller
     public function store(Request $request): JsonResponse
     {
         $currentTeam = $this->currentTeamOrFail($request);
+        $this->authorize('create', [V5Application::class, $currentTeam]);
         $projects = $this->projects($currentTeam);
         [$selectedProject, $selectedEnvironment] = $this->selectedProjectAndEnvironment($request, $projects);
 

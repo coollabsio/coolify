@@ -230,6 +230,8 @@ it('denies application mutations for a member of the current team as forbidden',
     $member = v5PolicyMemberUser();
     $policy = new ApplicationPolicy;
 
+    expect($policy->create($member, $team)->denied())->toBeTrue();
+
     foreach (['update', 'updateIngress', 'delete'] as $ability) {
         $response = $policy->{$ability}($member, $application, $team);
 
@@ -244,10 +246,20 @@ it('denies resource connection mutations for a member of the current team as for
     $member = v5PolicyMemberUser();
     $policy = new ResourceConnectionPolicy;
 
+    expect($policy->create($member, $team)->denied())->toBeTrue();
+
     foreach (['update', 'delete'] as $ability) {
         $response = $policy->{$ability}($member, $connection, $team);
 
         expect($response->denied())->toBeTrue()
             ->and($response->status())->toBeNull();
     }
+});
+
+it('allows admins to create applications and resource connections', function () {
+    $team = v5PolicyTeam(10);
+    $admin = v5PolicyUser('admin');
+
+    expect((new ApplicationPolicy)->create($admin, $team)->allowed())->toBeTrue()
+        ->and((new ResourceConnectionPolicy)->create($admin, $team)->allowed())->toBeTrue();
 });

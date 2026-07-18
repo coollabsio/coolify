@@ -3,6 +3,7 @@
 use App\Events\V5RealtimeTestEvent;
 use App\Models\Team;
 use App\Models\User;
+use App\Models\V5\Application;
 use App\Models\V5\Application as V5Application;
 use App\Models\V5\Server as V5Server;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -354,6 +355,36 @@ it('shares existing projects and environments with the v5 dashboard page', funct
         ->assertDontSee($otherProject->uuid)
         ->assertDontSee($otherEnvironment->name)
         ->assertDontSee($otherEnvironment->uuid);
+});
+
+it('opens a linked v5 application in its project and environment', function () {
+    $this->withoutVite();
+    fakeFluxHealth();
+    createSharedUserAndTeamTables();
+
+    [$user, $team] = createV5UserWithTeam();
+    [$project, $environment] = createV5ProjectWithEnvironment($team, 'linked-project', 'production');
+    $application = Application::query()->create([
+        'team_id' => $team->id,
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'linked-nginx',
+        'image' => 'nginx:alpine',
+        'container_name' => 'linked-v5-nginx',
+    ]);
+
+    $this->actingAs($user)
+        ->withSession(['currentTeam' => $team])
+        ->get(route('v5.dashboard', [
+            'project' => $project->uuid,
+            'environment' => $environment->uuid,
+            'application' => $application->uuid,
+        ]))
+        ->assertSuccessful()
+        ->assertSee('"selectedProjectUuid":"'.$project->uuid.'"', false)
+        ->assertSee('"selectedEnvironmentUuid":"'.$environment->uuid.'"', false)
+        ->assertSee('"selectedApplicationUuid":"'.$application->uuid.'"', false);
 });
 
 it('persists the selected v5 project and environment in the session', function () {
