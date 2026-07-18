@@ -1237,6 +1237,12 @@ class ApplicationsController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
+        if (! $server->canHostResources()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['server_uuid' => ['The specified server is configured as a build server and cannot host resources.']],
+            ], 422);
+        }
         $destinations = $server->destinations();
         if ($destinations->count() == 0) {
             return response()->json(['message' => 'Server has no destinations.'], 400);

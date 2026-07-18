@@ -25,13 +25,13 @@
                                 @foreach ($servers->sortBy('id') as $server)
                                     @foreach ($server->destinations() as $destination)
                                         <tr class="cursor-pointer hover:bg-coolgray-50 dark:hover:bg-coolgray-200"
-                                            wire:click="selectServer('{{ $server->id }}', '{{ $destination->id }}')">
+                                            wire:click="selectServer('{{ $server->id }}', '{{ $destination->uuid }}')">
                                             <td class="px-5 py-4 text-sm whitespace-nowrap dark:text-white"
-                                                :class="'{{ $selectedDestination === $destination->id }}' ?
+                                                :class="'{{ $selectedDestination === $destination->uuid }}' ?
                                                 'bg-coollabs text-white' : 'dark:bg-coolgray-100 bg-white'">
                                                 {{ $server->name }}</td>
                                             <td class="px-5 py-4 text-sm whitespace-nowrap dark:text-white "
-                                                :class="'{{ $selectedDestination === $destination->id }}' ?
+                                                :class="'{{ $selectedDestination === $destination->uuid }}' ?
                                                 'bg-coollabs text-white' : 'dark:bg-coolgray-100 bg-white'">
                                                 {{ $destination->name }}
                                             </td>

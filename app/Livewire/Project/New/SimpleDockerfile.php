@@ -38,7 +38,7 @@ CMD ["nginx", "-g", "daemon off;"]
             'dockerfile' => 'required',
         ]);
         $destination_uuid = $this->query['destination'] ?? null;
-        $destination = find_destination_for_current_team($destination_uuid);
+        $destination = find_resource_destination_for_current_team($destination_uuid);
         if (! $destination) {
             throw new \Exception('Destination not found.');
         }
@@ -51,7 +51,7 @@ CMD ["nginx", "-g", "daemon off;"]
         if (! $port) {
             $port = 80;
         }
-        $application = Application::create([
+        $application = new Application([
             'name' => 'dockerfile-'.new_public_id(),
             'repository_project_id' => 0,
             'git_repository' => 'coollabsio/coolify',
@@ -66,6 +66,7 @@ CMD ["nginx", "-g", "daemon off;"]
             'source_id' => 0,
             'source_type' => GithubApp::class,
         ]);
+        $application->save();
 
         $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
         $application->update([
