@@ -97,6 +97,10 @@
                         helper="Comma separated list of databases to backup. Empty will include the default one."
                         id="databasesToBackup" />
                 @endif
+            @elseif($backup->database_type === 'App\Models\StandaloneClickhouse')
+                <x-forms.input label="Databases To Backup"
+                    helper="Comma separated list of databases to backup. Empty will include the default one."
+                    id="databasesToBackup" />
             @endif
         </div>
         <div class="grid grid-cols-1 gap-2 md:grid-cols-3">

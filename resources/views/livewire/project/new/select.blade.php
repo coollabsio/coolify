@@ -433,28 +433,40 @@
                     server. <a class="underline dark:text-white" href="/servers" {{ wireNavigate() }}>
                         Go to servers page
                     </a> </div>
-            @else
-                @forelse($servers as $server)
-                    <div class="w-full coolbox group" wire:click="setServer({{ $server }})">
-                        <div class="flex flex-col mx-6">
-                            <div class="box-title">
-                                {{ $server->name }}
-                            </div>
-                            <div class="box-description">
-                                {{ $server->description }}
-                            </div>
+            @endif
+            @forelse($servers as $server)
+                <div class="w-full coolbox group" wire:click="setServer({{ $server }})">
+                    <div class="flex flex-col mx-6">
+                        <div class="box-title">
+                            {{ $server->name }}
+                        </div>
+                        <div class="box-description">
+                            {{ $server->description }}
                         </div>
                     </div>
-                @empty
+                </div>
+            @empty
+                @if ($buildServers?->isEmpty() && ! $onlyBuildServerAvailable)
                     <div>
-
                         <div>No validated & reachable servers found. <a class="underline dark:text-white"
                                 href="/servers" {{ wireNavigate() }}>
                                 Go to servers page
                             </a></div>
                     </div>
-                @endforelse
-            @endif
+                @endif
+            @endforelse
+            @foreach($buildServers ?? [] as $buildServer)
+                <div class="w-full coolbox opacity-60 cursor-not-allowed">
+                    <div class="flex flex-col mx-6">
+                        <div class="box-title">{{ $buildServer->name }}</div>
+                        <div class="box-description">
+                            This server is configured as a build server and cannot host resources.
+                            <a class="underline dark:text-white" href="{{ route('server.show', ['server_uuid' => $buildServer->uuid]) }}"
+                                {{ wireNavigate() }}>Change server settings</a>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
         </div>
     @endif
     @if ($current_step === 'destinations')

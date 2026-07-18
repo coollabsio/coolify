@@ -489,6 +489,7 @@ class General extends Component
             if ($this->isContainerLabelReadonlyEnabled) {
                 $this->resetDefaultLabels(false);
             }
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

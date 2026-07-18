@@ -102,6 +102,26 @@ describe('GET /api/v1/servers/{server_uuid}/destinations', function () {
 });
 
 describe('POST /api/v1/servers/{server_uuid}/destinations', function () {
+    test('creates a standalone destination', function () {
+        $response = $this->withHeaders(destinationsApiHeaders($this->bearerToken))
+            ->postJson("/api/v1/servers/{$this->server->uuid}/destinations", [
+                'name' => 'API Standalone',
+                'network' => 'api-standalone-network',
+            ]);
+
+        $response->assertCreated()
+            ->assertJson([
+                'name' => 'API Standalone',
+                'network' => 'api-standalone-network',
+                'type' => 'standalone',
+                'server_uuid' => $this->server->uuid,
+            ]);
+
+        expect(StandaloneDocker::where('server_id', $this->server->id)
+            ->where('network', 'api-standalone-network')
+            ->exists())->toBeTrue();
+    });
+
     test('requires a write token', function () {
         $readOnlyToken = destinationsApiToken($this->user, $this->team, ['read']);
 

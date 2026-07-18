@@ -196,3 +196,24 @@ it('rejects an invalid token without dispatching', function () use ($running) {
 
     Queue::assertNotPushed(PushServerUpdateJob::class);
 });
+
+it('dispatches a complete snapshot after an identical partial snapshot', function () use ($running) {
+    $partialPayload = sentinelPayload($running()) + [
+        'snapshot' => [
+            'version' => 1,
+            'complete' => false,
+        ],
+    ];
+
+    $completePayload = sentinelPayload($running()) + [
+        'snapshot' => [
+            'version' => 1,
+            'complete' => true,
+        ],
+    ];
+
+    pushSentinel($this->token, $partialPayload)->assertOk();
+    pushSentinel($this->token, $completePayload)->assertOk();
+
+    Queue::assertPushed(PushServerUpdateJob::class, 2);
+});

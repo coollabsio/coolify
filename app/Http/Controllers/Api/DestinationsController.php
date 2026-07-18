@@ -10,6 +10,7 @@ use App\Models\SwarmDocker;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class DestinationsController extends Controller
 {
@@ -59,6 +60,22 @@ class DestinationsController extends Controller
             ?? SwarmDocker::with('server:id,uuid,team_id')->whereHas('server', fn ($query) => $query->whereTeamId($teamId))->whereUuid($uuid)->firstOrFail();
     }
 
+    #[OA\Get(
+        summary: 'List destinations',
+        description: 'List all Docker network destinations for the authenticated team.',
+        path: '/destinations',
+        operationId: 'list-destinations',
+        security: [['bearerAuth' => []]],
+        tags: ['Destinations'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Destinations for the authenticated team.',
+                content: new OA\JsonContent(type: 'array', items: new OA\Items(ref: '#/components/schemas/Destination')),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+        ],
+    )]
     public function index(Request $request): JsonResponse
     {
         $teamId = $this->teamIdOrAbort();
@@ -74,6 +91,26 @@ class DestinationsController extends Controller
         );
     }
 
+    #[OA\Get(
+        summary: 'List destinations by server',
+        description: 'List Docker network destinations attached to a server owned by the authenticated team.',
+        path: '/servers/{server_uuid}/destinations',
+        operationId: 'list-server-destinations',
+        security: [['bearerAuth' => []]],
+        tags: ['Destinations'],
+        parameters: [
+            new OA\Parameter(name: 'server_uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Destinations attached to the server.',
+                content: new OA\JsonContent(type: 'array', items: new OA\Items(ref: '#/components/schemas/Destination')),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ],
+    )]
     public function index_by_server(Request $request, string $server_uuid): JsonResponse
     {
         $teamId = $this->teamIdOrAbort();
@@ -89,6 +126,26 @@ class DestinationsController extends Controller
         return response()->json($list->map(fn ($destination) => $this->transform($destination))->values());
     }
 
+    #[OA\Get(
+        summary: 'Get destination',
+        description: 'Get a Docker network destination by UUID.',
+        path: '/destinations/{uuid}',
+        operationId: 'get-destination-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Destinations'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Destination UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Destination details.',
+                content: new OA\JsonContent(ref: '#/components/schemas/Destination'),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ],
+    )]
     public function show(Request $request, string $uuid): JsonResponse
     {
         $teamId = $this->teamIdOrAbort();
@@ -100,6 +157,40 @@ class DestinationsController extends Controller
         return response()->json($this->transform($destination));
     }
 
+    #[OA\Post(
+        summary: 'Create destination',
+        description: 'Create a Docker network destination on a server owned by the authenticated team.',
+        path: '/servers/{server_uuid}/destinations',
+        operationId: 'create-server-destination',
+        security: [['bearerAuth' => []]],
+        tags: ['Destinations'],
+        parameters: [
+            new OA\Parameter(name: 'server_uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['network'],
+                properties: [
+                    new OA\Property(property: 'name', type: 'string', maxLength: 255),
+                    new OA\Property(property: 'network', type: 'string', maxLength: 255, pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'),
+                    new OA\Property(property: 'type', type: 'string', enum: ['standalone', 'swarm']),
+                ],
+                type: 'object',
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Destination created.',
+                content: new OA\JsonContent(ref: '#/components/schemas/Destination'),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 409, description: 'A destination with this network already exists.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ],
+    )]
     public function create(Request $request, string $server_uuid): JsonResponse
     {
         $teamId = $this->teamIdOrAbort();
@@ -183,6 +274,32 @@ class DestinationsController extends Controller
             || in_array($driverCode, ['19', '1062', '2067'], true);
     }
 
+    #[OA\Delete(
+        summary: 'Delete destination',
+        description: 'Delete an unused Docker network destination.',
+        path: '/destinations/{uuid}',
+        operationId: 'delete-destination-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Destinations'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Destination UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Destination deleted.',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Deleted.'),
+                    ],
+                    type: 'object',
+                ),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 409, description: 'Destination has attached resources.'),
+        ],
+    )]
     public function delete(Request $request, string $uuid): JsonResponse
     {
         $teamId = $this->teamIdOrAbort();

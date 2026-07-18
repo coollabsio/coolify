@@ -136,7 +136,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         $this->validate();
         try {
             $destination_uuid = $this->query['destination'] ?? null;
-            $destination = find_destination_for_current_team($destination_uuid);
+            $destination = find_resource_destination_for_current_team($destination_uuid);
             if (! $destination) {
                 throw new \Exception('Destination not found.');
             }
@@ -185,7 +185,8 @@ class GithubPrivateRepositoryDeployKey extends Component
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
                 $application_init['base_directory'] = $this->base_directory;
             }
-            $application = Application::create($application_init);
+            $application = new Application($application_init);
+            $application->save();
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
 
