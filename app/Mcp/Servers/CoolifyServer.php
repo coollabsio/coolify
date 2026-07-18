@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Servers;
 
+use App\Mcp\Tools\Control;
 use App\Mcp\Tools\GetApplication;
 use App\Mcp\Tools\GetDatabase;
 use App\Mcp\Tools\GetInfrastructureOverview;
@@ -21,12 +22,13 @@ class CoolifyServer extends Server
     protected string $version = '0.1.0';
 
     protected string $instructions = <<<'MD'
-Read-only MCP server for Coolify, scoped to the authenticated team token.
+MCP server for Coolify, scoped to the authenticated team token.
 
 Recommended workflow:
 1. get_infrastructure_overview — start here; single call returns all servers, projects with resource counts, and aggregates.
 2. list_servers / list_projects / list_applications / list_databases / list_services — paginated summary listings (default 50 per page, cap 100).
 3. get_server / get_application / get_database / get_service — full details for a single UUID.
+4. control — start, stop, or restart an application, standalone database, or service resource by UUID.
 
 Every response is `{ data, _actions?, _pagination? }`. `_actions` suggests the next tool + args; `_pagination.next` is the args to call again for the next page.
 MD;
@@ -42,9 +44,11 @@ MD;
         GetDatabase::class,
         ListServices::class,
         GetService::class,
+        Control::class,
     ];
 
     protected array $resources = [];
 
     protected array $prompts = [];
 }
+
